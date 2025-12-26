@@ -1,0 +1,2167 @@
+.. title:: CONJUNCTION DATA MESSAGE
+
+.. rubric:: RECOMMENDED STANDARD
+
+.. centered:: CCSDS 508.0-B-1
+
+.. centered:: BLUE BOOK
+.. centered:: June 2013
+
+.. centered::
+   Note:
+   This current
+   issue includes
+   all updates through
+   Technical Corrigendum 2,
+   dated October 2021
+
+
+AUTHORITY
+=========
+
+.. table::
+   :align: center
+
+   +----------+--------------------------------+
+   | Issue:   | Recommended Standard, Issue 1  |
+   +----------+--------------------------------+
+   | Date:    | June 2013                      |
+   +----------+--------------------------------+
+   | Location:| Washington, DC, USA            |
+   +----------+--------------------------------+
+
+This document has been approved for publication by the Management Council of the
+Consultative Committee for Space Data Systems (CCSDS) and represents the consensus
+technical agreement of the participating CCSDS Member Agencies. The procedure for
+review and authorization of CCSDS documents is detailed in Organization and Processes for
+the Consultative Committee for Space Data Systems (CCSDS A02.1-Y-3), and the record of
+Agency participation in the authorization of this document can be obtained from the CCSDS
+Secretariat at the address below.
+
+This document is published and maintained by:
+
+   CCSDS Secretariat
+   Space Communications and Navigation Office, 7L70
+   Space Operations Mission Directorate
+   NASA Headquarters
+   Washington, DC 20546-0001, USA
+
+
+STATEMENT OF INTENT
+===================
+
+The Consultative Committee for Space Data Systems (CCSDS) is an organization officially
+established by the management of its members. The Committee meets periodically to address
+data systems problems that are common to all participants, and to formulate sound technical
+solutions to these problems. Inasmuch as participation in the CCSDS is completely
+voluntary, the results of Committee actions are termed Recommended Standards and are
+not considered binding on any Agency.
+
+This Recommended Standard is issued by, and represents the consensus of, the CCSDS
+members. Endorsement of this Recommendation is entirely voluntary. Endorsement,
+however, indicates the following understandings:
+
+-  Whenever a member establishes a CCSDS-related standard, this standard will be in
+   accord with the relevant Recommended Standard. Establishing such a standard
+   does not preclude other provisions which a member may develop.
+-  Whenever a member establishes a CCSDS-related standard, that member will
+   provide other CCSDS members with the following information:
+
+   -  The standard itself.
+   -  The anticipated date of initial operational capability.
+   -  The anticipated duration of operational service.
+
+-  Specific service arrangements shall be made via memoranda of agreement. Neither
+   this Recommended Standard nor any ensuing standard is a substitute for a
+   memorandum of agreement.
+
+No later than three years from its date of issuance, this Recommended Standard will be
+reviewed by the CCSDS to determine whether it should: (1) remain in effect without change;
+(2) be changed to reflect the impact of new technologies, new requirements, or new
+directions; or (3) be retired or canceled.
+
+In those instances when a new version of a Recommended Standard is issued, existing
+CCSDS-related member standards and implementations are not negated or deemed to be
+non-CCSDS compatible. It is the responsibility of each member to determine when such
+standards or implementations are to be modified. Each member is, however, strongly
+encouraged to direct planning for its new standards and implementations towards the later
+version of the Recommended Standard.
+
+
+FOREWORD
+========
+
+This document is a Recommended Standard for Conjunction Data Messages (CDMs) and has
+been prepared by the CCSDS. The CDM described in this Recommended Standard is the
+baseline concept for conjunction information interchange applications between interested
+parties.
+
+This Recommended Standard establishes a common framework and provides a common
+basis for the format of conjunction information exchange between originators of conjunction
+assessment data and satellite owner/operators. It allows implementing organizations within
+each conjunction assessment originator to proceed coherently with the development of
+compatible derived standards for the flight and ground systems that are within their
+cognizance. Derived Agency standards can implement only a subset of the optional features
+allowed by the Recommended Standard and can incorporate features not addressed by this
+Recommended Standard.
+
+Attention is drawn to the possibility that some of the elements of this document may be the
+subject of patent rights. CCSDS shall not be held responsible for identifying any or all such
+patent rights.
+
+Through the process of normal evolution, it is expected that expansion, deletion, or
+modification of this document may occur. This Recommended Standard is therefore subject
+to CCSDS document management and change control procedures, which are defined in
+Organization and Processes for the Consultative Committee for Space Data Systems
+(CCSDS A02.1-Y-3). Current versions of CCSDS documents are maintained at the CCSDS
+Web site:
+
+   http://www.ccsds.org/
+
+Questions relating to the contents or status of this document should be addressed to the
+CCSDS Secretariat at the address indicated on page i.
+
+
+At time of publication, the active Member and Observer Agencies of the CCSDS were:
+
+Member Agencies
+---------------
+
+-  Agenzia Spaziale Italiana (ASI)/Italy.
+-  Canadian Space Agency (CSA)/Canada.
+-  Centre National d'Etudes Spatiales (CNES)/France.
+-  China National Space Administration (CNSA)/People's Republic of China.
+-  Deutsches Zentrum für Luft- und Raumfahrt e. V. (DLR)/Germany.
+-  European Space Agency (ESA)/Europe.
+-  Federal Space Agency (FSA)/Russian Federation.
+-  Instituto Nacional de Pesquisas Espaciais (INPE)/Brazil.
+-  Japan Aerospace Exploration Agency (JAXA)/Japan.
+-  National Aeronautics and Space Administration (NASA)/USA.
+-  UK Space Agency/United Kingdom.
+
+Observer Agencies
+-----------------
+
+-  Austrian Space Agency (ASA)/Austria.
+-  Belgian Federal Science Policy Office (BFSPO)/Belgium.
+-  Central Research Institute of Machine Building (TsNIIMash)/Russian Federation.
+-  China Satellite Launch and Tracking Control General, Beijing Institute of Tracking
+   and Telecommunications Technology (CLTC/BITTT)/China.
+-  Chinese Academy of Sciences (CAS)/China.
+-  Chinese Academy of Space Technology (CAST)/China.
+-  Commonwealth Scientific and Industrial Research Organization (CSIRO)/Australia.
+-  CSIR Satellite Applications Centre (CSIR)/Republic of South Africa.
+-  Danish National Space Center (DNSC)/Denmark.
+-  Departamento de Ciência e Tecnologia Aeroespacial (DCTA)/Brazil.
+-  European Organization for the Exploitation of Meteorological Satellites
+   (EUMETSAT)/Europe.
+-  European Telecommunications Satellite Organization (EUTELSAT)/Europe.
+-  Geo-Informatics and Space Technology Development Agency (GISTDA)/Thailand.
+-  Hellenic National Space Committee (HNSC)/Greece.
+-  Indian Space Research Organization (ISRO)/India.
+-  Institute of Space Research (IKI)/Russian Federation.
+-  KFKI Research Institute for Particle & Nuclear Physics (KFKI)/Hungary.
+-  Korea Aerospace Research Institute (KARI)/Korea.
+-  Ministry of Communications (MOC)/Israel.
+-  National Institute of Information and Communications Technology (NICT)/Japan.
+-  National Oceanic and Atmospheric Administration (NOAA)/USA.
+-  National Space Agency of the Republic of Kazakhstan (NSARK)/Kazakhstan.
+-  National Space Organization (NSPO)/Chinese Taipei.
+- Naval Center for Space Technology (NCST)/USA.
+-  Scientific and Technological Research Council of Turkey (TUBITAK)/Turkey.
+-  Space and Upper Atmosphere Research Commission (SUPARCO)/Pakistan.
+-  Swedish Space Corporation (SSC)/Sweden.
+-  United States Geological Survey (USGS)/USA.
+
+DOCUMENT CONTROL
+================
+
+.. list-table::
+   :widths: 25 25 25 25
+   :header-rows: 1
+
+   * - Document
+     - Title
+     - Date
+     - Status
+   * - CCSDS 508.0-B-1
+     - Conjunction Data Message, Recommended Standard, Issue 1
+     - June 2013
+     - Current issue
+   * - CCSDS 508.0-B-1 EC 1
+     - Editorial change 1
+     - March 2014
+     - Corrects broken hyperlinks; updates references to superseded documents; updates obsolete style elements.
+   * - CCSDS 508.0-B-1 EC 2
+     - Editorial change 2
+     - February 2018
+     - Addresses minor typographical and layout issues.
+   * - CCSDS 508.0-B-1 Cor. 1
+     - Technical Corrigendum 1
+     - June 2018
+     - Adds direction to use Space Assigned Numbers Authority (SANA) registry values.
+   * - CCSDS 508.0-B-1 Cor. 2
+     - Technical Corrigendum 2
+     - October 2021
+     - Adds specifications and examples for messages with elements qualified with respect to a namespace.
+
+
+.. _introduction_cdm:
+
+1 INTRODUCTION
+==============
+
+.. _introduction_purpose_and_scope_cdm:
+
+1.1 PURPOSE AND SCOPE
+---------------------
+
+This Conjunction Data Message (CDM) Recommended Standard specifies a standard
+message format for use in exchanging spacecraft conjunction information between
+originators of Conjunction Assessments (CAs) and satellite owner/operators and other
+authorized parties. Such exchanges are used to inform satellite owner/operators of
+conjunctions between objects in space to enable consistent warning by different
+organizations employing diverse CA techniques.
+
+This Recommended Standard will:
+
+a) facilitate interoperability and enable consistent warning between data originators who
+   supply CA and the satellite owner/operators who use it;
+b) facilitate automation for the CA processes; and
+c) provide critical information to enable timely CA decisions.
+
+This document includes requirements and criteria that the message format has been designed
+to meet (see annex D). Also included are informative descriptions of conjunction information
+pertinent to performing CA (see annex E).
+
+.. _introduction_applicability_cdm:
+
+1.2 APPLICABILITY
+-----------------
+
+This Recommended Standard is applicable to satellite operations in all environments in
+which close approaches and collisions among satellites are concerns. It contains the
+specification for a CDM designed for applications involving conjunction information
+interchange between originators of CAs and recipients. Conjunction information includes
+data types such as miss distance, probability of collision, Time of Closest Approach (TCA),
+and closest approach relative position and velocity. Further information describing the
+conjunction information contained in this message can be found in section 3 and annex E.
+
+This message is suited for exchanges that involve manual or automated interaction. The
+attributes of a CDM make it suitable for use in machine-to-machine interfaces because of the
+large amount of data typically present. The CDM is self contained. However, additional
+information could be specified in an Interface Control Document (ICD) written jointly by the
+service originator and recipients.
+
+It is desirable that CDM originators maintain consistency with respect to the optional
+keywords provided in their implementations; i.e., it is desirable that the composition of the
+CDMs provided not change on a frequent basis.
+
+This Recommended Standard is applicable only to the message format and content, but not to
+its transmission nor to the algorithms used to produce the data within. The method of
+transmitting the message between exchange partners is beyond the scope of this document
+and could be specified in an ICD.
+
+The methods used to predict conjunctions and calculate the probability of collision, and the
+definition of the conjunction assessment accuracy underlying a particular CDM, are also
+outside the scope of this Recommended Standard (the interested reader can consult
+references in annex F).
+
+.. _introduction_document_structure_cdm:
+
+1.3 DOCUMENT STRUCTURE
+----------------------
+
+Section 2 provides a brief overview of the CCSDS-recommended CDM.
+
+Section 3 provides details about the structure and content of the CDM in ‘Keyword = Value
+Notation' (KVN).
+
+Section 4 provides details about the structure and content of the CDM in eXtensible Markup
+Language (XML).
+
+Section 5 addresses the CDM data in general.
+
+Section 6 discusses the syntax considerations of the CDM.
+
+Annex A contains an Implementation Conformance Statement (ICS) proforma that may be
+used by implementers to compactly describe their implementations.
+
+Annex B provides information on security, the Space Assigned Numbers Authority (SANA),
+and patent-related information.
+
+Annex C is a list of abbreviations and acronyms applicable to the CDM.
+
+Annex D provides rationale and requirements for the CDM Recommended Standard.
+
+Annex E provides a description of the CA information contained in the CDM.
+
+Annex F provides informative references.
+
+.. _introduction_conventions_and_definitions_cdm:
+
+1.4 CONVENTIONS AND DEFINITIONS
+-------------------------------
+
+.. _introduction_notation_cdm:
+
+1.4.1 NOTATION
+^^^^^^^^^^^^^^
+
+.. _introduction_unit_notations_cdm:
+
+1.4.1.1 Unit Notations
+""""""""""""""""""""""
+
+The following conventions for unit notations apply throughout this Recommended Standard.
+Insofar as possible, an effort has been made to use units that are part of the International
+System of Units (SI); units are either SI base units, SI derived units, or units outside the SI
+that are accepted for use with the SI (see reference [1]). The units used within this document
+are as follows:
+
+-  km: kilometers;
+-  m: meters;
+-  d: days, 86400 SI seconds;
+-  s: SI seconds;
+-  kg: kilograms;
+-  W: watts;
+-  %: percent.
+
+.. _introduction_general_notation_cdm:
+
+1.4.1.2 General
+"""""""""""""""
+
+The following notational conventions are used in this document:
+
+a) multiplication of units is denoted with a single asterisk ‘*’ (e.g., ‘kg*s’);
+b) exponents of units are denoted with a double asterisk ‘**’ (e.g., m\ :sup:`2` = m**2);
+c) division of units is denoted with a single forward slash ‘/’ (e.g., m/s).
+
+.. _introduction_nomenclature_cdm:
+
+1.4.2 NOMENCLATURE
+^^^^^^^^^^^^^^^^^^
+
+.. _introduction_general_nomenclature_cdm:
+
+1.4.2.1 General
+"""""""""""""""
+
+The CDM contains information about a conjunction between two space objects (hereafter
+referred to as 'Object1' and 'Object2').
+
+.. _introduction_normative_text_cdm:
+
+1.4.2.2 Normative Text
+""""""""""""""""""""""
+
+The following conventions apply for the normative specifications in this Recommended
+Standard:
+
+a) the words 'shall' and 'must' imply a binding and verifiable specification;
+b) the word 'should' implies an optional, but desirable, specification;
+c) the word 'may' implies an optional specification;
+d) the words 'is', 'are', and 'will' imply statements of fact.
+
+.. NOTE::
+   These conventions do not imply constraints on diction in text that is clearly
+   informative in nature.
+
+.. _introduction_informative_text_cdm:
+
+1.4.2.3 Informative Text
+""""""""""""""""""""""""
+
+In the normative sections of this document (sections 3-6), informative text is set off from the
+normative specifications either in notes or under one of the following subsection headings:
+
+-  Overview;
+-  Discussion.
+
+.. _introduction_other_conventions_cdm:
+
+1.4.3 OTHER CONVENTIONS
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _introduction_terminology_cdm:
+
+1.4.3.1 Terminology
+"""""""""""""""""""""
+
+In this document, the term ‘ASCII’is used generically to refer to the text character set
+defined in reference [2]. The terms ‘N/A' and 'n/a' are defined to mean 'not available' or
+'not applicable'.
+
+.. _introduction_orthography_cdm:
+
+1.4.3.2 Orthography
+"""""""""""""""""""
+
+The following terms define orthographic conventions for XML notation in this
+Recommended Standard:
+
+CamelCase
+   A style of capitalization in which the initial characters of concatenated words
+   are capitalized, as in CamelCase.
+
+lowerCamelCase
+   A variant of CamelCase in which the first character of a character string
+   formed from concatenated words is lowercase, as in lowerCamelCase. In the case of a
+   character string consisting of only a single word, only lowercase characters are used.
+
+.. _introduction_references_cdm:
+
+1.5 REFERENCES
+--------------
+
+The following publications contain provisions which, through reference in this text,
+constitute provisions of this Recommended Standard. At the time of publication, the editions
+indicated were valid. All publications are subject to revision, and users of this
+Recommended Standard are encouraged to investigate the possibility of applying the most
+recent editions of the publications indicated below. The CCSDS Secretariat maintains a
+register of currently valid CCSDS publications.
+
+[1] The International System of Units (SI). 8th ed. Sèvres, France: BIPM, 2006.
+[2] Information Technology—8-Bit Single-Byte Coded Graphic Character Sets—Part 1:
+    Latin Alphabet No. 1. International Standard, ISO/IEC 8859-1:1998. Geneva: ISO,
+    1998.
+[3] Henry S. Thompson, et al., eds. XML Schema Part 1: Structures. 2nd ed. W3C
+    Recommendation. N.p.: W3C, October 2004.
+[4] Paul V. Biron and Ashok Malhotra, eds. XML Schema Part 2: Datatypes. 2nd ed. W3C
+    Recommendation. N.p.: W3C, October 2004.
+[5] Time Code Formats. Issue 4. Recommendation for Space Data System Standards (Blue
+    Book), CCSDS 301.0-B-4. Washington, D.C.: CCSDS, November 2010.
+[6] XML Specification for Navigation Data Messages. Issue 2. Recommendation for Space
+    Data System Standards (Blue Book), CCSDS 505.0-B-2. Washington, D.C.: CCSDS,
+    May 2021.
+
+
+.. _overview_cdm:
+
+2 OVERVIEW
+==========
+
+.. _overview_general_cdm:
+
+2.1 GENERAL
+-----------
+
+This section provides a high-level overview of the CCSDS-recommended CDM, a message
+format designed to facilitate standardized exchange of conjunction information between
+originators of CA data and satellite owner/operators.
+
+.. _overview_basic_content_cdm:
+
+2.2 CDM BASIC CONTENT
+---------------------
+
+The CDM is ASCII format encoded either in plain text or XML (see references [2], [3], and
+[4]). This CDM document describes a KVN-formatted message as well as an XML-formatted
+message (it is desirable that an ICD specify which of these formats will be exchanged).
+
+The CDM contains information about a single conjunction between Object1 and Object2. It
+contains
+
+-  Object1/Object2 positions/velocities at TCA with respect to one of a small set of
+   widely used reference frames (ITRF, GCRF—see reference [F11], EME2000);
+-  Object1/Object2 covariances at TCA with respect to an object centered reference
+   frame;
+-  the relative position/velocity of Object2 with respect to an Object1 centered reference
+   frame;
+-  information relevant to how all the above data was determined.
+
+This information is used by satellite owner/operators to evaluate the risk of a conjunction and
+plan maneuvers if warranted by that agency/organization. Where possible, the CDM is
+consistent with other CCSDS Navigation Data Messages (NDMs). Similar tables have been
+used to describe header, metadata, and data information. Common keywords have been used
+in order to minimize duplication and confusion (e.g., CREATION_DATE, ORIGINATOR,
+OBJECT_NAME, INTERNATIONAL_DESIGNATOR, etc.).
+
+
+
+.. _kvn_content_structure_cdm:
+
+3 CDM CONTENT/STRUCTURE IN KVN
+==============================
+
+.. _kvn_general_cdm:
+
+3.1 GENERAL
+-----------
+
+3.1.1 The CDM in KVN shall consist of digital data represented as ASCII text lines. The
+lines constituting a CDM shall be represented as a combination of the following:
+
+a) a header;
+b) relative metadata/data (metadata/data describing relative relationships between
+   Object1 and Object2);
+c) metadata (data about how Object1 and Object2 data were created);
+d) data (for both Object1 and Object2); and
+e) optional comments (explanatory information).
+
+.. NOTE::
+
+   1. KVN messages contain one keyword per line (see 6.3.1.4).
+   2. The order of keywords in the KVN representation is fixed by this Recommended
+      Standard (see 6.3.1.9).
+
+3.1.2 The CDM shall be plain text consisting of CA data for a single conjunction event. It
+shall be easily readable by both humans and computers.
+
+3.1.3 The method of exchanging CDMs shall be decided on a case-by-case basis by the
+participating parties and should be documented in an ICD.
+
+.. _kvn_header_cdm:
+
+3.2 CDM HEADER
+--------------
+
+The CDM header shall consist of the KVN elements defined in table 3-1, which specifies for
+each KVN header item:
+
+a) the keyword to be used;
+b) a short description of the item;
+c) examples of allowed values; and
+d) whether the item is obligatory or optional.
+
+.. _table_3-1_cdm:
+
+.. list-table:: Table 3-1: CDM KVN Header
+   :widths: 20 50 15 15
+   :header-rows: 1
+
+   * - Keyword
+     - Description
+     - Example of Values
+     - Obligatory
+   * - CCSDS_CDM_VERS
+     - Format version in the form of 'x.y', where 'y' is incremented for corrections
+       and minor changes, and 'x' is incremented for major changes.
+     - 1.0
+       2.0
+     - Yes
+   * - COMMENT
+     - (See 6.3.4 for formatting rules.)
+     - COMMENT This is a
+       comment
+     - No
+   * - CREATION_DATE
+     - Message creation date/time in Coordinated Universal Time (UTC).
+       (See 6.3.2.6 for formatting rules.)
+     - 2010-03-12T22:31:12.000
+       2010-071T22:31:12.000
+     - Yes
+   * - ORIGINATOR
+     - Creating agency or owner/operator. Value should be the 'Abbreviation' value
+       from the SANA 'Organizations' registry
+       (https://sanaregistry.org/r/organizations) for an organization that has the Role of
+       'Conjunction Data Message Originator'. (See 5.2.9 for formatting rules.)
+     - JSPOC, ESA SST,
+       CAESAR, JPL, SDC
+     - Yes
+   * - MESSAGE_FOR
+     - Spacecraft name(s) for which the CDM is provided.
+     - SPOT, ENVISAT,
+       IRIDIUM, INTELSAT
+     - No
+   * - MESSAGE_ID
+     - ID that uniquely identifies a message from a given originator. The format and
+       content of the message identifier value are at the discretion of the originator.
+       (See 5.2.9 for formatting rules.)
+     - 201113719185
+       ABC-12_34
+     - Yes
+
+.. _kvn_relative_metadata_data_cdm:
+
+3.3 CDM RELATIVE METADATA/DATA
+------------------------------
+
+The CDM relative metadata/data shall consist of the KVN elements defined in table 3-2,
+which specifies for each KVN relative metadata/data item:
+
+a) the keyword to be used;
+b) a short description of the item;
+c) the units to be used if applicable; and
+d) whether the item is obligatory or optional.
+
+.. _table_3-2_cdm:
+
+.. list-table:: Table 3-2: CDM KVN Relative Metadata/Data
+   :widths: 25 55 10 10
+   :header-rows: 1
+
+   * - Keyword
+     - Description
+     - Units
+     - Obligatory
+   * - COMMENT
+     - (See 6.3.4 for formatting rules.)
+     - n/a
+     - No
+   * - TCA
+     - The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)
+     - n/a
+     - Yes
+   * - MISS_DISTANCE
+     - The norm of the relative position vector. It indicates how close the two objects are at
+       TCA. Data type = double.
+     - m
+     - Yes
+   * - RELATIVE_SPEED
+     - The norm of the relative velocity vector. It indicates how fast the two objects are moving
+       relative to each other at TCA. Data type = double.
+     - m/s
+     - No
+   * - RELATIVE_POSITION_R
+     - The R component of Object2's position relative to Object1's position in the Radial,
+       Transverse, and Normal (RTN) coordinate frame. (See annex E for definition.) Data type
+       = double.
+     - m
+     - No
+   * - RELATIVE_POSITION_T
+     - The T component of Object2's position relative to Object1's position in the RTN
+       coordinate frame. (See annex E for definition.) Data type = double.
+     - m
+     - No
+   * - RELATIVE_POSITION_N
+     - The N component of Object2's position relative to Object1's position in the RTN
+       coordinate frame. (See annex E for definition.) Data type = double.
+     - m
+     - No
+   * - RELATIVE_VELOCITY_R
+     - The R component of Object2's velocity relative to Object1's velocity in the RTN
+       coordinate frame. (See annex E for definition.) Data type = double.
+     - m/s
+     - No
+   * - RELATIVE_VELOCITY_T
+     - The T component of Object2's velocity relative to Object1's velocity in the RTN
+       coordinate frame. (See annex E for definition.) Data type = double.
+     - m/s
+     - No
+   * - RELATIVE_VELOCITY_N
+     - The N component of Object2's velocity relative to Object1's velocity in the RTN
+       coordinate frame. (See annex E for definition.) Data type = double.
+     - m/s
+     - No
+   * - START_SCREEN_PERIOD
+     - The start time in UTC of the screening period for the conjunction assessment. (See 6.3.2.6
+       for formatting rules.)
+     - n/a
+     - No
+   * - STOP_SCREEN_PERIOD
+     - The stop time in UTC of the screening period for the conjunction assessment. (See 6.3.2.6
+       for formatting rules.)
+     - n/a
+     - No
+   * - SCREEN_VOLUME_FRAME
+     - Name of the Object1 centered reference frame in which the screening volume data are given.
+       Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex E for
+       definition.)
+     - n/a
+     - No
+   * - SCREEN_VOLUME_SHAPE
+     - Shape of the screening volume: ELLIPSOID or BOX.
+     - n/a
+     - No
+   * - SCREEN_VOLUME_X
+     - The R or T (depending on if RTN or TVN is selected) component size of the screening
+       volume in the SCREEN_VOLUME_FRAME. Data type = double.
+     - m
+     - No
+   * - SCREEN_VOLUME_Y
+     - The T or V (depending on if RTN or TVN is selected) component size of the screening
+       volume in the SCREEN_VOLUME_FRAME. Data type = double.
+     - m
+     - No
+   * - SCREEN_VOLUME_Z
+     - The N component size of the screening volume in the SCREEN_VOLUME_FRAME.
+       Data type = double.
+     - m
+     - No
+   * - SCREEN_ENTRY_TIME
+     - The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for formatting
+       rules.)
+     - n/a
+     - No
+   * - SCREEN_EXIT_TIME
+     - The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
+       rules.)
+     - n/a
+     - No
+   * - COLLISION_PROBABILITY
+     - The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will
+       collide. Data type = double.
+     - n/a
+     - No
+   * - COLLISION_PROBABILITY_METHOD
+     - The method that was used to calculate the collision probability. (See annex E for
+       definition.)
+     - n/a
+     - No
+
+
+
+.. _kvn_metadata_cdm:
+
+3.4 CDM METADATA
+----------------
+
+The CDM metadata shall consist of the KVN elements defined in table 3-3, which specifies
+for each KVN metadata item:
+
+a) the keyword to be used;
+b) a short description of the item;
+c) normative values or examples of allowed values;
+d) whether the ‘Normative Values/Examples' column contains normative values (N) or
+   examples of allowed values (E) for the item; and
+e) whether the item is obligatory or optional.
+
+.. NOTE::
+   Table 3-3 and table 3-4 will be used to define both Object1 and Object2
+   depending on the value of the keyword OBJECT which is specified in table 3-3.
+
+.. _table_3-3_cdm:
+
+.. list-table:: Table 3-3: CDM KVN Metadata
+   :widths: 20 45 20 5 10
+   :header-rows: 1
+
+   * - Keyword
+     - Description
+     - Normative Values/
+       Examples
+     - N/E
+     - Obligatory
+   * - COMMENT
+     - (See 6.3.4 for formatting rules.)
+     - COMMENT This is a
+       comment
+     - E
+     - No
+   * - OBJECT
+     - The object to which the
+       metadata and data apply
+       (Object1 or Object2).
+     - OBJECT1
+       OBJECT2
+     - N
+     - Yes
+   * - OBJECT_DESIGNATOR
+     - The satellite catalog
+       designator for the object. (See
+       5.2.9 for formatting rules.)
+     - 12345
+     - E
+     - Yes
+   * - CATALOG_NAME
+     - The satellite catalog used for
+       the object. Value should be
+       taken from the SANA
+       'Conjunction Data Message
+       CATALOG_NAME' registry
+       (https://sanaregistry.org/r/cdm
+       _catalog). (See 5.2.9 for
+       formatting rules.)
+     - SATCAT
+     - E
+     - Yes
+   * - OBJECT_NAME
+     - Spacecraft name for the
+       object.
+     - SPOT, ENVISAT,
+       IRIDIUM, INTELSAT
+     - E
+     - Yes
+   * - INTERNATIONAL_DESIGNATOR
+     - The full international
+       designator for the object.
+       Values shall have the format
+       YYYY-NNNP{PP}, where:
+       YYYY = year of launch;
+       NNN = three-digit serial
+       number of launch (with
+       leading zeros);
+       P{PP} = At least one capital
+       letter for the identification of
+       the part brought into space by
+       the launch. In cases where the
+       object has no international
+       designator, the value
+       UNKNOWN should be used.
+       (See 5.2.9 for further
+       formatting rules.)
+     - 2002-021A
+       2002-009A
+       1997-020AA
+       1998-037ABC
+       2001-049PE
+       UNKNOWN
+     - E
+     - Yes
+   * - OBJECT_TYPE
+     - The object type.
+     - PAYLOAD
+       ROCKET BODY
+       DEBRIS
+       UNKNOWN
+       OTHER
+     - N
+     - No
+   * - OPERATOR_CONTACT_POSITION
+     - Contact position of the
+       owner/operator of the object.
+     - ORBITAL SAFETY
+       ANALYST (OSA),
+       NETWORK
+       CONTROLLER
+     - E
+     - No
+   * - OPERATOR_ORGANIZATION
+     - Contact organization of the
+       object.
+     - EUMETSAT, ESA,
+       INTELSAT, IRIDIUM
+     - E
+     - No
+   * - OPERATOR_PHONE
+     - Phone number of the contact
+       position or organization for the
+       object.
+     - +49615130312
+     - E
+     - No
+   * - OPERATOR_EMAIL
+     - Email address of the contact
+       position or organization of the
+       object.
+     - JOHN.DOE@
+       SOMEWHERE.NET
+     - E
+     - No
+   * - EPHEMERIS_NAME
+     - Unique name of the external
+       ephemeris file used for the
+       object or NONE. This is used
+       to indicate whether an external
+       (i.e., Owner/Operator [O/O]
+       provided) ephemeris file was
+       used to calculate the CA. If
+       'NONE' is specified, then the
+       output of the most current
+       Orbit Determination (OD) of
+       the CDM originator was used
+       in the CA.
+     - EPHEMERIS
+       SATELLITE A,
+       NONE
+     - E
+     - Yes
+   * - COVARIANCE_METHOD
+     - Method used to calculate the
+       covariance during the OD that
+       produced the state vector, or
+       whether an arbitrary, non-
+       calculated default value was
+       used. Caution should be used
+       when using the default value
+       for calculating collision
+       probability.
+     - CALCULATED
+       DEFAULT
+     - N
+     - Yes
+   * - MANEUVERABLE
+     - The maneuver capacity of the
+       object. (See 1.4.3.1 for
+       definition of 'N/A'.)
+     - YES
+       NO
+       N/A
+     - N
+     - Yes
+   * - ORBIT_CENTER
+     - The central body about which
+       Object1 and Object2 orbit. If
+       not specified, the center is
+       assumed to be Earth.
+     - EARTH
+       SUN
+       MOON
+       MARS
+     - E
+     - No
+   * - REF_FRAME
+     - Name of the reference frame
+       in which the state vector data
+       are given. Value must be
+       selected from the list of values
+       to the right (see reference [F1])
+       and be the same for both
+       Object1 and Object2.
+     - GCRF (see reference
+       [F11])
+       EME2000
+       ITRF
+     - N
+     - Yes
+   * - GRAVITY_MODEL
+     - The gravity model used for the
+       OD of the object. (See annex
+       E under GRAVITY_MODEL for
+       definition).
+     - EGM-96: 36D 360
+       WGS-84_GEOID: 24D
+       240
+       JGM-2: 41D 410
+     - E
+     - No
+   * - ATMOSPHERIC_MODEL
+     - The atmospheric density
+       model used for the OD of the
+       object. If 'NONE' is specified,
+       then no atmospheric model
+       was used.
+     - JACCHIA 70
+       MSIS
+       JACCHIA 70 DCA
+       NONE
+     - E
+     - No
+   * - N_BODY_PERTURBATIONS
+     - The N-body gravitational
+       perturbations used for the OD
+       of the object. If 'NONE' is
+       specified, then no third-body
+       gravitational perturbations
+       were used.
+     - MOON, SUN
+       JUPITER
+       NONE
+     - E
+     - No
+   * - SOLAR_RAD_PRESSURE
+     - Indication of whether solar
+       radiation pressure
+       perturbations were used for the
+       OD of the object.
+     - YES
+       NO
+     - N
+     - No
+   * - EARTH_TIDES
+     - Indication of whether solid
+       Earth and ocean tides were
+       used for the OD of the object.
+     - YES
+       NO
+     - N
+     - No
+   * - INTRACK_THRUST
+     - Indication of whether in-track
+       thrust modeling was used for
+       the OD of the object.
+     - YES
+       NO
+     - N
+     - No
+
+
+
+.. _kvn_data_cdm:
+
+3.5 CDM DATA
+------------
+
+3.5.1 The CDM Data section shall be formed as logical blocks:
+
+-  OD Parameters;
+-  Additional Parameters;
+-  State Vector; and
+-  Covariance Matrix.
+
+3.5.2 The logical blocks of the CDM Data section shall consist of KVN elements as
+defined in table 3-4, which specifies for each data item:
+
+a) the keyword to be used;
+b) a short description of the item;
+c) the units to be used if applicable; and
+d) whether the item is obligatory or optional.
+
+.. _table_3-4_cdm:
+
+.. list-table:: Table 3-4: CDM KVN Data
+   :widths: 25 65 5 5
+   :header-rows: 1
+
+   * - Keyword
+     - Description
+     - Units
+     - Obligatory
+   * - COMMENT
+     - (See 6.3.4 for formatting rules.)
+     - n/a
+     - No
+   * - **OD Parameters**
+     -
+     -
+     -
+   * - COMMENT
+     - (See 6.3.4 for formatting rules.)
+     - n/a
+     - No
+   * - TIME_LASTOB_START
+     - The start of a time interval (UTC) that contains the time of the last accepted
+       observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+       of zero duration (i.e., same value as that of TIME_LASTOB_END).
+     - n/a
+     - No
+   * - TIME_LASTOB_END
+     - The end of a time interval (UTC) that contains the time of the last accepted
+       observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+       of zero duration (i.e., same value as that of TIME_LASTOB_START).
+     - n/a
+     - No
+   * - RECOMMENDED_OD_SPAN
+     - The recommended OD time span calculated for the object. (See annex E for definition.)
+       Data type = double.
+     - d
+     - No
+   * - ACTUAL_OD_SPAN
+     - Based on the observations available and the RECOMMENDED_OD_SPAN, the actual
+       time span used for the OD of the object. (See annex E for definition.) Data type =
+       double.
+     - d
+     - No
+   * - OBS_AVAILABLE
+     - The number of observations available for the OD of the object. (See annex E for
+       definition.) Data type = integer.
+     - n/a
+     - No
+   * - OBS_USED
+     - The number of observations accepted for the OD of the object. (See annex E for
+       definition.) Data type = integer.
+     - n/a
+     - No
+   * - TRACKS_AVAILABLE
+     - The number of sensor tracks available for the OD of the object. (See annex E for
+       definition.) Data type = integer.
+     - n/a
+     - No
+   * - TRACKS_USED
+     - The number of sensor tracks accepted for the OD of the object. (See annex E for
+       definition.) Data type = integer.
+     - n/a
+     - No
+   * - RESIDUALS_ACCEPTED
+     - The percentage of residuals accepted in the OD of the object. Data type = double, range
+       = 0.0 to 100.0.
+     - %
+     - No
+   * - WEIGHTED_RMS
+     - The weighted Root Mean Square (RMS) of the residuals from a batch least squares OD.
+       (See annex E for definition.) Data type = double.
+     - n/a
+     - No
+   * - **Additional Parameters**
+     -
+     -
+     -
+   * - COMMENT
+     - (See 6.3.4 for formatting rules.)
+     - n/a
+     - No
+   * - AREA_PC
+     - The actual area of the object. (See annex E for definition.) Data type = double.
+     - m**2
+     - No
+   * - AREA_DRG
+     - The effective area of the object exposed to atmospheric drag. (See annex E for
+       definition.) Data type = double.
+     - m**2
+     - No
+   * - AREA_SRP
+     - The effective area of the object exposed to solar radiation pressure. (See annex E for
+       definition.) Data type = double.
+     - m**2
+     - No
+   * - MASS
+     - The mass of the object. Data type = double.
+     - kg
+     - No
+   * - CD_AREA_OVER_MASS
+     - The object's CD.A/m used to propagate the state vector and covariance to TCA. (See
+       annex E for definition.) Data type = double.
+     - m**2/kg
+     - No
+   * - CR_AREA_OVER_MASS
+     - The object's C, •A/m used to propagate the state vector and covariance to TCA. (See
+       annex E for definition.) Data type = double.
+     - m**2/kg
+     - No
+   * - THRUST_ACCELERATION
+     - The object's acceleration due to in-track thrust used to propagate the state vector and
+       covariance to TCA. (See annex E for definition.) Data type = double.
+     - m/s**2
+     - No
+   * - SEDR
+     - The amount of energy being removed from the object's orbit by atmospheric drag. This
+       value is an average calculated during the OD. (See annex E for definition.) Data type
+       = double.
+     - W/kg
+     - No
+   * - **State Vector (all values have data type=double)**
+     -
+     -
+     -
+   * - COMMENT
+     - (See 6.3.4 for formatting rules.)
+     - n/a
+     - No
+   * - X
+     - Object Position Vector X component.
+     - km
+     - Yes
+   * - Y
+     - Object Position Vector Y component.
+     - km
+     - Yes
+   * - Z
+     - Object Position Vector Z component.
+     - km
+     - Yes
+   * - X_DOT
+     - Object Velocity Vector X component.
+     - km/s
+     - Yes
+   * - Y_DOT
+     - Object Velocity Vector Y component.
+     - km/s
+     - Yes
+   * - Z_DOT
+     - Object Velocity Vector Z component.
+     - km/s
+     - Yes
+   * - **Covariance Matrix in the RTN Coordinate Frame (see annex E for definition)
+       (Covariance Matrix 9x9 Lower Triangular Form. All parameters of the 6×6 position/velocity submatrix must be
+       given. All data type=double.)**
+     -
+     -
+     -
+   * - COMMENT
+     - (See 6.3.4 for formatting rules.)
+     - n/a
+     - No
+   * - CR_R
+     - Object covariance matrix [1,1].
+     - m**2
+     - Yes
+   * - CT_R
+     - Object covariance matrix [2,1].
+     - m**2
+     - Yes
+   * - CT_T
+     - Object covariance matrix [2,2].
+     - m**2
+     - Yes
+   * - CN_R
+     - Object covariance matrix [3,1].
+     - m**2
+     - Yes
+   * - CN_T
+     - Object covariance matrix [3,2].
+     - m**2
+     - Yes
+   * - CN_N
+     - Object covariance matrix [3,3].
+     - m**2
+     - Yes
+   * - CRDOT_R
+     - Object covariance matrix [4,1].
+     - m**2/s
+     - Yes
+   * - CRDOT_T
+     - Object covariance matrix [4,2].
+     - m**2/s
+     - Yes
+   * - CRDOT_N
+     - Object covariance matrix [4,3].
+     - m**2/s
+     - Yes
+   * - CRDOT_RDOT
+     - Object covariance matrix [4,4].
+     - m**2/s**2
+     - Yes
+   * - CTDOT_R
+     - Object covariance matrix [5,1].
+     - m**2/s
+     - Yes
+   * - CTDOT_T
+     - Object covariance matrix [5,2].
+     - m**2/s
+     - Yes
+   * - CTDOT_N
+     - Object covariance matrix [5,3].
+     - m**2/s
+     - Yes
+   * - CTDOT_RDOT
+     - Object covariance matrix [5,4].
+     - m**2/s**2
+     - Yes
+   * - CTDOT_TDOT
+     - Object covariance matrix [5,5].
+     - m**2/s**2
+     - Yes
+   * - CNDOT_R
+     - Object covariance matrix [6,1].
+     - m**2/s
+     - Yes
+   * - CNDOT_T
+     - Object covariance matrix [6,2].
+     - m**2/s
+     - Yes
+   * - CNDOT_N
+     - Object covariance matrix [6,3].
+     - m**2/s
+     - Yes
+   * - CNDOT_RDOT
+     - Object covariance matrix [6,4].
+     - m**2/s**2
+     - Yes
+   * - CNDOT_TDOT
+     - Object covariance matrix [6,5].
+     - m**2/s**2
+     - Yes
+   * - CNDOT_NDOT
+     - Object covariance matrix [6,6].
+     - m**2/s**2
+     - Yes
+   * - CDRG_R
+     - Object covariance matrix [7,1].
+     - m**3/kg
+     - No
+   * - CDRG_T
+     - Object covariance matrix [7,2].
+     - m**3/kg
+     - No
+   * - CDRG_N
+     - Object covariance matrix [7,3].
+     - m**3/kg
+     - No
+   * - CDRG_RDOT
+     - Object covariance matrix [7,4].
+     - m**3/(kg*s)
+     - No
+   * - CDRG_TDOT
+     - Object covariance matrix [7,5].
+     - m**3/(kg*s)
+     - No
+   * - CDRG_NDOT
+     - Object covariance matrix [7,6].
+     - m**3/(kg*s)
+     - No
+   * - CDRG_DRG
+     - Object covariance matrix [7,7].
+     - m**4/kg**2
+     - No
+   * - CSRP_R
+     - Object covariance matrix [8,1].
+     - m**3/kg
+     - No
+   * - CSRP_T
+     - Object covariance matrix [8,2].
+     - m**3/kg
+     - No
+   * - CSRP_N
+     - Object covariance matrix [8,3].
+     - m**3/kg
+     - No
+   * - CSRP_RDOT
+     - Object covariance matrix [8,4].
+     - m**3/(kg*s)
+     - No
+   * - CSRP_TDOT
+     - Object covariance matrix [8,5].
+     - m**3/(kg*s)
+     - No
+   * - CSRP_NDOT
+     - Object covariance matrix [8,6].
+     - m**3/(kg*s)
+     - No
+   * - CSRP_DRG
+     - Object covariance matrix [8,7].
+     - m**4/kg**2
+     - No
+   * - CSRP_SRP
+     - Object covariance matrix [8,8].
+     - m**4/kg**2
+     - No
+   * - CTHR_R
+     - Object covariance matrix [9,1].
+     - m**2/s**2
+     - No
+   * - CTHR_T
+     - Object covariance matrix [9,2].
+     - m**2/s**2
+     - No
+   * - CTHR_N
+     - Object covariance matrix [9,3].
+     - m**2/s**2
+     - No
+   * - CTHR_RDOT
+     - Object covariance matrix [9,4].
+     - m**2/s**3
+     - No
+   * - CTHR_TDOT
+     - Object covariance matrix [9,5].
+     - m**2/s**3
+     - No
+   * - CTHR_NDOT
+     - Object covariance matrix [9,6].
+     - m**2/s**3
+     - No
+   * - CTHR_DRG
+     - Object covariance matrix [9,7].
+     - m**3/(kg*s**2)
+     - No
+   * - CTHR_SRP
+     - Object covariance matrix [9,8].
+     - m**3/(kg*s**2)
+     - No
+   * - CTHR_THR
+     - Object covariance matrix [9,9].
+     - m**2/s**4
+     - No
+
+
+.. _kvn_metadata_cdm:
+
+3.4 CDM METADATA
+----------------
+
+The CDM metadata shall consist of the KVN elements defined in table 3-3, which specifies
+for each KVN metadata item:
+
+a) the keyword to be used;
+b) a short description of the item;
+c) normative values or examples of allowed values;
+d) whether the ‘Normative Values/Examples' column contains normative values (N) or
+   examples of allowed values (E) for the item; and
+e) whether the item is obligatory or optional.
+
+.. NOTE::
+   Table 3-3 and table 3-4 will be used to define both Object1 and Object2
+   depending on the value of the keyword OBJECT which is specified in table 3-3.
+
+.. _table_3-3_cdm:
+
+.. list-table:: Table 3-3: CDM KVN Metadata
+   :widths: 20 45 20 5 10
+   :header-rows: 1
+
+   * - Keyword
+     - Description
+     - Normative Values/
+       Examples
+     - N/E
+     - Obligatory
+   * - COMMENT
+     - (See 6.3.4 for formatting rules.)
+     - COMMENT This is a
+       comment
+     - E
+     - No
+   * - OBJECT
+     - The object to which the
+       metadata and data apply
+       (Object1 or Object2).
+     - OBJECT1
+       OBJECT2
+     - N
+     - Yes
+   * - OBJECT_DESIGNATOR
+     - The satellite catalog
+       designator for the object. (See
+       5.2.9 for formatting rules.)
+     - 12345
+     - E
+     - Yes
+   * - CATALOG_NAME
+     - The satellite catalog used for
+       the object. Value should be
+       taken from the SANA
+       'Conjunction Data Message
+       CATALOG_NAME' registry
+       (https://sanaregistry.org/r/cdm
+       _catalog). (See 5.2.9 for
+       formatting rules.)
+     - SATCAT
+     - E
+     - Yes
+   * - OBJECT_NAME
+     - Spacecraft name for the
+       object.
+     - SPOT, ENVISAT,
+       IRIDIUM, INTELSAT
+     - E
+     - Yes
+   * - INTERNATIONAL_DESIGNATOR
+     - The full international
+       designator for the object.
+       Values shall have the format
+       YYYY-NNNP{PP}, where:
+       YYYY = year of launch;
+       NNN = three-digit serial
+       number of launch (with
+       leading zeros);
+       P{PP} = At least one capital
+       letter for the identification of
+       the part brought into space by
+       the launch. In cases where the
+       object has no international
+       designator, the value
+       UNKNOWN should be used.
+       (See 5.2.9 for further
+       formatting rules.)
+     - 2002-021A
+       2002-009A
+       1997-020AA
+       1998-037ABC
+       2001-049PE
+       UNKNOWN
+     - E
+     - Yes
+   * - OBJECT_TYPE
+     - The object type.
+     - PAYLOAD
+       ROCKET BODY
+       DEBRIS
+       UNKNOWN
+       OTHER
+     - N
+     - No
+   * - OPERATOR_CONTACT_POSITION
+     - Contact position of the
+       owner/operator of the object.
+     - ORBITAL SAFETY
+       ANALYST (OSA),
+       NETWORK
+       CONTROLLER
+     - E
+     - No
+   * - OPERATOR_ORGANIZATION
+     - Contact organization of the
+       object.
+     - EUMETSAT, ESA,
+       INTELSAT, IRIDIUM
+     - E
+     - No
+   * - OPERATOR_PHONE
+     - Phone number of the contact
+       position or organization for the
+       object.
+     - +49615130312
+     - E
+     - No
+   * - OPERATOR_EMAIL
+     - Email address of the contact
+       position or organization of the
+       object.
+     - JOHN.DOE@
+       SOMEWHERE.NET
+     - E
+     - No
+   * - EPHEMERIS_NAME
+     - Unique name of the external
+       ephemeris file used for the
+       object or NONE. This is used
+       to indicate whether an external
+       (i.e., Owner/Operator [O/O]
+       provided) ephemeris file was
+       used to calculate the CA. If
+       'NONE' is specified, then the
+       output of the most current
+       Orbit Determination (OD) of
+       the CDM originator was used
+       in the CA.
+     - EPHEMERIS
+       SATELLITE A,
+       NONE
+     - E
+     - Yes
+   * - COVARIANCE_METHOD
+     - Method used to calculate the
+       covariance during the OD that
+       produced the state vector, or
+       whether an arbitrary, non-
+       calculated default value was
+       used. Caution should be used
+       when using the default value
+       for calculating collision
+       probability.
+     - CALCULATED
+       DEFAULT
+     - N
+     - Yes
+   * - MANEUVERABLE
+     - The maneuver capacity of the
+       object. (See 1.4.3.1 for
+       definition of 'N/A'.)
+     - YES
+       NO
+       N/A
+     - N
+     - Yes
+   * - ORBIT_CENTER
+     - The central body about which
+       Object1 and Object2 orbit. If
+       not specified, the center is
+       assumed to be Earth.
+     - EARTH
+       SUN
+       MOON
+       MARS
+     - E
+     - No
+   * - REF_FRAME
+     - Name of the reference frame
+       in which the state vector data
+       are given. Value must be
+       selected from the list of values
+       to the right (see reference [F1])
+       and be the same for both
+       Object1 and Object2.
+     - GCRF (see reference
+       [F11])
+       EME2000
+       ITRF
+     - N
+     - Yes
+   * - GRAVITY_MODEL
+     - The gravity model used for the
+       OD of the object. (See annex
+       E under GRAVITY_MODEL for
+       definition).
+     - EGM-96: 36D 360
+       WGS-84_GEOID: 24D
+       240
+       JGM-2: 41D 410
+     - E
+     - No
+   * - ATMOSPHERIC_MODEL
+     - The atmospheric density
+       model used for the OD of the
+       object. If 'NONE' is specified,
+       then no atmospheric model
+       was used.
+     - JACCHIA 70
+       MSIS
+       JACCHIA 70 DCA
+       NONE
+     - E
+     - No
+   * - N_BODY_PERTURBATIONS
+     - The N-body gravitational
+       perturbations used for the OD
+       of the object. If 'NONE' is
+       specified, then no third-body
+       gravitational perturbations
+       were used.
+     - MOON, SUN
+       JUPITER
+       NONE
+     - E
+     - No
+   * - SOLAR_RAD_PRESSURE
+     - Indication of whether solar
+       radiation pressure
+       perturbations were used for the
+       OD of the object.
+     - YES
+       NO
+     - N
+     - No
+   * - EARTH_TIDES
+     - Indication of whether solid
+       Earth and ocean tides were
+       used for the OD of the object.
+     - YES
+       NO
+     - N
+     - No
+   * - INTRACK_THRUST
+     - Indication of whether in-track
+       thrust modeling was used for
+       the OD of the object.
+     - YES
+       NO
+     - N
+     - No
+   
+.. _xml_content_structure_cdm:
+
+4 CDM CONTENT/STRUCTURE IN XML
+==============================
+
+.. _xml_schema_discussion_cdm:
+
+4.1 DISCUSSION—THE CDM/XML SCHEMA
+---------------------------------
+
+The CDM/XML schema is available on the SANA Web site. SANA is the registrar for the
+protocol registries created under CCSDS.
+
+The CDM XML schema explicitly defines the permitted data elements and values acceptable
+for the XML version of the CDM message.
+
+The location of the CDM/XML schema is:
+
+-  https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-cdm-1.0.xsd for
+   messages with elements not qualified with respect to a namespace;
+-  https://sanaregistry.org/r/ndmxml_qualified/ndmxml-2.0.0-cdm-1.0.xsd for messages
+   with elements qualified with respect to a namespace.
+
+.. NOTE::
+   Reference [6] subsection 4.3 has more information regarding messages with
+   elements qualified with respect to a namespace.
+
+Where possible this schema uses simple types and complex types used by the constituent
+schemas that make up NDMs (see reference [6]).
+
+An Extensible Stylesheet Language Transformations (XSLT) converter is available on the SANA
+Web site to transform an XML CDM to a KVN CDM if desired by the CDM recipient. The location
+of the CDM/XML XSLT converter is:
+
+-  https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-cdm-1.1.xsl for
+   messages with elements not qualified with respect to a namespace;
+-  https://sanaregistry.org/r/ndmxml_qualified/ndmxml-2.0.0-cdm-1.1.xsl for messages
+   with elements qualified with respect to a namespace.
+
+.. NOTE::
+   Reference [6] subsection 4.3 has more information regarding messages with
+   elements qualified with respect to a namespace.
+
+.. _xml_basic_structure_cdm:
+
+4.2 CDM/XML BASIC STRUCTURE
+---------------------------
+
+4.2.1 Each CDM shall consist of a <header> and a <body>.
+
+4.2.2 The CDM body shall consist of one relative metadata/data and two segment constructs.
+
+4.2.3 Each <segment> shall consist of a <metadata>/<data> pair, as shown in figure 4-1.
+
+.. _figure_4-1_cdm:
+
+.. figure:: /images/placeholder.png
+   
+   Figure 4-1: CDM XML Basic Structure
+
+.. code-block::
+   
+   <header>
+   </header>
+   <body>
+      <relativeMetadataData>
+      </relativeMetadataData>
+      <segment>
+         <metadata>
+         </metadata>
+         <data>
+         </data>
+      </segment>
+      <segment>
+         <metadata>
+         </metadata>
+         <data>
+         </data>
+      </segment>
+   </body>
+
+4.2.4 XML tags shall be uppercase and correspond with the KVN keywords in 3.2 through
+3.5 (uppercase with ‘_’ [the underscore character] as separators). The XML logical tags
+related to message structure shall be in lowerCamelCase.
+
+.. _xml_constructing_instance_cdm:
+
+4.3 CONSTRUCTING A CDM/XML INSTANCE
+-----------------------------------
+
+.. _xml_constructing_overview_cdm:
+
+4.3.1 OVERVIEW
+^^^^^^^^^^^^^^
+
+This subsection provides more detailed instructions for the user on how to create an XML
+message based on the ASCII-text KVN-formatted message described in 3.1 through 3.6 (see
+reference [6]).
+
+.. _xml_version_cdm:
+
+4.3.2 XML VERSION
+^^^^^^^^^^^^^^^^^
+
+The first line in the instantiation shall specify the XML version:
+
+.. code-block:: xml
+   
+   <?xml version="1.0" encoding="UTF-8"?>
+
+This line must appear on the first line of each instantiation, exactly as shown.
+
+.. _xml_root_element_cdm:
+
+4.3.3 BEGINNING THE INSTANTIATION: ROOT DATA ELEMENT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+4.3.3.1 A CDM instantiation shall be delimited with the <cdm></cdm> root element tags
+using the standard attributes documented in reference [3].
+
+4.3.3.2 The XML Schema Instance namespace attribute must appear in the root element tag
+of all CDM/XML instantiations, exactly as shown:
+
+.. code-block::
+   
+   xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"
+
+4.3.3.3 For messages with elements qualified with respect to a namespace, the NDM/XML
+namespace must next be coded, exactly as shown:
+
+.. code-block::
+   
+   xmlns:ndm="urn:ccsds:schema:ndmxml"
+
+The value that follows the ‘xmlns:' in the NDM/XML name space (‘ndm' in this case) is a
+prefix that must be used on every XML tag.
+
+.. NOTE::
+   This xmlns:ndm setting is only necessary for messages with elements qualified
+   with respect to a namespace, but it does not hurt anything for it to appear on any
+   NDM/XML instantiation.
+
+4.3.3.4 If it is desired to validate an instantiation against the CCSDS Web-based schema,
+the xsi:noNamespaceSchemaLocation attribute must be coded as a single string of non-blank
+characters, with no line breaks, exactly as shown:
+
+.. code-block::
+
+   xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_unqualified/n
+   dmxml-2.0.0-master-2.0.xsd" for messages with elements not qualified with respect
+   to a namespace;
+   
+   xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_qualified/ndm
+   xml-2.0.0-master-2.0.xsd" for messages with elements qualified with respect to a
+   namespace.
+
+.. NOTE::
+   The length of the value associated with the xsi:noNamespaceSchemaLocation
+   attribute can cause the string to wrap to a new line; however, the string itself
+   contains no breaks.
+
+4.3.3.5 For use in a local operations environment, the schema set may be downloaded from
+the SANA Web site to a local server that meets local requirements for operations robustness.
+
+4.3.3.6 If a local version is used, the value associated with the
+xsi:noNamespaceSchemaLocation attribute must be changed to a URL that is accessible to
+the local server.
+
+4.3.3.7 The final attributes of the <cdm> tag shall be 'id' and 'version'.
+
+4.3.3.8 The 'id' attribute shall be ‘id="CCSDS_CDM_VERS"'.
+
+4.3.3.9 The 'version' attribute shall be 'version="1.0"'.
+
+.. NOTE::
+
+   1. The following example root element tag for a CDM instantiation combines all the
+      directions in the preceding several subsections for messages with elements not
+      qualified with respect to a namespace:
+   
+      .. code-block:: xml
+      
+         <?xml version="1.0" encoding="UTF-8"?>
+         <cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation=
+         "https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-master-2.0.xs
+         id="CCSDS_CDM_VERS" version="1.0">
+   
+   2. The following example root element tag for a CDM instantiation combines all the
+      directions in the preceding several subsections for messages with elements qualified
+      with respect to a namespace:
+      
+      .. code-block:: xml
+      
+         <?xml version="1.0" encoding="UTF-8"?>
+         <cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns:ndm="urn:ccsds:schema:ndmxml"
+         xsi:noNamespaceSchemaLocation=
+         "https://sanaregistry.org/r/ndmxml_qualified/ndmxml-2.0.0-master-2.0.xsd"
+         id="CCSDS_CDM_VERS" version="1.0">
+
+.. _xml_header_section_cdm:
+
+4.3.4 THE CDM/XML HEADER SECTION
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+4.3.4.1 The CDM header shall have a standard header format, with tags <header> and </header>.
+
+4.3.4.2 Immediately following the <header> tag, the message may have any number of
+<COMMENT></COMMENT> tag pairs.
+
+4.3.4.3 The standard CDM header shall contain the following element tags:
+
+a) <CREATION_DATE>;
+b) <ORIGINATOR>;
+c) optional <MESSAGE_FOR>;
+d) <MESSAGE_ID>.
+
+.. NOTE::
+   The rules for these keywords are specified in 3.2. The header would look like this:
+   
+   .. code-block:: xml
+   
+      <header>
+         <COMMENT>Some comment string.</COMMENT>
+         <CREATION_DATE>2010-03-12T22:31:12.000</CREATION_DATE>
+         <ORIGINATOR>JSPOC</ORIGINATOR>
+         <MESSAGE_FOR>SATELLITE A</MESSAGE_FOR>
+         <MESSAGE_ID>201113719185</MESSAGE_ID>
+      </header>
+
+.. _xml_body_section_cdm:
+
+4.3.5 THE CDM/XML BODY SECTION
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+4.3.5.1 After coding the <header>, the instantiation must include a <body></body> tag
+pair.
+
+4.3.5.2 Inside the <body></body> tag pair, there must appear one
+<relativeMetadataData></relativeMetadataData> tag pair.
+
+4.3.5.3 Following the <relativeMetadataData></relativeMetadataData> tag pair, there must
+appear two <segment></segment> tag pairs, one for Object1 and one for Object2.
+
+4.3.5.4 Each segment must be made up of one <metadata></metadata> tag pair and one
+<data></data> tag pair.
+
+.. _xml_relative_metadata_data_section_cdm:
+
+4.3.6 THE CDM/XML RELATIVE METADATA/DATA SECTION
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+4.3.6.1 The relative metadata/data section shall be set off by the
+<relativeMetadataData></relativeMetadataData> tag combination.
+
+4.3.6.2 Immediately following the <relativeMetadataData> tag, the message may have any
+number of <COMMENT></COMMENT> tag pairs.
+
+4.3.6.3 Between the <relativeMetadataData> and </relativeMetadataData> tags, the
+keywords shall be those specified in table 3-2.
+
+.. _xml_metadata_section_cdm:
+
+4.3.7 THE CDM/XML METADATA SECTION
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+4.3.7.1 All CDMs must have two metadata sections, one for Object1 and one for Object2.
+
+4.3.7.2 The metadata section for Object1 shall follow the relative metadata/data section and
+shall be set off by the <metadata></metadata> tag combination. The metadata section for
+Object2 shall follow the Object1 data section and shall be set off by the
+<metadata></metadata> tag combination.
+
+4.3.7.3 Immediately following the <metadata> tag, the message may have any number of
+<COMMENT></COMMENT> tag pairs.
+
+4.3.7.4 Between the <metadata> and </metadata> tags for both Object1 and Object2, the
+keywords shall be those specified in table 3-3. The value of the keyword OBJECT shall be
+used to define whether the metadata defines Object1 or Object2.
+
+.. _xml_data_section_cdm:
+
+4.3.8 THE CDM DATA SECTION
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+4.3.8.1 All CDMs must have two data sections, one for Object1 and one for Object2.
+
+4.3.8.2 Each data section shall follow the corresponding metadata section and shall be set
+off by the <data></data> tag combination.
+
+4.3.8.3 Immediately following the <data> tag, the message may have any number of
+<COMMENT></COMMENT> tag pairs.
+
+4.3.8.4 Between the <data> and </data> tags, the keywords shall be those specified in
+table 3-4. The value of the keyword OBJECT, referenced in table 3-3, shall be used to define
+whether the data defines Object1 or Object2.
+
+.. _xml_special_tags_cdm:
+
+4.3.9 SPECIAL CDM/XML TAGS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+4.3.9.1 The information content in the CDM shall be separated into constructs described in 3.5
+as 'logical blocks'. Special tags in the CDM shall be used to encapsulate the information in
+the logical blocks of the CDM. Immediately following the special tags for logical blocks, the
+message may have any number of <COMMENT></COMMENT> tag pairs.
+
+4.3.9.2 The special tags indicating logical block divisions shall be those defined in table 4-1.
+
+.. _table_4-1_cdm:
+
+.. list-table:: Table 4-1: Relation of KVN Logical Blocks to Special CDM/XML Tags
+   :widths: 50 50
+   :header-rows: 1
+
+   * - CDM Logical Block
+     - Associated CDM/XML Tag
+   * - OD Parameters
+     - <odParameters>
+   * - Additional Parameters
+     - <additionalParameters>
+   * - State Vector
+     - <stateVector>
+   * - Covariance Matrix
+     - <covarianceMatrix>
+
+4.3.9.3 Another special tag that shall be used is defined in table 4-2.
+
+.. _table_4-2_cdm:
+
+.. list-table:: Table 4-2: Another Special CDM/XML Tag
+   :widths: 30 70
+   :header-rows: 1
+
+   * - Special Tag
+     - Definition
+   * - <relativeStateVector>
+     - Includes the relative state vector keywords:
+       RELATIVE_POSITION_R, RELATIVE_POSITION_T,
+       RELATIVE_POSITION_N, RELATIVE_VELOCITY_R,
+       RELATIVE_VELOCITY_T, and
+       RELATIVE_VELOCITY_N.
+
+.. _xml_units_cdm:
+
+4.3.10 UNITS IN THE CDM/XML
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The units in the CDM/XML shall be the same units used in the KVN-formatted CDM
+described in 3.3 and 3.5. XML attributes shall be used to explicitly define the units or other
+important information associated with the given data element (see 6.4.3 for examples).
+
+.. _xml_example_discussion_cdm:
+
+4.4 DISCUSSION—CDM/XML EXAMPLE
+--------------------------------
+
+The following is a sample of a CDM in XML format:
+
+.. code-block:: xml
+   
+   <?xml version="1.0" encoding="UTF-8"?>
+   <cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xmlns:ndm="urn:ccsds:schema:ndmxml"
+   xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-master-2.0.xsd"
+   id="CCSDS_CDM_VERS" version="1.0">
+      <header>
+         <COMMENT>Sample CDM - XML version</COMMENT>
+         <CREATION_DATE>2010-03-12T22:31:12.000</CREATION_DATE>
+         <ORIGINATOR>JSPOC</ORIGINATOR>
+         <MESSAGE_FOR>SATELLITE A</MESSAGE_FOR>
+         <MESSAGE_ID>20111371985</MESSAGE_ID>
+      </header>
+      <body>
+         <relativeMetadataData>
+            <COMMENT>Relative Metadata/Data</COMMENT>
+            <TCA>2010-03-13T22:37:52.618</TCA>
+            <MISS_DISTANCE units="m">715</MISS_DISTANCE>
+            <RELATIVE_SPEED units="m/s">14762</RELATIVE_SPEED>
+            <relativeStateVector>
+               <RELATIVE_POSITION_R units="m">27.4</RELATIVE_POSITION_R>
+               <RELATIVE_POSITION_T units="m">-70.2</RELATIVE_POSITION_T>
+               <RELATIVE_POSITION_N units="m">711.8</RELATIVE_POSITION_N>
+               <RELATIVE_VELOCITY_R units="m/s">-7.2</RELATIVE_VELOCITY_R>
+               <RELATIVE_VELOCITY_T units="m/s">-14692.0</RELATIVE_VELOCITY_T>
+               <RELATIVE_VELOCITY_N units="m/s">-1437.2</RELATIVE_VELOCITY_N>
+            </relativeStateVector>
+            <START_SCREEN_PERIOD>2010-03-12T18:29:32.212</START_SCREEN_PERIOD>
+            <STOP_SCREEN_PERIOD>2010-03-15T18:29:32.212</STOP_SCREEN_PERIOD>
+            <SCREEN_VOLUME_FRAME>RTN</SCREEN_VOLUME_FRAME>
+            <SCREEN_VOLUME_SHAPE>ELLIPSOID</SCREEN_VOLUME_SHAPE>
+            <SCREEN_VOLUME_X units="m">200</SCREEN_VOLUME_X>
+            <SCREEN_VOLUME_Y units="m">1000</SCREEN_VOLUME_Y>
+            <SCREEN_VOLUME_Z units="m">1000</SCREEN_VOLUME_Z>
+            <SCREEN_ENTRY_TIME>2010-03-13T20:25:43.222</SCREEN_ENTRY_TIME>
+            <SCREEN_EXIT_TIME>2010-03-13T23:44:29.324</SCREEN_EXIT_TIME>
+            <COLLISION_PROBABILITY>4.835E-05</COLLISION_PROBABILITY>
+            <COLLISION_PROBABILITY_METHOD>FOSTER-1992</COLLISION_PROBABILITY_METHOD>
+         </relativeMetadataData>
+         <segment>
+            <metadata>
+               <COMMENT>Object1 Metadata</COMMENT>
+               <OBJECT>OBJECT1</OBJECT>
+               <OBJECT_DESIGNATOR>12345</OBJECT_DESIGNATOR>
+               <CATALOG_NAME>SATCAT</CATALOG_NAME>
+               <OBJECT_NAME>SATELLITE A</OBJECT_NAME>
+               <INTERNATIONAL_DESIGNATOR>1997-030E</INTERNATIONAL_DESIGNATOR>
+               <OBJECT_TYPE>PAYLOAD</OBJECT_TYPE>
+               <OPERATOR_CONTACT_POSITION>OSA</OPERATOR_CONTACT_POSITION>
+               <OPERATOR_ORGANIZATION>EUMETSAT</OPERATOR_ORGANIZATION>
+               <OPERATOR_PHONE>+49615130312</OPERATOR_PHONE>
+               <OPERATOR_EMAIL>JOHN.DOE@SOMEWHERE.NET</OPERATOR_EMAIL>
+               <EPHEMERIS_NAME>EPHEMERIS SATELLITE A</EPHEMERIS_NAME>
+               <COVARIANCE_METHOD>CALCULATED</COVARIANCE_METHOD>
+               <MANEUVERABLE>YES</MANEUVERABLE>
+               <REF_FRAME>EME2000</REF_FRAME>
+               <GRAVITY_MODEL>EGM-96: 36D 36O</GRAVITY_MODEL>
+               <ATMOSPHERIC_MODEL>JACCHIA 70 DCA</ATMOSPHERIC_MODEL>
+               <N_BODY_PERTURBATIONS>MOON,SUN</N_BODY_PERTURBATIONS>
+               <SOLAR_RAD_PRESSURE>NO</SOLAR_RAD_PRESSURE>
+               <EARTH_TIDES>NO</EARTH_TIDES>
+               <INTRACK_THRUST>NO</INTRACK_THRUST>
+            </metadata>
+            <data>
+               <COMMENT>Object1 Data</COMMENT>
+               <odParameters>
+                  <COMMENT>Object1 OD Parameters</COMMENT>
+                  <TIME_LASTOB_START>2010-03-12T02:14:12.746</TIME_LASTOB_START>
+                  <TIME_LASTOB_END>2010-03-12T02:14:12.746</TIME_LASTOB_END>
+                  <RECOMMENDED_OD_SPAN units="d">7.88</RECOMMENDED_OD_SPAN>
+                  <ACTUAL_OD_SPAN units="d">5.50</ACTUAL_OD_SPAN>
+                  <OBS_AVAILABLE>592</OBS_AVAILABLE>
+                  <OBS_USED>59</OBS_USED>
+                  <TRACKS_AVAILABLE>123</TRACKS_AVAILABLE>
+                  <TRACKS_USED>119</TRACKS_USED>
+                  <RESIDUALS_ACCEPTED units="%">97.8</RESIDUALS_ACCEPTED>
+                  <WEIGHTED_RMS>0.864</WEIGHTED_RMS>
+               </odParameters>
+               <additionalParameters>
+                  <COMMENT>Object 1 Additional Parameters</COMMENT>
+                  <AREA_PC units="m**2">5.2</AREA_PC>
+                  <MASS units="kg">2516</MASS>
+                  <CD_AREA_OVER_MASS units="m**2/kg">0.045663</CD_AREA_OVER_MASS>
+                  <CR_AREA_OVER_MASS units="m**2/kg">0.000000</CR_AREA_OVER_MASS>
+                  <THRUST_ACCELERATION units="m/s**2">0.0</THRUST_ACCELERATION>
+                  <SEDR units="W/kg">4.54570E-05</SEDR>
+               </additionalParameters>
+               <stateVector>
+                  <COMMENT>Object1 State Vector</COMMENT>
+                  <X units="km">2570.097065</X>
+                  <Y units="km">2244.654904</Y>
+                  <Z units="km">6281.497978</Z>
+                  <X_DOT units="km/s">4.418769571</X_DOT>
+                  <Y_DOT units="km/s">4.833547743</Y_DOT>
+                  <Z_DOT units="km/s">-3.526774282</Z_DOT>
+               </stateVector>
+               <covarianceMatrix>
+                  <COMMENT>Object1 Covariance in the RTN Coordinate Frame </COMMENT>
+                  <CR_R units="m**2">4.142E+01</CR_R>
+                  <CT_R units="m**2">-8.579E+00</CT_R>
+                  <CT_T units="m**2">2.533E+03</CT_T>
+                  <CN_R units="m**2">-2.313E+01</CN_R>
+                  <CN_T units="m**2">1.336E+01</CN_T>
+                  <CN_N units="m**2">7.098E+01</CN_N>
+                  <CRDOT_R units="m**2/s">2.520E-03</CRDOT_R>
+                  <CRDOT_T units="m**2/s">-5.476E+00</CRDOT_T>
+                  <CRDOT_N units="m**2/s">8.626E-04</CRDOT_N>
+                  <CRDOT_RDOT units="m**2/s**2">5.744E-03</CRDOT_RDOT>
+                  <CTDOT_R units="m**2/s">-1.006E-02</CTDOT_R>
+                  <CTDOT_T units="m**2/s">4.041E-03</CTDOT_T>
+                  <CTDOT_N units="m**2/s">-1.359E-03</CTDOT_N>
+                  <CTDOT_RDOT units="m**2/s**2">-1.502E-05</CTDOT_RDOT>
+                  <CTDOT_TDOT units="m**2/s**2">1.049E-05</CTDOT_TDOT>
+                  <CNDOT_R units="m**2/s">1.053E-03</CNDOT_R>
+                  <CNDOT_T units="m**2/s">-3.412E-03</CNDOT_T>
+                  <CNDOT_N units="m**2/s">1.213E-02</CNDOT_N>
+                  <CNDOT_RDOT units="m**2/s**2">-3.004E-06</CNDOT_RDOT>
+                  <CNDOT_TDOT units="m**2/s**2">-1.091E-06</CNDOT_TDOT>
+                  <CNDOT_NDOT units="m**2/s**2">5.529E-05</CNDOT_NDOT>
+               </covarianceMatrix>
+            </data>
+         </segment>
+         <segment>
+            <metadata>
+               <COMMENT>Object2 Metadata</COMMENT>
+               <OBJECT>OBJECT2</OBJECT>
+               <OBJECT_DESIGNATOR>30337</OBJECT_DESIGNATOR>
+               <CATALOG_NAME>SATCAT</CATALOG_NAME>
+               <OBJECT_NAME>FENGYUN 1C DEB</OBJECT_NAME>
+               <INTERNATIONAL_DESIGNATOR>1999-025AA</INTERNATIONAL_DESIGNATOR>
+               <OBJECT_TYPE>DEBRIS</OBJECT_TYPE>
+               <EPHEMERIS_NAME>NONE</EPHEMERIS_NAME>
+               <COVARIANCE_METHOD>CALCULATED</COVARIANCE_METHOD>
+               <MANEUVERABLE>NO</MANEUVERABLE>
+               <REF_FRAME>EME2000</REF_FRAME>
+               <GRAVITY_MODEL>EGM-96: 36D 36O</GRAVITY_MODEL>
+               <ATMOSPHERIC_MODEL>JACCHIA 70 DCA</ATMOSPHERIC_MODEL>
+               <N_BODY_PERTURBations>MOON,SUN</N_BODY_PERTURBATIONS>
+               <SOLAR_RAD_PRESSURE>YES</SOLAR_RAD_PRESSURE>
+               <EARTH_TIDES>NO</EARTH_TIDES>
+               <INTRACK_THRUST>NO</INTRACK_THRUST>
+            </metadata>
+            <data>
+               <COMMENT>Object2 Data</COMMENT>
+               <odParameters>
+                  <COMMENT>Object2 OD Parameters</COMMENT>
+                  <TIME_LASTOB_START>2010-03-12T01:14:12.746</TIME_LASTOB_START>
+                  <TIME_LASTOB_END>2010-03-12T03:14:12.746</TIME_LASTOB_END>
+                  <RECOMMENDED_OD_SPAN units="d">2.63</RECOMMENDED_OD_SPAN>
+                  <ACTUAL_OD_SPAN units="d">2.63</ACTUAL_OD_SPAN>
+                  <OBS_AVAILABLE>59</OBS_AVAILABLE>
+                  <OBS_USED>58</OBS_USED>
+                  <TRACKS_AVAILABLE>15</TRACKS_AVAILABLE>
+                  <TRACKS_USED>15</TRACKS_USED>
+                  <RESIDUALS_ACCEPTED units="%">97.8</RESIDUALS_ACCEPTED>
+                  <WEIGHTED_RMS>0.864</WEIGHTED_RMS>
+               </odParameters>
+               <additionalParameters>
+                  <COMMENT>Object2 Additional Parameters</COMMENT>
+                  <COMMENT>Apogee Altitude=768 km</COMMENT>
+                  <COMMENT>Perigee Altitude=414 km</COMMENT>
+                  <COMMENT>Inclination=98.8 deg</COMMENT>
+                  <AREA_PC units="m**2">0.9</AREA_PC>
+                  <CD_AREA_OVER_MASS units="m**2/kg">0.118668</CD_AREA_OVER_MASS>
+                  <CR_AREA_OVER_MASS units="m**2/kg">0.075204</CR_AREA_OVER_MASS>
+                  <THRUST_ACCELERATION units="m/s**2">0.0</THRUST_ACCELERATION>
+                  <SEDR units="W/kg">5.40900E-03</SEDR>
+               </additionalParameters>
+               <stateVector>
+                  <COMMENT>Object2 State Vector</COMMENT>
+                  <X units="km">2569.540800</X>
+                  <Y units="km">2245.093614</Y>
+                  <Z units="km">6281.599946</Z>
+                  <X_DOT units="km/s">-2.888612500</X_DOT>
+                  <Y_DOT units="km/s">-6.007247516</Y_DOT>
+                  <Z_DOT units="km/s">3.328770172</Z_DOT>
+               </stateVector>
+               <covarianceMatrix>
+                  <COMMENT>Object2 Covariance in the RTN Coordinate Frame</COMMENT>
+                  <CR_R units="m**2">1.337E+03</CR_R>
+                  <CT_R units="m**2">-4.806E+04</CT_R>
+                  <CT_T units="m**2">2.492E+06</CT_T>
+                  <CN_R units="m**2">-3.298E+01</CN_R>
+                  <CN_T units="m**2">-7.5888E+02</CN_T>
+                  <CN_N units="m**2">7.105E+01</CN_N>
+                  <CRDOT_R units="m**2/s">2.591E-03</CRDOT_R>
+                  <CRDOT_T units="m**2/s">-4.152E-02</CRDOT_T>
+                  <CRDOT_N units="m**2/s">-1.784E-06</CRDOT_N>
+                  <CRDOT_RDOT units="m**2/s**2">6.886E-05</CRDOT_RDOT>
+                  <CTDOT_R units="m**2/s">-1.016E-02</CTDOT_R>
+                  <CTDOT_T units="m**2/s">-1.506E-04</CTDOT_T>
+                  <CTDOT_N units="m**2/s">1.637E-03</CTDOT_N>
+                  <CTDOT_RDOT units="m**2/s**2">-2.987E-06</CTDOT_RDOT>
+                  <CTDOT_TDOT units="m**2/s**2">1.059E-05</CTDOT_TDOT>
+                  <CNDOT_R units="m**2/s">4.400E-03</CNDOT_R>
+                  <CNDOT_T units="m**2/s">8.482E-03</CNDOT_T>
+                  <CNDOT_N units="m**2/s">8.633E-05</CNDOT_N>
+                  <CNDOT_RDOT units="m**2/s**2">-1.903E-06</CNDOT_RDOT>
+                  <CNDOT_TDOT units="m**2/s**2">-4.594E-06</CNDOT_TDOT>
+                  <CNDOT_NDOT units="m**2/s**2">5.178E-05</CNDOT_NDOT>
+               </covarianceMatrix>
+            </data>
+         </segment>
+      </body>
+   </cdm>

@@ -1,0 +1,25 @@
+[project]
+name = "ccsds-ndm-docs"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = [
+    "sphinx",
+    "shibuya",
+    "sphinx-autobuild>=2024.10.3",
+    "sphinx-tabs>=3.4.7",
+    "ccsds-ndm-py",
+]
+
+[dependency-groups]
+dev = [
+    "reuse>=5.1.1",
+]
+
+[tool.uv.workspace]
+members = [
+    "bindings/python",
+]
+
+[tool.uv.sources]
+ccsds-ndm-py = { workspace = true }
+

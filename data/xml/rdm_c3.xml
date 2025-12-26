@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:noNamespaceSchemaLocation="../RDMschema.xsd"
+id="CCSDS_RDM_VERS"
+version="1.0">
+<header>
+<COMMENT>This is RDM Annex C KVN Fig C-1 expressed in XML</COMMENT>
+<CREATION_DATE>2018-04-22T09:31:34</CREATION_DATE>
+<ORIGINATOR>ESA</ORIGINATOR>
+<MESSAGE_ID>ESA/20180422-001</MESSAGE_ID>
+</header>
+<body>
+<segment>
+<metadata>
+<OBJECT_NAME>SPACEOBJECT</OBJECT_NAME>
+<INTERNATIONAL_DESIGNATOR>2018-099B</INTERNATIONAL_DESIGNATOR>
+<CONTROLLED_REENTRY>NO</CONTROLLED_REENTRY>
+<CENTER_NAME>EARTH</CENTER_NAME>
+<TIME_SYSTEM>UTC</TIME_SYSTEM>
+<EPOCH_TZERO>2018-04-22T00:00:00.00</EPOCH_TZERO>
+</metadata>
+<data>
+<atmosphericReentryParameters>
+<ORBIT_LIFETIME units="d">23.0</ORBIT_LIFETIME>
+<REENTRY_ALTITUDE units="km">150.0</REENTRY_ALTITUDE>
+</atmosphericReentryParameters>
+</data>
+</segment>
+</body>
+</rdm>

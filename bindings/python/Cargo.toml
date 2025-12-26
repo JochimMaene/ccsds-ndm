@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2025 Jochim Maene <16223990+JochimMaene@users.noreply.github.com>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+[package]
+name = "ccsds-ndm-py"
+version = "0.1.0"
+authors = ["Jochim Maene <16223990+JochimMaene@users.noreply.github.com>"]
+edition = "2021"
+description = "Python bindings for ccsds-ndm"
+license = "MPL-2.0"
+repository = "https://github.com/JochimMaene/ccsds-ndm"
+rust-version = "1.70"
+
+[lib]
+name = "ccsds_ndm"
+crate-type = ["cdylib"]
+
+[dependencies]
+ccsds-ndm = { path = "../../ccsds-ndm" }
+numpy = "0.27.0"
+pyo3 = { version = "0.27.0", features = ["extension-module"] }

@@ -1,0 +1,2535 @@
+<!DOCTYPE html>
+<html lang="en" data-accent-color="violet" data-content_root="../">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>CONJUNCTION DATA MESSAGE - CCSDS NDM documentation</title><link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><script>
+    function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
+    setColorMode(localStorage._theme||"auto");
+  </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=e1a1ceaf" />
+    <link rel="stylesheet" type="text/css" href="../_static/shibuya.css?v=83cb36c2" />
+    <link media="print" rel="stylesheet" type="text/css" href="../_static/print.css?v=20ff2c19" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sy-f-text: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+  --sy-f-heading: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+}
+</style>
+    <meta property="og:type" content="website"/><meta property="og:title" content="CONJUNCTION DATA MESSAGE"/>
+    <meta name="twitter:card" content="summary"/>
+  </head>
+<body><div class="sy-head">
+  <div class="sy-head-blur"></div>
+  <div class="sy-head-inner sy-container mx-auto">
+    <a class="sy-head-brand" href="../index.html">
+      
+      
+      <strong>CCSDS NDM</strong>
+    </a>
+    <div class="sy-head-nav" id="head-nav">
+      <nav class="sy-head-links"><ul><li class="link"><a href="../rust/index.html.html">Rust API</a></li></ul></nav>
+      <div class="sy-head-extra flex items-center print:hidden"><form class="searchbox flex items-center" action="../search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form><div class="sy-head-socials">
+  <a href="https://github.com/JochimMaene/ccsds-ndm" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div></div>
+    </div>
+    <div class="sy-head-actions flex items-center shrink-0 print:hidden"><button class="js-theme theme-switch flex items-center"
+data-aria-auto="Switch to light color mode"
+data-aria-light="Switch to dark color mode"
+data-aria-dark="Switch to auto color mode">
+<i class="i-lucide theme-icon"></i>
+</button><button class="md:hidden flex items-center js-menu" aria-label="Menu" type="button" aria-controls="head-nav" aria-expanded="false">
+        <div class="hamburger">
+          <span class="hamburger_1"></span>
+          <span class="hamburger_2"></span>
+          <span class="hamburger_3"></span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+<div class="sy-page sy-container flex mx-auto">
+  <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
+    <div class="sy-lside-inner md:sticky">
+      <div class="sy-scrollbar p-6">
+        <div class="globaltoc" data-expand-depth="0"><p class="caption" role="heading" aria-level="3"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guide/quicktour.html">Quicktour</a></li>
+</ul>
+<p class="caption" role="heading" aria-level="3"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/python.html">Python API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/core.html">Core &amp; Common Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/opm.html">Orbit Parameter Message (OPM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/oem.html">Orbit Ephemeris Message (OEM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/omm.html">Orbit Mean-Elements Message (OMM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/ocm.html">Orbit Comprehensive Message (OCM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/tdm.html">Tracking Data Message (TDM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/rdm.html">Re-entry Data Message (RDM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/cdm.html">Conjunction Data Message (CDM)</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading" aria-level="3"><span class="caption-text">CCSDS Standards</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="ndm.html">AUTHORITY</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ndm.html#foreword">FOREWORD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ndm.html#document-control">DOCUMENT CONTROL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ndm.html#ndm-sec-1">1 INTRODUCTION</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ndm.html#ndm-sec-2">2 SCOPE OF NAVIGATION</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ndm.html#ndm-sec-3">3 NAVIGATION DATA MESSAGE EXCHANGE FRAMEWORK</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ndm.html#ndm-sec-4">4 CCSDS NAVIGATION DATA MESSAGES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ndm.html#annex-a">ANNEX A</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html">AUTHORITY</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#statement-of-intent">STATEMENT OF INTENT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#foreword">FOREWORD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#document-control">DOCUMENT CONTROL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#introduction">1 INTRODUCTION</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#overview">2 OVERVIEW</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#id10">3 ATTITUDE PARAMETER MESSAGE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#id21">4 ATTITUDE EPHEMERIS MESSAGE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#id32">5 ATTITUDE COMPREHENSIVE MESSAGE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#attitude-data-messages-kvn-syntax">6 ATTITUDE DATA MESSAGES KVN SYNTAX</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#constructing-an-adm-xml-instance">7 CONSTRUCTING AN ADM/XML INSTANCE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#annex-a">ANNEX A</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#annex-b">ANNEX B</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#annex-c">ANNEX C</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#annex-d">ANNEX D</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#annex-e">ANNEX E</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#annex-f">ANNEX F</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#annex-g">ANNEX G</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#annex-h-informative-references">Annex H: Informative References</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#annex-i-items-for-an-interface-control-document">Annex I: Items for an Interface Control Document</a></li>
+<li class="toctree-l1"><a class="reference internal" href="adm.html#annex-j-changes-versus-previous-version">Annex J: Changes Versus Previous Version</a></li>
+</ul>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
+  <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
+    <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
+      <i class="i-lucide close"></i>
+    </button>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
+<li><a class="reference internal" href="#">AUTHORITY</a></li>
+<li><a class="reference internal" href="#statement-of-intent">STATEMENT OF INTENT</a></li>
+<li><a class="reference internal" href="#foreword">FOREWORD</a><ul>
+<li><a class="reference internal" href="#member-agencies">Member Agencies</a></li>
+<li><a class="reference internal" href="#observer-agencies">Observer Agencies</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#document-control">DOCUMENT CONTROL</a></li>
+<li><a class="reference internal" href="#introduction">1 INTRODUCTION</a><ul>
+<li><a class="reference internal" href="#purpose-and-scope">1.1 PURPOSE AND SCOPE</a></li>
+<li><a class="reference internal" href="#applicability">1.2 APPLICABILITY</a></li>
+<li><a class="reference internal" href="#document-structure">1.3 DOCUMENT STRUCTURE</a></li>
+<li><a class="reference internal" href="#conventions-and-definitions">1.4 CONVENTIONS AND DEFINITIONS</a><ul>
+<li><a class="reference internal" href="#notation">1.4.1 NOTATION</a><ul>
+<li><a class="reference internal" href="#unit-notations">1.4.1.1 Unit Notations</a></li>
+<li><a class="reference internal" href="#general">1.4.1.2 General</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#nomenclature">1.4.2 NOMENCLATURE</a><ul>
+<li><a class="reference internal" href="#introduction-general-nomenclature-cdm">1.4.2.1 General</a></li>
+<li><a class="reference internal" href="#normative-text">1.4.2.2 Normative Text</a></li>
+<li><a class="reference internal" href="#informative-text">1.4.2.3 Informative Text</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#other-conventions">1.4.3 OTHER CONVENTIONS</a><ul>
+<li><a class="reference internal" href="#terminology">1.4.3.1 Terminology</a></li>
+<li><a class="reference internal" href="#orthography">1.4.3.2 Orthography</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#references">1.5 REFERENCES</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#overview">2 OVERVIEW</a><ul>
+<li><a class="reference internal" href="#overview-general-cdm">2.1 GENERAL</a></li>
+<li><a class="reference internal" href="#cdm-basic-content">2.2 CDM BASIC CONTENT</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cdm-content-structure-in-kvn">3 CDM CONTENT/STRUCTURE IN KVN</a><ul>
+<li><a class="reference internal" href="#kvn-general-cdm">3.1 GENERAL</a></li>
+<li><a class="reference internal" href="#cdm-header">3.2 CDM HEADER</a></li>
+<li><a class="reference internal" href="#cdm-relative-metadata-data">3.3 CDM RELATIVE METADATA/DATA</a></li>
+<li><a class="reference internal" href="#cdm-metadata">3.4 CDM METADATA</a></li>
+<li><a class="reference internal" href="#cdm-data">3.5 CDM DATA</a></li>
+<li><a class="reference internal" href="#id4">3.4 CDM METADATA</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cdm-content-structure-in-xml">4 CDM CONTENT/STRUCTURE IN XML</a><ul>
+<li><a class="reference internal" href="#discussionthe-cdm-xml-schema">4.1 DISCUSSION—THE CDM/XML SCHEMA</a></li>
+<li><a class="reference internal" href="#cdm-xml-basic-structure">4.2 CDM/XML BASIC STRUCTURE</a></li>
+<li><a class="reference internal" href="#constructing-a-cdm-xml-instance">4.3 CONSTRUCTING A CDM/XML INSTANCE</a><ul>
+<li><a class="reference internal" href="#xml-constructing-overview-cdm">4.3.1 OVERVIEW</a></li>
+<li><a class="reference internal" href="#xml-version">4.3.2 XML VERSION</a></li>
+<li><a class="reference internal" href="#beginning-the-instantiation-root-data-element">4.3.3 BEGINNING THE INSTANTIATION: ROOT DATA ELEMENT</a></li>
+<li><a class="reference internal" href="#the-cdm-xml-header-section">4.3.4 THE CDM/XML HEADER SECTION</a></li>
+<li><a class="reference internal" href="#the-cdm-xml-body-section">4.3.5 THE CDM/XML BODY SECTION</a></li>
+<li><a class="reference internal" href="#the-cdm-xml-relative-metadata-data-section">4.3.6 THE CDM/XML RELATIVE METADATA/DATA SECTION</a></li>
+<li><a class="reference internal" href="#the-cdm-xml-metadata-section">4.3.7 THE CDM/XML METADATA SECTION</a></li>
+<li><a class="reference internal" href="#the-cdm-data-section">4.3.8 THE CDM DATA SECTION</a></li>
+<li><a class="reference internal" href="#special-cdm-xml-tags">4.3.9 SPECIAL CDM/XML TAGS</a></li>
+<li><a class="reference internal" href="#units-in-the-cdm-xml">4.3.10 UNITS IN THE CDM/XML</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#discussioncdm-xml-example">4.4 DISCUSSION—CDM/XML EXAMPLE</a></li>
+</ul>
+</li>
+</ul>
+</div><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
+  </aside>
+  <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
+  <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+<div class="sy-breadcrumbs" role="navigation">
+  <div class="sy-breadcrumbs-inner flex items-center">
+    <div class="md:hidden mr-3">
+      <button class="js-menu" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+        <i class="i-lucide menu"></i>
+      </button>
+    </div>
+    <ol class="flex-1" itemscope itemtype="https://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../index.html"><span itemprop="name">CCSDS NDM</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="1" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <strong itemprop="name">CONJUNCTION DATA MESSAGE</strong>
+        <meta itemprop="position" content="2" />
+      </li></ol>
+    <div class="xl:hidden ml-1">
+      <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
+        aria-expanded="false">
+        <i class="i-lucide outdent"></i>
+      </button>
+    </div>
+  </div>
+</div><div class="flex flex-col break-words justify-between">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  
+
+
+<div class="copy-page-wrapper relative pb-4 lg:absolute lg:top-8 lg:right-6 xl:right-12">
+  <div id="copy-page-trigger">
+    <button
+      type="button"
+      class="js-copy px-3 py-1 inline-flex items-center gap-1"
+      data-url="../_sources/ccsds-books/cdm.rst.txt"
+    >
+      <i class="i-lucide" data-icon="copy"></i>
+      <span>Copy page</span>
+    </button>
+    <button class="js-menu px-2 py-1" type="button" aria-label="More actions"
+      aria-haspopup="menu" aria-expanded="false" aria-controls="copy-page-content">
+      <i class="i-lucide chevron-down"></i>
+    </button>
+  </div>
+  <div id="copy-page-content" role="menu" aria-orientation="vertical" aria-hidden="true">
+    <div role="presentation">
+      <div class="flex flex-col" role="group">
+        <button class="js-copy" type="button" role="menuitem"
+          data-url="../_sources/ccsds-books/cdm.rst.txt">
+          <span class="iconify-icon">
+            <i class="i-lucide" data-icon="copy"></i>
+          </span>
+          <span>Copy page</span>
+        </button>
+        <a role="menuitem" href="../_sources/ccsds-books/cdm.rst.txt" target="_blank" rel="nofollow">
+          
+            <iconify-icon icon="bi:code-slash"></iconify-icon>
+            <span>View Source</span>
+          
+        </a>
+        
+        <a role="menuitem" href="https://chatgpt.com/?hints=search&q=Read%20../_sources/ccsds-books/cdm.rst.txt%20so%20I%20can%20ask%20questions%20about%20it." target="_blank" rel="nofollow">
+          <iconify-icon icon="bi:openai"></iconify-icon>
+          <span>Open in ChatGPT</span>
+        </a>
+        
+        
+        <a role="menuitem" href="https://claude.ai/new?q=Read%20../_sources/ccsds-books/cdm.rst.txt%20so%20I%20can%20ask%20questions%20about%20it." target="_blank" rel="nofollow">
+          <iconify-icon icon="bi:claude"></iconify-icon>
+          <span>Open in Claude</span>
+        </a>
+        
+        
+      </div>
+    </div>
+  </div>
+</div>
+<article class="yue" role="main">
+          <p class="rubric">RECOMMENDED STANDARD</p>
+<p class="centered">
+<strong>CCSDS 508.0-B-1</strong></p><p class="centered">
+<strong>BLUE BOOK</strong></p><p class="centered">
+<strong>June 2013</strong></p><p class="centered">
+<strong>Note:
+This current
+issue includes
+all updates through
+Technical Corrigendum 2,
+dated October 2021</strong></p><section id="authority">
+<h1>AUTHORITY<a class="headerlink" href="#authority" title="Link to this heading">¶</a></h1>
+<div class="table-wrapper docutils container">
+<table class="docutils align-center">
+<tbody>
+<tr class="row-odd"><td><p>Issue:</p></td>
+<td><p>Recommended Standard, Issue 1</p></td>
+</tr>
+<tr class="row-even"><td><p>Date:</p></td>
+<td><p>June 2013</p></td>
+</tr>
+<tr class="row-odd"><td><p>Location:</p></td>
+<td><p>Washington, DC, USA</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>This document has been approved for publication by the Management Council of the
+Consultative Committee for Space Data Systems (CCSDS) and represents the consensus
+technical agreement of the participating CCSDS Member Agencies. The procedure for
+review and authorization of CCSDS documents is detailed in Organization and Processes for
+the Consultative Committee for Space Data Systems (CCSDS A02.1-Y-3), and the record of
+Agency participation in the authorization of this document can be obtained from the CCSDS
+Secretariat at the address below.</p>
+<p>This document is published and maintained by:</p>
+<blockquote>
+<div><p>CCSDS Secretariat
+Space Communications and Navigation Office, 7L70
+Space Operations Mission Directorate
+NASA Headquarters
+Washington, DC 20546-0001, USA</p>
+</div></blockquote>
+</section>
+<section id="statement-of-intent">
+<h1>STATEMENT OF INTENT<a class="headerlink" href="#statement-of-intent" title="Link to this heading">¶</a></h1>
+<p>The Consultative Committee for Space Data Systems (CCSDS) is an organization officially
+established by the management of its members. The Committee meets periodically to address
+data systems problems that are common to all participants, and to formulate sound technical
+solutions to these problems. Inasmuch as participation in the CCSDS is completely
+voluntary, the results of Committee actions are termed Recommended Standards and are
+not considered binding on any Agency.</p>
+<p>This Recommended Standard is issued by, and represents the consensus of, the CCSDS
+members. Endorsement of this Recommendation is entirely voluntary. Endorsement,
+however, indicates the following understandings:</p>
+<ul class="simple">
+<li><p>Whenever a member establishes a CCSDS-related standard, this standard will be in
+accord with the relevant Recommended Standard. Establishing such a standard
+does not preclude other provisions which a member may develop.</p></li>
+<li><p>Whenever a member establishes a CCSDS-related standard, that member will
+provide other CCSDS members with the following information:</p>
+<ul>
+<li><p>The standard itself.</p></li>
+<li><p>The anticipated date of initial operational capability.</p></li>
+<li><p>The anticipated duration of operational service.</p></li>
+</ul>
+</li>
+<li><p>Specific service arrangements shall be made via memoranda of agreement. Neither
+this Recommended Standard nor any ensuing standard is a substitute for a
+memorandum of agreement.</p></li>
+</ul>
+<p>No later than three years from its date of issuance, this Recommended Standard will be
+reviewed by the CCSDS to determine whether it should: (1) remain in effect without change;
+(2) be changed to reflect the impact of new technologies, new requirements, or new
+directions; or (3) be retired or canceled.</p>
+<p>In those instances when a new version of a Recommended Standard is issued, existing
+CCSDS-related member standards and implementations are not negated or deemed to be
+non-CCSDS compatible. It is the responsibility of each member to determine when such
+standards or implementations are to be modified. Each member is, however, strongly
+encouraged to direct planning for its new standards and implementations towards the later
+version of the Recommended Standard.</p>
+</section>
+<section id="foreword">
+<h1>FOREWORD<a class="headerlink" href="#foreword" title="Link to this heading">¶</a></h1>
+<p>This document is a Recommended Standard for Conjunction Data Messages (CDMs) and has
+been prepared by the CCSDS. The CDM described in this Recommended Standard is the
+baseline concept for conjunction information interchange applications between interested
+parties.</p>
+<p>This Recommended Standard establishes a common framework and provides a common
+basis for the format of conjunction information exchange between originators of conjunction
+assessment data and satellite owner/operators. It allows implementing organizations within
+each conjunction assessment originator to proceed coherently with the development of
+compatible derived standards for the flight and ground systems that are within their
+cognizance. Derived Agency standards can implement only a subset of the optional features
+allowed by the Recommended Standard and can incorporate features not addressed by this
+Recommended Standard.</p>
+<p>Attention is drawn to the possibility that some of the elements of this document may be the
+subject of patent rights. CCSDS shall not be held responsible for identifying any or all such
+patent rights.</p>
+<p>Through the process of normal evolution, it is expected that expansion, deletion, or
+modification of this document may occur. This Recommended Standard is therefore subject
+to CCSDS document management and change control procedures, which are defined in
+Organization and Processes for the Consultative Committee for Space Data Systems
+(CCSDS A02.1-Y-3). Current versions of CCSDS documents are maintained at the CCSDS
+Web site:</p>
+<blockquote>
+<div><p><a class="reference external" href="http://www.ccsds.org/">http://www.ccsds.org/</a></p>
+</div></blockquote>
+<p>Questions relating to the contents or status of this document should be addressed to the
+CCSDS Secretariat at the address indicated on page i.</p>
+<p>At time of publication, the active Member and Observer Agencies of the CCSDS were:</p>
+<section id="member-agencies">
+<h2>Member Agencies<a class="headerlink" href="#member-agencies" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Agenzia Spaziale Italiana (ASI)/Italy.</p></li>
+<li><p>Canadian Space Agency (CSA)/Canada.</p></li>
+<li><p>Centre National d’Etudes Spatiales (CNES)/France.</p></li>
+<li><p>China National Space Administration (CNSA)/People’s Republic of China.</p></li>
+<li><p>Deutsches Zentrum für Luft- und Raumfahrt e. V. (DLR)/Germany.</p></li>
+<li><p>European Space Agency (ESA)/Europe.</p></li>
+<li><p>Federal Space Agency (FSA)/Russian Federation.</p></li>
+<li><p>Instituto Nacional de Pesquisas Espaciais (INPE)/Brazil.</p></li>
+<li><p>Japan Aerospace Exploration Agency (JAXA)/Japan.</p></li>
+<li><p>National Aeronautics and Space Administration (NASA)/USA.</p></li>
+<li><p>UK Space Agency/United Kingdom.</p></li>
+</ul>
+</section>
+<section id="observer-agencies">
+<h2>Observer Agencies<a class="headerlink" href="#observer-agencies" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Austrian Space Agency (ASA)/Austria.</p></li>
+<li><p>Belgian Federal Science Policy Office (BFSPO)/Belgium.</p></li>
+<li><p>Central Research Institute of Machine Building (TsNIIMash)/Russian Federation.</p></li>
+<li><p>China Satellite Launch and Tracking Control General, Beijing Institute of Tracking
+and Telecommunications Technology (CLTC/BITTT)/China.</p></li>
+<li><p>Chinese Academy of Sciences (CAS)/China.</p></li>
+<li><p>Chinese Academy of Space Technology (CAST)/China.</p></li>
+<li><p>Commonwealth Scientific and Industrial Research Organization (CSIRO)/Australia.</p></li>
+<li><p>CSIR Satellite Applications Centre (CSIR)/Republic of South Africa.</p></li>
+<li><p>Danish National Space Center (DNSC)/Denmark.</p></li>
+<li><p>Departamento de Ciência e Tecnologia Aeroespacial (DCTA)/Brazil.</p></li>
+<li><p>European Organization for the Exploitation of Meteorological Satellites
+(EUMETSAT)/Europe.</p></li>
+<li><p>European Telecommunications Satellite Organization (EUTELSAT)/Europe.</p></li>
+<li><p>Geo-Informatics and Space Technology Development Agency (GISTDA)/Thailand.</p></li>
+<li><p>Hellenic National Space Committee (HNSC)/Greece.</p></li>
+<li><p>Indian Space Research Organization (ISRO)/India.</p></li>
+<li><p>Institute of Space Research (IKI)/Russian Federation.</p></li>
+<li><p>KFKI Research Institute for Particle &amp; Nuclear Physics (KFKI)/Hungary.</p></li>
+<li><p>Korea Aerospace Research Institute (KARI)/Korea.</p></li>
+<li><p>Ministry of Communications (MOC)/Israel.</p></li>
+<li><p>National Institute of Information and Communications Technology (NICT)/Japan.</p></li>
+<li><p>National Oceanic and Atmospheric Administration (NOAA)/USA.</p></li>
+<li><p>National Space Agency of the Republic of Kazakhstan (NSARK)/Kazakhstan.</p></li>
+<li><p>National Space Organization (NSPO)/Chinese Taipei.</p></li>
+<li><p>Naval Center for Space Technology (NCST)/USA.</p></li>
+<li><p>Scientific and Technological Research Council of Turkey (TUBITAK)/Turkey.</p></li>
+<li><p>Space and Upper Atmosphere Research Commission (SUPARCO)/Pakistan.</p></li>
+<li><p>Swedish Space Corporation (SSC)/Sweden.</p></li>
+<li><p>United States Geological Survey (USGS)/USA.</p></li>
+</ul>
+</section>
+</section>
+<section id="document-control">
+<h1>DOCUMENT CONTROL<a class="headerlink" href="#document-control" title="Link to this heading">¶</a></h1>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Document</p></th>
+<th class="head"><p>Title</p></th>
+<th class="head"><p>Date</p></th>
+<th class="head"><p>Status</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>CCSDS 508.0-B-1</p></td>
+<td><p>Conjunction Data Message, Recommended Standard, Issue 1</p></td>
+<td><p>June 2013</p></td>
+<td><p>Current issue</p></td>
+</tr>
+<tr class="row-odd"><td><p>CCSDS 508.0-B-1 EC 1</p></td>
+<td><p>Editorial change 1</p></td>
+<td><p>March 2014</p></td>
+<td><p>Corrects broken hyperlinks; updates references to superseded documents; updates obsolete style elements.</p></td>
+</tr>
+<tr class="row-even"><td><p>CCSDS 508.0-B-1 EC 2</p></td>
+<td><p>Editorial change 2</p></td>
+<td><p>February 2018</p></td>
+<td><p>Addresses minor typographical and layout issues.</p></td>
+</tr>
+<tr class="row-odd"><td><p>CCSDS 508.0-B-1 Cor. 1</p></td>
+<td><p>Technical Corrigendum 1</p></td>
+<td><p>June 2018</p></td>
+<td><p>Adds direction to use Space Assigned Numbers Authority (SANA) registry values.</p></td>
+</tr>
+<tr class="row-even"><td><p>CCSDS 508.0-B-1 Cor. 2</p></td>
+<td><p>Technical Corrigendum 2</p></td>
+<td><p>October 2021</p></td>
+<td><p>Adds specifications and examples for messages with elements qualified with respect to a namespace.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="introduction">
+<span id="introduction-cdm"></span><h1>1 INTRODUCTION<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h1>
+<section id="purpose-and-scope">
+<span id="introduction-purpose-and-scope-cdm"></span><h2>1.1 PURPOSE AND SCOPE<a class="headerlink" href="#purpose-and-scope" title="Link to this heading">¶</a></h2>
+<p>This Conjunction Data Message (CDM) Recommended Standard specifies a standard
+message format for use in exchanging spacecraft conjunction information between
+originators of Conjunction Assessments (CAs) and satellite owner/operators and other
+authorized parties. Such exchanges are used to inform satellite owner/operators of
+conjunctions between objects in space to enable consistent warning by different
+organizations employing diverse CA techniques.</p>
+<p>This Recommended Standard will:</p>
+<ol class="loweralpha simple">
+<li><p>facilitate interoperability and enable consistent warning between data originators who
+supply CA and the satellite owner/operators who use it;</p></li>
+<li><p>facilitate automation for the CA processes; and</p></li>
+<li><p>provide critical information to enable timely CA decisions.</p></li>
+</ol>
+<p>This document includes requirements and criteria that the message format has been designed
+to meet (see annex D). Also included are informative descriptions of conjunction information
+pertinent to performing CA (see annex E).</p>
+</section>
+<section id="applicability">
+<span id="introduction-applicability-cdm"></span><h2>1.2 APPLICABILITY<a class="headerlink" href="#applicability" title="Link to this heading">¶</a></h2>
+<p>This Recommended Standard is applicable to satellite operations in all environments in
+which close approaches and collisions among satellites are concerns. It contains the
+specification for a CDM designed for applications involving conjunction information
+interchange between originators of CAs and recipients. Conjunction information includes
+data types such as miss distance, probability of collision, Time of Closest Approach (TCA),
+and closest approach relative position and velocity. Further information describing the
+conjunction information contained in this message can be found in section 3 and annex E.</p>
+<p>This message is suited for exchanges that involve manual or automated interaction. The
+attributes of a CDM make it suitable for use in machine-to-machine interfaces because of the
+large amount of data typically present. The CDM is self contained. However, additional
+information could be specified in an Interface Control Document (ICD) written jointly by the
+service originator and recipients.</p>
+<p>It is desirable that CDM originators maintain consistency with respect to the optional
+keywords provided in their implementations; i.e., it is desirable that the composition of the
+CDMs provided not change on a frequent basis.</p>
+<p>This Recommended Standard is applicable only to the message format and content, but not to
+its transmission nor to the algorithms used to produce the data within. The method of
+transmitting the message between exchange partners is beyond the scope of this document
+and could be specified in an ICD.</p>
+<p>The methods used to predict conjunctions and calculate the probability of collision, and the
+definition of the conjunction assessment accuracy underlying a particular CDM, are also
+outside the scope of this Recommended Standard (the interested reader can consult
+references in annex F).</p>
+</section>
+<section id="document-structure">
+<span id="introduction-document-structure-cdm"></span><h2>1.3 DOCUMENT STRUCTURE<a class="headerlink" href="#document-structure" title="Link to this heading">¶</a></h2>
+<p>Section 2 provides a brief overview of the CCSDS-recommended CDM.</p>
+<p>Section 3 provides details about the structure and content of the CDM in ‘Keyword = Value
+Notation’ (KVN).</p>
+<p>Section 4 provides details about the structure and content of the CDM in eXtensible Markup
+Language (XML).</p>
+<p>Section 5 addresses the CDM data in general.</p>
+<p>Section 6 discusses the syntax considerations of the CDM.</p>
+<p>Annex A contains an Implementation Conformance Statement (ICS) proforma that may be
+used by implementers to compactly describe their implementations.</p>
+<p>Annex B provides information on security, the Space Assigned Numbers Authority (SANA),
+and patent-related information.</p>
+<p>Annex C is a list of abbreviations and acronyms applicable to the CDM.</p>
+<p>Annex D provides rationale and requirements for the CDM Recommended Standard.</p>
+<p>Annex E provides a description of the CA information contained in the CDM.</p>
+<p>Annex F provides informative references.</p>
+</section>
+<section id="conventions-and-definitions">
+<span id="introduction-conventions-and-definitions-cdm"></span><h2>1.4 CONVENTIONS AND DEFINITIONS<a class="headerlink" href="#conventions-and-definitions" title="Link to this heading">¶</a></h2>
+<section id="notation">
+<span id="introduction-notation-cdm"></span><h3>1.4.1 NOTATION<a class="headerlink" href="#notation" title="Link to this heading">¶</a></h3>
+<section id="unit-notations">
+<span id="introduction-unit-notations-cdm"></span><h4>1.4.1.1 Unit Notations<a class="headerlink" href="#unit-notations" title="Link to this heading">¶</a></h4>
+<p>The following conventions for unit notations apply throughout this Recommended Standard.
+Insofar as possible, an effort has been made to use units that are part of the International
+System of Units (SI); units are either SI base units, SI derived units, or units outside the SI
+that are accepted for use with the SI (see reference [1]). The units used within this document
+are as follows:</p>
+<ul class="simple">
+<li><p>km: kilometers;</p></li>
+<li><p>m: meters;</p></li>
+<li><p>d: days, 86400 SI seconds;</p></li>
+<li><p>s: SI seconds;</p></li>
+<li><p>kg: kilograms;</p></li>
+<li><p>W: watts;</p></li>
+<li><p>%: percent.</p></li>
+</ul>
+</section>
+<section id="general">
+<span id="introduction-general-notation-cdm"></span><h4>1.4.1.2 General<a class="headerlink" href="#general" title="Link to this heading">¶</a></h4>
+<p>The following notational conventions are used in this document:</p>
+<ol class="loweralpha simple">
+<li><p>multiplication of units is denoted with a single asterisk ‘*’ (e.g., ‘kg*s’);</p></li>
+<li><p>exponents of units are denoted with a double asterisk ‘**’ (e.g., m<sup>2</sup> = m**2);</p></li>
+<li><p>division of units is denoted with a single forward slash ‘/’ (e.g., m/s).</p></li>
+</ol>
+</section>
+</section>
+<section id="nomenclature">
+<span id="introduction-nomenclature-cdm"></span><h3>1.4.2 NOMENCLATURE<a class="headerlink" href="#nomenclature" title="Link to this heading">¶</a></h3>
+<section id="introduction-general-nomenclature-cdm">
+<span id="id1"></span><h4>1.4.2.1 General<a class="headerlink" href="#introduction-general-nomenclature-cdm" title="Link to this heading">¶</a></h4>
+<p>The CDM contains information about a conjunction between two space objects (hereafter
+referred to as ‘Object1’ and ‘Object2’).</p>
+</section>
+<section id="normative-text">
+<span id="introduction-normative-text-cdm"></span><h4>1.4.2.2 Normative Text<a class="headerlink" href="#normative-text" title="Link to this heading">¶</a></h4>
+<p>The following conventions apply for the normative specifications in this Recommended
+Standard:</p>
+<ol class="loweralpha simple">
+<li><p>the words ‘shall’ and ‘must’ imply a binding and verifiable specification;</p></li>
+<li><p>the word ‘should’ implies an optional, but desirable, specification;</p></li>
+<li><p>the word ‘may’ implies an optional specification;</p></li>
+<li><p>the words ‘is’, ‘are’, and ‘will’ imply statements of fact.</p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>These conventions do not imply constraints on diction in text that is clearly
+informative in nature.</p>
+</div>
+</section>
+<section id="informative-text">
+<span id="introduction-informative-text-cdm"></span><h4>1.4.2.3 Informative Text<a class="headerlink" href="#informative-text" title="Link to this heading">¶</a></h4>
+<p>In the normative sections of this document (sections 3-6), informative text is set off from the
+normative specifications either in notes or under one of the following subsection headings:</p>
+<ul class="simple">
+<li><p>Overview;</p></li>
+<li><p>Discussion.</p></li>
+</ul>
+</section>
+</section>
+<section id="other-conventions">
+<span id="introduction-other-conventions-cdm"></span><h3>1.4.3 OTHER CONVENTIONS<a class="headerlink" href="#other-conventions" title="Link to this heading">¶</a></h3>
+<section id="terminology">
+<span id="introduction-terminology-cdm"></span><h4>1.4.3.1 Terminology<a class="headerlink" href="#terminology" title="Link to this heading">¶</a></h4>
+<p>In this document, the term ‘ASCII’is used generically to refer to the text character set
+defined in reference [2]. The terms ‘N/A’ and ‘n/a’ are defined to mean ‘not available’ or
+‘not applicable’.</p>
+</section>
+<section id="orthography">
+<span id="introduction-orthography-cdm"></span><h4>1.4.3.2 Orthography<a class="headerlink" href="#orthography" title="Link to this heading">¶</a></h4>
+<p>The following terms define orthographic conventions for XML notation in this
+Recommended Standard:</p>
+<dl class="simple">
+<dt>CamelCase</dt><dd><p>A style of capitalization in which the initial characters of concatenated words
+are capitalized, as in CamelCase.</p>
+</dd>
+<dt>lowerCamelCase</dt><dd><p>A variant of CamelCase in which the first character of a character string
+formed from concatenated words is lowercase, as in lowerCamelCase. In the case of a
+character string consisting of only a single word, only lowercase characters are used.</p>
+</dd>
+</dl>
+</section>
+</section>
+</section>
+<section id="references">
+<span id="introduction-references-cdm"></span><h2>1.5 REFERENCES<a class="headerlink" href="#references" title="Link to this heading">¶</a></h2>
+<p>The following publications contain provisions which, through reference in this text,
+constitute provisions of this Recommended Standard. At the time of publication, the editions
+indicated were valid. All publications are subject to revision, and users of this
+Recommended Standard are encouraged to investigate the possibility of applying the most
+recent editions of the publications indicated below. The CCSDS Secretariat maintains a
+register of currently valid CCSDS publications.</p>
+<p>[1] The International System of Units (SI). 8th ed. Sèvres, France: BIPM, 2006.
+[2] Information Technology—8-Bit Single-Byte Coded Graphic Character Sets—Part 1:</p>
+<blockquote>
+<div><p>Latin Alphabet No. 1. International Standard, ISO/IEC 8859-1:1998. Geneva: ISO,
+1998.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>[3] Henry S. Thompson, et al., eds. XML Schema Part 1: Structures. 2nd ed. W3C</dt><dd><p>Recommendation. N.p.: W3C, October 2004.</p>
+</dd>
+<dt>[4] Paul V. Biron and Ashok Malhotra, eds. XML Schema Part 2: Datatypes. 2nd ed. W3C</dt><dd><p>Recommendation. N.p.: W3C, October 2004.</p>
+</dd>
+<dt>[5] Time Code Formats. Issue 4. Recommendation for Space Data System Standards (Blue</dt><dd><p>Book), CCSDS 301.0-B-4. Washington, D.C.: CCSDS, November 2010.</p>
+</dd>
+<dt>[6] XML Specification for Navigation Data Messages. Issue 2. Recommendation for Space</dt><dd><p>Data System Standards (Blue Book), CCSDS 505.0-B-2. Washington, D.C.: CCSDS,
+May 2021.</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="overview">
+<span id="overview-cdm"></span><h1>2 OVERVIEW<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h1>
+<section id="overview-general-cdm">
+<span id="id2"></span><h2>2.1 GENERAL<a class="headerlink" href="#overview-general-cdm" title="Link to this heading">¶</a></h2>
+<p>This section provides a high-level overview of the CCSDS-recommended CDM, a message
+format designed to facilitate standardized exchange of conjunction information between
+originators of CA data and satellite owner/operators.</p>
+</section>
+<section id="cdm-basic-content">
+<span id="overview-basic-content-cdm"></span><h2>2.2 CDM BASIC CONTENT<a class="headerlink" href="#cdm-basic-content" title="Link to this heading">¶</a></h2>
+<p>The CDM is ASCII format encoded either in plain text or XML (see references [2], [3], and
+[4]). This CDM document describes a KVN-formatted message as well as an XML-formatted
+message (it is desirable that an ICD specify which of these formats will be exchanged).</p>
+<p>The CDM contains information about a single conjunction between Object1 and Object2. It
+contains</p>
+<ul class="simple">
+<li><p>Object1/Object2 positions/velocities at TCA with respect to one of a small set of
+widely used reference frames (ITRF, GCRF—see reference [F11], EME2000);</p></li>
+<li><p>Object1/Object2 covariances at TCA with respect to an object centered reference
+frame;</p></li>
+<li><p>the relative position/velocity of Object2 with respect to an Object1 centered reference
+frame;</p></li>
+<li><p>information relevant to how all the above data was determined.</p></li>
+</ul>
+<p>This information is used by satellite owner/operators to evaluate the risk of a conjunction and
+plan maneuvers if warranted by that agency/organization. Where possible, the CDM is
+consistent with other CCSDS Navigation Data Messages (NDMs). Similar tables have been
+used to describe header, metadata, and data information. Common keywords have been used
+in order to minimize duplication and confusion (e.g., CREATION_DATE, ORIGINATOR,
+OBJECT_NAME, INTERNATIONAL_DESIGNATOR, etc.).</p>
+</section>
+</section>
+<section id="cdm-content-structure-in-kvn">
+<span id="kvn-content-structure-cdm"></span><h1>3 CDM CONTENT/STRUCTURE IN KVN<a class="headerlink" href="#cdm-content-structure-in-kvn" title="Link to this heading">¶</a></h1>
+<section id="kvn-general-cdm">
+<span id="id3"></span><h2>3.1 GENERAL<a class="headerlink" href="#kvn-general-cdm" title="Link to this heading">¶</a></h2>
+<p>3.1.1 The CDM in KVN shall consist of digital data represented as ASCII text lines. The
+lines constituting a CDM shall be represented as a combination of the following:</p>
+<ol class="loweralpha simple">
+<li><p>a header;</p></li>
+<li><p>relative metadata/data (metadata/data describing relative relationships between
+Object1 and Object2);</p></li>
+<li><p>metadata (data about how Object1 and Object2 data were created);</p></li>
+<li><p>data (for both Object1 and Object2); and</p></li>
+<li><p>optional comments (explanatory information).</p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ol class="arabic simple">
+<li><p>KVN messages contain one keyword per line (see 6.3.1.4).</p></li>
+<li><p>The order of keywords in the KVN representation is fixed by this Recommended
+Standard (see 6.3.1.9).</p></li>
+</ol>
+</div>
+<p>3.1.2 The CDM shall be plain text consisting of CA data for a single conjunction event. It
+shall be easily readable by both humans and computers.</p>
+<p>3.1.3 The method of exchanging CDMs shall be decided on a case-by-case basis by the
+participating parties and should be documented in an ICD.</p>
+</section>
+<section id="cdm-header">
+<span id="kvn-header-cdm"></span><h2>3.2 CDM HEADER<a class="headerlink" href="#cdm-header" title="Link to this heading">¶</a></h2>
+<p>The CDM header shall consist of the KVN elements defined in table 3-1, which specifies for
+each KVN header item:</p>
+<ol class="loweralpha simple">
+<li><p>the keyword to be used;</p></li>
+<li><p>a short description of the item;</p></li>
+<li><p>examples of allowed values; and</p></li>
+<li><p>whether the item is obligatory or optional.</p></li>
+</ol>
+<div class="table-wrapper colwidths-given docutils container" id="id8">
+<span id="table-3-1-cdm"></span><span id="table-3-1-cdm"></span><table class="docutils align-default" id="id8">
+<caption><span class="caption-text">Table 3-1: CDM KVN Header</span><a class="headerlink" href="#id8" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 50.0%" />
+<col style="width: 15.0%" />
+<col style="width: 15.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Keyword</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Example of Values</p></th>
+<th class="head"><p>Obligatory</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>CCSDS_CDM_VERS</p></td>
+<td><p>Format version in the form of ‘x.y’, where ‘y’ is incremented for corrections
+and minor changes, and ‘x’ is incremented for major changes.</p></td>
+<td><p>1.0
+2.0</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>COMMENT</p></td>
+<td><p>(See 6.3.4 for formatting rules.)</p></td>
+<td><p>COMMENT This is a
+comment</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CREATION_DATE</p></td>
+<td><p>Message creation date/time in Coordinated Universal Time (UTC).
+(See 6.3.2.6 for formatting rules.)</p></td>
+<td><p>2010-03-12T22:31:12.000
+2010-071T22:31:12.000</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>ORIGINATOR</p></td>
+<td><p>Creating agency or owner/operator. Value should be the ‘Abbreviation’ value
+from the SANA ‘Organizations’ registry
+(<a class="reference external" href="https://sanaregistry.org/r/organizations">https://sanaregistry.org/r/organizations</a>) for an organization that has the Role of
+‘Conjunction Data Message Originator’. (See 5.2.9 for formatting rules.)</p></td>
+<td><p>JSPOC, ESA SST,
+CAESAR, JPL, SDC</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>MESSAGE_FOR</p></td>
+<td><p>Spacecraft name(s) for which the CDM is provided.</p></td>
+<td><p>SPOT, ENVISAT,
+IRIDIUM, INTELSAT</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>MESSAGE_ID</p></td>
+<td><p>ID that uniquely identifies a message from a given originator. The format and
+content of the message identifier value are at the discretion of the originator.
+(See 5.2.9 for formatting rules.)</p></td>
+<td><p>201113719185
+ABC-12_34</p></td>
+<td><p>Yes</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="cdm-relative-metadata-data">
+<span id="kvn-relative-metadata-data-cdm"></span><h2>3.3 CDM RELATIVE METADATA/DATA<a class="headerlink" href="#cdm-relative-metadata-data" title="Link to this heading">¶</a></h2>
+<p>The CDM relative metadata/data shall consist of the KVN elements defined in table 3-2,
+which specifies for each KVN relative metadata/data item:</p>
+<ol class="loweralpha simple">
+<li><p>the keyword to be used;</p></li>
+<li><p>a short description of the item;</p></li>
+<li><p>the units to be used if applicable; and</p></li>
+<li><p>whether the item is obligatory or optional.</p></li>
+</ol>
+<div class="table-wrapper colwidths-given docutils container" id="id9">
+<span id="table-3-2-cdm"></span><span id="table-3-2-cdm"></span><table class="docutils align-default" id="id9">
+<caption><span class="caption-text">Table 3-2: CDM KVN Relative Metadata/Data</span><a class="headerlink" href="#id9" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 55.0%" />
+<col style="width: 10.0%" />
+<col style="width: 10.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Keyword</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Units</p></th>
+<th class="head"><p>Obligatory</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>COMMENT</p></td>
+<td><p>(See 6.3.4 for formatting rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>TCA</p></td>
+<td><p>The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>MISS_DISTANCE</p></td>
+<td><p>The norm of the relative position vector. It indicates how close the two objects are at
+TCA. Data type = double.</p></td>
+<td><p>m</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>RELATIVE_SPEED</p></td>
+<td><p>The norm of the relative velocity vector. It indicates how fast the two objects are moving
+relative to each other at TCA. Data type = double.</p></td>
+<td><p>m/s</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>RELATIVE_POSITION_R</p></td>
+<td><p>The R component of Object2’s position relative to Object1’s position in the Radial,
+Transverse, and Normal (RTN) coordinate frame. (See annex E for definition.) Data type
+= double.</p></td>
+<td><p>m</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>RELATIVE_POSITION_T</p></td>
+<td><p>The T component of Object2’s position relative to Object1’s position in the RTN
+coordinate frame. (See annex E for definition.) Data type = double.</p></td>
+<td><p>m</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>RELATIVE_POSITION_N</p></td>
+<td><p>The N component of Object2’s position relative to Object1’s position in the RTN
+coordinate frame. (See annex E for definition.) Data type = double.</p></td>
+<td><p>m</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>RELATIVE_VELOCITY_R</p></td>
+<td><p>The R component of Object2’s velocity relative to Object1’s velocity in the RTN
+coordinate frame. (See annex E for definition.) Data type = double.</p></td>
+<td><p>m/s</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>RELATIVE_VELOCITY_T</p></td>
+<td><p>The T component of Object2’s velocity relative to Object1’s velocity in the RTN
+coordinate frame. (See annex E for definition.) Data type = double.</p></td>
+<td><p>m/s</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>RELATIVE_VELOCITY_N</p></td>
+<td><p>The N component of Object2’s velocity relative to Object1’s velocity in the RTN
+coordinate frame. (See annex E for definition.) Data type = double.</p></td>
+<td><p>m/s</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>START_SCREEN_PERIOD</p></td>
+<td><p>The start time in UTC of the screening period for the conjunction assessment. (See 6.3.2.6
+for formatting rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>STOP_SCREEN_PERIOD</p></td>
+<td><p>The stop time in UTC of the screening period for the conjunction assessment. (See 6.3.2.6
+for formatting rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>SCREEN_VOLUME_FRAME</p></td>
+<td><p>Name of the Object1 centered reference frame in which the screening volume data are given.
+Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex E for
+definition.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>SCREEN_VOLUME_SHAPE</p></td>
+<td><p>Shape of the screening volume: ELLIPSOID or BOX.</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>SCREEN_VOLUME_X</p></td>
+<td><p>The R or T (depending on if RTN or TVN is selected) component size of the screening
+volume in the SCREEN_VOLUME_FRAME. Data type = double.</p></td>
+<td><p>m</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>SCREEN_VOLUME_Y</p></td>
+<td><p>The T or V (depending on if RTN or TVN is selected) component size of the screening
+volume in the SCREEN_VOLUME_FRAME. Data type = double.</p></td>
+<td><p>m</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>SCREEN_VOLUME_Z</p></td>
+<td><p>The N component size of the screening volume in the SCREEN_VOLUME_FRAME.
+Data type = double.</p></td>
+<td><p>m</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>SCREEN_ENTRY_TIME</p></td>
+<td><p>The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for formatting
+rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>SCREEN_EXIT_TIME</p></td>
+<td><p>The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
+rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>COLLISION_PROBABILITY</p></td>
+<td><p>The probability (denoted ‘p’ where 0.0&lt;=p&lt;=1.0), that Object1 and Object2 will
+collide. Data type = double.</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>COLLISION_PROBABILITY_METHOD</p></td>
+<td><p>The method that was used to calculate the collision probability. (See annex E for
+definition.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="cdm-metadata">
+<span id="kvn-metadata-cdm"></span><h2>3.4 CDM METADATA<a class="headerlink" href="#cdm-metadata" title="Link to this heading">¶</a></h2>
+<p>The CDM metadata shall consist of the KVN elements defined in table 3-3, which specifies
+for each KVN metadata item:</p>
+<ol class="loweralpha simple">
+<li><p>the keyword to be used;</p></li>
+<li><p>a short description of the item;</p></li>
+<li><p>normative values or examples of allowed values;</p></li>
+<li><p>whether the ‘Normative Values/Examples’ column contains normative values (N) or
+examples of allowed values (E) for the item; and</p></li>
+<li><p>whether the item is obligatory or optional.</p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Table 3-3 and table 3-4 will be used to define both Object1 and Object2
+depending on the value of the keyword OBJECT which is specified in table 3-3.</p>
+</div>
+<div class="table-wrapper colwidths-given docutils container" id="id10">
+<span id="table-3-3-cdm"></span><span id="table-3-3-cdm"></span><table class="docutils align-default" id="id10">
+<caption><span class="caption-text">Table 3-3: CDM KVN Metadata</span><a class="headerlink" href="#id10" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 45.0%" />
+<col style="width: 20.0%" />
+<col style="width: 5.0%" />
+<col style="width: 10.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Keyword</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Normative Values/
+Examples</p></th>
+<th class="head"><p>N/E</p></th>
+<th class="head"><p>Obligatory</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>COMMENT</p></td>
+<td><p>(See 6.3.4 for formatting rules.)</p></td>
+<td><p>COMMENT This is a
+comment</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>OBJECT</p></td>
+<td><p>The object to which the
+metadata and data apply
+(Object1 or Object2).</p></td>
+<td><p>OBJECT1
+OBJECT2</p></td>
+<td><p>N</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>OBJECT_DESIGNATOR</p></td>
+<td><p>The satellite catalog
+designator for the object. (See
+5.2.9 for formatting rules.)</p></td>
+<td><p>12345</p></td>
+<td><p>E</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CATALOG_NAME</p></td>
+<td><p>The satellite catalog used for
+the object. Value should be
+taken from the SANA
+‘Conjunction Data Message
+CATALOG_NAME’ registry
+(<a class="reference external" href="https://sanaregistry.org/r/cdm">https://sanaregistry.org/r/cdm</a>
+_catalog). (See 5.2.9 for
+formatting rules.)</p></td>
+<td><p>SATCAT</p></td>
+<td><p>E</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>OBJECT_NAME</p></td>
+<td><p>Spacecraft name for the
+object.</p></td>
+<td><p>SPOT, ENVISAT,
+IRIDIUM, INTELSAT</p></td>
+<td><p>E</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>INTERNATIONAL_DESIGNATOR</p></td>
+<td><p>The full international
+designator for the object.
+Values shall have the format
+YYYY-NNNP{PP}, where:
+YYYY = year of launch;
+NNN = three-digit serial
+number of launch (with
+leading zeros);
+P{PP} = At least one capital
+letter for the identification of
+the part brought into space by
+the launch. In cases where the
+object has no international
+designator, the value
+UNKNOWN should be used.
+(See 5.2.9 for further
+formatting rules.)</p></td>
+<td><p>2002-021A
+2002-009A
+1997-020AA
+1998-037ABC
+2001-049PE
+UNKNOWN</p></td>
+<td><p>E</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>OBJECT_TYPE</p></td>
+<td><p>The object type.</p></td>
+<td><p>PAYLOAD
+ROCKET BODY
+DEBRIS
+UNKNOWN
+OTHER</p></td>
+<td><p>N</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>OPERATOR_CONTACT_POSITION</p></td>
+<td><p>Contact position of the
+owner/operator of the object.</p></td>
+<td><p>ORBITAL SAFETY
+ANALYST (OSA),
+NETWORK
+CONTROLLER</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>OPERATOR_ORGANIZATION</p></td>
+<td><p>Contact organization of the
+object.</p></td>
+<td><p>EUMETSAT, ESA,
+INTELSAT, IRIDIUM</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>OPERATOR_PHONE</p></td>
+<td><p>Phone number of the contact
+position or organization for the
+object.</p></td>
+<td><p>+49615130312</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>OPERATOR_EMAIL</p></td>
+<td><p>Email address of the contact
+position or organization of the
+object.</p></td>
+<td><p>JOHN.DOE&#64;
+SOMEWHERE.NET</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>EPHEMERIS_NAME</p></td>
+<td><p>Unique name of the external
+ephemeris file used for the
+object or NONE. This is used
+to indicate whether an external
+(i.e., Owner/Operator [O/O]
+provided) ephemeris file was
+used to calculate the CA. If
+‘NONE’ is specified, then the
+output of the most current
+Orbit Determination (OD) of
+the CDM originator was used
+in the CA.</p></td>
+<td><p>EPHEMERIS
+SATELLITE A,
+NONE</p></td>
+<td><p>E</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>COVARIANCE_METHOD</p></td>
+<td><p>Method used to calculate the
+covariance during the OD that
+produced the state vector, or
+whether an arbitrary, non-
+calculated default value was
+used. Caution should be used
+when using the default value
+for calculating collision
+probability.</p></td>
+<td><p>CALCULATED
+DEFAULT</p></td>
+<td><p>N</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>MANEUVERABLE</p></td>
+<td><p>The maneuver capacity of the
+object. (See 1.4.3.1 for
+definition of ‘N/A’.)</p></td>
+<td><p>YES
+NO
+N/A</p></td>
+<td><p>N</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>ORBIT_CENTER</p></td>
+<td><p>The central body about which
+Object1 and Object2 orbit. If
+not specified, the center is
+assumed to be Earth.</p></td>
+<td><p>EARTH
+SUN
+MOON
+MARS</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>REF_FRAME</p></td>
+<td><p>Name of the reference frame
+in which the state vector data
+are given. Value must be
+selected from the list of values
+to the right (see reference [F1])
+and be the same for both
+Object1 and Object2.</p></td>
+<td><p>GCRF (see reference
+[F11])
+EME2000
+ITRF</p></td>
+<td><p>N</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>GRAVITY_MODEL</p></td>
+<td><p>The gravity model used for the
+OD of the object. (See annex
+E under GRAVITY_MODEL for
+definition).</p></td>
+<td><p>EGM-96: 36D 360
+WGS-84_GEOID: 24D
+240
+JGM-2: 41D 410</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>ATMOSPHERIC_MODEL</p></td>
+<td><p>The atmospheric density
+model used for the OD of the
+object. If ‘NONE’ is specified,
+then no atmospheric model
+was used.</p></td>
+<td><p>JACCHIA 70
+MSIS
+JACCHIA 70 DCA
+NONE</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>N_BODY_PERTURBATIONS</p></td>
+<td><p>The N-body gravitational
+perturbations used for the OD
+of the object. If ‘NONE’ is
+specified, then no third-body
+gravitational perturbations
+were used.</p></td>
+<td><p>MOON, SUN
+JUPITER
+NONE</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>SOLAR_RAD_PRESSURE</p></td>
+<td><p>Indication of whether solar
+radiation pressure
+perturbations were used for the
+OD of the object.</p></td>
+<td><p>YES
+NO</p></td>
+<td><p>N</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>EARTH_TIDES</p></td>
+<td><p>Indication of whether solid
+Earth and ocean tides were
+used for the OD of the object.</p></td>
+<td><p>YES
+NO</p></td>
+<td><p>N</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>INTRACK_THRUST</p></td>
+<td><p>Indication of whether in-track
+thrust modeling was used for
+the OD of the object.</p></td>
+<td><p>YES
+NO</p></td>
+<td><p>N</p></td>
+<td><p>No</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="cdm-data">
+<span id="kvn-data-cdm"></span><h2>3.5 CDM DATA<a class="headerlink" href="#cdm-data" title="Link to this heading">¶</a></h2>
+<p>3.5.1 The CDM Data section shall be formed as logical blocks:</p>
+<ul class="simple">
+<li><p>OD Parameters;</p></li>
+<li><p>Additional Parameters;</p></li>
+<li><p>State Vector; and</p></li>
+<li><p>Covariance Matrix.</p></li>
+</ul>
+<p>3.5.2 The logical blocks of the CDM Data section shall consist of KVN elements as
+defined in table 3-4, which specifies for each data item:</p>
+<ol class="loweralpha simple">
+<li><p>the keyword to be used;</p></li>
+<li><p>a short description of the item;</p></li>
+<li><p>the units to be used if applicable; and</p></li>
+<li><p>whether the item is obligatory or optional.</p></li>
+</ol>
+<div class="table-wrapper colwidths-given docutils container" id="id11">
+<span id="table-3-4-cdm"></span><span id="table-3-4-cdm"></span><table class="docutils align-default" id="id11">
+<caption><span class="caption-text">Table 3-4: CDM KVN Data</span><a class="headerlink" href="#id11" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 65.0%" />
+<col style="width: 5.0%" />
+<col style="width: 5.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Keyword</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Units</p></th>
+<th class="head"><p>Obligatory</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>COMMENT</p></td>
+<td><p>(See 6.3.4 for formatting rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>OD Parameters</strong></p></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>COMMENT</p></td>
+<td><p>(See 6.3.4 for formatting rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>TIME_LASTOB_START</p></td>
+<td><p>The start of a time interval (UTC) that contains the time of the last accepted
+observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+of zero duration (i.e., same value as that of TIME_LASTOB_END).</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>TIME_LASTOB_END</p></td>
+<td><p>The end of a time interval (UTC) that contains the time of the last accepted
+observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+of zero duration (i.e., same value as that of TIME_LASTOB_START).</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>RECOMMENDED_OD_SPAN</p></td>
+<td><p>The recommended OD time span calculated for the object. (See annex E for definition.)
+Data type = double.</p></td>
+<td><p>d</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>ACTUAL_OD_SPAN</p></td>
+<td><p>Based on the observations available and the RECOMMENDED_OD_SPAN, the actual
+time span used for the OD of the object. (See annex E for definition.) Data type =
+double.</p></td>
+<td><p>d</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>OBS_AVAILABLE</p></td>
+<td><p>The number of observations available for the OD of the object. (See annex E for
+definition.) Data type = integer.</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>OBS_USED</p></td>
+<td><p>The number of observations accepted for the OD of the object. (See annex E for
+definition.) Data type = integer.</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>TRACKS_AVAILABLE</p></td>
+<td><p>The number of sensor tracks available for the OD of the object. (See annex E for
+definition.) Data type = integer.</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>TRACKS_USED</p></td>
+<td><p>The number of sensor tracks accepted for the OD of the object. (See annex E for
+definition.) Data type = integer.</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>RESIDUALS_ACCEPTED</p></td>
+<td><p>The percentage of residuals accepted in the OD of the object. Data type = double, range
+= 0.0 to 100.0.</p></td>
+<td><p>%</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>WEIGHTED_RMS</p></td>
+<td><p>The weighted Root Mean Square (RMS) of the residuals from a batch least squares OD.
+(See annex E for definition.) Data type = double.</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Additional Parameters</strong></p></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>COMMENT</p></td>
+<td><p>(See 6.3.4 for formatting rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>AREA_PC</p></td>
+<td><p>The actual area of the object. (See annex E for definition.) Data type = double.</p></td>
+<td><p>m**2</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>AREA_DRG</p></td>
+<td><p>The effective area of the object exposed to atmospheric drag. (See annex E for
+definition.) Data type = double.</p></td>
+<td><p>m**2</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>AREA_SRP</p></td>
+<td><p>The effective area of the object exposed to solar radiation pressure. (See annex E for
+definition.) Data type = double.</p></td>
+<td><p>m**2</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>MASS</p></td>
+<td><p>The mass of the object. Data type = double.</p></td>
+<td><p>kg</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CD_AREA_OVER_MASS</p></td>
+<td><p>The object’s CD.A/m used to propagate the state vector and covariance to TCA. (See
+annex E for definition.) Data type = double.</p></td>
+<td><p>m**2/kg</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CR_AREA_OVER_MASS</p></td>
+<td><p>The object’s C, •A/m used to propagate the state vector and covariance to TCA. (See
+annex E for definition.) Data type = double.</p></td>
+<td><p>m**2/kg</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>THRUST_ACCELERATION</p></td>
+<td><p>The object’s acceleration due to in-track thrust used to propagate the state vector and
+covariance to TCA. (See annex E for definition.) Data type = double.</p></td>
+<td><p>m/s**2</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>SEDR</p></td>
+<td><p>The amount of energy being removed from the object’s orbit by atmospheric drag. This
+value is an average calculated during the OD. (See annex E for definition.) Data type
+= double.</p></td>
+<td><p>W/kg</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>State Vector (all values have data type=double)</strong></p></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>COMMENT</p></td>
+<td><p>(See 6.3.4 for formatting rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>X</p></td>
+<td><p>Object Position Vector X component.</p></td>
+<td><p>km</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>Y</p></td>
+<td><p>Object Position Vector Y component.</p></td>
+<td><p>km</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>Z</p></td>
+<td><p>Object Position Vector Z component.</p></td>
+<td><p>km</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>X_DOT</p></td>
+<td><p>Object Velocity Vector X component.</p></td>
+<td><p>km/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>Y_DOT</p></td>
+<td><p>Object Velocity Vector Y component.</p></td>
+<td><p>km/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>Z_DOT</p></td>
+<td><p>Object Velocity Vector Z component.</p></td>
+<td><p>km/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Covariance Matrix in the RTN Coordinate Frame (see annex E for definition)
+(Covariance Matrix 9x9 Lower Triangular Form. All parameters of the 6×6 position/velocity submatrix must be
+given. All data type=double.)</strong></p></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>COMMENT</p></td>
+<td><p>(See 6.3.4 for formatting rules.)</p></td>
+<td><p>n/a</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CR_R</p></td>
+<td><p>Object covariance matrix [1,1].</p></td>
+<td><p>m**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CT_R</p></td>
+<td><p>Object covariance matrix [2,1].</p></td>
+<td><p>m**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CT_T</p></td>
+<td><p>Object covariance matrix [2,2].</p></td>
+<td><p>m**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CN_R</p></td>
+<td><p>Object covariance matrix [3,1].</p></td>
+<td><p>m**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CN_T</p></td>
+<td><p>Object covariance matrix [3,2].</p></td>
+<td><p>m**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CN_N</p></td>
+<td><p>Object covariance matrix [3,3].</p></td>
+<td><p>m**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CRDOT_R</p></td>
+<td><p>Object covariance matrix [4,1].</p></td>
+<td><p>m**2/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CRDOT_T</p></td>
+<td><p>Object covariance matrix [4,2].</p></td>
+<td><p>m**2/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CRDOT_N</p></td>
+<td><p>Object covariance matrix [4,3].</p></td>
+<td><p>m**2/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CRDOT_RDOT</p></td>
+<td><p>Object covariance matrix [4,4].</p></td>
+<td><p>m**2/s**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CTDOT_R</p></td>
+<td><p>Object covariance matrix [5,1].</p></td>
+<td><p>m**2/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CTDOT_T</p></td>
+<td><p>Object covariance matrix [5,2].</p></td>
+<td><p>m**2/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CTDOT_N</p></td>
+<td><p>Object covariance matrix [5,3].</p></td>
+<td><p>m**2/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CTDOT_RDOT</p></td>
+<td><p>Object covariance matrix [5,4].</p></td>
+<td><p>m**2/s**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CTDOT_TDOT</p></td>
+<td><p>Object covariance matrix [5,5].</p></td>
+<td><p>m**2/s**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CNDOT_R</p></td>
+<td><p>Object covariance matrix [6,1].</p></td>
+<td><p>m**2/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CNDOT_T</p></td>
+<td><p>Object covariance matrix [6,2].</p></td>
+<td><p>m**2/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CNDOT_N</p></td>
+<td><p>Object covariance matrix [6,3].</p></td>
+<td><p>m**2/s</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CNDOT_RDOT</p></td>
+<td><p>Object covariance matrix [6,4].</p></td>
+<td><p>m**2/s**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CNDOT_TDOT</p></td>
+<td><p>Object covariance matrix [6,5].</p></td>
+<td><p>m**2/s**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CNDOT_NDOT</p></td>
+<td><p>Object covariance matrix [6,6].</p></td>
+<td><p>m**2/s**2</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>CDRG_R</p></td>
+<td><p>Object covariance matrix [7,1].</p></td>
+<td><p>m**3/kg</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CDRG_T</p></td>
+<td><p>Object covariance matrix [7,2].</p></td>
+<td><p>m**3/kg</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CDRG_N</p></td>
+<td><p>Object covariance matrix [7,3].</p></td>
+<td><p>m**3/kg</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CDRG_RDOT</p></td>
+<td><p>Object covariance matrix [7,4].</p></td>
+<td><p>m**3/(kg*s)</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CDRG_TDOT</p></td>
+<td><p>Object covariance matrix [7,5].</p></td>
+<td><p>m**3/(kg*s)</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CDRG_NDOT</p></td>
+<td><p>Object covariance matrix [7,6].</p></td>
+<td><p>m**3/(kg*s)</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CDRG_DRG</p></td>
+<td><p>Object covariance matrix [7,7].</p></td>
+<td><p>m**4/kg**2</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CSRP_R</p></td>
+<td><p>Object covariance matrix [8,1].</p></td>
+<td><p>m**3/kg</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CSRP_T</p></td>
+<td><p>Object covariance matrix [8,2].</p></td>
+<td><p>m**3/kg</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CSRP_N</p></td>
+<td><p>Object covariance matrix [8,3].</p></td>
+<td><p>m**3/kg</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CSRP_RDOT</p></td>
+<td><p>Object covariance matrix [8,4].</p></td>
+<td><p>m**3/(kg*s)</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CSRP_TDOT</p></td>
+<td><p>Object covariance matrix [8,5].</p></td>
+<td><p>m**3/(kg*s)</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CSRP_NDOT</p></td>
+<td><p>Object covariance matrix [8,6].</p></td>
+<td><p>m**3/(kg*s)</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CSRP_DRG</p></td>
+<td><p>Object covariance matrix [8,7].</p></td>
+<td><p>m**4/kg**2</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CSRP_SRP</p></td>
+<td><p>Object covariance matrix [8,8].</p></td>
+<td><p>m**4/kg**2</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CTHR_R</p></td>
+<td><p>Object covariance matrix [9,1].</p></td>
+<td><p>m**2/s**2</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CTHR_T</p></td>
+<td><p>Object covariance matrix [9,2].</p></td>
+<td><p>m**2/s**2</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CTHR_N</p></td>
+<td><p>Object covariance matrix [9,3].</p></td>
+<td><p>m**2/s**2</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CTHR_RDOT</p></td>
+<td><p>Object covariance matrix [9,4].</p></td>
+<td><p>m**2/s**3</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CTHR_TDOT</p></td>
+<td><p>Object covariance matrix [9,5].</p></td>
+<td><p>m**2/s**3</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CTHR_NDOT</p></td>
+<td><p>Object covariance matrix [9,6].</p></td>
+<td><p>m**2/s**3</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CTHR_DRG</p></td>
+<td><p>Object covariance matrix [9,7].</p></td>
+<td><p>m**3/(kg*s**2)</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>CTHR_SRP</p></td>
+<td><p>Object covariance matrix [9,8].</p></td>
+<td><p>m**3/(kg*s**2)</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>CTHR_THR</p></td>
+<td><p>Object covariance matrix [9,9].</p></td>
+<td><p>m**2/s**4</p></td>
+<td><p>No</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="id4">
+<span id="id5"></span><h2>3.4 CDM METADATA<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h2>
+<p>The CDM metadata shall consist of the KVN elements defined in table 3-3, which specifies
+for each KVN metadata item:</p>
+<ol class="loweralpha simple">
+<li><p>the keyword to be used;</p></li>
+<li><p>a short description of the item;</p></li>
+<li><p>normative values or examples of allowed values;</p></li>
+<li><p>whether the ‘Normative Values/Examples’ column contains normative values (N) or
+examples of allowed values (E) for the item; and</p></li>
+<li><p>whether the item is obligatory or optional.</p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Table 3-3 and table 3-4 will be used to define both Object1 and Object2
+depending on the value of the keyword OBJECT which is specified in table 3-3.</p>
+</div>
+<div class="table-wrapper colwidths-given docutils container" id="id12">
+<span id="id6"></span><span id="id6"></span><table class="docutils align-default" id="id12">
+<caption><span class="caption-text">Table 3-3: CDM KVN Metadata</span><a class="headerlink" href="#id12" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 45.0%" />
+<col style="width: 20.0%" />
+<col style="width: 5.0%" />
+<col style="width: 10.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Keyword</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Normative Values/
+Examples</p></th>
+<th class="head"><p>N/E</p></th>
+<th class="head"><p>Obligatory</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>COMMENT</p></td>
+<td><p>(See 6.3.4 for formatting rules.)</p></td>
+<td><p>COMMENT This is a
+comment</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>OBJECT</p></td>
+<td><p>The object to which the
+metadata and data apply
+(Object1 or Object2).</p></td>
+<td><p>OBJECT1
+OBJECT2</p></td>
+<td><p>N</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>OBJECT_DESIGNATOR</p></td>
+<td><p>The satellite catalog
+designator for the object. (See
+5.2.9 for formatting rules.)</p></td>
+<td><p>12345</p></td>
+<td><p>E</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>CATALOG_NAME</p></td>
+<td><p>The satellite catalog used for
+the object. Value should be
+taken from the SANA
+‘Conjunction Data Message
+CATALOG_NAME’ registry
+(<a class="reference external" href="https://sanaregistry.org/r/cdm">https://sanaregistry.org/r/cdm</a>
+_catalog). (See 5.2.9 for
+formatting rules.)</p></td>
+<td><p>SATCAT</p></td>
+<td><p>E</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>OBJECT_NAME</p></td>
+<td><p>Spacecraft name for the
+object.</p></td>
+<td><p>SPOT, ENVISAT,
+IRIDIUM, INTELSAT</p></td>
+<td><p>E</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>INTERNATIONAL_DESIGNATOR</p></td>
+<td><p>The full international
+designator for the object.
+Values shall have the format
+YYYY-NNNP{PP}, where:
+YYYY = year of launch;
+NNN = three-digit serial
+number of launch (with
+leading zeros);
+P{PP} = At least one capital
+letter for the identification of
+the part brought into space by
+the launch. In cases where the
+object has no international
+designator, the value
+UNKNOWN should be used.
+(See 5.2.9 for further
+formatting rules.)</p></td>
+<td><p>2002-021A
+2002-009A
+1997-020AA
+1998-037ABC
+2001-049PE
+UNKNOWN</p></td>
+<td><p>E</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>OBJECT_TYPE</p></td>
+<td><p>The object type.</p></td>
+<td><p>PAYLOAD
+ROCKET BODY
+DEBRIS
+UNKNOWN
+OTHER</p></td>
+<td><p>N</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>OPERATOR_CONTACT_POSITION</p></td>
+<td><p>Contact position of the
+owner/operator of the object.</p></td>
+<td><p>ORBITAL SAFETY
+ANALYST (OSA),
+NETWORK
+CONTROLLER</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>OPERATOR_ORGANIZATION</p></td>
+<td><p>Contact organization of the
+object.</p></td>
+<td><p>EUMETSAT, ESA,
+INTELSAT, IRIDIUM</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>OPERATOR_PHONE</p></td>
+<td><p>Phone number of the contact
+position or organization for the
+object.</p></td>
+<td><p>+49615130312</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>OPERATOR_EMAIL</p></td>
+<td><p>Email address of the contact
+position or organization of the
+object.</p></td>
+<td><p>JOHN.DOE&#64;
+SOMEWHERE.NET</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>EPHEMERIS_NAME</p></td>
+<td><p>Unique name of the external
+ephemeris file used for the
+object or NONE. This is used
+to indicate whether an external
+(i.e., Owner/Operator [O/O]
+provided) ephemeris file was
+used to calculate the CA. If
+‘NONE’ is specified, then the
+output of the most current
+Orbit Determination (OD) of
+the CDM originator was used
+in the CA.</p></td>
+<td><p>EPHEMERIS
+SATELLITE A,
+NONE</p></td>
+<td><p>E</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>COVARIANCE_METHOD</p></td>
+<td><p>Method used to calculate the
+covariance during the OD that
+produced the state vector, or
+whether an arbitrary, non-
+calculated default value was
+used. Caution should be used
+when using the default value
+for calculating collision
+probability.</p></td>
+<td><p>CALCULATED
+DEFAULT</p></td>
+<td><p>N</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>MANEUVERABLE</p></td>
+<td><p>The maneuver capacity of the
+object. (See 1.4.3.1 for
+definition of ‘N/A’.)</p></td>
+<td><p>YES
+NO
+N/A</p></td>
+<td><p>N</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>ORBIT_CENTER</p></td>
+<td><p>The central body about which
+Object1 and Object2 orbit. If
+not specified, the center is
+assumed to be Earth.</p></td>
+<td><p>EARTH
+SUN
+MOON
+MARS</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>REF_FRAME</p></td>
+<td><p>Name of the reference frame
+in which the state vector data
+are given. Value must be
+selected from the list of values
+to the right (see reference [F1])
+and be the same for both
+Object1 and Object2.</p></td>
+<td><p>GCRF (see reference
+[F11])
+EME2000
+ITRF</p></td>
+<td><p>N</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>GRAVITY_MODEL</p></td>
+<td><p>The gravity model used for the
+OD of the object. (See annex
+E under GRAVITY_MODEL for
+definition).</p></td>
+<td><p>EGM-96: 36D 360
+WGS-84_GEOID: 24D
+240
+JGM-2: 41D 410</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>ATMOSPHERIC_MODEL</p></td>
+<td><p>The atmospheric density
+model used for the OD of the
+object. If ‘NONE’ is specified,
+then no atmospheric model
+was used.</p></td>
+<td><p>JACCHIA 70
+MSIS
+JACCHIA 70 DCA
+NONE</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>N_BODY_PERTURBATIONS</p></td>
+<td><p>The N-body gravitational
+perturbations used for the OD
+of the object. If ‘NONE’ is
+specified, then no third-body
+gravitational perturbations
+were used.</p></td>
+<td><p>MOON, SUN
+JUPITER
+NONE</p></td>
+<td><p>E</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>SOLAR_RAD_PRESSURE</p></td>
+<td><p>Indication of whether solar
+radiation pressure
+perturbations were used for the
+OD of the object.</p></td>
+<td><p>YES
+NO</p></td>
+<td><p>N</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>EARTH_TIDES</p></td>
+<td><p>Indication of whether solid
+Earth and ocean tides were
+used for the OD of the object.</p></td>
+<td><p>YES
+NO</p></td>
+<td><p>N</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>INTRACK_THRUST</p></td>
+<td><p>Indication of whether in-track
+thrust modeling was used for
+the OD of the object.</p></td>
+<td><p>YES
+NO</p></td>
+<td><p>N</p></td>
+<td><p>No</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</section>
+<section id="cdm-content-structure-in-xml">
+<span id="xml-content-structure-cdm"></span><h1>4 CDM CONTENT/STRUCTURE IN XML<a class="headerlink" href="#cdm-content-structure-in-xml" title="Link to this heading">¶</a></h1>
+<section id="discussionthe-cdm-xml-schema">
+<span id="xml-schema-discussion-cdm"></span><h2>4.1 DISCUSSION—THE CDM/XML SCHEMA<a class="headerlink" href="#discussionthe-cdm-xml-schema" title="Link to this heading">¶</a></h2>
+<p>The CDM/XML schema is available on the SANA Web site. SANA is the registrar for the
+protocol registries created under CCSDS.</p>
+<p>The CDM XML schema explicitly defines the permitted data elements and values acceptable
+for the XML version of the CDM message.</p>
+<p>The location of the CDM/XML schema is:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-cdm-1.0.xsd">https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-cdm-1.0.xsd</a> for
+messages with elements not qualified with respect to a namespace;</p></li>
+<li><p><a class="reference external" href="https://sanaregistry.org/r/ndmxml_qualified/ndmxml-2.0.0-cdm-1.0.xsd">https://sanaregistry.org/r/ndmxml_qualified/ndmxml-2.0.0-cdm-1.0.xsd</a> for messages
+with elements qualified with respect to a namespace.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Reference [6] subsection 4.3 has more information regarding messages with
+elements qualified with respect to a namespace.</p>
+</div>
+<p>Where possible this schema uses simple types and complex types used by the constituent
+schemas that make up NDMs (see reference [6]).</p>
+<p>An Extensible Stylesheet Language Transformations (XSLT) converter is available on the SANA
+Web site to transform an XML CDM to a KVN CDM if desired by the CDM recipient. The location
+of the CDM/XML XSLT converter is:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-cdm-1.1.xsl">https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-cdm-1.1.xsl</a> for
+messages with elements not qualified with respect to a namespace;</p></li>
+<li><p><a class="reference external" href="https://sanaregistry.org/r/ndmxml_qualified/ndmxml-2.0.0-cdm-1.1.xsl">https://sanaregistry.org/r/ndmxml_qualified/ndmxml-2.0.0-cdm-1.1.xsl</a> for messages
+with elements qualified with respect to a namespace.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Reference [6] subsection 4.3 has more information regarding messages with
+elements qualified with respect to a namespace.</p>
+</div>
+</section>
+<section id="cdm-xml-basic-structure">
+<span id="xml-basic-structure-cdm"></span><h2>4.2 CDM/XML BASIC STRUCTURE<a class="headerlink" href="#cdm-xml-basic-structure" title="Link to this heading">¶</a></h2>
+<p>4.2.1 Each CDM shall consist of a &lt;header&gt; and a &lt;body&gt;.</p>
+<p>4.2.2 The CDM body shall consist of one relative metadata/data and two segment constructs.</p>
+<p>4.2.3 Each &lt;segment&gt; shall consist of a &lt;metadata&gt;/&lt;data&gt; pair, as shown in figure 4-1.</p>
+<figure class="align-default" id="id13">
+<span id="figure-4-1-cdm"></span><img alt="images/placeholder.png" src="images/placeholder.png" />
+<figcaption>
+<p><span class="caption-text">Figure 4-1: CDM XML Basic Structure</span><a class="headerlink" href="#id13" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="o">&lt;</span><span class="n">header</span><span class="o">&gt;</span>
+</span><span data-line="2"><span class="o">&lt;/</span><span class="n">header</span><span class="o">&gt;</span>
+</span><span data-line="3"><span class="o">&lt;</span><span class="n">body</span><span class="o">&gt;</span>
+</span><span data-line="4">   <span class="o">&lt;</span><span class="n">relativeMetadataData</span><span class="o">&gt;</span>
+</span><span data-line="5">   <span class="o">&lt;/</span><span class="n">relativeMetadataData</span><span class="o">&gt;</span>
+</span><span data-line="6">   <span class="o">&lt;</span><span class="n">segment</span><span class="o">&gt;</span>
+</span><span data-line="7">      <span class="o">&lt;</span><span class="n">metadata</span><span class="o">&gt;</span>
+</span><span data-line="8">      <span class="o">&lt;/</span><span class="n">metadata</span><span class="o">&gt;</span>
+</span><span data-line="9">      <span class="o">&lt;</span><span class="n">data</span><span class="o">&gt;</span>
+</span><span data-line="10">      <span class="o">&lt;/</span><span class="n">data</span><span class="o">&gt;</span>
+</span><span data-line="11">   <span class="o">&lt;/</span><span class="n">segment</span><span class="o">&gt;</span>
+</span><span data-line="12">   <span class="o">&lt;</span><span class="n">segment</span><span class="o">&gt;</span>
+</span><span data-line="13">      <span class="o">&lt;</span><span class="n">metadata</span><span class="o">&gt;</span>
+</span><span data-line="14">      <span class="o">&lt;/</span><span class="n">metadata</span><span class="o">&gt;</span>
+</span><span data-line="15">      <span class="o">&lt;</span><span class="n">data</span><span class="o">&gt;</span>
+</span><span data-line="16">      <span class="o">&lt;/</span><span class="n">data</span><span class="o">&gt;</span>
+</span><span data-line="17">   <span class="o">&lt;/</span><span class="n">segment</span><span class="o">&gt;</span>
+</span><span data-line="18"><span class="o">&lt;/</span><span class="n">body</span><span class="o">&gt;</span>
+</span></pre></div>
+</div>
+<p>4.2.4 XML tags shall be uppercase and correspond with the KVN keywords in 3.2 through
+3.5 (uppercase with ‘_’ [the underscore character] as separators). The XML logical tags
+related to message structure shall be in lowerCamelCase.</p>
+</section>
+<section id="constructing-a-cdm-xml-instance">
+<span id="xml-constructing-instance-cdm"></span><h2>4.3 CONSTRUCTING A CDM/XML INSTANCE<a class="headerlink" href="#constructing-a-cdm-xml-instance" title="Link to this heading">¶</a></h2>
+<section id="xml-constructing-overview-cdm">
+<span id="id7"></span><h3>4.3.1 OVERVIEW<a class="headerlink" href="#xml-constructing-overview-cdm" title="Link to this heading">¶</a></h3>
+<p>This subsection provides more detailed instructions for the user on how to create an XML
+message based on the ASCII-text KVN-formatted message described in 3.1 through 3.6 (see
+reference [6]).</p>
+</section>
+<section id="xml-version">
+<span id="xml-version-cdm"></span><h3>4.3.2 XML VERSION<a class="headerlink" href="#xml-version" title="Link to this heading">¶</a></h3>
+<p>The first line in the instantiation shall specify the XML version:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+</span></pre></div>
+</div>
+<p>This line must appear on the first line of each instantiation, exactly as shown.</p>
+</section>
+<section id="beginning-the-instantiation-root-data-element">
+<span id="xml-root-element-cdm"></span><h3>4.3.3 BEGINNING THE INSTANTIATION: ROOT DATA ELEMENT<a class="headerlink" href="#beginning-the-instantiation-root-data-element" title="Link to this heading">¶</a></h3>
+<p>4.3.3.1 A CDM instantiation shall be delimited with the &lt;cdm&gt;&lt;/cdm&gt; root element tags
+using the standard attributes documented in reference [3].</p>
+<p>4.3.3.2 The XML Schema Instance namespace attribute must appear in the root element tag
+of all CDM/XML instantiations, exactly as shown:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="n">xmlns</span><span class="p">:</span><span class="n">xsi</span> <span class="o">=</span> <span class="s2">&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span>
+</span></pre></div>
+</div>
+<p>4.3.3.3 For messages with elements qualified with respect to a namespace, the NDM/XML
+namespace must next be coded, exactly as shown:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="n">xmlns</span><span class="p">:</span><span class="n">ndm</span><span class="o">=</span><span class="s2">&quot;urn:ccsds:schema:ndmxml&quot;</span>
+</span></pre></div>
+</div>
+<p>The value that follows the ‘xmlns:’ in the NDM/XML name space (‘ndm’ in this case) is a
+prefix that must be used on every XML tag.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This xmlns:ndm setting is only necessary for messages with elements qualified
+with respect to a namespace, but it does not hurt anything for it to appear on any
+NDM/XML instantiation.</p>
+</div>
+<p>4.3.3.4 If it is desired to validate an instantiation against the CCSDS Web-based schema,
+the xsi:noNamespaceSchemaLocation attribute must be coded as a single string of non-blank
+characters, with no line breaks, exactly as shown:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="n">xsi</span><span class="p">:</span><span class="n">noNamespaceSchemaLocation</span><span class="o">=</span><span class="s2">&quot;https://sanaregistry.org/r/ndmxml_unqualified/n</span>
+</span><span data-line="2"><span class="n">dmxml</span><span class="o">-</span><span class="mf">2.0.0</span><span class="o">-</span><span class="n">master</span><span class="o">-</span><span class="mf">2.0</span><span class="o">.</span><span class="n">xsd</span><span class="s2">&quot; for messages with elements not qualified with respect</span>
+</span><span data-line="3"><span class="n">to</span> <span class="n">a</span> <span class="n">namespace</span><span class="p">;</span>
+</span><span data-line="4">
+</span><span data-line="5"><span class="n">xsi</span><span class="p">:</span><span class="n">noNamespaceSchemaLocation</span><span class="o">=</span><span class="s2">&quot;https://sanaregistry.org/r/ndmxml_qualified/ndm</span>
+</span><span data-line="6"><span class="n">xml</span><span class="o">-</span><span class="mf">2.0.0</span><span class="o">-</span><span class="n">master</span><span class="o">-</span><span class="mf">2.0</span><span class="o">.</span><span class="n">xsd</span><span class="s2">&quot; for messages with elements qualified with respect to a</span>
+</span><span data-line="7"><span class="n">namespace</span><span class="o">.</span>
+</span></pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The length of the value associated with the xsi:noNamespaceSchemaLocation
+attribute can cause the string to wrap to a new line; however, the string itself
+contains no breaks.</p>
+</div>
+<p>4.3.3.5 For use in a local operations environment, the schema set may be downloaded from
+the SANA Web site to a local server that meets local requirements for operations robustness.</p>
+<p>4.3.3.6 If a local version is used, the value associated with the
+xsi:noNamespaceSchemaLocation attribute must be changed to a URL that is accessible to
+the local server.</p>
+<p>4.3.3.7 The final attributes of the &lt;cdm&gt; tag shall be ‘id’ and ‘version’.</p>
+<p>4.3.3.8 The ‘id’ attribute shall be ‘id=”CCSDS_CDM_VERS”’.</p>
+<p>4.3.3.9 The ‘version’ attribute shall be ‘version=”1.0”’.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ol class="arabic">
+<li><p>The following example root element tag for a CDM instantiation combines all the
+directions in the preceding several subsections for messages with elements not
+qualified with respect to a namespace:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+</span><span data-line="2"><span class="nt">&lt;cdm</span><span class="w"> </span><span class="na">xmlns:xsi=</span><span class="s">&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span>
+</span><span data-line="3"><span class="na">xsi:noNamespaceSchemaLocation=</span>
+</span><span data-line="4"><span class="s">&quot;https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-master-2.0.xs</span>
+</span><span data-line="5"><span class="s">id=&quot;</span><span class="err">CCSDS_CDM_VERS&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="nt">&gt;</span>
+</span></pre></div>
+</div>
+</li>
+<li><p>The following example root element tag for a CDM instantiation combines all the
+directions in the preceding several subsections for messages with elements qualified
+with respect to a namespace:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+</span><span data-line="2"><span class="nt">&lt;cdm</span><span class="w"> </span><span class="na">xmlns:xsi=</span><span class="s">&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span>
+</span><span data-line="3"><span class="na">xmlns:ndm=</span><span class="s">&quot;urn:ccsds:schema:ndmxml&quot;</span>
+</span><span data-line="4"><span class="na">xsi:noNamespaceSchemaLocation=</span>
+</span><span data-line="5"><span class="s">&quot;https://sanaregistry.org/r/ndmxml_qualified/ndmxml-2.0.0-master-2.0.xsd&quot;</span>
+</span><span data-line="6"><span class="na">id=</span><span class="s">&quot;CCSDS_CDM_VERS&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="nt">&gt;</span>
+</span></pre></div>
+</div>
+</li>
+</ol>
+</div>
+</section>
+<section id="the-cdm-xml-header-section">
+<span id="xml-header-section-cdm"></span><h3>4.3.4 THE CDM/XML HEADER SECTION<a class="headerlink" href="#the-cdm-xml-header-section" title="Link to this heading">¶</a></h3>
+<p>4.3.4.1 The CDM header shall have a standard header format, with tags &lt;header&gt; and &lt;/header&gt;.</p>
+<p>4.3.4.2 Immediately following the &lt;header&gt; tag, the message may have any number of
+&lt;COMMENT&gt;&lt;/COMMENT&gt; tag pairs.</p>
+<p>4.3.4.3 The standard CDM header shall contain the following element tags:</p>
+<ol class="loweralpha simple">
+<li><p>&lt;CREATION_DATE&gt;;</p></li>
+<li><p>&lt;ORIGINATOR&gt;;</p></li>
+<li><p>optional &lt;MESSAGE_FOR&gt;;</p></li>
+<li><p>&lt;MESSAGE_ID&gt;.</p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The rules for these keywords are specified in 3.2. The header would look like this:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="nt">&lt;header&gt;</span>
+</span><span data-line="2"><span class="w">   </span><span class="nt">&lt;COMMENT&gt;</span>Some<span class="w"> </span>comment<span class="w"> </span>string.<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="3"><span class="w">   </span><span class="nt">&lt;CREATION_DATE&gt;</span>2010-03-12T22:31:12.000<span class="nt">&lt;/CREATION_DATE&gt;</span>
+</span><span data-line="4"><span class="w">   </span><span class="nt">&lt;ORIGINATOR&gt;</span>JSPOC<span class="nt">&lt;/ORIGINATOR&gt;</span>
+</span><span data-line="5"><span class="w">   </span><span class="nt">&lt;MESSAGE_FOR&gt;</span>SATELLITE<span class="w"> </span>A<span class="nt">&lt;/MESSAGE_FOR&gt;</span>
+</span><span data-line="6"><span class="w">   </span><span class="nt">&lt;MESSAGE_ID&gt;</span>201113719185<span class="nt">&lt;/MESSAGE_ID&gt;</span>
+</span><span data-line="7"><span class="nt">&lt;/header&gt;</span>
+</span></pre></div>
+</div>
+</div>
+</section>
+<section id="the-cdm-xml-body-section">
+<span id="xml-body-section-cdm"></span><h3>4.3.5 THE CDM/XML BODY SECTION<a class="headerlink" href="#the-cdm-xml-body-section" title="Link to this heading">¶</a></h3>
+<p>4.3.5.1 After coding the &lt;header&gt;, the instantiation must include a &lt;body&gt;&lt;/body&gt; tag
+pair.</p>
+<p>4.3.5.2 Inside the &lt;body&gt;&lt;/body&gt; tag pair, there must appear one
+&lt;relativeMetadataData&gt;&lt;/relativeMetadataData&gt; tag pair.</p>
+<p>4.3.5.3 Following the &lt;relativeMetadataData&gt;&lt;/relativeMetadataData&gt; tag pair, there must
+appear two &lt;segment&gt;&lt;/segment&gt; tag pairs, one for Object1 and one for Object2.</p>
+<p>4.3.5.4 Each segment must be made up of one &lt;metadata&gt;&lt;/metadata&gt; tag pair and one
+&lt;data&gt;&lt;/data&gt; tag pair.</p>
+</section>
+<section id="the-cdm-xml-relative-metadata-data-section">
+<span id="xml-relative-metadata-data-section-cdm"></span><h3>4.3.6 THE CDM/XML RELATIVE METADATA/DATA SECTION<a class="headerlink" href="#the-cdm-xml-relative-metadata-data-section" title="Link to this heading">¶</a></h3>
+<p>4.3.6.1 The relative metadata/data section shall be set off by the
+&lt;relativeMetadataData&gt;&lt;/relativeMetadataData&gt; tag combination.</p>
+<p>4.3.6.2 Immediately following the &lt;relativeMetadataData&gt; tag, the message may have any
+number of &lt;COMMENT&gt;&lt;/COMMENT&gt; tag pairs.</p>
+<p>4.3.6.3 Between the &lt;relativeMetadataData&gt; and &lt;/relativeMetadataData&gt; tags, the
+keywords shall be those specified in table 3-2.</p>
+</section>
+<section id="the-cdm-xml-metadata-section">
+<span id="xml-metadata-section-cdm"></span><h3>4.3.7 THE CDM/XML METADATA SECTION<a class="headerlink" href="#the-cdm-xml-metadata-section" title="Link to this heading">¶</a></h3>
+<p>4.3.7.1 All CDMs must have two metadata sections, one for Object1 and one for Object2.</p>
+<p>4.3.7.2 The metadata section for Object1 shall follow the relative metadata/data section and
+shall be set off by the &lt;metadata&gt;&lt;/metadata&gt; tag combination. The metadata section for
+Object2 shall follow the Object1 data section and shall be set off by the
+&lt;metadata&gt;&lt;/metadata&gt; tag combination.</p>
+<p>4.3.7.3 Immediately following the &lt;metadata&gt; tag, the message may have any number of
+&lt;COMMENT&gt;&lt;/COMMENT&gt; tag pairs.</p>
+<p>4.3.7.4 Between the &lt;metadata&gt; and &lt;/metadata&gt; tags for both Object1 and Object2, the
+keywords shall be those specified in table 3-3. The value of the keyword OBJECT shall be
+used to define whether the metadata defines Object1 or Object2.</p>
+</section>
+<section id="the-cdm-data-section">
+<span id="xml-data-section-cdm"></span><h3>4.3.8 THE CDM DATA SECTION<a class="headerlink" href="#the-cdm-data-section" title="Link to this heading">¶</a></h3>
+<p>4.3.8.1 All CDMs must have two data sections, one for Object1 and one for Object2.</p>
+<p>4.3.8.2 Each data section shall follow the corresponding metadata section and shall be set
+off by the &lt;data&gt;&lt;/data&gt; tag combination.</p>
+<p>4.3.8.3 Immediately following the &lt;data&gt; tag, the message may have any number of
+&lt;COMMENT&gt;&lt;/COMMENT&gt; tag pairs.</p>
+<p>4.3.8.4 Between the &lt;data&gt; and &lt;/data&gt; tags, the keywords shall be those specified in
+table 3-4. The value of the keyword OBJECT, referenced in table 3-3, shall be used to define
+whether the data defines Object1 or Object2.</p>
+</section>
+<section id="special-cdm-xml-tags">
+<span id="xml-special-tags-cdm"></span><h3>4.3.9 SPECIAL CDM/XML TAGS<a class="headerlink" href="#special-cdm-xml-tags" title="Link to this heading">¶</a></h3>
+<p>4.3.9.1 The information content in the CDM shall be separated into constructs described in 3.5
+as ‘logical blocks’. Special tags in the CDM shall be used to encapsulate the information in
+the logical blocks of the CDM. Immediately following the special tags for logical blocks, the
+message may have any number of &lt;COMMENT&gt;&lt;/COMMENT&gt; tag pairs.</p>
+<p>4.3.9.2 The special tags indicating logical block divisions shall be those defined in table 4-1.</p>
+<div class="table-wrapper colwidths-given docutils container" id="id14">
+<span id="table-4-1-cdm"></span><span id="table-4-1-cdm"></span><table class="docutils align-default" id="id14">
+<caption><span class="caption-text">Table 4-1: Relation of KVN Logical Blocks to Special CDM/XML Tags</span><a class="headerlink" href="#id14" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>CDM Logical Block</p></th>
+<th class="head"><p>Associated CDM/XML Tag</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>OD Parameters</p></td>
+<td><p>&lt;odParameters&gt;</p></td>
+</tr>
+<tr class="row-odd"><td><p>Additional Parameters</p></td>
+<td><p>&lt;additionalParameters&gt;</p></td>
+</tr>
+<tr class="row-even"><td><p>State Vector</p></td>
+<td><p>&lt;stateVector&gt;</p></td>
+</tr>
+<tr class="row-odd"><td><p>Covariance Matrix</p></td>
+<td><p>&lt;covarianceMatrix&gt;</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>4.3.9.3 Another special tag that shall be used is defined in table 4-2.</p>
+<div class="table-wrapper colwidths-given docutils container" id="id15">
+<span id="table-4-2-cdm"></span><span id="table-4-2-cdm"></span><table class="docutils align-default" id="id15">
+<caption><span class="caption-text">Table 4-2: Another Special CDM/XML Tag</span><a class="headerlink" href="#id15" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Special Tag</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>&lt;relativeStateVector&gt;</p></td>
+<td><p>Includes the relative state vector keywords:
+RELATIVE_POSITION_R, RELATIVE_POSITION_T,
+RELATIVE_POSITION_N, RELATIVE_VELOCITY_R,
+RELATIVE_VELOCITY_T, and
+RELATIVE_VELOCITY_N.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="units-in-the-cdm-xml">
+<span id="xml-units-cdm"></span><h3>4.3.10 UNITS IN THE CDM/XML<a class="headerlink" href="#units-in-the-cdm-xml" title="Link to this heading">¶</a></h3>
+<p>The units in the CDM/XML shall be the same units used in the KVN-formatted CDM
+described in 3.3 and 3.5. XML attributes shall be used to explicitly define the units or other
+important information associated with the given data element (see 6.4.3 for examples).</p>
+</section>
+</section>
+<section id="discussioncdm-xml-example">
+<span id="xml-example-discussion-cdm"></span><h2>4.4 DISCUSSION—CDM/XML EXAMPLE<a class="headerlink" href="#discussioncdm-xml-example" title="Link to this heading">¶</a></h2>
+<p>The following is a sample of a CDM in XML format:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+</span><span data-line="2"><span class="nt">&lt;cdm</span><span class="w"> </span><span class="na">xmlns:xsi=</span><span class="s">&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span>
+</span><span data-line="3"><span class="na">xmlns:ndm=</span><span class="s">&quot;urn:ccsds:schema:ndmxml&quot;</span>
+</span><span data-line="4"><span class="na">xsi:noNamespaceSchemaLocation=</span><span class="s">&quot;https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-master-2.0.xsd&quot;</span>
+</span><span data-line="5"><span class="na">id=</span><span class="s">&quot;CCSDS_CDM_VERS&quot;</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="nt">&gt;</span>
+</span><span data-line="6"><span class="w">   </span><span class="nt">&lt;header&gt;</span>
+</span><span data-line="7"><span class="w">      </span><span class="nt">&lt;COMMENT&gt;</span>Sample<span class="w"> </span>CDM<span class="w"> </span>-<span class="w"> </span>XML<span class="w"> </span>version<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="8"><span class="w">      </span><span class="nt">&lt;CREATION_DATE&gt;</span>2010-03-12T22:31:12.000<span class="nt">&lt;/CREATION_DATE&gt;</span>
+</span><span data-line="9"><span class="w">      </span><span class="nt">&lt;ORIGINATOR&gt;</span>JSPOC<span class="nt">&lt;/ORIGINATOR&gt;</span>
+</span><span data-line="10"><span class="w">      </span><span class="nt">&lt;MESSAGE_FOR&gt;</span>SATELLITE<span class="w"> </span>A<span class="nt">&lt;/MESSAGE_FOR&gt;</span>
+</span><span data-line="11"><span class="w">      </span><span class="nt">&lt;MESSAGE_ID&gt;</span>20111371985<span class="nt">&lt;/MESSAGE_ID&gt;</span>
+</span><span data-line="12"><span class="w">   </span><span class="nt">&lt;/header&gt;</span>
+</span><span data-line="13"><span class="w">   </span><span class="nt">&lt;body&gt;</span>
+</span><span data-line="14"><span class="w">      </span><span class="nt">&lt;relativeMetadataData&gt;</span>
+</span><span data-line="15"><span class="w">         </span><span class="nt">&lt;COMMENT&gt;</span>Relative<span class="w"> </span>Metadata/Data<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="16"><span class="w">         </span><span class="nt">&lt;TCA&gt;</span>2010-03-13T22:37:52.618<span class="nt">&lt;/TCA&gt;</span>
+</span><span data-line="17"><span class="w">         </span><span class="nt">&lt;MISS_DISTANCE</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m&quot;</span><span class="nt">&gt;</span>715<span class="nt">&lt;/MISS_DISTANCE&gt;</span>
+</span><span data-line="18"><span class="w">         </span><span class="nt">&lt;RELATIVE_SPEED</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m/s&quot;</span><span class="nt">&gt;</span>14762<span class="nt">&lt;/RELATIVE_SPEED&gt;</span>
+</span><span data-line="19"><span class="w">         </span><span class="nt">&lt;relativeStateVector&gt;</span>
+</span><span data-line="20"><span class="w">            </span><span class="nt">&lt;RELATIVE_POSITION_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m&quot;</span><span class="nt">&gt;</span>27.4<span class="nt">&lt;/RELATIVE_POSITION_R&gt;</span>
+</span><span data-line="21"><span class="w">            </span><span class="nt">&lt;RELATIVE_POSITION_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m&quot;</span><span class="nt">&gt;</span>-70.2<span class="nt">&lt;/RELATIVE_POSITION_T&gt;</span>
+</span><span data-line="22"><span class="w">            </span><span class="nt">&lt;RELATIVE_POSITION_N</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m&quot;</span><span class="nt">&gt;</span>711.8<span class="nt">&lt;/RELATIVE_POSITION_N&gt;</span>
+</span><span data-line="23"><span class="w">            </span><span class="nt">&lt;RELATIVE_VELOCITY_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m/s&quot;</span><span class="nt">&gt;</span>-7.2<span class="nt">&lt;/RELATIVE_VELOCITY_R&gt;</span>
+</span><span data-line="24"><span class="w">            </span><span class="nt">&lt;RELATIVE_VELOCITY_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m/s&quot;</span><span class="nt">&gt;</span>-14692.0<span class="nt">&lt;/RELATIVE_VELOCITY_T&gt;</span>
+</span><span data-line="25"><span class="w">            </span><span class="nt">&lt;RELATIVE_VELOCITY_N</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m/s&quot;</span><span class="nt">&gt;</span>-1437.2<span class="nt">&lt;/RELATIVE_VELOCITY_N&gt;</span>
+</span><span data-line="26"><span class="w">         </span><span class="nt">&lt;/relativeStateVector&gt;</span>
+</span><span data-line="27"><span class="w">         </span><span class="nt">&lt;START_SCREEN_PERIOD&gt;</span>2010-03-12T18:29:32.212<span class="nt">&lt;/START_SCREEN_PERIOD&gt;</span>
+</span><span data-line="28"><span class="w">         </span><span class="nt">&lt;STOP_SCREEN_PERIOD&gt;</span>2010-03-15T18:29:32.212<span class="nt">&lt;/STOP_SCREEN_PERIOD&gt;</span>
+</span><span data-line="29"><span class="w">         </span><span class="nt">&lt;SCREEN_VOLUME_FRAME&gt;</span>RTN<span class="nt">&lt;/SCREEN_VOLUME_FRAME&gt;</span>
+</span><span data-line="30"><span class="w">         </span><span class="nt">&lt;SCREEN_VOLUME_SHAPE&gt;</span>ELLIPSOID<span class="nt">&lt;/SCREEN_VOLUME_SHAPE&gt;</span>
+</span><span data-line="31"><span class="w">         </span><span class="nt">&lt;SCREEN_VOLUME_X</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m&quot;</span><span class="nt">&gt;</span>200<span class="nt">&lt;/SCREEN_VOLUME_X&gt;</span>
+</span><span data-line="32"><span class="w">         </span><span class="nt">&lt;SCREEN_VOLUME_Y</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m&quot;</span><span class="nt">&gt;</span>1000<span class="nt">&lt;/SCREEN_VOLUME_Y&gt;</span>
+</span><span data-line="33"><span class="w">         </span><span class="nt">&lt;SCREEN_VOLUME_Z</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m&quot;</span><span class="nt">&gt;</span>1000<span class="nt">&lt;/SCREEN_VOLUME_Z&gt;</span>
+</span><span data-line="34"><span class="w">         </span><span class="nt">&lt;SCREEN_ENTRY_TIME&gt;</span>2010-03-13T20:25:43.222<span class="nt">&lt;/SCREEN_ENTRY_TIME&gt;</span>
+</span><span data-line="35"><span class="w">         </span><span class="nt">&lt;SCREEN_EXIT_TIME&gt;</span>2010-03-13T23:44:29.324<span class="nt">&lt;/SCREEN_EXIT_TIME&gt;</span>
+</span><span data-line="36"><span class="w">         </span><span class="nt">&lt;COLLISION_PROBABILITY&gt;</span>4.835E-05<span class="nt">&lt;/COLLISION_PROBABILITY&gt;</span>
+</span><span data-line="37"><span class="w">         </span><span class="nt">&lt;COLLISION_PROBABILITY_METHOD&gt;</span>FOSTER-1992<span class="nt">&lt;/COLLISION_PROBABILITY_METHOD&gt;</span>
+</span><span data-line="38"><span class="w">      </span><span class="nt">&lt;/relativeMetadataData&gt;</span>
+</span><span data-line="39"><span class="w">      </span><span class="nt">&lt;segment&gt;</span>
+</span><span data-line="40"><span class="w">         </span><span class="nt">&lt;metadata&gt;</span>
+</span><span data-line="41"><span class="w">            </span><span class="nt">&lt;COMMENT&gt;</span>Object1<span class="w"> </span>Metadata<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="42"><span class="w">            </span><span class="nt">&lt;OBJECT&gt;</span>OBJECT1<span class="nt">&lt;/OBJECT&gt;</span>
+</span><span data-line="43"><span class="w">            </span><span class="nt">&lt;OBJECT_DESIGNATOR&gt;</span>12345<span class="nt">&lt;/OBJECT_DESIGNATOR&gt;</span>
+</span><span data-line="44"><span class="w">            </span><span class="nt">&lt;CATALOG_NAME&gt;</span>SATCAT<span class="nt">&lt;/CATALOG_NAME&gt;</span>
+</span><span data-line="45"><span class="w">            </span><span class="nt">&lt;OBJECT_NAME&gt;</span>SATELLITE<span class="w"> </span>A<span class="nt">&lt;/OBJECT_NAME&gt;</span>
+</span><span data-line="46"><span class="w">            </span><span class="nt">&lt;INTERNATIONAL_DESIGNATOR&gt;</span>1997-030E<span class="nt">&lt;/INTERNATIONAL_DESIGNATOR&gt;</span>
+</span><span data-line="47"><span class="w">            </span><span class="nt">&lt;OBJECT_TYPE&gt;</span>PAYLOAD<span class="nt">&lt;/OBJECT_TYPE&gt;</span>
+</span><span data-line="48"><span class="w">            </span><span class="nt">&lt;OPERATOR_CONTACT_POSITION&gt;</span>OSA<span class="nt">&lt;/OPERATOR_CONTACT_POSITION&gt;</span>
+</span><span data-line="49"><span class="w">            </span><span class="nt">&lt;OPERATOR_ORGANIZATION&gt;</span>EUMETSAT<span class="nt">&lt;/OPERATOR_ORGANIZATION&gt;</span>
+</span><span data-line="50"><span class="w">            </span><span class="nt">&lt;OPERATOR_PHONE&gt;</span>+49615130312<span class="nt">&lt;/OPERATOR_PHONE&gt;</span>
+</span><span data-line="51"><span class="w">            </span><span class="nt">&lt;OPERATOR_EMAIL&gt;</span>JOHN.DOE@SOMEWHERE.NET<span class="nt">&lt;/OPERATOR_EMAIL&gt;</span>
+</span><span data-line="52"><span class="w">            </span><span class="nt">&lt;EPHEMERIS_NAME&gt;</span>EPHEMERIS<span class="w"> </span>SATELLITE<span class="w"> </span>A<span class="nt">&lt;/EPHEMERIS_NAME&gt;</span>
+</span><span data-line="53"><span class="w">            </span><span class="nt">&lt;COVARIANCE_METHOD&gt;</span>CALCULATED<span class="nt">&lt;/COVARIANCE_METHOD&gt;</span>
+</span><span data-line="54"><span class="w">            </span><span class="nt">&lt;MANEUVERABLE&gt;</span>YES<span class="nt">&lt;/MANEUVERABLE&gt;</span>
+</span><span data-line="55"><span class="w">            </span><span class="nt">&lt;REF_FRAME&gt;</span>EME2000<span class="nt">&lt;/REF_FRAME&gt;</span>
+</span><span data-line="56"><span class="w">            </span><span class="nt">&lt;GRAVITY_MODEL&gt;</span>EGM-96:<span class="w"> </span>36D<span class="w"> </span>36O<span class="nt">&lt;/GRAVITY_MODEL&gt;</span>
+</span><span data-line="57"><span class="w">            </span><span class="nt">&lt;ATMOSPHERIC_MODEL&gt;</span>JACCHIA<span class="w"> </span>70<span class="w"> </span>DCA<span class="nt">&lt;/ATMOSPHERIC_MODEL&gt;</span>
+</span><span data-line="58"><span class="w">            </span><span class="nt">&lt;N_BODY_PERTURBATIONS&gt;</span>MOON,SUN<span class="nt">&lt;/N_BODY_PERTURBATIONS&gt;</span>
+</span><span data-line="59"><span class="w">            </span><span class="nt">&lt;SOLAR_RAD_PRESSURE&gt;</span>NO<span class="nt">&lt;/SOLAR_RAD_PRESSURE&gt;</span>
+</span><span data-line="60"><span class="w">            </span><span class="nt">&lt;EARTH_TIDES&gt;</span>NO<span class="nt">&lt;/EARTH_TIDES&gt;</span>
+</span><span data-line="61"><span class="w">            </span><span class="nt">&lt;INTRACK_THRUST&gt;</span>NO<span class="nt">&lt;/INTRACK_THRUST&gt;</span>
+</span><span data-line="62"><span class="w">         </span><span class="nt">&lt;/metadata&gt;</span>
+</span><span data-line="63"><span class="w">         </span><span class="nt">&lt;data&gt;</span>
+</span><span data-line="64"><span class="w">            </span><span class="nt">&lt;COMMENT&gt;</span>Object1<span class="w"> </span>Data<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="65"><span class="w">            </span><span class="nt">&lt;odParameters&gt;</span>
+</span><span data-line="66"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Object1<span class="w"> </span>OD<span class="w"> </span>Parameters<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="67"><span class="w">               </span><span class="nt">&lt;TIME_LASTOB_START&gt;</span>2010-03-12T02:14:12.746<span class="nt">&lt;/TIME_LASTOB_START&gt;</span>
+</span><span data-line="68"><span class="w">               </span><span class="nt">&lt;TIME_LASTOB_END&gt;</span>2010-03-12T02:14:12.746<span class="nt">&lt;/TIME_LASTOB_END&gt;</span>
+</span><span data-line="69"><span class="w">               </span><span class="nt">&lt;RECOMMENDED_OD_SPAN</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;d&quot;</span><span class="nt">&gt;</span>7.88<span class="nt">&lt;/RECOMMENDED_OD_SPAN&gt;</span>
+</span><span data-line="70"><span class="w">               </span><span class="nt">&lt;ACTUAL_OD_SPAN</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;d&quot;</span><span class="nt">&gt;</span>5.50<span class="nt">&lt;/ACTUAL_OD_SPAN&gt;</span>
+</span><span data-line="71"><span class="w">               </span><span class="nt">&lt;OBS_AVAILABLE&gt;</span>592<span class="nt">&lt;/OBS_AVAILABLE&gt;</span>
+</span><span data-line="72"><span class="w">               </span><span class="nt">&lt;OBS_USED&gt;</span>59<span class="nt">&lt;/OBS_USED&gt;</span>
+</span><span data-line="73"><span class="w">               </span><span class="nt">&lt;TRACKS_AVAILABLE&gt;</span>123<span class="nt">&lt;/TRACKS_AVAILABLE&gt;</span>
+</span><span data-line="74"><span class="w">               </span><span class="nt">&lt;TRACKS_USED&gt;</span>119<span class="nt">&lt;/TRACKS_USED&gt;</span>
+</span><span data-line="75"><span class="w">               </span><span class="nt">&lt;RESIDUALS_ACCEPTED</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;%&quot;</span><span class="nt">&gt;</span>97.8<span class="nt">&lt;/RESIDUALS_ACCEPTED&gt;</span>
+</span><span data-line="76"><span class="w">               </span><span class="nt">&lt;WEIGHTED_RMS&gt;</span>0.864<span class="nt">&lt;/WEIGHTED_RMS&gt;</span>
+</span><span data-line="77"><span class="w">            </span><span class="nt">&lt;/odParameters&gt;</span>
+</span><span data-line="78"><span class="w">            </span><span class="nt">&lt;additionalParameters&gt;</span>
+</span><span data-line="79"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Object<span class="w"> </span>1<span class="w"> </span>Additional<span class="w"> </span>Parameters<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="80"><span class="w">               </span><span class="nt">&lt;AREA_PC</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>5.2<span class="nt">&lt;/AREA_PC&gt;</span>
+</span><span data-line="81"><span class="w">               </span><span class="nt">&lt;MASS</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;kg&quot;</span><span class="nt">&gt;</span>2516<span class="nt">&lt;/MASS&gt;</span>
+</span><span data-line="82"><span class="w">               </span><span class="nt">&lt;CD_AREA_OVER_MASS</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/kg&quot;</span><span class="nt">&gt;</span>0.045663<span class="nt">&lt;/CD_AREA_OVER_MASS&gt;</span>
+</span><span data-line="83"><span class="w">               </span><span class="nt">&lt;CR_AREA_OVER_MASS</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/kg&quot;</span><span class="nt">&gt;</span>0.000000<span class="nt">&lt;/CR_AREA_OVER_MASS&gt;</span>
+</span><span data-line="84"><span class="w">               </span><span class="nt">&lt;THRUST_ACCELERATION</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m/s**2&quot;</span><span class="nt">&gt;</span>0.0<span class="nt">&lt;/THRUST_ACCELERATION&gt;</span>
+</span><span data-line="85"><span class="w">               </span><span class="nt">&lt;SEDR</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;W/kg&quot;</span><span class="nt">&gt;</span>4.54570E-05<span class="nt">&lt;/SEDR&gt;</span>
+</span><span data-line="86"><span class="w">            </span><span class="nt">&lt;/additionalParameters&gt;</span>
+</span><span data-line="87"><span class="w">            </span><span class="nt">&lt;stateVector&gt;</span>
+</span><span data-line="88"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Object1<span class="w"> </span>State<span class="w"> </span>Vector<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="89"><span class="w">               </span><span class="nt">&lt;X</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km&quot;</span><span class="nt">&gt;</span>2570.097065<span class="nt">&lt;/X&gt;</span>
+</span><span data-line="90"><span class="w">               </span><span class="nt">&lt;Y</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km&quot;</span><span class="nt">&gt;</span>2244.654904<span class="nt">&lt;/Y&gt;</span>
+</span><span data-line="91"><span class="w">               </span><span class="nt">&lt;Z</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km&quot;</span><span class="nt">&gt;</span>6281.497978<span class="nt">&lt;/Z&gt;</span>
+</span><span data-line="92"><span class="w">               </span><span class="nt">&lt;X_DOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km/s&quot;</span><span class="nt">&gt;</span>4.418769571<span class="nt">&lt;/X_DOT&gt;</span>
+</span><span data-line="93"><span class="w">               </span><span class="nt">&lt;Y_DOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km/s&quot;</span><span class="nt">&gt;</span>4.833547743<span class="nt">&lt;/Y_DOT&gt;</span>
+</span><span data-line="94"><span class="w">               </span><span class="nt">&lt;Z_DOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km/s&quot;</span><span class="nt">&gt;</span>-3.526774282<span class="nt">&lt;/Z_DOT&gt;</span>
+</span><span data-line="95"><span class="w">            </span><span class="nt">&lt;/stateVector&gt;</span>
+</span><span data-line="96"><span class="w">            </span><span class="nt">&lt;covarianceMatrix&gt;</span>
+</span><span data-line="97"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Object1<span class="w"> </span>Covariance<span class="w"> </span>in<span class="w"> </span>the<span class="w"> </span>RTN<span class="w"> </span>Coordinate<span class="w"> </span>Frame<span class="w"> </span><span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="98"><span class="w">               </span><span class="nt">&lt;CR_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>4.142E+01<span class="nt">&lt;/CR_R&gt;</span>
+</span><span data-line="99"><span class="w">               </span><span class="nt">&lt;CT_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>-8.579E+00<span class="nt">&lt;/CT_R&gt;</span>
+</span><span data-line="100"><span class="w">               </span><span class="nt">&lt;CT_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>2.533E+03<span class="nt">&lt;/CT_T&gt;</span>
+</span><span data-line="101"><span class="w">               </span><span class="nt">&lt;CN_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>-2.313E+01<span class="nt">&lt;/CN_R&gt;</span>
+</span><span data-line="102"><span class="w">               </span><span class="nt">&lt;CN_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>1.336E+01<span class="nt">&lt;/CN_T&gt;</span>
+</span><span data-line="103"><span class="w">               </span><span class="nt">&lt;CN_N</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>7.098E+01<span class="nt">&lt;/CN_N&gt;</span>
+</span><span data-line="104"><span class="w">               </span><span class="nt">&lt;CRDOT_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>2.520E-03<span class="nt">&lt;/CRDOT_R&gt;</span>
+</span><span data-line="105"><span class="w">               </span><span class="nt">&lt;CRDOT_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>-5.476E+00<span class="nt">&lt;/CRDOT_T&gt;</span>
+</span><span data-line="106"><span class="w">               </span><span class="nt">&lt;CRDOT_N</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>8.626E-04<span class="nt">&lt;/CRDOT_N&gt;</span>
+</span><span data-line="107"><span class="w">               </span><span class="nt">&lt;CRDOT_RDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>5.744E-03<span class="nt">&lt;/CRDOT_RDOT&gt;</span>
+</span><span data-line="108"><span class="w">               </span><span class="nt">&lt;CTDOT_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>-1.006E-02<span class="nt">&lt;/CTDOT_R&gt;</span>
+</span><span data-line="109"><span class="w">               </span><span class="nt">&lt;CTDOT_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>4.041E-03<span class="nt">&lt;/CTDOT_T&gt;</span>
+</span><span data-line="110"><span class="w">               </span><span class="nt">&lt;CTDOT_N</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>-1.359E-03<span class="nt">&lt;/CTDOT_N&gt;</span>
+</span><span data-line="111"><span class="w">               </span><span class="nt">&lt;CTDOT_RDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>-1.502E-05<span class="nt">&lt;/CTDOT_RDOT&gt;</span>
+</span><span data-line="112"><span class="w">               </span><span class="nt">&lt;CTDOT_TDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>1.049E-05<span class="nt">&lt;/CTDOT_TDOT&gt;</span>
+</span><span data-line="113"><span class="w">               </span><span class="nt">&lt;CNDOT_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>1.053E-03<span class="nt">&lt;/CNDOT_R&gt;</span>
+</span><span data-line="114"><span class="w">               </span><span class="nt">&lt;CNDOT_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>-3.412E-03<span class="nt">&lt;/CNDOT_T&gt;</span>
+</span><span data-line="115"><span class="w">               </span><span class="nt">&lt;CNDOT_N</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>1.213E-02<span class="nt">&lt;/CNDOT_N&gt;</span>
+</span><span data-line="116"><span class="w">               </span><span class="nt">&lt;CNDOT_RDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>-3.004E-06<span class="nt">&lt;/CNDOT_RDOT&gt;</span>
+</span><span data-line="117"><span class="w">               </span><span class="nt">&lt;CNDOT_TDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>-1.091E-06<span class="nt">&lt;/CNDOT_TDOT&gt;</span>
+</span><span data-line="118"><span class="w">               </span><span class="nt">&lt;CNDOT_NDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>5.529E-05<span class="nt">&lt;/CNDOT_NDOT&gt;</span>
+</span><span data-line="119"><span class="w">            </span><span class="nt">&lt;/covarianceMatrix&gt;</span>
+</span><span data-line="120"><span class="w">         </span><span class="nt">&lt;/data&gt;</span>
+</span><span data-line="121"><span class="w">      </span><span class="nt">&lt;/segment&gt;</span>
+</span><span data-line="122"><span class="w">      </span><span class="nt">&lt;segment&gt;</span>
+</span><span data-line="123"><span class="w">         </span><span class="nt">&lt;metadata&gt;</span>
+</span><span data-line="124"><span class="w">            </span><span class="nt">&lt;COMMENT&gt;</span>Object2<span class="w"> </span>Metadata<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="125"><span class="w">            </span><span class="nt">&lt;OBJECT&gt;</span>OBJECT2<span class="nt">&lt;/OBJECT&gt;</span>
+</span><span data-line="126"><span class="w">            </span><span class="nt">&lt;OBJECT_DESIGNATOR&gt;</span>30337<span class="nt">&lt;/OBJECT_DESIGNATOR&gt;</span>
+</span><span data-line="127"><span class="w">            </span><span class="nt">&lt;CATALOG_NAME&gt;</span>SATCAT<span class="nt">&lt;/CATALOG_NAME&gt;</span>
+</span><span data-line="128"><span class="w">            </span><span class="nt">&lt;OBJECT_NAME&gt;</span>FENGYUN<span class="w"> </span>1C<span class="w"> </span>DEB<span class="nt">&lt;/OBJECT_NAME&gt;</span>
+</span><span data-line="129"><span class="w">            </span><span class="nt">&lt;INTERNATIONAL_DESIGNATOR&gt;</span>1999-025AA<span class="nt">&lt;/INTERNATIONAL_DESIGNATOR&gt;</span>
+</span><span data-line="130"><span class="w">            </span><span class="nt">&lt;OBJECT_TYPE&gt;</span>DEBRIS<span class="nt">&lt;/OBJECT_TYPE&gt;</span>
+</span><span data-line="131"><span class="w">            </span><span class="nt">&lt;EPHEMERIS_NAME&gt;</span>NONE<span class="nt">&lt;/EPHEMERIS_NAME&gt;</span>
+</span><span data-line="132"><span class="w">            </span><span class="nt">&lt;COVARIANCE_METHOD&gt;</span>CALCULATED<span class="nt">&lt;/COVARIANCE_METHOD&gt;</span>
+</span><span data-line="133"><span class="w">            </span><span class="nt">&lt;MANEUVERABLE&gt;</span>NO<span class="nt">&lt;/MANEUVERABLE&gt;</span>
+</span><span data-line="134"><span class="w">            </span><span class="nt">&lt;REF_FRAME&gt;</span>EME2000<span class="nt">&lt;/REF_FRAME&gt;</span>
+</span><span data-line="135"><span class="w">            </span><span class="nt">&lt;GRAVITY_MODEL&gt;</span>EGM-96:<span class="w"> </span>36D<span class="w"> </span>36O<span class="nt">&lt;/GRAVITY_MODEL&gt;</span>
+</span><span data-line="136"><span class="w">            </span><span class="nt">&lt;ATMOSPHERIC_MODEL&gt;</span>JACCHIA<span class="w"> </span>70<span class="w"> </span>DCA<span class="nt">&lt;/ATMOSPHERIC_MODEL&gt;</span>
+</span><span data-line="137"><span class="w">            </span><span class="nt">&lt;N_BODY_PERTURBations&gt;</span>MOON,SUN<span class="nt">&lt;/N_BODY_PERTURBATIONS&gt;</span>
+</span><span data-line="138"><span class="w">            </span><span class="nt">&lt;SOLAR_RAD_PRESSURE&gt;</span>YES<span class="nt">&lt;/SOLAR_RAD_PRESSURE&gt;</span>
+</span><span data-line="139"><span class="w">            </span><span class="nt">&lt;EARTH_TIDES&gt;</span>NO<span class="nt">&lt;/EARTH_TIDES&gt;</span>
+</span><span data-line="140"><span class="w">            </span><span class="nt">&lt;INTRACK_THRUST&gt;</span>NO<span class="nt">&lt;/INTRACK_THRUST&gt;</span>
+</span><span data-line="141"><span class="w">         </span><span class="nt">&lt;/metadata&gt;</span>
+</span><span data-line="142"><span class="w">         </span><span class="nt">&lt;data&gt;</span>
+</span><span data-line="143"><span class="w">            </span><span class="nt">&lt;COMMENT&gt;</span>Object2<span class="w"> </span>Data<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="144"><span class="w">            </span><span class="nt">&lt;odParameters&gt;</span>
+</span><span data-line="145"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Object2<span class="w"> </span>OD<span class="w"> </span>Parameters<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="146"><span class="w">               </span><span class="nt">&lt;TIME_LASTOB_START&gt;</span>2010-03-12T01:14:12.746<span class="nt">&lt;/TIME_LASTOB_START&gt;</span>
+</span><span data-line="147"><span class="w">               </span><span class="nt">&lt;TIME_LASTOB_END&gt;</span>2010-03-12T03:14:12.746<span class="nt">&lt;/TIME_LASTOB_END&gt;</span>
+</span><span data-line="148"><span class="w">               </span><span class="nt">&lt;RECOMMENDED_OD_SPAN</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;d&quot;</span><span class="nt">&gt;</span>2.63<span class="nt">&lt;/RECOMMENDED_OD_SPAN&gt;</span>
+</span><span data-line="149"><span class="w">               </span><span class="nt">&lt;ACTUAL_OD_SPAN</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;d&quot;</span><span class="nt">&gt;</span>2.63<span class="nt">&lt;/ACTUAL_OD_SPAN&gt;</span>
+</span><span data-line="150"><span class="w">               </span><span class="nt">&lt;OBS_AVAILABLE&gt;</span>59<span class="nt">&lt;/OBS_AVAILABLE&gt;</span>
+</span><span data-line="151"><span class="w">               </span><span class="nt">&lt;OBS_USED&gt;</span>58<span class="nt">&lt;/OBS_USED&gt;</span>
+</span><span data-line="152"><span class="w">               </span><span class="nt">&lt;TRACKS_AVAILABLE&gt;</span>15<span class="nt">&lt;/TRACKS_AVAILABLE&gt;</span>
+</span><span data-line="153"><span class="w">               </span><span class="nt">&lt;TRACKS_USED&gt;</span>15<span class="nt">&lt;/TRACKS_USED&gt;</span>
+</span><span data-line="154"><span class="w">               </span><span class="nt">&lt;RESIDUALS_ACCEPTED</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;%&quot;</span><span class="nt">&gt;</span>97.8<span class="nt">&lt;/RESIDUALS_ACCEPTED&gt;</span>
+</span><span data-line="155"><span class="w">               </span><span class="nt">&lt;WEIGHTED_RMS&gt;</span>0.864<span class="nt">&lt;/WEIGHTED_RMS&gt;</span>
+</span><span data-line="156"><span class="w">            </span><span class="nt">&lt;/odParameters&gt;</span>
+</span><span data-line="157"><span class="w">            </span><span class="nt">&lt;additionalParameters&gt;</span>
+</span><span data-line="158"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Object2<span class="w"> </span>Additional<span class="w"> </span>Parameters<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="159"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Apogee<span class="w"> </span>Altitude=768<span class="w"> </span>km<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="160"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Perigee<span class="w"> </span>Altitude=414<span class="w"> </span>km<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="161"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Inclination=98.8<span class="w"> </span>deg<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="162"><span class="w">               </span><span class="nt">&lt;AREA_PC</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>0.9<span class="nt">&lt;/AREA_PC&gt;</span>
+</span><span data-line="163"><span class="w">               </span><span class="nt">&lt;CD_AREA_OVER_MASS</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/kg&quot;</span><span class="nt">&gt;</span>0.118668<span class="nt">&lt;/CD_AREA_OVER_MASS&gt;</span>
+</span><span data-line="164"><span class="w">               </span><span class="nt">&lt;CR_AREA_OVER_MASS</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/kg&quot;</span><span class="nt">&gt;</span>0.075204<span class="nt">&lt;/CR_AREA_OVER_MASS&gt;</span>
+</span><span data-line="165"><span class="w">               </span><span class="nt">&lt;THRUST_ACCELERATION</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m/s**2&quot;</span><span class="nt">&gt;</span>0.0<span class="nt">&lt;/THRUST_ACCELERATION&gt;</span>
+</span><span data-line="166"><span class="w">               </span><span class="nt">&lt;SEDR</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;W/kg&quot;</span><span class="nt">&gt;</span>5.40900E-03<span class="nt">&lt;/SEDR&gt;</span>
+</span><span data-line="167"><span class="w">            </span><span class="nt">&lt;/additionalParameters&gt;</span>
+</span><span data-line="168"><span class="w">            </span><span class="nt">&lt;stateVector&gt;</span>
+</span><span data-line="169"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Object2<span class="w"> </span>State<span class="w"> </span>Vector<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="170"><span class="w">               </span><span class="nt">&lt;X</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km&quot;</span><span class="nt">&gt;</span>2569.540800<span class="nt">&lt;/X&gt;</span>
+</span><span data-line="171"><span class="w">               </span><span class="nt">&lt;Y</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km&quot;</span><span class="nt">&gt;</span>2245.093614<span class="nt">&lt;/Y&gt;</span>
+</span><span data-line="172"><span class="w">               </span><span class="nt">&lt;Z</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km&quot;</span><span class="nt">&gt;</span>6281.599946<span class="nt">&lt;/Z&gt;</span>
+</span><span data-line="173"><span class="w">               </span><span class="nt">&lt;X_DOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km/s&quot;</span><span class="nt">&gt;</span>-2.888612500<span class="nt">&lt;/X_DOT&gt;</span>
+</span><span data-line="174"><span class="w">               </span><span class="nt">&lt;Y_DOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km/s&quot;</span><span class="nt">&gt;</span>-6.007247516<span class="nt">&lt;/Y_DOT&gt;</span>
+</span><span data-line="175"><span class="w">               </span><span class="nt">&lt;Z_DOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;km/s&quot;</span><span class="nt">&gt;</span>3.328770172<span class="nt">&lt;/Z_DOT&gt;</span>
+</span><span data-line="176"><span class="w">            </span><span class="nt">&lt;/stateVector&gt;</span>
+</span><span data-line="177"><span class="w">            </span><span class="nt">&lt;covarianceMatrix&gt;</span>
+</span><span data-line="178"><span class="w">               </span><span class="nt">&lt;COMMENT&gt;</span>Object2<span class="w"> </span>Covariance<span class="w"> </span>in<span class="w"> </span>the<span class="w"> </span>RTN<span class="w"> </span>Coordinate<span class="w"> </span>Frame<span class="nt">&lt;/COMMENT&gt;</span>
+</span><span data-line="179"><span class="w">               </span><span class="nt">&lt;CR_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>1.337E+03<span class="nt">&lt;/CR_R&gt;</span>
+</span><span data-line="180"><span class="w">               </span><span class="nt">&lt;CT_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>-4.806E+04<span class="nt">&lt;/CT_R&gt;</span>
+</span><span data-line="181"><span class="w">               </span><span class="nt">&lt;CT_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>2.492E+06<span class="nt">&lt;/CT_T&gt;</span>
+</span><span data-line="182"><span class="w">               </span><span class="nt">&lt;CN_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>-3.298E+01<span class="nt">&lt;/CN_R&gt;</span>
+</span><span data-line="183"><span class="w">               </span><span class="nt">&lt;CN_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>-7.5888E+02<span class="nt">&lt;/CN_T&gt;</span>
+</span><span data-line="184"><span class="w">               </span><span class="nt">&lt;CN_N</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2&quot;</span><span class="nt">&gt;</span>7.105E+01<span class="nt">&lt;/CN_N&gt;</span>
+</span><span data-line="185"><span class="w">               </span><span class="nt">&lt;CRDOT_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>2.591E-03<span class="nt">&lt;/CRDOT_R&gt;</span>
+</span><span data-line="186"><span class="w">               </span><span class="nt">&lt;CRDOT_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>-4.152E-02<span class="nt">&lt;/CRDOT_T&gt;</span>
+</span><span data-line="187"><span class="w">               </span><span class="nt">&lt;CRDOT_N</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>-1.784E-06<span class="nt">&lt;/CRDOT_N&gt;</span>
+</span><span data-line="188"><span class="w">               </span><span class="nt">&lt;CRDOT_RDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>6.886E-05<span class="nt">&lt;/CRDOT_RDOT&gt;</span>
+</span><span data-line="189"><span class="w">               </span><span class="nt">&lt;CTDOT_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>-1.016E-02<span class="nt">&lt;/CTDOT_R&gt;</span>
+</span><span data-line="190"><span class="w">               </span><span class="nt">&lt;CTDOT_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>-1.506E-04<span class="nt">&lt;/CTDOT_T&gt;</span>
+</span><span data-line="191"><span class="w">               </span><span class="nt">&lt;CTDOT_N</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>1.637E-03<span class="nt">&lt;/CTDOT_N&gt;</span>
+</span><span data-line="192"><span class="w">               </span><span class="nt">&lt;CTDOT_RDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>-2.987E-06<span class="nt">&lt;/CTDOT_RDOT&gt;</span>
+</span><span data-line="193"><span class="w">               </span><span class="nt">&lt;CTDOT_TDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>1.059E-05<span class="nt">&lt;/CTDOT_TDOT&gt;</span>
+</span><span data-line="194"><span class="w">               </span><span class="nt">&lt;CNDOT_R</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>4.400E-03<span class="nt">&lt;/CNDOT_R&gt;</span>
+</span><span data-line="195"><span class="w">               </span><span class="nt">&lt;CNDOT_T</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>8.482E-03<span class="nt">&lt;/CNDOT_T&gt;</span>
+</span><span data-line="196"><span class="w">               </span><span class="nt">&lt;CNDOT_N</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s&quot;</span><span class="nt">&gt;</span>8.633E-05<span class="nt">&lt;/CNDOT_N&gt;</span>
+</span><span data-line="197"><span class="w">               </span><span class="nt">&lt;CNDOT_RDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>-1.903E-06<span class="nt">&lt;/CNDOT_RDOT&gt;</span>
+</span><span data-line="198"><span class="w">               </span><span class="nt">&lt;CNDOT_TDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>-4.594E-06<span class="nt">&lt;/CNDOT_TDOT&gt;</span>
+</span><span data-line="199"><span class="w">               </span><span class="nt">&lt;CNDOT_NDOT</span><span class="w"> </span><span class="na">units=</span><span class="s">&quot;m**2/s**2&quot;</span><span class="nt">&gt;</span>5.178E-05<span class="nt">&lt;/CNDOT_NDOT&gt;</span>
+</span><span data-line="200"><span class="w">            </span><span class="nt">&lt;/covarianceMatrix&gt;</span>
+</span><span data-line="201"><span class="w">         </span><span class="nt">&lt;/data&gt;</span>
+</span><span data-line="202"><span class="w">      </span><span class="nt">&lt;/segment&gt;</span>
+</span><span data-line="203"><span class="w">   </span><span class="nt">&lt;/body&gt;</span>
+</span><span data-line="204"><span class="nt">&lt;/cdm&gt;</span>
+</span></pre></div>
+</div>
+</section>
+</section>
+
+        </article><button class="back-to-top" type="button">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+  </svg>
+  <span>Back to top</span>
+</button><div class="navigation flex print:hidden"></div></div>
+    </div>
+  </main>
+</div>
+<footer class="sy-foot">
+  <div class="sy-foot-inner sy-container mx-auto">
+    <div class="sy-foot-reserved md:flex justify-between items-center">
+      <div class="sy-foot-copyright"><p>2025, Jochim</p>
+  
+  <p>
+    Made with
+    
+    <a href="https://www.sphinx-doc.org/">Sphinx</a> and
+    
+    <a href="https://shibuya.lepture.com">Shibuya theme</a>.
+  </p>
+</div>
+      <div class="sy-foot-socials">
+<a href="https://github.com/JochimMaene/ccsds-ndm" aria-label="GitHub">
+  <iconify-icon icon="simple-icons:github"></iconify-icon>
+</a></div>
+    </div>
+  </div>
+</footer>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/shibuya.js?v=cac61aee"></script></body>
+</html>

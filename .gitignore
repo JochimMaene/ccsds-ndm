@@ -1,0 +1,69 @@
+# ------------------------------
+# Rust general
+# ------------------------------
+/target/
+**/target/
+Cargo.lock
+# Keep Cargo.lock if you’re building a binary or want reproducible builds
+# (Uncomment if appropriate)
+# !Cargo.lock
+
+# Rust build artifacts
+*.rs.bk
+*.rmeta
+
+# ------------------------------
+# Python bindings (PyO3 + maturin + uv)
+# ------------------------------
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual environments and uv lock file
+.venv/
+uv.lock
+
+# Maturin / PyO3 build outputs
+/build/
+dist/
+*.so
+*.pyd
+*.dll
+*.dylib
+
+# Wheel and sdist
+*.whl
+*.egg-info/
+*.eggs/
+
+
+# ------------------------------
+# IDE / Editor
+# ------------------------------
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ------------------------------
+# Tests & Logs
+# ------------------------------
+*.log
+coverage/
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.tox/
+.nox/
+
+# ------------------------------
+# XSD schemas
+# ------------------------------
+
+xsd/
+
+copilot-instructions.md
+
+flamegraph.svg
+perf.data
+perf.data.old

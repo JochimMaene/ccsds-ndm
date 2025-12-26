@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en" data-accent-color="violet" data-content_root="../">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Core &amp; Common Types - CCSDS NDM documentation</title><link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Orbit Parameter Message (OPM)" href="opm.html" /><link rel="prev" title="Python API" href="python.html" /><script>
+    function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
+    setColorMode(localStorage._theme||"auto");
+  </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=e1a1ceaf" />
+    <link rel="stylesheet" type="text/css" href="../_static/shibuya.css?v=83cb36c2" />
+    <link media="print" rel="stylesheet" type="text/css" href="../_static/print.css?v=20ff2c19" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sy-f-text: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+  --sy-f-heading: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+}
+</style>
+    <meta property="og:type" content="website"/><meta property="og:title" content="Core &amp; Common Types"/>
+    <meta name="twitter:card" content="summary"/>
+  </head>
+<body><div class="sy-head">
+  <div class="sy-head-blur"></div>
+  <div class="sy-head-inner sy-container mx-auto">
+    <a class="sy-head-brand" href="../index.html">
+      
+      
+      <strong>CCSDS NDM</strong>
+    </a>
+    <div class="sy-head-nav" id="head-nav">
+      <nav class="sy-head-links"><ul><li class="link"><a href="../rust/index.html.html">Rust API</a></li></ul></nav>
+      <div class="sy-head-extra flex items-center print:hidden"><form class="searchbox flex items-center" action="../search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form><div class="sy-head-socials">
+  <a href="https://github.com/JochimMaene/ccsds-ndm" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div></div>
+    </div>
+    <div class="sy-head-actions flex items-center shrink-0 print:hidden"><button class="js-theme theme-switch flex items-center"
+data-aria-auto="Switch to light color mode"
+data-aria-light="Switch to dark color mode"
+data-aria-dark="Switch to auto color mode">
+<i class="i-lucide theme-icon"></i>
+</button><button class="md:hidden flex items-center js-menu" aria-label="Menu" type="button" aria-controls="head-nav" aria-expanded="false">
+        <div class="hamburger">
+          <span class="hamburger_1"></span>
+          <span class="hamburger_2"></span>
+          <span class="hamburger_3"></span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+<div class="sy-page sy-container flex mx-auto">
+  <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
+    <div class="sy-lside-inner md:sticky">
+      <div class="sy-scrollbar p-6">
+        <div class="globaltoc" data-expand-depth="0"><p class="caption" role="heading" aria-level="3"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guide/quicktour.html">Quicktour</a></li>
+</ul>
+<p class="caption" role="heading" aria-level="3"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="python.html">Python API</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Core &amp; Common Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="opm.html">Orbit Parameter Message (OPM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="oem.html">Orbit Ephemeris Message (OEM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="omm.html">Orbit Mean-Elements Message (OMM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ocm.html">Orbit Comprehensive Message (OCM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tdm.html">Tracking Data Message (TDM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rdm.html">Re-entry Data Message (RDM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cdm.html">Conjunction Data Message (CDM)</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading" aria-level="3"><span class="caption-text">CCSDS Standards</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html">AUTHORITY</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#foreword">FOREWORD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#document-control">DOCUMENT CONTROL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#ndm-sec-1">1 INTRODUCTION</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#ndm-sec-2">2 SCOPE OF NAVIGATION</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#ndm-sec-3">3 NAVIGATION DATA MESSAGE EXCHANGE FRAMEWORK</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#ndm-sec-4">4 CCSDS NAVIGATION DATA MESSAGES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#annex-a">ANNEX A</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html">AUTHORITY</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#statement-of-intent">STATEMENT OF INTENT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#foreword">FOREWORD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#document-control">DOCUMENT CONTROL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#introduction">1 INTRODUCTION</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#overview">2 OVERVIEW</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#id10">3 ATTITUDE PARAMETER MESSAGE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#id21">4 ATTITUDE EPHEMERIS MESSAGE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#id32">5 ATTITUDE COMPREHENSIVE MESSAGE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#attitude-data-messages-kvn-syntax">6 ATTITUDE DATA MESSAGES KVN SYNTAX</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#constructing-an-adm-xml-instance">7 CONSTRUCTING AN ADM/XML INSTANCE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-a">ANNEX A</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-b">ANNEX B</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-c">ANNEX C</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-d">ANNEX D</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-e">ANNEX E</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-f">ANNEX F</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-g">ANNEX G</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-h-informative-references">Annex H: Informative References</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-i-items-for-an-interface-control-document">Annex I: Items for an Interface Control Document</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-j-changes-versus-previous-version">Annex J: Changes Versus Previous Version</a></li>
+</ul>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
+  <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
+    <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
+      <i class="i-lucide close"></i>
+    </button>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
+<li><a class="reference internal" href="#ccsds_ndm.from_str"><code class="docutils literal notranslate"><span class="pre">from_str()</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.from_file"><code class="docutils literal notranslate"><span class="pre">from_file()</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OdmHeader"><code class="docutils literal notranslate"><span class="pre">OdmHeader</span></code></a><ul>
+<li><a class="reference internal" href="#ccsds_ndm.OdmHeader.classification"><code class="docutils literal notranslate">classification</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OdmHeader.comments"><code class="docutils literal notranslate">comments</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OdmHeader.creation_date"><code class="docutils literal notranslate">creation_date</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OdmHeader.message_id"><code class="docutils literal notranslate">message_id</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OdmHeader.originator"><code class="docutils literal notranslate">originator</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVector"><code class="docutils literal notranslate"><span class="pre">StateVector</span></code></a><ul>
+<li><a class="reference internal" href="#ccsds_ndm.StateVector.epoch"><code class="docutils literal notranslate">epoch</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVector.x"><code class="docutils literal notranslate">x</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVector.x_dot"><code class="docutils literal notranslate">x_dot</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVector.y"><code class="docutils literal notranslate">y</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVector.y_dot"><code class="docutils literal notranslate">y_dot</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVector.z"><code class="docutils literal notranslate">z</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVector.z_dot"><code class="docutils literal notranslate">z_dot</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc"><code class="docutils literal notranslate"><span class="pre">StateVectorAcc</span></code></a><ul>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc.epoch"><code class="docutils literal notranslate">epoch</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc.x"><code class="docutils literal notranslate">x</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc.x_ddot"><code class="docutils literal notranslate">x_ddot</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc.x_dot"><code class="docutils literal notranslate">x_dot</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc.y"><code class="docutils literal notranslate">y</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc.y_ddot"><code class="docutils literal notranslate">y_ddot</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc.y_dot"><code class="docutils literal notranslate">y_dot</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc.z"><code class="docutils literal notranslate">z</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc.z_ddot"><code class="docutils literal notranslate">z_ddot</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.StateVectorAcc.z_dot"><code class="docutils literal notranslate">z_dot</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
+  </aside>
+  <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
+  <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+<div class="sy-breadcrumbs" role="navigation">
+  <div class="sy-breadcrumbs-inner flex items-center">
+    <div class="md:hidden mr-3">
+      <button class="js-menu" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+        <i class="i-lucide menu"></i>
+      </button>
+    </div>
+    <ol class="flex-1" itemscope itemtype="https://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../index.html"><span itemprop="name">CCSDS NDM</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="1" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="python.html"><span itemprop="name">Python API</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="2" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <strong itemprop="name">Core &amp; Common Types</strong>
+        <meta itemprop="position" content="3" />
+      </li></ol>
+    <div class="xl:hidden ml-1">
+      <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
+        aria-expanded="false">
+        <i class="i-lucide outdent"></i>
+      </button>
+    </div>
+  </div>
+</div><div class="flex flex-col break-words justify-between">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  
+
+
+<div class="copy-page-wrapper relative pb-4 lg:absolute lg:top-8 lg:right-6 xl:right-12">
+  <div id="copy-page-trigger">
+    <button
+      type="button"
+      class="js-copy px-3 py-1 inline-flex items-center gap-1"
+      data-url="../_sources/api/core.rst.txt"
+    >
+      <i class="i-lucide" data-icon="copy"></i>
+      <span>Copy page</span>
+    </button>
+    <button class="js-menu px-2 py-1" type="button" aria-label="More actions"
+      aria-haspopup="menu" aria-expanded="false" aria-controls="copy-page-content">
+      <i class="i-lucide chevron-down"></i>
+    </button>
+  </div>
+  <div id="copy-page-content" role="menu" aria-orientation="vertical" aria-hidden="true">
+    <div role="presentation">
+      <div class="flex flex-col" role="group">
+        <button class="js-copy" type="button" role="menuitem"
+          data-url="../_sources/api/core.rst.txt">
+          <span class="iconify-icon">
+            <i class="i-lucide" data-icon="copy"></i>
+          </span>
+          <span>Copy page</span>
+        </button>
+        <a role="menuitem" href="../_sources/api/core.rst.txt" target="_blank" rel="nofollow">
+          
+            <iconify-icon icon="bi:code-slash"></iconify-icon>
+            <span>View Source</span>
+          
+        </a>
+        
+        <a role="menuitem" href="https://chatgpt.com/?hints=search&q=Read%20../_sources/api/core.rst.txt%20so%20I%20can%20ask%20questions%20about%20it." target="_blank" rel="nofollow">
+          <iconify-icon icon="bi:openai"></iconify-icon>
+          <span>Open in ChatGPT</span>
+        </a>
+        
+        
+        <a role="menuitem" href="https://claude.ai/new?q=Read%20../_sources/api/core.rst.txt%20so%20I%20can%20ask%20questions%20about%20it." target="_blank" rel="nofollow">
+          <iconify-icon icon="bi:claude"></iconify-icon>
+          <span>Open in Claude</span>
+        </a>
+        
+        
+      </div>
+    </div>
+  </div>
+</div>
+<article class="yue" role="main">
+          <section id="core-common-types">
+<h1>Core &amp; Common Types<a class="headerlink" href="#core-common-types" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="ccsds_ndm.from_str">
+<span class="sig-prename descclassname"><span class="pre">ccsds_ndm.</span></span><span class="sig-name descname"><span class="pre">from_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.from_str" title="Link to this definition">¶</a></dt>
+<dd><p>Parse a string (KVN or XML) and return the corresponding NDM object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The content to parse.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The parsed NDM object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Union[<a class="reference internal" href="oem.html#ccsds_ndm.Oem" title="ccsds_ndm.Oem">Oem</a>, <a class="reference internal" href="cdm.html#ccsds_ndm.Cdm" title="ccsds_ndm.Cdm">Cdm</a>, <a class="reference internal" href="omm.html#ccsds_ndm.Omm" title="ccsds_ndm.Omm">Omm</a>, <a class="reference internal" href="opm.html#ccsds_ndm.Opm" title="ccsds_ndm.Opm">Opm</a>, <a class="reference internal" href="ocm.html#ccsds_ndm.Ocm" title="ccsds_ndm.Ocm">Ocm</a>, <a class="reference internal" href="tdm.html#ccsds_ndm.Tdm" title="ccsds_ndm.Tdm">Tdm</a>, <a class="reference internal" href="rdm.html#ccsds_ndm.Rdm" title="ccsds_ndm.Rdm">Rdm</a>]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If parsing fails.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ccsds_ndm.from_file">
+<span class="sig-prename descclassname"><span class="pre">ccsds_ndm.</span></span><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.from_file" title="Link to this definition">¶</a></dt>
+<dd><p>Parse from a file path (KVN or XML).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to the file.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The parsed NDM object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Union[<a class="reference internal" href="oem.html#ccsds_ndm.Oem" title="ccsds_ndm.Oem">Oem</a>, <a class="reference internal" href="cdm.html#ccsds_ndm.Cdm" title="ccsds_ndm.Cdm">Cdm</a>, <a class="reference internal" href="omm.html#ccsds_ndm.Omm" title="ccsds_ndm.Omm">Omm</a>, <a class="reference internal" href="opm.html#ccsds_ndm.Opm" title="ccsds_ndm.Opm">Opm</a>, <a class="reference internal" href="ocm.html#ccsds_ndm.Ocm" title="ccsds_ndm.Ocm">Ocm</a>, <a class="reference internal" href="tdm.html#ccsds_ndm.Tdm" title="ccsds_ndm.Tdm">Tdm</a>, <a class="reference internal" href="rdm.html#ccsds_ndm.Rdm" title="ccsds_ndm.Rdm">Rdm</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ccsds_ndm.OdmHeader">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ccsds_ndm.</span></span><span class="sig-name descname"><span class="pre">OdmHeader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">originator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">classification</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comment</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.OdmHeader" title="Link to this definition">¶</a></dt>
+<dd><p>Represents the header of a CCSDS Orbit Data Message (ODM).</p>
+<p>The header contains metadata common to all ODM message types.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>creation_date</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – File creation date/time in UTC.</p></li>
+<li><p><strong>originator</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Creating agency or operator.</p></li>
+<li><p><strong>classification</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – User-defined free-text message classification/caveats.</p></li>
+<li><p><strong>message_id</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – ID that uniquely identifies a message from a given originator.</p></li>
+<li><p><strong>comment</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Comments.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OdmHeader.classification">
+<span class="sig-name descname"><span class="pre">classification</span></span><a class="headerlink" href="#ccsds_ndm.OdmHeader.classification" title="Link to this definition">¶</a></dt>
+<dd><p>User-defined free-text message classification/caveats.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OdmHeader.comments">
+<span class="sig-name descname"><span class="pre">comments</span></span><a class="headerlink" href="#ccsds_ndm.OdmHeader.comments" title="Link to this definition">¶</a></dt>
+<dd><p>Comments.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OdmHeader.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#ccsds_ndm.OdmHeader.creation_date" title="Link to this definition">¶</a></dt>
+<dd><p>File creation date/time in UTC.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OdmHeader.message_id">
+<span class="sig-name descname"><span class="pre">message_id</span></span><a class="headerlink" href="#ccsds_ndm.OdmHeader.message_id" title="Link to this definition">¶</a></dt>
+<dd><p>ID that uniquely identifies a message from a given originator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OdmHeader.originator">
+<span class="sig-name descname"><span class="pre">originator</span></span><a class="headerlink" href="#ccsds_ndm.OdmHeader.originator" title="Link to this definition">¶</a></dt>
+<dd><p>Creating agency or operator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVector">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ccsds_ndm.</span></span><span class="sig-name descname"><span class="pre">StateVector</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epoch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_dot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_dot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z_dot</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.StateVector" title="Link to this definition">¶</a></dt>
+<dd><p>Position and velocity at a specific epoch (without acceleration).</p>
+<p>Simplified version of StateVectorAcc used in OPM and other messages.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>epoch</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Epoch of the state vector.</p></li>
+<li><p><strong>x</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Position vector X-component (km).</p></li>
+<li><p><strong>y</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Position vector Y-component (km).</p></li>
+<li><p><strong>z</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Position vector Z-component (km).</p></li>
+<li><p><strong>x_dot</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Velocity vector X-component (km/s).</p></li>
+<li><p><strong>y_dot</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Velocity vector Y-component (km/s).</p></li>
+<li><p><strong>z_dot</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Velocity vector Z-component (km/s).</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVector.epoch">
+<span class="sig-name descname"><span class="pre">epoch</span></span><a class="headerlink" href="#ccsds_ndm.StateVector.epoch" title="Link to this definition">¶</a></dt>
+<dd><p>Epoch of the state vector.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVector.x">
+<span class="sig-name descname"><span class="pre">x</span></span><a class="headerlink" href="#ccsds_ndm.StateVector.x" title="Link to this definition">¶</a></dt>
+<dd><p>Position vector X-component (km).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVector.x_dot">
+<span class="sig-name descname"><span class="pre">x_dot</span></span><a class="headerlink" href="#ccsds_ndm.StateVector.x_dot" title="Link to this definition">¶</a></dt>
+<dd><p>Velocity vector X-component (km/s).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVector.y">
+<span class="sig-name descname"><span class="pre">y</span></span><a class="headerlink" href="#ccsds_ndm.StateVector.y" title="Link to this definition">¶</a></dt>
+<dd><p>Position vector Y-component (km).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVector.y_dot">
+<span class="sig-name descname"><span class="pre">y_dot</span></span><a class="headerlink" href="#ccsds_ndm.StateVector.y_dot" title="Link to this definition">¶</a></dt>
+<dd><p>Velocity vector Y-component (km/s).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVector.z">
+<span class="sig-name descname"><span class="pre">z</span></span><a class="headerlink" href="#ccsds_ndm.StateVector.z" title="Link to this definition">¶</a></dt>
+<dd><p>Position vector Z-component (km).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVector.z_dot">
+<span class="sig-name descname"><span class="pre">z_dot</span></span><a class="headerlink" href="#ccsds_ndm.StateVector.z_dot" title="Link to this definition">¶</a></dt>
+<dd><p>Velocity vector Z-component (km/s).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ccsds_ndm.</span></span><span class="sig-name descname"><span class="pre">StateVectorAcc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epoch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_dot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_dot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z_dot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_ddot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_ddot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z_ddot</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc" title="Link to this definition">¶</a></dt>
+<dd><p>Position and velocity (and optionally acceleration) at a specific epoch.</p>
+<p>Used in OEM to represent object state.
+Units: Position in km, Velocity in km/s, Acceleration in km/s² (by default)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>epoch</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Epoch of the state vector.</p></li>
+<li><p><strong>x</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Position vector X-component (km).</p></li>
+<li><p><strong>y</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Position vector Y-component (km).</p></li>
+<li><p><strong>z</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Position vector Z-component (km).</p></li>
+<li><p><strong>x_dot</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Velocity vector X-component (km/s).</p></li>
+<li><p><strong>y_dot</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Velocity vector Y-component (km/s).</p></li>
+<li><p><strong>z_dot</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Velocity vector Z-component (km/s).</p></li>
+<li><p><strong>x_ddot</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Acceleration vector X-component (km/s²).</p></li>
+<li><p><strong>y_ddot</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Acceleration vector Y-component (km/s²).</p></li>
+<li><p><strong>z_ddot</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Acceleration vector Z-component (km/s²).</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc.epoch">
+<span class="sig-name descname"><span class="pre">epoch</span></span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc.epoch" title="Link to this definition">¶</a></dt>
+<dd><p>Epoch of the state vector.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc.x">
+<span class="sig-name descname"><span class="pre">x</span></span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc.x" title="Link to this definition">¶</a></dt>
+<dd><p>Position vector X-component (km).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc.x_ddot">
+<span class="sig-name descname"><span class="pre">x_ddot</span></span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc.x_ddot" title="Link to this definition">¶</a></dt>
+<dd><p>Acceleration vector X-component (km/s²).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc.x_dot">
+<span class="sig-name descname"><span class="pre">x_dot</span></span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc.x_dot" title="Link to this definition">¶</a></dt>
+<dd><p>Velocity vector X-component (km/s).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc.y">
+<span class="sig-name descname"><span class="pre">y</span></span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc.y" title="Link to this definition">¶</a></dt>
+<dd><p>Position vector Y-component (km).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc.y_ddot">
+<span class="sig-name descname"><span class="pre">y_ddot</span></span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc.y_ddot" title="Link to this definition">¶</a></dt>
+<dd><p>Acceleration vector Y-component (km/s²).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc.y_dot">
+<span class="sig-name descname"><span class="pre">y_dot</span></span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc.y_dot" title="Link to this definition">¶</a></dt>
+<dd><p>Velocity vector Y-component (km/s).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc.z">
+<span class="sig-name descname"><span class="pre">z</span></span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc.z" title="Link to this definition">¶</a></dt>
+<dd><p>Position vector Z-component (km).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc.z_ddot">
+<span class="sig-name descname"><span class="pre">z_ddot</span></span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc.z_ddot" title="Link to this definition">¶</a></dt>
+<dd><p>Acceleration vector Z-component (km/s²).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.StateVectorAcc.z_dot">
+<span class="sig-name descname"><span class="pre">z_dot</span></span><a class="headerlink" href="#ccsds_ndm.StateVectorAcc.z_dot" title="Link to this definition">¶</a></dt>
+<dd><p>Velocity vector Z-component (km/s).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+        </article><button class="back-to-top" type="button">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+  </svg>
+  <span>Back to top</span>
+</button><div class="navigation flex print:hidden"><div class="navigation-prev">
+    <a href="python.html">
+      <i class="i-lucide chevron-left"></i>
+      <div class="page-info">
+        <span>Previous</span><div class="title">Python API</div></div>
+    </a>
+  </div><div class="navigation-next">
+    <a href="opm.html">
+      <div class="page-info">
+        <span>Next</span>
+        <div class="title">Orbit Parameter Message (OPM)</div>
+      </div>
+      <i class="i-lucide chevron-right"></i>
+    </a>
+  </div></div></div>
+    </div>
+  </main>
+</div>
+<footer class="sy-foot">
+  <div class="sy-foot-inner sy-container mx-auto">
+    <div class="sy-foot-reserved md:flex justify-between items-center">
+      <div class="sy-foot-copyright"><p>2025, Jochim</p>
+  
+  <p>
+    Made with
+    
+    <a href="https://www.sphinx-doc.org/">Sphinx</a> and
+    
+    <a href="https://shibuya.lepture.com">Shibuya theme</a>.
+  </p>
+</div>
+      <div class="sy-foot-socials">
+<a href="https://github.com/JochimMaene/ccsds-ndm" aria-label="GitHub">
+  <iconify-icon icon="simple-icons:github"></iconify-icon>
+</a></div>
+    </div>
+  </div>
+</footer>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/shibuya.js?v=cac61aee"></script></body>
+</html>

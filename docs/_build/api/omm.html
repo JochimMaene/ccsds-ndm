@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en" data-accent-color="violet" data-content_root="../">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Orbit Mean-Elements Message (OMM) - CCSDS NDM documentation</title><link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Orbit Comprehensive Message (OCM)" href="ocm.html" /><link rel="prev" title="Orbit Ephemeris Message (OEM)" href="oem.html" /><script>
+    function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
+    setColorMode(localStorage._theme||"auto");
+  </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=e1a1ceaf" />
+    <link rel="stylesheet" type="text/css" href="../_static/shibuya.css?v=83cb36c2" />
+    <link media="print" rel="stylesheet" type="text/css" href="../_static/print.css?v=20ff2c19" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sy-f-text: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+  --sy-f-heading: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+}
+</style>
+    <meta property="og:type" content="website"/><meta property="og:title" content="Orbit Mean-Elements Message (OMM)"/>
+    <meta name="twitter:card" content="summary"/>
+  </head>
+<body><div class="sy-head">
+  <div class="sy-head-blur"></div>
+  <div class="sy-head-inner sy-container mx-auto">
+    <a class="sy-head-brand" href="../index.html">
+      
+      
+      <strong>CCSDS NDM</strong>
+    </a>
+    <div class="sy-head-nav" id="head-nav">
+      <nav class="sy-head-links"><ul><li class="link"><a href="../rust/index.html.html">Rust API</a></li></ul></nav>
+      <div class="sy-head-extra flex items-center print:hidden"><form class="searchbox flex items-center" action="../search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form><div class="sy-head-socials">
+  <a href="https://github.com/JochimMaene/ccsds-ndm" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div></div>
+    </div>
+    <div class="sy-head-actions flex items-center shrink-0 print:hidden"><button class="js-theme theme-switch flex items-center"
+data-aria-auto="Switch to light color mode"
+data-aria-light="Switch to dark color mode"
+data-aria-dark="Switch to auto color mode">
+<i class="i-lucide theme-icon"></i>
+</button><button class="md:hidden flex items-center js-menu" aria-label="Menu" type="button" aria-controls="head-nav" aria-expanded="false">
+        <div class="hamburger">
+          <span class="hamburger_1"></span>
+          <span class="hamburger_2"></span>
+          <span class="hamburger_3"></span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+<div class="sy-page sy-container flex mx-auto">
+  <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
+    <div class="sy-lside-inner md:sticky">
+      <div class="sy-scrollbar p-6">
+        <div class="globaltoc" data-expand-depth="0"><p class="caption" role="heading" aria-level="3"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../guide/quicktour.html">Quicktour</a></li>
+</ul>
+<p class="caption" role="heading" aria-level="3"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="python.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="core.html">Core &amp; Common Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="opm.html">Orbit Parameter Message (OPM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="oem.html">Orbit Ephemeris Message (OEM)</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Orbit Mean-Elements Message (OMM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ocm.html">Orbit Comprehensive Message (OCM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tdm.html">Tracking Data Message (TDM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rdm.html">Re-entry Data Message (RDM)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cdm.html">Conjunction Data Message (CDM)</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading" aria-level="3"><span class="caption-text">CCSDS Standards</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html">AUTHORITY</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#foreword">FOREWORD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#document-control">DOCUMENT CONTROL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#ndm-sec-1">1 INTRODUCTION</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#ndm-sec-2">2 SCOPE OF NAVIGATION</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#ndm-sec-3">3 NAVIGATION DATA MESSAGE EXCHANGE FRAMEWORK</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#ndm-sec-4">4 CCSDS NAVIGATION DATA MESSAGES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/ndm.html#annex-a">ANNEX A</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html">AUTHORITY</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#statement-of-intent">STATEMENT OF INTENT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#foreword">FOREWORD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#document-control">DOCUMENT CONTROL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#introduction">1 INTRODUCTION</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#overview">2 OVERVIEW</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#id10">3 ATTITUDE PARAMETER MESSAGE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#id21">4 ATTITUDE EPHEMERIS MESSAGE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#id32">5 ATTITUDE COMPREHENSIVE MESSAGE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#attitude-data-messages-kvn-syntax">6 ATTITUDE DATA MESSAGES KVN SYNTAX</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#constructing-an-adm-xml-instance">7 CONSTRUCTING AN ADM/XML INSTANCE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-a">ANNEX A</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-b">ANNEX B</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-c">ANNEX C</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-d">ANNEX D</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-e">ANNEX E</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-f">ANNEX F</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-g">ANNEX G</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-h-informative-references">Annex H: Informative References</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-i-items-for-an-interface-control-document">Annex I: Items for an Interface Control Document</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ccsds-books/adm.html#annex-j-changes-versus-previous-version">Annex J: Changes Versus Previous Version</a></li>
+</ul>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
+  <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
+    <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
+      <i class="i-lucide close"></i>
+    </button>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
+<li><a class="reference internal" href="#ccsds_ndm.Omm"><code class="docutils literal notranslate"><span class="pre">Omm</span></code></a><ul>
+<li><a class="reference internal" href="#ccsds_ndm.Omm.from_file"><code class="docutils literal notranslate">from_file()</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.Omm.from_str"><code class="docutils literal notranslate">from_str()</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.Omm.header"><code class="docutils literal notranslate">header</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.Omm.segment"><code class="docutils literal notranslate">segment</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.Omm.to_file"><code class="docutils literal notranslate">to_file()</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.Omm.to_str"><code class="docutils literal notranslate">to_str()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmSegment"><code class="docutils literal notranslate"><span class="pre">OmmSegment</span></code></a><ul>
+<li><a class="reference internal" href="#ccsds_ndm.OmmSegment.data"><code class="docutils literal notranslate">data</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmSegment.metadata"><code class="docutils literal notranslate">metadata</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmMetadata"><code class="docutils literal notranslate"><span class="pre">OmmMetadata</span></code></a><ul>
+<li><a class="reference internal" href="#ccsds_ndm.OmmMetadata.center_name"><code class="docutils literal notranslate">center_name</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmMetadata.comment"><code class="docutils literal notranslate">comment</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmMetadata.mean_element_theory"><code class="docutils literal notranslate">mean_element_theory</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmMetadata.object_id"><code class="docutils literal notranslate">object_id</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmMetadata.object_name"><code class="docutils literal notranslate">object_name</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmMetadata.ref_frame"><code class="docutils literal notranslate">ref_frame</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmMetadata.ref_frame_epoch"><code class="docutils literal notranslate">ref_frame_epoch</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmMetadata.time_system"><code class="docutils literal notranslate">time_system</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmData"><code class="docutils literal notranslate"><span class="pre">OmmData</span></code></a><ul>
+<li><a class="reference internal" href="#ccsds_ndm.OmmData.covariance_matrix"><code class="docutils literal notranslate">covariance_matrix</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmData.mean_elements"><code class="docutils literal notranslate">mean_elements</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmData.spacecraft_parameters"><code class="docutils literal notranslate">spacecraft_parameters</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmData.tle_parameters"><code class="docutils literal notranslate">tle_parameters</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.OmmData.user_defined_parameters"><code class="docutils literal notranslate">user_defined_parameters</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements"><code class="docutils literal notranslate"><span class="pre">MeanElements</span></code></a><ul>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements.arg_of_pericenter"><code class="docutils literal notranslate">arg_of_pericenter</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements.comments"><code class="docutils literal notranslate">comments</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements.eccentricity"><code class="docutils literal notranslate">eccentricity</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements.epoch"><code class="docutils literal notranslate">epoch</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements.gm"><code class="docutils literal notranslate">gm</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements.inclination"><code class="docutils literal notranslate">inclination</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements.mean_anomaly"><code class="docutils literal notranslate">mean_anomaly</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements.mean_motion"><code class="docutils literal notranslate">mean_motion</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements.ra_of_asc_node"><code class="docutils literal notranslate">ra_of_asc_node</span></code></a></li>
+<li><a class="reference internal" href="#ccsds_ndm.MeanElements.semi_major_axis"><code class="docutils literal notranslate">semi_major_axis</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
+  </aside>
+  <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
+  <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+<div class="sy-breadcrumbs" role="navigation">
+  <div class="sy-breadcrumbs-inner flex items-center">
+    <div class="md:hidden mr-3">
+      <button class="js-menu" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+        <i class="i-lucide menu"></i>
+      </button>
+    </div>
+    <ol class="flex-1" itemscope itemtype="https://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../index.html"><span itemprop="name">CCSDS NDM</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="1" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="python.html"><span itemprop="name">Python API</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="2" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <strong itemprop="name">Orbit Mean-Elements Message (OMM)</strong>
+        <meta itemprop="position" content="3" />
+      </li></ol>
+    <div class="xl:hidden ml-1">
+      <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
+        aria-expanded="false">
+        <i class="i-lucide outdent"></i>
+      </button>
+    </div>
+  </div>
+</div><div class="flex flex-col break-words justify-between">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  
+
+
+<div class="copy-page-wrapper relative pb-4 lg:absolute lg:top-8 lg:right-6 xl:right-12">
+  <div id="copy-page-trigger">
+    <button
+      type="button"
+      class="js-copy px-3 py-1 inline-flex items-center gap-1"
+      data-url="../_sources/api/omm.rst.txt"
+    >
+      <i class="i-lucide" data-icon="copy"></i>
+      <span>Copy page</span>
+    </button>
+    <button class="js-menu px-2 py-1" type="button" aria-label="More actions"
+      aria-haspopup="menu" aria-expanded="false" aria-controls="copy-page-content">
+      <i class="i-lucide chevron-down"></i>
+    </button>
+  </div>
+  <div id="copy-page-content" role="menu" aria-orientation="vertical" aria-hidden="true">
+    <div role="presentation">
+      <div class="flex flex-col" role="group">
+        <button class="js-copy" type="button" role="menuitem"
+          data-url="../_sources/api/omm.rst.txt">
+          <span class="iconify-icon">
+            <i class="i-lucide" data-icon="copy"></i>
+          </span>
+          <span>Copy page</span>
+        </button>
+        <a role="menuitem" href="../_sources/api/omm.rst.txt" target="_blank" rel="nofollow">
+          
+            <iconify-icon icon="bi:code-slash"></iconify-icon>
+            <span>View Source</span>
+          
+        </a>
+        
+        <a role="menuitem" href="https://chatgpt.com/?hints=search&q=Read%20../_sources/api/omm.rst.txt%20so%20I%20can%20ask%20questions%20about%20it." target="_blank" rel="nofollow">
+          <iconify-icon icon="bi:openai"></iconify-icon>
+          <span>Open in ChatGPT</span>
+        </a>
+        
+        
+        <a role="menuitem" href="https://claude.ai/new?q=Read%20../_sources/api/omm.rst.txt%20so%20I%20can%20ask%20questions%20about%20it." target="_blank" rel="nofollow">
+          <iconify-icon icon="bi:claude"></iconify-icon>
+          <span>Open in Claude</span>
+        </a>
+        
+        
+      </div>
+    </div>
+  </div>
+</div>
+<article class="yue" role="main">
+          <section id="orbit-mean-elements-message-omm">
+<h1>Orbit Mean-Elements Message (OMM)<a class="headerlink" href="#orbit-mean-elements-message-omm" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="ccsds_ndm.Omm">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ccsds_ndm.</span></span><span class="sig-name descname"><span class="pre">Omm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">header</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">segment</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.Omm" title="Link to this definition">¶</a></dt>
+<dd><p>Create a new OMM message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>header</strong> (<a class="reference internal" href="core.html#ccsds_ndm.OdmHeader" title="ccsds_ndm.OdmHeader"><em>OdmHeader</em></a>) – The message header.</p></li>
+<li><p><strong>segment</strong> (<a class="reference internal" href="#ccsds_ndm.OmmSegment" title="ccsds_ndm.OmmSegment"><em>OmmSegment</em></a>) – The data segment.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="ccsds_ndm.Omm.from_file">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.Omm.from_file" title="Link to this definition">¶</a></dt>
+<dd><p>Create an OMM message from a file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to the input file.</p></li>
+<li><p><strong>format</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Format (‘kvn’ or ‘xml’). Auto-detected if None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The parsed OMM object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ccsds_ndm.Omm" title="ccsds_ndm.Omm">Omm</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ccsds_ndm.Omm.from_str">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.Omm.from_str" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.Omm.header">
+<span class="sig-name descname"><span class="pre">header</span></span><a class="headerlink" href="#ccsds_ndm.Omm.header" title="Link to this definition">¶</a></dt>
+<dd><p>The message header.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="core.html#ccsds_ndm.OdmHeader" title="ccsds_ndm.OdmHeader">OdmHeader</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.Omm.segment">
+<span class="sig-name descname"><span class="pre">segment</span></span><a class="headerlink" href="#ccsds_ndm.Omm.segment" title="Link to this definition">¶</a></dt>
+<dd><p>The data segment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ccsds_ndm.OmmSegment" title="ccsds_ndm.OmmSegment">OmmSegment</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ccsds_ndm.Omm.to_file">
+<span class="sig-name descname"><span class="pre">to_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.Omm.to_file" title="Link to this definition">¶</a></dt>
+<dd><p>Write to file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Output file path.</p></li>
+<li><p><strong>format</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Output format (‘kvn’ or ‘xml’).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ccsds_ndm.Omm.to_str">
+<span class="sig-name descname"><span class="pre">to_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">format</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.Omm.to_str" title="Link to this definition">¶</a></dt>
+<dd><p>Serialize to string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>format</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Output format (‘kvn’ or ‘xml’).
+(Mandatory)</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The serialized string.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmSegment">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ccsds_ndm.</span></span><span class="sig-name descname"><span class="pre">OmmSegment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">metadata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.OmmSegment" title="Link to this definition">¶</a></dt>
+<dd><p>Create a new OMM Segment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>metadata</strong> (<a class="reference internal" href="#ccsds_ndm.OmmMetadata" title="ccsds_ndm.OmmMetadata"><em>OmmMetadata</em></a>) – Segment metadata.</p></li>
+<li><p><strong>data</strong> (<a class="reference internal" href="#ccsds_ndm.OmmData" title="ccsds_ndm.OmmData"><em>OmmData</em></a>) – Segment data.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmSegment.data">
+<span class="sig-name descname"><span class="pre">data</span></span><a class="headerlink" href="#ccsds_ndm.OmmSegment.data" title="Link to this definition">¶</a></dt>
+<dd><p>Segment data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ccsds_ndm.OmmData" title="ccsds_ndm.OmmData">OmmData</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmSegment.metadata">
+<span class="sig-name descname"><span class="pre">metadata</span></span><a class="headerlink" href="#ccsds_ndm.OmmSegment.metadata" title="Link to this definition">¶</a></dt>
+<dd><p>Segment metadata.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ccsds_ndm.OmmMetadata" title="ccsds_ndm.OmmMetadata">OmmMetadata</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmMetadata">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ccsds_ndm.</span></span><span class="sig-name descname"><span class="pre">OmmMetadata</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">object_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">object_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">center_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_system</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mean_element_theory</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_frame_epoch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comment</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.OmmMetadata" title="Link to this definition">¶</a></dt>
+<dd><p>Create a new OMM Metadata object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>object_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Spacecraft name.</p></li>
+<li><p><strong>object_id</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Object identifier.</p></li>
+<li><p><strong>center_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Origin of the reference frame.</p></li>
+<li><p><strong>ref_frame</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Reference frame.</p></li>
+<li><p><strong>time_system</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Time system.</p></li>
+<li><p><strong>mean_element_theory</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Description of the Mean Element Theory.</p></li>
+<li><p><strong>ref_frame_epoch</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Epoch of the reference frame.</p></li>
+<li><p><strong>comment</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Comments.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmMetadata.center_name">
+<span class="sig-name descname"><span class="pre">center_name</span></span><a class="headerlink" href="#ccsds_ndm.OmmMetadata.center_name" title="Link to this definition">¶</a></dt>
+<dd><p>Origin of the reference frame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmMetadata.comment">
+<span class="sig-name descname"><span class="pre">comment</span></span><a class="headerlink" href="#ccsds_ndm.OmmMetadata.comment" title="Link to this definition">¶</a></dt>
+<dd><p>Comments.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmMetadata.mean_element_theory">
+<span class="sig-name descname"><span class="pre">mean_element_theory</span></span><a class="headerlink" href="#ccsds_ndm.OmmMetadata.mean_element_theory" title="Link to this definition">¶</a></dt>
+<dd><p>Description of the Mean Element Theory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmMetadata.object_id">
+<span class="sig-name descname"><span class="pre">object_id</span></span><a class="headerlink" href="#ccsds_ndm.OmmMetadata.object_id" title="Link to this definition">¶</a></dt>
+<dd><p>Object identifier.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmMetadata.object_name">
+<span class="sig-name descname"><span class="pre">object_name</span></span><a class="headerlink" href="#ccsds_ndm.OmmMetadata.object_name" title="Link to this definition">¶</a></dt>
+<dd><p>Spacecraft name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmMetadata.ref_frame">
+<span class="sig-name descname"><span class="pre">ref_frame</span></span><a class="headerlink" href="#ccsds_ndm.OmmMetadata.ref_frame" title="Link to this definition">¶</a></dt>
+<dd><p>Reference frame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmMetadata.ref_frame_epoch">
+<span class="sig-name descname"><span class="pre">ref_frame_epoch</span></span><a class="headerlink" href="#ccsds_ndm.OmmMetadata.ref_frame_epoch" title="Link to this definition">¶</a></dt>
+<dd><p>Epoch of the reference frame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmMetadata.time_system">
+<span class="sig-name descname"><span class="pre">time_system</span></span><a class="headerlink" href="#ccsds_ndm.OmmMetadata.time_system" title="Link to this definition">¶</a></dt>
+<dd><p>Time system.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmData">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ccsds_ndm.</span></span><span class="sig-name descname"><span class="pre">OmmData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mean_elements</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.OmmData" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmData.covariance_matrix">
+<span class="sig-name descname"><span class="pre">covariance_matrix</span></span><a class="headerlink" href="#ccsds_ndm.OmmData.covariance_matrix" title="Link to this definition">¶</a></dt>
+<dd><p>Covariance matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[<a class="reference internal" href="opm.html#ccsds_ndm.OpmCovarianceMatrix" title="ccsds_ndm.OpmCovarianceMatrix">OpmCovarianceMatrix</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmData.mean_elements">
+<span class="sig-name descname"><span class="pre">mean_elements</span></span><a class="headerlink" href="#ccsds_ndm.OmmData.mean_elements" title="Link to this definition">¶</a></dt>
+<dd><p>Mean elements.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ccsds_ndm.MeanElements" title="ccsds_ndm.MeanElements">MeanElements</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmData.spacecraft_parameters">
+<span class="sig-name descname"><span class="pre">spacecraft_parameters</span></span><a class="headerlink" href="#ccsds_ndm.OmmData.spacecraft_parameters" title="Link to this definition">¶</a></dt>
+<dd><p>Spacecraft parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[SpacecraftParameters]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmData.tle_parameters">
+<span class="sig-name descname"><span class="pre">tle_parameters</span></span><a class="headerlink" href="#ccsds_ndm.OmmData.tle_parameters" title="Link to this definition">¶</a></dt>
+<dd><p>TLE parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[TleParameters]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.OmmData.user_defined_parameters">
+<span class="sig-name descname"><span class="pre">user_defined_parameters</span></span><a class="headerlink" href="#ccsds_ndm.OmmData.user_defined_parameters" title="Link to this definition">¶</a></dt>
+<dd><p>User defined parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[UserDefined]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ccsds_ndm.</span></span><span class="sig-name descname"><span class="pre">MeanElements</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epoch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eccentricity</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inclination</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ra_of_asc_node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg_of_pericenter</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mean_anomaly</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">semi_major_axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mean_motion</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gm</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ccsds_ndm.MeanElements" title="Link to this definition">¶</a></dt>
+<dd><p>Create a new MeanElements object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>epoch</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Epoch of the mean elements.</p></li>
+<li><p><strong>eccentricity</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Eccentricity.</p></li>
+<li><p><strong>inclination</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Inclination (deg).</p></li>
+<li><p><strong>ra_of_asc_node</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Right ascension of the ascending node (deg).</p></li>
+<li><p><strong>arg_of_pericenter</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Argument of pericenter (deg).</p></li>
+<li><p><strong>mean_anomaly</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Mean anomaly (deg).</p></li>
+<li><p><strong>semi_major_axis</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Semi-major axis (km).</p></li>
+<li><p><strong>mean_motion</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Mean motion (rev/day).</p></li>
+<li><p><strong>gm</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Gravitational coefficient (km³/s²).</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements.arg_of_pericenter">
+<span class="sig-name descname"><span class="pre">arg_of_pericenter</span></span><a class="headerlink" href="#ccsds_ndm.MeanElements.arg_of_pericenter" title="Link to this definition">¶</a></dt>
+<dd><p>Argument of pericenter.</p>
+<p>Units: deg</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements.comments">
+<span class="sig-name descname"><span class="pre">comments</span></span><a class="headerlink" href="#ccsds_ndm.MeanElements.comments" title="Link to this definition">¶</a></dt>
+<dd><p>Comments.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements.eccentricity">
+<span class="sig-name descname"><span class="pre">eccentricity</span></span><a class="headerlink" href="#ccsds_ndm.MeanElements.eccentricity" title="Link to this definition">¶</a></dt>
+<dd><p>Eccentricity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements.epoch">
+<span class="sig-name descname"><span class="pre">epoch</span></span><a class="headerlink" href="#ccsds_ndm.MeanElements.epoch" title="Link to this definition">¶</a></dt>
+<dd><p>Epoch of the mean elements.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements.gm">
+<span class="sig-name descname"><span class="pre">gm</span></span><a class="headerlink" href="#ccsds_ndm.MeanElements.gm" title="Link to this definition">¶</a></dt>
+<dd><p>Gravitational coefficient (GM).</p>
+<p>Units: km³/s²</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements.inclination">
+<span class="sig-name descname"><span class="pre">inclination</span></span><a class="headerlink" href="#ccsds_ndm.MeanElements.inclination" title="Link to this definition">¶</a></dt>
+<dd><p>Inclination.</p>
+<p>Units: deg</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements.mean_anomaly">
+<span class="sig-name descname"><span class="pre">mean_anomaly</span></span><a class="headerlink" href="#ccsds_ndm.MeanElements.mean_anomaly" title="Link to this definition">¶</a></dt>
+<dd><p>Mean anomaly.</p>
+<p>Units: deg</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements.mean_motion">
+<span class="sig-name descname"><span class="pre">mean_motion</span></span><a class="headerlink" href="#ccsds_ndm.MeanElements.mean_motion" title="Link to this definition">¶</a></dt>
+<dd><p>Mean motion.</p>
+<p>Units: rev/day</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements.ra_of_asc_node">
+<span class="sig-name descname"><span class="pre">ra_of_asc_node</span></span><a class="headerlink" href="#ccsds_ndm.MeanElements.ra_of_asc_node" title="Link to this definition">¶</a></dt>
+<dd><p>Right ascension of the ascending node.</p>
+<p>Units: deg</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ccsds_ndm.MeanElements.semi_major_axis">
+<span class="sig-name descname"><span class="pre">semi_major_axis</span></span><a class="headerlink" href="#ccsds_ndm.MeanElements.semi_major_axis" title="Link to this definition">¶</a></dt>
+<dd><p>Semi-major axis.</p>
+<p>Units: km</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+        </article><button class="back-to-top" type="button">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+  </svg>
+  <span>Back to top</span>
+</button><div class="navigation flex print:hidden"><div class="navigation-prev">
+    <a href="oem.html">
+      <i class="i-lucide chevron-left"></i>
+      <div class="page-info">
+        <span>Previous</span><div class="title">Orbit Ephemeris Message (OEM)</div></div>
+    </a>
+  </div><div class="navigation-next">
+    <a href="ocm.html">
+      <div class="page-info">
+        <span>Next</span>
+        <div class="title">Orbit Comprehensive Message (OCM)</div>
+      </div>
+      <i class="i-lucide chevron-right"></i>
+    </a>
+  </div></div></div>
+    </div>
+  </main>
+</div>
+<footer class="sy-foot">
+  <div class="sy-foot-inner sy-container mx-auto">
+    <div class="sy-foot-reserved md:flex justify-between items-center">
+      <div class="sy-foot-copyright"><p>2025, Jochim</p>
+  
+  <p>
+    Made with
+    
+    <a href="https://www.sphinx-doc.org/">Sphinx</a> and
+    
+    <a href="https://shibuya.lepture.com">Shibuya theme</a>.
+  </p>
+</div>
+      <div class="sy-foot-socials">
+<a href="https://github.com/JochimMaene/ccsds-ndm" aria-label="GitHub">
+  <iconify-icon icon="simple-icons:github"></iconify-icon>
+</a></div>
+    </div>
+  </div>
+</footer>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/shibuya.js?v=cac61aee"></script></body>
+</html>

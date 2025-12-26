@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: 2025 Jochim Maene <16223990+JochimMaene@users.noreply.github.com>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+[project]
+name = "ccsds-ndm-py"
+description = "Parse and generate CCSDS Navigation Data Messages (NDM) in KVN and XML formats"
+requires-python = ">=3.9"
+license = "MPL-2.0"
+authors = [
+    { name = "Jochim Maene", email = "16223990+JochimMaene@users.noreply.github.com" }
+]
+keywords = ["ccsds", "ndm", "space", "orbit", "astrodynamics", "ephemeris"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.16.0",
+]
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/JochimMaene/ccsds-ndm"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]
+
+[build-system]
+requires = ["maturin>=1.9"]
+build-backend = "maturin"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "."
+module-name = "ccsds_ndm"
+strip = true
+
+[tool.uv]
+# Rebuild package when any rust files change
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "Cargo.toml" },
+  { file = "**/*.pyi" },
+  { file = "**/*.rs" },
+  { file = "../**/*.rs" },
+]
