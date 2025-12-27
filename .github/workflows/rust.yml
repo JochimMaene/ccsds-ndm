@@ -68,5 +68,6 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
           files: ccsds-ndm/codecov.json
           fail_ci_if_error: true
