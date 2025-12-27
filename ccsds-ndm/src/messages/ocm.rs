@@ -3698,7 +3698,9 @@ BAD_KEY = VAL
 META_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Unexpected OCM Metadata key")));
+        assert!(
+            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Unexpected OCM Metadata key"))
+        );
     }
 
     #[test]
@@ -3762,7 +3764,7 @@ META_STOP
         assert_eq!(meta.object_name, Some("SAT1".to_string()));
         assert_eq!(meta.object_type, Some(ObjectDescription::Payload));
         assert!(meta.sclk_offset_at_epoch.is_some());
-        
+
         // Roundtrip to hit write_kvn for all fields
         let output = ocm.to_kvn().unwrap();
         let ocm2 = Ocm::from_kvn(&output).unwrap();
@@ -3786,7 +3788,10 @@ UNEXPECTED_KEY = VAL
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
         assert!(ocm.body.segment.data.user.is_some());
-        assert_eq!(ocm.body.segment.data.user.as_ref().unwrap().comment[0], "preceding comment");
+        assert_eq!(
+            ocm.body.segment.data.user.as_ref().unwrap().comment[0],
+            "preceding comment"
+        );
     }
 
     #[test]
@@ -3843,7 +3848,7 @@ TRAJ_STOP
         assert_eq!(traj.traj_id, Some("T1".to_string()));
         assert_eq!(traj.traj_basis, Some(TrajBasis::Predicted));
         assert_eq!(traj.orb_revnum_basis, Some(RevNumBasis::One));
-        
+
         let output = ocm.to_kvn().unwrap();
         assert!(output.contains("ORB_REVNUM_BASIS"));
         assert!(output.contains("1"));
@@ -3915,7 +3920,7 @@ PHYS_STOP
         let phys = ocm.body.segment.data.phys.as_ref().unwrap();
         assert_eq!(phys.manufacturer, Some("ACME".to_string()));
         assert_eq!(phys.ixx.as_ref().unwrap().value, 100.0);
-        
+
         let output = ocm.to_kvn().unwrap();
         assert!(output.contains("IXX"));
         assert!(output.contains("100") || output.contains("1.0e2") || output.contains("1e2"));
@@ -3935,7 +3940,9 @@ DRAG_COEFF_NOM = NOT_A_FLOAT
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid DRAG_COEFF_NOM")));
+        assert!(
+            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid DRAG_COEFF_NOM"))
+        );
 
         let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -4029,7 +4036,7 @@ COV_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
         assert_eq!(ocm.body.segment.data.cov[0].cov_ordering, CovOrder::LtmWcc);
-        
+
         // Also test UTMWCC
         let kvn2 = kvn.replace("LTMWCC", "UTMWCC");
         let ocm2 = Ocm::from_kvn(&kvn2).unwrap();

@@ -2307,7 +2307,9 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::MissingField(msg) if msg.contains("INTERPOLATION_DEGREE is required")));
+        assert!(
+            matches!(err, CcsdsNdmError::MissingField(msg) if msg.contains("INTERPOLATION_DEGREE is required"))
+        );
     }
 
     #[test]
@@ -2335,7 +2337,9 @@ EPOCH = 2023-01-01T00:00:00
 0.01 0.01 0.01 0.1 0.1 1.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Unexpected EOF within COVARIANCE block")));
+        assert!(
+            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Unexpected EOF within COVARIANCE block"))
+        );
     }
 
     #[test]
@@ -2358,7 +2362,9 @@ EPOCH = 2023-01-01T00:00:00
 NOT_A_FLOAT
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid float in covariance")));
+        assert!(
+            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid float in covariance"))
+        );
     }
 
     #[test]
@@ -2381,7 +2387,9 @@ EPOCH = 2023-01-01T00:00:00
 KEY = VAL
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Expected covariance data row")));
+        assert!(
+            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Expected covariance data row"))
+        );
     }
 
     #[test]
@@ -2459,7 +2467,7 @@ META_STOP
 BAD KEY = VAL
 "#;
         let _ = Oem::from_kvn(kvn1); // Just to hit the Err branches in State Vector loop (it might error later or here)
-        
+
         // Error in Covariance section
         let kvn2 = r#"CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
