@@ -7,8 +7,8 @@ use ccsds_ndm::common as core_common;
 use ccsds_ndm::messages::rdm as core_rdm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{
-    ControlledType, DayInterval, DayIntervalRequired, ObjectDescription, Percentage, PercentageRequired,
-    PositionRequired, YesNo,
+    ControlledType, DayInterval, DayIntervalRequired, ObjectDescription, Percentage,
+    PercentageRequired, PositionRequired, YesNo,
 };
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
@@ -49,7 +49,7 @@ impl Rdm {
             inner: core_rdm::Rdm {
                 header: header.inner,
                 body: core_rdm::RdmBody {
-                    segment: segment.inner,
+                    segment: Box::new(segment.inner),
                 },
                 id: Some("CCSDS_RDM_VERS".to_string()),
                 version: "1.0".to_string(),
@@ -85,13 +85,13 @@ impl Rdm {
     #[getter]
     fn get_segment(&self) -> RdmSegment {
         RdmSegment {
-            inner: self.inner.body.segment.clone(),
+            inner: *self.inner.body.segment.clone(),
         }
     }
 
     #[setter]
     fn set_segment(&mut self, segment: RdmSegment) {
-        self.inner.body.segment = segment.inner;
+        self.inner.body.segment = Box::new(segment.inner);
     }
 
     /// Create an RDM message from a string.
@@ -111,28 +111,29 @@ impl Rdm {
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = match format {
-            Some("kvn") => core_rdm::Rdm::from_kvn(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some("xml") => core_rdm::Rdm::from_xml(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some(other) => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                    other
-                )))
-            }
-            None => match ccsds_ndm::from_str(data) {
-                Ok(MessageType::Rdm(rdm)) => rdm,
-                Ok(other) => {
+        let inner =
+            match format {
+                Some("kvn") => core_rdm::Rdm::from_kvn(data)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                Some("xml") => core_rdm::Rdm::from_xml(data)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                Some(other) => {
                     return Err(PyValueError::new_err(format!(
-                        "Parsed message is not RDM (got {:?})",
+                        "Unsupported format '{}'. Use 'kvn' or 'xml'",
                         other
                     )))
                 }
-                Err(e) => return Err(PyValueError::new_err(e.to_string())),
-            },
-        };
+                None => match ccsds_ndm::from_str(data) {
+                    Ok(MessageType::Rdm(rdm)) => rdm,
+                    Ok(other) => {
+                        return Err(PyValueError::new_err(format!(
+                            "Parsed message is not RDM (got {:?})",
+                            other
+                        )))
+                    }
+                    Err(e) => return Err(PyValueError::new_err(e.to_string())),
+                },
+            };
         Ok(Self { inner })
     }
 
@@ -539,8 +540,7 @@ impl RdmMetadata {
                 earth_tides,
                 intrack_thrust: intrack_thrust_enum,
                 drag_parameters_source,
-                drag_parameters_altitude: drag_parameters_altitude
-                    .map(PositionRequired::new),
+                drag_parameters_altitude: drag_parameters_altitude.map(PositionRequired::new),
                 reentry_uncertainty_method,
                 reentry_disintegration,
                 impact_uncertainty_method,
@@ -548,9 +548,7 @@ impl RdmMetadata {
                 previous_message_epoch: previous_message_epoch
                     .map(|s| parse_epoch(&s))
                     .transpose()?,
-                next_message_epoch: next_message_epoch
-                    .map(|s| parse_epoch(&s))
-                    .transpose()?,
+                next_message_epoch: next_message_epoch.map(|s| parse_epoch(&s)).transpose()?,
             },
         })
     }
@@ -780,7 +778,10 @@ impl RdmMetadata {
 
     #[getter]
     fn get_drag_parameters_altitude(&self) -> Option<f64> {
-        self.inner.drag_parameters_altitude.as_ref().map(|v| v.value)
+        self.inner
+            .drag_parameters_altitude
+            .as_ref()
+            .map(|v| v.value)
     }
     #[setter]
     fn set_drag_parameters_altitude(&mut self, v: Option<f64>) {
@@ -1083,22 +1084,20 @@ impl AtmosphericReentryParameters {
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 reentry_altitude: PositionRequired::new(reentry_altitude),
                 orbit_lifetime_window_start: orbit_lifetime_window_start
-                    .map(|v| DayIntervalRequired::new(v))
+                    .map(DayIntervalRequired::new)
                     .transpose()
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 orbit_lifetime_window_end: orbit_lifetime_window_end
-                    .map(|v| DayIntervalRequired::new(v))
+                    .map(DayIntervalRequired::new)
                     .transpose()
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 nominal_reentry_epoch: nominal_reentry_epoch
                     .map(|s| parse_epoch(&s))
                     .transpose()?,
-                reentry_window_start: reentry_window_start
-                    .map(|s| parse_epoch(&s))
-                    .transpose()?,
+                reentry_window_start: reentry_window_start.map(|s| parse_epoch(&s)).transpose()?,
                 reentry_window_end: reentry_window_end.map(|s| parse_epoch(&s)).transpose()?,
                 orbit_lifetime_confidence_level: orbit_lifetime_confidence_level
-                    .map(|v| PercentageRequired::new(v))
+                    .map(PercentageRequired::new)
                     .transpose()
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
             },
@@ -1133,7 +1132,7 @@ impl AtmosphericReentryParameters {
     #[setter]
     fn set_orbit_lifetime_window_start(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.orbit_lifetime_window_start = v
-            .map(|x| DayIntervalRequired::new(x))
+            .map(DayIntervalRequired::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1149,7 +1148,7 @@ impl AtmosphericReentryParameters {
     #[setter]
     fn set_orbit_lifetime_window_end(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.orbit_lifetime_window_end = v
-            .map(|x| DayIntervalRequired::new(x))
+            .map(DayIntervalRequired::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1204,7 +1203,7 @@ impl AtmosphericReentryParameters {
     #[setter]
     fn set_orbit_lifetime_confidence_level(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.orbit_lifetime_confidence_level = v
-            .map(|x| PercentageRequired::new(x))
+            .map(PercentageRequired::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1246,11 +1245,11 @@ impl GroundImpactParameters {
             inner: core_common::GroundImpactParameters {
                 comment: comment.unwrap_or_default(),
                 probability_of_impact: probability_of_impact
-                    .map(|v| Probability::new(v))
+                    .map(Probability::new)
                     .transpose()
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 probability_of_burn_up: probability_of_burn_up
-                    .map(|v| Probability::new(v))
+                    .map(Probability::new)
                     .transpose()
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 probability_of_break_up: None,
@@ -1292,7 +1291,7 @@ impl GroundImpactParameters {
     #[setter]
     fn set_probability_of_impact(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.probability_of_impact = v
-            .map(|x| ccsds_ndm::types::Probability::new(x))
+            .map(ccsds_ndm::types::Probability::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1305,7 +1304,7 @@ impl GroundImpactParameters {
     #[setter]
     fn set_probability_of_burn_up(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.probability_of_burn_up = v
-            .map(|x| ccsds_ndm::types::Probability::new(x))
+            .map(ccsds_ndm::types::Probability::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1318,7 +1317,7 @@ impl GroundImpactParameters {
     #[setter]
     fn set_probability_of_break_up(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.probability_of_break_up = v
-            .map(|x| ccsds_ndm::types::Probability::new(x))
+            .map(ccsds_ndm::types::Probability::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1334,7 +1333,7 @@ impl GroundImpactParameters {
     #[setter]
     fn set_probability_of_land_impact(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.probability_of_land_impact = v
-            .map(|x| ccsds_ndm::types::Probability::new(x))
+            .map(ccsds_ndm::types::Probability::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1347,7 +1346,7 @@ impl GroundImpactParameters {
     #[setter]
     fn set_probability_of_casualty(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.probability_of_casualty = v
-            .map(|x| ccsds_ndm::types::Probability::new(x))
+            .map(ccsds_ndm::types::Probability::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1408,7 +1407,7 @@ impl GroundImpactParameters {
     #[setter]
     fn set_nominal_impact_lon(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.nominal_impact_lon = v
-            .map(|x| ccsds_ndm::types::LongitudeRequired::new(x))
+            .map(ccsds_ndm::types::LongitudeRequired::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1421,7 +1420,7 @@ impl GroundImpactParameters {
     #[setter]
     fn set_nominal_impact_lat(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.nominal_impact_lat = v
-            .map(|x| ccsds_ndm::types::LatitudeRequired::new(x))
+            .map(ccsds_ndm::types::LatitudeRequired::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1434,7 +1433,7 @@ impl GroundImpactParameters {
     #[setter]
     fn set_nominal_impact_alt(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.nominal_impact_alt = v
-            .map(|x| ccsds_ndm::types::AltitudeRequired::new(x))
+            .map(ccsds_ndm::types::AltitudeRequired::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1530,7 +1529,10 @@ impl RdmSpacecraftParameters {
     }
     #[setter]
     fn set_solar_rad_area(&mut self, v: Option<f64>) {
-        self.inner.solar_rad_area = v.map(|x| ccsds_ndm::types::Area { value: x, units: None });
+        self.inner.solar_rad_area = v.map(|x| ccsds_ndm::types::Area {
+            value: x,
+            units: None,
+        });
     }
 
     #[getter]
@@ -1548,7 +1550,10 @@ impl RdmSpacecraftParameters {
     }
     #[setter]
     fn set_drag_area(&mut self, v: Option<f64>) {
-        self.inner.drag_area = v.map(|x| ccsds_ndm::types::Area { value: x, units: None });
+        self.inner.drag_area = v.map(|x| ccsds_ndm::types::Area {
+            value: x,
+            units: None,
+        });
     }
 
     #[getter]
@@ -1566,7 +1571,10 @@ impl RdmSpacecraftParameters {
     }
     #[setter]
     fn set_rcs(&mut self, v: Option<f64>) {
-        self.inner.rcs = v.map(|x| ccsds_ndm::types::Area { value: x, units: None });
+        self.inner.rcs = v.map(|x| ccsds_ndm::types::Area {
+            value: x,
+            units: None,
+        });
     }
 
     #[getter]
@@ -1576,7 +1584,7 @@ impl RdmSpacecraftParameters {
     #[setter]
     fn set_ballistic_coeff(&mut self, v: Option<f64>) -> PyResult<()> {
         self.inner.ballistic_coeff = v
-            .map(|x| ccsds_ndm::types::BallisticCoeffRequired::new(x))
+            .map(ccsds_ndm::types::BallisticCoeffRequired::new)
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
@@ -1725,7 +1733,10 @@ impl OdParameters {
     }
     #[setter]
     fn set_residuals_accepted(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.residuals_accepted = v.map(|x| Percentage { value: x, units: None });
+        self.inner.residuals_accepted = v.map(|x| Percentage {
+            value: x,
+            units: None,
+        });
         Ok(())
     }
 

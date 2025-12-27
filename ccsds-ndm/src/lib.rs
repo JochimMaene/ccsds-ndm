@@ -279,7 +279,6 @@ fn detect_and_parse_kvn(s: &str) -> Result<MessageType> {
             return crate::traits::Ndm::from_kvn(s).map(MessageType::Ocm);
         }
 
-
         return Err(CcsdsNdmError::UnsupportedMessage(format!(
             "Could not determine NDM type from KVN header line: '{}'",
             trimmed_line

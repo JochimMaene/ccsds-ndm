@@ -46,21 +46,19 @@ impl<'a> Iterator for KvnTokenizer<'a> {
         let (line_num0, raw_line) = self.lines.next()?;
         let line_num = line_num0 + 1;
 
-
-
         let line = raw_line.trim();
 
         if line.is_empty() {
             return Some(Ok(KvnLine::Empty));
         }
 
-        if line.starts_with("COMMENT") {
+        if let Some(stripped) = line.strip_prefix("COMMENT") {
             // Check boundary: "COMMENT" must be the whole line OR followed by whitespace
-            if line.len() == 7 {
+            if stripped.is_empty() {
                 return Some(Ok(KvnLine::Comment("")));
             }
-            if line.as_bytes()[7].is_ascii_whitespace() {
-                let content = line[7..].trim();
+            if stripped.as_bytes()[0].is_ascii_whitespace() {
+                let content = stripped.trim();
                 return Some(Ok(KvnLine::Comment(content)));
             }
         }

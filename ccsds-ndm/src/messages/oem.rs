@@ -237,7 +237,7 @@ impl OemMetadata {
         I: Iterator<Item = Result<KvnLine<'a>>>,
     {
         let mut builder = OemMetadataBuilder::default();
-        while let Some(token) = tokens.next() {
+        for token in tokens.by_ref() {
             match token? {
                 KvnLine::BlockEnd("META") => break,
                 KvnLine::Comment(c) => builder.comment.push(c.to_string()),
@@ -389,7 +389,7 @@ impl OemData {
 
         // 1. Parse Top-Level Comments first, as per XSD sequence
         while let Some(peek_res) = tokens.peek() {
-            if let Err(_) = peek_res {
+            if peek_res.is_err() {
                 if let Some(Err(e)) = tokens.next() {
                     return Err(e);
                 }
@@ -410,7 +410,7 @@ impl OemData {
 
         // 2. Parse State Vectors
         while let Some(peek_res) = tokens.peek() {
-            if let Err(_) = peek_res {
+            if peek_res.is_err() {
                 if let Some(Err(e)) = tokens.next() {
                     return Err(e);
                 }
@@ -442,7 +442,7 @@ impl OemData {
 
         // 4. Parse Covariance Matrices
         while let Some(peek_res) = tokens.peek() {
-            if let Err(_) = peek_res {
+            if peek_res.is_err() {
                 if let Some(Err(e)) = tokens.next() {
                     return Err(e);
                 }
@@ -548,7 +548,7 @@ impl ToKvn for OemCovarianceMatrix {
         // Write triangular format with scientific notation
         let f = |v: f64| format!("{:.14e}", v);
 
-        writer.write_line(&f(self.cx_x.value));
+        writer.write_line(f(self.cx_x.value));
         writer.write_line(format!("{} {}", f(self.cy_x.value), f(self.cy_y.value)));
         writer.write_line(format!(
             "{} {} {}",

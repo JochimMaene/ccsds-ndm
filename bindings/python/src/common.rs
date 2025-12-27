@@ -162,6 +162,7 @@ pub struct StateVectorAcc {
 #[pymethods]
 impl StateVectorAcc {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         epoch: String,
         x: f64,

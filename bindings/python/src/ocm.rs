@@ -101,7 +101,7 @@ impl Ocm {
             inner: core_ocm::Ocm {
                 header: header.inner,
                 body: core_ocm::OcmBody {
-                    segment: segment.inner,
+                    segment: Box::new(segment.inner),
                 },
                 id: Some("CCSDS_OCM_VERS".to_string()),
                 version: "3.0".to_string(),
@@ -143,13 +143,13 @@ impl Ocm {
     #[getter]
     fn get_segment(&self) -> OcmSegment {
         OcmSegment {
-            inner: self.inner.body.segment.clone(),
+            inner: *self.inner.body.segment.clone(),
         }
     }
 
     #[setter]
     fn set_segment(&mut self, segment: OcmSegment) {
-        self.inner.body.segment = segment.inner;
+        self.inner.body.segment = Box::new(segment.inner);
     }
     /// Serialize to string.
     ///

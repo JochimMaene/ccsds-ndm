@@ -140,20 +140,21 @@ impl FromKvnTokens for CdmHeader {
                 KvnLine::Empty => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, .. } => match *key {
-                    "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_FOR" | "MESSAGE_ID" => {
-                        if let Some(Ok(KvnLine::Pair { key, val, .. })) = tokens.next() {
-                            match key {
-                                "CREATION_DATE" => creation_date = Some(Epoch::new(val)?),
-                                "ORIGINATOR" => originator = Some(val.to_string()),
-                                "MESSAGE_FOR" => message_for = Some(val.to_string()),
-                                "MESSAGE_ID" => message_id = Some(val.to_string()),
-                                _ => unreachable!(),
-                            }
+                KvnLine::Pair {
+                    key: "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_FOR" | "MESSAGE_ID",
+                    ..
+                } => {
+                    if let Some(Ok(KvnLine::Pair { key, val, .. })) = tokens.next() {
+                        match key {
+                            "CREATION_DATE" => creation_date = Some(Epoch::new(val)?),
+                            "ORIGINATOR" => originator = Some(val.to_string()),
+                            "MESSAGE_FOR" => message_for = Some(val.to_string()),
+                            "MESSAGE_ID" => message_id = Some(val.to_string()),
+                            _ => unreachable!(),
                         }
                     }
-                    _ => break, // Start of Relative Metadata
-                },
+                }
+                KvnLine::Pair { .. } => break, // Start of Relative Metadata
                 _ => break,
             }
         }
@@ -313,7 +314,7 @@ impl ToKvn for RelativeMetadataData {
             writer.write_pair("SCREEN_EXIT_TIME", v);
         }
         if let Some(v) = &self.collision_probability {
-            writer.write_pair("COLLISION_PROBABILITY", &v.value);
+            writer.write_pair("COLLISION_PROBABILITY", v.value);
         }
         if let Some(v) = &self.collision_probability_method {
             writer.write_pair("COLLISION_PROBABILITY_METHOD", v);

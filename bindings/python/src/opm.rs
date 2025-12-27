@@ -127,7 +127,6 @@ impl Opm {
     /// ----------
     /// path : str
     ///     Path to the input file.
-
     /// format : str, optional
     ///     Format ('kvn' or 'xml'). Auto-detected if None.
     ///
@@ -421,6 +420,7 @@ pub struct KeplerianElements {
 #[pymethods]
 impl KeplerianElements {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         semi_major_axis: f64,
         eccentricity: f64,
@@ -625,6 +625,7 @@ pub struct OpmCovarianceMatrix {
 #[pymethods]
 impl OpmCovarianceMatrix {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         cx_x: Option<f64>,
         cy_x: Option<f64>,

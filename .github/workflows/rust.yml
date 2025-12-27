@@ -1,110 +1,82 @@
 name: Rust
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    env:
-      MACOSX_DEPLOYMENT_TARGET: 10.12
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-
+  test:
+    name: Test
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust Stable
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          toolchain: stable
-          components: rustfmt, clippy
-          override: true
+          workspaces: ccsds-ndm
+      - name: Run tests
+        working-directory: ccsds-ndm
+        run: cargo test --all-features
 
-      # Necessary for now for the cargo cache: https://github.com/actions/cache/issues/133#issuecomment-599102035
-      - if: matrix.os == 'ubuntu-latest'
-        run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
-
-      - name: Install cargo-readme for Ubuntu
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions-rs/cargo@v1
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          command: install
-          args: cargo-readme
+          components: rustfmt
+      - name: Enforce formatting
+        working-directory: ccsds-ndm
+        run: cargo fmt --check
 
-      - name: Install audit
-        uses: actions-rs/cargo@v1
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          command: install
-          args: cargo-audit
-
-      - name: Build
-        uses: actions-rs/cargo@v1
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
         with:
-          command: build
-          args: --all-targets --verbose --manifest-path ./ccsds-ndm/Cargo.toml
+          workspaces: ccsds-ndm
+      - name: Linting
+        working-directory: ccsds-ndm
+        run: cargo clippy -- -D warnings
 
-      - name: Lint with RustFmt
-        uses: actions-rs/cargo@v1
+  reuse:
+    name: REUSE Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+      - name: Check REUSE compliance
+        run: uvx reuse lint
+
+  coverage:
+    name: Code coverage
+    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    env:
+      UV_PROJECT: ccsds-ndm
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+      - name: Generate code coverage
+        working-directory: ccsds-ndm
+        run: cargo llvm-cov --all-features --workspace --codecov --output-path codecov.json
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
         with:
-          command: fmt
-          args: --manifest-path ./ccsds-ndm/Cargo.toml -- --check
-
-      - name: Lint Benchmarks with RustFmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --manifest-path ./ccsds-ndm/Cargo.toml -- ./ccsds-ndm/benches/bpe_benchmark.rs --check
-
-      - name: Lint with Clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --manifest-path ./ccsds-ndm/Cargo.toml --all-targets --all-features -- -D warnings
-
-      - name: Run Tests
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        working-directory: ./ccsds-ndm
-        run: make test
-
-      # Skip integration tests for now on Windows
-      - name: Run lib Tests on Windows
-        if: matrix.os == 'windows-latest'
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose --manifest-path ./ccsds-ndm/Cargo.toml --lib
-
-      - name: Run doc Tests on Windows
-        if: matrix.os == 'windows-latest'
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose --manifest-path ./ccsds-ndm/Cargo.toml --doc
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-
-      - name: Run Audit
-        uses: actions-rs/cargo@v1
-        with:
-          command: audit
-          args: -D warnings -f ./ccsds-ndm/Cargo.lock --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0014 --ignore RUSTSEC-2025-0119
-
-      # Verify that Readme.md is up to date.
-      - name: Make sure, Readme generated from lib.rs matches actual Readme
-        if: matrix.os == 'ubuntu-latest'
-        shell: bash
-        working-directory: ./ccsds-ndm
-        run: cargo readme > must_match_readme.md && diff must_match_readme.md README.md
-
-      - name: Check semver
-        if: matrix.os == 'ubuntu-latest'
-        uses: obi1kenobi/cargo-semver-checks-action@v2
-        with:
-          manifest-path: ./ccsds-ndm/Cargo.toml
+          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          files: ccsds-ndm/codecov.json
+          fail_ci_if_error: true

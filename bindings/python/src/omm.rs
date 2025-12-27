@@ -271,6 +271,7 @@ pub struct OmmMetadata {
 #[pymethods]
 impl OmmMetadata {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         object_name: String,
         object_id: String,
@@ -439,6 +440,7 @@ pub struct MeanElements {
 #[pymethods]
 impl MeanElements {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         epoch: String,
         eccentricity: f64,
@@ -802,6 +804,7 @@ impl TleParameters {
         signature = (*, ephemeris_type=None, classification_type=None, norad_cat_id=None, element_set_no=None, rev_at_epoch=None, bstar=None, bterm=None, mean_motion_dot=None, mean_motion_ddot=None, agom=None),
         text_signature = "(ephemeris_type: Optional[int] = None, classification_type: Optional[str] = None, norad_cat_id: Optional[int] = None, element_set_no: Optional[int] = None, rev_at_epoch: Optional[int] = None, bstar: Optional[float] = None, bterm: Optional[float] = None, mean_motion_dot: Optional[float] = None, mean_motion_ddot: Optional[float] = None, agom: Optional[float] = None)"
     )]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         ephemeris_type: Option<i32>,
         classification_type: Option<String>,

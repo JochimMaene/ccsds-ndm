@@ -468,7 +468,7 @@ impl RelativeMetadataData {
                 screen_volume_z: screen_volume_z.map(|v| Length::new(v, None)),
                 screen_entry_time: screen_entry_time.map(|s| parse_epoch_str(&s)).transpose()?,
                 screen_exit_time: screen_exit_time.map(|s| parse_epoch_str(&s)).transpose()?,
-                collision_probability: collision_probability.map(|v| Probability::new(v)).transpose()
+                collision_probability: collision_probability.map(Probability::new).transpose()
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 collision_probability_method,
             }
@@ -505,7 +505,7 @@ impl RelativeMetadataData {
     fn collision_probability(&self) -> Option<f64> { self.inner.collision_probability.as_ref().map(|v| v.value) }
     #[setter]
     fn set_collision_probability(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.inner.collision_probability = value.map(|v| Probability::new(v)).transpose()
+        self.inner.collision_probability = value.map(Probability::new).transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
