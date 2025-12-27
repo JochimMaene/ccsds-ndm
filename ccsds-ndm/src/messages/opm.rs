@@ -564,7 +564,7 @@ impl ToKvn for KeplerianElements {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         writer.write_measure("SEMI_MAJOR_AXIS", &self.semi_major_axis);
-        writer.write_pair("ECCENTRICITY", &self.eccentricity);
+        writer.write_pair("ECCENTRICITY", self.eccentricity);
         writer.write_measure("INCLINATION", &self.inclination.to_unit_value());
         writer.write_measure("RA_OF_ASC_NODE", &self.ra_of_asc_node.to_unit_value());
         writer.write_measure("ARG_OF_PERICENTER", &self.arg_of_pericenter.to_unit_value());

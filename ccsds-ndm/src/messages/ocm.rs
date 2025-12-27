@@ -92,7 +92,7 @@ impl Ndm for Ocm {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OcmBody {
     #[serde(rename = "segment")]
-    pub segment: OcmSegment,
+    pub segment: Box<OcmSegment>,
 }
 
 impl ToKvn for OcmBody {
@@ -108,7 +108,9 @@ impl OcmBody {
     {
         // OCM has exactly one segment implied by structure in KVN
         let segment = OcmSegment::from_kvn_tokens(tokens)?;
-        Ok(OcmBody { segment })
+        Ok(OcmBody {
+            segment: Box::new(segment),
+        })
     }
 }
 
@@ -702,7 +704,7 @@ impl OcmData {
                 KvnLine::BlockStart("USER") => {
                     tokens.next(); // Consume USER_START
                     let mut ud = UserDefined::default();
-                    while let Some(token) = tokens.next() {
+                    for token in tokens.by_ref() {
                         match token? {
                             KvnLine::BlockEnd("USER") => break,
                             KvnLine::Comment(c) => ud.comment.push(c.to_string()),
@@ -910,7 +912,7 @@ impl OcmTrajState {
             traj_lines: vec![],
         };
 
-        while let Some(token) = tokens.next() {
+        for token in tokens.by_ref() {
             match token? {
                 KvnLine::BlockEnd("TRAJ") => break,
                 KvnLine::Comment(c) => traj.comment.push(c.to_string()),
@@ -1274,7 +1276,7 @@ impl OcmPhysicalDescription {
     {
         tokens.next(); // Consume PHYS_START
         let mut phys = OcmPhysicalDescription::default();
-        while let Some(token) = tokens.next() {
+        for token in tokens.by_ref() {
             match token? {
                 KvnLine::BlockEnd("PHYS") => break,
                 KvnLine::Comment(c) => phys.comment.push(c.to_string()),
@@ -1577,7 +1579,7 @@ impl OcmCovarianceMatrix {
     {
         tokens.next();
         let mut builder = OcmCovarianceMatrixBuilder::default();
-        while let Some(token) = tokens.next() {
+        for token in tokens.by_ref() {
             match token? {
                 KvnLine::BlockEnd("COV") => break,
                 KvnLine::Comment(c) => builder.comment.push(c.to_string()),
@@ -1919,7 +1921,7 @@ impl OcmManeuverParameters {
     {
         tokens.next();
         let mut builder = OcmManeuverParametersBuilder::default();
-        while let Some(token) = tokens.next() {
+        for token in tokens.by_ref() {
             match token? {
                 KvnLine::BlockEnd("MAN") => break,
                 KvnLine::Comment(c) => builder.comment.push(c.to_string()),
@@ -2083,7 +2085,7 @@ impl ToKvn for OcmPerturbations {
             writer.write_pair("GRAVITY_MODEL", v);
         }
         if let Some(v) = &self.equatorial_radius {
-            writer.write_measure("EQUATORIAL_RADIUS", &v);
+            writer.write_measure("EQUATORIAL_RADIUS", v);
         }
         if let Some(v) = &self.gm {
             writer.write_pair("GM", v.value.to_string());
@@ -2131,37 +2133,37 @@ impl ToKvn for OcmPerturbations {
             writer.write_pair("SW_INTERP_METHOD", v);
         }
         if let Some(v) = &self.fixed_geomag_kp {
-            writer.write_measure("FIXED_GEOMAG_KP", &v);
+            writer.write_measure("FIXED_GEOMAG_KP", v);
         }
         if let Some(v) = &self.fixed_geomag_ap {
-            writer.write_measure("FIXED_GEOMAG_AP", &v);
+            writer.write_measure("FIXED_GEOMAG_AP", v);
         }
         if let Some(v) = &self.fixed_geomag_dst {
-            writer.write_measure("FIXED_GEOMAG_DST", &v);
+            writer.write_measure("FIXED_GEOMAG_DST", v);
         }
         if let Some(v) = &self.fixed_f10p7 {
-            writer.write_measure("FIXED_F10P7", &v);
+            writer.write_measure("FIXED_F10P7", v);
         }
         if let Some(v) = &self.fixed_f10p7_mean {
-            writer.write_measure("FIXED_F10P7_MEAN", &v);
+            writer.write_measure("FIXED_F10P7_MEAN", v);
         }
         if let Some(v) = &self.fixed_m10p7 {
-            writer.write_measure("FIXED_M10P7", &v);
+            writer.write_measure("FIXED_M10P7", v);
         }
         if let Some(v) = &self.fixed_m10p7_mean {
-            writer.write_measure("FIXED_M10P7_MEAN", &v);
+            writer.write_measure("FIXED_M10P7_MEAN", v);
         }
         if let Some(v) = &self.fixed_s10p7 {
-            writer.write_measure("FIXED_S10P7", &v);
+            writer.write_measure("FIXED_S10P7", v);
         }
         if let Some(v) = &self.fixed_s10p7_mean {
-            writer.write_measure("FIXED_S10P7_MEAN", &v);
+            writer.write_measure("FIXED_S10P7_MEAN", v);
         }
         if let Some(v) = &self.fixed_y10p7 {
-            writer.write_measure("FIXED_Y10P7", &v);
+            writer.write_measure("FIXED_Y10P7", v);
         }
         if let Some(v) = &self.fixed_y10p7_mean {
-            writer.write_measure("FIXED_Y10P7_MEAN", &v);
+            writer.write_measure("FIXED_Y10P7_MEAN", v);
         }
         writer.write_section("PERT_STOP");
     }
@@ -2174,7 +2176,7 @@ impl OcmPerturbations {
     {
         tokens.next();
         let mut pert = OcmPerturbations::default();
-        while let Some(token) = tokens.next() {
+        for token in tokens.by_ref() {
             match token? {
                 KvnLine::BlockEnd("PERT") => break,
                 KvnLine::Comment(c) => pert.comment.push(c.to_string()),
@@ -2456,7 +2458,7 @@ impl ToKvn for OcmOdParameters {
             writer.write_pair("CONSIDER_PARAMS", v);
         }
         if let Some(v) = &self.sedr {
-            writer.write_measure("SEDR", &v);
+            writer.write_measure("SEDR", v);
         }
         if let Some(v) = &self.sensors_n {
             writer.write_pair("SENSORS_N", v);
@@ -2482,7 +2484,7 @@ impl OcmOdParameters {
         tokens.next();
         let mut builder = OcmOdParametersBuilder::default();
 
-        while let Some(token) = tokens.next() {
+        for token in tokens.by_ref() {
             match token? {
                 KvnLine::BlockEnd("OD") => break,
                 KvnLine::Comment(c) => builder.comment.push(c.to_string()),

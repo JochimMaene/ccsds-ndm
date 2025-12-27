@@ -101,7 +101,7 @@ impl ToKvn for AdmHeader {
     }
 }
 
-//// Represents the `odmHeader` complex type.
+/// Represents the `odmHeader` complex type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdmHeader {
@@ -156,26 +156,24 @@ impl FromKvnTokens for OdmHeader {
                 KvnLine::Empty => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, .. } => {
-                    // Check if this key belongs to the Header
-                    match *key {
-                        "CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID" => {
-                            // Valid header key, consume and parse
-                            if let Some(Ok(KvnLine::Pair { key, val, .. })) = tokens.next() {
-                                match key {
-                                    "CLASSIFICATION" => classification = Some(val.to_string()),
-                                    "CREATION_DATE" => creation_date = Some(Epoch::from_str(val)?),
-                                    "ORIGINATOR" => originator = Some(val.to_string()),
-                                    "MESSAGE_ID" => message_id = Some(val.to_string()),
-                                    _ => unreachable!(),
-                                }
-                            }
+                KvnLine::Pair {
+                    key: "CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID",
+                    ..
+                } => {
+                    // Valid header key, consume and parse
+                    if let Some(Ok(KvnLine::Pair { key, val, .. })) = tokens.next() {
+                        match key {
+                            "CLASSIFICATION" => classification = Some(val.to_string()),
+                            "CREATION_DATE" => creation_date = Some(Epoch::from_str(val)?),
+                            "ORIGINATOR" => originator = Some(val.to_string()),
+                            "MESSAGE_ID" => message_id = Some(val.to_string()),
+                            _ => unreachable!(),
                         }
-                        // If it's any other key (like OBJECT_NAME), it's not part of the header.
-                        // Break and let the next parser handle it.
-                        _ => break,
                     }
                 }
+                // If it's any other key (like OBJECT_NAME), it's not part of the header.
+                // Break and let the next parser handle it.
+                KvnLine::Pair { .. } => break,
                 // Any other token (BlockStart, BlockEnd, Raw) signals end of header
                 _ => break,
             }
@@ -340,9 +338,6 @@ pub fn parse_state_vector_raw(line: &str) -> Result<StateVectorAcc> {
     let y_dot_val = next_f64("Y_DOT")?;
     let z_dot_val = next_f64("Z_DOT")?;
 
-    // Drop the closure so we can use tokens directly
-    drop(next_f64);
-
     // Check if acceleration exists
     let (x_ddot, y_ddot, z_ddot) = if let Some(x_ddot_str) = tokens.next() {
         let x_acc = x_ddot_str
@@ -429,7 +424,7 @@ pub struct Quaternion {
 impl Quaternion {
     pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> Result<Self> {
         for (name, v) in [("Q1", q1), ("Q2", q2), ("Q3", q3), ("QC", qc)] {
-            if v < -1.0 || v > 1.0 {
+            if !(-1.0..=1.0).contains(&v) {
                 return Err(CcsdsNdmError::Validation(format!(
                     "{} component out of range [-1,1]: {}",
                     name, v

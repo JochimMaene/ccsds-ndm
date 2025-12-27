@@ -297,7 +297,6 @@ impl Oem {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-
     fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
         let data = self.to_str(format)?;
         match fs::write(path, data) {
@@ -365,6 +364,7 @@ impl OemSegment {
 #[pymethods]
 impl OemMetadata {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         object_name: String,
         object_id: String,

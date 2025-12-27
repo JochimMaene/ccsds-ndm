@@ -299,7 +299,7 @@ pub struct Angle {
 impl Angle {
     /// XSD angleRange: -360.0 <= value < 360.0
     pub fn new(value: f64, units: Option<AngleUnits>) -> Result<Self> {
-        if value < -360.0 || value >= 360.0 {
+        if !(-360.0..360.0).contains(&value) {
             return Err(CcsdsNdmError::Validation(format!(
                 "Angle out of range [-360,360): {}",
                 value
@@ -402,7 +402,7 @@ impl FromKvn for DayIntervalRequired {
         let v: f64 = value
             .parse()
             .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
-        Ok(Self::new(v)?)
+        Self::new(v)
     }
 }
 impl std::fmt::Display for DayIntervalRequired {
@@ -508,7 +508,7 @@ pub struct AltitudeRequired {
 impl AltitudeRequired {
     /// altRange: -430.5 ..= 8848
     pub fn new(value: f64) -> Result<Self> {
-        if value < -430.5 || value > 8848.0 {
+        if !(-430.5..=8848.0).contains(&value) {
             return Err(CcsdsNdmError::Validation(format!(
                 "Altitude out of range [-430.5,8848]: {}",
                 value
@@ -531,7 +531,7 @@ impl FromKvn for AltitudeRequired {
         let v: f64 = value
             .parse()
             .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
-        Ok(Self::new(v)?)
+        Self::new(v)
     }
 }
 impl std::fmt::Display for AltitudeRequired {
@@ -579,7 +579,7 @@ impl FromKvn for WkgRequired {
         let v: f64 = value
             .parse()
             .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
-        Ok(Self::new(v)?)
+        Self::new(v)
     }
 }
 
@@ -796,7 +796,7 @@ impl FromKvn for PercentageRequired {
         let v: f64 = value
             .parse()
             .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
-        Ok(Self::new(v)?)
+        Self::new(v)
     }
 }
 
@@ -875,7 +875,7 @@ pub struct LatitudeRequired {
 }
 impl LatitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
-        if value < -90.0 || value > 90.0 {
+        if !(-90.0..=90.0).contains(&value) {
             return Err(CcsdsNdmError::Validation(format!(
                 "Latitude out of range [-90,90]: {}",
                 value
@@ -902,7 +902,7 @@ pub struct LongitudeRequired {
 }
 impl LongitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
-        if value < -180.0 || value > 180.0 {
+        if !(-180.0..=180.0).contains(&value) {
             return Err(CcsdsNdmError::Validation(format!(
                 "Longitude out of range [-180,180]: {}",
                 value
@@ -1234,20 +1234,15 @@ impl std::str::FromStr for ManBasis {
 }
 
 /// Maneuver duty cycle type per XSD dcTypeType.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum ManDc {
+    #[default]
     #[serde(rename = "CONTINUOUS")]
     Continuous,
     #[serde(rename = "TIME")]
     Time,
     #[serde(rename = "TIME_AND_ANGLE")]
     TimeAndAngle,
-}
-
-impl Default for ManDc {
-    fn default() -> Self {
-        Self::Continuous
-    }
 }
 
 impl std::str::FromStr for ManDc {
@@ -1265,8 +1260,9 @@ impl std::str::FromStr for ManDc {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum CovOrder {
+    #[default]
     #[serde(rename = "LTM")]
     Ltm,
     #[serde(rename = "UTM")]
@@ -1277,12 +1273,6 @@ pub enum CovOrder {
     LtmWcc,
     #[serde(rename = "UTMWCC")]
     UtmWcc,
-}
-
-impl Default for CovOrder {
-    fn default() -> Self {
-        Self::Ltm
-    }
 }
 
 impl std::str::FromStr for CovOrder {

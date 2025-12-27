@@ -17,15 +17,11 @@ use std::str::FromStr;
 //----------------------------------------------------------------------
 
 // 1/ER (Inverse Earth Radii) for BSTAR
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum InvErUnits {
     #[serde(rename = "1/ER")]
+    #[default]
     InvEr,
-}
-impl Default for InvErUnits {
-    fn default() -> Self {
-        InvErUnits::InvEr
-    }
 }
 impl std::fmt::Display for InvErUnits {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -47,15 +43,11 @@ impl FromStr for InvErUnits {
 pub type BStar = UnitValue<f64, InvErUnits>;
 
 // rev/day for MEAN_MOTION
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDayUnits {
     #[serde(rename = "rev/day")]
+    #[default]
     RevPerDay,
-}
-impl Default for RevPerDayUnits {
-    fn default() -> Self {
-        RevPerDayUnits::RevPerDay
-    }
 }
 impl std::fmt::Display for RevPerDayUnits {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -77,15 +69,11 @@ impl FromStr for RevPerDayUnits {
 pub type MeanMotion = UnitValue<f64, RevPerDayUnits>;
 
 // rev/day**2 for MEAN_MOTION_DOT
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDay2Units {
     #[serde(rename = "rev/day**2")]
+    #[default]
     RevPerDay2,
-}
-impl Default for RevPerDay2Units {
-    fn default() -> Self {
-        RevPerDay2Units::RevPerDay2
-    }
 }
 impl std::fmt::Display for RevPerDay2Units {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -107,15 +95,11 @@ impl FromStr for RevPerDay2Units {
 pub type MeanMotionDot = UnitValue<f64, RevPerDay2Units>;
 
 // rev/day**3 for MEAN_MOTION_DDOT
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDay3Units {
     #[serde(rename = "rev/day**3")]
+    #[default]
     RevPerDay3,
-}
-impl Default for RevPerDay3Units {
-    fn default() -> Self {
-        RevPerDay3Units::RevPerDay3
-    }
 }
 impl std::fmt::Display for RevPerDay3Units {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -502,7 +486,7 @@ impl OmmData {
                         tle_builder.comment.push(c.to_string());
                     } else if cov_builder.cx_x.is_some() {
                         cov_builder.comment.push(c.to_string());
-                    } else if ud_builder.params.len() > 0 {
+                    } else if !ud_builder.params.is_empty() {
                         ud_builder.comment.push(c.to_string());
                     } else {
                         // Default to main data comments if no specific block is clearly active/accepting comments
@@ -606,7 +590,7 @@ impl ToKvn for MeanElements {
         if let Some(v) = &self.mean_motion {
             writer.write_measure("MEAN_MOTION", v);
         }
-        writer.write_pair("ECCENTRICITY", &self.eccentricity);
+        writer.write_pair("ECCENTRICITY", self.eccentricity);
         writer.write_measure("INCLINATION", &self.inclination.to_unit_value());
         writer.write_measure("RA_OF_ASC_NODE", &self.ra_of_asc_node.to_unit_value());
         writer.write_measure("ARG_OF_PERICENTER", &self.arg_of_pericenter.to_unit_value());

@@ -163,7 +163,7 @@ impl FromKvnTokens for RdmHeader {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RdmBody {
-    pub segment: RdmSegment,
+    pub segment: Box<RdmSegment>,
 }
 
 impl ToKvn for RdmBody {
@@ -178,7 +178,9 @@ impl RdmBody {
         I: Iterator<Item = Result<KvnLine<'a>>>,
     {
         let segment = RdmSegment::from_kvn_tokens(tokens)?;
-        Ok(RdmBody { segment })
+        Ok(RdmBody {
+            segment: Box::new(segment),
+        })
     }
 }
 
