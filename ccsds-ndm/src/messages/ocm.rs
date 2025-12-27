@@ -3654,4 +3654,390 @@ MAN_STOP
         assert_eq!(ocm.body.segment.data.cov.len(), 1);
         assert_eq!(ocm.body.segment.data.man.len(), 1);
     }
+
+    #[test]
+    fn test_ocm_parsing_errors() {
+        // Empty file
+        let err = Ocm::from_kvn("").unwrap_err();
+        assert!(matches!(err, CcsdsNdmError::MissingField(msg) if msg == "Empty file"));
+
+        // Wrong first keyword
+        let err = Ocm::from_kvn("CREATION_DATE = 2023-01-01T00:00:00").unwrap_err();
+        assert!(matches!(err, CcsdsNdmError::MissingField(msg) if msg.contains("first keyword")));
+
+        // Comments before version should be OK
+        let kvn = r#"
+COMMENT leading comment
+CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+"#;
+        assert!(Ocm::from_kvn(kvn).is_ok());
+
+        // Unexpected segment start
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+TRAJ_START
+"#;
+        let err = Ocm::from_kvn(kvn).unwrap_err();
+        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Expected META_START")));
+
+        // Metadata unexpected key
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+BAD_KEY = VAL
+META_STOP
+"#;
+        let err = Ocm::from_kvn(kvn).unwrap_err();
+        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Unexpected OCM Metadata key")));
+    }
+
+    #[test]
+    fn test_ocm_metadata_all_fields() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+COMMENT meta comment
+OBJECT_NAME = SAT1
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CATALOG_NAME = SATCAT
+OBJECT_DESIGNATOR = 12345
+ALTERNATE_NAMES = SAT_ALT
+ORIGINATOR_POC = JOHN DOE
+ORIGINATOR_POSITION = ENGINEER
+ORIGINATOR_PHONE = 123-456
+ORIGINATOR_EMAIL = john@example.com
+ORIGINATOR_ADDRESS = 123 Street
+TECH_ORG = SPACE_CORP
+TECH_POC = JANE DOE
+TECH_POSITION = SCIENTIST
+TECH_PHONE = 987-654
+TECH_EMAIL = jane@example.com
+TECH_ADDRESS = 456 Avenue
+PREVIOUS_MESSAGE_ID = MSG_001
+NEXT_MESSAGE_ID = MSG_003
+ADM_MSG_LINK = ADM_LINK
+CDM_MSG_LINK = CDM_LINK
+PRM_MSG_LINK = PRM_LINK
+RDM_MSG_LINK = RDM_LINK
+TDM_MSG_LINK = TDM_LINK
+OPERATOR = OPS_TEAM
+OWNER = OWNER_TEAM
+COUNTRY = USA
+CONSTELLATION = STARLINK
+OBJECT_TYPE = PAYLOAD
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+OPS_STATUS = OPERATIONAL
+ORBIT_CATEGORY = LEO
+OCM_DATA_ELEMENTS = ALL
+SCLK_OFFSET_AT_EPOCH = 0.1 [s]
+SCLK_SEC_PER_SI_SEC = 0.99 [s]
+PREVIOUS_MESSAGE_EPOCH = 2022-12-31T23:00:00
+NEXT_MESSAGE_EPOCH = 2023-01-01T01:00:00
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+TIME_SPAN = 1.0 [d]
+TAIMUTC_AT_TZERO = 37.0 [s]
+NEXT_LEAP_EPOCH = 2024-01-01T00:00:00
+NEXT_LEAP_TAIMUTC = 38.0 [s]
+UT1MUTC_AT_TZERO = -0.1 [s]
+EOP_SOURCE = IERS
+INTERP_METHOD_EOP = LINEAR
+CELESTIAL_SOURCE = IAU
+META_STOP
+"#;
+        let ocm = Ocm::from_kvn(kvn).unwrap();
+        let meta = &ocm.body.segment.metadata;
+        assert_eq!(meta.object_name, Some("SAT1".to_string()));
+        assert_eq!(meta.object_type, Some(ObjectDescription::Payload));
+        assert!(meta.sclk_offset_at_epoch.is_some());
+        
+        // Roundtrip to hit write_kvn for all fields
+        let output = ocm.to_kvn().unwrap();
+        let ocm2 = Ocm::from_kvn(&output).unwrap();
+        assert_eq!(ocm.body.segment.metadata, ocm2.body.segment.metadata);
+    }
+
+    #[test]
+    fn test_ocm_data_loop_break_and_comments() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+COMMENT preceding comment
+USER_START
+PARAM = VAL
+USER_STOP
+UNEXPECTED_KEY = VAL
+"#;
+        let ocm = Ocm::from_kvn(kvn).unwrap();
+        assert!(ocm.body.segment.data.user.is_some());
+        assert_eq!(ocm.body.segment.data.user.as_ref().unwrap().comment[0], "preceding comment");
+    }
+
+    #[test]
+    fn test_ocm_user_defined_unexpected_token() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+USER_START
+META_START
+USER_STOP
+"#;
+        let err = Ocm::from_kvn(kvn).unwrap_err();
+        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Unexpected in USER")));
+    }
+
+    #[test]
+    fn test_traj_all_fields() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+TRAJ_START
+COMMENT traj comment
+TRAJ_ID = T1
+TRAJ_PREV_ID = T0
+TRAJ_NEXT_ID = T2
+TRAJ_BASIS = PREDICTED
+TRAJ_BASIS_ID = B1
+INTERPOLATION = LINEAR
+INTERPOLATION_DEGREE = 1
+PROPAGATOR = SGP4
+CENTER_NAME = EARTH
+TRAJ_REF_FRAME = GCRF
+TRAJ_FRAME_EPOCH = 2023-01-01T00:00:00
+USEABLE_START_TIME = 2023-01-01T00:00:00
+USEABLE_STOP_TIME = 2023-01-02T00:00:00
+ORB_REVNUM = 1234
+ORB_REVNUM_BASIS = 1
+TRAJ_TYPE = CARTPV
+ORB_AVERAGING = NONE
+TRAJ_UNITS = km km/s
+2023-01-01T00:00:00 1 2 3 4 5 6
+TRAJ_STOP
+"#;
+        let ocm = Ocm::from_kvn(kvn).unwrap();
+        let traj = &ocm.body.segment.data.traj[0];
+        assert_eq!(traj.traj_id, Some("T1".to_string()));
+        assert_eq!(traj.traj_basis, Some(TrajBasis::Predicted));
+        assert_eq!(traj.orb_revnum_basis, Some(RevNumBasis::One));
+        
+        let output = ocm.to_kvn().unwrap();
+        assert!(output.contains("ORB_REVNUM_BASIS"));
+        assert!(output.contains("1"));
+    }
+
+    #[test]
+    fn test_phys_all_fields_robust() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+PHYS_START
+MANUFACTURER = ACME
+BUS_MODEL = B1
+DOCKED_WITH = SAT2
+DRAG_CONST_AREA = 1.0 [m**2]
+DRAG_COEFF_NOM = 2.2
+DRAG_UNCERTAINTY = 10 [%]
+INITIAL_WET_MASS = 1000 [kg]
+WET_MASS = 900 [kg]
+DRY_MASS = 800 [kg]
+OEB_PARENT_FRAME = GCRF
+OEB_PARENT_FRAME_EPOCH = 2023-01-01T00:00:00
+OEB_Q1 = 0
+OEB_Q2 = 0
+OEB_Q3 = 0
+OEB_QC = 1
+OEB_MAX = 5 [m]
+OEB_INT = 3 [m]
+OEB_MIN = 2 [m]
+AREA_ALONG_OEB_MAX = 15 [m**2]
+AREA_ALONG_OEB_INT = 10 [m**2]
+AREA_ALONG_OEB_MIN = 6 [m**2]
+AREA_MIN_FOR_PC = 5 [m**2]
+AREA_MAX_FOR_PC = 20 [m**2]
+AREA_TYP_FOR_PC = 10 [m**2]
+RCS = 1 [m**2]
+RCS_MIN = 0.5 [m**2]
+RCS_MAX = 2 [m**2]
+SRP_CONST_AREA = 12 [m**2]
+SOLAR_RAD_COEFF = 1.5
+SOLAR_RAD_UNCERTAINTY = 5 [%]
+VM_ABSOLUTE = 4.5
+VM_APPARENT_MIN = 5.0
+VM_APPARENT = 5.5
+VM_APPARENT_MAX = 6.0
+REFLECTANCE = 0.8
+ATT_CONTROL_MODE = THREE_AXIS
+ATT_ACTUATOR_TYPE = REACTION_WHEELS
+ATT_KNOWLEDGE = 0.1 [deg]
+ATT_CONTROL = 0.5 [deg]
+ATT_POINTING = 0.2 [deg]
+AVG_MANEUVER_FREQ = 12 [#/yr]
+MAX_THRUST = 0.1 [N]
+DV_BOL = 0.5 [km/s]
+DV_REMAINING = 0.2 [km/s]
+IXX = 100 [kg*m**2]
+IYY = 150 [kg*m**2]
+IZZ = 150 [kg*m**2]
+IXY = 1 [kg*m**2]
+IXZ = 2 [kg*m**2]
+IYZ = 3 [kg*m**2]
+PHYS_STOP
+"#;
+        let ocm = Ocm::from_kvn(kvn).unwrap();
+        let phys = ocm.body.segment.data.phys.as_ref().unwrap();
+        assert_eq!(phys.manufacturer, Some("ACME".to_string()));
+        assert_eq!(phys.ixx.as_ref().unwrap().value, 100.0);
+        
+        let output = ocm.to_kvn().unwrap();
+        assert!(output.contains("IXX"));
+        assert!(output.contains("100") || output.contains("1.0e2") || output.contains("1e2"));
+    }
+
+    #[test]
+    fn test_phys_parsing_errors() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+PHYS_START
+DRAG_COEFF_NOM = NOT_A_FLOAT
+PHYS_STOP
+"#;
+        let err = Ocm::from_kvn(kvn).unwrap_err();
+        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid DRAG_COEFF_NOM")));
+
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+PHYS_START
+OEB_Q1 = NOT_A_FLOAT
+PHYS_STOP
+"#;
+        let err = Ocm::from_kvn(kvn).unwrap_err();
+        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid OEB_Q1")));
+    }
+
+    #[test]
+    fn test_pert_all_fields_robust() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+PERT_START
+ATMOSPHERIC_MODEL = NRLMSISE-00
+GRAVITY_MODEL = EGM2008
+EQUATORIAL_RADIUS = 6378.137 [km]
+GM = 398600.4415 [km**3/s**2]
+N_BODY_PERTURBATIONS = SUN MOON JUPITER
+OCEAN_TIDES_MODEL = GOT
+SOLID_TIDES_MODEL = IERS
+REDUCTION_THEORY = IAU
+PERT_STOP
+"#;
+        let ocm = Ocm::from_kvn(kvn).unwrap();
+        let pert = ocm.body.segment.data.pert.as_ref().unwrap();
+        assert_eq!(pert.atmospheric_model, Some("NRLMSISE-00".to_string()));
+        assert!(pert.gm.is_some());
+    }
+
+    #[test]
+    fn test_od_all_fields_robust() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+OD_START
+OD_ID = OD1
+OD_PREV_ID = OD0
+OD_METHOD = LS
+OD_EPOCH = 2023-01-01T00:00:00
+OD_TIME_TAG = 2023-01-01T00:00:00
+DAYS_SINCE_FIRST_OBS = 10 [d]
+DAYS_SINCE_LAST_OBS = 1 [d]
+RECOMMENDED_OD_SPAN = 7 [d]
+ACTUAL_OD_SPAN = 7.5 [d]
+OBS_AVAILABLE = 100
+OBS_USED = 95
+TRACKS_AVAILABLE = 10
+TRACKS_USED = 9
+MAX_RESI_ACCEPTED = 3 [%]
+WEIGHTED_RMS = 0.5
+OD_STOP
+"#;
+        let ocm = Ocm::from_kvn(kvn).unwrap();
+        let od = ocm.body.segment.data.od.as_ref().unwrap();
+        assert_eq!(od.od_id, "OD1");
+        assert_eq!(od.obs_available, Some(100));
+    }
+
+    #[test]
+    fn test_cov_ordering_wcc() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+COV_START
+COV_REF_FRAME = RSW
+COV_TYPE = CARTPV
+COV_ORDERING = LTMWCC
+2023-01-01T00:00:00 1e-6 1e-6 1e-6 1e-6 1e-6 1e-6
+COV_STOP
+"#;
+        let ocm = Ocm::from_kvn(kvn).unwrap();
+        assert_eq!(ocm.body.segment.data.cov[0].cov_ordering, CovOrder::LtmWcc);
+        
+        // Also test UTMWCC
+        let kvn2 = kvn.replace("LTMWCC", "UTMWCC");
+        let ocm2 = Ocm::from_kvn(&kvn2).unwrap();
+        assert_eq!(ocm2.body.segment.data.cov[0].cov_ordering, CovOrder::UtmWcc);
+
+        // Also test FULL
+        let kvn3 = kvn.replace("LTMWCC", "FULL");
+        let ocm3 = Ocm::from_kvn(&kvn3).unwrap();
+        assert_eq!(ocm3.body.segment.data.cov[0].cov_ordering, CovOrder::Full);
+    }
 }
