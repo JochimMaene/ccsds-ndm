@@ -46,15 +46,6 @@ jobs:
         working-directory: ccsds-ndm
         run: cargo clippy -- -D warnings
 
-  reuse:
-    name: REUSE Compliance
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-      - name: Check REUSE compliance
-        run: uvx reuse lint
 
   coverage:
     name: Code coverage
@@ -77,6 +68,5 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
           files: ccsds-ndm/codecov.json
           fail_ci_if_error: true

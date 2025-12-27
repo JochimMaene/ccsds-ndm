@@ -1234,20 +1234,15 @@ impl std::str::FromStr for ManBasis {
 }
 
 /// Maneuver duty cycle type per XSD dcTypeType.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum ManDc {
+    #[default]
     #[serde(rename = "CONTINUOUS")]
     Continuous,
     #[serde(rename = "TIME")]
     Time,
     #[serde(rename = "TIME_AND_ANGLE")]
     TimeAndAngle,
-}
-
-impl Default for ManDc {
-    fn default() -> Self {
-        Self::Continuous
-    }
 }
 
 impl std::str::FromStr for ManDc {
@@ -1265,8 +1260,9 @@ impl std::str::FromStr for ManDc {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum CovOrder {
+    #[default]
     #[serde(rename = "LTM")]
     Ltm,
     #[serde(rename = "UTM")]
@@ -1277,12 +1273,6 @@ pub enum CovOrder {
     LtmWcc,
     #[serde(rename = "UTMWCC")]
     UtmWcc,
-}
-
-impl Default for CovOrder {
-    fn default() -> Self {
-        Self::Ltm
-    }
 }
 
 impl std::str::FromStr for CovOrder {
