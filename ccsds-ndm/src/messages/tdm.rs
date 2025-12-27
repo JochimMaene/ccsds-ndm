@@ -184,11 +184,17 @@ impl TdmBody {
     {
         let mut segments = Vec::new();
         while tokens.peek().is_some() {
+            let mut pending_comments = Vec::new();
             let mut has_content = false;
             while let Some(peeked) = tokens.peek() {
                 match peeked {
-                    Ok(KvnLine::Empty) | Ok(KvnLine::Comment(_)) => {
+                    Ok(KvnLine::Empty) => {
                         tokens.next();
+                    }
+                    Ok(KvnLine::Comment(_)) => {
+                        if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                            pending_comments.push(c.to_string());
+                        }
                     }
                     Ok(_) => {
                         has_content = true;
@@ -202,7 +208,11 @@ impl TdmBody {
             if !has_content {
                 break;
             }
-            segments.push(TdmSegment::from_kvn_tokens(tokens)?);
+            let mut segment = TdmSegment::from_kvn_tokens(tokens)?;
+            if !pending_comments.is_empty() {
+                segment.metadata.comment.splice(0..0, pending_comments.drain(..));
+            }
+            segments.push(segment);
         }
 
         if segments.is_empty() {

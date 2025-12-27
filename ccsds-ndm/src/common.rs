@@ -456,6 +456,8 @@ pub struct AngularVelocity {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVector {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comment: Vec<String>,
     pub epoch: Epoch,
     pub x: Position,
     pub y: Position,
@@ -467,6 +469,7 @@ pub struct StateVector {
 
 impl ToKvn for StateVector {
     fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
         writer.write_pair("EPOCH", &self.epoch);
         writer.write_measure("X", &self.x);
         writer.write_measure("Y", &self.y);
@@ -482,6 +485,7 @@ impl FromKvnTokens for StateVector {
     where
         I: Iterator<Item = Result<KvnLine<'a>>>,
     {
+        let mut comment = Vec::new();
         let mut epoch: Option<Epoch> = None;
         let mut x: Option<Position> = None;
         let mut y: Option<Position> = None;
@@ -495,11 +499,11 @@ impl FromKvnTokens for StateVector {
                 return Err(tokens.next().unwrap().unwrap_err());
             }
             match peeked.as_ref().unwrap() {
-                KvnLine::Empty => {
+                KvnLine::Comment(c) => {
+                    comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Comment(_) => {
-                    // Comments are allowed but ignored at state vector level
+                KvnLine::Empty => {
                     tokens.next();
                 }
                 KvnLine::Pair { key, val, unit } => {
@@ -549,6 +553,7 @@ impl FromKvnTokens for StateVector {
         }
 
         Ok(StateVector {
+            comment,
             epoch: epoch
                 .ok_or_else(|| CcsdsNdmError::MissingField("EPOCH is required".to_string()))?,
             x: x.ok_or_else(|| CcsdsNdmError::MissingField("X is required".to_string()))?,

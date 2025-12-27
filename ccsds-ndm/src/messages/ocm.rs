@@ -677,6 +677,7 @@ impl OcmData {
         I: Iterator<Item = Result<KvnLine<'a>>>,
     {
         let mut data = OcmData::default();
+        let mut pending_comments = Vec::new();
 
         while let Some(peeked) = tokens.peek() {
             if peeked.is_err() {
@@ -684,26 +685,53 @@ impl OcmData {
             }
             match peeked.as_ref().unwrap() {
                 KvnLine::BlockStart("TRAJ") => {
-                    data.traj.push(OcmTrajState::from_kvn_tokens(tokens)?)
+                    let mut block = OcmTrajState::from_kvn_tokens(tokens)?;
+                    if !pending_comments.is_empty() {
+                        block.comment.splice(0..0, pending_comments.drain(..));
+                    }
+                    data.traj.push(block);
                 }
                 KvnLine::BlockStart("PHYS") => {
-                    data.phys = Some(OcmPhysicalDescription::from_kvn_tokens(tokens)?)
+                    let mut block = OcmPhysicalDescription::from_kvn_tokens(tokens)?;
+                    if !pending_comments.is_empty() {
+                        block.comment.splice(0..0, pending_comments.drain(..));
+                    }
+                    data.phys = Some(block);
                 }
                 KvnLine::BlockStart("COV") => {
-                    data.cov.push(OcmCovarianceMatrix::from_kvn_tokens(tokens)?)
+                    let mut block = OcmCovarianceMatrix::from_kvn_tokens(tokens)?;
+                    if !pending_comments.is_empty() {
+                        block.comment.splice(0..0, pending_comments.drain(..));
+                    }
+                    data.cov.push(block);
                 }
-                KvnLine::BlockStart("MAN") => data
-                    .man
-                    .push(OcmManeuverParameters::from_kvn_tokens(tokens)?),
+                KvnLine::BlockStart("MAN") => {
+                    let mut block = OcmManeuverParameters::from_kvn_tokens(tokens)?;
+                    if !pending_comments.is_empty() {
+                        block.comment.splice(0..0, pending_comments.drain(..));
+                    }
+                    data.man.push(block);
+                }
                 KvnLine::BlockStart("PERT") => {
-                    data.pert = Some(OcmPerturbations::from_kvn_tokens(tokens)?)
+                    let mut block = OcmPerturbations::from_kvn_tokens(tokens)?;
+                    if !pending_comments.is_empty() {
+                        block.comment.splice(0..0, pending_comments.drain(..));
+                    }
+                    data.pert = Some(block);
                 }
                 KvnLine::BlockStart("OD") => {
-                    data.od = Some(OcmOdParameters::from_kvn_tokens(tokens)?)
+                    let mut block = OcmOdParameters::from_kvn_tokens(tokens)?;
+                    if !pending_comments.is_empty() {
+                        block.comment.splice(0..0, pending_comments.drain(..));
+                    }
+                    data.od = Some(block);
                 }
                 KvnLine::BlockStart("USER") => {
                     tokens.next(); // Consume USER_START
                     let mut ud = UserDefined::default();
+                    if !pending_comments.is_empty() {
+                        ud.comment.splice(0..0, pending_comments.drain(..));
+                    }
                     for token in tokens.by_ref() {
                         match token? {
                             KvnLine::BlockEnd("USER") => break,
@@ -720,7 +748,12 @@ impl OcmData {
                     }
                     data.user = Some(ud);
                 }
-                KvnLine::Empty | KvnLine::Comment(_) => {
+                KvnLine::Comment(_) => {
+                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                        pending_comments.push(c.to_string());
+                    }
+                }
+                KvnLine::Empty => {
                     tokens.next();
                 }
                 _ => break,

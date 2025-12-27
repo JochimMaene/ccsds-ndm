@@ -1773,7 +1773,7 @@ pub struct RdmStateVector {
 #[pymethods]
 impl RdmStateVector {
     #[new]
-    #[pyo3(signature = (*, epoch, x, y, z, x_dot, y_dot, z_dot))]
+    #[pyo3(signature = (*, epoch, x, y, z, x_dot, y_dot, z_dot, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         epoch: String,
@@ -1783,10 +1783,12 @@ impl RdmStateVector {
         x_dot: f64,
         y_dot: f64,
         z_dot: f64,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         use ccsds_ndm::types::{Position, Velocity};
         Ok(Self {
             inner: core_common::StateVector {
+                comment: comment.unwrap_or_default(),
                 epoch: parse_epoch(&epoch)?,
                 x: Position {
                     value: x,
@@ -1814,6 +1816,16 @@ impl RdmStateVector {
                 },
             },
         })
+    }
+
+    #[getter]
+    fn get_comments(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comments(&mut self, comments: Vec<String>) {
+        self.inner.comment = comments;
     }
 
     #[getter]
@@ -1987,6 +1999,16 @@ impl RdmCovarianceMatrix {
                 },
             },
         }
+    }
+
+    #[getter]
+    fn get_comments(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comments(&mut self, comments: Vec<String>) {
+        self.inner.comment = comments;
     }
 
     #[getter]

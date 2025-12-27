@@ -627,11 +627,11 @@ impl OemMetadata {
 #[pymethods]
 impl OemData {
     #[new]
-    fn new(state_vectors: Vec<StateVectorAcc>) -> Self {
+    fn new(state_vectors: Vec<StateVectorAcc>, comments: Option<Vec<String>>) -> Self {
         Self {
             inner: core_oem::OemData {
                 state_vector: state_vectors.into_iter().map(|s| s.inner).collect(),
-                comment: vec![],
+                comment: comments.unwrap_or_default(),
                 covariance_matrix: vec![],
             },
         }

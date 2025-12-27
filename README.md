@@ -1,6 +1,7 @@
 # CCSDS NDM
 
 [![CI](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/CI.yml/badge.svg)](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/JochimMaene/ccsds-ndm/branch/main/graph/badge.svg)](https://codecov.io/gh/JochimMaene/ccsds-ndm)
 [![PyPI](https://img.shields.io/pypi/v/ccsds-ndm-py)](https://pypi.org/project/ccsds-ndm-py/)
 [![crates.io](https://img.shields.io/crates/v/ccsds-ndm)](https://crates.io/crates/ccsds-ndm)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)

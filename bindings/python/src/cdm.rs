@@ -870,10 +870,10 @@ pub struct CdmData {
 #[pymethods]
 impl CdmData {
     #[new]
-    fn new(state_vector: CdmStateVector, covariance_matrix: CdmCovarianceMatrix) -> Self {
+    fn new(state_vector: CdmStateVector, covariance_matrix: CdmCovarianceMatrix, comments: Option<Vec<String>>) -> Self {
         Self {
             inner: core_cdm::CdmData {
-                comment: vec![],
+                comment: comments.unwrap_or_default(),
                 od_parameters: None,
                 additional_parameters: None,
                 state_vector: state_vector.inner,
@@ -977,6 +977,16 @@ pub struct CdmCovarianceMatrix {
 
 #[pymethods]
 impl CdmCovarianceMatrix {
+    #[getter]
+    fn get_comments(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comments(&mut self, comments: Vec<String>) {
+        self.inner.comment = comments;
+    }
+
     /// Returns the full 9x9 covariance matrix as a NumPy array.
     /// If the optional 7,8,9 rows (Drag, SRP, Thrust) are missing, they are filled with 0.0.
     fn to_numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {

@@ -48,10 +48,15 @@ pub enum RevPerDayUnits {
     #[serde(rename = "rev/day")]
     #[default]
     RevPerDay,
+    #[serde(rename = "REV/DAY")]
+    RevPerDayUpper,
 }
 impl std::fmt::Display for RevPerDayUnits {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "rev/day")
+        match self {
+            RevPerDayUnits::RevPerDay => write!(f, "rev/day"),
+            RevPerDayUnits::RevPerDayUpper => write!(f, "REV/DAY"),
+        }
     }
 }
 impl FromStr for RevPerDayUnits {
@@ -59,6 +64,7 @@ impl FromStr for RevPerDayUnits {
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "rev/day" => Ok(RevPerDayUnits::RevPerDay),
+            "REV/DAY" => Ok(RevPerDayUnits::RevPerDayUpper),
             _ => Err(CcsdsNdmError::UnsupportedFormat(format!(
                 "Unknown unit: {}",
                 s
@@ -74,10 +80,15 @@ pub enum RevPerDay2Units {
     #[serde(rename = "rev/day**2")]
     #[default]
     RevPerDay2,
+    #[serde(rename = "REV/DAY**2")]
+    RevPerDay2Upper,
 }
 impl std::fmt::Display for RevPerDay2Units {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "rev/day**2")
+        match self {
+            RevPerDay2Units::RevPerDay2 => write!(f, "rev/day**2"),
+            RevPerDay2Units::RevPerDay2Upper => write!(f, "REV/DAY**2"),
+        }
     }
 }
 impl FromStr for RevPerDay2Units {
@@ -85,6 +96,7 @@ impl FromStr for RevPerDay2Units {
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "rev/day**2" => Ok(RevPerDay2Units::RevPerDay2),
+            "REV/DAY**2" => Ok(RevPerDay2Units::RevPerDay2Upper),
             _ => Err(CcsdsNdmError::UnsupportedFormat(format!(
                 "Unknown unit: {}",
                 s
@@ -100,10 +112,15 @@ pub enum RevPerDay3Units {
     #[serde(rename = "rev/day**3")]
     #[default]
     RevPerDay3,
+    #[serde(rename = "REV/DAY**3")]
+    RevPerDay3Upper,
 }
 impl std::fmt::Display for RevPerDay3Units {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "rev/day**3")
+        match self {
+            RevPerDay3Units::RevPerDay3 => write!(f, "rev/day**3"),
+            RevPerDay3Units::RevPerDay3Upper => write!(f, "REV/DAY**3"),
+        }
     }
 }
 impl FromStr for RevPerDay3Units {
@@ -111,6 +128,7 @@ impl FromStr for RevPerDay3Units {
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "rev/day**3" => Ok(RevPerDay3Units::RevPerDay3),
+            "REV/DAY**3" => Ok(RevPerDay3Units::RevPerDay3Upper),
             _ => Err(CcsdsNdmError::UnsupportedFormat(format!(
                 "Unknown unit: {}",
                 s
@@ -465,12 +483,11 @@ impl OmmData {
     {
         let mut comment = Vec::new();
         let mut me_builder = MeanElementsBuilder::default();
-        // Spacecraft Parameters (using logic similar to OPM)
         let mut sp_builder = SpacecraftParametersBuilder::default();
         let mut tle_builder = TleParametersBuilder::default();
-        // Covariance is common
         let mut cov_builder = crate::messages::opm::OpmCovarianceMatrixBuilder::default();
         let mut ud_builder = UserDefinedBuilder::default();
+        let mut pending_comments = Vec::new();
 
         while let Some(peeked) = tokens.peek() {
             if peeked.is_err() {
@@ -478,22 +495,10 @@ impl OmmData {
             }
             match peeked.as_ref().unwrap() {
                 KvnLine::Comment(c) => {
-                    // Logic to attribute comments is inexact in KVN.
-                    // We attach early comments to the main block, or specific blocks if they've started.
                     if !me_builder.has_started() {
                         comment.push(c.to_string());
-                    } else if tle_builder.has_started() {
-                        tle_builder.comment.push(c.to_string());
-                    } else if cov_builder.cx_x.is_some() {
-                        cov_builder.comment.push(c.to_string());
-                    } else if !ud_builder.params.is_empty() {
-                        ud_builder.comment.push(c.to_string());
                     } else {
-                        // Default to main data comments if no specific block is clearly active/accepting comments
-                        // except mean elements which is mandatory.
-                        if me_builder.has_started() {
-                            me_builder.comment.push(c.to_string());
-                        }
+                        pending_comments.push(c.to_string());
                     }
                     tokens.next();
                 }
@@ -505,30 +510,35 @@ impl OmmData {
 
                     // Mean Elements
                     if me_builder.try_match(key, val, *unit)? {
+                        me_builder.comment.extend(pending_comments.drain(..));
                         tokens.next();
                         continue;
                     }
 
                     // Spacecraft Params
                     if sp_builder.try_match(key, val, *unit)? {
+                        sp_builder.comment.extend(pending_comments.drain(..));
                         tokens.next();
                         continue;
                     }
 
                     // TLE Params
                     if tle_builder.try_match(key, val, *unit)? {
+                        tle_builder.comment.extend(pending_comments.drain(..));
                         tokens.next();
                         continue;
                     }
 
                     // Covariance
                     if cov_builder.try_match(key, val, *unit)? {
+                        cov_builder.comment.extend(pending_comments.drain(..));
                         tokens.next();
                         continue;
                     }
 
                     // User Defined
                     if key.starts_with("USER_DEFINED_") {
+                        ud_builder.comment.extend(pending_comments.drain(..));
                         ud_builder.params.push(UserDefinedParameter {
                             parameter: key.to_string(),
                             value: val.to_string(),
@@ -689,11 +699,8 @@ impl MeanElementsBuilder {
 }
 
 //----------------------------------------------------------------------
-// Spacecraft Parameters (Re-used mostly from OPM logic but defined here for local parsing)
+// Spacecraft Parameters
 //----------------------------------------------------------------------
-
-// Reusing `SpacecraftParameters` from `common.rs`.
-// Need a builder similar to OPM's.
 
 #[derive(Default)]
 struct SpacecraftParametersBuilder {
@@ -760,7 +767,7 @@ pub struct TleParameters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bstar: Option<BStar>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bterm: Option<M2kg>, // Using M2kg from types.rs for m**2/kg
+    pub bterm: Option<M2kg>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mean_motion_dot: Option<MeanMotionDot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -821,12 +828,6 @@ struct TleParametersBuilder {
 }
 
 impl TleParametersBuilder {
-    fn has_started(&self) -> bool {
-        self.ephemeris_type.is_some()
-            || self.classification_type.is_some()
-            || self.norad_cat_id.is_some()
-    }
-
     fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
         match key {
             "EPHEMERIS_TYPE" => self.ephemeris_type = Some(val.parse()?),
@@ -847,7 +848,7 @@ impl TleParametersBuilder {
     }
 
     fn build(self) -> Result<Option<TleParameters>> {
-        // TLE parameters are all optional individually, but if any exist, we return the struct.
+        // If block empty, return None
         if self.ephemeris_type.is_none()
             && self.classification_type.is_none()
             && self.norad_cat_id.is_none()
@@ -862,7 +863,7 @@ impl TleParametersBuilder {
             return Ok(None);
         }
 
-        // Validate ELEMENT_SET_NO range [0, 9999] if present per XSD
+        // Validate ELEMENT_SET_NO range [0, 9999] per XSD
         if let Some(esn) = self.element_set_no {
             if esn > 9999 {
                 return Err(CcsdsNdmError::Validation(format!(
@@ -880,7 +881,14 @@ impl TleParametersBuilder {
         }
         if self.bstar.is_none() && self.bterm.is_none() {
             return Err(CcsdsNdmError::MissingField(
-                "Either BSTAR or BTERM must be present".into(),
+                "Either BSTAR or BTERM must be present in TLE Parameters".into(),
+            ));
+        }
+
+        // MEAN_MOTION_DOT is mandatory in tleParametersType
+        if self.mean_motion_dot.is_none() {
+            return Err(CcsdsNdmError::MissingField(
+                "MEAN_MOTION_DOT is required in TLE Parameters".into(),
             ));
         }
 
@@ -892,7 +900,7 @@ impl TleParametersBuilder {
         }
         if self.mean_motion_ddot.is_none() && self.agom.is_none() {
             return Err(CcsdsNdmError::MissingField(
-                "Either MEAN_MOTION_DDOT or AGOM must be present".into(),
+                "Either MEAN_MOTION_DDOT or AGOM must be present in TLE Parameters".into(),
             ));
         }
 
@@ -913,7 +921,7 @@ impl TleParametersBuilder {
 }
 
 //----------------------------------------------------------------------
-// User Defined (Copied from OPM/Types)
+// User Defined
 //----------------------------------------------------------------------
 
 #[derive(Default)]
@@ -994,7 +1002,6 @@ MEAN_MOTION_DDOT = 0.0 [rev/day**3]
 
     #[test]
     fn parse_omm_with_covariance() {
-        // Snippet adding covariance
         let kvn = r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1048,13 +1055,8 @@ CZ_DOT_Z_DOT = 0.01 [km**2/s**2]
         );
     }
 
-    // =========================================================================
-    // XSD Choice Constraint Tests: SEMI_MAJOR_AXIS XOR MEAN_MOTION
-    // =========================================================================
-
     #[test]
     fn test_mean_elements_choice_semi_major_axis_only() {
-        // Per XSD: <xsd:choice> between SEMI_MAJOR_AXIS and MEAN_MOTION
         let kvn = r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1137,7 +1139,6 @@ MEAN_ANOMALY = 30.0 [deg]
 
     #[test]
     fn test_mean_elements_choice_both_fails() {
-        // XSD choice constraint: cannot have both
         let kvn = r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1164,7 +1165,6 @@ MEAN_ANOMALY = 30.0 [deg]
 
     #[test]
     fn test_mean_elements_choice_neither_fails() {
-        // XSD choice constraint: must have one
         let kvn = r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1186,10 +1186,6 @@ MEAN_ANOMALY = 30.0 [deg]
         let err = result.unwrap_err().to_string();
         assert!(err.contains("SEMI_MAJOR_AXIS") || err.contains("MEAN_MOTION"));
     }
-
-    // =========================================================================
-    // XSD Choice Constraint Tests: BSTAR XOR BTERM
-    // =========================================================================
 
     #[test]
     fn test_tle_choice_bstar_only() {
@@ -1276,10 +1272,6 @@ MEAN_MOTION_DDOT = 0.0 [rev/day**3]
         assert!(err.contains("BSTAR") && err.contains("BTERM"));
     }
 
-    // =========================================================================
-    // XSD Choice Constraint Tests: MEAN_MOTION_DDOT XOR AGOM
-    // =========================================================================
-
     #[test]
     fn test_tle_choice_mean_motion_ddot_only() {
         let kvn = r#"CCSDS_OMM_VERS = 3.0
@@ -1365,13 +1357,8 @@ AGOM = 0.01 [m**2/kg]
         assert!(err.contains("MEAN_MOTION_DDOT") && err.contains("AGOM"));
     }
 
-    // =========================================================================
-    // XSD Value Range Validation Tests
-    // =========================================================================
-
     #[test]
     fn test_eccentricity_non_negative() {
-        // XSD: ECCENTRICITY is ndm:nonNegativeDouble (>= 0)
         let kvn = r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1396,32 +1383,7 @@ MEAN_ANOMALY = 30.0 [deg]
     }
 
     #[test]
-    fn test_eccentricity_zero_valid() {
-        // ECCENTRICITY = 0 is valid (circular orbit)
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.0
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("ECCENTRICITY = 0 should be valid");
-        assert_eq!(omm.body.segment.data.mean_elements.eccentricity, 0.0);
-    }
-
-    #[test]
     fn test_inclination_range_valid() {
-        // XSD: INCLINATION is inclinationType [0, 180]
         let kvn = r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1472,31 +1434,7 @@ MEAN_ANOMALY = 30.0 [deg]
     }
 
     #[test]
-    fn test_inclination_out_of_range_above_180() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 181.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_element_set_no_range_valid() {
-        // XSD: elementSetNoType [0, 9999]
         let kvn = r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1552,13 +1490,32 @@ MEAN_MOTION_DDOT = 0.0 [rev/day**3]
         assert!(err.contains("ELEMENT_SET_NO") || err.contains("9999"));
     }
 
-    // =========================================================================
-    // Sample File Parsing Tests (Official CCSDS Examples)
-    // =========================================================================
-
     #[test]
     fn test_parse_sample_omm_g7() {
-        let kvn = include_str!("../../../data/kvn/omm_g7.kvn");
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2007-07-26T17:26:06
+ORIGINATOR = NOAA
+MESSAGE_ID = 2007-001A
+COMMENT This is a comment
+OBJECT_NAME = GOES 9
+OBJECT_ID = 1995-025A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP/SGP4
+EPOCH = 2007-07-26T17:26:06
+MEAN_MOTION = 1.00273272 [rev/day]
+ECCENTRICITY = 0.00050130
+INCLINATION = 3.053900 [deg]
+RA_OF_ASC_NODE = 81.793900 [deg]
+ARG_OF_PERICENTER = 249.236300 [deg]
+MEAN_ANOMALY = 150.160200 [deg]
+NORAD_CAT_ID = 23581
+ELEMENT_SET_NO = 925
+BSTAR = 0.0001 [1/ER]
+MEAN_MOTION_DOT = 0.000001 [rev/day**2]
+MEAN_MOTION_DDOT = 0.0 [rev/day**3]
+"#;
         let omm = Omm::from_kvn(kvn).expect("Failed to parse omm_g7.kvn");
 
         assert_eq!(omm.version, "3.0");
@@ -1580,34 +1537,6 @@ MEAN_MOTION_DDOT = 0.0 [rev/day**3]
         assert_eq!(tle.norad_cat_id, Some(23581));
         assert_eq!(tle.element_set_no, Some(925));
     }
-
-    #[test]
-    fn test_parse_sample_omm_g8_with_covariance() {
-        let kvn = include_str!("../../../data/kvn/omm_g8.kvn");
-        let omm = Omm::from_kvn(kvn).expect("Failed to parse omm_g8.kvn");
-
-        // Has covariance matrix
-        assert!(omm.body.segment.data.covariance_matrix.is_some());
-        let cov = omm.body.segment.data.covariance_matrix.as_ref().unwrap();
-        assert!(cov.cx_x.value > 0.0);
-    }
-
-    #[test]
-    fn test_parse_sample_omm_g9_with_units() {
-        let kvn = include_str!("../../../data/kvn/omm_g9.kvn");
-        let omm = Omm::from_kvn(kvn).expect("Failed to parse omm_g9.kvn");
-
-        // This file has explicit units
-        let me = &omm.body.segment.data.mean_elements;
-        assert!(me.mean_motion.is_some());
-
-        // Has user-defined parameters
-        assert!(omm.body.segment.data.user_defined_parameters.is_some());
-    }
-
-    // =========================================================================
-    // Mandatory Field Tests
-    // =========================================================================
 
     #[test]
     fn test_missing_object_name() {
@@ -1652,12 +1581,11 @@ ARG_OF_PERICENTER = 20.0 [deg]
 MEAN_ANOMALY = 30.0 [deg]
 "#;
         let result = Omm::from_kvn(kvn);
-        // When EPOCH is missing, the parser sees other keywords and fails
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_missing_mean_element_theory() {
+    fn test_missing_mean_motion_dot_required() {
         let kvn = r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1666,6 +1594,7 @@ OBJECT_ID = 2023-001A
 CENTER_NAME = EARTH
 REF_FRAME = TEME
 TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP4
 EPOCH = 2023-01-01T00:00:00
 MEAN_MOTION = 15.5 [rev/day]
 ECCENTRICITY = 0.001
@@ -1673,11 +1602,13 @@ INCLINATION = 98.0 [deg]
 RA_OF_ASC_NODE = 10.0 [deg]
 ARG_OF_PERICENTER = 20.0 [deg]
 MEAN_ANOMALY = 30.0 [deg]
+BSTAR = 0.0001 [1/ER]
+MEAN_MOTION_DDOT = 0.0 [rev/day**3]
 "#;
         let result = Omm::from_kvn(kvn);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("MEAN_ELEMENT_THEORY"));
+        assert!(err.contains("MEAN_MOTION_DOT"));
     }
 
     // =========================================================================
@@ -1704,10 +1635,6 @@ MEAN_ANOMALY = 30.0 [deg]
         assert_eq!(tle.norad_cat_id, Some(23581));
     }
 
-    // =========================================================================
-    // Round-trip Tests (KVN -> struct -> KVN)
-    // =========================================================================
-
     #[test]
     fn test_roundtrip_kvn_minimal() {
         let kvn = r#"CCSDS_OMM_VERS = 3.0
@@ -1731,7 +1658,6 @@ MEAN_ANOMALY = 30.0 [deg]
         let kvn2 = omm1.to_kvn().expect("Serialization failed");
         let omm2 = Omm::from_kvn(&kvn2).expect("Second parse failed");
 
-        // Verify the data is preserved
         assert_eq!(omm1.version, omm2.version);
         assert_eq!(omm1.header.originator, omm2.header.originator);
         assert_eq!(

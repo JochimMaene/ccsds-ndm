@@ -203,15 +203,26 @@ impl CdmBody {
 
         // 2. Segments (Expect exactly 2)
         let mut segments = Vec::new();
+        let mut pending_comments = Vec::new();
+
         while let Some(peeked) = tokens.peek() {
             if peeked.is_err() {
                 return Err(tokens.next().unwrap().unwrap_err());
             }
             match peeked.as_ref().unwrap() {
                 KvnLine::Pair { key: "OBJECT", .. } => {
-                    segments.push(CdmSegment::from_kvn_tokens(tokens)?);
+                    let mut segment = CdmSegment::from_kvn_tokens(tokens)?;
+                    if !pending_comments.is_empty() {
+                        segment.metadata.comment.splice(0..0, pending_comments.drain(..));
+                    }
+                    segments.push(segment);
                 }
-                KvnLine::Empty | KvnLine::Comment(_) => {
+                KvnLine::Comment(_) => {
+                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                        pending_comments.push(c.to_string());
+                    }
+                }
+                KvnLine::Empty => {
                     tokens.next();
                 }
                 _ => break,

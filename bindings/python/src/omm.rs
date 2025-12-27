@@ -657,10 +657,10 @@ impl OmmData {
     /// mean_elements : MeanElements
     ///     Mean elements.
     #[new]
-    fn new(mean_elements: MeanElements) -> Self {
+    fn new(mean_elements: MeanElements, comments: Option<Vec<String>>) -> Self {
         Self {
             inner: core_omm::OmmData {
-                comment: vec![],
+                comment: comments.unwrap_or_default(),
                 mean_elements: mean_elements.inner,
                 spacecraft_parameters: None,
                 tle_parameters: None,
@@ -690,6 +690,19 @@ impl OmmData {
     #[setter]
     fn set_mean_elements(&mut self, value: MeanElements) {
         self.inner.mean_elements = value.inner;
+    }
+
+    /// Comments.
+    ///
+    /// :type: List[str]
+    #[getter]
+    fn get_comments(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comments(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 
     /// Spacecraft parameters.
