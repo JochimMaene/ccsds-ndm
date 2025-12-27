@@ -4,26 +4,30 @@
 
 use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::traits::Ndm;
-use std::fs;
-use pyo3::exceptions::PyValueError;
-use ccsds_ndm::MessageType;
 use ccsds_ndm::types::{self as core_types, *};
+use ccsds_ndm::MessageType;
 use numpy::PyArray2;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use std::fs;
 
 // Helper to parse epoch strings
 fn parse_epoch_str(value: &str) -> PyResult<Epoch> {
-    value.parse().map_err(|e: EpochError| PyErr::new::<PyValueError, _>(e.to_string()))
+    value
+        .parse()
+        .map_err(|e: EpochError| PyErr::new::<PyValueError, _>(e.to_string()))
 }
 
 // Helper to handle unit setting
 // If `provided_unit` is Some, it checks compliance with `T::default()`.
-fn validate_unit<T: Default + std::fmt::Display + PartialEq>(provided: Option<String>) -> PyResult<()> {
+fn validate_unit<T: Default + std::fmt::Display + PartialEq>(
+    provided: Option<String>,
+) -> PyResult<()> {
     if let Some(u_str) = provided {
-        // We try to parse the string into the Unit Enum. 
+        // We try to parse the string into the Unit Enum.
         let default_unit = T::default();
         if u_str != default_unit.to_string() {
-             return Err(PyValueError::new_err(format!(
+            return Err(PyValueError::new_err(format!(
                 "Unit mismatch. CCSDS CDM requires '{}', but got '{}'. Conversion is not supported.",
                 default_unit, u_str
             )));
@@ -95,24 +99,29 @@ impl Cdm {
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = match format {
-            Some("kvn") => core_cdm::Cdm::from_kvn(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some("xml") => core_cdm::Cdm::from_xml(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some(other) => return Err(PyValueError::new_err(format!(
-                "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                other
-            ))),
-            None => match ccsds_ndm::from_str(data) {
-                Ok(MessageType::Cdm(cdm)) => cdm,
-                Ok(other) => return Err(PyValueError::new_err(format!(
-                    "Parsed message is not CDM (got {:?})",
-                    other
-                ))),
-                Err(e) => return Err(PyValueError::new_err(e.to_string())),
-            },
-        };
+        let inner =
+            match format {
+                Some("kvn") => core_cdm::Cdm::from_kvn(data)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                Some("xml") => core_cdm::Cdm::from_xml(data)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                Some(other) => {
+                    return Err(PyValueError::new_err(format!(
+                        "Unsupported format '{}'. Use 'kvn' or 'xml'",
+                        other
+                    )))
+                }
+                None => match ccsds_ndm::from_str(data) {
+                    Ok(MessageType::Cdm(cdm)) => cdm,
+                    Ok(other) => {
+                        return Err(PyValueError::new_err(format!(
+                            "Parsed message is not CDM (got {:?})",
+                            other
+                        )))
+                    }
+                    Err(e) => return Err(PyValueError::new_err(e.to_string())),
+                },
+            };
         Ok(Self { inner })
     }
 
@@ -150,8 +159,14 @@ impl Cdm {
     ///     The serialized CDM string.
     fn to_str(&self, format: &str) -> PyResult<String> {
         match format {
-            "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => self.inner.to_xml().map_err(|e| PyValueError::new_err(e.to_string())),
+            "kvn" => self
+                .inner
+                .to_kvn()
+                .map_err(|e| PyValueError::new_err(e.to_string())),
+            "xml" => self
+                .inner
+                .to_xml()
+                .map_err(|e| PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
                 other
@@ -159,16 +174,18 @@ impl Cdm {
         }
     }
 
-    
-
     #[getter]
     fn header(&self) -> CdmHeader {
-        CdmHeader { inner: self.inner.header.clone() }
+        CdmHeader {
+            inner: self.inner.header.clone(),
+        }
     }
 
     #[getter]
     fn body(&self) -> CdmBody {
-        CdmBody { inner: self.inner.body.clone() }
+        CdmBody {
+            inner: self.inner.body.clone(),
+        }
     }
 
     #[getter]
@@ -192,11 +209,12 @@ impl Cdm {
         let data = self.to_str(format)?;
         match fs::write(path, data) {
             Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!("Failed to write file: {}", e))),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Failed to write file: {}",
+                e
+            ))),
         }
     }
-
-    
 }
 
 /// Header section of the CDM.
@@ -231,7 +249,7 @@ impl CdmHeader {
         originator: String,
         message_id: String,
         message_for: Option<String>,
-        comment: Vec<String>
+        comment: Vec<String>,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: core_cdm::CdmHeader {
@@ -248,45 +266,65 @@ impl CdmHeader {
     ///
     /// :type: str
     #[getter]
-    fn creation_date(&self) -> String { self.inner.creation_date.to_string() }
+    fn creation_date(&self) -> String {
+        self.inner.creation_date.to_string()
+    }
     #[setter]
     fn set_creation_date(&mut self, value: String) -> PyResult<()> {
         self.inner.creation_date = parse_epoch_str(&value)?;
         Ok(())
     }
-    
+
     /// Creating agency or owner/operator.
     ///
     /// :type: str
     #[getter]
-    fn originator(&self) -> String { self.inner.originator.clone() }
+    fn originator(&self) -> String {
+        self.inner.originator.clone()
+    }
     #[setter]
-    fn set_originator(&mut self, value: String) { self.inner.originator = value; }
+    fn set_originator(&mut self, value: String) {
+        self.inner.originator = value;
+    }
 
     /// ID used to uniquely identify this message.
     ///
     /// :type: str
     #[getter]
-    fn message_id(&self) -> String { self.inner.message_id.clone() }
+    fn message_id(&self) -> String {
+        self.inner.message_id.clone()
+    }
     #[setter]
-    fn set_message_id(&mut self, value: String) { self.inner.message_id = value; }
+    fn set_message_id(&mut self, value: String) {
+        self.inner.message_id = value;
+    }
 
     /// Spacecraft name(s) for which the CDM is provided.
     ///
     /// :type: Optional[str]
     #[getter]
-    fn message_for(&self) -> Option<String> { self.inner.message_for.clone() }
+    fn message_for(&self) -> Option<String> {
+        self.inner.message_for.clone()
+    }
     #[setter]
-    fn set_message_for(&mut self, value: Option<String>) { self.inner.message_for = value; }
+    fn set_message_for(&mut self, value: Option<String>) {
+        self.inner.message_for = value;
+    }
 
     #[getter]
-    fn comment(&self) -> Vec<String> { self.inner.comment.clone() }
+    fn comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
     #[setter]
-    fn set_comment(&mut self, value: Vec<String>) { self.inner.comment = value; }
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
 
     fn __repr__(&self) -> String {
-        format!("CdmHeader(originator='{}', message_id='{}')",
-            self.inner.originator, self.inner.message_id)
+        format!(
+            "CdmHeader(originator='{}', message_id='{}')",
+            self.inner.originator, self.inner.message_id
+        )
     }
 }
 
@@ -310,25 +348,35 @@ pub struct CdmBody {
 #[pymethods]
 impl CdmBody {
     #[new]
-    fn new(relative_metadata_data: RelativeMetadataData, segments: Vec<CdmSegment>) -> PyResult<Self> {
+    fn new(
+        relative_metadata_data: RelativeMetadataData,
+        segments: Vec<CdmSegment>,
+    ) -> PyResult<Self> {
         // CCSDS Spec implies exactly 2 segments usually, but we allow vector
-        let inner_segs: Vec<core_cdm::CdmSegment> = segments.iter().map(|s| s.inner.clone()).collect();
+        let inner_segs: Vec<core_cdm::CdmSegment> =
+            segments.iter().map(|s| s.inner.clone()).collect();
         Ok(Self {
             inner: core_cdm::CdmBody {
                 relative_metadata_data: relative_metadata_data.inner,
-                segments: inner_segs
-            }
+                segments: inner_segs,
+            },
         })
     }
 
     #[getter]
     fn relative_metadata_data(&self) -> RelativeMetadataData {
-        RelativeMetadataData { inner: self.inner.relative_metadata_data.clone() }
+        RelativeMetadataData {
+            inner: self.inner.relative_metadata_data.clone(),
+        }
     }
 
     #[getter]
     fn segments(&self) -> Vec<CdmSegment> {
-        self.inner.segments.iter().map(|s| CdmSegment { inner: s.clone() }).collect()
+        self.inner
+            .segments
+            .iter()
+            .map(|s| CdmSegment { inner: s.clone() })
+            .collect()
     }
 }
 
@@ -386,21 +434,21 @@ impl RelativeMetadataData {
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
-        tca, 
-        miss_distance, 
-        relative_speed=None, 
-        relative_position=None, 
-        relative_velocity=None, 
-        start_screen_period=None, 
-        stop_screen_period=None, 
-        screen_volume_frame=None, 
-        screen_volume_shape=None, 
-        screen_volume_x=None, 
-        screen_volume_y=None, 
-        screen_volume_z=None, 
-        screen_entry_time=None, 
-        screen_exit_time=None, 
-        collision_probability=None, 
+        tca,
+        miss_distance,
+        relative_speed=None,
+        relative_position=None,
+        relative_velocity=None,
+        start_screen_period=None,
+        stop_screen_period=None,
+        screen_volume_frame=None,
+        screen_volume_shape=None,
+        screen_volume_x=None,
+        screen_volume_y=None,
+        screen_volume_z=None,
+        screen_entry_time=None,
+        screen_exit_time=None,
+        collision_probability=None,
         collision_probability_method=None,
         comment=vec![],
         // Optional units arguments for strict validation
@@ -426,7 +474,6 @@ impl RelativeMetadataData {
         comment: Vec<String>,
         miss_distance_unit: Option<String>,
     ) -> PyResult<Self> {
-        
         validate_unit::<LengthUnits>(miss_distance_unit)?;
 
         let rel_state = if let (Some(p), Some(v)) = (relative_position, relative_velocity) {
@@ -459,8 +506,12 @@ impl RelativeMetadataData {
                 miss_distance: Length::new(miss_distance, None),
                 relative_speed: relative_speed.map(|v| Dv::new(v, None)),
                 relative_state_vector: rel_state,
-                start_screen_period: start_screen_period.map(|s| parse_epoch_str(&s)).transpose()?,
-                stop_screen_period: stop_screen_period.map(|s| parse_epoch_str(&s)).transpose()?,
+                start_screen_period: start_screen_period
+                    .map(|s| parse_epoch_str(&s))
+                    .transpose()?,
+                stop_screen_period: stop_screen_period
+                    .map(|s| parse_epoch_str(&s))
+                    .transpose()?,
                 screen_volume_frame: screen_volume_frame.map(map_frame),
                 screen_volume_shape: screen_volume_shape.map(map_shape),
                 screen_volume_x: screen_volume_x.map(|v| Length::new(v, None)),
@@ -468,15 +519,19 @@ impl RelativeMetadataData {
                 screen_volume_z: screen_volume_z.map(|v| Length::new(v, None)),
                 screen_entry_time: screen_entry_time.map(|s| parse_epoch_str(&s)).transpose()?,
                 screen_exit_time: screen_exit_time.map(|s| parse_epoch_str(&s)).transpose()?,
-                collision_probability: collision_probability.map(Probability::new).transpose()
+                collision_probability: collision_probability
+                    .map(Probability::new)
+                    .transpose()
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 collision_probability_method,
-            }
+            },
         })
     }
 
     #[getter]
-    fn tca(&self) -> String { self.inner.tca.to_string() }
+    fn tca(&self) -> String {
+        self.inner.tca.to_string()
+    }
     #[setter]
     fn set_tca(&mut self, value: String) -> PyResult<()> {
         self.inner.tca = parse_epoch_str(&value)?;
@@ -484,42 +539,59 @@ impl RelativeMetadataData {
     }
 
     #[getter]
-    fn miss_distance(&self) -> f64 { self.inner.miss_distance.value }
+    fn miss_distance(&self) -> f64 {
+        self.inner.miss_distance.value
+    }
     #[setter]
     fn set_miss_distance(&mut self, value: f64) {
         self.inner.miss_distance = Length::new(value, None);
     }
     #[getter]
-    fn miss_distance_units(&self) -> String { "m".to_string() }
-    
+    fn miss_distance_units(&self) -> String {
+        "m".to_string()
+    }
+
     #[getter]
-    fn relative_speed(&self) -> Option<f64> { self.inner.relative_speed.as_ref().map(|v| v.value) }
+    fn relative_speed(&self) -> Option<f64> {
+        self.inner.relative_speed.as_ref().map(|v| v.value)
+    }
     #[setter]
     fn set_relative_speed(&mut self, value: Option<f64>) {
         self.inner.relative_speed = value.map(|v| Dv::new(v, None));
     }
     #[getter]
-    fn relative_speed_units(&self) -> String { "m/s".to_string() }
+    fn relative_speed_units(&self) -> String {
+        "m/s".to_string()
+    }
 
     #[getter]
-    fn collision_probability(&self) -> Option<f64> { self.inner.collision_probability.as_ref().map(|v| v.value) }
+    fn collision_probability(&self) -> Option<f64> {
+        self.inner.collision_probability.as_ref().map(|v| v.value)
+    }
     #[setter]
     fn set_collision_probability(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.inner.collision_probability = value.map(Probability::new).transpose()
+        self.inner.collision_probability = value
+            .map(Probability::new)
+            .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
     #[getter]
-    fn collision_probability_method(&self) -> Option<String> { self.inner.collision_probability_method.clone() }
+    fn collision_probability_method(&self) -> Option<String> {
+        self.inner.collision_probability_method.clone()
+    }
     #[setter]
     fn set_collision_probability_method(&mut self, value: Option<String>) {
         self.inner.collision_probability_method = value;
     }
 
     #[getter]
-    fn start_screen_period(&self) -> Option<String> { 
-        self.inner.start_screen_period.as_ref().map(|e| e.to_string()) 
+    fn start_screen_period(&self) -> Option<String> {
+        self.inner
+            .start_screen_period
+            .as_ref()
+            .map(|e| e.to_string())
     }
     #[setter]
     fn set_start_screen_period(&mut self, value: Option<String>) -> PyResult<()> {
@@ -528,8 +600,11 @@ impl RelativeMetadataData {
     }
 
     #[getter]
-    fn stop_screen_period(&self) -> Option<String> { 
-        self.inner.stop_screen_period.as_ref().map(|e| e.to_string()) 
+    fn stop_screen_period(&self) -> Option<String> {
+        self.inner
+            .stop_screen_period
+            .as_ref()
+            .map(|e| e.to_string())
     }
     #[setter]
     fn set_stop_screen_period(&mut self, value: Option<String>) -> PyResult<()> {
@@ -538,8 +613,8 @@ impl RelativeMetadataData {
     }
 
     #[getter]
-    fn screen_entry_time(&self) -> Option<String> { 
-        self.inner.screen_entry_time.as_ref().map(|e| e.to_string()) 
+    fn screen_entry_time(&self) -> Option<String> {
+        self.inner.screen_entry_time.as_ref().map(|e| e.to_string())
     }
     #[setter]
     fn set_screen_entry_time(&mut self, value: Option<String>) -> PyResult<()> {
@@ -548,8 +623,8 @@ impl RelativeMetadataData {
     }
 
     #[getter]
-    fn screen_exit_time(&self) -> Option<String> { 
-        self.inner.screen_exit_time.as_ref().map(|e| e.to_string()) 
+    fn screen_exit_time(&self) -> Option<String> {
+        self.inner.screen_exit_time.as_ref().map(|e| e.to_string())
     }
     #[setter]
     fn set_screen_exit_time(&mut self, value: Option<String>) -> PyResult<()> {
@@ -558,21 +633,34 @@ impl RelativeMetadataData {
     }
 
     #[getter]
-    fn screen_volume_x(&self) -> Option<f64> { self.inner.screen_volume_x.as_ref().map(|v| v.value) }
+    fn screen_volume_x(&self) -> Option<f64> {
+        self.inner.screen_volume_x.as_ref().map(|v| v.value)
+    }
     #[getter]
-    fn screen_volume_y(&self) -> Option<f64> { self.inner.screen_volume_y.as_ref().map(|v| v.value) }
+    fn screen_volume_y(&self) -> Option<f64> {
+        self.inner.screen_volume_y.as_ref().map(|v| v.value)
+    }
     #[getter]
-    fn screen_volume_z(&self) -> Option<f64> { self.inner.screen_volume_z.as_ref().map(|v| v.value) }
+    fn screen_volume_z(&self) -> Option<f64> {
+        self.inner.screen_volume_z.as_ref().map(|v| v.value)
+    }
 
     #[getter]
-    fn comment(&self) -> Vec<String> { self.inner.comment.clone() }
+    fn comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
     #[setter]
-    fn set_comment(&mut self, value: Vec<String>) { self.inner.comment = value; }
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
 
     fn __repr__(&self) -> String {
-        format!("RelativeMetadataData(tca='{}', miss_distance={}, collision_probability={:?})",
-            self.inner.tca, self.inner.miss_distance.value, 
-            self.inner.collision_probability.as_ref().map(|p| p.value))
+        format!(
+            "RelativeMetadataData(tca='{}', miss_distance={}, collision_probability={:?})",
+            self.inner.tca,
+            self.inner.miss_distance.value,
+            self.inner.collision_probability.as_ref().map(|p| p.value)
+        )
     }
 }
 
@@ -591,18 +679,29 @@ impl CdmSegment {
             inner: core_cdm::CdmSegment {
                 metadata: metadata.inner,
                 data: data.inner,
-            }
+            },
         }
     }
 
     #[getter]
-    fn metadata(&self) -> CdmMetadata { CdmMetadata { inner: self.inner.metadata.clone() } }
+    fn metadata(&self) -> CdmMetadata {
+        CdmMetadata {
+            inner: self.inner.metadata.clone(),
+        }
+    }
 
     #[getter]
-    fn data(&self) -> CdmData { CdmData { inner: self.inner.data.clone() } }
+    fn data(&self) -> CdmData {
+        CdmData {
+            inner: self.inner.data.clone(),
+        }
+    }
 
     fn __repr__(&self) -> String {
-        format!("CdmSegment(object_name='{}')", self.inner.metadata.object_name)
+        format!(
+            "CdmSegment(object_name='{}')",
+            self.inner.metadata.object_name
+        )
     }
 }
 
@@ -719,7 +818,7 @@ impl CdmMetadata {
             CdmObjectType::Object1 => core_types::CdmObjectType::Object1,
             CdmObjectType::Object2 => core_types::CdmObjectType::Object2,
         };
-        
+
         let map_cov = |c: CovarianceMethodType| match c {
             CovarianceMethodType::Calculated => core_types::CovarianceMethodType::Calculated,
             CovarianceMethodType::Default => core_types::CovarianceMethodType::Default,
@@ -736,7 +835,13 @@ impl CdmMetadata {
             ReferenceFrameType::Gcrf => core_types::ReferenceFrameType::Gcrf,
             ReferenceFrameType::Itrf => core_types::ReferenceFrameType::Itrf,
         };
-        let map_bool_to_yn = |b: bool| if b { core_types::YesNo::Yes } else { core_types::YesNo::No };
+        let map_bool_to_yn = |b: bool| {
+            if b {
+                core_types::YesNo::Yes
+            } else {
+                core_types::YesNo::No
+            }
+        };
 
         let map_desc = |d: ObjectDescription| match d {
             ObjectDescription::Payload => core_types::ObjectDescription::Payload,
@@ -770,83 +875,141 @@ impl CdmMetadata {
                 solar_rad_pressure: solar_rad_pressure.map(map_bool_to_yn),
                 earth_tides: earth_tides.map(map_bool_to_yn),
                 intrack_thrust: intrack_thrust.map(map_bool_to_yn),
-            }
+            },
         }
     }
 
     #[getter]
-    fn object_name(&self) -> String { self.inner.object_name.clone() }
+    fn object_name(&self) -> String {
+        self.inner.object_name.clone()
+    }
     #[setter]
-    fn set_object_name(&mut self, value: String) { self.inner.object_name = value; }
+    fn set_object_name(&mut self, value: String) {
+        self.inner.object_name = value;
+    }
 
     #[getter]
-    fn object_designator(&self) -> String { self.inner.object_designator.clone() }
+    fn object_designator(&self) -> String {
+        self.inner.object_designator.clone()
+    }
     #[setter]
-    fn set_object_designator(&mut self, value: String) { self.inner.object_designator = value; }
+    fn set_object_designator(&mut self, value: String) {
+        self.inner.object_designator = value;
+    }
 
     #[getter]
-    fn catalog_name(&self) -> String { self.inner.catalog_name.clone() }
+    fn catalog_name(&self) -> String {
+        self.inner.catalog_name.clone()
+    }
     #[setter]
-    fn set_catalog_name(&mut self, value: String) { self.inner.catalog_name = value; }
+    fn set_catalog_name(&mut self, value: String) {
+        self.inner.catalog_name = value;
+    }
 
     #[getter]
-    fn international_designator(&self) -> String { self.inner.international_designator.clone() }
+    fn international_designator(&self) -> String {
+        self.inner.international_designator.clone()
+    }
     #[setter]
-    fn set_international_designator(&mut self, value: String) { self.inner.international_designator = value; }
+    fn set_international_designator(&mut self, value: String) {
+        self.inner.international_designator = value;
+    }
 
     #[getter]
-    fn ephemeris_name(&self) -> String { self.inner.ephemeris_name.clone() }
+    fn ephemeris_name(&self) -> String {
+        self.inner.ephemeris_name.clone()
+    }
     #[setter]
-    fn set_ephemeris_name(&mut self, value: String) { self.inner.ephemeris_name = value; }
+    fn set_ephemeris_name(&mut self, value: String) {
+        self.inner.ephemeris_name = value;
+    }
 
     #[getter]
-    fn operator_contact_position(&self) -> Option<String> { self.inner.operator_contact_position.clone() }
+    fn operator_contact_position(&self) -> Option<String> {
+        self.inner.operator_contact_position.clone()
+    }
     #[setter]
-    fn set_operator_contact_position(&mut self, value: Option<String>) { self.inner.operator_contact_position = value; }
+    fn set_operator_contact_position(&mut self, value: Option<String>) {
+        self.inner.operator_contact_position = value;
+    }
 
     #[getter]
-    fn operator_organization(&self) -> Option<String> { self.inner.operator_organization.clone() }
+    fn operator_organization(&self) -> Option<String> {
+        self.inner.operator_organization.clone()
+    }
     #[setter]
-    fn set_operator_organization(&mut self, value: Option<String>) { self.inner.operator_organization = value; }
+    fn set_operator_organization(&mut self, value: Option<String>) {
+        self.inner.operator_organization = value;
+    }
 
     #[getter]
-    fn operator_phone(&self) -> Option<String> { self.inner.operator_phone.clone() }
+    fn operator_phone(&self) -> Option<String> {
+        self.inner.operator_phone.clone()
+    }
     #[setter]
-    fn set_operator_phone(&mut self, value: Option<String>) { self.inner.operator_phone = value; }
+    fn set_operator_phone(&mut self, value: Option<String>) {
+        self.inner.operator_phone = value;
+    }
 
     #[getter]
-    fn operator_email(&self) -> Option<String> { self.inner.operator_email.clone() }
+    fn operator_email(&self) -> Option<String> {
+        self.inner.operator_email.clone()
+    }
     #[setter]
-    fn set_operator_email(&mut self, value: Option<String>) { self.inner.operator_email = value; }
+    fn set_operator_email(&mut self, value: Option<String>) {
+        self.inner.operator_email = value;
+    }
 
     #[getter]
-    fn orbit_center(&self) -> Option<String> { self.inner.orbit_center.clone() }
+    fn orbit_center(&self) -> Option<String> {
+        self.inner.orbit_center.clone()
+    }
     #[setter]
-    fn set_orbit_center(&mut self, value: Option<String>) { self.inner.orbit_center = value; }
+    fn set_orbit_center(&mut self, value: Option<String>) {
+        self.inner.orbit_center = value;
+    }
 
     #[getter]
-    fn gravity_model(&self) -> Option<String> { self.inner.gravity_model.clone() }
+    fn gravity_model(&self) -> Option<String> {
+        self.inner.gravity_model.clone()
+    }
     #[setter]
-    fn set_gravity_model(&mut self, value: Option<String>) { self.inner.gravity_model = value; }
+    fn set_gravity_model(&mut self, value: Option<String>) {
+        self.inner.gravity_model = value;
+    }
 
     #[getter]
-    fn atmospheric_model(&self) -> Option<String> { self.inner.atmospheric_model.clone() }
+    fn atmospheric_model(&self) -> Option<String> {
+        self.inner.atmospheric_model.clone()
+    }
     #[setter]
-    fn set_atmospheric_model(&mut self, value: Option<String>) { self.inner.atmospheric_model = value; }
+    fn set_atmospheric_model(&mut self, value: Option<String>) {
+        self.inner.atmospheric_model = value;
+    }
 
     #[getter]
-    fn n_body_perturbations(&self) -> Option<String> { self.inner.n_body_perturbations.clone() }
+    fn n_body_perturbations(&self) -> Option<String> {
+        self.inner.n_body_perturbations.clone()
+    }
     #[setter]
-    fn set_n_body_perturbations(&mut self, value: Option<String>) { self.inner.n_body_perturbations = value; }
+    fn set_n_body_perturbations(&mut self, value: Option<String>) {
+        self.inner.n_body_perturbations = value;
+    }
 
     #[getter]
-    fn comment(&self) -> Vec<String> { self.inner.comment.clone() }
+    fn comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
     #[setter]
-    fn set_comment(&mut self, value: Vec<String>) { self.inner.comment = value; }
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
 
     fn __repr__(&self) -> String {
-        format!("CdmMetadata(object_name='{}', designator='{}')",
-            self.inner.object_name, self.inner.object_designator)
+        format!(
+            "CdmMetadata(object_name='{}', designator='{}')",
+            self.inner.object_name, self.inner.object_designator
+        )
     }
 }
 
@@ -870,7 +1033,11 @@ pub struct CdmData {
 #[pymethods]
 impl CdmData {
     #[new]
-    fn new(state_vector: CdmStateVector, covariance_matrix: CdmCovarianceMatrix, comments: Option<Vec<String>>) -> Self {
+    fn new(
+        state_vector: CdmStateVector,
+        covariance_matrix: CdmCovarianceMatrix,
+        comments: Option<Vec<String>>,
+    ) -> Self {
         Self {
             inner: core_cdm::CdmData {
                 comment: comments.unwrap_or_default(),
@@ -878,26 +1045,40 @@ impl CdmData {
                 additional_parameters: None,
                 state_vector: state_vector.inner,
                 covariance_matrix: covariance_matrix.inner,
-            }
+            },
         }
     }
 
     #[getter]
-    fn state_vector(&self) -> CdmStateVector { CdmStateVector { inner: self.inner.state_vector.clone() } }
+    fn state_vector(&self) -> CdmStateVector {
+        CdmStateVector {
+            inner: self.inner.state_vector.clone(),
+        }
+    }
 
     #[getter]
-    fn covariance_matrix(&self) -> CdmCovarianceMatrix { CdmCovarianceMatrix { inner: self.inner.covariance_matrix.clone() } }
+    fn covariance_matrix(&self) -> CdmCovarianceMatrix {
+        CdmCovarianceMatrix {
+            inner: self.inner.covariance_matrix.clone(),
+        }
+    }
 
     #[getter]
-    fn comment(&self) -> Vec<String> { self.inner.comment.clone() }
+    fn comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
     #[setter]
-    fn set_comment(&mut self, value: Vec<String>) { self.inner.comment = value; }
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
 
     fn __repr__(&self) -> String {
-        format!("CdmData(position=[{:.3}, {:.3}, {:.3}] km)",
+        format!(
+            "CdmData(position=[{:.3}, {:.3}, {:.3}] km)",
             self.inner.state_vector.x.value,
             self.inner.state_vector.y.value,
-            self.inner.state_vector.z.value)
+            self.inner.state_vector.z.value
+        )
     }
 }
 
@@ -935,38 +1116,82 @@ impl CdmStateVector {
                 x_dot: VelocityRequired::new(x_dot),
                 y_dot: VelocityRequired::new(y_dot),
                 z_dot: VelocityRequired::new(z_dot),
-            }
+            },
         }
     }
 
-    #[getter] fn x(&self) -> f64 { self.inner.x.value }
-    #[setter] fn set_x(&mut self, value: f64) { self.inner.x = PositionRequired::new(value); }
-    #[getter] fn x_units(&self) -> String { "km".to_string() }
-    
-    #[getter] fn y(&self) -> f64 { self.inner.y.value }
-    #[setter] fn set_y(&mut self, value: f64) { self.inner.y = PositionRequired::new(value); }
-    
-    #[getter] fn z(&self) -> f64 { self.inner.z.value }
-    #[setter] fn set_z(&mut self, value: f64) { self.inner.z = PositionRequired::new(value); }
-    
-    #[getter] fn x_dot(&self) -> f64 { self.inner.x_dot.value }
-    #[setter] fn set_x_dot(&mut self, value: f64) { self.inner.x_dot = VelocityRequired::new(value); }
-    #[getter] fn x_dot_units(&self) -> String { "km/s".to_string() }
-    
-    #[getter] fn y_dot(&self) -> f64 { self.inner.y_dot.value }
-    #[setter] fn set_y_dot(&mut self, value: f64) { self.inner.y_dot = VelocityRequired::new(value); }
-    
-    #[getter] fn z_dot(&self) -> f64 { self.inner.z_dot.value }
-    #[setter] fn set_z_dot(&mut self, value: f64) { self.inner.z_dot = VelocityRequired::new(value); }
+    #[getter]
+    fn x(&self) -> f64 {
+        self.inner.x.value
+    }
+    #[setter]
+    fn set_x(&mut self, value: f64) {
+        self.inner.x = PositionRequired::new(value);
+    }
+    #[getter]
+    fn x_units(&self) -> String {
+        "km".to_string()
+    }
+
+    #[getter]
+    fn y(&self) -> f64 {
+        self.inner.y.value
+    }
+    #[setter]
+    fn set_y(&mut self, value: f64) {
+        self.inner.y = PositionRequired::new(value);
+    }
+
+    #[getter]
+    fn z(&self) -> f64 {
+        self.inner.z.value
+    }
+    #[setter]
+    fn set_z(&mut self, value: f64) {
+        self.inner.z = PositionRequired::new(value);
+    }
+
+    #[getter]
+    fn x_dot(&self) -> f64 {
+        self.inner.x_dot.value
+    }
+    #[setter]
+    fn set_x_dot(&mut self, value: f64) {
+        self.inner.x_dot = VelocityRequired::new(value);
+    }
+    #[getter]
+    fn x_dot_units(&self) -> String {
+        "km/s".to_string()
+    }
+
+    #[getter]
+    fn y_dot(&self) -> f64 {
+        self.inner.y_dot.value
+    }
+    #[setter]
+    fn set_y_dot(&mut self, value: f64) {
+        self.inner.y_dot = VelocityRequired::new(value);
+    }
+
+    #[getter]
+    fn z_dot(&self) -> f64 {
+        self.inner.z_dot.value
+    }
+    #[setter]
+    fn set_z_dot(&mut self, value: f64) {
+        self.inner.z_dot = VelocityRequired::new(value);
+    }
 
     fn __repr__(&self) -> String {
-        format!("CdmStateVector(x={:.3}, y={:.3}, z={:.3} km)",
-            self.inner.x.value, self.inner.y.value, self.inner.z.value)
+        format!(
+            "CdmStateVector(x={:.3}, y={:.3}, z={:.3} km)",
+            self.inner.x.value, self.inner.y.value, self.inner.z.value
+        )
     }
 }
 
 /// Covariance Matrix at TCA.
-/// 
+///
 /// Provides uncertainty information for the state vector.
 /// Can be converted to a NumPy array using `to_numpy()`.
 #[pyclass]
@@ -1001,40 +1226,106 @@ impl CdmCovarianceMatrix {
 
         // 1-6 Basic State (Diagonal and Lower Tri provided in struct)
         set(0, 0, c.cr_r.value);
-        set(1, 0, c.ct_r.value); set(1, 1, c.ct_t.value);
-        set(2, 0, c.cn_r.value); set(2, 1, c.cn_t.value); set(2, 2, c.cn_n.value);
-        
-        set(3, 0, c.crdot_r.value); set(3, 1, c.crdot_t.value); set(3, 2, c.crdot_n.value); set(3, 3, c.crdot_rdot.value);
-        set(4, 0, c.ctdot_r.value); set(4, 1, c.ctdot_t.value); set(4, 2, c.ctdot_n.value); set(4, 3, c.ctdot_rdot.value); set(4, 4, c.ctdot_tdot.value);
-        set(5, 0, c.cndot_r.value); set(5, 1, c.cndot_t.value); set(5, 2, c.cndot_n.value); set(5, 3, c.cndot_rdot.value); set(5, 4, c.cndot_tdot.value); set(5, 5, c.cndot_ndot.value);
+        set(1, 0, c.ct_r.value);
+        set(1, 1, c.ct_t.value);
+        set(2, 0, c.cn_r.value);
+        set(2, 1, c.cn_t.value);
+        set(2, 2, c.cn_n.value);
+
+        set(3, 0, c.crdot_r.value);
+        set(3, 1, c.crdot_t.value);
+        set(3, 2, c.crdot_n.value);
+        set(3, 3, c.crdot_rdot.value);
+        set(4, 0, c.ctdot_r.value);
+        set(4, 1, c.ctdot_t.value);
+        set(4, 2, c.ctdot_n.value);
+        set(4, 3, c.ctdot_rdot.value);
+        set(4, 4, c.ctdot_tdot.value);
+        set(5, 0, c.cndot_r.value);
+        set(5, 1, c.cndot_t.value);
+        set(5, 2, c.cndot_n.value);
+        set(5, 3, c.cndot_rdot.value);
+        set(5, 4, c.cndot_tdot.value);
+        set(5, 5, c.cndot_ndot.value);
 
         // Optional Rows (7, 8, 9)
         // Row 7: Drag
-        if let (Some(r), Some(t), Some(n), Some(rd), Some(td), Some(nd), Some(drg)) = 
-           (&c.cdrg_r, &c.cdrg_t, &c.cdrg_n, &c.cdrg_rdot, &c.cdrg_tdot, &c.cdrg_ndot, &c.cdrg_drg) {
-            set(6, 0, r.value); set(6, 1, t.value); set(6, 2, n.value);
-            set(6, 3, rd.value); set(6, 4, td.value); set(6, 5, nd.value);
+        if let (Some(r), Some(t), Some(n), Some(rd), Some(td), Some(nd), Some(drg)) = (
+            &c.cdrg_r,
+            &c.cdrg_t,
+            &c.cdrg_n,
+            &c.cdrg_rdot,
+            &c.cdrg_tdot,
+            &c.cdrg_ndot,
+            &c.cdrg_drg,
+        ) {
+            set(6, 0, r.value);
+            set(6, 1, t.value);
+            set(6, 2, n.value);
+            set(6, 3, rd.value);
+            set(6, 4, td.value);
+            set(6, 5, nd.value);
             set(6, 6, drg.value);
         }
 
         // Row 8: SRP
-        if let (Some(r), Some(t), Some(n), Some(rd), Some(td), Some(nd), Some(drg), Some(srp)) = 
-           (&c.csrp_r, &c.csrp_t, &c.csrp_n, &c.csrp_rdot, &c.csrp_tdot, &c.csrp_ndot, &c.csrp_drg, &c.csrp_srp) {
-            set(7, 0, r.value); set(7, 1, t.value); set(7, 2, n.value);
-            set(7, 3, rd.value); set(7, 4, td.value); set(7, 5, nd.value);
-            set(7, 6, drg.value); set(7, 7, srp.value);
+        if let (Some(r), Some(t), Some(n), Some(rd), Some(td), Some(nd), Some(drg), Some(srp)) = (
+            &c.csrp_r,
+            &c.csrp_t,
+            &c.csrp_n,
+            &c.csrp_rdot,
+            &c.csrp_tdot,
+            &c.csrp_ndot,
+            &c.csrp_drg,
+            &c.csrp_srp,
+        ) {
+            set(7, 0, r.value);
+            set(7, 1, t.value);
+            set(7, 2, n.value);
+            set(7, 3, rd.value);
+            set(7, 4, td.value);
+            set(7, 5, nd.value);
+            set(7, 6, drg.value);
+            set(7, 7, srp.value);
         }
 
         // Row 9: Thrust
-        if let (Some(r), Some(t), Some(n), Some(rd), Some(td), Some(nd), Some(drg), Some(srp), Some(thr)) = 
-           (&c.cthr_r, &c.cthr_t, &c.cthr_n, &c.cthr_rdot, &c.cthr_tdot, &c.cthr_ndot, &c.cthr_drg, &c.cthr_srp, &c.cthr_thr) {
-            set(8, 0, r.value); set(8, 1, t.value); set(8, 2, n.value);
-            set(8, 3, rd.value); set(8, 4, td.value); set(8, 5, nd.value);
-            set(8, 6, drg.value); set(8, 7, srp.value); set(8, 8, thr.value);
+        if let (
+            Some(r),
+            Some(t),
+            Some(n),
+            Some(rd),
+            Some(td),
+            Some(nd),
+            Some(drg),
+            Some(srp),
+            Some(thr),
+        ) = (
+            &c.cthr_r,
+            &c.cthr_t,
+            &c.cthr_n,
+            &c.cthr_rdot,
+            &c.cthr_tdot,
+            &c.cthr_ndot,
+            &c.cthr_drg,
+            &c.cthr_srp,
+            &c.cthr_thr,
+        ) {
+            set(8, 0, r.value);
+            set(8, 1, t.value);
+            set(8, 2, n.value);
+            set(8, 3, rd.value);
+            set(8, 4, td.value);
+            set(8, 5, nd.value);
+            set(8, 6, drg.value);
+            set(8, 7, srp.value);
+            set(8, 8, thr.value);
         }
-        
+
         // Return 9x9 array
-        let numpy_arr = PyArray2::from_vec2(py, &array.chunks(9).map(|c| c.to_vec()).collect::<Vec<_>>()).unwrap();
+        let numpy_arr =
+            PyArray2::from_vec2(py, &array.chunks(9).map(|c| c.to_vec()).collect::<Vec<_>>())
+                .unwrap();
         Ok(numpy_arr)
     }
 }

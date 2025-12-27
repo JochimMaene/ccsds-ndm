@@ -422,28 +422,28 @@ impl OpmData {
 
                     // State Vector
                     if sv_builder.try_match(key, val)? {
-                        sv_builder.comment.extend(pending_comments.drain(..));
+                        sv_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Keplerian Elements
                     if ke_builder.try_match(key, val, *unit)? {
-                        ke_builder.comment.extend(pending_comments.drain(..));
+                        ke_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Spacecraft Parameters
                     if sp_builder.try_match(key, val, *unit)? {
-                        sp_builder.comment.extend(pending_comments.drain(..));
+                        sp_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Covariance
                     if cov_builder.try_match(key, val, *unit)? {
-                        cov_builder.comment.extend(pending_comments.drain(..));
+                        cov_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
@@ -454,14 +454,14 @@ impl OpmData {
                         current_maneuver = ManeuverParametersBuilder::default();
                     }
                     if current_maneuver.try_match(key, val, *unit)? {
-                        current_maneuver.comment.extend(pending_comments.drain(..));
+                        current_maneuver.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // User Defined
                     if key.starts_with("USER_DEFINED_") {
-                        ud_builder.comment.extend(pending_comments.drain(..));
+                        ud_builder.comment.append(&mut pending_comments);
                         ud_builder.params.push(UserDefinedParameter {
                             parameter: key.to_string(),
                             value: val.to_string(),

@@ -213,7 +213,10 @@ impl CdmBody {
                 KvnLine::Pair { key: "OBJECT", .. } => {
                     let mut segment = CdmSegment::from_kvn_tokens(tokens)?;
                     if !pending_comments.is_empty() {
-                        segment.metadata.comment.splice(0..0, pending_comments.drain(..));
+                        segment
+                            .metadata
+                            .comment
+                            .splice(0..0, pending_comments.drain(..));
                     }
                     segments.push(segment);
                 }

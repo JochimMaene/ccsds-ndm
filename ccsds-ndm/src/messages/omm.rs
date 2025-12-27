@@ -510,35 +510,35 @@ impl OmmData {
 
                     // Mean Elements
                     if me_builder.try_match(key, val, *unit)? {
-                        me_builder.comment.extend(pending_comments.drain(..));
+                        me_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Spacecraft Params
                     if sp_builder.try_match(key, val, *unit)? {
-                        sp_builder.comment.extend(pending_comments.drain(..));
+                        sp_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // TLE Params
                     if tle_builder.try_match(key, val, *unit)? {
-                        tle_builder.comment.extend(pending_comments.drain(..));
+                        tle_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Covariance
                     if cov_builder.try_match(key, val, *unit)? {
-                        cov_builder.comment.extend(pending_comments.drain(..));
+                        cov_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // User Defined
                     if key.starts_with("USER_DEFINED_") {
-                        ud_builder.comment.extend(pending_comments.drain(..));
+                        ud_builder.comment.append(&mut pending_comments);
                         ud_builder.params.push(UserDefinedParameter {
                             parameter: key.to_string(),
                             value: val.to_string(),
