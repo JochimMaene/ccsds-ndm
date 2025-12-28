@@ -1,9 +1,13 @@
 name: Rust
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
 
-env:
-  CARGO_TERM_COLOR: always
 
 jobs:
   test:
@@ -20,31 +24,22 @@ jobs:
         run: cargo test --all-features
 
   fmt:
-    name: Rustfmt
+    name: Linting - Format check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
+
       - name: Enforce formatting
         working-directory: ccsds-ndm
         run: cargo fmt --check
 
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: ccsds-ndm
       - name: Linting
         working-directory: ccsds-ndm
         run: cargo clippy -- -D warnings
+      
 
 
   coverage:
@@ -71,3 +66,25 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
           files: ccsds-ndm/codecov.json
           fail_ci_if_error: true
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [test, fmt, coverage]
+    if: github.ref_type == 'tag'
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Publish to crates.io
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+        run: |
+          cargo login $CRATES_TOKEN
+          cargo publish
