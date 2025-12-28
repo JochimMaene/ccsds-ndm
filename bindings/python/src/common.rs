@@ -401,6 +401,7 @@ pub struct StateVector {
 #[pymethods]
 impl StateVector {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         epoch: String,
         x: f64,
@@ -409,9 +410,11 @@ impl StateVector {
         x_dot: f64,
         y_dot: f64,
         z_dot: f64,
+        comments: Option<Vec<String>>,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: core_common::StateVector {
+                comment: comments.unwrap_or_default(),
                 epoch: parse_epoch(&epoch)?,
                 x: Position {
                     value: x,
@@ -452,6 +455,19 @@ impl StateVector {
             self.inner.y_dot.value,
             self.inner.z_dot.value
         )
+    }
+
+    /// Comments.
+    ///
+    /// :type: List[str]
+    #[getter]
+    fn get_comments(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comments(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 
     /// Epoch of the state vector.

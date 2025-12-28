@@ -182,11 +182,19 @@ impl OpmMetadata {
         let mut builder = OpmMetadataBuilder::default();
 
         // OPM Metadata ends when we hit a Data keyword (e.g., EPOCH, X, Y...)
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::Comment(c) => {
                     builder.comment.push(c.to_string());
                     tokens.next();
@@ -235,7 +243,7 @@ fn is_opm_data_keyword(key: &str) -> bool {
             | "CX_X"
             | "MAN_EPOCH_IGNITION"
             | "USER_DEFINED_"
-    )
+    ) || key.starts_with("USER_DEFINED_")
 }
 
 #[derive(Default)]
@@ -398,17 +406,26 @@ impl OpmData {
         let mut maneuvers = Vec::new();
         let mut current_maneuver = ManeuverParametersBuilder::default();
         let mut ud_builder = UserDefinedBuilder::default();
+        let mut pending_comments = Vec::new();
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::Comment(c) => {
                     if !sv_builder.has_started() {
                         comment.push(c.to_string());
-                    } else if current_maneuver.has_started() {
-                        current_maneuver.comment.push(c.to_string());
+                    } else {
+                        pending_comments.push(c.to_string());
                     }
                     tokens.next();
                 }
@@ -421,24 +438,28 @@ impl OpmData {
 
                     // State Vector
                     if sv_builder.try_match(key, val)? {
+                        sv_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Keplerian Elements
                     if ke_builder.try_match(key, val, *unit)? {
+                        ke_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Spacecraft Parameters
                     if sp_builder.try_match(key, val, *unit)? {
+                        sp_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Covariance
                     if cov_builder.try_match(key, val, *unit)? {
+                        cov_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
@@ -449,12 +470,14 @@ impl OpmData {
                         current_maneuver = ManeuverParametersBuilder::default();
                     }
                     if current_maneuver.try_match(key, val, *unit)? {
+                        current_maneuver.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // User Defined
                     if key.starts_with("USER_DEFINED_") {
+                        ud_builder.comment.append(&mut pending_comments);
                         ud_builder.params.push(UserDefinedParameter {
                             parameter: key.to_string(),
                             value: val.to_string(),
@@ -476,11 +499,27 @@ impl OpmData {
             maneuvers.push(current_maneuver.build()?);
         }
 
+        let spacecraft_parameters = sp_builder.build()?;
+
+        // Validation Rule: If maneuvers are present, MASS is mandatory
+        // (CCSDS 502.0-B-3 Sec 3.2.4.9)
+        if !maneuvers.is_empty() {
+            let mass_present = spacecraft_parameters
+                .as_ref()
+                .map(|sp| sp.mass.is_some())
+                .unwrap_or(false);
+            if !mass_present {
+                return Err(CcsdsNdmError::MissingField(
+                    "MASS is required in Spacecraft Parameters when Maneuvers are present".into(),
+                ));
+            }
+        }
+
         Ok(OpmData {
             comment,
             state_vector: sv_builder.build()?,
             keplerian_elements: ke_builder.build()?,
-            spacecraft_parameters: sp_builder.build()?,
+            spacecraft_parameters,
             covariance_matrix: cov_builder.build()?,
             maneuver_parameters: maneuvers,
             user_defined_parameters: ud_builder.build(),
@@ -494,6 +533,7 @@ impl OpmData {
 
 #[derive(Default)]
 struct StateVectorBuilder {
+    comment: Vec<String>,
     epoch: Option<Epoch>,
     x: Option<Position>,
     y: Option<Position>,
@@ -524,6 +564,7 @@ impl StateVectorBuilder {
 
     fn build(self) -> Result<StateVector> {
         Ok(StateVector {
+            comment: self.comment,
             epoch: self
                 .epoch
                 .ok_or(CcsdsNdmError::MissingField("EPOCH".into()))?,
@@ -611,12 +652,36 @@ impl KeplerianElementsBuilder {
     }
 
     fn build(self) -> Result<Option<KeplerianElements>> {
+        // If no Keplerian fields are present, return None
         if self.semi_major_axis.is_none()
             && self.eccentricity.is_none()
             && self.inclination.is_none()
+            && self.ra_of_asc_node.is_none()
+            && self.arg_of_pericenter.is_none()
+            && self.true_anomaly.is_none()
+            && self.mean_anomaly.is_none()
+            && self.gm.is_none()
         {
             return Ok(None);
         }
+
+        // If ANY are present, ALL mandatory ones must be present
+        let semi_major_axis = self
+            .semi_major_axis
+            .ok_or(CcsdsNdmError::MissingField("SEMI_MAJOR_AXIS".into()))?;
+        let eccentricity = self
+            .eccentricity
+            .ok_or(CcsdsNdmError::MissingField("ECCENTRICITY".into()))?;
+        let inclination = self
+            .inclination
+            .ok_or(CcsdsNdmError::MissingField("INCLINATION".into()))?;
+        let ra_of_asc_node = self
+            .ra_of_asc_node
+            .ok_or(CcsdsNdmError::MissingField("RA_OF_ASC_NODE".into()))?;
+        let arg_of_pericenter = self
+            .arg_of_pericenter
+            .ok_or(CcsdsNdmError::MissingField("ARG_OF_PERICENTER".into()))?;
+        let gm = self.gm.ok_or(CcsdsNdmError::MissingField("GM".into()))?;
 
         if self.true_anomaly.is_some() && self.mean_anomaly.is_some() {
             return Err(CcsdsNdmError::KvnParse(
@@ -632,24 +697,14 @@ impl KeplerianElementsBuilder {
 
         Ok(Some(KeplerianElements {
             comment: self.comment,
-            semi_major_axis: self
-                .semi_major_axis
-                .ok_or(CcsdsNdmError::MissingField("SEMI_MAJOR_AXIS".into()))?,
-            eccentricity: self
-                .eccentricity
-                .ok_or(CcsdsNdmError::MissingField("ECCENTRICITY".into()))?,
-            inclination: self
-                .inclination
-                .ok_or(CcsdsNdmError::MissingField("INCLINATION".into()))?,
-            ra_of_asc_node: self
-                .ra_of_asc_node
-                .ok_or(CcsdsNdmError::MissingField("RA_OF_ASC_NODE".into()))?,
-            arg_of_pericenter: self
-                .arg_of_pericenter
-                .ok_or(CcsdsNdmError::MissingField("ARG_OF_PERICENTER".into()))?,
+            semi_major_axis,
+            eccentricity,
+            inclination,
+            ra_of_asc_node,
+            arg_of_pericenter,
             true_anomaly: self.true_anomaly,
             mean_anomaly: self.mean_anomaly,
-            gm: self.gm.ok_or(CcsdsNdmError::MissingField("GM".into()))?,
+            gm,
         }))
     }
 }
@@ -678,7 +733,12 @@ impl SpacecraftParametersBuilder {
     }
 
     fn build(self) -> Result<Option<SpacecraftParameters>> {
-        if self.mass.is_none() && self.solar_rad_area.is_none() && self.drag_area.is_none() {
+        if self.mass.is_none()
+            && self.solar_rad_area.is_none()
+            && self.solar_rad_coeff.is_none()
+            && self.drag_area.is_none()
+            && self.drag_coeff.is_none()
+        {
             return Ok(None);
         }
         Ok(Some(SpacecraftParameters {
@@ -751,9 +811,12 @@ impl OpmCovarianceMatrixBuilder {
     }
 
     pub fn build(self) -> Result<Option<OpmCovarianceMatrix>> {
-        if self.cx_x.is_none() {
+        // If no covariance fields provided, return None
+        if self.cx_x.is_none() && self.cov_ref_frame.is_none() {
             return Ok(None);
         }
+
+        // If ANY are provided, ALL 21 elements are required
         Ok(Some(OpmCovarianceMatrix {
             comment: self.comment,
             cov_ref_frame: self.cov_ref_frame,
@@ -831,7 +894,7 @@ pub struct ManeuverParameters {
     pub comment: Vec<String>,
     pub man_epoch_ignition: Epoch,
     pub man_duration: Duration,
-    pub man_delta_mass: DeltaMass, // Changed from DeltaMassZ to DeltaMass (strict negative)
+    pub man_delta_mass: DeltaMassZ, // Must be <= 0
     pub man_ref_frame: String,
     pub man_dv_1: Velocity,
     pub man_dv_2: Velocity,
@@ -859,7 +922,7 @@ struct ManeuverParametersBuilder {
     comment: Vec<String>,
     man_epoch_ignition: Option<Epoch>,
     man_duration: Option<Duration>,
-    man_delta_mass: Option<DeltaMass>, // Strict negative
+    man_delta_mass: Option<DeltaMassZ>,
     man_ref_frame: Option<String>,
     man_dv_1: Option<Velocity>,
     man_dv_2: Option<Velocity>,
@@ -867,10 +930,6 @@ struct ManeuverParametersBuilder {
 }
 
 impl ManeuverParametersBuilder {
-    fn has_started(&self) -> bool {
-        self.man_epoch_ignition.is_some()
-    }
-
     fn has_data(&self) -> bool {
         self.man_epoch_ignition.is_some()
             || self.man_duration.is_some()
@@ -885,7 +944,8 @@ impl ManeuverParametersBuilder {
             "MAN_DURATION" => self.man_duration = Some(Duration::from_kvn(val, unit)?),
             "MAN_DELTA_MASS" => {
                 let uv = UnitValue::<f64, MassUnits>::from_kvn(val, unit)?;
-                self.man_delta_mass = Some(DeltaMass::new(uv.value, uv.units)?);
+                // DeltaMassZ validation handled by ::new() (value <= 0)
+                self.man_delta_mass = Some(DeltaMassZ::new(uv.value, uv.units)?);
             }
             "MAN_REF_FRAME" => self.man_ref_frame = Some(val.to_string()),
             "MAN_DV_1" => self.man_dv_1 = Some(Velocity::from_kvn(val, unit)?),
@@ -1023,6 +1083,7 @@ Z = -82.9177 [km]
 X_DOT = 3.11548207 [km/s]
 Y_DOT = 0.47042605 [km/s]
 Z_DOT = -0.00101490 [km/s]
+MASS = 1000.0 [kg]
 MAN_EPOCH_IGNITION = 2000-06-03T04:23:00
 MAN_DURATION = 1500.0 [s]
 MAN_DELTA_MASS = -10.5 [kg]
@@ -1244,7 +1305,6 @@ Z_DOT = -4.191076 [km/s]
 
     #[test]
     fn test_xsd_state_vector_missing_epoch() {
-        // XSD: EPOCH is mandatory in stateVectorType
         let kvn = r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1778,6 +1838,7 @@ Z = 3000 [km]
 X_DOT = 1.0 [km/s]
 Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
+MASS = 3000.000000 [kg]
 MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
 MAN_DURATION = 100 [s]
 MAN_DELTA_MASS = -5.0 [kg]
@@ -1811,6 +1872,7 @@ Z = 3000 [km]
 X_DOT = 1.0 [km/s]
 Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
+MASS = 3000.000000 [kg]
 MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
 MAN_DURATION = 100 [s]
 MAN_DELTA_MASS = -5.0 [kg]
@@ -1838,9 +1900,41 @@ MAN_DV_3 = 0.0 [km/s]
     }
 
     #[test]
-    fn test_xsd_maneuver_delta_mass_zero_rejected() {
-        // Note: XSD deltamassTypeZ is nonPositiveDouble (≤0), but library enforces strictly negative
-        // This tests library's stricter-than-XSD validation
+    fn test_xsd_maneuver_delta_mass_zero_allowed() {
+        // XSD: deltamassTypeZ is nonPositiveDouble (≤0), so zero is allowed
+        // This represents attitude maneuvers that don't use propellant
+        let kvn = r#"CCSDS_OPM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+EPOCH = 2023-01-01T00:00:00
+X = 1000 [km]
+Y = 2000 [km]
+Z = 3000 [km]
+X_DOT = 1.0 [km/s]
+Y_DOT = 2.0 [km/s]
+Z_DOT = 3.0 [km/s]
+MASS = 3000.000000 [kg]
+MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
+MAN_DURATION = 100 [s]
+MAN_DELTA_MASS = 0.0 [kg]
+MAN_REF_FRAME = RSW
+MAN_DV_1 = 0.1 [km/s]
+MAN_DV_2 = 0.0 [km/s]
+MAN_DV_3 = 0.0 [km/s]
+"#;
+        // XSD allows zero for attitude maneuvers
+        let opm = Opm::from_kvn(kvn).unwrap();
+        let man = &opm.body.segment.data.maneuver_parameters[0];
+        assert_eq!(man.man_delta_mass.value, 0.0);
+    }
+
+    #[test]
+    fn test_xsd_maneuver_delta_mass_positive_rejected() {
         let kvn = r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1858,13 +1952,12 @@ Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
 MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
 MAN_DURATION = 100 [s]
-MAN_DELTA_MASS = 0.0 [kg]
+MAN_DELTA_MASS = 5.0 [kg]
 MAN_REF_FRAME = RSW
 MAN_DV_1 = 0.1 [km/s]
 MAN_DV_2 = 0.0 [km/s]
 MAN_DV_3 = 0.0 [km/s]
 "#;
-        // Library is stricter than XSD - requires negative delta mass
         let err = Opm::from_kvn(kvn).unwrap_err();
         assert!(matches!(err, CcsdsNdmError::Validation(_)));
     }
@@ -1887,6 +1980,7 @@ Z = 3000 [km]
 X_DOT = 1.0 [km/s]
 Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
+MASS = 3000.000000 [kg]
 MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
 MAN_DURATION = 100 [s]
 MAN_DELTA_MASS = -100.0 [kg]
@@ -1966,7 +2060,6 @@ MAN_DV_3 = 0.0 [km/s]
 
     #[test]
     fn test_xsd_kvn_roundtrip() {
-        // Full roundtrip: KVN -> Opm -> KVN
         let kvn = r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1975,7 +2068,7 @@ OBJECT_ID = 999
 CENTER_NAME = EARTH
 REF_FRAME = GCRF
 TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00.000000
+EPOCH = 2023-01-01T00:00:00
 X = 6503.514 [km]
 Y = 1239.647 [km]
 Z = -717.490 [km]

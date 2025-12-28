@@ -11,8 +11,8 @@
 // Default units are documented in the .pyi stub files.
 
 use ccsds_ndm::types as core_types;
-use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
 
 // =============================================================================
 // Helper Functions

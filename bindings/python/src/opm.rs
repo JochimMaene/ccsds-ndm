@@ -6,7 +6,9 @@ use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::opm as core_opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::types::{Angle, Distance, Gm, Inclination, UserDefined as CoreUserDefined, UserDefinedParameter};
+use ccsds_ndm::types::{
+    Angle, Distance, Gm, Inclination, UserDefined as CoreUserDefined, UserDefinedParameter,
+};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -649,13 +651,14 @@ impl OpmCovarianceMatrix {
         cz_dot_y_dot: Option<f64>,
         cz_dot_z_dot: Option<f64>,
         cov_ref_frame: Option<String>,
+        comments: Option<Vec<String>>,
     ) -> Self {
         use ccsds_ndm::types::{
             PositionCovariance, PositionVelocityCovariance, VelocityCovariance,
         };
         Self {
             inner: ccsds_ndm::common::OpmCovarianceMatrix {
-                comment: vec![],
+                comment: comments.unwrap_or_default(),
                 cov_ref_frame,
                 cx_x: PositionCovariance::new(cx_x.unwrap_or(0.0), None),
                 cy_x: PositionCovariance::new(cy_x.unwrap_or(0.0), None),
@@ -1203,14 +1206,14 @@ impl ManeuverParameters {
         man_dv_2: f64,
         man_dv_3: f64,
     ) -> PyResult<Self> {
-        use ccsds_ndm::types::{DeltaMass, Duration, Velocity};
+        use ccsds_ndm::types::{DeltaMassZ, Duration, Velocity};
         Ok(Self {
             inner: core_opm::ManeuverParameters {
                 comment: vec![],
                 man_epoch_ignition: parse_epoch(&man_epoch_ignition)?,
                 man_duration: Duration::new(man_duration, None)
                     .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
-                man_delta_mass: DeltaMass::new(man_delta_mass, None)
+                man_delta_mass: DeltaMassZ::new(man_delta_mass, None)
                     .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
                 man_ref_frame,
                 man_dv_1: Velocity::new(man_dv_1, None),

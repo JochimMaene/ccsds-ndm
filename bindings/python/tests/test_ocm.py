@@ -190,7 +190,11 @@ class TestOcmConstruction:
         """Test constructing a complete OCM message."""
         # Header
         header = OdmHeader(
-            originator="TEST_ORIGINATOR", creation_date="2023-01-01T00:00:00.000Z"
+            originator="TEST_ORIGINATOR",
+            creation_date="2023-01-01T00:00:00.000Z",
+            classification=None,
+            message_id=None,
+            comment=None,
         )
 
         # Metadata
@@ -293,21 +297,21 @@ class TestOcmGettersSetters:
 
 
 # =============================================================================
-# Data Helper Property Tests
+# Data Optional Field Tests
 # =============================================================================
 
 
-class TestOcmDataHelpers:
-    """Tests for OcmData helper properties."""
+class TestOcmDataOptionalFields:
+    """Tests for OcmData optional fields."""
 
-    def test_data_helper_properties(self):
-        """Test OcmData count and has_* properties."""
+    def test_data_optional_properties(self):
+        """Test OcmData optional properties are None by default."""
         data = OcmData()
 
-        # Initial state
-        assert data.has_phys == False
-        assert data.has_pert == False
-        assert data.has_od == False
+        # Initial state - optional fields are None
+        assert data.phys is None
+        assert data.pert is None
+        assert data.od is None
 
     def test_data_with_physical_description(self):
         """Test OcmData with physical description set."""
@@ -316,12 +320,12 @@ class TestOcmDataHelpers:
 
         data.phys = phys
 
-        assert data.has_phys == True
+        assert data.phys is not None
         assert data.phys.manufacturer == "Test"
 
         # Test clearing
         data.phys = None
-        assert data.has_phys == False
+        assert data.phys is None
 
 
 # =============================================================================

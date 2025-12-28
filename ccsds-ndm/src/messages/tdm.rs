@@ -122,11 +122,19 @@ impl FromKvnTokens for TdmHeader {
         let mut originator = None;
         let mut message_id = None;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::Comment(c) => {
                     comment.push(c.to_string());
                     tokens.next();
@@ -184,25 +192,41 @@ impl TdmBody {
     {
         let mut segments = Vec::new();
         while tokens.peek().is_some() {
+            let mut pending_comments = Vec::new();
             let mut has_content = false;
             while let Some(peeked) = tokens.peek() {
                 match peeked {
-                    Ok(KvnLine::Empty) | Ok(KvnLine::Comment(_)) => {
+                    Ok(KvnLine::Empty) => {
                         tokens.next();
+                    }
+                    Ok(KvnLine::Comment(_)) => {
+                        if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                            pending_comments.push(c.to_string());
+                        }
                     }
                     Ok(_) => {
                         has_content = true;
                         break;
                     }
                     Err(_) => {
-                        return Err(tokens.next().unwrap().unwrap_err());
+                        return Err(tokens
+                            .next()
+                            .expect("Peeked error should exist")
+                            .unwrap_err());
                     }
                 }
             }
             if !has_content {
                 break;
             }
-            segments.push(TdmSegment::from_kvn_tokens(tokens)?);
+            let mut segment = TdmSegment::from_kvn_tokens(tokens)?;
+            if !pending_comments.is_empty() {
+                segment
+                    .metadata
+                    .comment
+                    .splice(0..0, pending_comments.drain(..));
+            }
+            segments.push(segment);
         }
 
         if segments.is_empty() {
@@ -571,11 +595,19 @@ impl TdmMetadata {
     {
         let mut meta = TdmMetadata::default();
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::BlockEnd("META") => {
                     tokens.next();
                     break;
@@ -732,11 +764,19 @@ impl TdmData {
         let mut comment = Vec::new();
         let mut observations = Vec::new();
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::BlockEnd("DATA") => {
                     tokens.next();
                     break;
@@ -2265,5 +2305,566 @@ DATA_STOP
         assert_eq!(seg.metadata.data_quality.as_deref(), Some("VALIDATED"));
         assert_eq!(seg.metadata.correction_range, Some(0.001));
         assert_eq!(seg.metadata.corrections_applied.as_deref(), Some("YES"));
+    }
+
+    // =========================================================================
+    // ADDITIONAL COVERAGE TESTS
+    // =========================================================================
+
+    // -----------------------------------------
+    // Version validation error paths
+    // -----------------------------------------
+
+    #[test]
+    fn test_tdm_empty_file_error() {
+        let err = Tdm::from_kvn("").unwrap_err();
+        match err {
+            CcsdsNdmError::MissingField(f) => assert_eq!(f, "Empty file"),
+            _ => panic!("Expected Empty file error, got: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_tdm_version_not_first_error() {
+        let kvn = r#"
+CREATION_DATE = 2023-01-01T00:00:00
+CCSDS_TDM_VERS = 2.0
+"#;
+        let err = Tdm::from_kvn(kvn).unwrap_err();
+        match err {
+            CcsdsNdmError::MissingField(f) => {
+                assert!(f.contains("CCSDS_TDM_VERS must be the first keyword"));
+            }
+            _ => panic!("Expected version-not-first error, got: {:?}", err),
+        }
+    }
+
+    // -----------------------------------------
+    // XML roundtrip tests
+    // -----------------------------------------
+
+    #[test]
+    fn test_tdm_xml_roundtrip_minimal() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-14
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).unwrap();
+        let xml = tdm.to_xml().unwrap();
+        assert!(xml.contains("<tdm"));
+        assert!(xml.contains("PARTICIPANT_1"));
+        let tdm2 = Tdm::from_xml(&xml).unwrap();
+        assert_eq!(
+            tdm.body.segments[0].metadata.participant_1,
+            tdm2.body.segments[0].metadata.participant_1
+        );
+    }
+
+    #[test]
+    fn test_tdm_xml_roundtrip_with_observations() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-14
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+RANGE = 2023-01-01T00:01:00 1001.0
+DOPPLER_INSTANTANEOUS = 2023-01-01T00:02:00 -0.5
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).unwrap();
+        let xml = tdm.to_xml().unwrap();
+        let tdm2 = Tdm::from_xml(&xml).unwrap();
+        assert_eq!(
+            tdm.body.segments[0].data.observations.len(),
+            tdm2.body.segments[0].data.observations.len()
+        );
+    }
+
+    // -----------------------------------------
+    // MESSAGE_ID serialization test
+    // -----------------------------------------
+
+    #[test]
+    fn test_tdm_message_id_kvn_roundtrip() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-UNIQUE-001
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-14
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).unwrap();
+        assert_eq!(tdm.header.message_id.as_deref(), Some("MSG-UNIQUE-001"));
+
+        let kvn2 = tdm.to_kvn().unwrap();
+        assert!(kvn2.contains("MESSAGE_ID"));
+        assert!(kvn2.contains("MSG-UNIQUE-001"));
+
+        let tdm2 = Tdm::from_kvn(&kvn2).unwrap();
+        assert_eq!(tdm.header.message_id, tdm2.header.message_id);
+    }
+
+    // -----------------------------------------
+    // Optional metadata fields KVN serialization tests
+    // -----------------------------------------
+
+    #[test]
+    fn test_tdm_metadata_optional_fields_kvn_roundtrip() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TRACK_ID = TRACK_XYZ
+DATA_TYPES = RANGE,DOPPLER_INTEGRATED,ANGLE_1
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+PARTICIPANT_1 = DSS-14
+PARTICIPANT_2 = SPACECRAFT_A
+PARTICIPANT_3 = QUASAR_1
+PARTICIPANT_4 = RELAY_SAT
+PARTICIPANT_5 = DSS-25
+MODE = SEQUENTIAL
+PATH = 1,2,1
+EPHEMERIS_NAME_1 = DSS14_EPHEM
+EPHEMERIS_NAME_2 = SC_EPHEM
+EPHEMERIS_NAME_3 = QUASAR_EPHEM
+EPHEMERIS_NAME_4 = RELAY_EPHEM
+EPHEMERIS_NAME_5 = DSS25_EPHEM
+TRANSMIT_BAND = X
+RECEIVE_BAND = Ka
+TURNAROUND_NUMERATOR = 880
+TURNAROUND_DENOMINATOR = 749
+TIMETAG_REF = TRANSMIT
+INTEGRATION_INTERVAL = 30.0
+INTEGRATION_REF = START
+FREQ_OFFSET = 1000.0
+RANGE_MODE = ONE_WAY
+RANGE_MODULUS = 16384.0
+RANGE_UNITS = RU
+ANGLE_TYPE = RADEC
+REFERENCE_FRAME = ICRF
+INTERPOLATION = HERMITE
+INTERPOLATION_DEGREE = 9
+DOPPLER_COUNT_BIAS = 123456789.0
+DOPPLER_COUNT_SCALE = 2000
+DOPPLER_COUNT_ROLLOVER = YES
+TRANSMIT_DELAY_1 = 0.0001
+TRANSMIT_DELAY_2 = 0.0002
+TRANSMIT_DELAY_3 = 0.0003
+TRANSMIT_DELAY_4 = 0.0004
+TRANSMIT_DELAY_5 = 0.0005
+RECEIVE_DELAY_1 = 0.0006
+RECEIVE_DELAY_2 = 0.0007
+RECEIVE_DELAY_3 = 0.0008
+RECEIVE_DELAY_4 = 0.0009
+RECEIVE_DELAY_5 = 0.0010
+DATA_QUALITY = DEGRADED
+CORRECTION_ANGLE_1 = 0.01
+CORRECTION_ANGLE_2 = 0.02
+CORRECTION_DOPPLER = 0.03
+CORRECTION_MAG = 0.04
+CORRECTION_RANGE = 0.05
+CORRECTION_RCS = 0.06
+CORRECTION_RECEIVE = 0.07
+CORRECTION_TRANSMIT = 0.08
+CORRECTION_ABERRATION_YEARLY = 0.09
+CORRECTION_ABERRATION_DIURNAL = 0.10
+CORRECTIONS_APPLIED = NO
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).unwrap();
+        let kvn2 = tdm.to_kvn().unwrap();
+
+        // Verify all optional fields are in the output
+        assert!(kvn2.contains("TRACK_ID") && kvn2.contains("TRACK_XYZ"));
+        assert!(kvn2.contains("DATA_TYPES"));
+        assert!(kvn2.contains("START_TIME"));
+        assert!(kvn2.contains("STOP_TIME"));
+        assert!(kvn2.contains("PARTICIPANT_3"));
+        assert!(kvn2.contains("PARTICIPANT_4"));
+        assert!(kvn2.contains("PARTICIPANT_5"));
+        assert!(kvn2.contains("PATH_1") || kvn2.contains("PATH"));
+        assert!(kvn2.contains("EPHEMERIS_NAME_1"));
+        assert!(kvn2.contains("EPHEMERIS_NAME_2"));
+        assert!(kvn2.contains("EPHEMERIS_NAME_3"));
+        assert!(kvn2.contains("EPHEMERIS_NAME_4"));
+        assert!(kvn2.contains("EPHEMERIS_NAME_5"));
+        assert!(kvn2.contains("TRANSMIT_BAND") && kvn2.contains("X"));
+        assert!(kvn2.contains("RECEIVE_BAND") && kvn2.contains("Ka"));
+        assert!(kvn2.contains("TURNAROUND_NUMERATOR"));
+        assert!(kvn2.contains("TURNAROUND_DENOMINATOR"));
+        assert!(kvn2.contains("TIMETAG_REF"));
+        assert!(kvn2.contains("INTEGRATION_INTERVAL"));
+        assert!(kvn2.contains("INTEGRATION_REF"));
+        assert!(kvn2.contains("FREQ_OFFSET"));
+        assert!(kvn2.contains("RANGE_MODE"));
+        assert!(kvn2.contains("RANGE_MODULUS"));
+        assert!(kvn2.contains("RANGE_UNITS"));
+        assert!(kvn2.contains("ANGLE_TYPE"));
+        assert!(kvn2.contains("REFERENCE_FRAME"));
+        assert!(kvn2.contains("INTERPOLATION"));
+        assert!(kvn2.contains("INTERPOLATION_DEGREE"));
+        assert!(kvn2.contains("DOPPLER_COUNT_BIAS"));
+        assert!(kvn2.contains("DOPPLER_COUNT_SCALE"));
+        assert!(kvn2.contains("DOPPLER_COUNT_ROLLOVER"));
+        assert!(kvn2.contains("TRANSMIT_DELAY_1"));
+        assert!(kvn2.contains("TRANSMIT_DELAY_2"));
+        assert!(kvn2.contains("TRANSMIT_DELAY_3"));
+        assert!(kvn2.contains("TRANSMIT_DELAY_4"));
+        assert!(kvn2.contains("TRANSMIT_DELAY_5"));
+        assert!(kvn2.contains("RECEIVE_DELAY_1"));
+        assert!(kvn2.contains("RECEIVE_DELAY_2"));
+        assert!(kvn2.contains("RECEIVE_DELAY_3"));
+        assert!(kvn2.contains("RECEIVE_DELAY_4"));
+        assert!(kvn2.contains("RECEIVE_DELAY_5"));
+        assert!(kvn2.contains("DATA_QUALITY") && kvn2.contains("DEGRADED"));
+        assert!(kvn2.contains("CORRECTION_ANGLE_1"));
+        assert!(kvn2.contains("CORRECTION_ANGLE_2"));
+        assert!(kvn2.contains("CORRECTION_DOPPLER"));
+        assert!(kvn2.contains("CORRECTION_MAG"));
+        assert!(kvn2.contains("CORRECTION_RANGE"));
+        assert!(kvn2.contains("CORRECTION_RCS"));
+        assert!(kvn2.contains("CORRECTION_RECEIVE"));
+        assert!(kvn2.contains("CORRECTION_TRANSMIT"));
+        assert!(kvn2.contains("CORRECTION_ABERRATION_YEARLY"));
+        assert!(kvn2.contains("CORRECTION_ABERRATION_DIURNAL"));
+        assert!(kvn2.contains("CORRECTIONS_APPLIED"));
+
+        // Roundtrip parse
+        let tdm2 = Tdm::from_kvn(&kvn2).unwrap();
+        assert_eq!(
+            tdm.body.segments[0].metadata.track_id,
+            tdm2.body.segments[0].metadata.track_id
+        );
+    }
+
+    // -----------------------------------------
+    // PATH_1, PATH_2 serialization test
+    // -----------------------------------------
+
+    #[test]
+    fn test_tdm_path_1_path_2_kvn_roundtrip() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-14
+PARTICIPANT_2 = SPACECRAFT_A
+PARTICIPANT_3 = DSS-25
+MODE = SINGLE_DIFF
+PATH_1 = 1,2,1
+PATH_2 = 3,2,3
+META_STOP
+DATA_START
+RECEIVE_FREQ = 2023-01-01T00:00:00 8415000000.0
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).unwrap();
+        let kvn2 = tdm.to_kvn().unwrap();
+
+        assert!(kvn2.contains("PATH_1"));
+        assert!(kvn2.contains("PATH_2"));
+
+        let tdm2 = Tdm::from_kvn(&kvn2).unwrap();
+        assert_eq!(
+            tdm.body.segments[0].metadata.path_1,
+            tdm2.body.segments[0].metadata.path_1
+        );
+        assert_eq!(
+            tdm.body.segments[0].metadata.path_2,
+            tdm2.body.segments[0].metadata.path_2
+        );
+    }
+
+    // -----------------------------------------
+    // TdmObservationData key() and value_to_string() tests
+    // -----------------------------------------
+
+    #[test]
+    fn test_tdm_observation_data_key_and_value_roundtrip() {
+        // Test that we can roundtrip various observation types through KVN
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-14
+META_STOP
+DATA_START
+ANGLE_1 = 2023-01-01T00:00:00 45.5
+ANGLE_2 = 2023-01-01T00:00:01 30.25
+CARRIER_POWER = 2023-01-01T00:00:02 -150.5
+CLOCK_BIAS = 2023-01-01T00:00:03 0.000001234
+CLOCK_DRIFT = 2023-01-01T00:00:04 0.0000000001
+DOPPLER_COUNT = 2023-01-01T00:00:05 12345678.0
+DOPPLER_INSTANTANEOUS = 2023-01-01T00:00:06 -0.5
+DOPPLER_INTEGRATED = 2023-01-01T00:00:07 -0.45
+DOR = 2023-01-01T00:00:08 0.000123456
+MAG = 2023-01-01T00:00:09 12.5
+PC_N0 = 2023-01-01T00:00:10 45.5
+PR_N0 = 2023-01-01T00:00:11 35.2
+PRESSURE = 2023-01-01T00:00:12 1013.25
+RANGE = 2023-01-01T00:00:13 1000.0
+RCS = 2023-01-01T00:00:14 1.5
+RECEIVE_FREQ = 2023-01-01T00:00:15 8415000000.0
+RECEIVE_FREQ_1 = 2023-01-01T00:00:16 8415000001.0
+RECEIVE_FREQ_2 = 2023-01-01T00:00:17 8415000002.0
+RECEIVE_FREQ_3 = 2023-01-01T00:00:18 8415000003.0
+RECEIVE_FREQ_4 = 2023-01-01T00:00:19 8415000004.0
+RECEIVE_FREQ_5 = 2023-01-01T00:00:20 8415000005.0
+RHUMIDITY = 2023-01-01T00:00:21 65.5
+STEC = 2023-01-01T00:00:22 50.0
+TEMPERATURE = 2023-01-01T00:00:23 293.15
+TRANSMIT_FREQ_1 = 2023-01-01T00:00:24 7167941261.0
+TRANSMIT_FREQ_2 = 2023-01-01T00:00:25 7167941262.0
+TRANSMIT_FREQ_3 = 2023-01-01T00:00:26 7167941263.0
+TRANSMIT_FREQ_4 = 2023-01-01T00:00:27 7167941264.0
+TRANSMIT_FREQ_5 = 2023-01-01T00:00:28 7167941265.0
+TRANSMIT_FREQ_RATE_1 = 2023-01-01T00:00:29 0.001
+TRANSMIT_FREQ_RATE_2 = 2023-01-01T00:00:30 0.002
+TRANSMIT_FREQ_RATE_3 = 2023-01-01T00:00:31 0.003
+TRANSMIT_FREQ_RATE_4 = 2023-01-01T00:00:32 0.004
+TRANSMIT_FREQ_RATE_5 = 2023-01-01T00:00:33 0.005
+TROPO_DRY = 2023-01-01T00:00:34 2.3
+TROPO_WET = 2023-01-01T00:00:35 0.15
+VLBI_DELAY = 2023-01-01T00:00:36 -0.000000789
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).unwrap();
+        let kvn2 = tdm.to_kvn().unwrap();
+
+        // Verify all observation types are preserved
+        assert!(kvn2.contains("ANGLE_1"));
+        assert!(kvn2.contains("ANGLE_2"));
+        assert!(kvn2.contains("CARRIER_POWER"));
+        assert!(kvn2.contains("CLOCK_BIAS"));
+        assert!(kvn2.contains("CLOCK_DRIFT"));
+        assert!(kvn2.contains("DOPPLER_COUNT"));
+        assert!(kvn2.contains("DOPPLER_INSTANTANEOUS"));
+        assert!(kvn2.contains("DOPPLER_INTEGRATED"));
+        assert!(kvn2.contains("DOR"));
+        assert!(kvn2.contains("MAG"));
+        assert!(kvn2.contains("PC_N0"));
+        assert!(kvn2.contains("PR_N0"));
+        assert!(kvn2.contains("PRESSURE"));
+        assert!(kvn2.contains("RANGE"));
+        assert!(kvn2.contains("RCS"));
+        assert!(kvn2.contains("RECEIVE_FREQ_5"));
+        assert!(kvn2.contains("RHUMIDITY"));
+        assert!(kvn2.contains("STEC"));
+        assert!(kvn2.contains("TEMPERATURE"));
+        assert!(kvn2.contains("TRANSMIT_FREQ_5"));
+        assert!(kvn2.contains("TRANSMIT_FREQ_RATE_5"));
+        assert!(kvn2.contains("TROPO_DRY"));
+        assert!(kvn2.contains("TROPO_WET"));
+        assert!(kvn2.contains("VLBI_DELAY"));
+
+        // Roundtrip parse
+        let tdm2 = Tdm::from_kvn(&kvn2).unwrap();
+        assert_eq!(
+            tdm.body.segments[0].data.observations.len(),
+            tdm2.body.segments[0].data.observations.len()
+        );
+    }
+
+    #[test]
+    fn test_tdm_phase_count_observations() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-14
+META_STOP
+DATA_START
+TRANSMIT_PHASE_CT_1 = 2023-01-01T00:00:00 7175173383.615373
+TRANSMIT_PHASE_CT_2 = 2023-01-01T00:00:01 7175173384.615373
+TRANSMIT_PHASE_CT_3 = 2023-01-01T00:00:02 7175173385.615373
+TRANSMIT_PHASE_CT_4 = 2023-01-01T00:00:03 7175173386.615373
+TRANSMIT_PHASE_CT_5 = 2023-01-01T00:00:04 7175173387.615373
+RECEIVE_PHASE_CT_1 = 2023-01-01T00:00:05 8429753135.986102
+RECEIVE_PHASE_CT_2 = 2023-01-01T00:00:06 8429753136.986102
+RECEIVE_PHASE_CT_3 = 2023-01-01T00:00:07 8429753137.986102
+RECEIVE_PHASE_CT_4 = 2023-01-01T00:00:08 8429753138.986102
+RECEIVE_PHASE_CT_5 = 2023-01-01T00:00:09 8429753139.986102
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).unwrap();
+        let kvn2 = tdm.to_kvn().unwrap();
+
+        assert!(kvn2.contains("TRANSMIT_PHASE_CT_1"));
+        assert!(kvn2.contains("TRANSMIT_PHASE_CT_2"));
+        assert!(kvn2.contains("TRANSMIT_PHASE_CT_3"));
+        assert!(kvn2.contains("TRANSMIT_PHASE_CT_4"));
+        assert!(kvn2.contains("TRANSMIT_PHASE_CT_5"));
+        assert!(kvn2.contains("RECEIVE_PHASE_CT_1"));
+        assert!(kvn2.contains("RECEIVE_PHASE_CT_2"));
+        assert!(kvn2.contains("RECEIVE_PHASE_CT_3"));
+        assert!(kvn2.contains("RECEIVE_PHASE_CT_4"));
+        assert!(kvn2.contains("RECEIVE_PHASE_CT_5"));
+
+        let tdm2 = Tdm::from_kvn(&kvn2).unwrap();
+        assert_eq!(
+            tdm.body.segments[0].data.observations.len(),
+            tdm2.body.segments[0].data.observations.len()
+        );
+    }
+
+    // -----------------------------------------
+    // Unknown keyword error test
+    // -----------------------------------------
+
+    #[test]
+    fn test_tdm_unknown_data_keyword_error() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-14
+META_STOP
+DATA_START
+UNKNOWN_DATA_TYPE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        let err = Tdm::from_kvn(kvn).unwrap_err();
+        match err {
+            CcsdsNdmError::KvnParse(msg) => {
+                assert!(msg.contains("Unknown TDM data keyword"));
+            }
+            _ => panic!("Expected KvnParse error, got: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_tdm_unknown_metadata_key_error() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-14
+UNKNOWN_METADATA = SOME_VALUE
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        let err = Tdm::from_kvn(kvn).unwrap_err();
+        match err {
+            CcsdsNdmError::KvnParse(msg) => {
+                assert!(msg.contains("Unexpected TDM Metadata key"));
+            }
+            _ => panic!("Expected KvnParse error, got: {:?}", err),
+        }
+    }
+
+    // -----------------------------------------
+    // Full roundtrip with all features
+    // -----------------------------------------
+
+    #[test]
+    fn test_tdm_full_roundtrip_multi_segment() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+COMMENT TDM example with multiple segments
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = NASA/JPL
+MESSAGE_ID = TDM-MULTI-001
+META_START
+COMMENT First segment - Range tracking
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+PARTICIPANT_1 = DSS-14
+PARTICIPANT_2 = SPACECRAFT_A
+MODE = SEQUENTIAL
+PATH = 1,2,1
+TRANSMIT_BAND = X
+RECEIVE_BAND = X
+DATA_QUALITY = VALIDATED
+META_STOP
+DATA_START
+COMMENT Range measurements
+RANGE = 2023-01-01T00:00:00 1000.0
+RANGE = 2023-01-01T00:30:00 1010.0
+RANGE = 2023-01-01T01:00:00 1020.0
+DATA_STOP
+META_START
+COMMENT Second segment - Doppler tracking  
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T01:00:00
+STOP_TIME = 2023-01-01T02:00:00
+PARTICIPANT_1 = DSS-25
+PARTICIPANT_2 = SPACECRAFT_A
+MODE = SEQUENTIAL
+PATH = 1,2,1
+META_STOP
+DATA_START
+COMMENT Doppler measurements
+DOPPLER_INTEGRATED = 2023-01-01T01:00:00 -0.5
+DOPPLER_INTEGRATED = 2023-01-01T01:30:00 -0.45
+DOPPLER_INTEGRATED = 2023-01-01T02:00:00 -0.4
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).unwrap();
+
+        assert_eq!(tdm.body.segments.len(), 2);
+        assert_eq!(tdm.body.segments[0].metadata.participant_1, "DSS-14");
+        assert_eq!(tdm.body.segments[1].metadata.participant_1, "DSS-25");
+
+        let kvn2 = tdm.to_kvn().unwrap();
+        let tdm2 = Tdm::from_kvn(&kvn2).unwrap();
+
+        assert_eq!(tdm.body.segments.len(), tdm2.body.segments.len());
+        assert_eq!(
+            tdm.body.segments[0].data.observations.len(),
+            tdm2.body.segments[0].data.observations.len()
+        );
+        assert_eq!(
+            tdm.body.segments[1].data.observations.len(),
+            tdm2.body.segments[1].data.observations.len()
+        );
+    }
+
+    #[test]
+    fn test_tdm_data_comment() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-14
+META_STOP
+DATA_START
+COMMENT First data comment
+COMMENT Second data comment
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).unwrap();
+        assert_eq!(tdm.body.segments[0].data.comment.len(), 2);
+        assert_eq!(tdm.body.segments[0].data.comment[0], "First data comment");
+        assert_eq!(tdm.body.segments[0].data.comment[1], "Second data comment");
     }
 }

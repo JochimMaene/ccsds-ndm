@@ -118,28 +118,29 @@ impl Tdm {
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = match format {
-            Some("kvn") => core_tdm::Tdm::from_kvn(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some("xml") => core_tdm::Tdm::from_xml(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some(other) => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                    other
-                )))
-            }
-            None => match ccsds_ndm::from_str(data) {
-                Ok(MessageType::Tdm(tdm)) => tdm,
-                Ok(other) => {
+        let inner =
+            match format {
+                Some("kvn") => core_tdm::Tdm::from_kvn(data)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                Some("xml") => core_tdm::Tdm::from_xml(data)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                Some(other) => {
                     return Err(PyValueError::new_err(format!(
-                        "Parsed message is not TDM (got {:?})",
+                        "Unsupported format '{}'. Use 'kvn' or 'xml'",
                         other
                     )))
                 }
-                Err(e) => return Err(PyValueError::new_err(e.to_string())),
-            },
-        };
+                None => match ccsds_ndm::from_str(data) {
+                    Ok(MessageType::Tdm(tdm)) => tdm,
+                    Ok(other) => {
+                        return Err(PyValueError::new_err(format!(
+                            "Parsed message is not TDM (got {:?})",
+                            other
+                        )))
+                    }
+                    Err(e) => return Err(PyValueError::new_err(e.to_string())),
+                },
+            };
         Ok(Self { inner })
     }
 
@@ -205,7 +206,10 @@ impl Tdm {
         let data = self.to_str(format)?;
         match fs::write(path, data) {
             Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!("Failed to write file: {}", e))),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Failed to write file: {}",
+                e
+            ))),
         }
     }
 }

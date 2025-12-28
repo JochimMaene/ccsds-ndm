@@ -97,7 +97,7 @@ class TestRdmConstruction:
         )
 
         assert data.atmospheric_reentry_parameters.orbit_lifetime == 3.0
-        assert data.has_ground_impact == True
+        assert data.ground_impact_parameters is not None
         assert data.ground_impact_parameters.probability_of_impact == 0.5
         assert "RdmData" in repr(data)
 
@@ -205,7 +205,7 @@ class TestRdmConstruction:
         assert rdm.header.message_id == "RDM_TEST_001"
         assert rdm.segment.metadata.object_name == "STARLINK-1234"
         assert rdm.segment.data.atmospheric_reentry_parameters.orbit_lifetime == 2.5
-        assert rdm.segment.data.has_ground_impact == True
+        assert rdm.segment.data.ground_impact_parameters is not None
         assert "Rdm" in repr(rdm)
 
 
