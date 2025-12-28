@@ -141,7 +141,12 @@ impl OcmSegment {
                     t
                 )))
             }
-            Some(Err(_)) => return Err(tokens.next().unwrap().unwrap_err()),
+            Some(Err(_)) => {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err())
+            }
             None => return Err(CcsdsNdmError::KvnParse("Unexpected EOF".into())),
         }
 
@@ -459,11 +464,19 @@ impl OcmMetadata {
         let mut interp_method_eop: Option<String> = None;
         let mut celestial_source: Option<String> = None;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::BlockEnd("META") => {
                     tokens.next();
                     break;
@@ -559,10 +572,18 @@ impl OcmMetadata {
         let et = epoch_tzero.ok_or(CcsdsNdmError::MissingField("EPOCH_TZERO".into()))?;
 
         // Apply defaults per XSD/Blue Book where applicable
-        let sclk_offset_at_epoch =
-            sclk_offset_at_epoch.or_else(|| Some(TimeOffset::from_kvn("0.0", None).unwrap()));
-        let sclk_sec_per_si_sec =
-            sclk_sec_per_si_sec.or_else(|| Some(Duration::from_kvn("1.0", None).unwrap()));
+        let sclk_offset_at_epoch = sclk_offset_at_epoch.or_else(|| {
+            Some(
+                TimeOffset::from_kvn("0.0", None)
+                    .expect("default SCLK_OFFSET_AT_EPOCH '0.0' is valid"),
+            )
+        });
+        let sclk_sec_per_si_sec = sclk_sec_per_si_sec.or_else(|| {
+            Some(
+                Duration::from_kvn("1.0", None)
+                    .expect("default SCLK_SEC_PER_SI_SEC '1.0' is valid"),
+            )
+        });
 
         Ok(OcmMetadata {
             comment,
@@ -679,11 +700,19 @@ impl OcmData {
         let mut data = OcmData::default();
         let mut pending_comments = Vec::new();
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::BlockStart("TRAJ") => {
                     let mut block = OcmTrajState::from_kvn_tokens(tokens)?;
                     if !pending_comments.is_empty() {
@@ -2220,7 +2249,7 @@ impl OcmPerturbations {
                     "EQUATORIAL_RADIUS" => {
                         pert.equatorial_radius = Some(Position::from_kvn(val, unit)?)
                     }
-                    "GM" => pert.gm = Some(Gm::new(val.parse().unwrap(), None).unwrap()), // Simplification, handle error properly
+                    "GM" => pert.gm = Some(Gm::from_kvn(val, unit)?),
                     "N_BODY_PERTURBATIONS" => pert.n_body_perturbations = Some(val.into()),
                     "CENTRAL_BODY_ROTATION" => {
                         pert.central_body_rotation = Some(AngleRate::from_kvn(val, unit)?)

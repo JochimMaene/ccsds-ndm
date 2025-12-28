@@ -398,9 +398,9 @@ impl OemData {
                 if let Some(Err(e)) = tokens.next() {
                     return Err(e);
                 }
-                unreachable!();
+                unreachable!("peek_res.is_err() was true but next() didn't return Err");
             }
-            match peek_res.as_ref().unwrap() {
+            match peek_res.as_ref().expect("checked is_err above") {
                 KvnLine::Comment(_) => {
                     if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
                         comment.push(c.to_string());
@@ -419,9 +419,9 @@ impl OemData {
                 if let Some(Err(e)) = tokens.next() {
                     return Err(e);
                 }
-                unreachable!();
+                unreachable!("peek_res.is_err() was true but next() didn't return Err");
             }
-            match peek_res.as_ref().unwrap() {
+            match peek_res.as_ref().expect("checked is_err above") {
                 KvnLine::BlockStart("META") | KvnLine::BlockStart("COVARIANCE") => break,
                 KvnLine::Raw(_) => {
                     let sv = StateVectorAcc::from_kvn_tokens(tokens)?;
@@ -452,9 +452,9 @@ impl OemData {
                 if let Some(Err(e)) = tokens.next() {
                     return Err(e);
                 }
-                unreachable!();
+                unreachable!("peek_res.is_err() was true but next() didn't return Err");
             }
-            match peek_res.as_ref().unwrap() {
+            match peek_res.as_ref().expect("checked is_err above") {
                 KvnLine::BlockStart("COVARIANCE") => {
                     tokens.next(); // Consume COVARIANCE_START
                     loop {

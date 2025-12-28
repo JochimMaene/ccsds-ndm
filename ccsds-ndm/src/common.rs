@@ -140,13 +140,20 @@ impl FromKvnTokens for OdmHeader {
         let mut originator = None;
         let mut message_id = None;
 
-        while let Some(peeked) = tokens.peek() {
+        while tokens.peek().is_some() {
             // If the next token is an error, return it immediately
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
 
-            let token = peeked.as_ref().unwrap();
+            let token = tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok");
             match token {
                 KvnLine::Comment(_) => {
                     if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
@@ -494,11 +501,19 @@ impl FromKvnTokens for StateVector {
         let mut y_dot: Option<Velocity> = None;
         let mut z_dot: Option<Velocity> = None;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::Comment(c) => {
                     comment.push(c.to_string());
                     tokens.next();
@@ -764,11 +779,19 @@ impl FromKvnTokens for OpmCovarianceMatrix {
         req!(cz_dot_y_dot: VelocityCovariance);
         req!(cz_dot_z_dot: VelocityCovariance);
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::Empty => {
                     tokens.next();
                 }

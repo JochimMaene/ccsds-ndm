@@ -122,11 +122,19 @@ impl FromKvnTokens for RdmHeader {
         let mut originator = None;
         let mut message_id = None;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::Comment(c) => {
                     comment.push(c.to_string());
                     tokens.next();
@@ -391,11 +399,19 @@ impl RdmMetadata {
         let mut previous_message_epoch: Option<Epoch> = None;
         let mut next_message_epoch: Option<Epoch> = None;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 // No META_STOP expectation
                 KvnLine::Comment(c) => {
                     comment.push(c.to_string());
@@ -905,11 +921,19 @@ impl RdmData {
         let mut od_parameters: Option<OdParameters> = None;
         let mut user_defined_parameters: Vec<(String, String)> = Vec::new();
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 // No DATA_STOP expected
                 KvnLine::Comment(c) => {
                     comment.push(c.to_string());

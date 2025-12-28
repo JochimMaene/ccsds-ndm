@@ -307,11 +307,19 @@ impl OmmMetadata {
     {
         let mut builder = OmmMetadataBuilder::default();
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::Comment(c) => {
                     builder.comment.push(c.to_string());
                     tokens.next();
@@ -489,11 +497,19 @@ impl OmmData {
         let mut ud_builder = UserDefinedBuilder::default();
         let mut pending_comments = Vec::new();
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+        while tokens.peek().is_some() {
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens
+                    .next()
+                    .expect("Peeked error should exist")
+                    .unwrap_err());
             }
-            match peeked.as_ref().unwrap() {
+            match tokens
+                .peek()
+                .expect("Peeked value should exist")
+                .as_ref()
+                .expect("Peeked value should be Ok")
+            {
                 KvnLine::Comment(c) => {
                     if !me_builder.has_started() {
                         comment.push(c.to_string());

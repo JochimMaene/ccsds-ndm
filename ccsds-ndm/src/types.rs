@@ -33,7 +33,7 @@ static EPOCH_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r"^(\-?\d{4}\d*-((\d{2}-\d{2})|\d{3})T\d{2}:\d{2}:\d{2}(\.\d*)?(Z|[+-]\d{2}:\d{2})?|[+-]?\d*(\.\d*)?)$",
     )
-    .unwrap()
+    .expect("EPOCH_REGEX pattern is valid")
 });
 
 impl Epoch {

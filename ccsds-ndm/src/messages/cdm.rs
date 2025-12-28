@@ -128,10 +128,13 @@ impl FromKvnTokens for CdmHeader {
 
         while let Some(peeked) = tokens.peek() {
             if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+                if let Some(Err(e)) = tokens.next() {
+                    return Err(e);
+                }
+                unreachable!("peeked.is_err() was true but next() didn't return Err");
             }
 
-            match peeked.as_ref().unwrap() {
+            match peeked.as_ref().expect("checked is_err above") {
                 KvnLine::Comment(_) => {
                     if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
                         comment.push(c.to_string());
@@ -207,9 +210,12 @@ impl CdmBody {
 
         while let Some(peeked) = tokens.peek() {
             if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+                if let Some(Err(e)) = tokens.next() {
+                    return Err(e);
+                }
+                unreachable!("peeked.is_err() was true but next() didn't return Err");
             }
-            match peeked.as_ref().unwrap() {
+            match peeked.as_ref().expect("checked is_err above") {
                 KvnLine::Pair { key: "OBJECT", .. } => {
                     let mut segment = CdmSegment::from_kvn_tokens(tokens)?;
                     if !pending_comments.is_empty() {
@@ -365,10 +371,13 @@ impl RelativeMetadataData {
 
         while let Some(peeked) = tokens.peek() {
             if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+                if let Some(Err(e)) = tokens.next() {
+                    return Err(e);
+                }
+                unreachable!("peeked.is_err() was true but next() didn't return Err");
             }
 
-            match peeked.as_ref().unwrap() {
+            match peeked.as_ref().expect("checked is_err above") {
                 KvnLine::BlockStart("META") => break,
                 KvnLine::Comment(_) => {
                     if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
@@ -734,9 +743,12 @@ impl CdmMetadata {
 
         while let Some(peeked) = tokens.peek() {
             if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+                if let Some(Err(e)) = tokens.next() {
+                    return Err(e);
+                }
+                unreachable!("peeked.is_err() was true but next() didn't return Err");
             }
-            match peeked.as_ref().unwrap() {
+            match peeked.as_ref().expect("checked is_err above") {
                 KvnLine::BlockEnd("META") => {
                     tokens.next();
                     break;
@@ -1067,9 +1079,12 @@ impl CdmData {
 
         while let Some(peeked) = tokens.peek() {
             if peeked.is_err() {
-                return Err(tokens.next().unwrap().unwrap_err());
+                if let Some(Err(e)) = tokens.next() {
+                    return Err(e);
+                }
+                unreachable!("peeked.is_err() was true but next() didn't return Err");
             }
-            match peeked.as_ref().unwrap() {
+            match peeked.as_ref().expect("checked is_err above") {
                 KvnLine::BlockStart("META") => break,
                 KvnLine::Comment(_) => {
                     if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
