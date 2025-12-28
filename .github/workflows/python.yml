@@ -3,7 +3,7 @@
 #
 #    maturin generate-ci github -m bindings/python/Cargo.toml
 #
-name: CI
+name: python
 
 on:
   push:

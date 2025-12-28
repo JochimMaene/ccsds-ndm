@@ -83,8 +83,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Publish to crates.io
+        working-directory: ./ccsds-ndm
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
-        run: |
-          cargo login $CRATES_TOKEN
-          cargo publish
+        run: cargo publish --token ${CRATES_TOKEN}
