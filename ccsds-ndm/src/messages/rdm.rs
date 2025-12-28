@@ -2286,4 +2286,759 @@ REENTRY_ALTITUDE = 80 [km]
             _ => panic!("Unexpected: {:?}", err),
         }
     }
+
+    // =========================================================================
+    // ADDITIONAL COVERAGE TESTS
+    // =========================================================================
+
+    // -----------------------------------------
+    // Version validation error paths
+    // -----------------------------------------
+
+    #[test]
+    fn test_rdm_empty_file_error() {
+        let err = Rdm::from_kvn("").unwrap_err();
+        match err {
+            CcsdsNdmError::MissingField(f) => assert_eq!(f, "Empty file"),
+            _ => panic!("Expected Empty file error, got: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_rdm_version_not_first_error() {
+        let kvn = r#"
+OBJECT_NAME = TEST
+CCSDS_RDM_VERS = 1.0
+"#;
+        let err = Rdm::from_kvn(kvn).unwrap_err();
+        match err {
+            CcsdsNdmError::MissingField(f) => {
+                assert!(f.contains("CCSDS_RDM_VERS must be the first keyword"));
+            }
+            _ => panic!("Expected version-not-first error, got: {:?}", err),
+        }
+    }
+
+    // -----------------------------------------
+    // XML roundtrip tests
+    // -----------------------------------------
+
+    #[test]
+    fn test_rdm_xml_roundtrip_minimal() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-11-13T12:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = RDM-001
+OBJECT_NAME = TEST-SAT
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-11-13T00:00:00
+ORBIT_LIFETIME = 2 [d]
+REENTRY_ALTITUDE = 80 [km]
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let xml = rdm.to_xml().unwrap();
+        assert!(xml.contains("<rdm"));
+        assert!(xml.contains("OBJECT_NAME"));
+        let rdm2 = Rdm::from_xml(&xml).unwrap();
+        assert_eq!(
+            rdm.body.segment.metadata.object_name,
+            rdm2.body.segment.metadata.object_name
+        );
+    }
+
+    #[test]
+    fn test_rdm_xml_roundtrip_comprehensive() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CATALOG_NAME = SATCAT
+OBJECT_DESIGNATOR = 12345
+OBJECT_TYPE = PAYLOAD
+OBJECT_OWNER = NASA
+OBJECT_OPERATOR = JPL
+CONTROLLED_REENTRY = YES
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+REF_FRAME = EME2000
+REF_FRAME_EPOCH = 2023-01-01T00:00:00
+EPHEMERIS_NAME = TEST_EPHEM
+GRAVITY_MODEL = EGM-96
+ATMOSPHERIC_MODEL = NRLMSISE-00
+SOLAR_FLUX_PREDICTION = PREDICTED
+N_BODY_PERTURBATIONS = MOON,SUN
+SOLAR_RAD_PRESSURE = YES
+EARTH_TIDES = SOLID
+INTRACK_THRUST = YES
+DRAG_PARAMETERS_SOURCE = OD
+DRAG_PARAMETERS_ALTITUDE = 500.0 [km]
+REENTRY_UNCERTAINTY_METHOD = MONTE_CARLO
+REENTRY_DISINTEGRATION = MASS-LOSS
+IMPACT_UNCERTAINTY_METHOD = STATISTICAL
+PREVIOUS_MESSAGE_ID = PREV-001
+PREVIOUS_MESSAGE_EPOCH = 2022-12-31T00:00:00
+NEXT_MESSAGE_EPOCH = 2023-01-02T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+ORBIT_LIFETIME_WINDOW_START = 3 [d]
+ORBIT_LIFETIME_WINDOW_END = 7 [d]
+NOMINAL_REENTRY_EPOCH = 2023-01-06T12:00:00
+REENTRY_WINDOW_START = 2023-01-05T00:00:00
+REENTRY_WINDOW_END = 2023-01-07T00:00:00
+ORBIT_LIFETIME_CONFIDENCE_LEVEL = 95.0 [%]
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let xml = rdm.to_xml().unwrap();
+        let rdm2 = Rdm::from_xml(&xml).unwrap();
+        assert_eq!(
+            rdm.body.segment.metadata.catalog_name,
+            rdm2.body.segment.metadata.catalog_name
+        );
+        assert_eq!(
+            rdm.body.segment.metadata.object_type,
+            rdm2.body.segment.metadata.object_type
+        );
+        assert_eq!(
+            rdm.body.segment.metadata.intrack_thrust,
+            rdm2.body.segment.metadata.intrack_thrust
+        );
+    }
+
+    // -----------------------------------------
+    // Optional metadata fields serialization tests
+    // -----------------------------------------
+
+    #[test]
+    fn test_rdm_metadata_optional_fields_kvn_roundtrip() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CATALOG_NAME = CATALOG123
+OBJECT_DESIGNATOR = DES456
+OBJECT_TYPE = DEBRIS
+OBJECT_OWNER = OWNER789
+OBJECT_OPERATOR = OPERATOR012
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+REF_FRAME = TEME
+REF_FRAME_EPOCH = 2023-01-01T12:00:00
+EPHEMERIS_NAME = EPHEM_TEST
+GRAVITY_MODEL = JGM-3: 20D 20O
+ATMOSPHERIC_MODEL = JACCHIA-71
+SOLAR_FLUX_PREDICTION = MEASURED
+N_BODY_PERTURBATIONS = MOON,SUN,VENUS
+SOLAR_RAD_PRESSURE = YES
+EARTH_TIDES = NONE
+INTRACK_THRUST = NO
+DRAG_PARAMETERS_SOURCE = ESTIMATED
+DRAG_PARAMETERS_ALTITUDE = 250.5 [km]
+REENTRY_UNCERTAINTY_METHOD = COVARIANCE
+REENTRY_DISINTEGRATION = BREAK-UP
+IMPACT_UNCERTAINTY_METHOD = STATISTICAL
+PREVIOUS_MESSAGE_ID = MSG-PREV-001
+PREVIOUS_MESSAGE_EPOCH = 2022-12-25T00:00:00
+NEXT_MESSAGE_EPOCH = 2023-01-08T00:00:00
+ORBIT_LIFETIME = 10 [d]
+REENTRY_ALTITUDE = 120 [km]
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let kvn2 = rdm.to_kvn().unwrap();
+
+        // Verify all optional fields are in the output (key-padded format: KEY<spaces> = VALUE)
+        assert!(kvn2.contains("CATALOG_NAME") && kvn2.contains("CATALOG123"));
+        assert!(kvn2.contains("OBJECT_DESIGNATOR") && kvn2.contains("DES456"));
+        assert!(kvn2.contains("OBJECT_TYPE") && kvn2.contains("DEBRIS"));
+        assert!(kvn2.contains("OBJECT_OWNER") && kvn2.contains("OWNER789"));
+        assert!(kvn2.contains("OBJECT_OPERATOR") && kvn2.contains("OPERATOR012"));
+        assert!(kvn2.contains("REF_FRAME") && kvn2.contains("TEME"));
+        assert!(kvn2.contains("EPHEMERIS_NAME") && kvn2.contains("EPHEM_TEST"));
+        assert!(kvn2.contains("GRAVITY_MODEL") && kvn2.contains("JGM-3: 20D 20O"));
+        assert!(kvn2.contains("ATMOSPHERIC_MODEL") && kvn2.contains("JACCHIA-71"));
+        assert!(kvn2.contains("SOLAR_FLUX_PREDICTION") && kvn2.contains("MEASURED"));
+        assert!(kvn2.contains("N_BODY_PERTURBATIONS") && kvn2.contains("MOON,SUN,VENUS"));
+        assert!(kvn2.contains("SOLAR_RAD_PRESSURE") && kvn2.contains("YES"));
+        assert!(kvn2.contains("EARTH_TIDES") && kvn2.contains("NONE"));
+        assert!(kvn2.contains("INTRACK_THRUST") && kvn2.contains("NO"));
+        assert!(kvn2.contains("DRAG_PARAMETERS_SOURCE") && kvn2.contains("ESTIMATED"));
+        assert!(kvn2.contains("REENTRY_UNCERTAINTY_METHOD") && kvn2.contains("COVARIANCE"));
+        assert!(kvn2.contains("REENTRY_DISINTEGRATION") && kvn2.contains("BREAK-UP"));
+        assert!(kvn2.contains("IMPACT_UNCERTAINTY_METHOD") && kvn2.contains("STATISTICAL"));
+        assert!(kvn2.contains("PREVIOUS_MESSAGE_ID") && kvn2.contains("MSG-PREV-001"));
+
+        // Roundtrip parse
+        let rdm2 = Rdm::from_kvn(&kvn2).unwrap();
+        assert_eq!(
+            rdm.body.segment.metadata.catalog_name,
+            rdm2.body.segment.metadata.catalog_name
+        );
+    }
+
+    // -----------------------------------------
+    // Ground impact parameters tests
+    // -----------------------------------------
+
+    #[test]
+    fn test_rdm_ground_impact_all_probabilities() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+PROBABILITY_OF_IMPACT = 0.25
+PROBABILITY_OF_BURN_UP = 0.60
+PROBABILITY_OF_BREAK_UP = 0.35
+PROBABILITY_OF_LAND_IMPACT = 0.15
+PROBABILITY_OF_CASUALTY = 0.001
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let g = rdm
+            .body
+            .segment
+            .data
+            .ground_impact_parameters
+            .as_ref()
+            .unwrap();
+        assert!((g.probability_of_impact.as_ref().unwrap().value - 0.25).abs() < 1e-9);
+        assert!((g.probability_of_burn_up.as_ref().unwrap().value - 0.60).abs() < 1e-9);
+        assert!((g.probability_of_break_up.as_ref().unwrap().value - 0.35).abs() < 1e-9);
+        assert!((g.probability_of_land_impact.as_ref().unwrap().value - 0.15).abs() < 1e-9);
+        assert!((g.probability_of_casualty.as_ref().unwrap().value - 0.001).abs() < 1e-9);
+
+        // Roundtrip
+        let kvn2 = rdm.to_kvn().unwrap();
+        assert!(kvn2.contains("PROBABILITY_OF_IMPACT"));
+        assert!(kvn2.contains("PROBABILITY_OF_BURN_UP"));
+        assert!(kvn2.contains("PROBABILITY_OF_BREAK_UP"));
+        assert!(kvn2.contains("PROBABILITY_OF_LAND_IMPACT"));
+        assert!(kvn2.contains("PROBABILITY_OF_CASUALTY"));
+    }
+
+    #[test]
+    fn test_rdm_ground_impact_nominal_and_windows() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+PROBABILITY_OF_IMPACT = 0.5
+NOMINAL_IMPACT_EPOCH = 2023-01-06T15:30:00
+IMPACT_WINDOW_START = 2023-01-06T12:00:00
+IMPACT_WINDOW_END = 2023-01-06T18:00:00
+IMPACT_REF_FRAME = EFG
+NOMINAL_IMPACT_LON = -120.5
+NOMINAL_IMPACT_LAT = 35.2
+NOMINAL_IMPACT_ALT = 0.0 [km]
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let g = rdm
+            .body
+            .segment
+            .data
+            .ground_impact_parameters
+            .as_ref()
+            .unwrap();
+        assert!(g.nominal_impact_epoch.is_some());
+        assert!(g.impact_window_start.is_some());
+        assert!(g.impact_window_end.is_some());
+        assert_eq!(g.impact_ref_frame.as_deref(), Some("EFG"));
+        assert!((g.nominal_impact_lon.as_ref().unwrap().value - (-120.5)).abs() < 1e-9);
+        assert!((g.nominal_impact_lat.as_ref().unwrap().value - 35.2).abs() < 1e-9);
+
+        let kvn2 = rdm.to_kvn().unwrap();
+        assert!(kvn2.contains("NOMINAL_IMPACT_EPOCH"));
+        assert!(kvn2.contains("IMPACT_WINDOW_START"));
+        assert!(kvn2.contains("IMPACT_WINDOW_END"));
+        assert!(kvn2.contains("IMPACT_REF_FRAME"));
+        assert!(kvn2.contains("NOMINAL_IMPACT_LON"));
+        assert!(kvn2.contains("NOMINAL_IMPACT_LAT"));
+        assert!(kvn2.contains("NOMINAL_IMPACT_ALT"));
+    }
+
+    #[test]
+    fn test_rdm_ground_impact_confidence_intervals_1() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+PROBABILITY_OF_IMPACT = 0.5
+IMPACT_1_CONFIDENCE = 68.3 [%]
+IMPACT_1_START_LON = -125.0
+IMPACT_1_START_LAT = 30.0
+IMPACT_1_STOP_LON = -115.0
+IMPACT_1_STOP_LAT = 40.0
+IMPACT_1_CROSS_TRACK = 50.0 [km]
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let g = rdm
+            .body
+            .segment
+            .data
+            .ground_impact_parameters
+            .as_ref()
+            .unwrap();
+        assert!((g.impact_1_confidence.as_ref().unwrap().value - 68.3).abs() < 1e-9);
+        assert!((g.impact_1_start_lon.as_ref().unwrap().value - (-125.0)).abs() < 1e-9);
+        assert!((g.impact_1_start_lat.as_ref().unwrap().value - 30.0).abs() < 1e-9);
+        assert!((g.impact_1_stop_lon.as_ref().unwrap().value - (-115.0)).abs() < 1e-9);
+        assert!((g.impact_1_stop_lat.as_ref().unwrap().value - 40.0).abs() < 1e-9);
+        assert!((g.impact_1_cross_track.as_ref().unwrap().value - 50.0).abs() < 1e-9);
+
+        let kvn2 = rdm.to_kvn().unwrap();
+        assert!(kvn2.contains("IMPACT_1_CONFIDENCE"));
+        assert!(kvn2.contains("IMPACT_1_START_LON"));
+        assert!(kvn2.contains("IMPACT_1_START_LAT"));
+        assert!(kvn2.contains("IMPACT_1_STOP_LON"));
+        assert!(kvn2.contains("IMPACT_1_STOP_LAT"));
+        assert!(kvn2.contains("IMPACT_1_CROSS_TRACK"));
+    }
+
+    #[test]
+    fn test_rdm_ground_impact_confidence_intervals_2() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+PROBABILITY_OF_IMPACT = 0.5
+IMPACT_2_CONFIDENCE = 95.0 [%]
+IMPACT_2_START_LON = -130.0
+IMPACT_2_START_LAT = 25.0
+IMPACT_2_STOP_LON = -110.0
+IMPACT_2_STOP_LAT = 45.0
+IMPACT_2_CROSS_TRACK = 100.0 [km]
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let g = rdm
+            .body
+            .segment
+            .data
+            .ground_impact_parameters
+            .as_ref()
+            .unwrap();
+        assert!((g.impact_2_confidence.as_ref().unwrap().value - 95.0).abs() < 1e-9);
+        assert!((g.impact_2_start_lon.as_ref().unwrap().value - (-130.0)).abs() < 1e-9);
+        assert!((g.impact_2_start_lat.as_ref().unwrap().value - 25.0).abs() < 1e-9);
+        assert!((g.impact_2_stop_lon.as_ref().unwrap().value - (-110.0)).abs() < 1e-9);
+        assert!((g.impact_2_stop_lat.as_ref().unwrap().value - 45.0).abs() < 1e-9);
+        assert!((g.impact_2_cross_track.as_ref().unwrap().value - 100.0).abs() < 1e-9);
+
+        let kvn2 = rdm.to_kvn().unwrap();
+        assert!(kvn2.contains("IMPACT_2_CONFIDENCE"));
+        assert!(kvn2.contains("IMPACT_2_START_LON"));
+        assert!(kvn2.contains("IMPACT_2_START_LAT"));
+        assert!(kvn2.contains("IMPACT_2_STOP_LON"));
+        assert!(kvn2.contains("IMPACT_2_STOP_LAT"));
+        assert!(kvn2.contains("IMPACT_2_CROSS_TRACK"));
+    }
+
+    #[test]
+    fn test_rdm_ground_impact_confidence_intervals_3() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+PROBABILITY_OF_IMPACT = 0.5
+IMPACT_3_CONFIDENCE = 99.7 [%]
+IMPACT_3_START_LON = -135.0
+IMPACT_3_START_LAT = 20.0
+IMPACT_3_STOP_LON = -105.0
+IMPACT_3_STOP_LAT = 50.0
+IMPACT_3_CROSS_TRACK = 150.0 [km]
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let g = rdm
+            .body
+            .segment
+            .data
+            .ground_impact_parameters
+            .as_ref()
+            .unwrap();
+        assert!((g.impact_3_confidence.as_ref().unwrap().value - 99.7).abs() < 1e-9);
+        assert!((g.impact_3_start_lon.as_ref().unwrap().value - (-135.0)).abs() < 1e-9);
+        assert!((g.impact_3_start_lat.as_ref().unwrap().value - 20.0).abs() < 1e-9);
+        assert!((g.impact_3_stop_lon.as_ref().unwrap().value - (-105.0)).abs() < 1e-9);
+        assert!((g.impact_3_stop_lat.as_ref().unwrap().value - 50.0).abs() < 1e-9);
+        assert!((g.impact_3_cross_track.as_ref().unwrap().value - 150.0).abs() < 1e-9);
+
+        let kvn2 = rdm.to_kvn().unwrap();
+        assert!(kvn2.contains("IMPACT_3_CONFIDENCE"));
+        assert!(kvn2.contains("IMPACT_3_START_LON"));
+        assert!(kvn2.contains("IMPACT_3_START_LAT"));
+        assert!(kvn2.contains("IMPACT_3_STOP_LON"));
+        assert!(kvn2.contains("IMPACT_3_STOP_LAT"));
+        assert!(kvn2.contains("IMPACT_3_CROSS_TRACK"));
+    }
+
+    // -----------------------------------------
+    // Spacecraft parameters serialization tests
+    // -----------------------------------------
+
+    #[test]
+    fn test_rdm_spacecraft_parameters_all_fields() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+WET_MASS = 5000 [kg]
+DRY_MASS = 3000 [kg]
+HAZARDOUS_SUBSTANCES = Hydrazine, Plutonium-238
+SOLAR_RAD_AREA = 30.0 [m**2]
+SOLAR_RAD_COEFF = 1.5
+DRAG_AREA = 25.0 [m**2]
+DRAG_COEFF = 2.3
+RCS = 18.0 [m**2]
+BALLISTIC_COEFF = 175.5
+THRUST_ACCELERATION = 0.0025
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let sp = rdm
+            .body
+            .segment
+            .data
+            .spacecraft_parameters
+            .as_ref()
+            .unwrap();
+
+        assert!((sp.wet_mass.as_ref().unwrap().value - 5000.0).abs() < 1e-9);
+        assert!((sp.dry_mass.as_ref().unwrap().value - 3000.0).abs() < 1e-9);
+        assert_eq!(
+            sp.hazardous_substances.as_deref(),
+            Some("Hydrazine, Plutonium-238")
+        );
+        assert!((sp.solar_rad_area.as_ref().unwrap().value - 30.0).abs() < 1e-9);
+        assert!((sp.solar_rad_coeff.unwrap() - 1.5).abs() < 1e-9);
+        assert!((sp.drag_area.as_ref().unwrap().value - 25.0).abs() < 1e-9);
+        assert!((sp.drag_coeff.unwrap() - 2.3).abs() < 1e-9);
+        assert!((sp.rcs.as_ref().unwrap().value - 18.0).abs() < 1e-9);
+        assert!(sp.ballistic_coeff.is_some());
+        assert!(sp.thrust_acceleration.is_some());
+
+        let kvn2 = rdm.to_kvn().unwrap();
+        assert!(kvn2.contains("WET_MASS"));
+        assert!(kvn2.contains("DRY_MASS"));
+        assert!(kvn2.contains("HAZARDOUS_SUBSTANCES"));
+        assert!(kvn2.contains("SOLAR_RAD_AREA"));
+        assert!(kvn2.contains("SOLAR_RAD_COEFF"));
+        assert!(kvn2.contains("DRAG_AREA"));
+        assert!(kvn2.contains("DRAG_COEFF"));
+        assert!(kvn2.contains("RCS"));
+        assert!(kvn2.contains("BALLISTIC_COEFF"));
+        assert!(kvn2.contains("THRUST_ACCELERATION"));
+    }
+
+    // -----------------------------------------
+    // OD parameters serialization tests
+    // -----------------------------------------
+
+    #[test]
+    fn test_rdm_od_parameters_all_fields() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+TIME_LASTOB_START = 2022-12-28T00:00:00
+TIME_LASTOB_END = 2022-12-31T23:59:59
+RECOMMENDED_OD_SPAN = 10.0 [d]
+ACTUAL_OD_SPAN = 7.5 [d]
+OBS_AVAILABLE = 500
+OBS_USED = 485
+TRACKS_AVAILABLE = 50
+TRACKS_USED = 48
+RESIDUALS_ACCEPTED = 97.5 [%]
+WEIGHTED_RMS = 1.125
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let od = rdm.body.segment.data.od_parameters.as_ref().unwrap();
+
+        assert!(od.time_lastob_start.is_some());
+        assert!(od.time_lastob_end.is_some());
+        assert!(od.recommended_od_span.is_some());
+        assert!(od.actual_od_span.is_some());
+        assert_eq!(od.obs_available, Some(500));
+        assert_eq!(od.obs_used, Some(485));
+        assert_eq!(od.tracks_available, Some(50));
+        assert_eq!(od.tracks_used, Some(48));
+        assert!(od.residuals_accepted.is_some());
+        assert!((od.weighted_rms.unwrap() - 1.125).abs() < 1e-9);
+
+        let kvn2 = rdm.to_kvn().unwrap();
+        assert!(kvn2.contains("TIME_LASTOB_START"));
+        assert!(kvn2.contains("TIME_LASTOB_END"));
+        assert!(kvn2.contains("RECOMMENDED_OD_SPAN"));
+        assert!(kvn2.contains("ACTUAL_OD_SPAN"));
+        assert!(kvn2.contains("OBS_AVAILABLE"));
+        assert!(kvn2.contains("OBS_USED"));
+        assert!(kvn2.contains("TRACKS_AVAILABLE"));
+        assert!(kvn2.contains("TRACKS_USED"));
+        assert!(kvn2.contains("RESIDUALS_ACCEPTED"));
+        assert!(kvn2.contains("WEIGHTED_RMS"));
+    }
+
+    // -----------------------------------------
+    // Unknown metadata key error test
+    // -----------------------------------------
+
+    #[test]
+    fn test_rdm_unknown_metadata_key_error() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+UNKNOWN_METADATA_KEY = VALUE
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+"#;
+        let err = Rdm::from_kvn(kvn).unwrap_err();
+        match err {
+            CcsdsNdmError::KvnParse(msg) => {
+                assert!(msg.contains("Unexpected RDM Metadata key"));
+            }
+            _ => panic!("Expected KvnParse error, got: {:?}", err),
+        }
+    }
+
+    // -----------------------------------------
+    // Atmospheric reentry parameters optional fields
+    // -----------------------------------------
+
+    #[test]
+    fn test_rdm_atmospheric_all_optional_fields() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+ORBIT_LIFETIME_WINDOW_START = 3 [d]
+ORBIT_LIFETIME_WINDOW_END = 7 [d]
+NOMINAL_REENTRY_EPOCH = 2023-01-06T12:00:00
+REENTRY_WINDOW_START = 2023-01-05T00:00:00
+REENTRY_WINDOW_END = 2023-01-07T00:00:00
+ORBIT_LIFETIME_CONFIDENCE_LEVEL = 95.0 [%]
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        let atm = &rdm.body.segment.data.atmospheric_reentry_parameters;
+
+        assert!(atm.orbit_lifetime_window_start.is_some());
+        assert!(atm.orbit_lifetime_window_end.is_some());
+        assert!(atm.nominal_reentry_epoch.is_some());
+        assert!(atm.reentry_window_start.is_some());
+        assert!(atm.reentry_window_end.is_some());
+        assert!(atm.orbit_lifetime_confidence_level.is_some());
+
+        let kvn2 = rdm.to_kvn().unwrap();
+        assert!(kvn2.contains("ORBIT_LIFETIME_WINDOW_START"));
+        assert!(kvn2.contains("ORBIT_LIFETIME_WINDOW_END"));
+        assert!(kvn2.contains("NOMINAL_REENTRY_EPOCH"));
+        assert!(kvn2.contains("REENTRY_WINDOW_START"));
+        assert!(kvn2.contains("REENTRY_WINDOW_END"));
+        assert!(kvn2.contains("ORBIT_LIFETIME_CONFIDENCE_LEVEL"));
+    }
+
+    // -----------------------------------------
+    // Full roundtrip with all optional data blocks
+    // -----------------------------------------
+
+    #[test]
+    fn test_rdm_full_roundtrip_all_blocks() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+COMMENT Header comment
+OBJECT_NAME = COMPREHENSIVE_TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CATALOG_NAME = SATCAT
+OBJECT_DESIGNATOR = 99999
+OBJECT_TYPE = ROCKET BODY
+OBJECT_OWNER = ESA
+OBJECT_OPERATOR = ESOC
+CONTROLLED_REENTRY = YES
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T09:00:00
+REF_FRAME = EME2000
+GRAVITY_MODEL = EGM-96: 36D 36O
+ATMOSPHERIC_MODEL = NRLMSISE-00
+N_BODY_PERTURBATIONS = MOON,SUN
+SOLAR_RAD_PRESSURE = YES
+EARTH_TIDES = ESR
+INTRACK_THRUST = NO
+REENTRY_DISINTEGRATION = MASS-LOSS + BREAK-UP
+ORBIT_LIFETIME = 5.5 [d]
+REENTRY_ALTITUDE = 80.0 [km]
+NOMINAL_REENTRY_EPOCH = 2023-01-06T19:45:33
+REENTRY_WINDOW_START = 2023-01-06T11:45:33
+REENTRY_WINDOW_END = 2023-01-06T22:12:56
+PROBABILITY_OF_IMPACT = 0.25
+PROBABILITY_OF_BURN_UP = 0.75
+EPOCH = 2023-01-01T09:30:12
+X = 4000.000000 [km]
+Y = 4000.000000 [km]
+Z = 4000.000000 [km]
+X_DOT = 7.000000 [km/s]
+Y_DOT = 7.000000 [km/s]
+Z_DOT = 7.000000 [km/s]
+COV_REF_FRAME = RTN
+CX_X = 0.10000 [km**2]
+CY_X = 0.10000 [km**2]
+CY_Y = 0.10000 [km**2]
+CZ_X = 0.10000 [km**2]
+CZ_Y = 0.10000 [km**2]
+CZ_Z = 0.10000 [km**2]
+CX_DOT_X = 0.02000 [km**2/s]
+CX_DOT_Y = 0.02000 [km**2/s]
+CX_DOT_Z = 0.02000 [km**2/s]
+CX_DOT_X_DOT = 0.00600 [km**2/s**2]
+CY_DOT_X = 0.02000 [km**2/s]
+CY_DOT_Y = 0.02000 [km**2/s]
+CY_DOT_Z = 0.02000 [km**2/s]
+CY_DOT_X_DOT = 0.00600 [km**2/s**2]
+CY_DOT_Y_DOT = 0.00600 [km**2/s**2]
+CZ_DOT_X = 0.02000 [km**2/s]
+CZ_DOT_Y = 0.02000 [km**2/s]
+CZ_DOT_Z = 0.02000 [km**2/s]
+CZ_DOT_X_DOT = 0.00400 [km**2/s**2]
+CZ_DOT_Y_DOT = 0.00400 [km**2/s**2]
+CZ_DOT_Z_DOT = 0.00400 [km**2/s**2]
+WET_MASS = 3582 [kg]
+DRAG_AREA = 23.3565 [m**2]
+DRAG_COEFF = 2.2634
+ACTUAL_OD_SPAN = 3.4554 [d]
+TRACKS_AVAILABLE = 18
+TRACKS_USED = 17
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+
+        // Verify all blocks present
+        assert!(rdm.body.segment.data.ground_impact_parameters.is_some());
+        assert!(rdm.body.segment.data.state_vector.is_some());
+        assert!(rdm.body.segment.data.covariance_matrix.is_some());
+        assert!(rdm.body.segment.data.spacecraft_parameters.is_some());
+        assert!(rdm.body.segment.data.od_parameters.is_some());
+
+        let kvn2 = rdm.to_kvn().unwrap();
+        let rdm2 = Rdm::from_kvn(&kvn2).unwrap();
+
+        // Compare key values
+        assert_eq!(
+            rdm.body.segment.metadata.object_name,
+            rdm2.body.segment.metadata.object_name
+        );
+        assert!(rdm2.body.segment.data.state_vector.is_some());
+        assert!(rdm2.body.segment.data.covariance_matrix.is_some());
+    }
+
+    #[test]
+    fn test_rdm_header_comment() {
+        let kvn = r#"
+CCSDS_RDM_VERS = 1.0
+COMMENT First header comment
+COMMENT Second header comment
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+"#;
+        let rdm = Rdm::from_kvn(kvn).unwrap();
+        assert_eq!(rdm.header.comment.len(), 2);
+        assert_eq!(rdm.header.comment[0], "First header comment");
+        assert_eq!(rdm.header.comment[1], "Second header comment");
+    }
 }
