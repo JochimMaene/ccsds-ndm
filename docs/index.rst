@@ -37,8 +37,7 @@ For the specific Attitude Data Messages standard, see :doc:`ccsds-books/adm`.
    api/python
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: CCSDS Standards
 
-   ccsds-books/ndm
-   ccsds-books/adm
+   ccsds-books/index

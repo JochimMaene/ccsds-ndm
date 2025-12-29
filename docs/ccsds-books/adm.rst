@@ -1,3 +1,7 @@
+===
+ADM
+===
+
 .. title:: ATTITUDE DATA MESSAGES
 
 .. rubric:: RECOMMENDED STANDARD

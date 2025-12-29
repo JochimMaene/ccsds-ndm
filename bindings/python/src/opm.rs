@@ -401,7 +401,7 @@ impl OpmMetadata {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -470,7 +470,7 @@ impl KeplerianElements {
 
     /// Comments associated with the Keplerian elements.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -709,7 +709,7 @@ impl OpmCovarianceMatrix {
     /// Comments associated with this covariance matrix.
     ///
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1138,7 +1138,7 @@ impl OpmData {
 
     /// Maneuver parameters.
     ///
-    /// :type: List[ManeuverParameters]
+    /// :type: list[ManeuverParameters]
     #[getter]
     fn get_maneuver_parameters(&self) -> Vec<ManeuverParameters> {
         self.inner
@@ -1233,7 +1233,7 @@ impl ManeuverParameters {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1388,7 +1388,7 @@ impl UserDefined {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()

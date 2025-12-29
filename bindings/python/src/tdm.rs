@@ -90,7 +90,7 @@ impl Tdm {
 
     /// Shortcut to access segments directly from the body.
     ///
-    /// :type: List[TdmSegment]
+    /// :type: list[TdmSegment]
     #[getter]
     fn get_segments(&self) -> Vec<TdmSegment> {
         self.inner
@@ -313,7 +313,7 @@ impl TdmHeader {
 
     /// Comments in the Header.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -337,7 +337,6 @@ impl TdmHeader {
 /// ----------
 /// segments : list[TdmSegment]
 ///     List of data segments.
-///     (Mandatory)
 #[pyclass]
 #[derive(Clone)]
 pub struct TdmBody {
@@ -364,7 +363,7 @@ impl TdmBody {
     ///
     /// Each segment consists of a Metadata Section and a Data Section.
     ///
-    /// :type: List[TdmSegment]
+    /// :type: list[TdmSegment]
     #[getter]
     fn get_segments(&self) -> Vec<TdmSegment> {
         self.inner
@@ -684,7 +683,7 @@ impl TdmMetadata {
     }
 
     /// Comments.
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1395,7 +1394,7 @@ impl TdmData {
 
     /// List of tracking observations.
     ///
-    /// :type: List[TdmObservation]
+    /// :type: list[TdmObservation]
     #[getter]
     fn get_observations(&self) -> Vec<TdmObservation> {
         self.inner
@@ -1420,7 +1419,7 @@ impl TdmData {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()

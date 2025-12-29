@@ -397,7 +397,7 @@ impl OmmMetadata {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -484,7 +484,7 @@ impl MeanElements {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -694,7 +694,7 @@ impl OmmData {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -857,7 +857,7 @@ impl TleParameters {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1052,7 +1052,7 @@ impl UserDefined {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()

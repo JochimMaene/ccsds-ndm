@@ -182,7 +182,7 @@ impl Oem {
 
     /// The list of data segments.
     ///
-    /// :type: List[OemSegment]
+    /// :type: list[OemSegment]
     #[getter]
     fn get_segments(&self) -> Vec<OemSegment> {
         self.inner
@@ -654,7 +654,7 @@ impl OemData {
     ///
     /// All components are expressed in the reference frame specified in the metadata.
     ///
-    /// :type: List[StateVectorAcc]
+    /// :type: list[StateVectorAcc]
     #[getter]
     fn get_state_vectors(&self) -> Vec<StateVectorAcc> {
         self.inner
@@ -678,7 +678,7 @@ impl OemData {
     ///
     /// Matrices are given in lower triangular form in the covariance reference frame.
     ///
-    /// :type: List[OemCovarianceMatrix]
+    /// :type: list[OemCovarianceMatrix]
     #[getter]
     fn get_covariance_matrices(&self) -> Vec<OemCovarianceMatrix> {
         self.inner
@@ -698,7 +698,7 @@ impl OemData {
     /// Comments can appear between state vectors and covariance matrices to provide
     /// additional context or annotations about the ephemeris data.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -722,7 +722,7 @@ impl OemData {
     ///     
     ///     Units: position in km, velocity in km/s, acceleration in km/s²
     ///
-    /// :type: Tuple[List[str], numpy.ndarray]
+    /// :type: tuple[list[str], numpy.ndarray]
     #[getter]
     fn get_state_vectors_numpy<'py>(&self, py: Python<'py>) -> (Vec<String>, Py<PyAny>) {
         let epochs: Vec<String> = self
@@ -845,10 +845,12 @@ impl OemData {
         Ok(())
     }
 
-    /// Get covariance matrices as a Tuple associated with a NumPy array.
+    /// Get covariance matrices as a tuple associated with a NumPy array.
     ///
     /// Returns:
-    ///     Tuple[List[str], np.ndarray]: (Epochs, 2D Array of size Nx21).
+    ///     tuple[list[str], np.ndarray]: (Epochs, 2D Array of size Nx21).
+    ///
+    /// :type: tuple[list[str], numpy.ndarray]
     #[getter]
     fn get_covariance_matrices_numpy<'py>(
         &self,
@@ -1170,7 +1172,7 @@ impl OemCovarianceMatrix {
 
     /// Comments associated with this covariance matrix.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()

@@ -114,7 +114,7 @@ impl OdmHeader {
     // Note: Using "comments" (plural) to match existing stub
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -459,7 +459,7 @@ impl StateVector {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -623,7 +623,7 @@ impl SpacecraftParameters {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
