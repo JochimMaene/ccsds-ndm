@@ -54,7 +54,6 @@ jobs:
 
   # Build wheels only on tags or manual dispatch to save CI time
   linux:
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -76,7 +75,6 @@ jobs:
           path: dist
 
   musllinux:
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -98,7 +96,6 @@ jobs:
           path: dist
 
   windows:
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +112,6 @@ jobs:
           path: dist
 
   macos:
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -140,7 +136,6 @@ jobs:
           path: dist
 
   sdist:
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
