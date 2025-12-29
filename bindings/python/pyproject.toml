@@ -25,6 +25,11 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy",
     "Topic :: Scientific/Engineering :: Physics",
 ]
+readme = "README.md"
+homepage = "https://github.com/JochimMaene/ccsds-ndm"
+documentation = "https://jochimmaene.github.io/ccsds-ndm"
+changelog = "https://github.com/JochimMaene/ccsds-ndm/releases"
+bugtracker = "https://github.com/JochimMaene/ccsds-ndm/issues"
 dependencies = [
     "numpy>=1.16.0",
 ]
@@ -32,6 +37,10 @@ dynamic = ["version"]
 
 [project.urls]
 Repository = "https://github.com/JochimMaene/ccsds-ndm"
+Homepage = "https://github.com/JochimMaene/ccsds-ndm"
+Documentation = "https://jochimmaene.github.io/ccsds-ndm"
+Changelog = "https://github.com/JochimMaene/ccsds-ndm/releases"
+Bug Tracker = "https://github.com/JochimMaene/ccsds-ndm/issues"
 
 [dependency-groups]
 dev = [
