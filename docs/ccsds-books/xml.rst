@@ -1,3 +1,7 @@
+===
+XML
+===
+
 .. title:: XML SPECIFICATION FOR NAVIGATION DATA MESSAGES
 
 .. rubric:: RECOMMENDED STANDARD
@@ -1255,7 +1259,7 @@ and </spacecraftParameters>), the user shall place the keywords required by the
 specific logical block as specified in reference [4].
 
 4.9.14 DISCUSSION
-^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^
 
 This non-normative subsection discusses and provides examples of the use of quaternion tags
 in the APM.
@@ -1309,7 +1313,7 @@ Here is an example APM quaternion construct with the optional derivative:
    </quaternionState>
 
 4.9.15 DISCUSSION
-^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^
 
 This non-normative subsection discusses and provides examples of the use of rotation tags in
 the APM.
@@ -1349,7 +1353,7 @@ For example, the following shows rotation rates for a 321 rotation sequence:
 .. _user_defined_parameters_xml:
 
 4.10 USER DEFINED PARAMETERS
----------------------------
+----------------------------
 
 .. note::
    User-defined parameters have been added to some of the Navigation Data
@@ -1897,7 +1901,7 @@ TECHNICAL MATERIAL AND CONVENTIONS
 (INFORMATIVE)
 
 F1 EXTENSIBLE MARKUP LANGUAGE
-----------------------------
+-----------------------------
 
 F1.1 GENERAL
 ^^^^^^^^^^^^^

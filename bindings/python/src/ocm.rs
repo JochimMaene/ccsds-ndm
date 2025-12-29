@@ -872,6 +872,9 @@ impl OcmMetadata {
         self.inner.tech_address = value;
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1117,6 +1120,8 @@ impl OcmMetadata {
         });
     }
     /// The creation epoch of the previous OCM for this space object.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_previous_message_epoch(&self) -> Option<String> {
         self.inner
@@ -1130,6 +1135,8 @@ impl OcmMetadata {
         Ok(())
     }
     /// The anticipated creation epoch of the next OCM message for this space object.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_next_message_epoch(&self) -> Option<String> {
         self.inner
@@ -1143,6 +1150,8 @@ impl OcmMetadata {
         Ok(())
     }
     /// The time of the earliest data in the message.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_start_time(&self) -> Option<String> {
         self.inner
@@ -1156,6 +1165,8 @@ impl OcmMetadata {
         Ok(())
     }
     /// The time of the latest data in the message.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_stop_time(&self) -> Option<String> {
         self.inner
@@ -1169,6 +1180,8 @@ impl OcmMetadata {
         Ok(())
     }
     /// The approximate span of time covered by the data in the message [d].
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_time_span(&self) -> Option<f64> {
         self.inner.time_span.as_ref().map(|t| t.value)
@@ -1260,6 +1273,8 @@ impl OcmMetadata {
     }
 
     /// Method used to interpolate the EOP data.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_interp_method_eop(&self) -> Option<String> {
         self.inner.interp_method_eop.clone()
@@ -1270,6 +1285,8 @@ impl OcmMetadata {
     }
 
     /// Source of celestial body ephemeris data used in the OCM.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_celestial_source(&self) -> Option<String> {
         self.inner.celestial_source.clone()
@@ -1306,7 +1323,7 @@ impl OcmData {
 
     /// List of trajectory state time history blocks.
     ///
-    /// :type: List[OcmTrajState]
+    /// :type: list[OcmTrajState]
     #[getter]
     fn get_traj(&self) -> Vec<OcmTrajState> {
         self.inner
@@ -1339,7 +1356,7 @@ impl OcmData {
 
     /// List of maneuver specifications.
     ///
-    /// :type: List[OcmManeuver]
+    /// :type: list[OcmManeuver]
     #[getter]
     fn get_man(&self) -> Vec<OcmManeuver> {
         self.inner
@@ -1355,7 +1372,7 @@ impl OcmData {
 
     /// List of covariance time history blocks.
     ///
-    /// :type: List[OcmCovarianceMatrix]
+    /// :type: list[OcmCovarianceMatrix]
     #[getter]
     fn get_cov(&self) -> Vec<OcmCovarianceMatrix> {
         self.inner
@@ -1413,10 +1430,18 @@ impl OcmData {
     fn set_user(&mut self, value: Option<UserDefined>) {
         self.inner.user = value.map(|u| u.inner);
     }
+
+    /// Number of covariance time history blocks.
+    ///
+    /// :type: int
     #[getter]
     fn get_cov_count(&self) -> usize {
         self.inner.cov.len()
     }
+
+    /// Whether user-defined parameters are present.
+    ///
+    /// :type: bool
     #[getter]
     fn has_user(&self) -> bool {
         self.inner.user.is_some()
@@ -1633,7 +1658,7 @@ impl OcmTrajState {
 
     /// Contiguous set of trajectory state data lines.
     ///
-    /// :type: List[TrajLine]
+    /// :type: list[TrajLine]
     #[getter]
     fn get_traj_lines(&self) -> Vec<TrajLine> {
         self.inner
@@ -1649,7 +1674,7 @@ impl OcmTrajState {
 
     /// Comments for this trajectory block.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1826,6 +1851,8 @@ impl OcmTrajState {
     }
 
     /// Basis for the orbit revolution counter (0 or 1).
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_orb_revnum_basis(&self) -> Option<String> {
         self.inner
@@ -1842,6 +1869,8 @@ impl OcmTrajState {
         Ok(())
     }
     /// Specifies the averaging method for orbital elements.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_orb_averaging(&self) -> Option<String> {
         self.inner.orb_averaging.clone()
@@ -1852,6 +1881,8 @@ impl OcmTrajState {
     }
 
     /// SI unit designations for the state elements.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_traj_units(&self) -> Option<String> {
         self.inner.traj_units.clone()
@@ -1911,7 +1942,7 @@ impl TrajLine {
 
     /// Trajectory state elements for this epoch.
     ///
-    /// :type: List[float]
+    /// :type: list[float]
     #[getter]
     fn get_values(&self) -> Vec<f64> {
         self.inner.values.clone()
@@ -2232,6 +2263,9 @@ impl OcmPhysicalDescription {
         self.inner.manufacturer = value;
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -2379,6 +2413,8 @@ impl OcmPhysicalDescription {
         });
     }
     /// Total spacecraft mass at the current state epoch [kg].
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_wet_mass(&self) -> Option<f64> {
         self.inner.wet_mass.as_ref().map(|m| m.value)
@@ -2392,6 +2428,8 @@ impl OcmPhysicalDescription {
         });
     }
     /// The dry mass of the spacecraft [kg].
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_dry_mass(&self) -> Option<f64> {
         self.inner.dry_mass.as_ref().map(|m| m.value)
@@ -2640,6 +2678,8 @@ impl OcmPhysicalDescription {
         });
     }
     /// The minimum Radar Cross Section observed [m**2].
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_rcs_min(&self) -> Option<f64> {
         self.inner.rcs_min.as_ref().map(|a| a.value)
@@ -2653,6 +2693,8 @@ impl OcmPhysicalDescription {
         });
     }
     /// The maximum Radar Cross Section observed [m**2].
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_rcs_max(&self) -> Option<f64> {
         self.inner.rcs_max.as_ref().map(|a| a.value)
@@ -2811,6 +2853,8 @@ impl OcmPhysicalDescription {
 
     // === Maneuver Capabilities ===
     /// The average frequency of maneuvers [# / year].
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_avg_maneuver_freq(&self) -> Option<f64> {
         self.inner.avg_maneuver_freq.as_ref().map(|f| f.value)
@@ -2824,6 +2868,8 @@ impl OcmPhysicalDescription {
         });
     }
     /// The maximum thrust capability [N].
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_max_thrust(&self) -> Option<f64> {
         self.inner.max_thrust.as_ref().map(|t| t.value)
@@ -2837,6 +2883,8 @@ impl OcmPhysicalDescription {
         });
     }
     /// The total delta-v capability at Beginning-of-Life [km/s].
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_dv_bol(&self) -> Option<f64> {
         self.inner.dv_bol.as_ref().map(|v| v.value)
@@ -2850,6 +2898,8 @@ impl OcmPhysicalDescription {
         });
     }
     /// The estimated delta-v remaining [km/s].
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_dv_remaining(&self) -> Option<f64> {
         self.inner.dv_remaining.as_ref().map(|v| v.value)
@@ -3117,10 +3167,16 @@ impl OcmCovarianceMatrix {
     fn set_cov_next_id(&mut self, value: Option<String>) {
         self.inner.cov_next_id = value;
     }
+    /// Covariance basis.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_cov_basis(&self) -> Option<String> {
         self.inner.cov_basis.as_ref().map(|b| format!("{:?}", b))
     }
+    /// Covariance basis identifier.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_cov_basis_id(&self) -> Option<String> {
         self.inner.cov_basis_id.clone()
@@ -3158,6 +3214,10 @@ impl OcmCovarianceMatrix {
         self.inner.cov_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
+
+    /// Scale factor minimum.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_cov_scale_min(&self) -> Option<f64> {
         self.inner.cov_scale_min
@@ -3166,6 +3226,10 @@ impl OcmCovarianceMatrix {
     fn set_cov_scale_min(&mut self, value: Option<f64>) {
         self.inner.cov_scale_min = value;
     }
+
+    /// Scale factor maximum.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_cov_scale_max(&self) -> Option<f64> {
         self.inner.cov_scale_max
@@ -3174,6 +3238,10 @@ impl OcmCovarianceMatrix {
     fn set_cov_scale_max(&mut self, value: Option<f64>) {
         self.inner.cov_scale_max = value;
     }
+
+    /// The confidence level associated with the covariance [0-100].
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_cov_confidence(&self) -> Option<f64> {
         self.inner.cov_confidence.as_ref().map(|p| p.value)
@@ -3211,7 +3279,10 @@ impl OcmCovarianceMatrix {
     fn set_cov_units(&mut self, value: Option<String>) {
         self.inner.cov_units = value;
     }
+
     /// A list of covariance data lines.
+    ///
+    /// :type: list[CovLine]
     #[getter]
     fn get_cov_lines(&self) -> Vec<CovLine> {
         self.inner
@@ -3224,6 +3295,10 @@ impl OcmCovarianceMatrix {
     fn set_cov_lines(&mut self, value: Vec<CovLine>) {
         self.inner.cov_lines = value.into_iter().map(|c| c.inner).collect();
     }
+
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -3281,7 +3356,7 @@ impl CovLine {
 
     /// Covariance matrix elements for this epoch.
     ///
-    /// :type: List[float]
+    /// :type: list[float]
     #[getter]
     fn get_values(&self) -> Vec<f64> {
         self.inner.values.clone()
@@ -3548,12 +3623,18 @@ impl OcmManeuver {
     fn set_man_next_id(&mut self, value: Option<String>) {
         self.inner.man_next_id = value;
     }
+
     /// Basis of the maneuver data ('Observed', 'Predicted', etc.).
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_man_basis(&self) -> Option<String> {
         self.inner.man_basis.as_ref().map(|b| format!("{:?}", b))
     }
+
     /// Identifier for the orbit determination or simulation basis.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_man_basis_id(&self) -> Option<String> {
         self.inner.man_basis_id.clone()
@@ -3562,7 +3643,10 @@ impl OcmManeuver {
     fn set_man_basis_id(&mut self, value: Option<String>) {
         self.inner.man_basis_id = value;
     }
+
     /// Identifier for the maneuver device (e.g., thruster name).
+    ///
+    /// :type: str
     #[getter]
     fn get_man_device_id(&self) -> String {
         self.inner.man_device_id.clone()
@@ -3602,7 +3686,10 @@ impl OcmManeuver {
         self.inner.man_next_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
+
     /// Purpose of the maneuver.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_man_purpose(&self) -> Option<String> {
         self.inner.man_purpose.clone()
@@ -3611,7 +3698,10 @@ impl OcmManeuver {
     fn set_man_purpose(&mut self, value: Option<String>) {
         self.inner.man_purpose = value;
     }
+
     /// Source of the predicted maneuver data.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_man_pred_source(&self) -> Option<String> {
         self.inner.man_pred_source.clone()
@@ -3649,7 +3739,10 @@ impl OcmManeuver {
         self.inner.man_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
+
     /// Name of the gravity assist body.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_grav_assist_name(&self) -> Option<String> {
         self.inner.grav_assist_name.clone()
@@ -3658,7 +3751,10 @@ impl OcmManeuver {
     fn set_grav_assist_name(&mut self, value: Option<String>) {
         self.inner.grav_assist_name = value;
     }
+
     /// Type of duty cycle ('Continuous', 'Impulsive', 'Duration').
+    ///
+    /// :type: str
     #[getter]
     fn get_dc_type(&self) -> String {
         format!("{:?}", self.inner.dc_type)
@@ -3672,6 +3768,8 @@ impl OcmManeuver {
     }
 
     /// Start of the duty cycle window.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_dc_win_open(&self) -> Option<String> {
         self.inner
@@ -3686,6 +3784,8 @@ impl OcmManeuver {
     }
 
     /// End of the duty cycle window.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_dc_win_close(&self) -> Option<String> {
         self.inner
@@ -3700,6 +3800,8 @@ impl OcmManeuver {
     }
 
     /// Minimum number of duty cycles.
+    ///
+    /// :type: Optional[int]
     #[getter]
     fn get_dc_min_cycles(&self) -> Option<u64> {
         self.inner.dc_min_cycles
@@ -3710,6 +3812,8 @@ impl OcmManeuver {
     }
 
     /// Maximum number of duty cycles.
+    ///
+    /// :type: Optional[int]
     #[getter]
     fn get_dc_max_cycles(&self) -> Option<u64> {
         self.inner.dc_max_cycles
@@ -3720,6 +3824,8 @@ impl OcmManeuver {
     }
 
     /// Start time of duty cycle execution.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_dc_exec_start(&self) -> Option<String> {
         self.inner
@@ -3734,6 +3840,8 @@ impl OcmManeuver {
     }
 
     /// Stop time of duty cycle execution.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_dc_exec_stop(&self) -> Option<String> {
         self.inner
@@ -3748,6 +3856,8 @@ impl OcmManeuver {
     }
 
     /// Reference time for duty cycle.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_dc_ref_time(&self) -> Option<String> {
         self.inner
@@ -3762,6 +3872,8 @@ impl OcmManeuver {
     }
 
     /// Duration of the duty cycle pulse.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_dc_time_pulse_duration(&self) -> Option<f64> {
         self.inner.dc_time_pulse_duration.as_ref().map(|d| d.value)
@@ -3776,6 +3888,8 @@ impl OcmManeuver {
     }
 
     /// Period of the duty cycle pulse.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_dc_time_pulse_period(&self) -> Option<f64> {
         self.inner.dc_time_pulse_period.as_ref().map(|d| d.value)
@@ -3790,6 +3904,8 @@ impl OcmManeuver {
     }
 
     /// Reference direction for duty cycle.
+    ///
+    /// :type: Optional[list[float]]
     #[getter]
     fn get_dc_ref_dir(&self) -> Option<Vec<f64>> {
         self.inner.dc_ref_dir.as_ref().map(|v| vec![v.x, v.y, v.z])
@@ -3815,6 +3931,8 @@ impl OcmManeuver {
     }
 
     /// Body frame for duty cycle.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_dc_body_frame(&self) -> Option<String> {
         self.inner.dc_body_frame.clone()
@@ -3825,6 +3943,8 @@ impl OcmManeuver {
     }
 
     /// Body trigger for duty cycle.
+    ///
+    /// :type: Optional[list[float]]
     #[getter]
     fn get_dc_body_trigger(&self) -> Option<Vec<f64>> {
         self.inner
@@ -3853,6 +3973,8 @@ impl OcmManeuver {
     }
 
     /// Phase angle start for duty cycle.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_dc_pa_start_angle(&self) -> Option<f64> {
         self.inner.dc_pa_start_angle.as_ref().map(|a| a.value)
@@ -3867,6 +3989,8 @@ impl OcmManeuver {
     }
 
     /// Phase angle stop for duty cycle.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_dc_pa_stop_angle(&self) -> Option<f64> {
         self.inner.dc_pa_stop_angle.as_ref().map(|a| a.value)
@@ -3881,6 +4005,8 @@ impl OcmManeuver {
     }
 
     /// Specifies the maneuver composition (e.g., 'VECTOR', 'SCALAR').
+    ///
+    /// :type: str
     #[getter]
     fn get_man_composition(&self) -> String {
         self.inner.man_composition.clone()
@@ -3890,6 +4016,8 @@ impl OcmManeuver {
         self.inner.man_composition = value;
     }
     /// SI unit designations for the maneuver elements.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_man_units(&self) -> Option<String> {
         self.inner.man_units.clone()
@@ -3900,7 +4028,7 @@ impl OcmManeuver {
     }
     /// A list of maneuver data lines.
     ///
-    /// :type: List[ManLine]
+    /// :type: list[ManLine]
     #[getter]
     fn get_man_lines(&self) -> Vec<ManLine> {
         self.inner
@@ -3916,7 +4044,7 @@ impl OcmManeuver {
 
     /// Comments for this maneuver block.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -3974,7 +4102,7 @@ impl ManLine {
 
     /// Maneuver elements for this epoch.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_values(&self) -> Vec<String> {
         self.inner.values.clone()
@@ -4023,7 +4151,7 @@ impl OcmPerturbations {
 
     /// Comments for the perturbations section.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -4055,6 +4183,9 @@ impl OcmPerturbations {
         self.inner.gravity_model = value;
     }
     /// Equatorial radius of the central body [km].
+    ///
+    /// :type: Optional[float]
+    /// :unit: km
     #[getter]
     fn get_equatorial_radius(&self) -> Option<f64> {
         self.inner.equatorial_radius.as_ref().map(|p| p.value)
@@ -4068,6 +4199,9 @@ impl OcmPerturbations {
         });
     }
     /// Mass of the central body times the gravitational constant [km**3/s**2].
+    ///
+    /// :type: Optional[float]
+    /// :unit: km³/s²
     #[getter]
     fn get_gm(&self) -> Option<f64> {
         self.inner.gm.as_ref().map(|g| g.value)
@@ -4503,6 +4637,9 @@ impl OcmOdParameters {
         )
     }
 
+    /// Comments for the orbit determination parameters section.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -4925,6 +5062,9 @@ impl UserDefined {
         format!("UserDefined(params={})", self.inner.user_defined.len())
     }
 
+    /// Comments for the user-defined section.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -4934,6 +5074,8 @@ impl UserDefined {
         self.inner.comment = value;
     }
     /// User-defined parameters.
+    ///
+    /// :type: dict[str, str]
     #[getter]
     fn get_parameters(&self) -> std::collections::HashMap<String, String> {
         self.inner

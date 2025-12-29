@@ -9,7 +9,7 @@ authors = ["Jochim Maene <16223990+JochimMaene@users.noreply.github.com>"]
 edition = "2021"
 description = "Parse and generate CCSDS Navigation Data Messages (NDM) in KVN and XML formats"
 license = "MPL-2.0"
-repository = "https://github.com/JochimMaene/ccsds-ndm2"
+repository = "https://github.com/JochimMaene/ccsds-ndm"
 documentation = "https://docs.rs/ccsds-ndm"
 
 [dependencies]

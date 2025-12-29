@@ -1,3 +1,7 @@
+===
+CDM
+===
+
 .. title:: CONJUNCTION DATA MESSAGE
 
 .. rubric:: RECOMMENDED STANDARD
@@ -2549,7 +2553,7 @@ The following rules apply for both KVN- and XML-formatted CDMs.
 .. _general_rules_cdm:
 
 5.2 RULES THAT APPLY IN KVN AND XML
----------------------------------
+-----------------------------------
 
 5.2.1 Some keywords represent obligatory items and some are optional. KVN and XML
 assignments representing optional items may be omitted.
@@ -3022,7 +3026,7 @@ A2.1 GENERAL INFORMATION
 .. _annex_a_identification_ics_cdm:
 
 A2.1.1 Identification of ICS
-"""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""
 
 .. list-table::
    :widths: 50 50
@@ -3108,7 +3112,7 @@ A2.1.4 Document Version
 .. _annex_a_requirements_list_cdm:
 
 A2.1.5 Requirements List
-^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. list-table::
    :widths: 5 25 20 15 10 10

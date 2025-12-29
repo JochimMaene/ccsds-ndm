@@ -20,7 +20,11 @@ html_theme = "shibuya"
 html_theme_options = {
     "github_url": "https://github.com/JochimMaene/ccsds-ndm",
     "nav_links": [
-        {"title": "Rust API", "url": "rust/index.html", "external": True},
+        {
+            "title": "Rust API",
+            "url": "https://docs.rs/ccsds-ndm/latest/ccsds_ndm/",
+            "external": True,
+        },
     ],
 }
 

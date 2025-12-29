@@ -34,7 +34,7 @@ def ocm_kvn_path():
 
 
 @pytest.fixture
-def ocm_parsed(ocm_kvn_path):
+def ocm_parsed(ocm_kvn_path) -> Ocm:
     """Provides a parsed OCM object from the example KVN file."""
     assert ocm_kvn_path.exists(), f"Test data file not found at {ocm_kvn_path}"
     kvn_content = ocm_kvn_path.read_text()
@@ -53,28 +53,28 @@ def ocm_parsed(ocm_kvn_path):
 class TestOcmParsing:
     """Tests for parsing OCM files."""
 
-    def test_parse_returns_ocm_type(self, ocm_parsed):
+    def test_parse_returns_ocm_type(self, ocm_parsed: Ocm):
         """Verify parse returns an Ocm instance."""
         assert ocm_parsed is not None
         assert isinstance(ocm_parsed, Ocm)
 
-    def test_ocm_header_fields(self, ocm_parsed):
+    def test_ocm_header_fields(self, ocm_parsed: Ocm):
         """Test that header fields are correctly parsed."""
         header = ocm_parsed.header
         assert header.originator == "JAPAN AEROSPACE EXPLORATION AGENCY"
         assert header.creation_date == "2022-11-06T09:23:57"
 
-    def test_ocm_metadata_time_system(self, ocm_parsed):
+    def test_ocm_metadata_time_system(self, ocm_parsed: Ocm):
         """Test that metadata time_system is correctly parsed."""
         metadata = ocm_parsed.segment.metadata
         assert metadata.time_system == "UTC"
 
-    def test_ocm_metadata_epoch_tzero(self, ocm_parsed):
+    def test_ocm_metadata_epoch_tzero(self, ocm_parsed: Ocm):
         """Test that metadata epoch_tzero is correctly parsed."""
         metadata = ocm_parsed.segment.metadata
         assert metadata.epoch_tzero == "2022-12-18T14:28:15.1172"
 
-    def test_ocm_trajectory_details(self, ocm_parsed):
+    def test_ocm_trajectory_details(self, ocm_parsed: Ocm):
         """Test trajectory state details."""
         data = ocm_parsed.segment.data
         traj_states = data.traj

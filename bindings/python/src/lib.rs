@@ -122,6 +122,8 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<OmmMetadata>()?;
     m.add_class::<MeanElements>()?;
     m.add_class::<OmmData>()?;
+    m.add_class::<omm::TleParameters>()?;
+    m.add_class::<common::SpacecraftParameters>()?;
 
     // Register OPM wrapper classes
     m.add_class::<Opm>()?;
@@ -130,6 +132,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<KeplerianElements>()?;
     m.add_class::<OpmCovarianceMatrix>()?;
     m.add_class::<OpmData>()?;
+    m.add_class::<ManeuverParameters>()?;
 
     // Register OCM wrapper classes
     m.add_class::<ocm::Ocm>()?;
@@ -165,6 +168,9 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<rdm::AtmosphericReentryParameters>()?;
     m.add_class::<rdm::GroundImpactParameters>()?;
     m.add_class::<rdm::RdmSpacecraftParameters>()?;
+    m.add_class::<rdm::RdmCovarianceMatrix>()?;
+    m.add_class::<rdm::RdmStateVector>()?;
+    m.add_class::<rdm::OdParameters>()?;
 
     // Register CDM wrapper classes
     // CDM Classes

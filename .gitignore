@@ -62,8 +62,25 @@ htmlcov/
 
 xsd/
 
-copilot-instructions.md
+# ------------------------------
+# Profiling outputs
+# ------------------------------
 
 flamegraph.svg
 perf.data
 perf.data.old
+
+# ------------------------------
+# Build artifacts
+# ------------------------------
+
+_build/
+
+# ------------------------------
+# LLM Instructions
+# ------------------------------
+
+copilot-instructions.md
+.geminiignore
+GEMINI.md
+CLAUDE.md

@@ -314,7 +314,7 @@ impl RdmHeader {
 
     /// Comments.
     ///
-    /// :type: List[str]
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -557,6 +557,9 @@ impl RdmMetadata {
         format!("RdmMetadata(object_name='{}')", self.inner.object_name)
     }
 
+    /// Object name.
+    ///
+    /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
         self.inner.object_name.clone()
@@ -566,6 +569,9 @@ impl RdmMetadata {
         self.inner.object_name = v;
     }
 
+    /// International designator (COSPAR ID).
+    ///
+    /// :type: str
     #[getter]
     fn get_international_designator(&self) -> String {
         self.inner.international_designator.clone()
@@ -575,6 +581,9 @@ impl RdmMetadata {
         self.inner.international_designator = v;
     }
 
+    /// Catalog name.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_catalog_name(&self) -> Option<String> {
         self.inner.catalog_name.clone()
@@ -584,6 +593,9 @@ impl RdmMetadata {
         self.inner.catalog_name = v;
     }
 
+    /// Object designator.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_object_designator(&self) -> Option<String> {
         self.inner.object_designator.clone()
@@ -593,6 +605,9 @@ impl RdmMetadata {
         self.inner.object_designator = v;
     }
 
+    /// Object type.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_object_type(&self) -> Option<String> {
         self.inner.object_type.as_ref().map(|v| v.to_string())
@@ -610,6 +625,9 @@ impl RdmMetadata {
         Ok(())
     }
 
+    /// Object owner.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_object_owner(&self) -> Option<String> {
         self.inner.object_owner.clone()
@@ -619,6 +637,9 @@ impl RdmMetadata {
         self.inner.object_owner = v;
     }
 
+    /// Object operator.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_object_operator(&self) -> Option<String> {
         self.inner.object_operator.clone()
@@ -628,6 +649,9 @@ impl RdmMetadata {
         self.inner.object_operator = v;
     }
 
+    /// Controlled re-entry status.
+    ///
+    /// :type: str
     #[getter]
     fn get_controlled_reentry(&self) -> String {
         self.inner.controlled_reentry.to_string()
@@ -640,6 +664,9 @@ impl RdmMetadata {
         Ok(())
     }
 
+    /// Center name (e.g., EARTH).
+    ///
+    /// :type: str
     #[getter]
     fn get_center_name(&self) -> String {
         self.inner.center_name.clone()
@@ -649,6 +676,9 @@ impl RdmMetadata {
         self.inner.center_name = v;
     }
 
+    /// Time system.
+    ///
+    /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
         self.inner.time_system.clone()
@@ -658,6 +688,9 @@ impl RdmMetadata {
         self.inner.time_system = v;
     }
 
+    /// Epoch from which the orbit lifetime is calculated.
+    ///
+    /// :type: str
     #[getter]
     fn get_epoch_tzero(&self) -> String {
         self.inner.epoch_tzero.as_str().to_string()
@@ -668,6 +701,9 @@ impl RdmMetadata {
         Ok(())
     }
 
+    /// Reference frame.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_ref_frame(&self) -> Option<String> {
         self.inner.ref_frame.clone()
@@ -677,6 +713,9 @@ impl RdmMetadata {
         self.inner.ref_frame = v;
     }
 
+    /// Reference frame epoch.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_ref_frame_epoch(&self) -> Option<String> {
         self.inner
@@ -690,6 +729,9 @@ impl RdmMetadata {
         Ok(())
     }
 
+    /// Ephemeris name.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_ephemeris_name(&self) -> Option<String> {
         self.inner.ephemeris_name.clone()
@@ -699,6 +741,9 @@ impl RdmMetadata {
         self.inner.ephemeris_name = v;
     }
 
+    /// Gravity model.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_gravity_model(&self) -> Option<String> {
         self.inner.gravity_model.clone()
@@ -708,6 +753,9 @@ impl RdmMetadata {
         self.inner.gravity_model = v;
     }
 
+    /// Atmospheric model.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_atmospheric_model(&self) -> Option<String> {
         self.inner.atmospheric_model.clone()
@@ -717,6 +765,9 @@ impl RdmMetadata {
         self.inner.atmospheric_model = v;
     }
 
+    /// Solar flux prediction methodology.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_solar_flux_prediction(&self) -> Option<String> {
         self.inner.solar_flux_prediction.clone()
@@ -726,6 +777,9 @@ impl RdmMetadata {
         self.inner.solar_flux_prediction = v;
     }
 
+    /// N-body perturbations.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_n_body_perturbations(&self) -> Option<String> {
         self.inner.n_body_perturbations.clone()
@@ -735,6 +789,9 @@ impl RdmMetadata {
         self.inner.n_body_perturbations = v;
     }
 
+    /// Solar radiation pressure model.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_solar_rad_pressure(&self) -> Option<String> {
         self.inner.solar_rad_pressure.clone()
@@ -744,6 +801,9 @@ impl RdmMetadata {
         self.inner.solar_rad_pressure = v;
     }
 
+    /// Earth tides model.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_earth_tides(&self) -> Option<String> {
         self.inner.earth_tides.clone()
@@ -753,6 +813,9 @@ impl RdmMetadata {
         self.inner.earth_tides = v;
     }
 
+    /// In-track thrust status.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_intrack_thrust(&self) -> Option<String> {
         self.inner.intrack_thrust.as_ref().map(|v| v.to_string())
@@ -767,6 +830,9 @@ impl RdmMetadata {
         Ok(())
     }
 
+    /// Drag parameters source.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_drag_parameters_source(&self) -> Option<String> {
         self.inner.drag_parameters_source.clone()
@@ -776,6 +842,9 @@ impl RdmMetadata {
         self.inner.drag_parameters_source = v;
     }
 
+    /// Drag parameters altitude (km).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_drag_parameters_altitude(&self) -> Option<f64> {
         self.inner
@@ -788,6 +857,9 @@ impl RdmMetadata {
         self.inner.drag_parameters_altitude = v.map(PositionRequired::new);
     }
 
+    /// Reentry uncertainty method.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_reentry_uncertainty_method(&self) -> Option<String> {
         self.inner.reentry_uncertainty_method.clone()
@@ -797,6 +869,9 @@ impl RdmMetadata {
         self.inner.reentry_uncertainty_method = v;
     }
 
+    /// Reentry disintegration.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_reentry_disintegration(&self) -> Option<String> {
         self.inner.reentry_disintegration.clone()
@@ -806,6 +881,9 @@ impl RdmMetadata {
         self.inner.reentry_disintegration = v;
     }
 
+    /// Impact uncertainty method.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_impact_uncertainty_method(&self) -> Option<String> {
         self.inner.impact_uncertainty_method.clone()
@@ -815,6 +893,9 @@ impl RdmMetadata {
         self.inner.impact_uncertainty_method = v;
     }
 
+    /// Previous message ID.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_previous_message_id(&self) -> Option<String> {
         self.inner.previous_message_id.clone()
@@ -824,6 +905,9 @@ impl RdmMetadata {
         self.inner.previous_message_id = v;
     }
 
+    /// Previous message epoch.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_previous_message_epoch(&self) -> Option<String> {
         self.inner
@@ -837,6 +921,9 @@ impl RdmMetadata {
         Ok(())
     }
 
+    /// Next message epoch.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_next_message_epoch(&self) -> Option<String> {
         self.inner
@@ -850,6 +937,9 @@ impl RdmMetadata {
         Ok(())
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -942,6 +1032,9 @@ impl RdmData {
         )
     }
 
+    /// Atmospheric re-entry parameters.
+    ///
+    /// :type: AtmosphericReentryParameters
     #[getter]
     fn get_atmospheric_reentry_parameters(&self) -> AtmosphericReentryParameters {
         AtmosphericReentryParameters {
@@ -953,6 +1046,9 @@ impl RdmData {
         self.inner.atmospheric_reentry_parameters = v.inner;
     }
 
+    /// Ground impact parameters.
+    ///
+    /// :type: Optional[GroundImpactParameters]
     #[getter]
     fn get_ground_impact_parameters(&self) -> Option<GroundImpactParameters> {
         self.inner
@@ -965,6 +1061,9 @@ impl RdmData {
         self.inner.ground_impact_parameters = v.map(|g| g.inner);
     }
 
+    /// State vector.
+    ///
+    /// :type: Optional[RdmStateVector]
     #[getter]
     fn get_state_vector(&self) -> Option<RdmStateVector> {
         self.inner
@@ -977,6 +1076,9 @@ impl RdmData {
         self.inner.state_vector = v.map(|sv| sv.inner);
     }
 
+    /// Covariance matrix.
+    ///
+    /// :type: Optional[RdmCovarianceMatrix]
     #[getter]
     fn get_covariance_matrix(&self) -> Option<RdmCovarianceMatrix> {
         self.inner
@@ -989,6 +1091,9 @@ impl RdmData {
         self.inner.covariance_matrix = v.map(|cm| cm.inner);
     }
 
+    /// Spacecraft parameters.
+    ///
+    /// :type: Optional[RdmSpacecraftParameters]
     #[getter]
     fn get_spacecraft_parameters(&self) -> Option<RdmSpacecraftParameters> {
         self.inner
@@ -1001,6 +1106,9 @@ impl RdmData {
         self.inner.spacecraft_parameters = v.map(|sp| sp.inner);
     }
 
+    /// Orbit determination parameters.
+    ///
+    /// :type: Optional[OdParameters]
     #[getter]
     fn get_od_parameters(&self) -> Option<OdParameters> {
         self.inner
@@ -1013,6 +1121,9 @@ impl RdmData {
         self.inner.od_parameters = v.map(|op| op.inner);
     }
 
+    /// User defined parameters.
+    ///
+    /// :type: list[tuple[str, str]]
     #[getter]
     fn get_user_defined_parameters(&self) -> Vec<(String, String)> {
         self.inner.user_defined_parameters.clone()
@@ -1022,6 +1133,9 @@ impl RdmData {
         self.inner.user_defined_parameters = v;
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1104,6 +1218,9 @@ impl AtmosphericReentryParameters {
         })
     }
 
+    /// Remaining time in orbit (days).
+    ///
+    /// :type: float
     #[getter]
     fn get_orbit_lifetime(&self) -> f64 {
         self.inner.orbit_lifetime.value
@@ -1113,6 +1230,9 @@ impl AtmosphericReentryParameters {
         self.inner.orbit_lifetime.value = v;
     }
 
+    /// Defined re-entry altitude (km).
+    ///
+    /// :type: float
     #[getter]
     fn get_reentry_altitude(&self) -> f64 {
         self.inner.reentry_altitude.value
@@ -1122,6 +1242,9 @@ impl AtmosphericReentryParameters {
         self.inner.reentry_altitude.value = v;
     }
 
+    /// Start of the orbit lifetime window (days).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_orbit_lifetime_window_start(&self) -> Option<f64> {
         self.inner
@@ -1138,6 +1261,9 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
+    /// End of the orbit lifetime window (days).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_orbit_lifetime_window_end(&self) -> Option<f64> {
         self.inner
@@ -1154,6 +1280,11 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
+    /// Nominal re-entry epoch.
+    ///
+    /// Format: ISO 8601
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_nominal_reentry_epoch(&self) -> Option<String> {
         self.inner
@@ -1167,6 +1298,11 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
+    /// Start of the re-entry window.
+    ///
+    /// Format: ISO 8601
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_reentry_window_start(&self) -> Option<String> {
         self.inner
@@ -1180,6 +1316,11 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
+    /// End of the re-entry window.
+    ///
+    /// Format: ISO 8601
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_reentry_window_end(&self) -> Option<String> {
         self.inner
@@ -1193,6 +1334,9 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
+    /// Confidence level for orbit lifetime (percentage 0-100).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_orbit_lifetime_confidence_level(&self) -> Option<f64> {
         self.inner
@@ -1209,6 +1353,9 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1284,6 +1431,9 @@ impl GroundImpactParameters {
         })
     }
 
+    /// Probability of impact.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_probability_of_impact(&self) -> Option<f64> {
         self.inner.probability_of_impact.as_ref().map(|p| p.value)
@@ -1297,6 +1447,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// Probability of burn-up.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_probability_of_burn_up(&self) -> Option<f64> {
         self.inner.probability_of_burn_up.as_ref().map(|p| p.value)
@@ -1310,6 +1463,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// Probability of break-up.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_probability_of_break_up(&self) -> Option<f64> {
         self.inner.probability_of_break_up.as_ref().map(|p| p.value)
@@ -1323,6 +1479,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// Probability of land impact.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_probability_of_land_impact(&self) -> Option<f64> {
         self.inner
@@ -1339,6 +1498,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// Probability of casualty.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_probability_of_casualty(&self) -> Option<f64> {
         self.inner.probability_of_casualty.as_ref().map(|p| p.value)
@@ -1352,6 +1514,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// Nominal impact epoch.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_nominal_impact_epoch(&self) -> Option<String> {
         self.inner
@@ -1365,6 +1530,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// Start of the impact window.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_impact_window_start(&self) -> Option<String> {
         self.inner
@@ -1378,6 +1546,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// End of the impact window.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_impact_window_end(&self) -> Option<String> {
         self.inner
@@ -1391,6 +1562,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// Impact reference frame.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_impact_ref_frame(&self) -> Option<String> {
         self.inner.impact_ref_frame.clone()
@@ -1400,6 +1574,9 @@ impl GroundImpactParameters {
         self.inner.impact_ref_frame = v;
     }
 
+    /// Nominal impact longitude (degrees).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_nominal_impact_lon(&self) -> Option<f64> {
         self.inner.nominal_impact_lon.as_ref().map(|v| v.value)
@@ -1413,6 +1590,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// Nominal impact latitude (degrees).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_nominal_impact_lat(&self) -> Option<f64> {
         self.inner.nominal_impact_lat.as_ref().map(|v| v.value)
@@ -1426,6 +1606,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// Nominal impact altitude (km).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_nominal_impact_alt(&self) -> Option<f64> {
         self.inner.nominal_impact_alt.as_ref().map(|v| v.value)
@@ -1439,6 +1622,9 @@ impl GroundImpactParameters {
         Ok(())
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1490,6 +1676,9 @@ impl RdmSpacecraftParameters {
         }
     }
 
+    /// Spacecraft wet mass (kg).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_wet_mass(&self) -> Option<f64> {
         self.inner.wet_mass.as_ref().map(|m| m.value)
@@ -1502,6 +1691,9 @@ impl RdmSpacecraftParameters {
         });
     }
 
+    /// Spacecraft dry mass (kg).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_dry_mass(&self) -> Option<f64> {
         self.inner.dry_mass.as_ref().map(|m| m.value)
@@ -1514,6 +1706,9 @@ impl RdmSpacecraftParameters {
         });
     }
 
+    /// Quantity of hazardous substances (kg).
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_hazardous_substances(&self) -> Option<String> {
         self.inner.hazardous_substances.clone()
@@ -1523,6 +1718,9 @@ impl RdmSpacecraftParameters {
         self.inner.hazardous_substances = v;
     }
 
+    /// Solar radiation pressure area (m^2).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_solar_rad_area(&self) -> Option<f64> {
         self.inner.solar_rad_area.as_ref().map(|v| v.value)
@@ -1535,6 +1733,9 @@ impl RdmSpacecraftParameters {
         });
     }
 
+    /// Solar radiation pressure coefficient.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_solar_rad_coeff(&self) -> Option<f64> {
         self.inner.solar_rad_coeff
@@ -1544,6 +1745,9 @@ impl RdmSpacecraftParameters {
         self.inner.solar_rad_coeff = v;
     }
 
+    /// Drag area (m^2).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_drag_area(&self) -> Option<f64> {
         self.inner.drag_area.as_ref().map(|v| v.value)
@@ -1556,6 +1760,9 @@ impl RdmSpacecraftParameters {
         });
     }
 
+    /// Drag coefficient.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_drag_coeff(&self) -> Option<f64> {
         self.inner.drag_coeff
@@ -1565,6 +1772,9 @@ impl RdmSpacecraftParameters {
         self.inner.drag_coeff = v;
     }
 
+    /// Radar cross section (m^2).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_rcs(&self) -> Option<f64> {
         self.inner.rcs.as_ref().map(|v| v.value)
@@ -1577,6 +1787,9 @@ impl RdmSpacecraftParameters {
         });
     }
 
+    /// Ballistic coefficient (kg/m^2).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_ballistic_coeff(&self) -> Option<f64> {
         self.inner.ballistic_coeff.as_ref().map(|v| v.value)
@@ -1590,6 +1803,9 @@ impl RdmSpacecraftParameters {
         Ok(())
     }
 
+    /// Constant thrust acceleration (m/s^2).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_thrust_acceleration(&self) -> Option<f64> {
         self.inner.thrust_acceleration.as_ref().map(|v| v.value)
@@ -1599,6 +1815,9 @@ impl RdmSpacecraftParameters {
         self.inner.thrust_acceleration = v.map(ccsds_ndm::types::Ms2Required::new);
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1641,6 +1860,9 @@ impl OdParameters {
         }
     }
 
+    /// Time of last observation start.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_time_lastob_start(&self) -> Option<String> {
         self.inner
@@ -1654,6 +1876,9 @@ impl OdParameters {
         Ok(())
     }
 
+    /// Time of last observation end.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_time_lastob_end(&self) -> Option<String> {
         self.inner
@@ -1667,6 +1892,9 @@ impl OdParameters {
         Ok(())
     }
 
+    /// Recommended orbit determination span (days).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_recommended_od_span(&self) -> Option<f64> {
         self.inner.recommended_od_span.as_ref().map(|v| v.value)
@@ -1679,6 +1907,9 @@ impl OdParameters {
         });
     }
 
+    /// Actual orbit determination span (days).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_actual_od_span(&self) -> Option<f64> {
         self.inner.actual_od_span.as_ref().map(|v| v.value)
@@ -1691,6 +1922,9 @@ impl OdParameters {
         });
     }
 
+    /// Number of observations available.
+    ///
+    /// :type: Optional[int]
     #[getter]
     fn get_obs_available(&self) -> Option<u32> {
         self.inner.obs_available
@@ -1700,6 +1934,9 @@ impl OdParameters {
         self.inner.obs_available = v;
     }
 
+    /// Number of observations used.
+    ///
+    /// :type: Optional[int]
     #[getter]
     fn get_obs_used(&self) -> Option<u32> {
         self.inner.obs_used
@@ -1709,6 +1946,9 @@ impl OdParameters {
         self.inner.obs_used = v;
     }
 
+    /// Number of tracks available.
+    ///
+    /// :type: Optional[int]
     #[getter]
     fn get_tracks_available(&self) -> Option<u32> {
         self.inner.tracks_available
@@ -1718,6 +1958,9 @@ impl OdParameters {
         self.inner.tracks_available = v;
     }
 
+    /// Number of tracks used.
+    ///
+    /// :type: Optional[int]
     #[getter]
     fn get_tracks_used(&self) -> Option<u32> {
         self.inner.tracks_used
@@ -1727,6 +1970,9 @@ impl OdParameters {
         self.inner.tracks_used = v;
     }
 
+    /// Residuals accepted (percentage).
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_residuals_accepted(&self) -> Option<f64> {
         self.inner.residuals_accepted.as_ref().map(|v| v.value)
@@ -1740,6 +1986,9 @@ impl OdParameters {
         Ok(())
     }
 
+    /// Weighted RMS.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn get_weighted_rms(&self) -> Option<f64> {
         self.inner.weighted_rms
@@ -1749,6 +1998,9 @@ impl OdParameters {
         self.inner.weighted_rms = v;
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1818,6 +2070,9 @@ impl RdmStateVector {
         })
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1828,6 +2083,9 @@ impl RdmStateVector {
         self.inner.comment = comments;
     }
 
+    /// Epoch.
+    ///
+    /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
         self.inner.epoch.as_str().to_string()
@@ -1838,6 +2096,9 @@ impl RdmStateVector {
         Ok(())
     }
 
+    /// X position (km).
+    ///
+    /// :type: float
     #[getter]
     fn get_x(&self) -> f64 {
         self.inner.x.value
@@ -1847,6 +2108,9 @@ impl RdmStateVector {
         self.inner.x.value = v;
     }
 
+    /// Y position (km).
+    ///
+    /// :type: float
     #[getter]
     fn get_y(&self) -> f64 {
         self.inner.y.value
@@ -1856,6 +2120,9 @@ impl RdmStateVector {
         self.inner.y.value = v;
     }
 
+    /// Z position (km).
+    ///
+    /// :type: float
     #[getter]
     fn get_z(&self) -> f64 {
         self.inner.z.value
@@ -1865,6 +2132,9 @@ impl RdmStateVector {
         self.inner.z.value = v;
     }
 
+    /// X velocity (km/s).
+    ///
+    /// :type: float
     #[getter]
     fn get_x_dot(&self) -> f64 {
         self.inner.x_dot.value
@@ -1874,6 +2144,9 @@ impl RdmStateVector {
         self.inner.x_dot.value = v;
     }
 
+    /// Y velocity (km/s).
+    ///
+    /// :type: float
     #[getter]
     fn get_y_dot(&self) -> f64 {
         self.inner.y_dot.value
@@ -1883,6 +2156,9 @@ impl RdmStateVector {
         self.inner.y_dot.value = v;
     }
 
+    /// Z velocity (km/s).
+    ///
+    /// :type: float
     #[getter]
     fn get_z_dot(&self) -> f64 {
         self.inner.z_dot.value
@@ -2001,6 +2277,9 @@ impl RdmCovarianceMatrix {
         }
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -2011,6 +2290,9 @@ impl RdmCovarianceMatrix {
         self.inner.comment = comments;
     }
 
+    /// Covariance reference frame.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_cov_ref_frame(&self) -> Option<String> {
         self.inner.cov_ref_frame.clone()
@@ -2020,6 +2302,9 @@ impl RdmCovarianceMatrix {
         self.inner.cov_ref_frame = v;
     }
 
+    /// CX_X covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cx_x(&self) -> f64 {
         self.inner.cx_x.value
@@ -2032,6 +2317,9 @@ impl RdmCovarianceMatrix {
     // ... Implement all other covariance elements ...
     // Since there are 21 elements, providing a few examples. The pattern is identical.
 
+    /// CY_X covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cy_x(&self) -> f64 {
         self.inner.cy_x.value
@@ -2041,6 +2329,9 @@ impl RdmCovarianceMatrix {
         self.inner.cy_x.value = v;
     }
 
+    /// CY_Y covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cy_y(&self) -> f64 {
         self.inner.cy_y.value
@@ -2050,6 +2341,9 @@ impl RdmCovarianceMatrix {
         self.inner.cy_y.value = v;
     }
 
+    /// CZ_X covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cz_x(&self) -> f64 {
         self.inner.cz_x.value
@@ -2059,6 +2353,9 @@ impl RdmCovarianceMatrix {
         self.inner.cz_x.value = v;
     }
 
+    /// CZ_Y covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cz_y(&self) -> f64 {
         self.inner.cz_y.value
@@ -2068,6 +2365,9 @@ impl RdmCovarianceMatrix {
         self.inner.cz_y.value = v;
     }
 
+    /// CZ_Z covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cz_z(&self) -> f64 {
         self.inner.cz_z.value
@@ -2078,6 +2378,9 @@ impl RdmCovarianceMatrix {
     }
 
     // Velocity-Position Cross
+    /// CX_DOT_X covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cx_dot_x(&self) -> f64 {
         self.inner.cx_dot_x.value
@@ -2087,6 +2390,9 @@ impl RdmCovarianceMatrix {
         self.inner.cx_dot_x.value = v;
     }
 
+    /// CX_DOT_Y covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cx_dot_y(&self) -> f64 {
         self.inner.cx_dot_y.value
@@ -2096,6 +2402,9 @@ impl RdmCovarianceMatrix {
         self.inner.cx_dot_y.value = v;
     }
 
+    /// CX_DOT_Z covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cx_dot_z(&self) -> f64 {
         self.inner.cx_dot_z.value
@@ -2106,6 +2415,9 @@ impl RdmCovarianceMatrix {
     }
 
     // Velocity Covariance
+    /// CX_DOT_X_DOT covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cx_dot_x_dot(&self) -> f64 {
         self.inner.cx_dot_x_dot.value
@@ -2115,6 +2427,9 @@ impl RdmCovarianceMatrix {
         self.inner.cx_dot_x_dot.value = v;
     }
 
+    /// CY_DOT_X covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cy_dot_x(&self) -> f64 {
         self.inner.cy_dot_x.value
@@ -2124,6 +2439,9 @@ impl RdmCovarianceMatrix {
         self.inner.cy_dot_x.value = v;
     }
 
+    /// CY_DOT_Y covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cy_dot_y(&self) -> f64 {
         self.inner.cy_dot_y.value
@@ -2133,6 +2451,9 @@ impl RdmCovarianceMatrix {
         self.inner.cy_dot_y.value = v;
     }
 
+    /// CY_DOT_Z covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cy_dot_z(&self) -> f64 {
         self.inner.cy_dot_z.value
@@ -2142,6 +2463,9 @@ impl RdmCovarianceMatrix {
         self.inner.cy_dot_z.value = v;
     }
 
+    /// CY_DOT_X_DOT covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cy_dot_x_dot(&self) -> f64 {
         self.inner.cy_dot_x_dot.value
@@ -2151,6 +2475,9 @@ impl RdmCovarianceMatrix {
         self.inner.cy_dot_x_dot.value = v;
     }
 
+    /// CY_DOT_Y_DOT covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cy_dot_y_dot(&self) -> f64 {
         self.inner.cy_dot_y_dot.value
@@ -2160,6 +2487,9 @@ impl RdmCovarianceMatrix {
         self.inner.cy_dot_y_dot.value = v;
     }
 
+    /// CZ_DOT_X covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cz_dot_x(&self) -> f64 {
         self.inner.cz_dot_x.value
@@ -2169,6 +2499,9 @@ impl RdmCovarianceMatrix {
         self.inner.cz_dot_x.value = v;
     }
 
+    /// CZ_DOT_Y covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cz_dot_y(&self) -> f64 {
         self.inner.cz_dot_y.value
@@ -2178,6 +2511,9 @@ impl RdmCovarianceMatrix {
         self.inner.cz_dot_y.value = v;
     }
 
+    /// CZ_DOT_Z covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cz_dot_z(&self) -> f64 {
         self.inner.cz_dot_z.value
@@ -2187,6 +2523,9 @@ impl RdmCovarianceMatrix {
         self.inner.cz_dot_z.value = v;
     }
 
+    /// CZ_DOT_X_DOT covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cz_dot_x_dot(&self) -> f64 {
         self.inner.cz_dot_x_dot.value
@@ -2196,6 +2535,9 @@ impl RdmCovarianceMatrix {
         self.inner.cz_dot_x_dot.value = v;
     }
 
+    /// CZ_DOT_Y_DOT covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cz_dot_y_dot(&self) -> f64 {
         self.inner.cz_dot_y_dot.value
@@ -2205,6 +2547,9 @@ impl RdmCovarianceMatrix {
         self.inner.cz_dot_y_dot.value = v;
     }
 
+    /// CZ_DOT_Z_DOT covariance element.
+    ///
+    /// :type: float
     #[getter]
     fn get_cz_dot_z_dot(&self) -> f64 {
         self.inner.cz_dot_z_dot.value
@@ -2214,6 +2559,9 @@ impl RdmCovarianceMatrix {
         self.inner.cz_dot_z_dot.value = v;
     }
 
+    /// Comments for the covariance matrix.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()

@@ -174,6 +174,9 @@ impl Cdm {
         }
     }
 
+    /// The message header.
+    ///
+    /// :type: CdmHeader
     #[getter]
     fn header(&self) -> CdmHeader {
         CdmHeader {
@@ -181,6 +184,9 @@ impl Cdm {
         }
     }
 
+    /// The message body containing relative metadata/data and object segments.
+    ///
+    /// :type: CdmBody
     #[getter]
     fn body(&self) -> CdmBody {
         CdmBody {
@@ -188,11 +194,17 @@ impl Cdm {
         }
     }
 
+    /// Unique ID for this message.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn id(&self) -> Option<String> {
         self.inner.id.clone()
     }
 
+    /// The CDM version.
+    ///
+    /// :type: str
     #[getter]
     fn version(&self) -> String {
         self.inner.version.clone()
@@ -311,6 +323,9 @@ impl CdmHeader {
         self.inner.message_for = value;
     }
 
+    /// Explanatory comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -363,6 +378,9 @@ impl CdmBody {
         })
     }
 
+    /// Data describing the relative relationships between Object1 and Object2.
+    ///
+    /// :type: RelativeMetadataData
     #[getter]
     fn relative_metadata_data(&self) -> RelativeMetadataData {
         RelativeMetadataData {
@@ -370,6 +388,9 @@ impl CdmBody {
         }
     }
 
+    /// The segments containing specific data for each object.
+    ///
+    /// :type: list[CdmSegment]
     #[getter]
     fn segments(&self) -> Vec<CdmSegment> {
         self.inner
@@ -528,6 +549,9 @@ impl RelativeMetadataData {
         })
     }
 
+    /// The date and time in UTC of the closest approach.
+    ///
+    /// :type: str
     #[getter]
     fn tca(&self) -> String {
         self.inner.tca.to_string()
@@ -538,6 +562,9 @@ impl RelativeMetadataData {
         Ok(())
     }
 
+    /// The norm of the relative position vector at TCA.
+    ///
+    /// :type: float
     #[getter]
     fn miss_distance(&self) -> f64 {
         self.inner.miss_distance.value
@@ -546,11 +573,9 @@ impl RelativeMetadataData {
     fn set_miss_distance(&mut self, value: f64) {
         self.inner.miss_distance = Length::new(value, None);
     }
-    #[getter]
-    fn miss_distance_units(&self) -> String {
-        "m".to_string()
-    }
-
+    /// The norm of the relative velocity vector at TCA.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn relative_speed(&self) -> Option<f64> {
         self.inner.relative_speed.as_ref().map(|v| v.value)
@@ -559,11 +584,10 @@ impl RelativeMetadataData {
     fn set_relative_speed(&mut self, value: Option<f64>) {
         self.inner.relative_speed = value.map(|v| Dv::new(v, None));
     }
-    #[getter]
-    fn relative_speed_units(&self) -> String {
-        "m/s".to_string()
-    }
 
+    /// The probability (denoted 'p' where 0.0<=p<=1.0) that the two objects will collide.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn collision_probability(&self) -> Option<f64> {
         self.inner.collision_probability.as_ref().map(|v| v.value)
@@ -577,6 +601,9 @@ impl RelativeMetadataData {
         Ok(())
     }
 
+    /// The method used to calculate the collision probability.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn collision_probability_method(&self) -> Option<String> {
         self.inner.collision_probability_method.clone()
@@ -586,6 +613,9 @@ impl RelativeMetadataData {
         self.inner.collision_probability_method = value;
     }
 
+    /// The start time in UTC of the screening period for the conjunction assessment.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn start_screen_period(&self) -> Option<String> {
         self.inner
@@ -599,6 +629,9 @@ impl RelativeMetadataData {
         Ok(())
     }
 
+    /// The stop time in UTC of the screening period for the conjunction assessment.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn stop_screen_period(&self) -> Option<String> {
         self.inner
@@ -612,6 +645,9 @@ impl RelativeMetadataData {
         Ok(())
     }
 
+    /// The time in UTC when Object2 enters the screening volume.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn screen_entry_time(&self) -> Option<String> {
         self.inner.screen_entry_time.as_ref().map(|e| e.to_string())
@@ -622,6 +658,9 @@ impl RelativeMetadataData {
         Ok(())
     }
 
+    /// The time in UTC when Object2 exits the screening volume.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn screen_exit_time(&self) -> Option<String> {
         self.inner.screen_exit_time.as_ref().map(|e| e.to_string())
@@ -632,19 +671,33 @@ impl RelativeMetadataData {
         Ok(())
     }
 
+    /// The R or T component size of the screening volume.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn screen_volume_x(&self) -> Option<f64> {
         self.inner.screen_volume_x.as_ref().map(|v| v.value)
     }
+
+    /// The T or V component size of the screening volume.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn screen_volume_y(&self) -> Option<f64> {
         self.inner.screen_volume_y.as_ref().map(|v| v.value)
     }
+
+    /// The N component size of the screening volume.
+    ///
+    /// :type: Optional[float]
     #[getter]
     fn screen_volume_z(&self) -> Option<f64> {
         self.inner.screen_volume_z.as_ref().map(|v| v.value)
     }
 
+    /// Explanatory comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -683,6 +736,9 @@ impl CdmSegment {
         }
     }
 
+    /// Metadata for the object.
+    ///
+    /// :type: CdmMetadata
     #[getter]
     fn metadata(&self) -> CdmMetadata {
         CdmMetadata {
@@ -690,6 +746,9 @@ impl CdmSegment {
         }
     }
 
+    /// Data section for the object.
+    ///
+    /// :type: CdmData
     #[getter]
     fn data(&self) -> CdmData {
         CdmData {
@@ -879,6 +938,9 @@ impl CdmMetadata {
         }
     }
 
+    /// Spacecraft name for the object.
+    ///
+    /// :type: str
     #[getter]
     fn object_name(&self) -> String {
         self.inner.object_name.clone()
@@ -888,6 +950,9 @@ impl CdmMetadata {
         self.inner.object_name = value;
     }
 
+    /// The satellite catalog designator for the object.
+    ///
+    /// :type: str
     #[getter]
     fn object_designator(&self) -> String {
         self.inner.object_designator.clone()
@@ -897,6 +962,9 @@ impl CdmMetadata {
         self.inner.object_designator = value;
     }
 
+    /// The satellite catalog used for the object.
+    ///
+    /// :type: str
     #[getter]
     fn catalog_name(&self) -> String {
         self.inner.catalog_name.clone()
@@ -906,6 +974,9 @@ impl CdmMetadata {
         self.inner.catalog_name = value;
     }
 
+    /// The full international designator (YYYY-NNNP{PP}).
+    ///
+    /// :type: str
     #[getter]
     fn international_designator(&self) -> String {
         self.inner.international_designator.clone()
@@ -915,6 +986,9 @@ impl CdmMetadata {
         self.inner.international_designator = value;
     }
 
+    /// Unique name of the external ephemeris file or 'NONE'.
+    ///
+    /// :type: str
     #[getter]
     fn ephemeris_name(&self) -> String {
         self.inner.ephemeris_name.clone()
@@ -924,6 +998,9 @@ impl CdmMetadata {
         self.inner.ephemeris_name = value;
     }
 
+    /// Contact position of the owner/operator.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn operator_contact_position(&self) -> Option<String> {
         self.inner.operator_contact_position.clone()
@@ -933,6 +1010,9 @@ impl CdmMetadata {
         self.inner.operator_contact_position = value;
     }
 
+    /// Contact organization.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn operator_organization(&self) -> Option<String> {
         self.inner.operator_organization.clone()
@@ -942,6 +1022,9 @@ impl CdmMetadata {
         self.inner.operator_organization = value;
     }
 
+    /// Phone number of the contact.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn operator_phone(&self) -> Option<String> {
         self.inner.operator_phone.clone()
@@ -951,6 +1034,9 @@ impl CdmMetadata {
         self.inner.operator_phone = value;
     }
 
+    /// Email address of the contact.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn operator_email(&self) -> Option<String> {
         self.inner.operator_email.clone()
@@ -960,6 +1046,9 @@ impl CdmMetadata {
         self.inner.operator_email = value;
     }
 
+    /// The central body (e.g., EARTH, SUN).
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn orbit_center(&self) -> Option<String> {
         self.inner.orbit_center.clone()
@@ -969,6 +1058,9 @@ impl CdmMetadata {
         self.inner.orbit_center = value;
     }
 
+    /// The gravity model used for the OD.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn gravity_model(&self) -> Option<String> {
         self.inner.gravity_model.clone()
@@ -978,6 +1070,9 @@ impl CdmMetadata {
         self.inner.gravity_model = value;
     }
 
+    /// The atmospheric density model used for the OD.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn atmospheric_model(&self) -> Option<String> {
         self.inner.atmospheric_model.clone()
@@ -987,6 +1082,9 @@ impl CdmMetadata {
         self.inner.atmospheric_model = value;
     }
 
+    /// N-body gravitational perturbations used.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn n_body_perturbations(&self) -> Option<String> {
         self.inner.n_body_perturbations.clone()
@@ -996,6 +1094,9 @@ impl CdmMetadata {
         self.inner.n_body_perturbations = value;
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1049,6 +1150,9 @@ impl CdmData {
         }
     }
 
+    /// Object position and velocity at TCA.
+    ///
+    /// :type: CdmStateVector
     #[getter]
     fn state_vector(&self) -> CdmStateVector {
         CdmStateVector {
@@ -1056,6 +1160,9 @@ impl CdmData {
         }
     }
 
+    /// Object covariance at TCA.
+    ///
+    /// :type: CdmCovarianceMatrix
     #[getter]
     fn covariance_matrix(&self) -> CdmCovarianceMatrix {
         CdmCovarianceMatrix {
@@ -1063,6 +1170,9 @@ impl CdmData {
         }
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1120,6 +1230,9 @@ impl CdmStateVector {
         }
     }
 
+    /// Position X component.
+    ///
+    /// :type: float
     #[getter]
     fn x(&self) -> f64 {
         self.inner.x.value
@@ -1128,11 +1241,10 @@ impl CdmStateVector {
     fn set_x(&mut self, value: f64) {
         self.inner.x = PositionRequired::new(value);
     }
-    #[getter]
-    fn x_units(&self) -> String {
-        "km".to_string()
-    }
 
+    /// Position Y component.
+    ///
+    /// :type: float
     #[getter]
     fn y(&self) -> f64 {
         self.inner.y.value
@@ -1142,6 +1254,9 @@ impl CdmStateVector {
         self.inner.y = PositionRequired::new(value);
     }
 
+    /// Position Z component.
+    ///
+    /// :type: float
     #[getter]
     fn z(&self) -> f64 {
         self.inner.z.value
@@ -1151,6 +1266,9 @@ impl CdmStateVector {
         self.inner.z = PositionRequired::new(value);
     }
 
+    /// Velocity X component.
+    ///
+    /// :type: float
     #[getter]
     fn x_dot(&self) -> f64 {
         self.inner.x_dot.value
@@ -1159,11 +1277,10 @@ impl CdmStateVector {
     fn set_x_dot(&mut self, value: f64) {
         self.inner.x_dot = VelocityRequired::new(value);
     }
-    #[getter]
-    fn x_dot_units(&self) -> String {
-        "km/s".to_string()
-    }
 
+    /// Velocity Y component.
+    ///
+    /// :type: float
     #[getter]
     fn y_dot(&self) -> f64 {
         self.inner.y_dot.value
@@ -1173,6 +1290,9 @@ impl CdmStateVector {
         self.inner.y_dot = VelocityRequired::new(value);
     }
 
+    /// Velocity Z component.
+    ///
+    /// :type: float
     #[getter]
     fn z_dot(&self) -> f64 {
         self.inner.z_dot.value
@@ -1202,6 +1322,9 @@ pub struct CdmCovarianceMatrix {
 
 #[pymethods]
 impl CdmCovarianceMatrix {
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comments(&self) -> Vec<String> {
         self.inner.comment.clone()

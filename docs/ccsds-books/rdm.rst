@@ -1,3 +1,7 @@
+===
+RDM
+===
+
 .. title:: RE-ENTRY DATA MESSAGE
 
 .. rubric:: RECOMMENDED STANDARD
@@ -429,7 +433,7 @@ entities or even the spacecraft operators themselves (e.g., for a controlled re-
 .. _rdm_content_rdm:
 
 2.2 RDM CONTENT
--------------
+----------------
 
 The RDM is an ASCII format, encoded either as plain text (usually referred to as KVN) or
 XML (references [3], [4], and [5]). This standard describes both.
@@ -1373,7 +1377,7 @@ A2.1.1 Identification of ICS
 .. _identification_of_iut_rdm:
 
 A2.1.2 Identification of Implementation Under Test
-"""""""""""""""""""""""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""""""""""""""""
 
 .. list-table::
    :widths: 50 50
@@ -2021,9 +2025,9 @@ The following terms will be used in equations in the following subsections:
      - impact velocity
    * - :math:`ε`
      - radiation emission coefficient
-   * - :math:`ho`
+   * - :math:`rho`
      - density
-   * - :math:`ho_0`
+   * - :math:`rho_0`
      - Earth sea level atmospheric density
    * - :math:`σ`
      - Stefan-Boltzmann constant
