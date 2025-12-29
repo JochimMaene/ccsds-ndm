@@ -20,7 +20,7 @@ regex = "1.12.2"
 once_cell = "1.19"
 
 [dev-dependencies]
-criterion = "0.7.0"
+criterion = "0.8.1"
 tempfile = "3"
 
 [[bench]]
