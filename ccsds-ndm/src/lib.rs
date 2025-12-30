@@ -206,7 +206,8 @@ pub fn from_file<P: AsRef<Path>>(path: P) -> Result<MessageType> {
 /// Helper to detect XML message type by sniffing the root tag.
 fn detect_and_parse_xml(s: &str) -> Result<MessageType> {
     let mut reader = Reader::from_str(s);
-    reader.trim_text(true);
+    reader.config_mut().trim_text_start = true;
+    reader.config_mut().trim_text_end = true;
 
     loop {
         match reader.read_event() {
