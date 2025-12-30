@@ -15,7 +15,10 @@ use std::fs;
 // Import OpmCovarianceMatrix from opm module (shared type)
 use crate::opm::OpmCovarianceMatrix;
 
-/// Create a new OMM message.
+/// Orbit Mean-Elements Message (OMM).
+///
+/// The OMM contains the orbital characteristics of a single object at a specified epoch,
+/// expressed in mean Keplerian elements.
 ///
 /// Parameters
 /// ----------
@@ -242,26 +245,26 @@ impl OmmSegment {
     }
 }
 
-/// Create a new OMM Metadata object.
+/// Metadata for the OMM.
 ///
 /// Parameters
 /// ----------
 /// object_name : str
-///     Spacecraft name.
+///     Spacecraft name for which mean element orbit state data is provided.
 /// object_id : str
-///     Object identifier.
+///     Object identifier of the object for which mean element orbit state data is provided.
 /// center_name : str
-///     Origin of the reference frame.
+///     Origin of the OMM reference frame.
 /// ref_frame : str
-///     Reference frame.
+///     Reference frame in which the Keplerian element data are given.
 /// time_system : str
-///     Time system.
+///     Time system used for Keplerian elements and covariance data.
 /// mean_element_theory : str
-///     Description of the Mean Element Theory.
+///     Description of the Mean Element Theory. Indicates the proper method to employ to propagate the state.
 /// ref_frame_epoch : str, optional
-///     Epoch of the reference frame.
+///     Epoch of reference frame, if not intrinsic to the definition of the reference frame.
 /// comment : list of str, optional
-///     Comments.
+///     Comments (allowed at the beginning of the OMM Metadata).
 #[pyclass]
 #[derive(Clone)]
 pub struct OmmMetadata {
@@ -300,7 +303,7 @@ impl OmmMetadata {
         format!("OmmMetadata(object_name='{}')", self.inner.object_name)
     }
 
-    /// Spacecraft name.
+    /// Spacecraft name for which mean element orbit state data is provided.
     ///
     /// :type: str
     #[getter]
@@ -313,7 +316,7 @@ impl OmmMetadata {
         self.inner.object_name = value;
     }
 
-    /// Object identifier.
+    /// Object identifier of the object for which mean element orbit state data is provided.
     ///
     /// :type: str
     #[getter]
@@ -326,7 +329,7 @@ impl OmmMetadata {
         self.inner.object_id = value;
     }
 
-    /// Origin of the reference frame.
+    /// Origin of the OMM reference frame.
     ///
     /// :type: str
     #[getter]
@@ -339,7 +342,7 @@ impl OmmMetadata {
         self.inner.center_name = value;
     }
 
-    /// Reference frame.
+    /// Reference frame in which the Keplerian element data are given.
     ///
     /// :type: str
     #[getter]
@@ -352,7 +355,7 @@ impl OmmMetadata {
         self.inner.ref_frame = value;
     }
 
-    /// Time system.
+    /// Time system used for Keplerian elements and covariance data.
     ///
     /// :type: str
     #[getter]
@@ -365,7 +368,7 @@ impl OmmMetadata {
         self.inner.time_system = value;
     }
 
-    /// Description of the Mean Element Theory.
+    /// Description of the Mean Element Theory. Indicates the proper method to employ to propagate the state.
     ///
     /// :type: str
     #[getter]
@@ -378,7 +381,7 @@ impl OmmMetadata {
         self.inner.mean_element_theory = value;
     }
 
-    /// Epoch of the reference frame.
+    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -395,7 +398,7 @@ impl OmmMetadata {
         Ok(())
     }
 
-    /// Comments.
+    /// Comments (allowed at the beginning of the OMM Metadata).
     ///
     /// :type: list[str]
     #[getter]
@@ -409,7 +412,7 @@ impl OmmMetadata {
     }
 }
 
-/// Create a new MeanElements object.
+/// Mean Keplerian Elements in the Specified Reference Frame.
 ///
 /// Parameters
 /// ----------
@@ -426,11 +429,11 @@ impl OmmMetadata {
 /// mean_anomaly : float
 ///     Mean anomaly (deg).
 /// semi_major_axis : float, optional
-///     Semi-major axis (km).
+///     Semi-major axis in kilometers. Preferred over MEAN_MOTION.
 /// mean_motion : float, optional
-///     Mean motion (rev/day).
+///     Keplerian Mean motion in revolutions per day. Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
 /// gm : float, optional
-///     Gravitational coefficient (km³/s²).
+///     Gravitational Coefficient (Gravitational Constant × Central Mass) in km³/s².
 #[pyclass]
 #[derive(Clone)]
 pub struct MeanElements {
@@ -495,7 +498,7 @@ impl MeanElements {
         self.inner.comment = value;
     }
 
-    /// Epoch of the mean elements.
+    /// Epoch of Mean Keplerian elements.
     ///
     /// :type: str
     #[getter]
@@ -594,6 +597,8 @@ impl MeanElements {
 
     /// Semi-major axis.
     ///
+    /// Preferred over MEAN_MOTION.
+    ///
     /// Units: km
     ///
     /// :type: Optional[float]
@@ -608,6 +613,8 @@ impl MeanElements {
     }
 
     /// Mean motion.
+    ///
+    /// Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
     ///
     /// Units: rev/day
     ///
@@ -642,6 +649,7 @@ impl MeanElements {
     }
 }
 
+/// OMM Data section.
 #[pyclass]
 #[derive(Clone)]
 pub struct OmmData {
@@ -677,7 +685,7 @@ impl OmmData {
         )
     }
 
-    /// Mean elements.
+    /// Mean Keplerian Elements in the Specified Reference Frame.
     ///
     /// :type: MeanElements
     #[getter]
@@ -705,7 +713,7 @@ impl OmmData {
         self.inner.comment = value;
     }
 
-    /// Spacecraft parameters.
+    /// Spacecraft Parameters.
     ///
     /// :type: Optional[SpacecraftParameters]
     #[getter]
@@ -721,7 +729,7 @@ impl OmmData {
         self.inner.spacecraft_parameters = value.map(|s| s.inner);
     }
 
-    /// TLE parameters.
+    /// TLE Related Parameters (Only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
     ///
     /// :type: Optional[TleParameters]
     #[getter]
@@ -737,7 +745,7 @@ impl OmmData {
         self.inner.tle_parameters = value.map(|t| t.inner);
     }
 
-    /// Covariance matrix.
+    /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form).
     ///
     /// :type: Optional[OpmCovarianceMatrix]
     #[getter]
@@ -753,7 +761,7 @@ impl OmmData {
         self.inner.covariance_matrix = value.map(|c| c.inner);
     }
 
-    /// User defined parameters.
+    /// User-Defined Parameters.
     ///
     /// :type: Optional[UserDefined]
     #[getter]
@@ -770,40 +778,32 @@ impl OmmData {
     }
 }
 
-/// Create a new TleParameters object.
+/// TLE Related Parameters.
+///
+/// This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
 ///
 /// Parameters
 /// ----------
 /// ephemeris_type : int, optional
-///     Ephemeris type.
-///     (Optional)
+///     Ephemeris Type, default value = 0.
 /// classification_type : str, optional
-///     Classification type.
-///     (Optional)
+///     Classification Type, default value = U.
 /// norad_cat_id : int, optional
-///     NORAD catalog ID.
-///     (Optional)
+///     NORAD Catalog Number ('Satellite Number').
 /// element_set_no : int, optional
-///     Element set number.
-///     (Optional)
+///     Element set number for this satellite.
 /// rev_at_epoch : int, optional
-///     Revolution number at epoch.
-///     (Optional)
+///     Revolution Number.
 /// bstar : float, optional
-///     B* drag term (1/ER).
-///     (Optional)
+///     B* drag term in 1/ER (Inverse Earth Radii). Required for SGP4.
 /// bterm : float, optional
-///     Ballistic coefficient (m²/kg).
-///     (Optional)
+///     Ballistic coefficient (m²/kg). Required for SGP4-XP.
 /// mean_motion_dot : float, optional
-///     First derivative of mean motion (rev/day²).
-///     (Optional)
+///     First derivative of mean motion (rev/day²). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
 /// mean_motion_ddot : float, optional
-///     Second derivative of mean motion (rev/day³).
-///     (Optional)
+///     Second derivative of mean motion (rev/day³). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
 /// agom : float, optional
-///     Solar radiation pressure area to mass ratio (m²/kg).
-///     (Optional)
+///     Solar radiation pressure coefficient (m²/kg). Required for SGP4-XP.
 #[pyclass]
 #[derive(Clone)]
 pub struct TleParameters {
@@ -868,7 +868,7 @@ impl TleParameters {
         self.inner.comment = value;
     }
 
-    /// Ephemeris type.
+    /// Ephemeris Type, default value = 0.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -881,7 +881,7 @@ impl TleParameters {
         self.inner.ephemeris_type = value;
     }
 
-    /// Classification type.
+    /// Classification Type, default value = U.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -894,7 +894,7 @@ impl TleParameters {
         self.inner.classification_type = value;
     }
 
-    /// NORAD catalog ID.
+    /// NORAD Catalog Number ('Satellite Number').
     ///
     /// :type: Optional[int]
     #[getter]
@@ -907,7 +907,7 @@ impl TleParameters {
         self.inner.norad_cat_id = value;
     }
 
-    /// Element set number.
+    /// Element set number for this satellite.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -920,7 +920,7 @@ impl TleParameters {
         self.inner.element_set_no = value;
     }
 
-    /// Revolution number at epoch.
+    /// Revolution Number.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -951,6 +951,8 @@ impl TleParameters {
 
     /// Ballistic coefficient.
     ///
+    /// Required for SGP4-XP.
+    ///
     /// Units: m²/kg
     ///
     /// :type: Optional[float]
@@ -965,7 +967,7 @@ impl TleParameters {
         self.inner.bterm = value.map(|v| M2kg::new(v, Default::default()));
     }
 
-    /// First derivative of mean motion.
+    /// First Time Derivative of the Mean Motion.
     ///
     /// Units: rev/day²
     ///
@@ -981,7 +983,7 @@ impl TleParameters {
         self.inner.mean_motion_dot = value.map(|v| MeanMotionDot::new(v, Default::default()));
     }
 
-    /// Second derivative of mean motion.
+    /// Second Time Derivative of Mean Motion.
     ///
     /// Units: rev/day³
     ///
@@ -998,6 +1000,8 @@ impl TleParameters {
     }
 
     /// Solar radiation pressure area to mass ratio.
+    ///
+    /// Required for SGP4-XP.
     ///
     /// Units: m²/kg
     ///

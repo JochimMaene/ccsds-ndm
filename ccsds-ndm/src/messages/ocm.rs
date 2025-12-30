@@ -15,6 +15,14 @@ use std::iter::Peekable;
 // Root OCM Structure
 //----------------------------------------------------------------------
 
+/// Orbit Comprehensive Message (OCM).
+///
+/// An OCM aggregates and extends OMM, OPM, and OEM content in a single hybrid message.
+/// It emphasizes flexibility and message conciseness by offering extensive optional
+/// standardized content while minimizing mandatory content.
+///
+/// References:
+/// - CCSDS 502.0-B-3, Section 5 (OCM)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename = "ocm")]
 pub struct Ocm {
@@ -89,6 +97,7 @@ impl Ndm for Ocm {
 // Body & Segment
 //----------------------------------------------------------------------
 
+/// The body of the OCM, containing a single segment.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OcmBody {
     #[serde(rename = "segment")]
@@ -114,6 +123,9 @@ impl OcmBody {
     }
 }
 
+/// A single segment of the OCM.
+///
+/// Contains metadata and data sections.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OcmSegment {
     pub metadata: OcmMetadata,
@@ -161,101 +173,201 @@ impl OcmSegment {
 // Metadata
 //----------------------------------------------------------------------
 
+/// OCM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmMetadata {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// The name of the object. While there is no CCSDS-based
+    /// restriction on the value for this keyword, it is recommended to use names from
+    /// either the UN Office of Outer Space Affairs designator indexm the spacecraft operator,
+    /// or a State Actor or commercial Space Situational Awareness (SSA) provider maintaining
+    /// the ‘CATALOG_NAME’ space catalog. If OBJECT_NAME is not listed in reference [3] or the
+    /// content is either unknown (uncorrelated) or cannot be disclosed, the value should be
+    /// set to UNKNOWN (or this keyword omitted).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_name: Option<String>,
+    /// An international designator for the object as assigned by
+    /// the UN Committee on Space Research (COSPAR). Such designator values shall have the
+    /// following COSPAR format:
+    /// YYYY-NNNP{PP}, where:
+    /// YYYY = Year of launch.
+    /// NNN = Three-digit serial number of launch in year YYYY (with leading zeros).
+    /// P{PP} = At least one capital letter for the identification of the part brought into
+    /// space by the launch.
+    /// If the object has no international designator or the content is either unknown
+    /// (uncorrelated) or cannot be disclosed, the value should be set to UNKNOWN (or this
+    /// keyword omitted).
+    /// NOTE – The international designator was typically specified by ‘OBJECT_ID’ in the
+    /// OPM, OMM, and OEM.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub international_designator: Option<String>,
+    /// The satellite catalog source (or source agency or
+    /// operator, value to be drawn from the SANA registry list of Space Object Catalogs at
+    /// https://sanaregistry.org/r/space_object_catalog, or alternatively, from the list of
+    /// organizations listed inthe ‘Abbreviation’ column of the SANA Organizations registry
+    /// at https://www.sanaregistry.org/r/organizations) from which ‘OBJECT_DESIGNATOR’
+    /// was obtained.
+    ///
+    /// Examples:
+    ///
+    /// CSPOC, RFSA, ESA, COMSPOC
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub catalog_name: Option<String>,
+    /// The unique satellite identification designator for
+    /// the object, as reflected in the catalog whose name is ‘CATALOG_NAME’. If the ID is
+    /// not known (uncorrelated object) or cannot be disclosed, ‘UNKNOWN’ may be used (or
+    /// this keyword omitted).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_designator: Option<String>,
+    /// Comma-delimited field containing alternate name(s) of this space object,
+    /// including assigned names used by spacecraft operator, State Actors, commercial SSA
+    /// providers, and/or media.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alternate_names: Option<String>,
+    /// Originator or programmatic Point-of-Contact (PoC) for OCM.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub originator_poc: Option<String>,
+    /// Contact position of the originator PoC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub originator_position: Option<String>,
+    /// Originator PoC phone number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub originator_phone: Option<String>,
+    /// Originator PoC email address.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub originator_email: Option<String>,
+    /// Originator's physical address (suggest commadelimited address lines).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub originator_address: Option<String>,
+    /// The creating agency or operator (value should be drawn from the ‘Abbreviation’
+    /// column of the SANA Organizations registry at
+    /// https://www.sanaregistry.org/r/organizations)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_org: Option<String>,
+    /// Free-text field containing technical PoC for OCM.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_poc: Option<String>,
+    /// Free-text field containing contact position of the technical PoC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_position: Option<String>,
+    /// Free-text field containing technical PoC phone number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_phone: Option<String>,
+    /// Free-text field containing technical PoC email address.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_email: Option<String>,
+    /// Free-text field containing technical PoC physical address information for OCM creator
+    /// (suggest comma-delimited address lines).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_address: Option<String>,
+    /// Free-text field containing an ID that uniquely identifies the previous message from
+    /// this message originator for this space object. The format and content of the message
+    /// identifier value are at the discretion of the originator.
+    /// NOTE – One may provide the previous message ID without supplying the
+    /// ‘PREVIOUS_MESSAGE_EPOCH’ keyword, and vice versa.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_message_id: Option<String>,
+    /// Free-text field containing an ID that uniquely identifies the next message from this
+    /// message originator for this space object. The format and content of the message
+    /// identifier value are at the discretion of the originator. NOTE—One may provide the next
+    /// message ID without supplying the ‘NEXT_MESSAGE_EPOCH' keyword, and vice versa.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_message_id: Option<String>,
+    /// Free-text field containing a unique identifier of Attitude Data Message (ADM)
+    /// (reference [10]) that are linked (relevant) to this Orbit Data Message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub adm_msg_link: Option<String>,
+    /// Free-text field containing a unique identifier of Conjunction Data Message (CDM)
+    /// that are linked (relevant) to this Orbit Data Message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdm_msg_link: Option<String>,
+    /// Free-text field containing a unique identifier of Pointing Request Message (PRM)
+    /// that are linked (relevant) to this Orbit Data Message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prm_msg_link: Option<String>,
+    /// Free-text field containing a unique identifier of Reentry Data Message (RDM)
+    /// that are linked (relevant) to this Orbit Data Message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rdm_msg_link: Option<String>,
+    /// Free-text string containing a comma-separated list of file name(s) and/or associated
+    /// identification number(s) of Tracking Data Message (TDM) observations upon which this
+    /// OD is based.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tdm_msg_link: Option<String>,
+    /// Free-text field containing the operator of the space object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator: Option<String>,
+    /// Free-text field containing the owner of the space object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
+    /// Free-text field containing the name of the country, country code, or country
+    /// abbreviation where the space object owner is based.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub country: Option<String>,
+    /// Free-text field containing the name of the constellation to which this space object
+    /// belongs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub constellation: Option<String>,
+    /// Specification of the type of object. Select from the accepted set of values indicated
+    /// in annex B, subsection B11.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_type: Option<ObjectDescription>,
+    /// Time system used for all absolute time stamps in the message (e.g., UTC, TAI).
     pub time_system: String,
+    /// Epoch to which all relative times in the message are referenced.
     pub epoch_tzero: Epoch,
+    /// Operational status of the space object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ops_status: Option<String>,
+    /// Orbit category (LEO, GEO, HEO, etc.).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orbit_category: Option<String>,
+    /// List of data elements included in the OCM message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ocm_data_elements: Option<String>,
+    /// Spacecraft clock offset at EPOCH_TZERO. Units: s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sclk_offset_at_epoch: Option<TimeOffset>,
+    /// Spacecraft clock scale factor. Units: s/SI-s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sclk_sec_per_si_sec: Option<Duration>,
+    /// Epoch of the previous message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_message_epoch: Option<Epoch>,
+    /// Anticipated epoch of the next message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_message_epoch: Option<Epoch>,
+    /// Time of the earliest data in the message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_time: Option<Epoch>,
+    /// Time of the latest data in the message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_time: Option<Epoch>,
+    /// Approximate time span covered by the data in the message. Units: d.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub time_span: Option<DayInterval>,
+    /// TAI minus UTC difference at EPOCH_TZERO. Units: s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub taimutc_at_tzero: Option<TimeOffset>,
+    /// Epoch of the next leap second.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_leap_epoch: Option<Epoch>,
+    /// TAI minus UTC difference at NEXT_LEAP_EPOCH. Units: s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_leap_taimutc: Option<TimeOffset>,
+    /// UT1 minus UTC difference at EPOCH_TZERO. Units: s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ut1mutc_at_tzero: Option<TimeOffset>,
+    /// Source of Earth Orientation Parameters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eop_source: Option<String>,
+    /// Interpolation method for EOP data.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interp_method_eop: Option<String>,
+    /// Source of celestial body ephemerides.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub celestial_source: Option<String>,
 }
@@ -642,21 +754,29 @@ impl OcmMetadata {
 // Data
 //----------------------------------------------------------------------
 
+/// OCM Data Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmData {
+    /// List of trajectory state time history blocks.
     #[serde(rename = "traj", default)]
     pub traj: Vec<OcmTrajState>,
+    /// Space object physical characteristics.
     #[serde(rename = "phys", default)]
     pub phys: Option<OcmPhysicalDescription>,
+    /// List of covariance time history blocks.
     #[serde(rename = "cov", default)]
     pub cov: Vec<OcmCovarianceMatrix>,
+    /// List of maneuver specifications.
     #[serde(rename = "man", default)]
     pub man: Vec<OcmManeuverParameters>,
+    /// Perturbation parameters.
     #[serde(rename = "pert", default)]
     pub pert: Option<OcmPerturbations>,
+    /// Orbit determination data.
     #[serde(rename = "od", default)]
     pub od: Option<OcmOdParameters>,
+    /// User-defined parameters.
     #[serde(rename = "user", default)]
     pub user: Option<UserDefined>,
 }
@@ -1066,109 +1186,161 @@ impl OcmTrajState {
 // 2. Physical Properties (ocmPhysicalDescriptionType)
 //----------------------------------------------------------------------
 
+/// Space Object Physical Characteristics.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmPhysicalDescription {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Manufacturer of the space object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manufacturer: Option<String>,
+    /// Bus model name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bus_model: Option<String>,
+    /// Other object(s) this object is docked with.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub docked_with: Option<String>,
+    /// Drag constant area. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_const_area: Option<Area>,
+    /// Nominal drag coefficient. Units: dimensionless.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_coeff_nom: Option<f64>,
+    /// Uncertainty in the drag coefficient. Units: %.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_uncertainty: Option<Percentage>,
+    /// Initial wet mass. Units: kg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_wet_mass: Option<Mass>,
+    /// Wet mass. Units: kg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wet_mass: Option<Mass>,
+    /// Dry mass. Units: kg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dry_mass: Option<Mass>,
+    /// ID of the OEB parent reference frame.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_parent_frame: Option<String>,
+    /// Epoch of the OEB parent reference frame.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_parent_frame_epoch: Option<Epoch>,
+    /// Quaternion component q1 of the OEB.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_q1: Option<f64>,
+    /// Quaternion component q2 of the OEB.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_q2: Option<f64>,
+    /// Quaternion component q3 of the OEB.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_q3: Option<f64>,
+    /// Quaternion scalar component qc of the OEB.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_qc: Option<f64>,
+    /// Dimension of OEB along max axis. Units: m.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_max: Option<Length>,
+    /// Dimension of OEB along intermediate axis. Units: m.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_int: Option<Length>,
+    /// Dimension of OEB along min axis. Units: m.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_min: Option<Length>,
+    /// Cross-sectional area along OEB max axis. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_along_oeb_max: Option<Area>,
+    /// Cross-sectional area along OEB intermediate axis. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_along_oeb_int: Option<Area>,
+    /// Cross-sectional area along OEB min axis. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_along_oeb_min: Option<Area>,
+    /// Minimum cross-sectional area for collision probability. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_min_for_pc: Option<Area>,
+    /// Maximum cross-sectional area for collision probability. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_max_for_pc: Option<Area>,
+    /// Typical cross-sectional area for collision probability. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_typ_for_pc: Option<Area>,
+    /// Radar cross section. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rcs: Option<Area>,
+    /// Minimum radar cross section. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rcs_min: Option<Area>,
+    /// Maximum radar cross section. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rcs_max: Option<Area>,
+    /// SRP constant area. Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub srp_const_area: Option<Area>,
+    /// Solar radiation coefficient. Units: dimensionless.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_coeff: Option<f64>,
+    /// Uncertainty in the solar radiation coefficient. Units: %.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_uncertainty: Option<Percentage>,
+    /// Absolute visual magnitude. Units: magnitude.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_absolute: Option<f64>,
+    /// Minimum apparent visual magnitude. Units: magnitude.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_apparent_min: Option<f64>,
+    /// Apparent visual magnitude. Units: magnitude.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_apparent: Option<f64>,
+    /// Maximum apparent visual magnitude. Units: magnitude.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_apparent_max: Option<f64>,
+    /// Diffuse reflection coefficient. Units: dimensionless [0.0, 1.0].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reflectance: Option<Probability>,
+    /// Attitude control mode.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_control_mode: Option<String>,
+    /// Type of actuator for attitude control.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_actuator_type: Option<String>,
+    /// Attitude knowledge accuracy. Units: deg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_knowledge: Option<Angle>,
+    /// Attitude control accuracy. Units: deg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_control: Option<Angle>,
+    /// Attitude pointing accuracy. Units: deg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_pointing: Option<Angle>,
+    /// Average number of maneuvers per year. Units: /y.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avg_maneuver_freq: Option<ManeuverFreq>,
+    /// Maximum thrust. Units: N.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_thrust: Option<Thrust>,
+    /// Delta-V capability at beginning of life. Units: km/s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dv_bol: Option<Velocity>,
+    /// Remaining Delta-V capability. Units: km/s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dv_remaining: Option<Velocity>,
+    /// Moment of inertia Ixx. Units: kg*m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ixx: Option<Moment>,
+    /// Moment of inertia Iyy. Units: kg*m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub iyy: Option<Moment>,
+    /// Moment of inertia Izz. Units: kg*m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub izz: Option<Moment>,
+    /// Moment of inertia Ixy. Units: kg*m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ixy: Option<Moment>,
+    /// Moment of inertia Ixz. Units: kg*m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ixz: Option<Moment>,
+    /// Moment of inertia Iyz. Units: kg*m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub iyz: Option<Moment>,
 }
@@ -1468,34 +1640,50 @@ impl OcmPhysicalDescription {
 // 3. Covariance (ocmCovarianceMatrixType)
 //----------------------------------------------------------------------
 
+/// OCM Covariance Matrix.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmCovarianceMatrix {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Unique identifier for the covariance message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_id: Option<String>,
+    /// ID of the previous covariance message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_prev_id: Option<String>,
+    /// ID of the next covariance message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_next_id: Option<String>,
+    /// Basis of the covariance data (e.g., PREDICTED, DETERMINED).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_basis: Option<CovBasis>,
+    /// ID of the basis for the covariance data.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_basis_id: Option<String>,
+    /// Reference frame for the covariance data.
     pub cov_ref_frame: String,
+    /// Epoch of the covariance reference frame.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_frame_epoch: Option<Epoch>,
+    /// Minimum scale factor for the covariance.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_scale_min: Option<f64>,
+    /// Maximum scale factor for the covariance.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_scale_max: Option<f64>,
+    /// Confidence level of the covariance. Units: %.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_confidence: Option<Percentage>,
+    /// Type of covariance (e.g., POS, POS_VEL).
     pub cov_type: String,
+    /// Ordering of the covariance matrix elements.
     pub cov_ordering: CovOrder,
+    /// Units of the covariance matrix elements.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_units: Option<String>,
+    /// Covariance data lines.
     #[serde(rename = "covLine")]
     pub cov_lines: Vec<CovLine>,
 }
@@ -1702,66 +1890,99 @@ impl OcmCovarianceMatrix {
 // 4. Maneuver (ocmManeuverParametersType)
 //----------------------------------------------------------------------
 
+/// OCM Maneuver Parameters.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmManeuverParameters {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Unique identifier for the maneuver.
     pub man_id: String,
+    /// ID of the previous maneuver.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_prev_id: Option<String>,
+    /// ID of the next maneuver.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_next_id: Option<String>,
+    /// Basis of the maneuver data (e.g., PREDICTED, DETERMINED).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_basis: Option<ManBasis>,
+    /// ID of the basis for the maneuver data.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_basis_id: Option<String>,
+    /// ID of the maneuvering device.
     pub man_device_id: String,
+    /// Epoch of the previous maneuver.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_prev_epoch: Option<Epoch>,
+    /// Epoch of the next maneuver.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_next_epoch: Option<Epoch>,
+    /// Purpose of the maneuver.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_purpose: Option<String>,
+    /// Source of the maneuver prediction.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_pred_source: Option<String>,
+    /// Reference frame for the maneuver data.
     pub man_ref_frame: String,
+    /// Epoch of the maneuver reference frame.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_frame_epoch: Option<Epoch>,
+    /// Name of the gravitational assist body.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grav_assist_name: Option<String>,
+    /// Duty cycle type.
     pub dc_type: ManDc,
+    /// Start of the duty cycle window.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_win_open: Option<Epoch>,
+    /// End of the duty cycle window.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_win_close: Option<Epoch>,
+    /// Minimum number of duty cycles.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_min_cycles: Option<u64>,
+    /// Maximum number of duty cycles.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_max_cycles: Option<u64>,
+    /// Start of maneuver execution.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_exec_start: Option<Epoch>,
+    /// End of maneuver execution.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_exec_stop: Option<Epoch>,
+    /// Reference time for the duty cycle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_ref_time: Option<Epoch>,
+    /// Duration of the duty cycle pulse. Units: s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_time_pulse_duration: Option<Duration>,
+    /// Period of the duty cycle pulse. Units: s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_time_pulse_period: Option<Duration>,
+    /// Reference direction for the duty cycle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_ref_dir: Option<Vec3Double>,
+    /// Body frame for the duty cycle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_body_frame: Option<String>,
+    /// Trigger conditions for the duty cycle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_body_trigger: Option<Vec3Double>,
+    /// Start angle for the PA duty cycle. Units: deg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_pa_start_angle: Option<Angle>,
+    /// Stop angle for the PA duty cycle. Units: deg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_pa_stop_angle: Option<Angle>,
+    /// Composition of the maneuver (e.g., START, STOP, COMBINED).
     pub man_composition: String,
+    /// Units of the maneuver data.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_units: Option<String>,
+    /// Maneuver data lines.
     #[serde(rename = "manLine")]
     pub man_lines: Vec<ManLine>,
 }
@@ -2071,67 +2292,98 @@ impl OcmManeuverParameters {
 // 5. Perturbations (ocmPerturbationsType)
 //----------------------------------------------------------------------
 
+/// OCM Perturbations Parameters.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmPerturbations {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Atmospheric model name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atmospheric_model: Option<String>,
+    /// Gravity model name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gravity_model: Option<String>,
+    /// Equatorial radius of the central body. Units: km.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub equatorial_radius: Option<Position>,
+    /// Gravitational coefficient. Units: km³/s².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gm: Option<Gm>,
+    /// N-body perturbations included.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub n_body_perturbations: Option<String>,
+    /// Central body angular rotation rate. Units: deg/s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub central_body_rotation: Option<AngleRate>,
+    /// Oblate flattening of the central body. Units: dimensionless.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oblate_flattening: Option<f64>,
+    /// Ocean tides model name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ocean_tides_model: Option<String>,
+    /// Solid tides model name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solid_tides_model: Option<String>,
+    /// Reduction theory used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reduction_theory: Option<String>,
+    /// Albedo model name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub albedo_model: Option<String>,
+    /// Size of the albedo grid.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub albedo_grid_size: Option<u64>,
+    /// Shadow model name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadow_model: Option<String>,
+    /// Bodies included in shadow calculations.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadow_bodies: Option<String>,
+    /// Solar radiation pressure model name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub srp_model: Option<String>,
+    /// Space weather data source.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sw_data_source: Option<String>,
+    /// Epoch of the space weather data.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sw_data_epoch: Option<Epoch>,
+    /// Interpolation method for space weather data.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sw_interp_method: Option<String>,
+    /// Fixed geomagnetic Kp index. Units: dimensionless.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_geomag_kp: Option<Geomag>,
+    /// Fixed geomagnetic Ap index. Units: dimensionless.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_geomag_ap: Option<Geomag>,
+    /// Fixed geomagnetic Dst index. Units: dimensionless.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_geomag_dst: Option<Geomag>,
+    /// Fixed F10.7 solar flux. Units: SFU.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_f10p7: Option<SolarFlux>,
+    /// Fixed mean F10.7 solar flux. Units: SFU.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_f10p7_mean: Option<SolarFlux>,
+    /// Fixed M10.7 solar flux. Units: SFU.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_m10p7: Option<SolarFlux>,
+    /// Fixed mean M10.7 solar flux. Units: SFU.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_m10p7_mean: Option<SolarFlux>,
+    /// Fixed S10.7 solar flux. Units: SFU.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_s10p7: Option<SolarFlux>,
+    /// Fixed mean S10.7 solar flux. Units: SFU.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_s10p7_mean: Option<SolarFlux>,
+    /// Fixed Y10.7 solar flux. Units: SFU.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_y10p7: Option<SolarFlux>,
+    /// Fixed mean Y10.7 solar flux. Units: SFU.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_y10p7_mean: Option<SolarFlux>,
 }
@@ -2310,64 +2562,95 @@ impl OcmPerturbations {
 // 6. OD (ocmOdParametersType)
 //----------------------------------------------------------------------
 
+/// OCM Orbit Determination Parameters.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmOdParameters {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Unique identifier for the OD solution.
     pub od_id: String,
+    /// ID of the previous OD solution.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_prev_id: Option<String>,
+    /// Method used for orbit determination.
     pub od_method: String,
+    /// Epoch of the orbit determination.
     pub od_epoch: Epoch,
+    /// Time elapsed since the first observation. Units: d.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub days_since_first_obs: Option<DayInterval>,
+    /// Time elapsed since the last observation. Units: d.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub days_since_last_obs: Option<DayInterval>,
+    /// Recommended time span for the OD solution. Units: d.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recommended_od_span: Option<DayInterval>,
+    /// Actual time span used for the OD solution. Units: d.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actual_od_span: Option<DayInterval>,
+    /// Number of observations available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub obs_available: Option<u64>,
+    /// Number of observations used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub obs_used: Option<u64>,
+    /// Number of tracks available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tracks_available: Option<u64>,
+    /// Number of tracks used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tracks_used: Option<u64>,
+    /// Maximum gap between observations. Units: d.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maximum_obs_gap: Option<DayInterval>,
+    /// Major eigenvalue of the covariance at OD epoch. Units: m.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_epoch_eigmaj: Option<Length>,
+    /// Intermediate eigenvalue of the covariance at OD epoch. Units: m.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_epoch_eigint: Option<Length>,
+    /// Minor eigenvalue of the covariance at OD epoch. Units: m.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_epoch_eigmin: Option<Length>,
+    /// Maximum predicted major eigenvalue. Units: m.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_max_pred_eigmaj: Option<Length>,
+    /// Minimum predicted minor eigenvalue. Units: m.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_min_pred_eigmin: Option<Length>,
+    /// Confidence level of the OD solution. Units: %.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_confidence: Option<Percentage>,
+    /// Geometric Dilution of Precision. Units: dimensionless.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gdop: Option<f64>,
+    /// Number of solved-for states.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solve_n: Option<u64>,
+    /// List of solved-for states.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solve_states: Option<String>,
+    /// Number of considered parameters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consider_n: Option<u64>,
+    /// List of considered parameters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consider_params: Option<String>,
+    /// Specific Energy Dissipation Rate. Units: W/kg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sedr: Option<Wkg>,
+    /// Number of sensors used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensors_n: Option<u64>,
+    /// List of sensors used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensors: Option<String>,
+    /// Weighted RMS of the residuals. Units: dimensionless.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub weighted_rms: Option<f64>,
+    /// List of data types used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_types: Option<String>,
 }

@@ -4719,7 +4719,7 @@ spacecraft. The OEB is defined by the three dimensions OEB_MAX, OEB_INT, and
 OEB_MIN. The OEB is used to model the cross-sectional area of the spacecraft for drag and
 solar radiation pressure calculations.
 
-.. figure:: /images/oeb.png
+.. figure:: ../images/ccsds_books/odm/F_1.png
    :align: center
 
    Figure F-1: Orbit Encompassing Box

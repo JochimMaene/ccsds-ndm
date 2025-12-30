@@ -15,6 +15,13 @@ use std::iter::Peekable;
 // Root OPM Structure
 //----------------------------------------------------------------------
 
+/// Orbit Parameter Message (OPM).
+///
+/// An OPM specifies the position and velocity of a single object at a specified epoch.
+/// Optionally, osculating Keplerian elements, maneuver parameters, and other data can be provided.
+///
+/// References:
+/// - CCSDS 502.0-B-3, Section 3 (OPM)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename = "opm")]
 pub struct Opm {
@@ -92,6 +99,7 @@ impl Ndm for Opm {
 // Body & Segment
 //----------------------------------------------------------------------
 
+/// The body of the OPM, containing a single segment.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OpmBody {
     #[serde(rename = "segment")]
@@ -115,6 +123,9 @@ impl OpmBody {
     }
 }
 
+/// A single segment of the OPM.
+///
+/// Contains metadata and data sections.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OpmSegment {
     pub metadata: OpmMetadata,
@@ -146,17 +157,66 @@ impl OpmSegment {
 // Metadata
 //----------------------------------------------------------------------
 
+/// OPM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmMetadata {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Spacecraft name for which orbit state data is provided. While there is no CCSDS-based
+    /// restriction on the value for this keyword, it is recommended to use names from the UN
+    /// Office of Outer Space Affairs designator index (which include Object name
+    /// and international designator of the participant). If OBJECT_NAME is not listed or the
+    /// content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
+    ///
+    /// Example
+    ///
+    /// EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
     pub object_name: String,
+    /// Object identifier of the object for which orbit state data is provided. While there is
+    /// no CCSDS-based restriction on the value for this keyword, it is recommended to use the
+    /// international spacecraft designator as published in the UN Office of Outer Space Affairs
+    /// designator index.
+    /// Recommended values have the format YYYY-NNNP{PP}, where:
+    /// YYYY = Year of launch.
+    /// NNN = Three-digit serial number of launch in year YYYY (with leading zeros).
+    /// P{PP} = At least one capital letter for the identification of the part brought into
+    /// space by the launch.
+    /// If the asset is not listed, the UN Office of Outer Space Affairs designator index format
+    /// is not used, or the content is either unknown or cannot be disclosed, the value should be
+    /// set to UNKNOWN.
+    ///
+    /// Example
+    ///
+    /// 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
     pub object_id: String,
+    /// Origin of the OPM reference frame, which shall be a natural solar system body (planets,
+    /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
+    /// system barycenter. Natural bodies shall be selected from the accepted set of values.
+    ///
+    /// Example
+    ///
+    /// EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN, JUPITER BARYCENTER, STS 106, EROS
     pub center_name: String,
+    /// Reference frame in which the state vector and optional Keplerian element data are given.
+    ///
+    /// Example
+    ///
+    /// ICRF, EME2000, ITRF2000, TEME
     pub ref_frame: String,
+    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
+    ///
+    /// Example
+    ///
+    /// 2001-11-06T11:17:33, 2002-204T15:56:23Z
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ref_frame_epoch: Option<Epoch>,
+    /// Time system used for state vector, maneuver, and covariance data.
+    ///
+    /// Example
+    ///
+    /// UTC, TAI, TT, GPS, TDB, TCB
     pub time_system: String,
 }
 
@@ -303,37 +363,51 @@ impl OpmMetadataBuilder {
 // Data
 //----------------------------------------------------------------------
 
+/// OPM Data Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmData {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+
+    /// State vector components (position and velocity).
     #[serde(rename = "stateVector")]
     pub state_vector: StateVector,
+
+    /// Osculating Keplerian elements.
     #[serde(
         rename = "keplerianElements",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub keplerian_elements: Option<KeplerianElements>,
+
+    /// Spacecraft physical parameters (mass, area, coefficients).
     #[serde(
         rename = "spacecraftParameters",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub spacecraft_parameters: Option<SpacecraftParameters>,
+
+    /// Position/velocity covariance matrix.
     #[serde(
         rename = "covarianceMatrix",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub covariance_matrix: Option<OpmCovarianceMatrix>,
+
+    /// Maneuver parameters.
     #[serde(
         rename = "maneuverParameters",
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
     pub maneuver_parameters: Vec<ManeuverParameters>,
+
+    /// User-defined parameters.
     #[serde(
         rename = "userDefinedParameters",
         default,
@@ -584,20 +658,30 @@ impl StateVectorBuilder {
     }
 }
 
+/// Osculating Keplerian Elements.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct KeplerianElements {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Semi-major axis. Units: km.
     pub semi_major_axis: Distance,
+    /// Eccentricity. Units: dimensionless.
     pub eccentricity: f64,
+    /// Inclination. Units: deg.
     pub inclination: Inclination,
+    /// Right ascension of the ascending node. Units: deg.
     pub ra_of_asc_node: Angle,
+    /// Argument of pericenter. Units: deg.
     pub arg_of_pericenter: Angle,
+    /// True anomaly. Units: deg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub true_anomaly: Option<Angle>,
+    /// Mean anomaly. Units: deg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mean_anomaly: Option<Angle>,
+    /// Gravitational coefficient (GM). Units: km³/s².
     pub gm: Gm,
 }
 
@@ -890,14 +974,22 @@ impl OpmCovarianceMatrixBuilder {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct ManeuverParameters {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Epoch of ignition
     pub man_epoch_ignition: Epoch,
+    /// Maneuver duration (If = 0, impulsive maneuver)
     pub man_duration: Duration,
+    /// Mass change during maneuver (value is < 0)
     pub man_delta_mass: DeltaMassZ, // Must be <= 0
+    /// Reference frame in which the velocity increment vector data are given.
     pub man_ref_frame: String,
+    /// 1st component of the velocity increment. Units: km/s.
     pub man_dv_1: Velocity,
+    /// 2nd component of the velocity increment. Units: km/s.
     pub man_dv_2: Velocity,
+    /// 3nd component of the velocity increment. Units: km/s.
     pub man_dv_3: Velocity,
 }
 

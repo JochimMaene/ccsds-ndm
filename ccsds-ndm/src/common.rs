@@ -105,13 +105,39 @@ impl ToKvn for AdmHeader {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdmHeader {
+    /// Comments
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// User-defined free-text message classification/caveats of this ODM. It is recommended
+    /// that selected values be pre-coordinated between exchanging entities by mutual agreement.
+    ///
+    /// Example
+    ///
+    /// SBU, ‘Operator-proprietary data; secondary distribution not permitted’
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<String>,
+    /// File creation date/time in UTC.
+    ///
+    /// Example
+    ///
+    /// 2001-11-06T11:17:33, 2002-204T15:56:23Z
     pub creation_date: Epoch,
+    /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
+    /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
+    /// Abbreviation column is not populated. If desired organization is not listed there, follow
+    /// procedures to request that originator be added to SANA registry.
+    ///
+    /// Example
+    ///
+    /// CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     pub originator: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// ID that uniquely identifies a message from a given originator. The format and content of
+    /// the message identifier value are at the discretion of the originator.
+    ///
+    /// Example
+    ///
+    /// ODM_201113719185, ABC-12_34
     pub message_id: Option<String>,
 }
 
@@ -199,25 +225,29 @@ impl FromKvnTokens for OdmHeader {
     }
 }
 
-/// Represents the `spacecraftParametersType` from the XSD.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpacecraftParameters {
+    /// Comments
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Spacecraft mass. Units: kg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mass: Option<Mass>,
+    /// Solar Radiation Pressure Area (AR). Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_area: Option<Area>,
+    /// Solar Radiation Pressure Coefficient (CR)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_coeff: Option<f64>,
+    /// Drag Area (AD). Units: m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_area: Option<Area>,
+    /// Drag Coefficient (CD)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_coeff: Option<f64>,
 }
 
-/// Represents the `odParametersType` from the XSD.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdParameters {
@@ -464,13 +494,21 @@ pub struct AngularVelocity {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVector {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Comments.
     pub comment: Vec<String>,
+    /// Epoch of the state vector.
     pub epoch: Epoch,
+    /// Position vector X-component. Units: km.
     pub x: Position,
+    /// Position vector Y-component. Units: km.
     pub y: Position,
+    /// Position vector Z-component. Units: km.
     pub z: Position,
+    /// Velocity vector X-component. Units: km/s.
     pub x_dot: Velocity,
+    /// Velocity vector Y-component. Units: km/s.
     pub y_dot: Velocity,
+    /// Velocity vector Z-component. Units: km/s.
     pub z_dot: Velocity,
 }
 
@@ -677,32 +715,56 @@ pub struct InertiaState {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmCovarianceMatrix {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Reference frame in which the covariance data are given.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_ref_frame: Option<String>,
-    // 6 position covariances
+    /// Position X covariance [1,1]. Units: km².
     pub cx_x: PositionCovariance,
+    /// Position X-Y covariance [2,1]. Units: km².
     pub cy_x: PositionCovariance,
+    /// Position Y covariance [2,2]. Units: km².
     pub cy_y: PositionCovariance,
+    /// Position X-Z covariance [3,1]. Units: km².
     pub cz_x: PositionCovariance,
+    /// Position Y-Z covariance [3,2]. Units: km².
     pub cz_y: PositionCovariance,
+    /// Position Z covariance [3,3]. Units: km².
     pub cz_z: PositionCovariance,
-    // cross pos/vel covariances
+
+    /// Velocity X / Position X covariance [4,1]. Units: km²/s.
     pub cx_dot_x: PositionVelocityCovariance,
+    /// Velocity X / Position Y covariance [4,2]. Units: km²/s.
     pub cx_dot_y: PositionVelocityCovariance,
+    /// Velocity X / Position Z covariance [4,3]. Units: km²/s.
     pub cx_dot_z: PositionVelocityCovariance,
+    /// Velocity X covariance [4,4]. Units: km²/s².
     pub cx_dot_x_dot: VelocityCovariance,
+
+    /// Velocity Y / Position X covariance [5,1]. Units: km²/s.
     pub cy_dot_x: PositionVelocityCovariance,
+    /// Velocity Y / Position Y covariance [5,2]. Units: km²/s.
     pub cy_dot_y: PositionVelocityCovariance,
+    /// Velocity Y / Position Z covariance [5,3]. Units: km²/s.
     pub cy_dot_z: PositionVelocityCovariance,
+    /// Velocity Y / Velocity X covariance [5,4]. Units: km²/s².
     pub cy_dot_x_dot: VelocityCovariance,
+    /// Velocity Y covariance [5,5]. Units: km²/s².
     pub cy_dot_y_dot: VelocityCovariance,
+
+    /// Velocity Z / Position X covariance [6,1]. Units: km²/s.
     pub cz_dot_x: PositionVelocityCovariance,
+    /// Velocity Z / Position Y covariance [6,2]. Units: km²/s.
     pub cz_dot_y: PositionVelocityCovariance,
+    /// Velocity Z / Position Z covariance [6,3]. Units: km²/s.
     pub cz_dot_z: PositionVelocityCovariance,
+    /// Velocity Z / Velocity X covariance [6,4]. Units: km²/s².
     pub cz_dot_x_dot: VelocityCovariance,
+    /// Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
     pub cz_dot_y_dot: VelocityCovariance,
+    /// Velocity Z covariance [6,6]. Units: km²/s².
     pub cz_dot_z_dot: VelocityCovariance,
 }
 

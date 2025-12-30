@@ -23,18 +23,6 @@ use std::fs;
 ///     The message header.
 /// segment : OpmSegment
 ///     The data segment.
-///
-/// Parameters
-/// ----------
-/// data : str
-///     Input string/content.
-/// format : str, optional
-///     Format ('kvn' or 'xml'). Auto-detected if None.
-///
-/// Returns
-/// -------
-/// Opm
-///     The parsed OPM object.
 #[pyclass]
 #[derive(Clone)]
 pub struct Opm {
@@ -192,6 +180,15 @@ impl Opm {
 }
 
 /// Represents a single segment of an OPM.
+///
+/// Contains metadata and data sections.
+///
+/// Parameters
+/// ----------
+/// metadata : OpmMetadata
+///     Segment metadata.
+/// data : OpmData
+///     Segment data.
 #[pyclass]
 #[derive(Clone)]
 pub struct OpmSegment {
@@ -268,11 +265,11 @@ impl OpmSegment {
 ///     Origin of the reference frame.
 /// ref_frame : str
 ///     Reference frame in which state vector data is given.
+/// time_system : str
 ///     Time system used for state vector, maneuver, and covariance data.
-///     Allowed values: 'GMST', 'GPS', 'MET', 'MRT', 'SCLK', 'TAI', 'TCB', 'TDB', 'TCG', 'TT', 'UT1', 'UTC'.
 /// ref_frame_epoch : str, optional
-///     Epoch of the reference frame, if not intrinsic to the definition.
-/// comment : list of str, optional
+///     Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
+/// comment : list[str], optional
 ///     Comments.
 #[pyclass]
 #[derive(Clone)]
@@ -413,6 +410,45 @@ impl OpmMetadata {
     }
 }
 
+/// Osculating Keplerian Elements.
+///
+/// Parameters
+/// ----------
+/// semi_major_axis : float
+///     Semi-major axis (km).
+/// eccentricity : float
+///     Eccentricity (dimensionless).
+/// inclination : float
+///     Inclination (deg).
+/// ra_of_asc_node : float
+///     Right ascension of the ascending node (deg).
+/// arg_of_pericenter : float
+///     Argument of pericenter (deg).
+/// gm : float
+///     Gravitational coefficient (km³/s²).
+/// true_anomaly : float, optional
+///     True anomaly (deg).
+/// mean_anomaly : float, optional
+///     Mean anomaly (deg).
+///
+/// Attributes
+/// ----------
+/// semi_major_axis : float
+///     Semi-major axis. Units: km.
+/// eccentricity : float
+///     Eccentricity. Units: dimensionless.
+/// inclination : float
+///     Inclination. Units: deg.
+/// ra_of_asc_node : float
+///     Right ascension of the ascending node. Units: deg.
+/// arg_of_pericenter : float
+///     Argument of pericenter. Units: deg.
+/// gm : float
+///     Gravitational coefficient (GM). Units: km³/s².
+/// true_anomaly : float or None
+///     True anomaly. Units: deg.
+/// mean_anomaly : float or None
+///     Mean anomaly. Units: deg.
 #[pyclass]
 #[derive(Clone)]
 pub struct KeplerianElements {
@@ -618,6 +654,62 @@ impl KeplerianElements {
     }
 }
 
+/// Represents a covariance matrix for position and velocity.
+///
+/// Parameters
+/// ----------
+/// cx_x : float, optional
+///     Position X covariance [1,1]. Units: km².
+/// cy_x : float, optional
+///     Position X-Y covariance [2,1]. Units: km².
+/// cy_y : float, optional
+///     Position Y covariance [2,2]. Units: km².
+/// cz_x : float, optional
+///     Position X-Z covariance [3,1]. Units: km².
+/// cz_y : float, optional
+///     Position Y-Z covariance [3,2]. Units: km².
+/// cz_z : float, optional
+///     Position Z covariance [3,3]. Units: km².
+/// cx_dot_x : float, optional
+///     Velocity X / Position X covariance [4,1]. Units: km²/s.
+/// cx_dot_y : float, optional
+///     Velocity X / Position Y covariance [4,2]. Units: km²/s.
+/// cx_dot_z : float, optional
+///     Velocity X / Position Z covariance [4,3]. Units: km²/s.
+/// cx_dot_x_dot : float, optional
+///     Velocity X covariance [4,4]. Units: km²/s².
+/// cy_dot_x : float, optional
+///     Velocity Y / Position X covariance [5,1]. Units: km²/s.
+/// cy_dot_y : float, optional
+///     Velocity Y / Position Y covariance [5,2]. Units: km²/s.
+/// cy_dot_z : float, optional
+///     Velocity Y / Position Z covariance [5,3]. Units: km²/s.
+/// cy_dot_x_dot : float, optional
+///     Velocity Y / Velocity X covariance [5,4]. Units: km²/s².
+/// cy_dot_y_dot : float, optional
+///     Velocity Y covariance [5,5]. Units: km²/s².
+/// cz_dot_x : float, optional
+///     Velocity Z / Position X covariance [6,1]. Units: km²/s.
+/// cz_dot_y : float, optional
+///     Velocity Z / Position Y covariance [6,2]. Units: km²/s.
+/// cz_dot_z : float, optional
+///     Velocity Z / Position Z covariance [6,3]. Units: km²/s.
+/// cz_dot_x_dot : float, optional
+///     Velocity Z / Velocity X covariance [6,4]. Units: km²/s².
+/// cz_dot_y_dot : float, optional
+///     Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
+/// cz_dot_z_dot : float, optional
+///     Velocity Z covariance [6,6]. Units: km²/s².
+/// cov_ref_frame : str, optional
+///     Reference frame for the covariance matrix.
+/// comments : list[str], optional
+///     Comments.
+///
+/// Attributes
+/// ----------
+/// cx_x : float
+///     Position X covariance [1,1]. Units: km².
+/// ... (see Parameters for full list of attributes with units)
 #[pyclass]
 #[derive(Clone)]
 pub struct OpmCovarianceMatrix {

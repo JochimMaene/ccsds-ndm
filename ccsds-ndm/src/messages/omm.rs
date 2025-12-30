@@ -142,6 +142,10 @@ pub type MeanMotionDDot = UnitValue<f64, RevPerDay3Units>;
 // Root OMM Structure
 //----------------------------------------------------------------------
 
+/// Orbit Mean-Elements Message (OMM).
+///
+/// The OMM contains the orbital characteristics of a single object at a specified epoch,
+/// expressed in mean Keplerian elements.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename = "omm")]
 pub struct Omm {
@@ -270,18 +274,70 @@ impl OmmSegment {
 // Metadata
 //----------------------------------------------------------------------
 
+/// Metadata for the OMM.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OmmMetadata {
+    /// Comments (allowed at the beginning of the OMM Metadata).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Spacecraft name for which mean element orbit state data is provided. While there is no
+    /// CCSDS-based restriction on the value for this keyword, it is recommended to use names
+    /// from the UN Office of Outer Space Affairs designator index (which include Object name
+    /// and international designator of the participant). If OBJECT_NAME is not listed in or the
+    /// content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
+    ///
+    /// Example
+    ///
+    /// Telkom 2, Spaceway 2, INMARSAT 4-F2, UNKNOWN
     pub object_name: String,
+    // Object identifier of the object for which mean element orbit state data is provided.
+    /// While there is no CCSDS-based restriction on the value for this keyword, it is
+    /// recommended to use names from the UN Office of Outer Space Affairs designator index
+    /// (which include Object name and international designator of the participant).
+    /// If OBJECT_NAME is not listed or the content is either unknown or cannot be disclosed,
+    /// the value should be set to UNKNOWN.
+    ///
+    /// Example: 2005-046A, 2005-046B, 2003-022A, UNKNOWN
     pub object_id: String,
+    /// Origin of the OMM reference frame, which shall be a natural solar system body (planets,
+    /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
+    /// system barycenter.
+    ///
+    /// Examples
+    ///
+    /// EARTH, MARS, MOON
     pub center_name: String,
+    /// Reference frame in which the Keplerian element data are given. Use of values other than
+    /// those in 3.2.3.3 should be documented in an ICD. NOTE—NORAD Two Line Element Sets and
+    /// corresponding Simplified General Perturbations (SGP) orbit propagator ephemeris outputs
+    /// are explicitly defined to be in the True Equator Mean Equinox of Date (TEME of Date)
+    /// reference frame. Therefore, TEME of date shall be used for OMMs based on NORAD Two Line
+    /// Element sets, rather than the almost imperceptibly different TEME of Epoch.
+    ///
+    /// Examples
+    ///
+    /// ICRF, ITRF2000, EME2000, TEME
     pub ref_frame: String,
+    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
+    ///
+    /// Examples
+    ///
+    /// 2001-11-06T11:17:33, 2002-204T15:56:23Z
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ref_frame_epoch: Option<Epoch>,
+    /// Time system used for Keplerian elements and covariance data.
+    ///
+    /// Examples
+    ///
+    /// UTC
     pub time_system: String,
+    /// Description of the Mean Element Theory. Indicates the proper method to employ to
+    /// propagate the state.
+    ///
+    /// Examples
+    ///
+    /// SGP, SGP4, SGP4-XP, DSST, USM
     pub mean_element_theory: String,
 }
 
@@ -405,31 +461,38 @@ impl OmmMetadataBuilder {
 // Data
 //----------------------------------------------------------------------
 
+/// OMM Data section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OmmData {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Mean Keplerian Elements in the Specified Reference Frame.
     #[serde(rename = "meanElements")]
     pub mean_elements: MeanElements,
+    /// Spacecraft Parameters.
     #[serde(
         rename = "spacecraftParameters",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub spacecraft_parameters: Option<SpacecraftParameters>,
+    /// TLE Related Parameters (Only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
     #[serde(
         rename = "tleParameters",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub tle_parameters: Option<TleParameters>,
+    /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form).
     #[serde(
         rename = "covarianceMatrix",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub covariance_matrix: Option<OpmCovarianceMatrix>,
+    /// User-Defined Parameters.
     #[serde(
         rename = "userDefinedParameters",
         default,
@@ -587,21 +650,50 @@ impl OmmData {
 // Mean Elements
 //----------------------------------------------------------------------
 
+/// Mean Keplerian Elements in the Specified Reference Frame.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct MeanElements {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Epoch of Mean Keplerian elements.
     pub epoch: Epoch,
+    /// Semi-major axis.
+    ///
+    /// Preferred over MEAN_MOTION.
+    ///
+    /// Units: km
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub semi_major_axis: Option<Distance>,
+    /// Keplerian Mean motion.
+    ///
+    /// Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
+    ///
+    /// Units: rev/day
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mean_motion: Option<MeanMotion>,
+    /// Eccentricity.
     pub eccentricity: f64,
+    /// Inclination.
+    ///
+    /// Units: deg
     pub inclination: Inclination,
+    /// Right ascension of ascending node.
+    ///
+    /// Units: deg
     pub ra_of_asc_node: Angle,
+    /// Argument of pericenter.
+    ///
+    /// Units: deg
     pub arg_of_pericenter: Angle,
+    /// Mean anomaly.
+    ///
+    /// Units: deg
     pub mean_anomaly: Angle,
+    /// Gravitational Coefficient (Gravitational Constant × Central Mass).
+    ///
+    /// Units: km³/s²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gm: Option<Gm>,
 }
@@ -765,29 +857,75 @@ impl SpacecraftParametersBuilder {
 // TLE Parameters
 //----------------------------------------------------------------------
 
+/// TLE Related Parameters.
+///
+/// This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TleParameters {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Ephemeris Type, default value = 0.
+    /// Some sources suggest the coding for the EPHEMERIS_TYPE keyword as follows:
+    ///
+    /// - 0 = SGP
+    /// - 2 = SGP4
+    /// - 3 = PPT3
+    /// - 4 = SGP4-XP
+    /// - 6 = Special Perturbations
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ephemeris_type: Option<i32>,
+    /// Classification Type, default value = U. Some sources suggest the following coding for
+    /// the CLASSIFICATION_TYPE keyword: U=unclassified, S=secret
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification_type: Option<String>,
+    /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
+    /// is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub norad_cat_id: Option<u32>,
+    /// Element set number for this satellite. Normally incremented sequentially but may be out
+    /// of sync if it is generated from a backup source. Used to distinguish different TLEs, and
+    /// therefore only meaningful if TLE-based data is being exchanged (i.e.,
+    /// MEAN_ELEMENT_THEORY = SGP/SGP4).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub element_set_no: Option<u32>,
+    /// Revolution Number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rev_at_epoch: Option<u32>,
+    /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
+    /// MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
+    ///
+    /// Units: 1/ER
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bstar: Option<BStar>,
+    /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
+    /// MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag
+    /// coefficient, A = average cross-sectional area, m = mass. Example values for BTERM =
+    /// 0.02 (rocket body), 0.0015 (payload); average value spanning 20,00 catalog objects =
+    /// 0.0286.
+    ///
+    /// Units: m²/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bterm: Option<M2kg>,
+    /// First Time Derivative of the Mean Motion (i.e., a drag term, required when
+    /// MEAN_ELEMENT_THEORY = SGP or PPT3).
+    ///
+    /// Units: rev/day²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mean_motion_dot: Option<MeanMotionDot>,
+    /// MEAN_ELEMENT_THEORY= SGP or PPT3: Second Time Derivative of Mean Motion (i.e., a
+    /// drag term).
+    ///
+    /// Units: rev/day³
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mean_motion_ddot: Option<MeanMotionDDot>,
+    /// MEAN_ELEMENT_THEORY= SGP4-XP: Solar radiation pressure coefficient AY/m, where y =
+    /// reflectivity, A = average cross-sectional area, m = mass. Example values AGOM = 0.01
+    /// (rocket body) and 0.001 (payload); average value spanning 20,00 catalog objects =
+    /// 0.0143 m2/kg.
+    ///
+    /// Units: m²/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agom: Option<M2kg>,
 }

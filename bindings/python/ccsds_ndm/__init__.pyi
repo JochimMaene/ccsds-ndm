@@ -996,6 +996,47 @@ class GroundImpactParameters:
     def probability_of_land_impact(self, value: Optional[float]) -> None: ...
 
 class KeplerianElements:
+    """
+    Osculating Keplerian Elements.
+
+    Parameters
+    ----------
+    semi_major_axis : float
+        Semi-major axis (km).
+    eccentricity : float
+        Eccentricity (dimensionless).
+    inclination : float
+        Inclination (deg).
+    ra_of_asc_node : float
+        Right ascension of the ascending node (deg).
+    arg_of_pericenter : float
+        Argument of pericenter (deg).
+    gm : float
+        Gravitational coefficient (km³/s²).
+    true_anomaly : float, optional
+        True anomaly (deg).
+    mean_anomaly : float, optional
+        Mean anomaly (deg).
+
+    Attributes
+    ----------
+    semi_major_axis : float
+        Semi-major axis. Units: km.
+    eccentricity : float
+        Eccentricity. Units: dimensionless.
+    inclination : float
+        Inclination. Units: deg.
+    ra_of_asc_node : float
+        Right ascension of the ascending node. Units: deg.
+    arg_of_pericenter : float
+        Argument of pericenter. Units: deg.
+    gm : float
+        Gravitational coefficient (GM). Units: km³/s².
+    true_anomaly : float or None
+        True anomaly. Units: deg.
+    mean_anomaly : float or None
+        Mean anomaly. Units: deg.
+    """
     def __init__(
         semi_major_axis,
         eccentricity,
@@ -1277,7 +1318,7 @@ class ManeuverableType:
 
 class MeanElements:
     """
-    Create a new MeanElements object.
+    Mean Keplerian Elements in the Specified Reference Frame.
 
     Parameters
     ----------
@@ -1294,11 +1335,11 @@ class MeanElements:
     mean_anomaly : float
         Mean anomaly (deg).
     semi_major_axis : float, optional
-        Semi-major axis (km).
+        Semi-major axis in kilometers. Preferred over MEAN_MOTION.
     mean_motion : float, optional
-        Mean motion (rev/day).
+        Keplerian Mean motion in revolutions per day. Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
     gm : float, optional
-        Gravitational coefficient (km³/s²).
+        Gravitational Coefficient (Gravitational Constant × Central Mass) in km³/s².
     """
     def __init__(
         epoch,
@@ -1349,7 +1390,7 @@ class MeanElements:
     @property
     def epoch(self) -> str:
         """
-        Epoch of the mean elements.
+        Epoch of Mean Keplerian elements.
         """
         ...
 
@@ -1393,6 +1434,8 @@ class MeanElements:
         """
         Mean motion.
 
+        Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
+
         Units: rev/day
         """
         ...
@@ -1414,6 +1457,8 @@ class MeanElements:
     def semi_major_axis(self) -> Optional[float]:
         """
         Semi-major axis.
+
+        Preferred over MEAN_MOTION.
 
         Units: km
         """
@@ -1441,10 +1486,8 @@ class Ocm:
     ----------
     header : OdmHeader
         The message header.
-        (Mandatory)
     segment : OcmSegment
         The OCM data segment.
-        (Mandatory)
     """
     def __init__(header, segment) -> None: ...
     def __getstate__(self, /):
@@ -1487,7 +1530,7 @@ class Ocm:
         Returns
         -------
         Ocm
-            The parsed OCM object.
+            The parsed Ocm object.
         """
         ...
 
@@ -2234,148 +2277,108 @@ class OcmMetadata:
     ----------
     time_system : str
         Time system that shall be used for all absolute time stamps in the message.
-        (Mandatory)
     epoch_tzero : str
-        Epoch to which all relative times in the message are referenced.
-        (Mandatory)
+        Epoch to which all relative times in the message are referenced (ISO 8601).
     object_name : str, optional
         Name of the space object that the message is associated with.
-        (Optional)
     international_designator : str, optional
         The COSPAR international designator of the space object.
-        (Optional)
     catalog_name : str, optional
         The name of the satellite catalog used for the space object identification.
-        (Optional)
     object_designator : str, optional
         The unique satellite identification designator used in the specified catalog.
-        (Optional)
     alternate_names : str, optional
         Alternate name(s) by which the space object is known.
-        (Optional)
     originator_poc : str, optional
         Originator Point-of-Contact.
-        (Optional)
     originator_position : str, optional
         Contact position of the originator PoC.
-        (Optional)
     originator_phone : str, optional
         Originator PoC phone number.
-        (Optional)
     originator_email : str, optional
         Originator PoC email address.
-        (Optional)
     originator_address : str, optional
         Originator's physical address.
-        (Optional)
     tech_org : str, optional
         Technical organization (creating agency or operator).
-        (Optional)
     tech_poc : str, optional
         Technical Point-of-Contact.
-        (Optional)
     tech_position : str, optional
         Contact position of the technical PoC.
-        (Optional)
     tech_phone : str, optional
         Technical PoC phone number.
-        (Optional)
     tech_email : str, optional
         Technical PoC email address.
-        (Optional)
     tech_address : str, optional
         Technical PoC physical address.
-        (Optional)
     previous_message_id : str, optional
         Identifier for the previous OCM message.
-        (Optional)
     next_message_id : str, optional
         Identifier for the anticipated next OCM message.
-        (Optional)
     adm_msg_link : str, optional
         Identifier of linked Attitude Data Message.
-        (Optional)
     cdm_msg_link : str, optional
         Identifier of linked Conjunction Data Message.
-        (Optional)
     prm_msg_link : str, optional
         Identifier of linked Pointing Request Message.
-        (Optional)
     rdm_msg_link : str, optional
         Identifier of linked Reentry Data Message.
-        (Optional)
     tdm_msg_link : str, optional
         Identifier of linked Tracking Data Message.
-        (Optional)
     operator : str, optional
         Operator of the space object.
-        (Optional)
     owner : str, optional
         Owner of the space object.
-        (Optional)
     country : str, optional
         Country of the owner or operator of the space object.
-        (Optional)
     constellation : str, optional
         Name of the constellation the space object belongs to.
-        (Optional)
     object_type : str, optional
         Type of object (PAYLOAD, ROCKET_BODY, DEBRIS, etc.).
-        (Optional)
     ops_status : str, optional
         Operational status of the space object.
-        (Optional)
     orbit_category : str, optional
         Orbit category (LEO, GEO, HEO, etc.).
-        (Optional)
     ocm_data_elements : str, optional
         List of data elements included in the OCM message.
-        (Optional)
     sclk_offset_at_epoch : float, optional
-        Spacecraft clock offset at EPOCH_TZERO [s].
-        (Conditional)
+        Spacecraft clock offset at EPOCH_TZERO (s).
     sclk_sec_per_si_sec : float, optional
-        Spacecraft clock scale factor [s/SI-s].
-        (Conditional)
+        Spacecraft clock scale factor (s/SI-s).
     previous_message_epoch : str, optional
-        Epoch of the previous message.
-        (Optional)
+        Epoch of the previous message (ISO 8601).
     next_message_epoch : str, optional
-        Anticipated epoch of the next message.
-        (Optional)
+        Anticipated epoch of the next message (ISO 8601).
     start_time : str, optional
-        Time of the earliest data in the message.
-        (Optional)
+        Time of the earliest data in the message (ISO 8601).
     stop_time : str, optional
-        Time of the latest data in the message.
-        (Optional)
+        Time of the latest data in the message (ISO 8601).
     time_span : float, optional
-        Approximate time span covered by the data [d].
-        (Optional)
+        Approximate time span covered by the data (d).
     taimutc_at_tzero : float, optional
-        TAI minus UTC difference at EPOCH_TZERO [s].
-        (Optional)
+        TAI minus UTC difference at EPOCH_TZERO (s).
     next_leap_epoch : str, optional
-        Epoch of the next leap second.
-        (Optional)
+        Epoch of the next leap second (ISO 8601).
     next_leap_taimutc : float, optional
-        TAI minus UTC difference at NEXT_LEAP_EPOCH [s].
-        (Conditional)
+        TAI minus UTC difference at NEXT_LEAP_EPOCH (s).
     ut1mutc_at_tzero : float, optional
-        UT1 minus UTC difference at EPOCH_TZERO [s].
-        (Optional)
+        UT1 minus UTC difference at EPOCH_TZERO (s).
     eop_source : str, optional
         Source of Earth Orientation Parameters.
-        (Optional)
     interp_method_eop : str, optional
         Interpolation method for EOP data.
-        (Optional)
     celestial_source : str, optional
         Source of celestial body ephemerides.
-        (Optional)
-    comment : list of str, optional
+    comment : list[str], optional
         Comments for the metadata block.
-        (Optional)
+
+    Attributes
+    ----------
+    time_system : str
+        Time system.
+    epoch_tzero : str
+        Epoch T-Zero.
+    ... (see Parameters for full list)
     """
     def __init__(
         *,
@@ -4167,10 +4170,8 @@ class OcmSegment:
     ----------
     metadata : OcmMetadata
         Segment metadata.
-        (Mandatory)
     data : OcmData
         Segment data blocks.
-        (Mandatory)
     """
     def __init__(metadata, data) -> None: ...
     def __getstate__(self, /):
@@ -4209,64 +4210,44 @@ class OcmTrajState:
     ----------
     center_name : str
         Origin of the orbit reference frame.
-        (Mandatory)
     traj_ref_frame : str
         Reference frame of the trajectory state time history.
-        (Mandatory)
     traj_type : str
         Specifies the trajectory state element set type.
-        (Mandatory)
-    traj_lines : list of TrajLine
+    traj_lines : list[TrajLine]
         Contiguous set of trajectory state data lines.
-        (Mandatory)
     traj_id : str, optional
         Identification number for this trajectory state time history block.
-        (Optional)
     traj_prev_id : str, optional
         Identification number for the previous trajectory state time history.
-        (Optional)
     traj_next_id : str, optional
         Identification number for the next trajectory state time history.
-        (Optional)
     traj_basis : str, optional
         The basis of this trajectory state time history data (PREDICTED, DETERMINED, etc.).
-        (Optional)
     traj_basis_id : str, optional
         Identification number for the telemetry dataset, orbit determination, or simulation.
-        (Optional)
     interpolation : str, optional
         Recommended interpolation method for the ephemeris data.
-        (Optional)
     interpolation_degree : int, optional
         Recommended interpolation degree.
-        (Conditional)
     propagator : str, optional
         Name of the orbit propagator used to create this trajectory state time history.
-        (Optional)
     traj_frame_epoch : str, optional
         Epoch of the orbit data reference frame, if not intrinsic to the definition.
-        (Conditional)
     useable_start_time : str, optional
         Start time of the useable time span covered by the ephemeris data.
-        (Optional)
     useable_stop_time : str, optional
         Stop time of the useable time span covered by the ephemeris data.
-        (Optional)
     orb_revnum : float, optional
         The integer orbit revolution number associated with the first trajectory state.
-        (Optional)
     orb_revnum_basis : str, optional
         Specifies the message creator’s basis for their orbit revolution counter (0 or 1).
-        (Conditional)
     orb_averaging : str, optional
         Specifies whether the orbit elements are osculating elements or mean elements.
-        (Conditional)
     traj_units : str, optional
         Comma-delimited set of SI unit designations for the trajectory state elements.
-        (Optional)
     comment : list[str], optional
         Comments.
-        (Optional)
     """
     def __init__(
         *,
@@ -4675,17 +4656,16 @@ class Oem:
     """
     Represents a CCSDS Orbit Ephemeris Message (OEM).
 
-    This is the top-level object for an OEM file. It contains a header
-    and a list of ephemeris data segments.
+    The OEM specifies the position and velocity of a single object at multiple epochs contained
+    within a specified time range. It allows for dynamic modeling of any number of gravitational
+    and non-gravitational accelerations.
 
     Parameters
     ----------
     header : OdmHeader
         The message header.
-        (Mandatory)
-    segments : list of OemSegment
+    segments : list[OemSegment]
         The list of data segments.
-        (Mandatory)
     """
     def __init__(header, segments) -> None: ...
     def __getstate__(self, /):
@@ -4786,20 +4766,66 @@ class OemCovarianceMatrix:
     Represents a covariance matrix at a specific epoch.
 
     The matrix provides uncertainty information for the state vector at the
-    same epoch.
+    same epoch. The lower triangular portion is typically stored in the file,
+    but here it is represented as a structured object.
 
     Parameters
     ----------
     epoch : str
-        Epoch of the covariance matrix.
+        Epoch of the covariance matrix (ISO 8601).
     values : numpy.ndarray
         Flat NumPy array of length 21 containing the covariance values.
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
-        (Optional)
     comment : list[str], optional
         Comments associated with this covariance matrix.
-        (Optional)
+
+    Attributes
+    ----------
+    epoch : str
+        Epoch of the covariance matrix.
+    cx_x : float
+        Position X covariance [1,1]. Units: km².
+    cy_x : float
+        Position X-Y covariance [2,1]. Units: km².
+    cy_y : float
+        Position Y covariance [2,2]. Units: km².
+    cz_x : float
+        Position X-Z covariance [3,1]. Units: km².
+    cz_y : float
+        Position Y-Z covariance [3,2]. Units: km².
+    cz_z : float
+        Position Z covariance [3,3]. Units: km².
+    cx_dot_x : float
+        Velocity X / Position X covariance [4,1]. Units: km²/s.
+    cx_dot_y : float
+        Velocity X / Position Y covariance [4,2]. Units: km²/s.
+    cx_dot_z : float
+        Velocity X / Position Z covariance [4,3]. Units: km²/s.
+    cx_dot_x_dot : float
+        Velocity X covariance [4,4]. Units: km²/s².
+    cy_dot_x : float
+        Velocity Y / Position X covariance [5,1]. Units: km²/s.
+    cy_dot_y : float
+        Velocity Y / Position Y covariance [5,2]. Units: km²/s.
+    cy_dot_z : float
+        Velocity Y / Position Z covariance [5,3]. Units: km²/s.
+    cy_dot_x_dot : float
+        Velocity Y / Velocity X covariance [5,4]. Units: km²/s².
+    cy_dot_y_dot : float
+        Velocity Y covariance [5,5]. Units: km²/s².
+    cz_dot_x : float
+        Velocity Z / Position X covariance [6,1]. Units: km²/s.
+    cz_dot_y : float
+        Velocity Z / Position Y covariance [6,2]. Units: km²/s.
+    cz_dot_z : float
+        Velocity Z / Position Z covariance [6,3]. Units: km²/s.
+    cz_dot_x_dot : float
+        Velocity Z / Velocity X covariance [6,4]. Units: km²/s².
+    cz_dot_y_dot : float
+        Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
+    cz_dot_z_dot : float
+        Velocity Z covariance [6,6]. Units: km²/s².
     """
     def __init__(epoch, values, cov_ref_frame, comment) -> None: ...
     def __getstate__(self, /):
@@ -5086,8 +5112,10 @@ class OemData:
 
     Parameters
     ----------
-    state_vectors : list of StateVectorAcc
+    state_vectors : list[StateVectorAcc]
         List of state vectors.
+    comments : list[str], optional
+        Comments.
     """
     def __init__(state_vectors, comments) -> None: ...
     def __getstate__(self, /):
@@ -5157,18 +5185,24 @@ class OemData:
     @property
     def state_vectors_numpy(self) -> tuple[list[str], numpy.ndarray]:
         """
-        State vectors as a tuple of epochs and NumPy array.
+        State vectors as a tuple of epochs and a NumPy array.
+
+        This method allows for efficient zero-copy access to state vector data
+        compatible with scientific Python libraries.
 
         Returns
         -------
         tuple[list[str], numpy.ndarray]
             A tuple containing:
-            - List of epoch strings (ISO 8601 format)
+            - List of epoch strings (ISO 8601 format).
             - 2D NumPy array of shape (N, 6) or (N, 9):
-              - N x 6: [X, Y, Z, X_DOT, Y_DOT, Z_DOT] if no accelerations
-              - N x 9: [X, Y, Z, X_DOT, Y_DOT, Z_DOT, X_DDOT, Y_DDOT, Z_DDOT] if accelerations present
+              - N x 6: [X, Y, Z, X_DOT, Y_DOT, Z_DOT] if no accelerations.
+              - N x 9: [X, Y, Z, X_DOT, Y_DOT, Z_DOT, X_DDOT, Y_DDOT, Z_DDOT] if accelerations present.
 
-            Units: position in km, velocity in km/s, acceleration in km/s²
+            Units:
+            - Position: km
+            - Velocity: km/s
+            - Acceleration: km/s²
         """
         ...
 
@@ -5195,27 +5229,21 @@ class OemMetadata:
     time_system : str
         Time system used for state vector, maneuver, and covariance data.
     start_time : str
-        Start time of the total time span covered by the ephemeris data.
+        Start time of the total time span covered by the ephemeris data (ISO 8601).
     stop_time : str
-        Stop time of the total time span covered by the ephemeris data.
+        Stop time of the total time span covered by the ephemeris data (ISO 8601).
     ref_frame_epoch : str, optional
-        Epoch of the reference frame, if not intrinsic to the definition.
-        (Optional)
+        Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
     useable_start_time : str, optional
-        Start of the recommended time span for use of the ephemeris data.
-        (Optional)
+        Start of the recommended time span for use of the ephemeris data (ISO 8601).
     useable_stop_time : str, optional
-        End of the recommended time span for use of the ephemeris data.
-        (Optional)
+        End of the recommended time span for use of the ephemeris data (ISO 8601).
     interpolation : str, optional
         Recommended interpolation method for ephemeris data.
-        (Optional)
     interpolation_degree : int, optional
         Degree of the interpolation polynomial.
-        (Optional)
     comment : list[str], optional
         Comments.
-        (Optional)
     """
     def __init__(
         object_name,
@@ -5401,8 +5429,7 @@ class OemSegment:
     """
     Represents a single segment of an OEM.
 
-    An OEM file can contain multiple segments, each with its own metadata
-    and ephemeris data (state vectors and optional covariance matrices).
+    Each segment contains metadata (context) and a list of ephemeris data points.
 
     Parameters
     ----------
@@ -5439,7 +5466,10 @@ class OemSegment:
 
 class Omm:
     """
-    Create a new OMM message.
+    Orbit Mean-Elements Message (OMM).
+
+    The OMM contains the orbital characteristics of a single object at a specified epoch,
+    expressed in mean Keplerian elements.
 
     Parameters
     ----------
@@ -5528,6 +5558,9 @@ class Omm:
         ...
 
 class OmmData:
+    """
+    OMM Data section.
+    """
     def __init__(mean_elements, comments) -> None: ...
     def __getstate__(self, /):
         """
@@ -5547,7 +5580,7 @@ class OmmData:
     @property
     def covariance_matrix(self) -> Optional[OpmCovarianceMatrix]:
         """
-        Covariance matrix.
+        Position/Velocity Covariance Matrix (6x6 Lower Triangular Form).
         """
         ...
 
@@ -5556,7 +5589,7 @@ class OmmData:
     @property
     def mean_elements(self) -> MeanElements:
         """
-        Mean elements.
+        Mean Keplerian Elements in the Specified Reference Frame.
         """
         ...
 
@@ -5565,7 +5598,7 @@ class OmmData:
     @property
     def spacecraft_parameters(self) -> Optional[SpacecraftParameters]:
         """
-        Spacecraft parameters.
+        Spacecraft Parameters.
         """
         ...
 
@@ -5574,7 +5607,7 @@ class OmmData:
     @property
     def tle_parameters(self) -> Optional[TleParameters]:
         """
-        TLE parameters.
+        TLE Related Parameters (Only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
         """
         ...
 
@@ -5583,7 +5616,7 @@ class OmmData:
     @property
     def user_defined_parameters(self) -> Optional[UserDefined]:
         """
-        User defined parameters.
+        User-Defined Parameters.
         """
         ...
 
@@ -5592,26 +5625,26 @@ class OmmData:
 
 class OmmMetadata:
     """
-    Create a new OMM Metadata object.
+    Metadata for the OMM.
 
     Parameters
     ----------
     object_name : str
-        Spacecraft name.
+        Spacecraft name for which mean element orbit state data is provided.
     object_id : str
-        Object identifier.
+        Object identifier of the object for which mean element orbit state data is provided.
     center_name : str
-        Origin of the reference frame.
+        Origin of the OMM reference frame.
     ref_frame : str
-        Reference frame.
+        Reference frame in which the Keplerian element data are given.
     time_system : str
-        Time system.
+        Time system used for Keplerian elements and covariance data.
     mean_element_theory : str
-        Description of the Mean Element Theory.
+        Description of the Mean Element Theory. Indicates the proper method to employ to propagate the state.
     ref_frame_epoch : str, optional
-        Epoch of the reference frame.
+        Epoch of reference frame, if not intrinsic to the definition of the reference frame.
     comment : list of str, optional
-        Comments.
+        Comments (allowed at the beginning of the OMM Metadata).
     """
     def __init__(
         object_name,
@@ -5632,7 +5665,7 @@ class OmmMetadata:
     @property
     def center_name(self) -> str:
         """
-        Origin of the reference frame.
+        Origin of the OMM reference frame.
         """
         ...
 
@@ -5641,7 +5674,7 @@ class OmmMetadata:
     @property
     def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (allowed at the beginning of the OMM Metadata).
         """
         ...
 
@@ -5650,7 +5683,7 @@ class OmmMetadata:
     @property
     def mean_element_theory(self) -> str:
         """
-        Description of the Mean Element Theory.
+        Description of the Mean Element Theory. Indicates the proper method to employ to propagate the state.
         """
         ...
 
@@ -5659,7 +5692,7 @@ class OmmMetadata:
     @property
     def object_id(self) -> str:
         """
-        Object identifier.
+        Object identifier of the object for which mean element orbit state data is provided.
         """
         ...
 
@@ -5668,7 +5701,7 @@ class OmmMetadata:
     @property
     def object_name(self) -> str:
         """
-        Spacecraft name.
+        Spacecraft name for which mean element orbit state data is provided.
         """
         ...
 
@@ -5677,7 +5710,7 @@ class OmmMetadata:
     @property
     def ref_frame(self) -> str:
         """
-        Reference frame.
+        Reference frame in which the Keplerian element data are given.
         """
         ...
 
@@ -5686,7 +5719,7 @@ class OmmMetadata:
     @property
     def ref_frame_epoch(self) -> Optional[str]:
         """
-        Epoch of the reference frame.
+        Epoch of reference frame, if not intrinsic to the definition of the reference frame.
         """
         ...
 
@@ -5695,7 +5728,7 @@ class OmmMetadata:
     @property
     def time_system(self) -> str:
         """
-        Time system.
+        Time system used for Keplerian elements and covariance data.
         """
         ...
 
@@ -5750,18 +5783,6 @@ class Opm:
         The message header.
     segment : OpmSegment
         The data segment.
-
-    Parameters
-    ----------
-    data : str
-        Input string/content.
-    format : str, optional
-        Format ('kvn' or 'xml'). Auto-detected if None.
-
-    Returns
-    -------
-    Opm
-        The parsed OPM object.
     """
     def __init__(header, segment) -> None: ...
     def __getstate__(self, /):
@@ -5844,6 +5865,64 @@ class Opm:
         ...
 
 class OpmCovarianceMatrix:
+    """
+    Represents a covariance matrix for position and velocity.
+
+    Parameters
+    ----------
+    cx_x : float, optional
+        Position X covariance [1,1]. Units: km².
+    cy_x : float, optional
+        Position X-Y covariance [2,1]. Units: km².
+    cy_y : float, optional
+        Position Y covariance [2,2]. Units: km².
+    cz_x : float, optional
+        Position X-Z covariance [3,1]. Units: km².
+    cz_y : float, optional
+        Position Y-Z covariance [3,2]. Units: km².
+    cz_z : float, optional
+        Position Z covariance [3,3]. Units: km².
+    cx_dot_x : float, optional
+        Velocity X / Position X covariance [4,1]. Units: km²/s.
+    cx_dot_y : float, optional
+        Velocity X / Position Y covariance [4,2]. Units: km²/s.
+    cx_dot_z : float, optional
+        Velocity X / Position Z covariance [4,3]. Units: km²/s.
+    cx_dot_x_dot : float, optional
+        Velocity X covariance [4,4]. Units: km²/s².
+    cy_dot_x : float, optional
+        Velocity Y / Position X covariance [5,1]. Units: km²/s.
+    cy_dot_y : float, optional
+        Velocity Y / Position Y covariance [5,2]. Units: km²/s.
+    cy_dot_z : float, optional
+        Velocity Y / Position Z covariance [5,3]. Units: km²/s.
+    cy_dot_x_dot : float, optional
+        Velocity Y / Velocity X covariance [5,4]. Units: km²/s².
+    cy_dot_y_dot : float, optional
+        Velocity Y covariance [5,5]. Units: km²/s².
+    cz_dot_x : float, optional
+        Velocity Z / Position X covariance [6,1]. Units: km²/s.
+    cz_dot_y : float, optional
+        Velocity Z / Position Y covariance [6,2]. Units: km²/s.
+    cz_dot_z : float, optional
+        Velocity Z / Position Z covariance [6,3]. Units: km²/s.
+    cz_dot_x_dot : float, optional
+        Velocity Z / Velocity X covariance [6,4]. Units: km²/s².
+    cz_dot_y_dot : float, optional
+        Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
+    cz_dot_z_dot : float, optional
+        Velocity Z covariance [6,6]. Units: km²/s².
+    cov_ref_frame : str, optional
+        Reference frame for the covariance matrix.
+    comments : list[str], optional
+        Comments.
+
+    Attributes
+    ----------
+    cx_x : float
+        Position X covariance [1,1]. Units: km².
+    ... (see Parameters for full list of attributes with units)
+    """
     def __init__(
         cx_x,
         cy_x,
@@ -6213,11 +6292,11 @@ class OpmMetadata:
         Origin of the reference frame.
     ref_frame : str
         Reference frame in which state vector data is given.
+    time_system : str
         Time system used for state vector, maneuver, and covariance data.
-        Allowed values: 'GMST', 'GPS', 'MET', 'MRT', 'SCLK', 'TAI', 'TCB', 'TDB', 'TCG', 'TT', 'UT1', 'UTC'.
     ref_frame_epoch : str, optional
-        Epoch of the reference frame, if not intrinsic to the definition.
-    comment : list of str, optional
+        Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
+    comment : list[str], optional
         Comments.
     """
     def __init__(
@@ -6310,6 +6389,15 @@ class OpmMetadata:
 class OpmSegment:
     """
     Represents a single segment of an OPM.
+
+    Contains metadata and data sections.
+
+    Parameters
+    ----------
+    metadata : OpmMetadata
+        Segment metadata.
+    data : OpmData
+        Segment data.
     """
     def __init__(metadata, data) -> None: ...
     def __getstate__(self, /):
@@ -9006,40 +9094,32 @@ class TdmSegment:
 
 class TleParameters:
     """
-    Create a new TleParameters object.
+    TLE Related Parameters.
+
+    This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
 
     Parameters
     ----------
     ephemeris_type : int, optional
-        Ephemeris type.
-        (Optional)
+        Ephemeris Type, default value = 0.
     classification_type : str, optional
-        Classification type.
-        (Optional)
+        Classification Type, default value = U.
     norad_cat_id : int, optional
-        NORAD catalog ID.
-        (Optional)
+        NORAD Catalog Number ('Satellite Number').
     element_set_no : int, optional
-        Element set number.
-        (Optional)
+        Element set number for this satellite.
     rev_at_epoch : int, optional
-        Revolution number at epoch.
-        (Optional)
+        Revolution Number.
     bstar : float, optional
-        B* drag term (1/ER).
-        (Optional)
+        B* drag term in 1/ER (Inverse Earth Radii). Required for SGP4.
     bterm : float, optional
-        Ballistic coefficient (m²/kg).
-        (Optional)
+        Ballistic coefficient (m²/kg). Required for SGP4-XP.
     mean_motion_dot : float, optional
-        First derivative of mean motion (rev/day²).
-        (Optional)
+        First derivative of mean motion (rev/day²). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
     mean_motion_ddot : float, optional
-        Second derivative of mean motion (rev/day³).
-        (Optional)
+        Second derivative of mean motion (rev/day³). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
     agom : float, optional
-        Solar radiation pressure area to mass ratio (m²/kg).
-        (Optional)
+        Solar radiation pressure coefficient (m²/kg). Required for SGP4-XP.
     """
     def __init__(
         ephemeris_type: Optional[int] = None,
@@ -9064,6 +9144,8 @@ class TleParameters:
         """
         Solar radiation pressure area to mass ratio.
 
+        Required for SGP4-XP.
+
         Units: m²/kg
         """
         ...
@@ -9086,6 +9168,8 @@ class TleParameters:
         """
         Ballistic coefficient.
 
+        Required for SGP4-XP.
+
         Units: m²/kg
         """
         ...
@@ -9095,7 +9179,7 @@ class TleParameters:
     @property
     def classification_type(self) -> Optional[str]:
         """
-        Classification type.
+        Classification Type, default value = U.
         """
         ...
 
@@ -9113,7 +9197,7 @@ class TleParameters:
     @property
     def element_set_no(self) -> Optional[int]:
         """
-        Element set number.
+        Element set number for this satellite.
         """
         ...
 
@@ -9122,7 +9206,7 @@ class TleParameters:
     @property
     def ephemeris_type(self) -> Optional[int]:
         """
-        Ephemeris type.
+        Ephemeris Type, default value = 0.
         """
         ...
 
@@ -9131,7 +9215,7 @@ class TleParameters:
     @property
     def mean_motion_ddot(self) -> Optional[float]:
         """
-        Second derivative of mean motion.
+        Second Time Derivative of Mean Motion.
 
         Units: rev/day³
         """
@@ -9142,7 +9226,7 @@ class TleParameters:
     @property
     def mean_motion_dot(self) -> Optional[float]:
         """
-        First derivative of mean motion.
+        First Time Derivative of the Mean Motion.
 
         Units: rev/day²
         """
@@ -9153,7 +9237,7 @@ class TleParameters:
     @property
     def norad_cat_id(self) -> Optional[int]:
         """
-        NORAD catalog ID.
+        NORAD Catalog Number ('Satellite Number').
         """
         ...
 
@@ -9162,7 +9246,7 @@ class TleParameters:
     @property
     def rev_at_epoch(self) -> Optional[int]:
         """
-        Revolution number at epoch.
+        Revolution Number.
         """
         ...
 

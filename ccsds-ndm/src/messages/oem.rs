@@ -19,6 +19,18 @@ use std::num::NonZeroU32;
 // Root OEM Structure
 //----------------------------------------------------------------------
 
+/// Orbit Ephemeris Message (OEM).
+///
+/// The OEM specifies the position and velocity of a single object at multiple epochs contained
+/// within a specified time range. It allows for dynamic modeling of any number of gravitational
+/// and non-gravitational accelerations. The OEM requires the use of an interpolation technique to interpret the
+/// position and velocity at times different from the tabular epochs.
+///
+/// The OEM also contains an optional covariance matrix that reflects the uncertainty of the orbit
+/// solution used to generate states in the ephemeris.
+///
+/// References:
+/// - CCSDS 502.0-B-3, Section 3 (OEM)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename = "oem")]
 pub struct Oem {
@@ -96,6 +108,7 @@ impl Ndm for Oem {
 // Body & Segments
 //----------------------------------------------------------------------
 
+/// The body of the OEM, containing one or more segments.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OemBody {
     #[serde(rename = "segment")]
@@ -142,6 +155,9 @@ impl OemBody {
     }
 }
 
+/// A single segment of the OEM.
+///
+/// Each segment contains metadata (context) and a list of ephemeris data points.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OemSegment {
     pub metadata: OemMetadata,
@@ -178,26 +194,130 @@ impl OemSegment {
 // Metadata
 //----------------------------------------------------------------------
 
+/// OEM Metadata Section.
+///
+/// This section contains descriptive information about the object and the ephemeris data,
+/// such as reference frames, time systems, and validation intervals.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OemMetadata {
+    /// Comments (optional).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Spacecraft name for which ephemeris data is provided. While there is no CCSDS-based
+    /// restriction on the value for this keyword, it is recommended to use names from the UN
+    /// Office of Outer Space Affairs designator index (which include Object name and
+    /// international designator of the participant). If OBJECT_NAME is not listed or the
+    /// content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
+    ///
+    /// Examples
+    ///
+    /// EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
     pub object_name: String,
+    /// Object identifier of the object for which ephemeris data is provided. While there is no
+    /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
+    /// international spacecraft designator as published in the UN Office of Outer Space Affairs
+    /// designator index. Recommended values have the format YYYY-NNNP{PP}, where:
+    /// YYYY = Year of launch.
+    /// NNN = Three-digit serial number of launch in year YYYY (with leading zeros).
+    /// P{PP} = At least one capital letter for the identification of the part brought into
+    /// space by the launch. If the asset is not listed, the UN Office of Outer Space Affairs
+    /// designator index format is not used, or the content is either unknown or cannot be
+    /// disclosed, the value should be set to UNKNOWN.
+    ///
+    /// Examples
+    ///
+    /// 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
     pub object_id: String,
+    /// Origin of the OEM reference frame, which may be a natural solar system body
+    /// (planets, asteroids, comets, and natural satellites), including any planet barycenter
+    /// or the solar system barycenter, or another reference frame center (such as a spacecraft,
+    /// formation flying reference ‘chief’ spacecraft, etc.). Natural bodies shall be selected
+    /// from the accepted set of values indicated in annex B, subsection B2. For spacecraft, it
+    /// is recommended to use either the OBJECT_ID or international designator of the participant
+    /// as catalogued in the UN Office of Outer Space Affairs designator index.
+    ///
+    /// Examples
+    ///
+    /// EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN, JUPITER BARYCENTER, STS 106, EROS
     pub center_name: String,
+    /// Reference frame in which the ephemeris data are given. Use of values other than those
+    /// in 3.2.3.3 should be documented in an ICD.
+    ///
+    /// Examples
+    ///
+    /// ICRF, ITRF2000, EME2000, TEME
     pub ref_frame: String,
+    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
+    ///
+    /// Conditional: Required if the reference frame is not fixed to a specific epoch.
+    ///
+    /// Examples
+    ///
+    /// 2001-11-06T11:17:33, 2002-204T15:56:23Z
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ref_frame_epoch: Option<Epoch>,
+    /// Time system used for ephemeris and covariance data.
+    ///
+    /// Examples
+    ///
+    /// UTC, TAI, TT, GPS, TDB, TCB
     pub time_system: String,
+    /// Start of TOTAL time span covered by ephemeris data and covariance data immediately
+    /// following this metadata block.
+    ///
+    /// Examples
+    ///
+    /// 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     pub start_time: Epoch,
+    /// Start time of USEABLE time span covered by ephemeris data immediately following this
+    /// metadata block. This optional keyword allows the message creator to introduce fictitious
+    /// (but numerically smooth) data nodes prior to the actual data time history to support
+    /// interpolation methods requiring more than two nodes (e.g., pure higher-order Lagrange
+    /// interpolation methods). The use of this keyword and introduction of fictitious node points
+    /// are optional and may not be necessary.
+    ///
+    /// Examples
+    ///
+    /// 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_start_time: Option<Epoch>,
+    /// Stop time of USEABLE time span covered by ephemeris data immediately following this
+    /// metadata block. This optional keyword allows the message creator to introduce
+    /// fictitious (but numerically smooth) data nodes following the actual data time history
+    /// to support interpolation methods requiring more than two nodes (e.g., pure higher-order
+    /// Lagrange interpolation methods). The use of this keyword and introduction of fictitious
+    /// node points are optional and may not be necessary.
+    ///
+    /// Examples
+    ///
+    /// 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_stop_time: Option<Epoch>,
+    /// End of TOTAL time span covered by ephemeris data and covariance data immediately
+    /// following this metadata block.
+    ///
+    /// Examples
+    ///
+    /// 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     pub stop_time: Epoch,
+    /// This keyword may be used to specify the recommended interpolation method for
+    /// ephemeris data in the immediately following set of ephemeris lines.
+    ///
+    /// Examples
+    ///
+    /// HERMITE, LINEAR, LAGRANGE
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation: Option<String>,
+    /// Recommended interpolation degree for ephemeris data in the immediately following set
+    /// of ephemeris lines. Must be an integer value. This keyword must be used if the
+    /// ‘INTERPOLATION’ keyword is used.
+    ///
+    /// Conditional: Required if `interpolation` is present.
+    ///
+    /// Examples
+    ///
+    /// 5, 8
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation_degree: Option<NonZeroU32>,
 }
@@ -351,14 +471,26 @@ impl OemMetadataBuilder {
 // Data Section
 //----------------------------------------------------------------------
 
+/// OEM Data Section.
+///
+/// Contains the list of state vectors and optional covariance matrices.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OemData {
+    /// Comments (optional).
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
 
+    /// List of state vectors.
+    ///
+    /// Each vector contains position (km), velocity (km/s), and optional acceleration (km/s²).
+    ///
+    /// Mandatory: At least one state vector is required in a valid segment (enforced by parser).
     #[serde(rename = "stateVector", default)]
     pub state_vector: Vec<StateVectorAcc>,
 
+    /// List of covariance matrices (optional).
+    ///
+    /// Units: km², km²/s, km²/s².
     #[serde(
         rename = "covarianceMatrix",
         default,
@@ -509,35 +641,70 @@ impl OemData {
 // Covariance Matrix
 //----------------------------------------------------------------------
 
+/// OEM Covariance Matrix.
+///
+/// Represents a 6x6 symmetric covariance matrix for position and velocity at a specific epoch.
+/// The lower triangular portion is stored/transmitted.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OemCovarianceMatrix {
+    /// Comments (optional).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Format: ISO 8601 string (e.g. "2000-01-01T00:00:00.000").
+    ///
+    /// Mandatory.
     pub epoch: Epoch,
+    /// Reference frame for the covariance data (if different from metadata).
+    ///
+    /// Optional.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_ref_frame: Option<String>,
 
+    /// Position X covariance [1,1]. Units: km².
     pub cx_x: PositionCovariance,
+    /// Position X-Y covariance [2,1]. Units: km².
     pub cy_x: PositionCovariance,
+    /// Position Y covariance [2,2]. Units: km².
     pub cy_y: PositionCovariance,
+    /// Position X-Z covariance [3,1]. Units: km².
     pub cz_x: PositionCovariance,
+    /// Position Y-Z covariance [3,2]. Units: km².
     pub cz_y: PositionCovariance,
+    /// Position Z covariance [3,3]. Units: km².
     pub cz_z: PositionCovariance,
+
+    /// Velocity X / Position X covariance [4,1]. Units: km²/s.
     pub cx_dot_x: PositionVelocityCovariance,
+    /// Velocity X / Position Y covariance [4,2]. Units: km²/s.
     pub cx_dot_y: PositionVelocityCovariance,
+    /// Velocity X / Position Z covariance [4,3]. Units: km²/s.
     pub cx_dot_z: PositionVelocityCovariance,
+    /// Velocity X covariance [4,4]. Units: km²/s².
     pub cx_dot_x_dot: VelocityCovariance,
+
+    /// Velocity Y / Position X covariance [5,1]. Units: km²/s.
     pub cy_dot_x: PositionVelocityCovariance,
+    /// Velocity Y / Position Y covariance [5,2]. Units: km²/s.
     pub cy_dot_y: PositionVelocityCovariance,
+    /// Velocity Y / Position Z covariance [5,3]. Units: km²/s.
     pub cy_dot_z: PositionVelocityCovariance,
+    /// Velocity Y / Velocity X covariance [5,4]. Units: km²/s².
     pub cy_dot_x_dot: VelocityCovariance,
+    /// Velocity Y covariance [5,5]. Units: km²/s².
     pub cy_dot_y_dot: VelocityCovariance,
+
+    /// Velocity Z / Position X covariance [6,1]. Units: km²/s.
     pub cz_dot_x: PositionVelocityCovariance,
+    /// Velocity Z / Position Y covariance [6,2]. Units: km²/s.
     pub cz_dot_y: PositionVelocityCovariance,
+    /// Velocity Z / Position Z covariance [6,3]. Units: km²/s.
     pub cz_dot_z: PositionVelocityCovariance,
+    /// Velocity Z / Velocity X covariance [6,4]. Units: km²/s².
     pub cz_dot_x_dot: VelocityCovariance,
+    /// Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
     pub cz_dot_y_dot: VelocityCovariance,
+    /// Velocity Z covariance [6,6]. Units: km²/s².
     pub cz_dot_z_dot: VelocityCovariance,
 }
 
