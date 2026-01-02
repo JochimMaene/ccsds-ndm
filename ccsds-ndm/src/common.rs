@@ -105,39 +105,41 @@ impl ToKvn for AdmHeader {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdmHeader {
-    /// Comments
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
     /// User-defined free-text message classification/caveats of this ODM. It is recommended
     /// that selected values be pre-coordinated between exchanging entities by mutual agreement.
     ///
-    /// Example
+    /// **Examples**: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
     ///
-    /// SBU, ‘Operator-proprietary data; secondary distribution not permitted’
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<String>,
-    /// File creation date/time in UTC.
+    /// File creation date/time in UTC. (For format specification, see 7.5.10.)
     ///
-    /// Example
+    /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
-    /// 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
     pub creation_date: Epoch,
     /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
     /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
     /// Abbreviation column is not populated. If desired organization is not listed there, follow
     /// procedures to request that originator be added to SANA registry.
     ///
-    /// Example
+    /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     ///
-    /// CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
     pub originator: String,
+    /// ID that uniquely identifies a message from a given originator. The format and content of the
+    /// message identifier value are at the discretion of the originator.
+    ///
+    /// **Examples**: OPM_201113719185, ABC-12_34
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// ID that uniquely identifies a message from a given originator. The format and content of
-    /// the message identifier value are at the discretion of the originator.
-    ///
-    /// Example
-    ///
-    /// ODM_201113719185, ABC-12_34
     pub message_id: Option<String>,
 }
 
@@ -225,25 +227,57 @@ impl FromKvnTokens for OdmHeader {
     }
 }
 
+/// Spacecraft physical parameters (mass, area, coefficients).
+///
+/// References:
+/// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpacecraftParameters {
-    /// Comments
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// Spacecraft mass. Units: kg.
+    /// Spacecraft mass.
+    ///
+    /// **Examples**: 1850.2, 3352.0
+    ///
+    /// **Units**: kg
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mass: Option<Mass>,
-    /// Solar Radiation Pressure Area (AR). Units: m².
+    /// Solar Radiation Pressure Area (AR).
+    ///
+    /// **Examples**: 14, 20.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_area: Option<Area>,
-    /// Solar Radiation Pressure Coefficient (CR)
+    /// Solar Radiation Pressure Coefficient (CR).
+    ///
+    /// **Examples**: 1, 1.34
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_coeff: Option<f64>,
-    /// Drag Area (AD). Units: m².
+    /// Drag Area (AD).
+    ///
+    /// **Examples**: 14, 20.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_area: Option<Area>,
-    /// Drag Coefficient (CD)
+    /// Drag Coefficient (CD).
+    ///
+    /// **Examples**: 2, 2.1
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_coeff: Option<f64>,
 }
@@ -279,17 +313,85 @@ pub struct OdParameters {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVectorAcc {
+    /// Epoch of state vector (see 7.5.10 for formatting rules).
+    ///
+    /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub epoch: Epoch,
+    /// Position vector X-component.
+    ///
+    /// **Examples**: 6653.148
+    ///
+    /// **Units**: km
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub x: Position,
+    /// Position vector Y-component.
+    ///
+    /// **Examples**: -20.0
+    ///
+    /// **Units**: km
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub y: Position,
+    /// Position vector Z-component.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **Units**: km
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub z: Position,
+    /// Velocity vector X-component.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **Units**: km/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub x_dot: Velocity,
+    /// Velocity vector Y-component.
+    ///
+    /// **Examples**: 7.7
+    ///
+    /// **Units**: km/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub y_dot: Velocity,
+    /// Velocity vector Z-component.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **Units**: km/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub z_dot: Velocity,
+    /// Acceleration vector X-component.
+    ///
+    /// **Examples**: 0.001
+    ///
+    /// **Units**: km/s²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub x_ddot: Option<Acc>,
+    /// Acceleration vector Y-component.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **Units**: km/s²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub y_ddot: Option<Acc>,
+    /// Acceleration vector Z-component.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **Units**: km/s²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub z_ddot: Option<Acc>,
 }
@@ -493,22 +595,64 @@ pub struct AngularVelocity {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVector {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    /// Comments.
     pub comment: Vec<String>,
-    /// Epoch of the state vector.
+    /// Epoch of state vector (see 7.5.10 for formatting rules).
+    ///
+    /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub epoch: Epoch,
-    /// Position vector X-component. Units: km.
+    /// Position vector X-component.
+    ///
+    /// **Examples**: 6653.148
+    ///
+    /// **Units**: km
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub x: Position,
-    /// Position vector Y-component. Units: km.
+    /// Position vector Y-component.
+    ///
+    /// **Examples**: -20.0
+    ///
+    /// **Units**: km
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub y: Position,
-    /// Position vector Z-component. Units: km.
+    /// Position vector Z-component.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **Units**: km
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub z: Position,
-    /// Velocity vector X-component. Units: km/s.
+    /// Velocity vector X-component.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **Units**: km/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub x_dot: Velocity,
-    /// Velocity vector Y-component. Units: km/s.
+    /// Velocity vector Y-component.
+    ///
+    /// **Examples**: 7.7
+    ///
+    /// **Units**: km/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub y_dot: Velocity,
-    /// Velocity vector Z-component. Units: km/s.
+    /// Velocity vector Z-component.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **Units**: km/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub z_dot: Velocity,
 }
 
@@ -715,56 +859,145 @@ pub struct InertiaState {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmCovarianceMatrix {
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// Reference frame in which the covariance data are given.
+    /// Reference frame in which the covariance data are given. Select from the accepted set of
+    /// values indicated in 3.2.4.11.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_ref_frame: Option<String>,
-    /// Position X covariance [1,1]. Units: km².
+    /// Position X covariance \[1,1\].
+    ///
+    /// **Units**: km²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_x: PositionCovariance,
-    /// Position X-Y covariance [2,1]. Units: km².
+    /// Position Y / Position X covariance \[2,1\].
+    ///
+    /// **Units**: km²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_x: PositionCovariance,
-    /// Position Y covariance [2,2]. Units: km².
+    /// Position Y covariance \[2,2\].
+    ///
+    /// **Units**: km²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_y: PositionCovariance,
-    /// Position X-Z covariance [3,1]. Units: km².
+    /// Position Z / Position X covariance \[3,1\].
+    ///
+    /// **Units**: km²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_x: PositionCovariance,
-    /// Position Y-Z covariance [3,2]. Units: km².
+    /// Position Z / Position Y covariance \[3,2\].
+    ///
+    /// **Units**: km²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_y: PositionCovariance,
-    /// Position Z covariance [3,3]. Units: km².
+    /// Position Z covariance \[3,3\].
+    ///
+    /// **Units**: km²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_z: PositionCovariance,
 
-    /// Velocity X / Position X covariance [4,1]. Units: km²/s.
+    /// Velocity X / Position X covariance \[4,1\].
+    ///
+    /// **Units**: km²/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_x: PositionVelocityCovariance,
-    /// Velocity X / Position Y covariance [4,2]. Units: km²/s.
+    /// Velocity X / Position Y covariance \[4,2\].
+    ///
+    /// **Units**: km²/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_y: PositionVelocityCovariance,
-    /// Velocity X / Position Z covariance [4,3]. Units: km²/s.
+    /// Velocity X / Position Z covariance \[4,3\].
+    ///
+    /// **Units**: km²/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_z: PositionVelocityCovariance,
-    /// Velocity X covariance [4,4]. Units: km²/s².
+    /// Velocity X covariance \[4,4\].
+    ///
+    /// **Units**: km²/s²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_x_dot: VelocityCovariance,
 
-    /// Velocity Y / Position X covariance [5,1]. Units: km²/s.
+    /// Velocity Y / Position X covariance \[5,1\].
+    ///
+    /// **Units**: km²/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_x: PositionVelocityCovariance,
-    /// Velocity Y / Position Y covariance [5,2]. Units: km²/s.
+    /// Velocity Y / Position Y covariance \[5,2\].
+    ///
+    /// **Units**: km²/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_y: PositionVelocityCovariance,
-    /// Velocity Y / Position Z covariance [5,3]. Units: km²/s.
+    /// Velocity Y / Position Z covariance \[5,3\].
+    ///
+    /// **Units**: km²/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_z: PositionVelocityCovariance,
-    /// Velocity Y / Velocity X covariance [5,4]. Units: km²/s².
+    /// Velocity Y / Velocity X covariance \[5,4\].
+    ///
+    /// **Units**: km²/s²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_x_dot: VelocityCovariance,
-    /// Velocity Y covariance [5,5]. Units: km²/s².
+    /// Velocity Y covariance \[5,5\].
+    ///
+    /// **Units**: km²/s²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_y_dot: VelocityCovariance,
 
-    /// Velocity Z / Position X covariance [6,1]. Units: km²/s.
+    /// Velocity Z / Position X covariance \[6,1\].
+    ///
+    /// **Units**: km²/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_x: PositionVelocityCovariance,
-    /// Velocity Z / Position Y covariance [6,2]. Units: km²/s.
+    /// Velocity Z / Position Y covariance \[6,2\].
+    ///
+    /// **Units**: km²/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_y: PositionVelocityCovariance,
-    /// Velocity Z / Position Z covariance [6,3]. Units: km²/s.
+    /// Velocity Z / Position Z covariance \[6,3\].
+    ///
+    /// **Units**: km²/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_z: PositionVelocityCovariance,
-    /// Velocity Z / Velocity X covariance [6,4]. Units: km²/s².
+    /// Velocity Z / Velocity X covariance \[6,4\].
+    ///
+    /// **Units**: km²/s²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_x_dot: VelocityCovariance,
-    /// Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
+    /// Velocity Z / Velocity Y covariance \[6,5\].
+    ///
+    /// **Units**: km²/s²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_y_dot: VelocityCovariance,
-    /// Velocity Z covariance [6,6]. Units: km²/s².
+    /// Velocity Z covariance \[6,6\].
+    ///
+    /// **Units**: km²/s²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_z_dot: VelocityCovariance,
 }
 

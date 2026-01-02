@@ -195,7 +195,7 @@ DOCUMENT CONTROL
    * - CCSDS 502.0-B-3 EC 1
      - Editorial change 1
      - May 2023
-     - Corrects errant cross-refence links, adjusts some minor format and page-layout elements.
+     - Corrects errant cross-reference links, adjusts some minor format and page-layout elements.
 
 .. NOTE::
    Changes from the previous issue are too numerous to permit meaningful
@@ -1518,15 +1518,15 @@ d) whether the item is Mandatory (M), Optional (O), or Conditional (C). Conditio
      -
      - O
    * - BSTAR or BTERM
-     - Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models: MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4). MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag coefficient, A = average cross-sectional area, m = mass. Example values for BTERM = 0.02 (rocket body), 0.0015 (payload); average value spanning 20,00 catalog objects = 0.0286.
-     - 1/[Earth radii] or m\ :sup:`2`\ /kg
+     - Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models: MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4). MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag coefficient, A = average cross-sectional area, m = mass. Example values for BTERM = 0.02 (rocket body), 0.0015 (payload); average value spanning 20,000 catalog objects = 0.0286.
+     - BSTAR: 1/[Earth radii] or BTERM: m\ :sup:`2`\ /kg
      - C
    * - MEAN_MOTION_DOT
      - First Time Derivative of the Mean Motion (i.e., a drag term, required when MEAN_ELEMENT_THEORY = SGP or PPT3). (See 4.2.4.7 for important details).
      - rev/day\ :sup:`2`
      - C
    * - MEAN_MOTION_DDOT or AGOM
-     - MEAN_ELEMENT_THEORY= SGP or PPT3: Second Time Derivative of Mean Motion (i.e., a drag term). (See 4.2.4.7 for important details). MEAN_ELEMENT_THEORY= SGP4-XP: Solar radiation pressure coefficient AY/m, where y = reflectivity, A = average cross-sectional area, m = mass. Example values AGOM = 0.01 (rocket body) and 0.001 (payload); average value spanning 20,00 catalog objects = 0.0143 m2/kg.
+     - MEAN_ELEMENT_THEORY= SGP or PPT3: Second Time Derivative of Mean Motion (i.e., a drag term). (See 4.2.4.7 for important details). MEAN_ELEMENT_THEORY= SGP4-XP: Solar radiation pressure coefficient AY/m, where y = reflectivity, A = average cross-sectional area, m = mass. Example values AGOM = 0.01 (rocket body) and 0.001 (payload); average value spanning 20,000 catalog objects = 0.0143 m2/kg.
      - rev/day\ :sup:`3`\ or m\ :sup:`2`\ /kg
      - C
    * - **Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. None or all parameters of the matrix must be given. COV_REF_FRAME may be omitted if it is the same as the REF_FRAME.)**
@@ -2640,7 +2640,7 @@ is provided in informative annex F, subsection F1.
      -
      - O
    * - DRAG_UNCERTAINTY
-     - Drag coefficient one sigma (1σ) percent uncertainty, where the actual range of drag coefficients to within 1σ shall be obtained from [1.0 ± 0.01*DRAG_UNCERTAINTY] (CD Nom). This factor is intended to allow operators to supply the nominal ballistic coefficient components while accommodating ballistic coefficient uncertainties.
+     - Drag coefficient one sigma (1σ) percent uncertainty, where the actual range of drag coefficients to within 1σ shall be obtained from [1.0 ± DRAG_UNCERTAINTY/100.0] * (CD Nom). This factor is intended to allow operators to supply the nominal ballistic coefficient components while accommodating ballistic coefficient uncertainties.
      - %
      - O
    * - INITIAL_WET_MASS
@@ -2736,7 +2736,7 @@ is provided in informative annex F, subsection F1.
      -
      - O
    * - SOLAR_RAD_UNCERTAINTY
-     - SRP one sigma (1σ) percent uncertainty, where the actual range of SRP coefficients to within 1σ shall be obtained from [1.0 ± 0.01*SRP_UNCERTAINTY] (CRNOM). This factor is intended to allow operators to supply the nominal ballistic coefficient components while accommodating ballistic coefficient uncertainties.
+     - SRP one sigma (1σ) percent uncertainty, where the actual range of SRP coefficients to within 1σ shall be obtained from [1.0 ± SRP_UNCERTAINTY/100.0] * (CRNOM). This factor is intended to allow operators to supply the nominal ballistic coefficient components while accommodating ballistic coefficient uncertainties.
      - %
      - O
    * - VM_ABSOLUTE
@@ -3209,15 +3209,15 @@ parameters may override the duty cycle maneuver stop time (DC_EXEC_STOP).
      - kg
      - O
    * - ACC_X
-     - Acceleration component Ax in the selected maneuver frame.
+     - Acceleration component ΔVx in the selected maneuver frame.
      - km/s²
      - O
    * - ACC_Y
-     - Acceleration component Ay in the selected maneuver frame.
+     - Acceleration component ΔVy in the selected maneuver frame.
      - km/s²
      - O
    * - ACC_Z
-     - Acceleration component Az in the selected maneuver frame.
+     - Acceleration component ΔVz in the selected maneuver frame.
      - km/s²
      - O
    * - ACC_INTERP
@@ -3241,7 +3241,7 @@ parameters may override the duty cycle maneuver stop time (DC_EXEC_STOP).
      - km/s
      - O
    * - DV_Z
-     - Velocity increment ΔVz in the selected maneuver reference frame. The actual ΔV should be impulsively applied at a time of <time tag> + 1/2 (MAN_DURA).
+     - Velocity increment AVz in the selected maneuver reference frame. The actual AV should be impulsively applied at a time of <time tag> + 1/2 (MAN_DURA).
      - km/s
      - O
    * - DV_MAG_SIGMA
@@ -3884,425 +3884,1065 @@ keywords shown in table 6-12 shall be used in an OCM user-defined data specifica
      -
      - M.. _syntax_odm:
 
-7 SYNTAX OF ORBIT DATA MESSAGES
-===============================
+7 ORBIT DATA MESSAGE SYNTAX
+===========================
+
+.. _syntax_overview_odm:
+
+7.1 OVERVIEW
+------------
+
+This section details the syntax requirements for each of the Orbit Data Messages.
 
 .. _syntax_general_odm:
 
-7.1 GENERAL
+7.2 GENERAL
 -----------
 
-7.1.1 The syntax of the KVN formatted OPM, OMM, and OEM shall be as described in this
-section.
-
-7.1.2 The syntax of the KVN formatted OCM shall be as described in this section.
-
-7.1.3 Examples of the OPM, OMM, OEM, and OCM are provided in annex G.
+The Orbit Data Messages (OPM, OMM, OEM, and OCM) shall observe the syntax described
+in 7.3 through 7.8.
 
 .. _syntax_lines_odm:
 
-7.2 LINES
----------
+7.3 ODM LINES
+-------------
 
-7.2.1 Each OPM, OMM, OEM, or OCM file shall consist of a set of lines.
+7.3.1 Each OPM, OMM, OEM, or OCM line shall be one of the following:
 
-7.2.2 Each line shall be one of the following types:
+- Header line;
+- Metadata line;
+- Data line;
+- Comment line; or
+- Blank line.
 
-a) Header line;
-b) Metadata line;
-c) Data line;
-d) Blank line.
+7.3.2 Each OPM, OMM, or OEM line must not exceed 254 ASCII characters and spaces
+(excluding line termination character[s]).
 
-7.2.3 All lines in an OPM, OMM, OEM, or OCM file shall have a maximum length of
-255 ASCII characters and spaces (excluding the line termination character[s]).
+7.3.3 OCM lines may be of arbitrary length. If exchange between the two parties requires a
+maximum line length, that limit should be mutually agreed upon between message exchange
+partners.
+
+7.3.4 Only printable ASCII characters and blanks shall be used. Control characters (such
+as TAB, etc.) shall not be used, except for the line termination characters specified below.
+
+7.3.5 Blank lines may be used at any position within the file. Blank lines shall have no
+assignable meaning and may be ignored.
+
+7.3.6 The first header line must be the first non-blank line in the file.
+
+7.3.7 All lines shall be terminated by a single Carriage Return or a single Line Feed, a
+Carriage Return/Line Feed pair, or a Line Feed/Carriage Return pair.
 
 .. _syntax_kvn_odm:
 
-7.3 KEYWORD = VALUE NOTATION
-----------------------------
+7.4 ORBIT DATA MESSAGES IN ‘KEYWORD = VALUE NOTATION’ (I.E., NON-XML) AND ORDER OF ASSIGNMENT STATEMENTS
+---------------------------------------------------------------------------------------------------------
 
-7.3.1 All Header, Metadata, and Data lines shall use the KVN.
+7.4.1 For the OPM and OMM, all header, metadata, and data lines shall use ‘keyword =
+value’ notation, abbreviated as KVN.
 
-7.3.2 The KVN lines shall be of the form ‘KEYWORD = VALUE'.
+7.4.1.1 For the OEM, all header and metadata elements shall use KVN notation.
 
-7.3.3 The keyword must be one of the keywords prescribed in sections 3, 4, 5, or 6 of this
-Recommended Standard, and it must be provided in all capital letters.
+7.4.1.2 OEM ephemeris data lines shall not use KVN format; rather, the OEM ephemeris
+data line has a fixed structure containing seven required fields (epoch time, three position
+components, three velocity components), and three optional acceleration components. (See
+5.2.4.)
 
-7.3.4 The keyword shall be separated from the value by an equals sign ‘=’.
+7.4.1.3 OEM covariance matrix epoch and covariance reference frame (if used) shall use
+KVN format. The OEM covariance data lines shall not use KVN format; rather, the OEM
+covariance data line has a fixed structure containing from one to six required fields (a row
+from the 6x6 lower triangular form covariance matrix). (See 5.2.5.)
 
-7.3.5 Leading and trailing blanks on both sides of the equals sign are permitted but are not
-required.
+7.4.1.4 For the OCM, all header and metadata elements shall use KVN notation.
 
-7.3.6 The value shall be a text string, a number, or a prescribed-constant, as specified for
-each keyword in sections 3, 4, 5, and 6.
+7.4.1.5 OCM trajectory state time history data lines shall not use KVN format; rather, the
+structure of such OCM trajectory state time history data shall comprise a contiguous set of
+lines, with the values on each line separated by at least one white space character, and those
+values consisting of the time tag followed by the parameters corresponding to the selected
+orbit set (see TRAJ_TYPE, 6.2.5).
 
-7.3.7 Only a single ‘KEYWORD = VALUE’ assignment shall be made on a line.
+7.4.1.6 OCM covariance matrix epoch and covariance reference frame (if used) shall use
+KVN format. The OCM covariance data lines shall not use KVN format; rather, OCM
+covariance time history data shall comprise a contiguous set of lines, with the values on each
+line separated by at least one white space character, and those values consisting of the time
+tag followed by the covariance matrix corresponding to the selected covariance type (see
+COV_TYPE, 6.2.7, particularly 6.2.7.11 through 6.2.7.13).
 
-7.3.8 Keywords shall not be repeated, except for the COMMENT keyword and keywords
-in the User-Defined Parameters section of the OPM, OMM, and OCM.
+7.4.1.7 OCM maneuver data lines shall not use KVN format; rather, OCM maneuver data
+shall comprise a contiguous set of lines, the values on each line separated by at least one
+white space character, and with those values consisting of the specified maneuver parameters
+(see MAN_COMPOSITION, 6.2.8.14).
+
+7.4.2 The keywords ‘COMMENT’, *‘_START’, and *‘_STOP’ are exceptions to the KVN
+syntax assignment.
+
+7.4.3 Only a single ‘keyword = value’ assignment shall be made on a line.
+
+7.4.4 Keywords must be uppercase and must not contain blanks.
+
+7.4.5 Any white space immediately preceding or following the keyword shall not be
+significant.
+
+7.4.6 Any white space immediately preceding or following the ‘equals’ sign shall not be
+significant.
+
+7.4.7 Any white space immediately preceding the end of line shall not be significant.
+
+7.4.8 The order of occurrence of mandatory and optional KVN assignments shall be fixed
+as shown in the tables in sections 3, 4, 5, and 6 that describe the OPM, OMM, OEM, and
+OCM keywords.
 
 .. _syntax_values_odm:
 
-7.4 VALUES
+7.5 VALUES
 ----------
 
-.. _syntax_values_general_odm:
+7.5.1 A non-empty value field must be assigned to each mandatory keyword except for
+*‘_START’ and *‘_STOP’ keyword values.
 
-7.4.1 GENERAL
-^^^^^^^^^^^^^
+7.5.2 Comments and free-text value fields may be in any case (or mix of case) desired by
+the user.
 
-7.4.1.1 The value in a KVN line shall be a text string, a number, or a prescribed-constant as specified in sections 3, 4, 5, or 6.
+7.5.3 Apart from comments and free-text fields, normative text value fields shall be
+constructed using only exclusively all uppercase or exclusively all lowercase.
 
-7.4.1.2 Blanks may be used to separate data items in a Data line. At least one blank shall be
-used.
+7.5.4 Integer values shall consist of a sequence of decimal digits with an optional leading
+sign (‘+’ or ‘-’). If the sign is omitted, ‘+’ shall be assumed. Leading zeroes may be used.
+The range of values that may be expressed as an integer is:
+-2,147,483,648 ≤ x ≤ +2,147,483,647 (i.e., -2\ :sup:`31` ≤ x ≤ 2\ :sup:`31`\ -1).
 
-7.4.1.3 The number of data items on a Data line shall be as specified in the tables in sections
-3, 4, 5, and 6.
+.. NOTE::
+   The commas in the range of values above are thousands separators and are used
+   only for readability. They should not appear in an actual message.
 
-7.4.1.4 In an OEM, an ephemeris data line after the metadata block contains the time, the
-components of the position vector, the components of the velocity vector, and, optionally, the
-components of the acceleration vector, in that order.
+7.5.5 Non-integer numeric values may be expressed in either fixed-point or floating-point
+notation. Both representations may be used within an OPM, OMM, OEM, or OCM.
 
-7.4.1.5 In an OCM, a trajectory state time history data line contains the time and the
-trajectory state elements as selected by the ‘TRAJ_TYPE' keyword, in that order.
+7.5.6 Non-integer numeric values expressed in fixed-point notation shall consist of a
+sequence of decimal digits separated by a period as a decimal point indicator, with an
+optional leading sign (‘+’ or ‘-’). If the sign is omitted, ‘+’ shall be assumed. Leading and
+trailing zeroes may be used. At least one digit shall appear before and after a decimal point.
+The number of digits shall be 16 or fewer.
 
-7.4.1.6 In an OCM, a covariance time history data line contains the time and the covariance
-matrix elements as selected by the 'COV_TYPE' keyword, in that order.
+7.5.7 Non-integer numeric values expressed in floating point notation shall consist of a
+sign, a mantissa, an alphabetic character indicating the division between the mantissa and
+exponent, and an exponent, constructed according to the following rules:
 
-7.4.1.7 In an OCM, a maneuver time history data line contains the time and the maneuver
-elements as selected by the ‘MAN_COMPOSITION' keyword, in that order.
+a) The sign may be ‘+’ or ‘-’. If the sign is omitted, ‘+’ shall be assumed.
+b) The mantissa must be a string of no more than 16 decimal digits with a decimal point
+   (‘.’) in the second position of the ASCII string, separating the integer portion of the
+   mantissa from the fractional part of the mantissa.
+c) The character used to denote exponentiation shall be ‘E’ or ‘e’. If the character
+   indicating the exponent and the following exponent are omitted, an exponent value of
+   zero shall be assumed (essentially yielding a fixed-point value).
+d) The exponent must be an integer and may have either a ‘+’ or ‘-’ sign (if the sign is
+   omitted, then ‘+’ shall be assumed).
+e) The maximum positive floating-point value is approximately 1.798E+308, with 16
+   significant decimal digits precision. The minimum positive floating-point value is
+   approximately 4.94E-324, with 16 significant decimal digits precision.
 
-.. _syntax_values_character_strings_odm:
+7.5.8 Blanks shall not be permitted within numeric values and time strings.
 
-7.4.2 CHARACTER STRINGS
-^^^^^^^^^^^^^^^^^^^^^^^
+7.5.9 In value fields that are text, an underscore shall be equivalent to a single blank.
+Individual blanks shall be retained (shall be significant), but multiple contiguous blanks shall
+be equivalent to a single blank.
 
-7.4.2.1 If the value is a character string, the string shall not be enclosed in quotes.
+7.5.10 In value fields that represent an absolute time tag or epoch, times shall be given in
+one of the following two formats:
 
-7.4.2.2 Character strings may contain any ASCII character except ‘=’ (equals sign).
+   YYYY-MM-DDThh:mm:ss[.d→d][Z]
 
-7.4.2.3 All character strings are case-sensitive, except where otherwise noted.
+or
 
-.. _syntax_values_numbers_odm:
+   YYYY-DDDThh:mm:ss[.d→d][Z],
 
-7.4.3 NUMBERS
-^^^^^^^^^^^^^
+where ‘YYYY’ is the year; ‘MM’ is the two-digit month; ‘DD’ is the two-digit day; ‘DDD’
+is the three-digit day of year; ‘T’ is constant; ‘hh:mm:ss[.d→d]’ is the time in hours, minutes,
+seconds, and optional fractional seconds; and ‘Z’ is an optional time code terminator (the
+only permitted value is ‘Z’ for Zulu, i.e., UTC). As many ‘d’ characters to the right of the
+period as required may be used to obtain the required precision, up to the maximum allowed
+for a fixed-point number. All fields shall have leading zeros. (See reference [2], ASCII
+Time Code A or B.)
 
-7.4.3.1 If the value is a number, it may be an integer or a real number.
+.. NOTE::
+   During a leap second introduction, the value of the two-digit integer seconds (ss)
+   field shall be ‘60’ as specified in reference [2].
 
-7.4.3.2 The format of a real number shall be one of the following:
+7.5.11 The time system for CREATION_DATE is UTC; for all other keywords representing
+times or epochs, the time system is determined by the TIME_SYSTEM metadata keyword.
 
-a) a free-format real number consisting of the following optional parts in the following
-   order: a sign (‘+’ or ‘-’), an integer part, a decimal point (‘.’), a fractional part;
-b) a free-format real number as in 7.4.3.2a followed by an exponent in the following
-   order: an exponent character (‘E’ or ‘e’), a sign (‘+’ or ‘-’), an integer exponent.
+.. _syntax_ocm_vector_data_type_odm:
 
-7.4.3.3 A real number must have either an integer part, or a fractional part, or both.
+7.6 OCM VECTOR DATA TYPE
+--------------------------
 
-7.4.3.4 A free-format integer shall consist of a sequence of digits, optionally preceded by a
-sign.
-
-7.4.3.5 Values shall be provided in the units specified in sections 3, 4, 5, or 6.
-
-7.4.3.6 In this document, the precision of real values (i.e., the number of digits) is not
-specified. The precision of all real values in an ODM shall be consistent with the accuracy
-required by the application. It is recommended that all parties exchanging ODMs agree on
-the precision of real values.
-
-7.4.3.7 Non-negative real numbers may be preceded by a plus sign ‘+’.
-
-7.4.3.8 Real numbers in which the fractional part is zero (e.g., 12.0) may be written with or
-without the trailing zero(s) and decimal point (e.g., as 12).
-
-7.4.3.9 A number that is an integer may be written as a real number (e.g., with a decimal
-point and trailing zero).
-
-.. _syntax_values_prescribed_constants_odm:
-
-7.4.4 PRESCRIBED-CONSTANTS
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-7.4.4.1 If the value is a prescribed-constant, it must be one of the values prescribed for that
-keyword in sections 3, 4, 5, or 6, or in an ICD.
-
-7.4.4.2 Prescribed-constants are case-sensitive.
-
-.. _syntax_values_time_odm:
-
-7.4.5 TIME
-^^^^^^^^^^
-The format of all time tags shall be as specified in 7.5.10.
+7.6.1 Several OCM keywords may be set to values containing more than one number.
+Examples include DC_REF_DIR and DC_BODY_TRIGGER. Such vectors shall be space-
+delimited and provided serially on a single line following the equals ‘=’ sign, adhering to the
+requirements for ‘numeric values’ provided in the previous sections.
 
 .. _syntax_units_odm:
 
-7.5 UNITS
----------
+7.7 UNITS IN THE ORBIT DATA MESSAGES
+--------------------------------------
 
-7.5.1 In KVN messages, units shall not be included in the file, but the units for all keywords
-shall be as specified in the tables in sections 3, 4, 5, and 6. For user defined keywords in the
-OPM, OMM, or OCM, the units shall be specified in an ICD. In an OCM message, units
-may be displayed via the TRAJ_UNITS, COV_UNITS and MAN_UNITS keywords.
+.. _syntax_units_opm_omm_odm:
 
-7.5.2 The specifications for units are as follows:
+7.7.1 OPM/OMM UNITS
+^^^^^^^^^^^^^^^^^^^^^
 
-- deg: degrees of arc
-- km: kilometers
-- km/s: kilometers per second
-- km**3/s**2: kilometers cubed per second squared
-- m: meters
-- m**2: meters squared
-- nT: nanoTesla
-- N: Newtons
-- s: seconds
-- W: watts
-- W/kg: watts per kilogram
+7.7.1.1 For documentation purposes and clarity only, units may be included as ASCII text
+after a value in the OPM and OMM. If units are displayed, they must exactly match the units
+(including lower/upper case) as specified in tables 3-3 and 4-3. If units are displayed, then:
 
-.. _syntax_abbreviations_odm:
+a) there must be at least one blank character between the value and the units text;
+b) the units must be enclosed within square brackets (e.g., ‘[km]’);
+c) combinations of units shall adhere to requirements listed in 1.5.
 
-7.6 ABBREVIATIONS AND ACRONYMS
-------------------------------
+7.7.1.2 Some of the items in the applicable tables are dimensionless. The table shows a
+unit value of ‘n/a’, which in this case means that there is no applicable units designator for
+these items (e.g., for ECCENTRICITY).
 
-Abbreviations and acronyms used in the ODM are defined in annex A.
+7.7.1.3 The notation ‘[n/a]’ shall not appear in an OPM or OMM.
+
+.. _syntax_units_oem_odm:
+
+7.7.2 OEM UNITS
+^^^^^^^^^^^^^^^
+
+7.7.2.1 In an OEM ephemeris data line, units shall be km, km/s, and km/s\ :sup:`2` for position,
+velocity, and acceleration components, respectively, but the units shall not be displayed.
+
+7.7.2.2 In an OEM covariance matrix line, units shall be km\ :sup:`2`, km\ :sup:`2`\ /s, or km\ :sup:`2`\ /s\ :sup:`2`,
+depending on whether the element is computed from two position components, one position
+component and one velocity component, or two velocity components. The units shall not be
+displayed.
+
+.. _syntax_units_ocm_odm:
+
+7.7.3 OCM UNITS
+^^^^^^^^^^^^^^^
+
+7.7.3.1 Apart from trajectory state, covariance, and maneuver data lines, units of OCM
+keyword values shall correspond to the normative ‘Units’ column of the accompanying
+Keyword Value Tables (i.e., tables 6-3 through 6-12) for each section definition.
+
+.. NOTE::
+   The units used throughout the OCM are generally a combination of kilometers
+   for distance and seconds for time (e.g., km/s for velocity, km/s\ :sup:`2` for
+   acceleration, and so forth). Mass is in kilograms, and force is in Newtons.
+
+7.7.3.2 The units of orbit time state history data lines, when present, shall adhere to the
+specified units for trajectory states as provided in the SANA Registry (reference [11]) for
+Orbital Elements (annex B, subsection B7).
+
+7.7.3.3 The units of covariance time history data lines, when present, shall adhere to the
+specified units for covariance data as provided in the SANA Registry (reference [11]) for
+Orbital Elements (annex B, subsection B7) and Additional Covariance Representations
+(annex B, subsection B8).
+
+7.7.3.4 The units of maneuver time history data lines, when present, shall adhere to the
+specified units for maneuver lines as provided in table 6-8 and table 6-9.
+
+7.7.3.5 For OCM keywords used to convey multipartite trajectory state, covariance, or
+maneuver data lines, units may accompany these data lines via the TRAJ_UNITS,
+COV_UNITS, and MAN_UNITS keywords, respectively. Units shall not be displayed in
+OCM trajectory state, covariance, or maneuver data lines themselves.
+
+7.7.3.6 For OCM keywords that are not used to convey multipartite trajectory state,
+covariance, or maneuver data lines, units may be included as ASCII text after a value in the
+OCM for documentation purposes and clarity only. If units are displayed, then:
+
+a) there must be at least one blank character between the value and the units text;
+b) the units must be enclosed within square brackets (e.g., ‘[m]’);
+c) combinations of units shall adhere to requirements listed in 1.5.
+
+7.7.3.7 Some of the items in the applicable tables are dimensionless. The table shows a
+unit value of ‘n/a’, which in this case means that there is no applicable units designator for
+these items (e.g., for ECCENTRICITY) and no units displayed.
 
 .. _syntax_comments_odm:
 
-7.7 COMMENTS
-------------
+7.8 COMMENTS IN THE ORBIT DATA MESSAGES
+-----------------------------------------
 
-7.7.1 Comment lines shall be used only as permitted in sections 3, 4, 5, and 6.
+7.8.1 There are certain pieces of information that provide clarity and remove ambiguity
+about the interpretation of the information in a file yet are not standardized so as to fit cleanly
+into the ‘keyword = value’ paradigm. Rather than force the information to fit into a space
+limited to one line, the ODM producer should put further specifications and information into
+comments. Static information should be separately shared and/or mutually agreed upon
+between message exchange partners outside of the ODM.
 
-7.7.2 A comment line shall begin with the keyword ‘COMMENT’.
+7.8.2 Comments may be used to provide provenance information or to help describe
+dynamical events or other pertinent information associated with the data. This additional
+information is intended to aid in consistency checks and elaboration when needed but shall
+not be required for successful processing of a file.
 
-7.7.3 The comment shall be a text string.
+7.8.3 For the OPM, OMM, OEM, and OCM, comment lines shall be optional.
 
-7.7.4 The comment keyword must be followed by at least one space, and then the comment
-itself.
+7.8.4 Comment text may be in any case (or mix of case) desired by the user.
 
-7.7.5 The comment may have any content and format.
+7.8.5 All comment lines shall begin with the ‘COMMENT’ keyword followed by at least
+one space. This keyword must appear on every comment line, not just the first such line.
+The remainder of the line shall be the comment value. White space shall be retained (shall be
+significant) in comment values.
+
+7.8.6 Placement of comments shall be as specified in the tables in sections 3, 4, 5, and 6
+that describe the OPM, OMM, OEM, and OCM keywords.
+
+7.8.7 Comments in the OPM may appear in the OPM Header immediately after the
+‘CCSDS_OPM_VERS’ keyword, at the very beginning of the OPM Metadata section, and at
+the beginning of a logical block in the OPM Data section. Comments must not appear
+between the components of any logical block in the OPM Data section.
+
+.. NOTE::
+   The logical blocks in the OPM Data section are indicated in table 3-3.
+
+7.8.8 Comments in the OMM may appear in the OMM Header immediately after the
+‘CCSDS_OMM_VERS’ keyword, at the very beginning of the OMM Metadata section, and
+at the beginning of a logical block in the OMM Data section. Comments must not appear
+between the components of any logical block in the OMM Data section.
+
+.. NOTE::
+   The logical blocks in the OMM Data section are indicated in table 4-3.
+
+7.8.9 Comments in the OEM may appear in the OEM Header immediately after the
+‘CCSDS_OEM_VERS’ keyword, at the very beginning of the OEM Metadata section (after
+the ‘META_START’ keyword), at the beginning of the OEM Ephemeris Data Section, and at
+the beginning of the OEM Covariance Data section (after the ‘COV_START’ keyword).
+Comment lines must not appear within any block of ephemeris lines or covariance matrix
+lines.
+
+7.8.10 Comments may appear in all logical blocks of the OCM, but only at the positions
+shown in the defining tables (generally at the top of each section, following the *_START
+section delimiting keyword).
+
+7.8.11 Extensive comments in an ODM are recommended in cases when that content is
+germane to the message and changes from message to message.
+
+7.8.12 The following comments should be provided:
+
+a) Information regarding the genesis, history, interpretation, intended use, etc., of the
+   state vector, spacecraft, maneuver, or ephemeris that may be of use to the receiver of
+   the OPM, OMM, OEM, or OCM:
+
+   .. code-block::
+
+      COMMENT Source: File created by JPL Multi-Mission Navigation Team as part
+      COMMENT of Launch Operations Readiness Test held on 20 April 2001.
+
+b) Natural body ephemeris information: When the Earth is not the center of motion, the
+   ephemerides of the planets, satellites, asteroids, and/or comets (including associated
+   constants) consistent with the ODM should be identified so that the recipient can, in a
+   consistent manner, make computations involving other centers:
+
+   .. code-block::
+
+      COMMENT Based on latest orbit solution which includes observations
+      COMMENT through 2000-May-15 relative to planetary ephemeris DE-0405.
+
+c) OEM accuracy vs. efficiency: If the covariance data section of the OEM is not utilized,
+   the producer of an OEM should report in comment lines what the expected accuracy of
+   the ephemeris is, so the user can smooth or otherwise compress the data without affecting
+   the accuracy of the trajectory. The OEM producer also should strive to achieve not only
+   the best accuracy possible, considering prediction errors, but also consider the efficiency
+   of the trajectory representation (e.g., step sizes of fractional seconds between ephemeris
+   lines may be necessary for precision scientific reconstruction of an orbit, but are
+   excessive from the standpoint of antenna pointing predicts generation).
+
+.. _syntax_keywords_odm:
+
+7.9 ORBIT DATA MESSAGE KEYWORDS
+---------------------------------
+
+.. _syntax_version_keywords_odm:
+
+7.9.1 VERSION KEYWORDS
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Header of the OPM, OMM, OEM, and OCM shall provide a CCSDS Orbit Data Message
+version number that identifies the format version; this is included to anticipate future changes.
+The version keywords for the OPM, OMM, OEM, and OCM shall be CCSDS_OPM_VERS,
+CCSDS_OMM_VERS, CCSDS_OEM_VERS, and CCSDS_OCM_VERS, respectively. The
+value shall have the form of ‘x.y’, where ‘y’ shall be incremented for corrections and minor
+changes, and ‘x’ shall be incremented for major changes. Version x.0 shall be reserved for
+versions accepted by the CCSDS as an official Recommended Standard (‘Blue Book’). Testing
+shall be conducted using OPM, OMM, OEM, and OCM version numbers less than 1.0 (e.g.,
+0.x). The specific OPM, OMM, OEM, and OCM version numbers to be used should be
+mutually agreed between message exchange partners. The following version numbers are
+supported (Blue Book) or have been supported in the past (Silver Book):
+
+.. list-table:: Version Keywords
+   :widths: 33 33 34
+   :header-rows: 1
+
+   * - Version Keyword
+     - Version Number
+     - Applicable Recommendation
+   * - CCSDS_OPM_VERS
+     - 1.0
+     - Silver Book 1.0, 09/2004
+   * - CCSDS_OPM_VERS
+     - 2.0
+     - Silver Book 2.0, 11/2009
+   * - CCSDS_OPM_VERS
+     - 3.0
+     - Blue Book 3.0 (this document)
+   * - CCSDS_OMM_VERS
+     - 2.0
+     - Silver Book 2.0, 11/2009
+   * - CCSDS_OMM_VERS
+     - 3.0
+     - Blue Book 3.0 (this document)
+   * - CCSDS_OEM_VERS
+     - 1.0
+     - Silver Book 1.0, 09/2004
+   * - CCSDS_OEM_VERS
+     - 2.0
+     - Silver Book 2.0, 11/2009
+   * - CCSDS_OEM_VERS
+     - 3.0
+     - Blue Book 3.0 (this document)
+   * - CCSDS_OCM_VERS
+     - 3.0
+     - Blue Book 3.0 (this document)
+
+.. _syntax_general_keywords_odm:
+
+7.9.2 GENERAL KEYWORDS
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+7.9.2.1 Only those keywords shown in tables 3-1, 3-2, and 3-3 shall be used in an OPM.
+Some keywords represent mandatory items, and some are optional. KVN assignments
+representing optional items may be omitted.
+
+7.9.2.2 Only those keywords shown in tables 4-1, 4-2, and 4-3 shall be used in an OMM.
+Some keywords represent mandatory items, and some are optional. KVN assignments
+representing optional items may be omitted.
+
+7.9.2.3 Only those keywords shown in tables 5-2 and 5-3 shall be used in an OEM. Some
+keywords represent mandatory items, and some are optional. KVN assignments representing
+optional items may be omitted.
+
+7.9.2.4 Only those keywords shown in tables 6-3 through 6-12 shall be used in an OCM.
+Some keywords represent mandatory items, and some are optional. KVN assignments
+representing optional items may be omitted.
+
+.. _syntax_regex_odm:
+
+7.10 VALIDATION AND INGEST OF KVN CONTENT VIA REGULAR EXPRESSIONS (OR ‘REGEX’)
+--------------------------------------------------------------------------------
+
+.. _syntax_regex_benefits_odm:
+
+7.10.1 BENEFITS OF USING REGULAR EXPRESSIONS WITH THE ODM
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Unlike the schema validation feature native to XML versions of this message as described in
+section 8, the KVN version of this message does not natively support such validations of
+KVN content. To accomplish validation and ingest of KVN versions of the ODM, the use of
+Regular Expressions (referred to as ‘Regex’) is strongly encouraged where possible. Most
+programming languages support the Regex feature, and Regex offers a detailed and rigorous
+way to ensure proper validation, interpretation, and conformance to Orbit Data Message
+content.
+
+.. _syntax_regex_samples_odm:
+
+7.10.2 SAMPLE REGULAR EXPRESSIONS FOR CCSDS MESSAGES
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To facilitate the use of Regular Expressions when processing CCSDS Navigation Messages,
+informative annex F, subsection F6 provides sample Regex patterns to rigorously match a
+variety of common KVN sequences.
 .. _xml_odm:
 
-8 XML-BASED FORMAT
-==================
+8 CONSTRUCTING AN ODM/XML INSTANCE
+==================================
 
-.. _xml_general_odm:
+.. _xml_overview_odm:
 
-8.1 GENERAL
------------
+8.1 OVERVIEW
+------------
 
-8.1.1 The eXtensible Markup Language (XML) versions of the ODM messages are based on
-the Navigation Data Message (NDM) XML Schema (reference [5]). The NDM XML
-Schema set is available on the SANA Web site at https://sanaregistry.org/r/ndmxml. The
-NDM XML Schema documentation is available on the SANA Web site at
-https://sanaregistry.org/r/ndmxml_docs.
+This section provides detailed instructions for the user on how to create an XML message
+(reference [5]) based on one of the KVN-formatted messages described in sections 3, 4, 5,
+and 6. This section applies only to the XML representation of ODMs.
 
-8.1.2 The ODM XML messages are constructed using the <ndm> container tag defined in
-the NDM XML Schema. The <ndm> tag has an attribute that allows for the identification
-of the type of message being created. For an ODM, the ‘id’ attribute in the <ndm> tag must
-be ‘CCSDS_ODM_VERS’. The version of the NDM XML Schema is identified by the
-‘version’ attribute of the <ndm> tag; currently ‘3.0’.
+Overall information on using XML for Navigation Data Messages is provided in
+reference [5]. The ODM/XML schemas are available on the SANA Web site. SANA is the
+registrar for the protocol registries created under CCSDS. The ODM/XML schemas
+explicitly define the permitted data elements and values acceptable for the XML versions of
+the ODMs. The location of the ODM/XML schemas is:
+
+- OPM: https://sanaregistry.org/files/ndmxml_unqualified/ndmxml-3.0.0-opm-3.0.xsd
+- OMM: https://sanaregistry.org/files/ndmxml_unqualified/ndmxml-3.0.0-omm-3.0.xsd
+- OEM: https://sanaregistry.org/files/ndmxml_unqualified/ndmxml-3.0.0-oem-3.0.xsd
+- OCM: https://sanaregistry.org/files/ndmxml_unqualified/ndmxml-3.0.0-ocm-3.0.xsd
+
+Figure 8-1 illustrates the basic structure of an ODM/XML instance. Defined structural
+elements are the header and body. The body then consists of one or more segments
+depending on the message type (one for the OPM, OMM, and OCM; one or more for the
+OEM). Each segment consists of a <metadata>/<data> pair. In an OEM, which could
+have more than one segment, the metadata/data pair is repeated in each segment.
+
+.. figure:: ../images/ccsds_books/odm/8_1.png
+   :align: center
+
+   Figure 8-1: ODM/XML Basic Structure
+
+ODM/XML tags for keywords defined in in sections 3, 4, 5, and 6 appear just as in the KVN,
+that is, all capital letters. Tags related to the XML message structure (i.e., that do not
+correspond directly to a KVN keyword) appear in 'lowerCamelCase' (e.g., <header>,
+<segment>, <metadata>, <stateVector>, <covarianceMatrix>, etc.).
+
+.. _xml_version_odm:
+
+8.2 XML VERSION
+---------------
+
+This section describes the Extensible Markup Language (or XML) version of the Orbit Data
+Message. The first line of each XML instantiation shall specify the XML version:
 
 .. code-block:: xml
 
    <?xml version="1.0" encoding="UTF-8"?>
-   <ndm:ndm xmlns:ndm="urn:ccsds:schema:ndmxml:3.0"
-            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-            id="CCSDS_ODM_VERS" version="3.0"
-            xsi:schemaLocation="urn:ccsds:schema:ndmxml:3.0
-            https://sanaregistry.org/r/ndmxml/ndmxml-3.0-master.xsd">
-     ...
-   </ndm:ndm>
 
-8.1.3 The ODM XML messages are composed of two main sections: the <header> and the
-<body>. The <header> is the same for all ODM messages and is described in 8.3. The
-<body> of the message consists of one or more <segment>s. The content of the <segment>
-is different for each of the four message types.
+This line must appear on the first line of each instantiation, exactly as shown.
 
-.. _xml_structure_odm:
+.. _xml_root_element_tag_odm:
 
-8.2 STRUCTURE OF AN ODM XML MESSAGE
------------------------------------
+8.3 BEGINNING THE INSTANTIATION: ROOT ELEMENT TAG
+-------------------------------------------------
 
-The ODM XML message has the following structure:
+8.3.1 Each instantiation shall have a ‘root element tag’ that identifies the message type and
+other information such as where to find the applicable schema, required attributes, etc.
 
-.. code-block:: xml
+8.3.2 The root element tag in an ODM/XML instantiation shall be one of those listed in
+table 8-1.
 
-   <ndm:ndm>
-     <ndm:opm>|<ndm:omm>|<ndm:oem>|<ndm:ocm>
-       <ndm:header>
-         ...
-       </ndm:header>
-       <ndm:body>
-         <ndm:segment>
-           <ndm:metadata>
-             ...
-           </ndm:metadata>
-           <ndm:data>
-             ...
-           </ndm:data>
-         </ndm:segment>
-         ...
-       </ndm:body>
-     </ndm:opm>|<ndm:omm>|<ndm:oem>|<ndm:ocm>
-     ...
-   </ndm:ndm>
+.. list-table:: ODM/XML Root Element Tags
+   :widths: 50 50
+   :header-rows: 1
 
-.. _xml_header_odm:
+   * - Root Element Tag
+     - Message Type
+   * - <opm></opm>
+     - Orbit Parameter Message
+   * - <omm></omm>
+     - Orbit Mean Elements Message
+   * - <oem></em>
+     - Orbit Ephemeris Message
+   * - <ocm></ocm>
+     - Orbit Comprehensive Message
 
-8.3 ODM XML HEADER
-------------------
+8.3.3 The XML Schema Instance namespace attribute must appear in the root element tag
+of all ODM/XML instantiations, exactly as shown:
 
-The <header> section is the same for all ODM message types. It has two mandatory tags,
-<CREATION_DATE> and <ORIGINATOR>, and one optional tag, <MESSAGE_ID>. The
-<CLASSIFICATION> from the KVN version is an attribute of the main message tag (e.g.
-<opm>). The <COMMENT> tag is optional and can appear multiple times. The structure of
-the <header> is as follows:
+   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 
-.. code-block:: xml
+If it is desired to validate an instantiation against the CCSDS Web-based schema, the
+xsi:noNamespaceSchemaLocation attribute must be coded as a single string of non-
+blank characters, with no line breaks exactly as shown:
 
-   <ndm:header>
-     <ndm:COMMENT>string</ndm:COMMENT>
-     ...
-     <ndm:CREATION_DATE>time</ndm:CREATION_DATE>
-     <ndm:ORIGINATOR>string</ndm:ORIGINATOR>
-     <ndm:MESSAGE_ID>string</ndm:MESSAGE_ID>
-   </ndm:header>
+   xsi:noNamespaceSchemaLocation=https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-3.0.0-master-3.0.xsd
 
-.. _xml_opm_odm:
+and
 
-8.4 ORBIT PARAMETER MESSAGE (OPM) XML
--------------------------------------
+   xsi:noNamespaceSchemaLocation=https://sanaregistry.org/r/ndmxml_qualified/ndmxml-3.0.0-master-3.0.xsd
 
-8.4.1 The OPM XML message is identified by the <opm> tag. The <opm> tag has one
-optional attribute, ‘classification’, which is used to specify the security classification of the
-message. The body of the message consists of one or more <segment>s. Each <segment>
-contains a <metadata> section and a <data> section. The structure is as follows:
+.. NOTE::
+   The value associated with the xsi:noNamespaceSchemaLocation
+   attribute shown in this document is too long to appear on a single line.
 
-.. code-block:: xml
+8.3.4 For use in a local operations environment, the schema set may be downloaded from
+the SANA website to a local server that meets local requirements for operations robustness.
 
-   <ndm:opm classification="string">
-     <ndm:header>
-       ...
-     </ndm:header>
-     <ndm:body>
-       <ndm:segment>
-         <ndm:metadata>
-           ...
-         </ndm:metadata>
-         <ndm:data>
-           ...
-         </ndm:data>
-       </ndm:segment>
-       ...
-     </ndm:body>
-   </ndm:opm>
+8.3.5 If a local version is used, the value associated with the
+xsi:noNamespaceSchemaLocation attribute must be changed to a URL that is
+accessible to the local server.
 
-8.4.2 The <metadata> section of an OPM segment contains the information listed in table 3-2.
+8.3.6 Two attributes shall appear in the root element tag of an ODM/XML single message
+instantiation, specifically, the CCSDS_xxx_VERS keyword that is also part of the standard
+KVN header, and the Blue Book version number. The final attributes of the root element tag
+shall be 'id' and 'version'.
 
-8.4.3 The <data> section of an OPM segment contains the information listed in table 3-3.
+8.3.7 The CCSDS_xxx_VERS keyword shall be supplied via the ‘id’ attribute of the root
+element tag. The ‘id’ attribute shall be ‘id="CCSDS_xxx_VERS"’, where xxx = OPM,
+OMM, OEM, or OCM.
 
-.. _xml_omm_odm:
+8.3.8 The version number of the Blue Book to which the schema applies shall be supplied
+via the 'version' attribute. The 'version' attribute shall be ‘version="3.0"’.
 
-8.5 ORBIT MEAN-ELEMENTS MESSAGE (OMM) XML
+.. NOTE::
+   The following example root element tag for an OPM instantiation combines all
+   the directions in the preceding several sections:
+
+   .. code-block:: xml
+
+      <?xml version="1.0" encoding="UTF-8"?>
+      <opm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-3.0.0-master-3.0.xsd"
+           id="CCSDS_OPM_VERS" version="3.0">
+
+   and
+
+   .. code-block:: xml
+
+      <?xml version="1.0" encoding="UTF-8"?>
+      <opm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_qualified/ndmxml-3.0.0-master-3.0.xsd"
+           id="CCSDS_OPM_VERS" version="3.0">
+
+.. _xml_header_section_odm:
+
+8.4 THE STANDARD ODM/XML HEADER SECTION
 -----------------------------------------
 
-8.5.1 The OMM XML message is identified by the <omm> tag. The <omm> tag has one
-optional attribute, ‘classification’, which is used to specify the security classification of the
-message. The body of the message consists of one or more <segment>s. Each <segment>
-contains a <metadata> section and a <data> section. The structure is as follows:
+8.4.1 The ODMs shall share a standard header section, with tags <header> and
+</header>.
 
-.. code-block:: xml
+8.4.2 Immediately following the <header> tag, the message may have any number of
+<COMMENT> elements.
 
-   <ndm:omm classification="string">
-     <ndm:header>
-       ...
-     </ndm:header>
-     <ndm:body>
-       <ndm:segment>
-         <ndm:metadata>
-           ...
-         </ndm:metadata>
-         <ndm:data>
-           ...
-         </ndm:data>
-       </ndm:segment>
-       ...
-     </ndm:body>
-   </ndm:omm>
+8.4.3 The standard ODM header shall contain the <CREATION_DATE> and the
+<ORIGINATOR> elements.
 
-8.5.2 The <metadata> section of an OMM segment contains the information listed in table 4-2.
+8.4.4 The standard ODM header may contain the <MESSAGE_ID> element.
 
-8.5.3 The <data> section of an OMM segment contains the information listed in table 4-3.
+.. NOTE::
+   An example <header> section is shown immediately below.
 
-.. _xml_oem_odm:
+   .. code-block:: xml
 
-8.6 ORBIT EPHEMERIS MESSAGE (OEM) XML
---------------------------------------
+      <header>
+        <COMMENT>This is the common ODM/XML header</COMMENT>
+        <COMMENT>I can put as many comments here as I want,</COMMENT>
+        <COMMENT>including none. </COMMENT>
+        <CREATION_DATE>2004-281T17:26:06</CREATION_DATE>
+        <ORIGINATOR>AGENCY-X</ORIGINATOR>
+        <MESSAGE_ID>XYZ123-2019</MESSAGE_ID>
+      </header>
 
-8.6.1 The OEM XML message is identified by the <oem> tag. The <oem> tag has one
-optional attribute, ‘classification’, which is used to specify the security classification of the
-message. The body of the message consists of one or more <segment>s. Each <segment>
-contains a <metadata> section and a <data> section. The structure is as follows:
+.. _xml_body_section_odm:
 
-.. code-block:: xml
+8.5 THE ODM/XML BODY SECTION
+------------------------------
 
-   <ndm:oem classification="string">
-     <ndm:header>
-       ...
-     </ndm:header>
-     <ndm:body>
-       <ndm:segment>
-         <ndm:metadata>
-           ...
-         </ndm:metadata>
-         <ndm:data>
-           ...
-         </ndm:data>
-       </ndm:segment>
-       ...
-     </ndm:body>
-   </ndm:oem>
+8.5.1 After coding the <header>, the instantiation must include a <body> section.
 
-8.6.2 The <metadata> section of an OEM segment contains the information listed in table 5-3.
+8.5.2 Inside the <body> section must appear at least one <segment> section.
 
-8.6.3 The <data> section of an OEM segment contains the ephemeris and optional covariance
-data.
+8.5.3 Each segment must be made up of one or more <metadata> and <data> sections,
+depending on the specific message type.
 
-.. _xml_ocm_odm:
+.. _xml_metadata_section_odm:
 
-8.7 ORBIT COMPREHENSIVE MESSAGE (OCM) XML
------------------------------------------
+8.6 THE ODM/XML METADATA SECTION
+----------------------------------
 
-8.7.1 The OCM XML message is identified by the <ocm> tag. The <ocm> tag has one
-optional attribute, ‘classification’, which is used to specify the security classification of the
-message. The body of the message consists of one or more <segment>s. Each <segment>
-contains a <metadata> section and a <data> section. The structure is as follows:
+8.6.1 All ODMs must have a metadata section.
 
-.. code-block:: xml
+8.6.2 The metadata section shall be delimited by the <metadata> element.
 
-   <ndm:ocm classification="string">
-     <ndm:header>
-       ...
-     </ndm:header>
-     <ndm:body>
-       <ndm:segment>
-         <ndm:metadata>
-           ...
-         </ndm:metadata>
-         <ndm:data>
-           ...
-         </ndm:data>
-       </ndm:segment>
-       ...
-     </ndm:body>
-   </ndm:ocm>
+8.6.3 Between the <metadata> and </metadata> tags, the keywords shall be the
+same as those in the metadata sections in sections 3, 4, 5, and 6, with possible exceptions as
+noted in the sections below that discuss creating instantiations of the specific messages.
 
-8.7.2 The <metadata> section of an OCM segment contains the information listed in table 6-3.
+.. _xml_data_section_odm:
 
-8.7.3 The <data> section of an OCM segment contains the information from tables 6-4 through 6-12.
+8.7 THE ODM/XML DATA SECTION
+------------------------------
+
+8.7.1 All ODMs must have a data section.
+
+8.7.2 The data section shall follow the metadata section and shall be delimited by the
+<data> element.
+
+8.7.3 Between the <data> and </data> tags, the keywords shall be the same as those in
+the data sections in sections 3, 4, 5, and 6, with possible exceptions as noted in the sections
+that discuss creating instantiations of the specific messages.
 .. _annex_a_odm:
 
-ANNEX A: ABBREVIATIONS AND ACRONYMS (NORMATIVE)
-===============================================
+ANNEX A
+=======
+
+(NORMATIVE)
+
+IMPLEMENTATION CONFORMANCE STATEMENT PROFORMA
+---------------------------------------------
+
+.. _annex_a_introduction_odm:
+
+A1 INTRODUCTION
+^^^^^^^^^^^^^^^^
+
+.. _annex_a_overview_odm:
+
+A1.1 OVERVIEW
+""""""""""""""
+
+This annex provides the Implementation Conformance Statement (ICS) Requirements List
+(RL) for an implementation of the Orbit Data Messages (CCSDS 502.0). The ICS for an
+implementation is generated by completing the RL in accordance with the instructions below.
+An implementation shall satisfy the mandatory conformance requirements referenced in the
+RL.
+
+The RL in this annex is blank. An implementation’s completed RL is called the ICS. The ICS
+states which capabilities and options have been implemented. The following can use the ICS:
+
+- the implementer, as a checklist to reduce the risk of failure to conform to the standard
+  through oversight;
+- a supplier or potential acquirer of the implementation, as a detailed indication of the
+  capabilities of the implementation, stated relative to the common basis for
+  understanding provided by the standard ICS proforma;
+- a user or potential user of the implementation, as a basis for initially checking the
+  possibility of interworking with another implementation (it should be noted that,
+  while interworking can never be guaranteed, failure to interwork can often be
+  predicted from incompatible ICS lists);
+- a tester, as the basis for selecting appropriate tests against which to assess the claim
+  for conformance of the implementation.
+
+.. _annex_a_abbreviations_and_conventions_odm:
+
+A1.2 ABBREVIATIONS AND CONVENTIONS
+"""""""""""""""""""""""""""""""""
+
+The RL consists of information in tabular form. The status of features is indicated using the
+abbreviations and conventions described below.
+
+Item Column
++++++++++++
+
+The item column contains sequential numbers for items in the table.
+
+Feature Column
+++++++++++++++
+
+The feature column contains a brief descriptive name for a feature. It implicitly means “Is
+this feature supported by the implementation?”
+
+Status Column
++++++++++++++
+
+The status column uses the following notations:
+
+- M: mandatory;
+- O: optional;
+- C: conditional;
+- X: prohibited;
+- I: out of scope;
+- N/A: not applicable.
+
+Support Column Symbols
+++++++++++++++++++++++
+
+The support column is to be used by the implementer to state whether a feature is supported
+by entering Y, N, or N/A, indicating:
+
+- Y: Yes, supported by the implementation.
+- N: No, not supported by the implementation.
+- N/A: Not applicable.
+
+The support column should also be used, when appropriate, to enter values supported for a
+given capability.
+
+.. _annex_a_instructions_for_completing_the_rl_odm:
+
+A1.3 INSTRUCTIONS FOR COMPLETING THE RL
+""""""""""""""""""""""""""""""""""""""""
+
+An implementer shows the extent of compliance to the Recommended Standard by
+completing the RL; that is, the state of compliance with all mandatory requirements and the
+options supported are shown. The resulting completed RL is called an ICS. The implementer
+shall complete the RL by entering appropriate responses in the support or values supported
+column, using the notation described in A1.2. If a conditional requirement is inapplicable,
+N/A should be used. If a mandatory requirement is not satisfied, exception information must
+be supplied by entering a reference Xi, where i is a unique identifier, to an accompanying
+rationale for the noncompliance.
+
+.. _annex_b_odm:
+
+ANNEX B
+=======
+
+(NORMATIVE)
+
+VALUES FOR SELECTED KEYWORDS
+----------------------------
+
+The values in this annex represent the recommended values for selected keywords present in
+OPM, OMM, OEM, or OCM message. For details and descriptions of the keyword
+interpretations, the reader is directed to references [H1] and [H7]. The message creator
+should seek to confirm with the recipient(s) that their software can support the selected
+keyword value, particularly for more complex content such as reference frames, orbital
+elements, and covariance definitions.
+
+These recommended values are stored on the SANA Registry, globally accessible on the
+CCSDS SANA registry website located at:
+
+https://sanaregistry.org/r/navigation_standard_normative_annexes
+
+It should be noted that the message creator or recipient may wish to automate processing of
+SANA registry normative content, which can be done by ingesting and processing of such
+content in electronic format. These formats can be accessed via the ‘Actions’ link on each
+registry, for example, for the Orbital Elements registry, a Comma Separated Value (CSV)
+format can be exported at: https://www.sanaregistry.org/r/orbital_elements?_export=csv and
+a JSON format at: https://www.sanaregistry.org/r/orbital_elements?_export=json. It should
+be noted that both the registry and these electronic data formats specify the number of vector
+elements corresponding to each keyword value.
+
+Exchange partners may submit additional (new) keyword values for consideration for future
+inclusion into the SANA registry by submitting a detailed email request
+(mailto:info@sanaregistry.org) per annex C, subsection C4. The CCSDS Area or Working
+Group responsible for the maintenance of the ODM at the time of the request is the approval
+authority. Until a suggested value is included in the SANA registry, exchange partners may
+define and use values that are not listed in the SANA registry if mutually agreed between
+message exchange partners.
+
+.. _annex_b_message_originators_odm:
+
+B1 MESSAGE ORIGINATORS
+^^^^^^^^^^^^^^^^^^^^^^
+
+The set of recommended values for the ORIGINATOR keyword is enumerated in the SANA
+Registry of Organizations, located at:
+
+https://sanaregistry.org/r/organizations
+
+.. _annex_b_reference_frame_centers_odm:
+
+B2 REFERENCE FRAME CENTERS AND THIRD-BODY PERTURBATIONS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A set of allowed values for the reference frame center keywords (CENTER_NAME for
+OPM, OEM, OMM, and OCM, as well as N_BODY_PERTURBATIONS in the OCM) is
+enumerated in the SANA Registry of Orbit Centers, located at:
+
+https://sanaregistry.org/r/orbit_centers
+
+The orbit center name is provided in the ‘Orbit Center’ column of the Orbit Center registry. It
+should be noted that these values may also be useful to specify another platform (satellite,
+airframe, ground vehicle, etc.) as the reference frame origin to permit the specification of
+relative positional state time history data. In this case, message authors shall clearly
+communicate to recipients that the orbit center is not a gravitational center, that propagation
+of ephemeris vectors or extrapolation of ephemeris start/stop states is not advisable, and that
+interpolation of state time histories should not be accomplished using classical orbit
+propagation forces (e.g., gravitational constants, drag).
+
+.. _annex_b_time_systems_odm:
+
+B3 TIME SYSTEMS
+^^^^^^^^^^^^^^^^
+
+A set of allowed values for the TIME_SYSTEM keyword is enumerated in the SANA
+Registry of Time Systems, located at:
+
+https://sanaregistry.org/r/time_systems
+
+.. _annex_b_celestial_body_reference_frames_odm:
+
+B4 CELESTIAL BODY REFERENCE FRAMES
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A set of allowed celestial body reference frame values for *_REF_FRAME keywords is
+enumerated in the SANA Registry of Celestial Body Reference Frames, located at:
+
+https://sanaregistry.org/r/celestial_body_reference_frames
+
+.. _annex_b_orbit_relative_reference_frames_odm:
+
+B5 ORBIT-RELATIVE REFERENCE FRAMES
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In addition to the above reference frames, maneuver and covariance data may be selected
+from the list of allowed orbit-relative reference frames using a *_REF_FRAME keyword
+values enumerated in the SANA Registry of Orbit-Relative Reference Frames, located at:
+
+https://sanaregistry.org/r/orbit_relative_reference_frames
+
+It should be noted that two types of orbit-relative local reference frames exist: inertial
+and rotating. When transforming velocity terms between inertial and rotating frames,
+remember to properly incorporate the (ω × r) contribution.
+
+.. _annex_b_additional_spacecraft_and_attitude_reference_frames_odm:
+
+B6 ADDITIONAL SPACECRAFT AND ATTITUDE REFERENCE FRAMES
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+An additional allowed set of spacecraft and attitude control reference frame values for
+*_REF_FRAME keywords is enumerated in the SANA Registry of Spacecraft and Attitude
+Control Reference Frames, located at:
+
+https://sanaregistry.org/r/spacecraft_body_reference_frames
+
+In numerous instances, these spacecraft body reference frames are specified by a keyword
+followed by an ‘i’ (e.g., ACTUATOR_i), the ‘i’ should be replaced by an integer value (1, 2,
+…) to denote the ‘i-th’ reference frame within the set of those reference frames.
+
+.. _annex_b_orbital_elements_odm:
+
+B7 ORBITAL ELEMENTS
+^^^^^^^^^^^^^^^^^^^^
+
+A set of allowed values for the TRAJ_TYPE keyword is enumerated in the SANA Registry
+of Orbital Elements, located at:
+
+https://sanaregistry.org/r/orbital_elements
+
+Unique to the OCM, orbit element states and/or time histories may be specified in multiple
+element set types.
+
+Orbit elements shall be interpreted as osculating elements unless either explicitly specified
+via the ORB_AVERAGING keyword or as mutually agreed between message exchange
+partners to contain mean elements (e.g., singly or doubly averaged elements based upon
+Kozai, Brouwer, or other theories).
+
+Inertial reference frames shall be specified when employing inertial element sets.
+
+When employing non-inertial element sets, inertial reference frames shall not be specified.
+
+.. _annex_b_additional_covariance_representations_odm:
+
+B8 ADDITIONAL COVARIANCE REPRESENTATIONS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Covariance matrices may either be specified as representing uncertainties expressed in the
+above ‘Orbital Elements’ types (e.g., COV_TYPE may be set to an TRAJ_TYPE such as
+CARTPVA) or may specify an event-based covariance type that includes event time
+uncertainties as enumerated in the SANA Registry of Covariance Representations, located at:
+
+https://sanaregistry.org/r/orbital_covariance_matrix_types
+
+.. _annex_b_atmosphere_models_odm:
+
+B9 ATMOSPHERE MODELS
+^^^^^^^^^^^^^^^^^^^^^
+
+A set of allowed values for the ATMOSPHERIC_MODEL keyword is enumerated in the
+SANA Registry of Atmosphere Models, located at:
+
+https://sanaregistry.org/r/atmosphere_models
+
+.. _annex_b_gravity_models_odm:
+
+B10 GRAVITY MODELS
+^^^^^^^^^^^^^^^^^^
+
+A set of allowed values for the GRAVITY_MODEL keyword is enumerated in the SANA
+Registry of Gravity Models, located at:
+
+https://sanaregistry.org/r/gravity_models
+
+.. _annex_b_object_types_odm:
+
+B11 OBJECT TYPES
+^^^^^^^^^^^^^^^^
+
+A set of allowed values for the OBJECT_TYPE keyword is enumerated in the SANA
+Registry of Object Types, located at:
+
+https://sanaregistry.org/r/object_types
+
+.. _annex_b_operational_status_odm:
+
+B12 OPERATIONAL STATUS
+^^^^^^^^^^^^^^^^^^^^^^
+
+A set of allowed values for the OPS_STATUS keyword is enumerated in the SANA Registry
+of Operational Status of Space Object, located at:
+
+https://sanaregistry.org/r/operational_status
+
+.. _annex_b_orbit_averaging_techniques_odm:
+
+B13 ORBIT AVERAGING TECHNIQUES
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A set of allowed values for the ORB_AVERAGING keyword is enumerated in the SANA
+Registry of Orbit Averaging Techniques, located at:
+
+https://sanaregistry.org/r/orbit_averaging
+
+.. _annex_b_orbit_categories_odm:
+
+B14 ORBIT CATEGORIES
+^^^^^^^^^^^^^^^^^^^^
+
+A set of allowed values for the ORBIT_CATEGORY keyword is enumerated in the SANA
+Registry of Orbit Types, located at:
+
+https://sanaregistry.org/r/orbit_categories
+
+
+.. _annex_c_odm:
+
+ANNEX C
+=======
+
+(INFORMATIVE)
+
+SECURITY, SANA, AND PATENT CONSIDERATIONS
+-------------------------------------------
+
+.. _annex_c_security_considerations_odm:
+
+C1 SECURITY CONSIDERATIONS
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _annex_c_security_analysis_odm:
+
+C2 ANALYSIS OF SECURITY CONSIDERATIONS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This annex presents the results of an analysis of security considerations applied to the
+technologies specified in this Recommended Standard.
+
+.. _annex_c_consequences_of_not_applying_security_odm:
+
+C3 CONSEQUENCES OF NOT APPLYING SECURITY TO THE TECHNOLOGY
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The consequences of not applying security to the systems and networks on which this
+Recommended Standard is implemented could include potential loss, corruption, and theft of
+data. Because these messages are used in preparing pointing and frequency predicts used
+during spacecraft commanding, and may also be used in collision avoidance analyses, the
+consequences of not applying security to the systems and networks on which this
+Recommended Standard is implemented could include compromise or loss of the mission if
+malicious tampering of a particularly severe nature occurs.
+
+.. _annex_c_potential_threats_and_attack_scenarios_odm:
+
+C3.1 POTENTIAL THREATS AND ATTACK SCENARIOS
+"""""""""""""""""""""""""""""""""""""""""""
+
+Potential threats or attack scenarios include, but are not limited to, (a) unauthorized access to
+the programs/processes that generate and interpret the messages, (b) unauthorized access to
+the messages during transmission between exchange partners, and (c) modification of the
+messages between partners. Protection from unauthorized access during transmission is
+especially important if the mission utilizes open ground networks, such as the Internet, to
+provide ground-station connectivity for the exchange of data formatted in compliance with
+this Recommended Standard. It is strongly recommended that potential threats or attack
+scenarios applicable to the systems and networks on which this Recommended Standard is
+implemented be addressed by the management of those systems and networks.
+
+.. _annex_c_data_privacy_odm:
+
+C3.2 DATA PRIVACY
+"""""""""""""""""
+
+Privacy of data formatted in compliance with the specifications of this Recommended
+Standard should be assured by the systems and networks on which this Recommended
+Standard is implemented.
+
+.. _annex_d_odm:
+
+ANNEX D
+=======
+
+(INFORMATIVE)
+
+ABBREVIATIONS AND ACRONYMS
+--------------------------
 
 This annex lists the abbreviations and acronyms used in this Recommended Standard.
 
@@ -4314,62 +4954,98 @@ This annex lists the abbreviations and acronyms used in this Recommended Standar
      - Attitude Data Message
    * - ASCII
      - American Standard Code for Information Interchange
-   * - BIPM
-     - Bureau International des Poids et Mesures
+   * - CATS
+     - Critical Angle to the Sun
    * - CCSDS
      - Consultative Committee for Space Data Systems
    * - CDM
      - Conjunction Data Message
-   * - ECEF
-     - Earth-Centered, Earth-Fixed
-   * - ECI
-     - Earth-Centered-Inertial
+   * - COSPAR
+     - United Nations Committee on Space Research
+   * - DSST
+     - Draper Semi-Analytic Satellite Theory
    * - EOP
      - Earth Orientation Parameters
-   * - GM
-     - Gravitational constant multiplied by the mass of the central body
-   * - GNSS
-     - Global Navigation Satellite System
    * - GPS
      - Global Positioning System
+   * - HEO
+     - high Earth orbit
+   * - IAU
+     - International Astronomical Union
    * - ICD
      - Interface Control Document
+   * - ICRF
+     - International Celestial Reference Frame
    * - IEC
-     - International Electrotechnical Commission
+     - International Electro-technical Commission
+   * - IIRV
+     - Improved Inter-Range Vector
+   * - IOD
+     - Initial Orbit Determination
    * - ISO
      - International Organization for Standardization
+   * - ITRF
+     - International Terrestrial Reference Frame
+   * - GDOP
+     - generalized dilution of precision
+   * - GRC
+     - Greenwich Rotating Coordinate Frame
+   * - J2000
+     - Earth Mean Equator and Equinox of J2000 (Julian Date 2000)
    * - KVN
-     - Keyword Value Notation
+     - keyword = value notation
    * - LEO
-     - Low Earth Orbit
-   * - NDM
-     - Navigation Data Message
-   * - NOAA
-     - National Oceanic and Atmospheric Administration
+     - low Earth orbit
+   * - LS
+     - Least Squares
+   * - LTM
+     - Lower Triangular Matrix
+   * - MARSGRAM
+     - Mars Global Reference Atmosphere Model
+   * - MSIS
+     - Mass-Spectrometer-Incoherent-Scatter
    * - NORAD
      - North American Aerospace Defense Command
-   * - OCM
-     - Orbit Comprehensive Message
+   * - OD
+     - Orbit Determination
    * - ODM
      - Orbit Data Message
+   * - OEB
+     - Optimally Encompassing Box
    * - OEM
      - Orbit Ephemeris Message
+   * - OCM
+     - Orbit Comprehensive Message
    * - OMM
      - Orbit Mean-Elements Message
    * - OPM
      - Orbit Parameter Message
+   * - PoC
+     - Point-of-Contact
    * - PRM
      - Pointing Request Message
    * - RDM
-     - Re-entry Data Message
-   * - SANA
-     - Space Assigned Numbers Authority
-   * - SCLK
-     - Spacecraft Clock
-   * - SI
-     - International System of Units
+     - Reentry Data Message
+   * - RMS
+     - Root Mean Square
+   * - RTN
+     - Radial, Transverse (along-track), and Normal
+   * - RSO
+     - Resident Space Object
+   * - SEDR
+     - Specific Energy Dissipation Rate
+   * - SGP
+     - Simplified General Perturbations
+   * - SGP4
+     - US Air Force Simplified General Perturbations No. 4
+   * - SP
+     - Sequential Processing
+   * - SPK
+     - Satellite, Planetary Kernel
    * - SRP
      - Solar Radiation Pressure
+   * - SSA
+     - Space Situational Awareness
    * - TAI
      - International Atomic Time
    * - TCB
@@ -4378,666 +5054,1181 @@ This annex lists the abbreviations and acronyms used in this Recommended Standar
      - Barycentric Dynamical Time
    * - TDM
      - Tracking Data Message
+   * - TDR
+     - True of Date Rotating
+   * - TEME
+     - True Equator Mean Equinox
    * - TLE
-     - Two-Line Element
-   * - TCG
-     - Geocentric Coordinate Time
+     - Two Line Element
+   * - TOD
+     - True Equator and Equinox of Date
    * - TT
-     - Terrestrial Time
-   * - UN
-     - United Nations
-   * - UNOOSA
-     - United Nations Office for Outer Space Affairs
-   * - US
-     - United States
-   * - UT1
-     - Universal Time 1
+     - Terrestrial Dynamical Time (see also ‘TDT’)
+   * - USM
+     - Universal Semi-analytical Method
    * - UTC
      - Coordinated Universal Time
+   * - UTM
+     - Upper Triangular Matrix
+   * - VENUSGRAM
+     - Venus Global Reference Atmosphere Model
+   * - W3C
+     - World Wide Web Consortium
+   * - WGS
+     - World Geodetic System
    * - XML
-     - eXtensible Markup Language
-   * - XSD
-     - XML Schema Definition
-.. _annex_b_odm:
+     - Extensible Markup Language
 
-ANNEX B: SANA REGISTRY (NORMATIVE)
-==================================
-
-.. _sana_general_odm:
-
-B1 GENERAL
-----------
-
-The SANA registry is the normative source for the list of accepted values for many of the
-keywords in this document. The SANA registry is available at https://sanaregistry.org/r/registries.
-
-.. _sana_organizations_odm:
-
-B2 ORGANIZATIONS
-----------------
-
-The list of accepted values for the ORIGINATOR keyword is maintained in the SANA
-registry for Organizations. The registry is available at
-https://sanaregistry.org/r/organizations.
-
-.. _sana_time_systems_odm:
-
-B3 TIME SYSTEMS
----------------
-
-The list of accepted values for the TIME_SYSTEM keyword is maintained in the SANA
-registry for Time Systems. The registry is available at
-https://sanaregistry.org/r/time_systems.
-
-.. _sana_reference_frames_odm:
-
-B4 REFERENCE FRAMES
---------------------
-
-The list of accepted values for the REF_FRAME keyword is maintained in the SANA registry
-for Reference Frames. The registry is available at
-https://sanaregistry.org/r/reference_frames.
-
-.. _sana_celestial_bodies_odm:
-
-B5 CELESTIAL BODIES
--------------------
-
-The list of accepted values for the CENTER_NAME keyword is maintained in the SANA
-registry for Celestial Bodies. The registry is available at
-https://sanaregistry.org/r/celestial_bodies.
-
-.. _sana_orbital_elements_odm:
-
-B6 ORBITAL ELEMENTS
---------------------
-
-The list of accepted values for the TRAJ_TYPE keyword is maintained in the SANA registry
-for Orbital Elements. The registry is available at
-https://sanaregistry.org/r/orbital_elements.
-
-.. _sana_covariance_elements_odm:
-
-B7 COVARIANCE ELEMENTS
------------------------
-
-The list of accepted values for the COV_TYPE keyword is maintained in the SANA registry
-for Covariance Elements. The registry is available at
-https://sanaregistry.org/r/covariance_elements.
-
-.. _sana_atmosphere_models_odm:
-
-B8 ATMOSPHERE MODELS
---------------------
-
-The list of accepted values for the ATMOSPHERIC_MODEL keyword is maintained in the SANA
-registry for Atmosphere Models. The registry is available at
-https://sanaregistry.org/r/atmosphere_models.
-
-.. _sana_gravity_models_odm:
-
-B9 GRAVITY MODELS
-------------------
-
-The list of accepted values for the GRAVITY_MODEL keyword is maintained in the SANA
-registry for Gravity Models. The registry is available at
-https://sanaregistry.org/r/gravity_models.
-
-.. _sana_object_types_odm:
-
-B10 OBJECT TYPES
-----------------
-
-The list of accepted values for the OBJECT_TYPE keyword is maintained in the SANA
-registry for Object Types. The registry is available at
-https://sanaregistry.org/r/object_types.
-
-.. _sana_ops_status_odm:
-
-B11 OPERATIONAL STATUS
-----------------------
-
-The list of accepted values for the OPS_STATUS keyword is maintained in the SANA registry
-for Operational Status. The registry is available at
-https://sanaregistry.org/r/ops_status.
-
-.. _sana_orbit_averaging_odm:
-
-B12 ORBIT AVERAGING
--------------------
-
-The list of accepted values for the ORB_AVERAGING keyword is maintained in the SANA
-registry for Orbit Averaging. The registry is available at
-https://sanaregistry.org/r/orbit_averaging.
-
-.. _sana_orbit_category_odm:
-
-B13 ORBIT CATEGORY
-------------------
-
-The list of accepted values for the ORBIT_CATEGORY keyword is maintained in the SANA
-registry for Orbit Category. The registry is available at
-https://sanaregistry.org/r/orbit_category.
-.. _annex_c_odm:
-
-ANNEX C: REFERENCE SYSTEMS (NORMATIVE)
-======================================
-
-.. _reference_systems_general_odm:
-
-C1 GENERAL
-----------
-
-This annex provides a brief description of selected reference systems that are used in this
-Recommended Standard. For more detailed information, see reference [H1].
-
-.. _reference_systems_icrf_odm:
-
-C2 INTERNATIONAL CELESTIAL REFERENCE FRAME (ICRF)
--------------------------------------------------
-
-The International Celestial Reference Frame (ICRF) is a barycentric reference frame that is
-aligned with the International Celestial Reference System (ICRS). The ICRS is a
-kinematically non-rotating system with its origin at the barycenter of the solar system. The
-axes of the ICRS are fixed with respect to a set of extragalactic radio sources. The ICRF is
-the realization of the ICRS by the catalog of coordinates of a set of extragalactic radio
-sources. The ICRF is maintained by the International Earth Rotation and Reference Systems
-Service (IERS).
-
-.. _reference_systems_gcrf_odm:
-
-C3 GEOCENTRIC CELESTIAL REFERENCE FRAME (GCRF)
------------------------------------------------
-
-The Geocentric Celestial Reference Frame (GCRF) is a geocentric reference frame that is
-kinematically non-rotating with respect to the ICRS. The GCRF has its origin at the
-barycenter of the Earth. The GCRF axes are aligned with the ICRS axes.
-
-.. _reference_systems_itrf_odm:
-
-C4 INTERNATIONAL TERRESTRIAL REFERENCE FRAME (ITRF)
----------------------------------------------------
-
-The International Terrestrial Reference Frame (ITRF) is a geocentric reference frame that
-co-rotates with the Earth. The ITRF has its origin at the barycenter of the Earth. The Z-axis
-of the ITRF is directed towards the North Pole. The X-axis is directed towards the prime
-meridian. The Y-axis completes the right-handed system. The ITRF is maintained by the
-IERS. The ITRF is updated periodically to account for the motion of the tectonic plates.
-
-.. _reference_systems_eme2000_odm:
-
-C5 EARTH MEAN EQUATOR AND EQUINOX OF J2000 (EME2000)
-----------------------------------------------------
-
-The Earth Mean Equator and Equinox of J2000 (EME2000) is a geocentric reference frame.
-The EME2000 has its origin at the barycenter of the Earth. The fundamental plane of the
-EME2000 is the mean equatorial plane of the Earth at the J2000 epoch. The X-axis is
-directed towards the mean vernal equinox at the J2000 epoch. The Z-axis is directed
-towards the mean North Pole at the J2000 epoch. The Y-axis completes the right-handed
-system.
-
-.. _reference_systems_tod_odm:
-
-C6 TRUE OF DATE (TOD)
----------------------
-
-The True of Date (TOD) is a geocentric reference frame. The TOD has its origin at the
-barycenter of the Earth. The fundamental plane of the TOD is the true equatorial plane of
-the Earth at the specified epoch. The X-axis is directed towards the true vernal equinox at
-the specified epoch. The Z-axis is directed towards the true North Pole at the specified
-epoch. The Y-axis completes the right-handed system.
-
-.. _reference_systems_teme_odm:
-
-C7 TRUE EQUATOR MEAN EQUINOX (TEME)
------------------------------------
-
-The True Equator Mean Equinox (TEME) is a geocentric reference frame. The TEME has its
-origin at the barycenter of the Earth. The fundamental plane of the TEME is the true
-equatorial plane of the Earth at the specified epoch. The X-axis is directed towards the
-mean vernal equinox of J2000. The Z-axis is directed towards the true North Pole at the
-specified epoch. The Y-axis completes the right-handed system.
-
-.. _reference_systems_rtn_odm:
-
-C8 RADIAL-TRANSVERSE-NORMAL (RTN)
----------------------------------
-
-The Radial-Transverse-Normal (RTN) is a local orbital reference frame. The RTN has its
-origin at the spacecraft’s center of mass. The R-axis is directed from the center of the
-central body to the spacecraft. The N-axis is directed along the instantaneous orbital angular
-momentum vector. The T-axis completes the right-handed system (T = N x R).
-
-.. _reference_systems_tnw_odm:
-
-C9 TRANSVERSE-NORMAL-RADIAL (TNW)
----------------------------------
-
-The Transverse-Normal-Radial (TNW) is a local orbital reference frame. The TNW has its
-origin at the spacecraft’s center of mass. The T-axis is directed along the velocity vector. The
-W-axis is directed along the instantaneous orbital angular momentum vector. The N-axis
-completes the right-handed system (N = W x T).
-.. _annex_d_odm:
-
-ANNEX D: GRAVITATIONAL PARAMETER (NORMATIVE)
-============================================
-
-The gravitational parameter, GM, is the product of the gravitational constant, G, and the
-mass, M, of the central body. The GM of a central body is known to a much higher
-precision than either G or M individually. The values of GM for the Earth, Moon, and Sun
-are given in table D-1.
-
-.. _gm_table_odm:
-
-.. list-table:: Gravitational Parameters
-   :widths: 25 50
-   :header-rows: 1
-
-   * - Central Body
-     - GM (km\ :sup:`3`\ /s\ :sup:`2`)
-   * - Earth
-     - 398600.4418
-   * - Moon
-     - 4902.80007
-   * - Sun
-     - 132712440018.0
-
-.. NOTE::
-   The values in table D-1 are taken from reference [H1].
 .. _annex_e_odm:
 
-ANNEX E: RATIONALE FOR ORBIT DATA MESSAGES (INFORMATIVE)
-========================================================
+ANNEX E
+=======
 
-.. _rationale_general_odm:
+(INFORMATIVE)
 
-E1 GENERAL
-----------
+RATIONALE FOR THIS STANDARD
+---------------------------
 
-This annex provides the rationale for the design of the Orbit Data Messages. The OPM,
-OMM, OEM, and OCM are designed to be used in a wide variety of applications, from pre-
-flight planning to on-orbit operations. The messages are designed to be flexible and
-extensible, to accommodate new requirements as they arise.
+.. _annex_e_overview_odm:
 
-.. _rationale_opm_odm:
+E1 OVERVIEW
+^^^^^^^^^^^
 
-E2 ORBIT PARAMETER MESSAGE (OPM)
---------------------------------
+This annex presents the rationale behind the design of each message. It may help the
+application engineer to select a suitable message.
 
-The OPM is designed for applications that require the exchange of a single state vector for a
-single object. The OPM is a simple, human-readable message that is easy to generate and
-parse. The OPM is well-suited for applications where the state vector is propagated by the
-recipient. The OPM allows for the inclusion of a covariance matrix, as well as maneuver
-parameters and spacecraft properties.
+A specification of requirements agreed to by all parties is essential to focus design and to
+ensure the product meets the needs of the Member Agencies and satellite operators. There
+are many ways of organizing requirements, but the categorization of requirements is not as
+important as the agreement to a sufficiently comprehensive set. In this annex, the
+requirements are organized into three categories:
 
-.. _rationale_omm_odm:
+a) Primary Requirements: These are the most elementary and necessary requirements.
+   They would exist no matter the context in which the CCSDS is operating, that is,
+   regardless of pre-existing conditions within the CCSDS, its Member Agencies, or
+   other independent users.
+b) Heritage Requirements: These are additional requirements that derive from pre-
+   existing Member Agency or other independent user requirements, conditions, or
+   needs. Ultimately, a Proposed Standard must reflect the heritage requirements of
+   the CCSDS Areas’ home institutions. This Recommended Standard does just that.
+   Corrections and/or additions to these requirements are expected during future
+   updates.
+c) Desirable Characteristics: These are not requirements, but they are felt to be
+   important or useful features of the Recommended Standard.
 
-E3 ORBIT MEAN-ELEMENTS MESSAGE (OMM)
--------------------------------------
+.. _annex_e_requirements_odm:
 
-The OMM is designed for applications that require the exchange of mean Keplerian elements.
-The OMM is based on the Two-Line Element (TLE) set format, which is widely used in the
-space community. The OMM is a simple, human-readable message that is easy to generate
-and parse. The OMM is well-suited for applications where the mean elements are propagated
-by the recipient using an analytical propagator such as SGP4. The OMM allows for the
-inclusion of a covariance matrix.
+E2 REQUIREMENTS ACCEPTED BY THE ORBIT DATA MESSAGES
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. _rationale_oem_odm:
+.. _annex_e_primary_requirements_odm:
 
-E4 ORBIT EPHEMERIS MESSAGE (OEM)
---------------------------------
+E2.1 PRIMARY REQUIREMENTS
+"""""""""""""""""""""""""
 
-The OEM is designed for applications that require the exchange of a time history of state
-vectors. The OEM is a simple, human-readable message that is easy to generate and parse.
-The OEM is well-suited for applications where the ephemeris is interpolated by the recipient.
-The OEM allows for the inclusion of a covariance matrix at each ephemeris point.
+.. list-table:: Primary Requirements
+   :widths: 10 50 10 10 10 10
+   :header-rows: 1
 
-.. _rationale_ocm_odm:
+   * - #
+     - Requirement
+     - OPM?
+     - OMM?
+     - OEM?
+     - OCM?
+   * - P1
+     - Data must be provided in digital form (computer file).
+     - Y
+     - Y
+     - Y
+     - Y
+   * - P2
+     - The file specification must not require of the receiving exchange partner the separate application of, or modeling of, spacecraft dynamics or gravitational force models, or integration or propagation.
+     - N
+     - N
+     - Y
+     - Y
+   * - P3
+     - The interface must facilitate the receiver of the message to generate a six-component Cartesian state vector (position and velocity) at any required epoch.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - P4
+     - State vector information must be provided in a reference frame that is clearly identified and unambiguous.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - P5
+     - Identification of the object and the center(s) of motion must be clearly identified and unambiguous.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - P6
+     - Time measurements (time stamps, or epochs) must be provided in a commonly used, clearly specified system.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - P7
+     - The time bounds of the ephemeris must be unambiguously specified.
+     - N/A
+     - N/A
+     - Y
+     - Y
+   * - P8
+     - The Recommended Standard must provide for clear specification of units of measure.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - P9
+     - Files must be readily ported between, and useable within, ‘all’ computational environments in use by Member Agencies.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - P10
+     - Files must have means of being uniquely identified and clearly annotated. The file name alone is considered insufficient for this purpose.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - P11
+     - File name syntax and length must not violate computer constraints for those computing environments in use by Member Agencies.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - P12
+     - A means to convey information about the uncertainty of the state shall be provided.
+     - Y
+     - Y
+     - Y
+     - Y
 
-E5 ORBIT COMPREHENSIVE MESSAGE (OCM)
--------------------------------------
-
-The OCM is designed for applications that require the exchange of a wide variety of orbit
-information. The OCM is a comprehensive message that can contain a state vector, mean
-elements, an ephemeris, a covariance matrix, maneuver parameters, spacecraft properties,
-and orbit determination results. The OCM is a flexible and extensible message that can be
-tailored to the needs of the application. The OCM is well-suited for applications where a
-large amount of information needs to be exchanged in a single message.
 .. _annex_f_odm:
 
-ANNEX F: ORBIT COMPREHENSIVE MESSAGE (OCM) (INFORMATIVE)
-========================================================
+ANNEX F
+=======
 
-.. _ocm_oeb_odm:
+(INFORMATIVE)
 
-F1 ORBIT ENCOMPASSING BOX (OEB)
--------------------------------
+TECHNICAL MATERIAL AND CONVENTIONS FOR ODM DATA
+-------------------------------------------------
 
-The Orbit Encompassing Box (OEB) is a rectangular box that is defined in the OEB frame.
-The OEB frame is a body-fixed frame that is aligned with the principal axes of the
-spacecraft. The OEB is defined by the three dimensions OEB_MAX, OEB_INT, and
-OEB_MIN. The OEB is used to model the cross-sectional area of the spacecraft for drag and
-solar radiation pressure calculations.
+.. _annex_f_satellite_physical_characteristics_odm:
+
+F1 SATELLITE PHYSICAL CHARACTERISTICS: OPTIMALLY ENCOMPASSING BOX
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This section of the informative technical annex defines satellite dimensional and orientational
+parameters of the OCM’s satellite physical characteristics specification.
+
+To facilitate improved modeling of the physical space occupied by a space object, the space
+object’s attitude/orientation, the probability of a hard body collision occurring, and drag and
+SRP acceleration forces, the OCM allows the specification of an OEB. It should be noted
+that the OEB describes the physical space occupied by the space object, which may or may
+not align with the inertia tensor for that object.
+
+For a box-shaped satellite (e.g., a CubeSat) without appendages, the satellite’s volume in
+three-dimensional space and a corresponding OEB would have a one-to-one mapping.
+
+For a satellite having solar arrays that extend from the spacecraft body structure, the OEB
+would extend from the main satellite body to encompass the deployed solar arrays as well.
+
+The OEB shape is shown in figure F-1 below. As illustrated, the OEB reference frame axes
+(depicted as RED dotted lines) are defined by convention as follows:
+
+The OEB x-axis is along the longest dimension of the box (Xoeb_max). This is sometimes
+referred to the ‘span’ of the space object.
+
+The OEB y-axis is along the intermediate orthonormal dimension (Ŷoeb_int).
+
+The OEB z-axis is along the shortest orthonormal dimension (Ẑoeb_min).
+
+The BOX shape can easily represent a cube by setting all orthonormal dimensions equal.
+
+If the longest two or three principal axis dimensions of the box are equivalent, Xoeb_max is
+defined as the direction along one of those longest principal dimensions, and the next is
+Ŷoeb_int.
+
+The OEB z-axis is always defined as: Ẑoeb_min = Xoeb_max × Ŷoeb_int.
 
 .. figure:: ../images/ccsds_books/odm/F_1.png
    :align: center
 
-   Figure F-1: Orbit Encompassing Box
+   Figure F-1: Depiction of Optimally Enclosing Box and Definitions of MAX, INT, and MIN Orientation Vectors Relative to OEB Parent Frame
 
-The cross-sectional area of the spacecraft is computed as the projection of the OEB onto the
-plane perpendicular to the direction of motion. The area is computed as:
+.. NOTE::
+   Parent and body axis are shown in proximity to each other for display purposes
+   only but could generally be in any orientation as specified by the quaternion.
 
-.. math::
-
-   A = A_{max} |\cos(\theta_x)| + A_{int} |\cos(\theta_y)| + A_{min} |\cos(\theta_z)|
-
-where :math:`A_{max}`, :math:`A_{int}`, and :math:`A_{min}` are the areas of the faces of the
-OEB, and :math:`\theta_x`, :math:`\theta_y`, and :math:`\theta_z` are the angles between the
-velocity vector and the axes of the OEB frame.
-
-.. _ocm_vm_odm:
-
-F2 VISUAL MAGNITUDE (VM)
-------------------------
-
-The visual magnitude (VM) is a measure of the brightness of the spacecraft as seen from the
-ground. The VM is a logarithmic scale, where a smaller number indicates a brighter object.
-The VM is defined as:
+A fixed orientation of the Optimally Encompassing Box with respect to the user-specified
+‘OEB_PARENT_FRAME’ is defined using a quaternion that maps from the user-specified
+OEB_PARENT_FRAME to the Optimally Encompassing Box vector directions. The above
+figure shows the proper definitions and sign conventions. The resulting transformation
+sequence is:
 
 .. math::
 
-   VM = -2.5 \log_{10} (F / F_0)
+   \begin{bmatrix} X \\ Y \\ Z \end{bmatrix}_{OEB} = [M] \begin{bmatrix} X \\ Y \\ Z \end{bmatrix}_{OEB\_PARENT\_FRAME}
 
-where F is the flux of the spacecraft, and F0 is a reference flux. The VM is a complex
-function of the spacecraft’s size, shape, orientation, and surface properties, as well as the
-viewing geometry.
-
-.. _ocm_duty_cycle_odm:
-
-F3 DUTY CYCLE
--------------
-
-The duty cycle is the fraction of time that a thruster is active. The duty cycle is used to
-model the thrust of a pulsed thruster. The duty cycle is defined as:
+Where the frame transformation matrix [M] is a function of the quaternion components:
 
 .. math::
 
-   \text{Duty Cycle} = \frac{\text{Pulse Duration}}{\text{Pulse Period}}
+   [M] = \begin{bmatrix} Q_1^2 - Q_2^2 - Q_3^2 + Q_c^2 & 2(Q_1Q_2 + Q_3Q_c) & 2(Q_1Q_3 - Q_2Q_c) \\ 2(Q_1Q_2 - Q_3Q_c) & -Q_1^2 + Q_2^2 - Q_3^2 + Q_c^2 & 2(Q_2Q_3 + Q_1Q_c) \\ 2(Q_1Q_3 + Q_2Q_c) & 2(Q_2Q_3 - Q_1Q_c) & -Q_1^2 - Q_2^2 + Q_3^2 + Q_c^2 \end{bmatrix}
 
-where the Pulse Duration is the duration of the thruster pulse, and the Pulse Period is the
-time between the start of consecutive pulses.
+The physical dimensions of the OEB (long, intermediate, and short dimensions) are specified
+via OEB_MAX, OEB_INT, and OEB_MIN, respectively.
 
-.. _ocm_gdop_odm:
+The cross-sectional area is modeled in the OCM as a combination of two parameter types:
 
-F4 GENERALIZED DILUTION OF PRECISION (GDOP)
---------------------------------------------
+a) an attitude-independent, constant cross-sectional area (e.g., DRAG_CONST_AREA or
+   SRP_CONST_AREA);
+b) attitude-dependent cross-sectional area as viewed along the OEB x, y, and z axes
+   (long, intermediate, and short dimension directions) via
+   AREA_ALONG_OEB_MAX, AREA_ALONG_OEB_INT, and
+   AREA_ALONG_OEB_MIN, respectively.
 
-The Generalized Dilution of Precision (GDOP) is a measure of the quality of the geometry of
-the tracking data. The GDOP is defined as:
-
-.. math::
-
-   GDOP = \sqrt{\text{trace}((H^T W H)^{-1})}
-
-where H is the matrix of partial derivatives of the measurements with respect to the state
-vector, and W is the weighting matrix. A smaller GDOP indicates a better geometry.
-
-.. _ocm_eigenvalue_interp_odm:
-
-F5 EIGENVALUE INTERPOLATION
----------------------------
-
-Eigenvalue interpolation is a method for interpolating a covariance matrix. The covariance
-matrix is first decomposed into its eigenvalues and eigenvectors. The eigenvalues are then
-interpolated linearly, and the eigenvectors are rotated using an Euler axis/angle rotation.
-The interpolated covariance matrix is then reconstructed from the interpolated eigenvalues
-and eigenvectors.
-
-.. _ocm_sedr_odm:
-
-F6 SPECIFIC ENERGY DISSIPATION RATE (SEDR)
-------------------------------------------
-
-The Specific Energy Dissipation Rate (SEDR) is the rate at which energy is being removed
-from the orbit by non-conservative forces. The SEDR is defined as:
+The analyst may use one or a combination of both parameter types to best represent the total
+cross-sectional area profile of the space object to be used in drag, lift, and SRP force
+estimates. The total cross-sectional area observed when viewed from an arbitrary unit-vector
+direction [x y z] could be:
 
 .. math::
 
-   SEDR = \frac{dE}{dt} / m
+   \text{TOTAL_AREA} = \text{DRAG_CONST_AREA} + \begin{bmatrix} \text{AREA_ALONG_OEB_MAX} \\ \text{AREA_ALONG_OEB_INT} \\ \text{AREA_ALONG_OEB_MIN} \end{bmatrix} \cdot [M] \begin{bmatrix} x \\ y \\ z \end{bmatrix}_{OEB\_PARENT\_FRAME}
 
-where dE/dt is the rate of change of the orbital energy, and m is the mass of the
-spacecraft. The SEDR is a useful parameter for monitoring the orbital decay of a
-spacecraft.
+For example, to model drag forces, a two-meter diameter spherical space object would be
+best modeled as a constant area (DRAG_CONST_AREA=3.1415m²) with all three
+AREA_ALONG_OEB parameters defaulting to zero. Conversely, a ten-meter long, 10 cm
+box-cross section gravity gradient boom would best be modeled by leaving
+DRAG_CONST_AREA defaulting to zero and setting AREA_ALONG_OEB_MAX =
+AREA_ALONG_OEB_INT = 1 m² and AREA_ALONG_OEB_MIN = 0.01 m². Finally, one can
+model a sphere encircling the gravity gradient boom’s centroid using a combination of these
+approaches by setting DRAG_CONST_AREA = 3.1415m², AREA_ALONG_OEB_MAX =
+AREA_ALONG_OEB_INT = 1 m² and AREA_ALONG_OEB_MIN = 0.01 m².
+
+As a second example, when modeling SRP forces, it should be noted that many GEO
+spacecraft have very large solar arrays that dominate the total cross-sectional surface of the
+spacecraft. Importantly, these solar arrays are designed to remain as normal to the Sun as
+possible irrespective of current spacecraft bus orientation. As such, the cross-sectional area
+of these arrays is best portrayed in the OCM by setting SRP_CONST_AREA to the
+combined solar array surface area as observed along the Sun viewing vector, and the
+remaining bus cross-sectional areas can be set using the three attitude-dependent
+AREA_ALONG_OEB parameters.
+
+.. _annex_f_apparent_to_absolute_visual_magnitude_relationship_odm:
+
+F2 APPARENT-TO-ABSOLUTE VISUAL MAGNITUDE RELATIONSHIP
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This section of the informative technical annex presents the relationships to be used to map
+apparent to absolute visual magnitude for inclusion in an OCM. These equations, based on
+reference [H8], examine signal magnitude for reflected illumination by a Resident Space
+Object (RSO) that is exoatmospheric, meaning that its illumination by the Sun is not reduced
+or impeded by atmospheric transmission losses. The equations do not account for spatial
+distribution across multiple detectors, which involves characterizing the Point Spread
+Function of the system.
+
+Definitions:
+
+- :math:`A_{Target}`: Effective area of the target [m²].
+- :math:`E_{EntranceAperture}`: The point source irradiance reaching the sensor aperture [W/m²].
+- :math:`d_{sunToTarget}`: Distance from the sun to the target [m] (e.g., 1 AU = 1.4959787066 × 10¹¹ m).
+- :math:`d_{TargetToSensor}`: Distance from target to sensor [m].
+- :math:`dia_{Target}`: Effective diameter of the target, [m].
+- :math:`E_{sun}`: Exoatmospheric solar irradiance, nominally 1380 [W/m²] at 1 AU.
+- :math:`E_{target}`: Target Irradiance at Sensor without atmospheric loss [W/m²].
+- :math:`E_o`: Ref. Visual Magnitude (Vega) Irradiance [2.77894× 10⁻⁸ W/m²].
+- F: General shadowing term accounting for the penumbra region’s influence [unitless, 0 ≤ F ≤1, 0 = umbra, and 1 = full Sun illumination].
+- :math:`I_{sun}`: Solar Intensity ≈ 3.088374161 × 10²⁵ [W/sr].
+- :math:`I_{Target}`: Intensity of reflected energy from target treated as a point source [W/sr].
+- :math:`Phase(\phi)`: Geometric reflectance phase function [unitless, 0 < Phase(φ) ≤1].
+- :math:`\phi`: Critical Angle to the Sun (CATS) from sun to the sensor, as shown in figure F-2 and referenced to the observed target [rad].
+- :math:`\pi`: Pi constant.
+- :math:`\rho`: Reflectance of the target [between 0 (none) and 1 (perfect reflectance)].
+- :math:`\tau_{Atmosphere}`: Effective transmission of the atmosphere [unitless, 0 < τ ≤ 1].
+
+Given an optical sensor’s measured target entrance aperture radiance:
+
+.. math::
+
+   E_{target} = \frac{E_{EntranceAperture}}{ \tau_{Atmosphere}} [W/m^2]
+
+.. math::
+
+   VM_{apparent} = -2.5 \log_{10} (\frac{E_{target}}{E_o}), \text{measured on the visual magnitude scale}
+
+or if :math:`VM_{apparent}` known: :math:`E_{target} = E_o 10^{[- \frac{VM_{apparent}}{2.5}]}`
+
+.. math::
+
+   I_{target} = E_{target} d_{TargetToSensor}^2 [W]
+
+.. math::
+
+   E_{sun} = \frac{I_{sun}}{d_{sunToTarget}^2} [W/m^2]
+
+.. math::
+
+   Phase(\phi) = \frac{\sin \phi + (\pi - \phi) \cos \phi}{\pi}
+
+.. math::
+
+   A_{Target} = \frac{\pi I_{Target}}{ \rho F E_{sun} Phase(\phi)} [m^2]
+
+.. NOTE::
+
+   1. :math:`A_{Target}` is undefined in umbra (F=0=darkness), or no reflection (ρ = 0).
+   2. If reflectance is unknown, one may assume a standard reference reflectance of fifteen percent.
+
+From which an effective diameter of the physical object can be roughly approximated as:
+
+.. math::
+
+   dia_{Target} \approx \sqrt{\frac{4 A_{Target}}{\pi}}
+
+From the above equations, :math:`VM_{absolute}` ‘normalized’ to a 1 AU Sun-to-target distance, a phase
+angle of 0° and an example reference 40,000 km target-to-sensor distance (equivalent to a
+GEO satellite tracked at 15.6° elevation above the optical site’s local horizon), is obtained as:
+
+.. math::
+
+   VM_{absolute} = -2.5 \log_{10} (\frac{E_{target}}{E_o}), \text{from which:}
+
+.. math::
+
+   VM_{absolute} = -2.5 \log_{10} ( \frac{[E_{Sun,1AU=1380W/m^2}] [Phase(0 rad)=1.0] [\rho A_{Target} \text{from above, in } m^2]}{\pi [E_o=2.77894 \times 10^{-8} W/m^2] [(40,000,000^2) m^2]} )
+
+.. figure:: ../images/ccsds_books/odm/F_2.png
+   :align: center
+
+   Figure F-2: Depiction of Optical Viewing CATS Angle Geometry
+
+.. _annex_f_maneuver_and_duty_cycle_diagrams_odm:
+
+F3 MANEUVER AND DUTY CYCLE DIAGRAMS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This section of the informative technical annex defines time-based and phase-angle-based
+duty cycle parameters.
+
+A ‘duty cycle’ is a cycle of thruster operation that operates intermittently rather than
+continuously, having an ‘on’ interval followed by an ‘off’ interval.
+
+Time-based duty cycle parameters
+""""""""""""""""""""""""""""""
+
+Time-based duty cycle parameters define a window of duty cycle operations, the actual
+execution interval and ‘ON’ and ‘OFF’ intervals, as shown in figure F-3.
+
+.. figure:: ../images/ccsds_books/odm/F_3.png
+   :align: center
+
+   Figure F-3: Diagram of Time-based Duty Cycle (DC_TYPE = ‘TIME’)
+
+Angle-based duty cycle parameters
+"""""""""""""""""""""""""""""""""
+
+Angle-based duty cycle parameters also define a window of duty cycle operations and actual
+execution interval and ‘ON’ and ‘OFF’ intervals, but in this case the ‘ON’ and ‘OFF’
+intervals are triggered by angular limits as shown in figure F-4.
+
+.. figure:: ../images/ccsds_books/odm/F_4.png
+   :align: center
+
+   Figure F-4: Diagram of a Rotating Spacecraft Body’s Progression through an Inertial Clock Angle-based Duty Cycle (DC_TYPE = ‘TIME_AND_ANGLE’)
+
+.. _annex_f_gpod_formulation_odm:
+
+F4 ORBIT DETERMINATION GENERALIZED DILUTION OF PRECISION (GDOP) FORMULATION
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This section of the informative technical annex defines the Generalized Dilution of Precision
+(GDoP) formulation used in the orbit determination section of the OCM.
+
+As described in reference [H16], GDoP provides a method to assess the navigation
+performance over a time-integrated orbit solution. GDoP broadens the DoP concept from the
+more common instantaneous geometric or kinematic solution of multiple transmit sources at
+one time to a scenario associated with a receiver that can integrate metric range and/or
+Doppler (or range-rate) measurements over time, potentially from different transmit sources,
+to estimate the user’s orbital position and velocity state. It is defined as a function of the sum
+of information matrices to obtain an observability grammian associated with a set of metric
+tracking measurements collected over time.
+
+The following equation for GDoP represents the uncertainty of an orbit state estimate as
+observed over time.
+
+.. math::
+
+   GDoP = \sqrt{max \text{ eig} \left( \left[ \sum_{t_0}^{t_n} (H^T W H)_i \right]^{-1} \right)}
+
+Where H is the measurement matrix modeled in the state estimate at the update time (i.e., the
+product of the observation and state transition matrices such that :math:`\tilde{H} = H \cdot \Phi`), and W is a
+diagonal matrix of relative weights that represents the accuracy of the measurements.
+:math:`H^TWH_i` represents the information matrix, the inverse of which is the covariance matrix. By
+summing over time, one obtains an estimate of the state uncertainty from the time-derived
+measurement set.
+
+.. _annex_f_euler_axis_angle_interpolation_odm:
+
+F5 EULER AXIS/ANGLE INTERPOLATION
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Euler Axis and Angle representation of Euler’s Theorem (see reference [H17] 10–14) is
+an effective way to interpolate a series of covariance matrices, reference frames or
+maneuvers, thrust, or acceleration vector directions.
+
+Interpolation of a series of three-dimensional vectors:
+""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+As presented in reference [H17], and consistent with the nomenclature of reference [H1]
+where e₁, e₂, and e₃ represent the three vector components of axis of rotation ê and φ
+represents the angle of rotation, a time-based interpolation of adjacent unit vectors ÛA and ÛB
+in a reference frame can be undertaken as:
+
+a) The axis of rotation ê can be obtained as: :math:`\hat{e} = \frac{\vec{U}_A \times \vec{U}_B}{|\vec{U}_A \times \vec{U}_B|}`.
+b) Assuming a constant rotational rate during this interval, :math:`\phi(t) = \frac{(t-t_1)}{(t_2-t_1)} \cos^{-1}(\vec{U}_A \cdot \vec{U}_B)`.
+c) The orthonormal rotation matrix [M(t)] is then:
+
+.. math::
+
+   \begin{bmatrix} (1-\cos\phi)\hat{e}_x^2 + \cos\phi & (1-\cos\phi)\hat{e}_x\hat{e}_y - \hat{e}_z\sin\phi & (1-\cos\phi)\hat{e}_x\hat{e}_z + \hat{e}_y\sin\phi \\ (1-\cos\phi)\hat{e}_y\hat{e}_x + \hat{e}_z\sin\phi & (1-\cos\phi)\hat{e}_y^2 + \cos\phi & (1-\cos\phi)\hat{e}_y\hate_z - \hat{e}_x\sin\phi \\ (1-\cos\phi)\hat{e}_z\hat{e}_x - \hat{e}_y\sin\phi & (1-\cos\phi)\hat{e}_z\hat{e}_y + \hat{e}_x\sin\phi & (1-\cos\phi)\hat{e}_z^2 + \cos\phi \end{bmatrix}
+
+d) From which the interpolated vector at time t is then v(t) = [M(t)]vA;
+e) The accompanying vector magnitudes (e.g., eigenvalues or thrust or acceleration
+   magnitudes) may be interpolated using Lagrange polynomials or linear expressions.
+
+Interpolation of a series of reference (or covariance eigenvector) frames:
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The eigenvector matrix [E(t)] contains the row-wise storage of the major, intermediate, and
+minor eigenvectors at time t, taking care to ensure that this ordered ‘triad’ of vectors adheres
+to the righthand rule. When interpolating between two eigenvector matrices [E₁] and [E₂],
+derived from two adjacent covariance matrices, respectively, [E(t)] can be evaluated as:
+
+a) The rotation occurring between [E₁] and [E₂] is: [MBA] = [E₂][E₁]ᵀ;
+b) Compute σ = (MBA₁₁ + MBA₂₂ + MBA₃₃);
+c) The angle of rotation from A to B is: :math:`\phi_{BA} = \cos^{-1}[\frac{1}{2}(\sigma - 1)]`;
+d) Exercising caution to accommodate nonunique cases (when sin φ = 0) as described
+   in reference [H17], the axis of rotation
+
+   .. math::
+
+      \hat{e} = [\frac{(MBA_{23}-MBA_{32})}{2\sin\phi} \frac{(MBA_{31}-MBA_{13})}{2\sin\phi} \frac{(MBA_{12}-MBA_{21})}{2\sin\phi}]
+
+e) The angle of rotation at time t is :math:`\phi(t) = (\frac{t-t_1}{t_2-t_1})\phi_{BA}`;
+f) [M(t)] can be computed using the above expression in step (3);
+g) And finally, the eigenvector matrix [E(t)] = [M(t)][E₁];
+h) When interpolating a series of covariance matrices, the accompanying eigenvalues
+   may be interpolated using Lagrange polynomials or linear expressions.
+
+.. _annex_f_regular_expressions_odm:
+
+F6 REGULAR EXPRESSIONS FOR VALIDATION AND INGEST OF ODMS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To accomplish validation and ingest of KVN versions of the ODM, the use of Regular
+Expressions (referred to as ‘Regex’) is strongly encouraged whenever possible. Regex offers
+a detailed and rigorous way to ensure proper validation, interpretation, and conformace to
+Orbit Data Message content. Most programming languages support the Regex feature,
+including C#, C++, Delphi, HTML5, Java and Javascript, MySQL, Oracle, PCRE, Perl, PHP,
+PowerShell, Python, R, Ruby, Scala, TCL, VBscript, Visual Basic, and XML Schema.
+
+While these RegEx sequences can provide a good level of validation of the entries, the reader
+is cautioned that using them on a long series of orbit or covariance data can be very
+inefficient and slow. RegEx sequences are best utilized on individual values such as
+Keyword = SingleValue.
+
+Sample Regular Expression for ‘Keyword = CCSDS Date/Time Format’
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The CCSDS Timecode format specified in 7.5.10 provides a convenient illustration of the
+power of using regular expressions. The color-coded Regex string below may be used to
+readily match any general ODM KVN line that sets a KVN keyword to a Timecode value.
+The group naming capability (color-coded in green below) inherent in Regex is particularly
+useful, by which the keyword, year, month, day, hour, minute, and second can be readily
+extracted and processed. As shown in figure F-5, this Regex sequence enforces the
+requirement that KVN keywords must be uppercase and can only consist of letters A-Z,
+digits 0-9, or underscores. It should be noted that in this expression, the optional inclusion by
+the message creator of one or more white space characters with the ‘(\s*)?’ sequences allow
+for maximum flexibility while still retaining a rigorous validation.
+
+.. NOTE::
+   In some languages, ‘^’ and ‘$’ matching at string line breaks must explicitly be
+   enabled to process a string containing a series of lines of the message.
+
+.. figure:: ../images/ccsds_books/odm/F_5.png
+   :align: center
+
+   Figure F-5: Regex Pattern for CCSDS Timecode
+
+Regex Pattern Matching Sequence:
+"""""""""""""""""""""""""""""""""
+
+Applying the above CCSDS Timecode Regex to a file containing the string
+‘CREATION_DATE = 2020-09-13T00:09:47.059345’ as an example, figure F-6 illustrates
+how this Regex expression is used to rigorously validate and match the string and identify the
+specified group names.
+
+.. figure:: ../images/ccsds_books/odm/F_6.png
+   :align: center
+
+   Figure F-6: Regex Pattern Matching Sequence for CCSDS Timecode
+
+Sample Regular Expression for ‘Keyword = NonDecimalString’
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Another common and useful Regex addresses the setting of keywords to a free-text string.
+Consistent with requirements for KVN values as specified in 7.5, the Regex shown in
+figure F-7 matches this sequence.
+
+.. figure:: ../images/ccsds_books/odm/F_7.png
+   :align: center
+
+   Figure F-7: Regex for a Non-Decimal String
+
+Sample Regular Expression for ‘Keyword = FreeTextString’
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Free-text strings that are contain exclusively uppercase or lowercase alphabetical characters,
+numbers, and/or the decimal point, hyphen, space or underscore characters may be matched
+as follows. It should be noted that the inclusion of a decimal point in this Regex sequence
+means that numerical KVN values can be matched with potentially unintended consequences;
+numbers should be specifically matched as a number (as shown below). Consistent with
+requirements for KVN values as specified in 7.5, the Regex shown in figure F-8 matches this
+sequence.
+
+.. figure:: ../images/ccsds_books/odm/F_8.png
+   :align: center
+
+   Figure F-8: Regex for Free-Text String
+
+Sample Regular Expression for ‘Keyword = CCSDS Numerical Value with optional units’
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Consistent with the requirements set forth in 7.5.4 through 7.5.7, KVN values that are
+integers or non-integer fixed or floating-point numbers may be matched with the Regex
+sequence provided in figure F-9, with named groups ‘keyword’, ‘value’, and ‘units’ set
+accordingly:
+
+.. figure:: ../images/ccsds_books/odm/F_9.png
+   :align: center
+
+   Figure F-9: Regex for String Containing Numerical Value with Optional Units
+
+Sample Regular Expression for ‘Keyword = Multipartite CCSDS Numerical Values’
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+For orbit, covariance, and/or maneuver lines providing a multipartite sequence of numerical
+values, the Regex pattern provided in figure F-10 may be used (in this example, to capture
+and set value1, value2, and value3 for a 3-element set of numbers):
+
+.. figure:: ../images/ccsds_books/odm/F_10.png
+   :align: center
+
+   Figure F-10: Regex for String Containing Numerical Value with Optional Units
+
+.. _annex_f_sedr_formulation_odm:
+
+F7 SPECIFIC ENERGY DISSIPATION RATE (SEDR) FORMULATION
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+An orbit’s Specific Energy Dissipation Rate (SEDR) represents the amount of energy (W/kg)
+being removed from a satellite’s orbit by atmospheric drag. It is a very useful metric for
+characterizing satellites since it accounts for both the drag environment (atmospheric density)
+and the ‘area to mass ratio’ of the specific object. It does this by including drag acceleration
+in the computation. Drag acceleration is proportional to atmospheric density and to satellite
+area to mass.
+
+SEDR is computed as follows:
+
+Instantaneous SEDR at time t is given by
+
+.. math::
+
+   SEDR(t) = - \vec{A}_D \cdot \vec{V}
+
+where,
+:math:`\vec{A}_D` = drag acceleration vector (inertial)
+:math:`\vec{V}` = velocity vector (inertial)
+
+Average SEDR over the orbit determination interval is given by
+
+.. math::
+
+   \frac{1}{T} \int_0^T SEDR(t)dt
+
+where, to correctly average over a complete orbital revolution, T is an integer
+multiple of the satellite period. This consideration is primarily for eccentric orbits.
+Aside from this consideration, T is the orbit determination interval.
+
+.. _annex_f_orbit_determination_parameters_odm:
+
+F8 ORBIT DETERMINATION PARAMETERS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _annex_f_orbit_determination_parameters_general_odm:
+
+F8.1 GENERAL
+""""""""""""
+
+Satellite Orbit Determination (OD) estimates the position and velocity of an orbiting object
+from discrete observations (for greater detail, see reference [H7]). The set of observations
+includes external measurements from terrestrial or space-based sensors and measurements
+from instruments on the satellite itself. Satellite orbit propagation estimates the future state of
+motion of a satellite whose orbit has been determined from past observations. Though a
+satellite’s motion is described by a set of ideal equations of motion representing physical
+hypotheses, the observations used in OD are subject to systematic and random uncertainties.
+Therefore OD and propagation are probabilistic and can only approximately describe the
+satellite’s motion. The degree of approximation that can be tolerated depends on the intended
+use of the orbital information.
+
+Satellite owners/operators employ different techniques to determine orbits from active and
+passive observations, such that the same data inputs lead to different predictions when they
+are used in different models. Satellite owners/operators often accept orbit descriptions
+developed using physical models that others employ. Differences in orbit predictions caused
+using different physical models and numerical techniques can be significant.
+
+A spacecraft is influenced by a variety of external forces, including terrestrial gravity,
+atmospheric drag, multibody gravitation, solar radiation pressure, tides, and spacecraft
+thrusters. Selection of forces for modelling depends on the accuracy and precision required
+by the OD process and the amount of available data. The complex modelling of these forces
+results in a highly nonlinear set of dynamical equations. Many physical and computational
+uncertainties limit the accuracy and precision of the spacecraft state that can be determined.
+Similarly, the observational data are inherently nonlinear with respect to the state of motion
+of the spacecraft, and some influences might not have been included in models of the
+observation of the state of motion.
+
+Satellite OD and propagation are stochastic estimation problems because observations are
+inherently noisy and uncertain and because not all phenomena that influence satellite motion
+are clearly discernible. Estimation is the process of extracting a desired time-varying signal
+from statistically noisy observations accumulated over time. Estimation encompasses data
+smoothing, which is statistical inference from past observations; filtering, which infers the
+signal from past observations and current observations; and prediction or propagation, which
+employs past and current observations to infer the future of the signal.
+
+.. _annex_f_initial_od_odm:
+
+F8.2 INITIAL OD
+""""""""""""""
+
+Initial OD (IOD) methods input tracking measurements with tracking platform locations, and
+output spacecraft position and velocity estimates. No a priori orbit estimate is required.
+Associated solution error magnitudes can be very large. IOD methods are sometimes
+nonlinear methods and are often trivial to implement. Measurement editing is typically not
+performed during IOD calculations because there are insufficient observations.
+
+.. figure:: ../images/ccsds_books/odm/F_4.png
+   :align: center
+
+   Figure F-4: Diagram of a Rotating Spacecraft Body’s Progression through an Inertial Clock Angle-based Duty Cycle (DC_TYPE = ‘TIME_AND_ANGLE’)
+
+.. _annex_f_gpod_formulation_odm:
+
+F4 ORBIT DETERMINATION GENERALIZED DILUTION OF PRECISION (GDOP) FORMULATION
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This section of the informative technical annex defines the Generalized Dilution of Precision
+(GDoP) formulation used in the orbit determination section of the OCM.
+
+As described in reference [H16], GDoP provides a method to assess the navigation
+performance over a time-integrated orbit solution. GDoP broadens the DoP concept from the
+more common instantaneous geometric or kinematic solution of multiple transmit sources at
+one time to a scenario associated with a receiver that can integrate metric range and/or
+Doppler (or range-rate) measurements over time, potentially from different transmit sources,
+to estimate the user’s orbital position and velocity state. It is defined as a function of the sum
+of information matrices to obtain an observability grammian associated with a set of metric
+tracking measurements collected over time.
+
+The following equation for GDoP represents the uncertainty of an orbit state estimate as
+observed over time.
+
+.. math::
+
+   GDoP = \sqrt{max \text{ eig} \left( \left[ \sum_{t_0}^{t_n} (H^T W H)_i \right]^{-1} \right)}
+
+Where H is the measurement matrix modeled in the state estimate at the update time (i.e., the
+product of the observation and state transition matrices such that :math:`\tilde{H} = H \cdot \Phi`), and W is a
+diagonal matrix of relative weights that represents the accuracy of the measurements.
+:math:`H^TWH_i` represents the information matrix, the inverse of which is the covariance matrix. By
+summing over time, one obtains an estimate of the state uncertainty from the time-derived
+measurement set.
+
+.. _annex_f_euler_axis_angle_interpolation_odm:
+
+F5 EULER AXIS/ANGLE INTERPOLATION
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Euler Axis and Angle representation of Euler’s Theorem (see reference [H17] 10–14) is
+an effective way to interpolate a series of covariance matrices, reference frames or
+maneuvers, thrust, or acceleration vector directions.
+
+Interpolation of a series of three-dimensional vectors:
+""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+As presented in reference [H17], and consistent with the nomenclature of reference [H1]
+where e₁, e₂, and e₃ represent the three vector components of axis of rotation ê and φ
+represents the angle of rotation, a time-based interpolation of adjacent unit vectors ÛA and ÛB
+in a reference frame can be undertaken as:
+
+a) The axis of rotation ê can be obtained as: :math:`\hat{e} = \frac{\vec{U}_A \times \vec{U}_B}{|\vec{U}_A \times \vec{U}_B|}`.
+b) Assuming a constant rotational rate during this interval, :math:`\phi(t) = \frac{(t-t_1)}{(t_2-t_1)} \cos^{-1}(\vec{U}_A \cdot \vec{U}_B)`.
+c) The orthonormal rotation matrix [M(t)] is then:
+
+.. math::
+
+   \begin{bmatrix} (1-\cos\phi)\hat{e}_x^2 + \cos\phi & (1-\cos\phi)\hat{e}_x\hat{e}_y - \hat{e}_z\sin\phi & (1-\cos\phi)\hat{e}_x\hat{e}_z + \hat{e}_y\sin\phi \\ (1-\cos\phi)\hat{e}_y\hat{e}_x + \hat{e}_z\sin\phi & (1-\cos\phi)\hat{e}_y^2 + \cos\phi & (1-\cos\phi)\hat{e}_y\hate_z - \hat{e}_x\sin\phi \\ (1-\cos\phi)\hat{e}_z\hat{e}_x - \hat{e}_y\sin\phi & (1-\cos\phi)\hat{e}_z\hat{e}_y + \hat{e}_x\sin\phi & (1-\cos\phi)\hat{e}_z^2 + \cos\phi \end{bmatrix}
+
+d) From which the interpolated vector at time t is then v(t) = [M(t)]vA;
+e) The accompanying vector magnitudes (e.g., eigenvalues or thrust or acceleration
+   magnitudes) may be interpolated using Lagrange polynomials or linear expressions.
+
+Interpolation of a series of reference (or covariance eigenvector) frames:
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The eigenvector matrix [E(t)] contains the row-wise storage of the major, intermediate, and
+minor eigenvectors at time t, taking care to ensure that this ordered ‘triad’ of vectors adheres
+to the righthand rule. When interpolating between two eigenvector matrices [E₁] and [E₂],
+derived from two adjacent covariance matrices, respectively, [E(t)] can be evaluated as:
+
+a) The rotation occurring between [E₁] and [E₂] is: [MBA] = [E₂][E₁]ᵀ;
+b) Compute σ = (MBA₁₁ + MBA₂₂ + MBA₃₃);
+c) The angle of rotation from A to B is: :math:`\phi_{BA} = \cos^{-1}[\frac{1}{2}(\sigma - 1)]`;
+d) Exercising caution to accommodate nonunique cases (when sin φ = 0) as described
+   in reference [H17], the axis of rotation
+
+   .. math::
+
+      \hat{e} = [\frac{(MBA_{23}-MBA_{32})}{2\sin\phi} \frac{(MBA_{31}-MBA_{13})}{2\sin\phi} \frac{(MBA_{12}-MBA_{21})}{2\sin\phi}]
+
+e) The angle of rotation at time t is :math:`\phi(t) = (\frac{t-t_1}{t_2-t_1})\phi_{BA}`;
+f) [M(t)] can be computed using the above expression in step (3);
+g) And finally, the eigenvector matrix [E(t)] = [M(t)][E₁];
+h) When interpolating a series of covariance matrices, the accompanying eigenvalues
+   may be interpolated using Lagrange polynomials or linear expressions.
+
+
+.. _annex_f_apparent_to_absolute_visual_magnitude_relationship_odm:
+
+F2 APPARENT-TO-ABSOLUTE VISUAL MAGNITUDE RELATIONSHIP
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This section of the informative technical annex presents the relationships to be used to map
+apparent to absolute visual magnitude for inclusion in an OCM. These equations, based on
+reference [H8], examine signal magnitude for reflected illumination by a Resident Space
+Object (RSO) that is exoatmospheric, meaning that its illumination by the Sun is not reduced
+or impeded by atmospheric transmission losses. The equations do not account for spatial
+distribution across multiple detectors, which involves characterizing the Point Spread
+Function of the system.
+
+Definitions:
+
+- :math:`A_{Target}`: Effective area of the target [m²].
+- :math:`E_{EntranceAperture}`: The point source irradiance reaching the sensor aperture [W/m²].
+- :math:`d_{sunToTarget}`: Distance from the sun to the target [m] (e.g., 1 AU = 1.4959787066 × 10¹¹ m).
+- :math:`d_{TargetToSensor}`: Distance from target to sensor [m].
+- :math:`dia_{Target}`: Effective diameter of the target, [m].
+- :math:`E_{sun}`: Exoatmospheric solar irradiance, nominally 1380 [W/m²] at 1 AU.
+- :math:`E_{target}`: Target Irradiance at Sensor without atmospheric loss [W/m²].
+- :math:`E_o`: Ref. Visual Magnitude (Vega) Irradiance [2.77894× 10⁻⁸ W/m²].
+- F: General shadowing term accounting for the penumbra region’s influence [unitless, 0 ≤ F ≤1, 0 = umbra, and 1 = full Sun illumination].
+- :math:`I_{sun}`: Solar Intensity ≈ 3.088374161 × 10²⁵ [W/sr].
+- :math:`I_{Target}`: Intensity of reflected energy from target treated as a point source [W/sr].
+- :math:`Phase(\phi)`: Geometric reflectance phase function [unitless, 0 < Phase(φ) ≤1].
+- :math:`\phi`: Critical Angle to the Sun (CATS) from sun to the sensor, as shown in figure F-2 and referenced to the observed target [rad].
+- :math:`\pi`: Pi constant.
+- :math:`\rho`: Reflectance of the target [between 0 (none) and 1 (perfect reflectance)].
+- :math:`\tau_{Atmosphere}`: Effective transmission of the atmosphere [unitless, 0 < τ ≤ 1].
+
+Given an optical sensor’s measured target entrance aperture radiance:
+
+.. math::
+
+   E_{target} = \frac{E_{EntranceAperture}}{ \tau_{Atmosphere}} [W/m^2]
+
+.. math::
+
+   VM_{apparent} = -2.5 \log_{10} (\frac{E_{target}}{E_o}), \text{measured on the visual magnitude scale}
+
+or if :math:`VM_{apparent}` known: :math:`E_{target} = E_o 10^{[- \frac{VM_{apparent}}{2.5}]}`
+
+.. math::
+
+   I_{target} = E_{target} d_{TargetToSensor}^2 [W]
+
+.. math::
+
+   E_{sun} = \frac{I_{sun}}{d_{sunToTarget}^2} [W/m^2]
+
+.. math::
+
+   Phase(\phi) = \frac{\sin \phi + (\pi - \phi) \cos \phi}{\pi}
+
+.. math::
+
+   A_{Target} = \frac{\pi I_{Target}}{ \rho F E_{sun} Phase(\phi)} [m^2]
+
+.. NOTE::
+
+   1. :math:`A_{Target}` is undefined in umbra (F=0=darkness), or no reflection (ρ = 0).
+   2. If reflectance is unknown, one may assume a standard reference reflectance of fifteen percent.
+
+From which an effective diameter of the physical object can be roughly approximated as:
+
+.. math::
+
+   dia_{Target} \approx \sqrt{\frac{4 A_{Target}}{\pi}}
+
+From the above equations, :math:`VM_{absolute}` ‘normalized’ to a 1 AU Sun-to-target distance, a phase
+angle of 0° and an example reference 40,000 km target-to-sensor distance (equivalent to a
+GEO satellite tracked at 15.6° elevation above the optical site’s local horizon), is obtained as:
+
+.. math::
+
+   VM_{absolute} = -2.5 \log_{10} (\frac{E_{target}}{E_o}), \text{from which:}
+
+.. math::
+
+   VM_{absolute} = -2.5 \log_{10} ( \frac{[E_{Sun,1AU=1380W/m^2}] [Phase(0 rad)=1.0] [\rho A_{Target} \text{from above, in } m^2]}{\pi [E_o=2.77894 \times 10^{-8} W/m^2] [(40,000,000^2) m^2]} )
+
+.. figure:: ../images/ccsds_books/odm/F_2.png
+   :align: center
+
+   Figure F-2: Depiction of Optical Viewing CATS Angle Geometry
+
+.. _annex_f_maneuver_and_duty_cycle_diagrams_odm:
+
+F3 MANEUVER AND DUTY CYCLE DIAGRAMS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This section of the informative technical annex defines time-based and phase-angle-based
+duty cycle parameters.
+
+A ‘duty cycle’ is a cycle of thruster operation that operates intermittently rather than
+continuously, having an ‘on’ interval followed by an ‘off’ interval.
+
+Time-based duty cycle parameters
+""""""""""""""""""""""""""""""""
+
+Time-based duty cycle parameters define a window of duty cycle operations, the actual
+execution interval and ‘ON’ and ‘OFF’ intervals, as shown in figure F-3.
+
+.. figure:: ../images/ccsds_books/odm/F_3.png
+   :align: center
+
+   Figure F-3: Diagram of Time-based Duty Cycle (DC_TYPE = ‘TIME’)
+
+Angle-based duty cycle parameters
+"""""""""""""""""""""""""""""""""
+
+Angle-based duty cycle parameters also define a window of duty cycle operations and actual
+execution interval and ‘ON’ and ‘OFF’ intervals, but in this case the ‘ON’ and ‘OFF’
+intervals are triggered by angular limits as shown in figure F-4.
+
+
 .. _annex_g_odm:
 
-ANNEX G: EXAMPLES (INFORMATIVE)
-===============================
+ANNEX G
+=======
 
-.. _example_opm_odm:
+(INFORMATIVE)
 
-G1 OPM EXAMPLE
---------------
+ODM EXAMPLES
+------------
+
+.. _annex_g_overview_odm:
+
+G1 OVERVIEW
+^^^^^^^^^^^
+
+The following are examples of OPMs.
+
+.. _annex_g_opm_examples_kvn_odm:
+
+G2 OPM EXAMPLES IN KVN
+^^^^^^^^^^^^^^^^^^^^^^
+
+The following figures are examples of OPMs in KVN format. The first has only a state; the
+second has state, Keplerian elements, and maneuvers; and the third and fourth include the
+position/velocity covariance matrix.
 
 .. code-block::
-   :linenos:
 
    CCSDS_OPM_VERS = 3.0
-   CREATION_DATE  = 2002-06-20T14:25:52
-   ORIGINATOR     = GSFC
-   OBJECT_NAME    = Fictitious Satellite
-   OBJECT_ID      = 2000-052A
+   CREATION_DATE = 2022-11-06T09:23:57
+   ORIGINATOR    = JAXA
+   COMMENT        GEOCENTRIC, CARTESIAN, EARTH FIXED
+   OBJECT_NAME    = OSPREY 5
+   OBJECT_ID      = 1998-999A
    CENTER_NAME    = EARTH
-   REF_FRAME      = EME2000
+   REF_FRAME      = ITRF2000
    TIME_SYSTEM    = UTC
-   EPOCH          = 2002-06-20T14:18:23.136
-   X              = 5102.5093
-   Y              = 6123.0114
-   Z              = 6378.1363
-   X_DOT          = -4.743219
-   Y_DOT          = 0.782314
-   Z_DOT          = 5.085236
+   EPOCH          = 2022-12-18T14:28:15.1172
+   X              = 6503.514000
+   Y              = 1239.647000
+   Z              = -717.490000
+   X_DOT          = -0.873160
+   Y_DOT          = 8.740420
+   Z_DOT          = -4.191076
+   MASS           = 3000.000000
+   SOLAR_RAD_AREA = 18.770000
+   SOLAR_RAD_COEFF= 1.000000
+   DRAG_AREA      = 18.770000
+   DRAG_COEFF     = 2.500000
 
-.. _example_omm_odm:
+.. _annex_g_omm_examples_kvn_odm:
 
-G2 OMM EXAMPLE
---------------
+G4 OMM EXAMPLES IN KVN
+^^^^^^^^^^^^^^^^^^^^^^
+
+The following figures are examples of OMMs in KVN format.
 
 .. code-block::
-   :linenos:
+
+   GOES 9 [P]
+   1 23581U 95025A   07064.44075725 -.00000113  00000-0  10000-3 0  9250
+   2 23581 003.0539 081.7939 0005013 249.2363 150.1602 01.00273272 43169
+
+.. code-block::
 
    CCSDS_OMM_VERS = 3.0
-   CREATION_DATE  = 2007-03-05T16:00:00
-   ORIGINATOR     = JAXA
-   OBJECT_NAME    = Fictitious Satellite
-   OBJECT_ID      = 1998-067A
-   CENTER_NAME    = EARTH
-   REF_FRAME      = TEME
-   TIME_SYSTEM    = UTC
-   MEAN_ELEMENT_THEORY = SGP4
-   EPOCH          = 2007-03-05T10:34:41.4264
-   MEAN_MOTION    = 14.32225912
-   ECCENTRICITY   = 0.0001997
-   INCLINATION    = 51.6433
-   RA_OF_ASC_NODE = 16.2059
-   ARG_OF_PERICENTER = 209.4390
-   MEAN_ANOMALY   = 150.6559
-   GM             = 398600.4418
-   BSTAR          = 0.000021984
+   CREATION_DATE = 2020-065T16:00:00
+   ORIGINATOR    = NOAA
+   MESSAGE_ID    = OMM 202013719185
+   OBJECT_NAME   = GOES 9
+   OBJECT_ID     = 1995-025A
+   CENTER_NAME   = EARTH
+   REF_FRAME     = TEME
+   TIME_SYSTEM   = UTC
+   MEAN_ELEMENT_THEORY = SGP/SGP4
+   EPOCH         = 2020-064T10:34:41.4264
+   MEAN_MOTION   = 1.00273272
+   ECCENTRICITY  = 0.0005013
+   INCLINATION   = 3.0539
+   RA_OF_ASC_NODE= 81.7939
+   ARG_OF_PERICENTER = 249.2363
+   MEAN_ANOMALY  = 150.1602
+   GM            = 398600.8
+   EPHEMERIS_TYPE= 0
+   CLASSIFICATION_TYPE = U
+   NORAD_CAT_ID  = 23581
+   ELEMENT_SET_NO= 0925
+   REV_AT_EPOCH  = 4316
+   BSTAR         = 0.0001
+   MEAN_MOTION_DOT = -0.00000113
+   MEAN_MOTION_DDOT = 0.0
 
-.. _example_oem_odm:
+.. _annex_g_oem_examples_kvn_odm:
 
-G3 OEM EXAMPLE
---------------
+G6 OEM EXAMPLES IN KVN
+^^^^^^^^^^^^^^^^^^^^^^
+
+The following figures are examples of OEMs in KVN format. Some ephemeris data lines
+have been omitted to save space.
 
 .. code-block::
-   :linenos:
 
    CCSDS_OEM_VERS = 3.0
-   CREATION_DATE  = 2002-06-20T14:25:52
-   ORIGINATOR     = GSFC
+   CREATION_DATE = 1996-11-04T17:22:31
+   ORIGINATOR    = NASA/JPL
 
    META_START
-   OBJECT_NAME    = Fictitious Satellite
-   OBJECT_ID      = 2000-052A
-   CENTER_NAME    = EARTH
-   REF_FRAME      = EME2000
-   TIME_SYSTEM    = UTC
-   START_TIME     = 2002-06-20T14:18:23.136
-   STOP_TIME      = 2002-06-20T14:28:23.136
+   OBJECT_NAME   = MARS GLOBAL SURVEYOR
+   OBJECT_ID     = 1996-062A
+   CENTER_NAME   = MARS BARYCENTER
+   REF_FRAME     = EME2000
+   TIME_SYSTEM   = UTC
+   START_TIME    = 2019-12-18T12:00:00.331
+   USEABLE_START_TIME = 2019-12-18T12:10:00.331
+   USEABLE_STOP_TIME = 2019-12-28T21:23:00.331
+   STOP_TIME     = 2019-12-28T21:28:00.331
+   INTERPOLATION = HERMITE
+   INTERPOLATION_DEGREE = 7
    META_STOP
+   COMMENT This file was produced by M.R. Pigs, OSAR NAV/JPL, 2019NOV 04. It is
+   COMMENT to be used for DSN scheduling purposes only.
 
-   2002-06-20T14:18:23.136 5102.5093 6123.0114 6378.1363 -4.743219 0.782314 5.085236
-   2002-06-20T14:23:23.136 5502.5093 6523.0114 6778.1363 -4.743219 0.782314 5.085236
-   2002-06-20T14:28:23.136 5902.5093 6923.0114 7178.1363 -4.743219 0.782314 5.085236
-
-.. _example_ocm_odm:
-
-G4 OCM EXAMPLE
---------------
-
-.. code-block::
-   :linenos:
-
-   CCSDS_OCM_VERS = 3.0
-   CREATION_DATE  = 2018-11-13T11:13:20.5Z
-   ORIGINATOR     = SOMEWHERE
-   MESSAGE_ID     = 0001
-
+   2019-12-18T12:00:00.331 2789.619 -280.045 -1746.755 4.73372 -2.49586 -1.04195
+   2019-12-18T12:01:00.331 2783.419 -308.143 -1877.071 5.18604 -2.42124 -1.99608
+   2019-12-18T12:02:00.331 2776.033 -336.859 -2008.682 5.63678 -2.33951 -1.94687
+   < intervening data records omitted here >
+   2019-12-28T21:28:00.331 -3881.024 563.959 -682.773 -3.28827 -3.66735 1.63861
    META_START
-   OBJECT_NAME    = Fictitious Satellite
-   TIME_SYSTEM    = UTC
-   EPOCH_TZERO    = 2018-11-13T10:00:00Z
+   OBJECT_NAME   = MARS GLOBAL SURVEYOR
+   OBJECT_ID     = 1996-062A
+   CENTER_NAME   = MARS BARYCENTER
+   REF_FRAME     = EME2000
+   TIME_SYSTEM   = UTC
+   START_TIME    = 2019-12-28T21:29:07.267
+   USEABLE_START_TIME = 2019-12-28T22:08:02.5
+   USEABLE_STOP_TIME = 2019-12-30T01:18:02.5
+   STOP_TIME     = 2019-12-30T01:28:02.267
+   INTERPOLATION = HERMITE
+   INTERPOLATION_DEGREE = 7
    META_STOP
+   COMMENT This block begins after trajectory correction maneuver TCM-3.
+   2019-12-28T21:29:07.267 -2432.166 -063.042 1742.754 7.33702 -3.495867 -1.041945
+   2019-12-28T21:59:02.267 -2445.234 -878.141 1873.073 1.86043 -3.421256 -0.996366
+   2019-12-28T22:00:02.267 -2458.079 -683.858 2007.684 6.36786 -3.339563 -0.946654
+   < intervening data records omitted here >
+   2019-12-30T01:28:02.267 2164.375 1115.811 -688.131 -3.53328 -2.88452 0.88535
 
-   TRAJ_START
-   CENTER_NAME    = EARTH
-   TRAJ_REF_FRAME = GCRF
-   TRAJ_TYPE      = CARTPV
-   2018-11-13T10:00:00.000Z 5102.5093 6123.0114 6378.1363 -4.743219 0.782314 5.085236
-   TRAJ_STOP
+.. _annex_g_ocm_examples_kvn_odm:
+
+G8 OCM EXAMPLES IN KVN
+^^^^^^^^^^^^^^^^^^^^^^
+
+The following figures are examples of OCMs in KVN format. The first has only a time
+history of orbital states and constitutes a minimal content OCM. The second includes space
+object characteristics and Perturbations Specifications; the third includes a time series of
+maneuvers, a time history of Cartesian position and velocity trajectory states, followed by a
+time history of Keplerian elements; and the fourth includes a time series of covariance
+matrices.
+
+
 .. _annex_h_odm:
 
-ANNEX H: INFORMATIVE REFERENCES (INFORMATIVE)
-=============================================
+ANNEX H
+=======
 
-[H1] D. A. Vallado, et al. “Revisiting Spacetrack Report #3.” In *Proceedings of the
+(INFORMATIVE)
+
+INFORMATIVE REFERENCES
+----------------------
+
+[H1] Navigation Data—Definitions and Conventions. Issue 4. Report Concerning Space
+     Data System Standards (Green Book), CCSDS 500.0-G-4. Washington, D.C.:
+     CCSDS, November 2019.
+[H2] “CelesTrak.” Center for Space Standards & Innovation (CSSI). http://celestrak.com/.
+[H3] David A. Vallado, et al. “Revisiting Spacetrack Report #3.” In *Proceedings of the
      AIAA/AAS Astrodynamics Specialist Conference and Exhibit* (AIAA 2006-6753).
      Reston, Virginia: AIAA, 2006.
+[H4] “Documentation.” SPICE: NASA’s Solar System Exploration Ancillary Information
+     System. Navigation and Ancillary Information Facility (NAIF).
+     http://naif.jpl.nasa.gov/naif/documentation.html.
+[H5] *Ground Network Tracking and Acquisition Data Handbook*. 453-HNDK-GN.
+     Greenbelt, Maryland: Goddard Space Flight Center, May 2007.
+[H6] Daniel L. Oltrogge, T.S. Kelso, and John H. Seago. “Ephemeris Requirements for
+     Space Situational Awareness.” In *Proceedings of the 21st AAS/AIAA Space Flight
+     Mechanics Meeting* (13–17 February 2011, New Orleans, Louisiana), AAS 11-151.
+     San Diego, California: Univelt, 2011.
+[H7] David A. Vallado. *Fundamentals of Astrodynamics and Applications*. 4th ed. Space
+     Technology Library. El Segundo, California: Microcosm Press, 2013.
+[H8] Daniel L. Oltrogge, Patrick North, and Michael Nicolls. “Multi-Phenomenology
+     Observation Network Evaluation Tool (MONET).” In *Proceedings of the 15th AMOS
+     Surveillance Technologies Conference* (9–12 September 2014, Maui, Hawaii). Kihei,
+     Hawaii: Maui Economic Development Board, 2014.
+[H9] Salvatore Alfano. “Orbital Covariance Interpolation.” In *Proceedings of the 14th
+     AAS/AIAA Space Flight Mechanics Meeting* (8–12 February 2004, Maui, Hawaii),
+     AAS 04-223. San Diego, California: Univelt, 2004.
+[H10] Sergei Tanygin. “Attitude Interpolation.” In *Proceedings of the 13th AAS/AIAA Space
+      Flight Mechanics Meeting* (9–13 February 2003, Ponce, Puerto Rico), AAS 03-197.
+      San Diego, California: Univelt, 2003.
+[H11] Sergei Tanygin. “Efficient Covariance Interpolation Using Blending of Approximate
+      State Error Transitions.” In *Proceedings of the 2013 AAS/AIAA Astrodynamics
+      Specialist Conference* (11–15 August 2013, Hilton Head, South Carolina), AAS 13-
+      762. San Diego, California: Univelt, 2013.
+[H12] James Woodburn and Sergei Tanygin. “Position Covariance Visualization.” In
+      *Proceedings of the 2002 AIAA/AAS Astrodynamics Specialist Conference and Exhibit*
+      (Monterey, California, Monterey, California), AIAA 2002-4985. Reston, Virginia:
+      AIAA, 2002.
+[H13] Salvatore Alfano. “Variance-Covariance Significant Figure Reduction and Its Effect
+      on Collision Probability Calculation.” In *Proceedings of the 70th International
+      Astronautical Congress (IAC)* (21–25 October 2019, Washington D.C.), IAC-19-
+      A6.2.8.51075. Paris: International Astronautical Federation, 2019.
+[H14] DISCOSweb. ESA. https://discosweb.esoc.esa.int/.
+[H15] Elliott D. Kaplan and Christopher Hegarty, eds. *Understanding GPS/GNSS:
+      Principles and Applications*. GNSS Technology and Applications. Boston and
+      London: Artech, 2017.
+[H16] Obed S. Sands, et al. “Dilution of Precision-Based Lunar Navigation Assessment for
+      Dynamic Position Fixing.” In *Proceedings of the 2006 National Technical Meeting of
+      The Institute of Navigation* (January 18–20, 2006, Monterey, California), 260–268.
+      Manassas, Virginia: ION, 2006.
+[H17] Peter C. Hughes. *Spacecraft Attitude Dynamics*. New York: John Wiley and Sons,
+      1986.
 
-[H2] F. R. Hoots, and R. L. Roehrich. *Spacetrack Report No. 3: Models for Propagation
-     of NORAD Element Sets*. Colorado Springs, Colorado: Peterson AFB, 1980.
-
-[H3] F. R. Hoots, P. W. Schumacher, and R. A. Glover. “History of Analytical Orbit
-     Modeling in the U. S. Space Surveillance System.” *Journal of Guidance, Control,
-     and Dynamics* 27, no. 2 (2004): 174-185.
-
-[H4] *Explanatory Supplement to the Astronomical Almanac*. Edited by P. Kenneth
-     Seidelmann. Sausalito, California: University Science Books, 1992.
-
-[H5] *The IERS Conventions (2010)*. Edited by Gérard Petit and Brian Luzum. IERS
-     Technical Note No. 36. Frankfurt am Main, Germany: IERS, 2010.
-
-[H6] W. H. Press, et al. *Numerical Recipes in C: The Art of Scientific Computing*. 2nd
-     ed. Cambridge, UK: Cambridge University Press, 1992.
-
-[H7] *Recommended Practice for Mission Design and Operations: Glossary of Terms*.
-     ANSI/AIAA R-113-2015. Reston, Virginia: AIAA, 2015.
-
-[H8] D. A. Vallado. *Fundamentals of Astrodynamics and Applications*. 4th ed. Space
-     Technology Library. El Segundo, California: Microcosm, 2013.
-
-[H9] J. R. Wright and J. J. Woodburn. “Simultaneous Real-Time Estimation of Orbit,
-     Covariance, and Non-Conservative Accelerations.” In *Advances in the
-     Astronautical Sciences*, vol. 119 (2005): 239-258.
-
-[H10] J. L. Junkins, and J. D. Turner. *Optimal Spacecraft Rotational Maneuvers*.
-      Amsterdam: Elsevier, 1986.
-
-[H11] J. L. Junkins, and H. Schaub. *Analytical Mechanics of Space Systems*. 3rd ed.
-      AIAA Education Series. Reston, Virginia: AIAA, 2013.
-
-[H12] M. D. Shuster. “A Survey of Attitude Representations.” *Journal of the
-      Astronautical Sciences* 41, no. 4 (October-December 1993): 439-517.
 .. _annex_i_odm:
 
-ANNEX I: OCM CHANGES FROM OPM, OMM, AND OEM (INFORMATIVE)
-==========================================================
+ANNEX I
+=======
 
-This annex provides a summary of the changes from the OPM, OMM, and OEM to the OCM.
+(INFORMATIVE)
 
-.. list-table:: OCM Changes from OPM, OMM, and OEM
-   :widths: 25 25 25 25
+ITEMS FOR AN INTERFACE CONTROL DOCUMENT
+---------------------------------------
+
+In several places in this document, there are references to items that should be specified in an
+Interface Control Document (ICD) between participants that supplements an exchange of
+ephemeris data. The ICD should be jointly produced by both participants in a cross-support
+involving the transfer of ephemeris data. This annex compiles those recommendations into a
+single section. Although the Orbit Data Messages described in this document may at times
+be used in situations in which participants have not negotiated ICDs, they should be
+developed and negotiated whenever specified in this Recommended Standard.
+
+.. list-table::
+   :widths: 50 50
    :header-rows: 1
 
-   * - OPM/OMM/OEM Keyword
-     - OCM Keyword
-     - Change
-     - Rationale
-   * - OBJECT_ID
-     - INTERNATIONAL_DESIGNATOR
-     - Keyword name change
-     - To be more descriptive
-   * - N/A
-     - CATALOG_NAME
-     - New keyword
-     - To specify the satellite catalog
-   * - N/A
-     - OBJECT_DESIGNATOR
-     - New keyword
-     - To specify the satellite catalog ID
-   * - N/A
-     - OCM_DATA_ELEMENTS
-     - New keyword
-     - To list the data blocks in the message
-   * - N/A
-     - START_TIME
-     - New keyword
-     - To specify the start time of the data
-   * - N/A
-     - STOP_TIME
-     - New keyword
-     - To specify the stop time of the data
-   * - N/A
-     - TIME_SPAN
-     - New keyword
-     - To specify the time span of the data
-   * - N/A
-     - TAIMUTC_AT_TZERO
-     - New keyword
-     - To specify the TAI-UTC at T0
-   * - N/A
-     - NEXT_LEAP_EPOCH
-     - New keyword
-     - To specify the epoch of the next leap second
-   * - N/A
-     - NEXT_LEAP_TAIMUTC
-     - New keyword
-     - To specify the TAI-UTC after the next leap second
-   * - N/A
-     - UT1MUTC_AT_TZERO
-     - New keyword
-     - To specify the UT1-UTC at T0
-   * - N/A
-     - EOP_SOURCE
-     - New keyword
-     - To specify the source of the EOP data
-   * - N/A
-     - CELESTIAL_SOURCE
-     - New keyword
-     - To specify the source of the celestial body ephemeris data
+   * - Item
+     - Section
+   * - 1) Detailed description of any user defined OPM, OMM, OEM, and OCM parameters used.
+     - 3.2, 4.2, 5.2, 6.2
+   * - 2) Detailed description of any exceptions for keyword values not drawn from the SANA registry (sanaregistry.org).
+     - annex B, subsection B6
+   * - 3) Specific information security interoperability provisions that apply between agencies.
+     - annex C
+
 .. _annex_j_odm:
 
-ANNEX J: CHANGES FROM PREVIOUS VERSION (INFORMATIVE)
-====================================================
+ANNEX J
+=======
 
-This annex lists the changes from the previous version of this Recommended Standard.
+(INFORMATIVE)
 
-- Added the Orbit Comprehensive Message (OCM).
-- Added the MESSAGE_ID keyword to the OPM, OMM, and OEM.
-- Added the CLASSIFICATION keyword to the OPM, OMM, and OEM.
-- Changed the name of the OBJECT_ID keyword in the OCM to
-  INTERNATIONAL_DESIGNATOR.
-- Added the CATALOG_NAME and OBJECT_DESIGNATOR keywords to the OCM.
-- Added a number of new keywords to the OCM to support new capabilities.
-- Added XML schemas for all four message types.
-- Made a number of editorial changes.
+CHANGES VERSUS PREVIOUS VERSION
+-------------------------------
+
+This annex lists the differences between ODM 2.0 and ODM 3.0. The differences are
+divided into those which affect the content of one or more of the orbit data messages, and
+those which only affect the document.
+
+.. _annex_j_changes_in_the_messages_odm:
+
+J1 CHANGES IN THE MESSAGES
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1. The OCM was added to provide better support for ISO Technical Committee 20,
+   Subcommittee 14 objectives (see section 6).
+2. MESSAGE_ID was added to the OPM, OMM, and OEM to provide better satisfaction of
+   requirement P10 (identification and annotation of messages).
+3. EPHEMERIS_TYPE was updated in the OMM to reflect currently used numbering
+   scheme.
+4. BSTAR and MEAN_MOTION_DDOT fields are paired with BTERM and AGOM
+   parameters to support the SGP and SGP4 propagators as well as the new SGP4-XP
+   propagator, respectively.
+
+.. _annex_j_changes_in_the_document_odm:
+
+J2 CHANGES IN THE DOCUMENT
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1. A new CCSDS repository for normative keyword values for navigation messages has
+   been created at the SANA Registry, accessible on the Internet at:
+   https://sanaregistry.org/r/navigation_standard_normative_annexes/. (See annex B for
+   details on the affected keywords and links to the content.)
+2. Several annexes were added. Some are required by CCSDS rule changes, and some are
+   for the provision of supplementary material.
+3. Examples for OPM, OMM, and OEM that formerly appeared in sections 3, 4, and 5,
+   respectively, have been moved to an informative annex.
+4. The ‘Checklist ICD’ that was added in ODM Version 2 has been discontinued. This
+   Checklist ICD, intended to convey information that the OPM, OEM, and OMM did not
+   address, such as third-body perturbations, solar pressure model, solid tides, ocean tides,
+   Earth albedo, and polar motion, has now been replaced by the material that can be
+   specified in the Orbit Comprehensive Message.
+
