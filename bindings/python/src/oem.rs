@@ -18,17 +18,16 @@ use std::num::NonZeroU32;
 
 /// Represents a CCSDS Orbit Ephemeris Message (OEM).
 ///
-/// This is the top-level object for an OEM file. It contains a header
-/// and a list of ephemeris data segments.
+/// The OEM specifies the position and velocity of a single object at multiple epochs contained
+/// within a specified time range. It allows for dynamic modeling of any number of gravitational
+/// and non-gravitational accelerations.
 ///
 /// Parameters
 /// ----------
 /// header : OdmHeader
 ///     The message header.
-///     (Mandatory)
-/// segments : list of OemSegment
+/// segments : list[OemSegment]
 ///     The list of data segments.
-///     (Mandatory)
 #[pyclass]
 #[derive(Clone)]
 pub struct Oem {
@@ -37,8 +36,7 @@ pub struct Oem {
 
 /// Represents a single segment of an OEM.
 ///
-/// An OEM file can contain multiple segments, each with its own metadata
-/// and ephemeris data (state vectors and optional covariance matrices).
+/// Each segment contains metadata (context) and a list of ephemeris data points.
 ///
 /// Parameters
 /// ----------
@@ -70,27 +68,21 @@ pub struct OemSegment {
 /// time_system : str
 ///     Time system used for state vector, maneuver, and covariance data.
 /// start_time : str
-///     Start time of the total time span covered by the ephemeris data.
+///     Start time of the total time span covered by the ephemeris data (ISO 8601).
 /// stop_time : str
-///     Stop time of the total time span covered by the ephemeris data.
+///     Stop time of the total time span covered by the ephemeris data (ISO 8601).
 /// ref_frame_epoch : str, optional
-///     Epoch of the reference frame, if not intrinsic to the definition.
-///     (Optional)
+///     Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
 /// useable_start_time : str, optional
-///     Start of the recommended time span for use of the ephemeris data.
-///     (Optional)
+///     Start of the recommended time span for use of the ephemeris data (ISO 8601).
 /// useable_stop_time : str, optional
-///     End of the recommended time span for use of the ephemeris data.
-///     (Optional)
+///     End of the recommended time span for use of the ephemeris data (ISO 8601).
 /// interpolation : str, optional
 ///     Recommended interpolation method for ephemeris data.
-///     (Optional)
 /// interpolation_degree : int, optional
 ///     Degree of the interpolation polynomial.
-///     (Optional)
 /// comment : list[str], optional
 ///     Comments.
-///     (Optional)
 #[pyclass]
 #[derive(Clone)]
 pub struct OemMetadata {
@@ -104,8 +96,10 @@ pub struct OemMetadata {
 ///
 /// Parameters
 /// ----------
-/// state_vectors : list of StateVectorAcc
+/// state_vectors : list[StateVectorAcc]
 ///     List of state vectors.
+/// comments : list[str], optional
+///     Comments.
 #[pyclass]
 #[derive(Clone)]
 pub struct OemData {
@@ -115,21 +109,66 @@ pub struct OemData {
 /// Represents a covariance matrix at a specific epoch.
 ///
 /// The matrix provides uncertainty information for the state vector at the
-/// same epoch.
+/// same epoch. The lower triangular portion is typically stored in the file,
+/// but here it is represented as a structured object.
 ///
 /// Parameters
 /// ----------
 /// epoch : str
-///     Epoch of the covariance matrix.
+///     Epoch of the covariance matrix (ISO 8601).
 /// values : numpy.ndarray
 ///     Flat NumPy array of length 21 containing the covariance values.
 /// cov_ref_frame : str, optional
 ///     Reference frame for the covariance matrix.
-///     (Optional)
 /// comment : list[str], optional
 ///     Comments associated with this covariance matrix.
-///     (Optional)
-
+///
+/// Attributes
+/// ----------
+/// epoch : str
+///     Epoch of the covariance matrix.
+/// cx_x : float
+///     Position X covariance [1,1]. Units: km².
+/// cy_x : float
+///     Position X-Y covariance [2,1]. Units: km².
+/// cy_y : float
+///     Position Y covariance [2,2]. Units: km².
+/// cz_x : float
+///     Position X-Z covariance [3,1]. Units: km².
+/// cz_y : float
+///     Position Y-Z covariance [3,2]. Units: km².
+/// cz_z : float
+///     Position Z covariance [3,3]. Units: km².
+/// cx_dot_x : float
+///     Velocity X / Position X covariance [4,1]. Units: km²/s.
+/// cx_dot_y : float
+///     Velocity X / Position Y covariance [4,2]. Units: km²/s.
+/// cx_dot_z : float
+///     Velocity X / Position Z covariance [4,3]. Units: km²/s.
+/// cx_dot_x_dot : float
+///     Velocity X covariance [4,4]. Units: km²/s².
+/// cy_dot_x : float
+///     Velocity Y / Position X covariance [5,1]. Units: km²/s.
+/// cy_dot_y : float
+///     Velocity Y / Position Y covariance [5,2]. Units: km²/s.
+/// cy_dot_z : float
+///     Velocity Y / Position Z covariance [5,3]. Units: km²/s.
+/// cy_dot_x_dot : float
+///     Velocity Y / Velocity X covariance [5,4]. Units: km²/s².
+/// cy_dot_y_dot : float
+///     Velocity Y covariance [5,5]. Units: km²/s².
+/// cz_dot_x : float
+///     Velocity Z / Position X covariance [6,1]. Units: km²/s.
+/// cz_dot_y : float
+///     Velocity Z / Position Y covariance [6,2]. Units: km²/s.
+/// cz_dot_z : float
+///     Velocity Z / Position Z covariance [6,3]. Units: km²/s.
+/// cz_dot_x_dot : float
+///     Velocity Z / Velocity X covariance [6,4]. Units: km²/s².
+/// cz_dot_y_dot : float
+///     Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
+/// cz_dot_z_dot : float
+///     Velocity Z covariance [6,6]. Units: km²/s².
 #[pyclass(name = "OemCovarianceMatrix")]
 #[derive(Clone)]
 pub struct OemCovarianceMatrix {
@@ -709,18 +748,24 @@ impl OemData {
         self.inner.comment = comments;
     }
 
-    /// State vectors as a tuple of epochs and NumPy array.
+    /// State vectors as a tuple of epochs and a NumPy array.
+    ///
+    /// This method allows for efficient zero-copy access to state vector data
+    /// compatible with scientific Python libraries.
     ///
     /// Returns
     /// -------
     /// tuple[list[str], numpy.ndarray]
     ///     A tuple containing:
-    ///     - List of epoch strings (ISO 8601 format)
+    ///     - List of epoch strings (ISO 8601 format).
     ///     - 2D NumPy array of shape (N, 6) or (N, 9):
-    ///       - N x 6: [X, Y, Z, X_DOT, Y_DOT, Z_DOT] if no accelerations
-    ///       - N x 9: [X, Y, Z, X_DOT, Y_DOT, Z_DOT, X_DDOT, Y_DDOT, Z_DDOT] if accelerations present
+    ///       - N x 6: [X, Y, Z, X_DOT, Y_DOT, Z_DOT] if no accelerations.
+    ///       - N x 9: [X, Y, Z, X_DOT, Y_DOT, Z_DOT, X_DDOT, Y_DDOT, Z_DDOT] if accelerations present.
     ///     
-    ///     Units: position in km, velocity in km/s, acceleration in km/s²
+    ///     Units:
+    ///     - Position: km
+    ///     - Velocity: km/s
+    ///     - Acceleration: km/s²
     ///
     /// :type: tuple[list[str], numpy.ndarray]
     #[getter]

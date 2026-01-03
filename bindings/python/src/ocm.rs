@@ -22,10 +22,8 @@ use std::fs;
 /// ----------
 /// header : OdmHeader
 ///     The message header.
-///     (Mandatory)
 /// segment : OcmSegment
 ///     The OCM data segment.
-///     (Mandatory)
 #[pyclass]
 #[derive(Clone)]
 pub struct Ocm {
@@ -46,7 +44,7 @@ impl Ocm {
     /// Returns
     /// -------
     /// Ocm
-    ///     The parsed OCM object.
+    ///     The parsed Ocm object.
     #[staticmethod]
     fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
         let inner = match format {
@@ -207,10 +205,8 @@ impl Ocm {
 /// ----------
 /// metadata : OcmMetadata
 ///     Segment metadata.
-///     (Mandatory)
 /// data : OcmData
 ///     Segment data blocks.
-///     (Mandatory)
 #[pyclass]
 #[derive(Clone)]
 pub struct OcmSegment {
@@ -281,148 +277,109 @@ impl OcmSegment {
 /// ----------
 /// time_system : str
 ///     Time system that shall be used for all absolute time stamps in the message.
-///     (Mandatory)
 /// epoch_tzero : str
-///     Epoch to which all relative times in the message are referenced.
-///     (Mandatory)
+///     Epoch to which all relative times in the message are referenced (ISO 8601).
 /// object_name : str, optional
 ///     Name of the space object that the message is associated with.
-///     (Optional)
 /// international_designator : str, optional
 ///     The COSPAR international designator of the space object.
-///     (Optional)
 /// catalog_name : str, optional
 ///     The name of the satellite catalog used for the space object identification.
-///     (Optional)
 /// object_designator : str, optional
 ///     The unique satellite identification designator used in the specified catalog.
-///     (Optional)
 /// alternate_names : str, optional
 ///     Alternate name(s) by which the space object is known.
-///     (Optional)
 /// originator_poc : str, optional
 ///     Originator Point-of-Contact.
-///     (Optional)
 /// originator_position : str, optional
 ///     Contact position of the originator PoC.
-///     (Optional)
 /// originator_phone : str, optional
 ///     Originator PoC phone number.
-///     (Optional)
 /// originator_email : str, optional
 ///     Originator PoC email address.
-///     (Optional)
 /// originator_address : str, optional
 ///     Originator's physical address.
-///     (Optional)
 /// tech_org : str, optional
 ///     Technical organization (creating agency or operator).
-///     (Optional)
 /// tech_poc : str, optional
 ///     Technical Point-of-Contact.
-///     (Optional)
 /// tech_position : str, optional
 ///     Contact position of the technical PoC.
-///     (Optional)
 /// tech_phone : str, optional
 ///     Technical PoC phone number.
-///     (Optional)
 /// tech_email : str, optional
 ///     Technical PoC email address.
-///     (Optional)
 /// tech_address : str, optional
 ///     Technical PoC physical address.
-///     (Optional)
 /// previous_message_id : str, optional
 ///     Identifier for the previous OCM message.
-///     (Optional)
 /// next_message_id : str, optional
 ///     Identifier for the anticipated next OCM message.
-///     (Optional)
 /// adm_msg_link : str, optional
 ///     Identifier of linked Attitude Data Message.
-///     (Optional)
 /// cdm_msg_link : str, optional
 ///     Identifier of linked Conjunction Data Message.
-///     (Optional)
 /// prm_msg_link : str, optional
 ///     Identifier of linked Pointing Request Message.
-///     (Optional)
 /// rdm_msg_link : str, optional
 ///     Identifier of linked Reentry Data Message.
-///     (Optional)
 /// tdm_msg_link : str, optional
 ///     Identifier of linked Tracking Data Message.
-///     (Optional)
 /// operator : str, optional
 ///     Operator of the space object.
-///     (Optional)
 /// owner : str, optional
 ///     Owner of the space object.
-///     (Optional)
 /// country : str, optional
 ///     Country of the owner or operator of the space object.
-///     (Optional)
 /// constellation : str, optional
 ///     Name of the constellation the space object belongs to.
-///     (Optional)
 /// object_type : str, optional
 ///     Type of object (PAYLOAD, ROCKET_BODY, DEBRIS, etc.).
-///     (Optional)
 /// ops_status : str, optional
 ///     Operational status of the space object.
-///     (Optional)
 /// orbit_category : str, optional
 ///     Orbit category (LEO, GEO, HEO, etc.).
-///     (Optional)
 /// ocm_data_elements : str, optional
 ///     List of data elements included in the OCM message.
-///     (Optional)
 /// sclk_offset_at_epoch : float, optional
-///     Spacecraft clock offset at EPOCH_TZERO [s].
-///     (Conditional)
+///     Spacecraft clock offset at EPOCH_TZERO (s).
 /// sclk_sec_per_si_sec : float, optional
-///     Spacecraft clock scale factor [s/SI-s].
-///     (Conditional)
+///     Spacecraft clock scale factor (s/SI-s).
 /// previous_message_epoch : str, optional
-///     Epoch of the previous message.
-///     (Optional)
+///     Epoch of the previous message (ISO 8601).
 /// next_message_epoch : str, optional
-///     Anticipated epoch of the next message.
-///     (Optional)
+///     Anticipated epoch of the next message (ISO 8601).
 /// start_time : str, optional
-///     Time of the earliest data in the message.
-///     (Optional)
+///     Time of the earliest data in the message (ISO 8601).
 /// stop_time : str, optional
-///     Time of the latest data in the message.
-///     (Optional)
+///     Time of the latest data in the message (ISO 8601).
 /// time_span : float, optional
-///     Approximate time span covered by the data [d].
-///     (Optional)
+///     Approximate time span covered by the data (d).
 /// taimutc_at_tzero : float, optional
-///     TAI minus UTC difference at EPOCH_TZERO [s].
-///     (Optional)
+///     TAI minus UTC difference at EPOCH_TZERO (s).
 /// next_leap_epoch : str, optional
-///     Epoch of the next leap second.
-///     (Optional)
+///     Epoch of the next leap second (ISO 8601).
 /// next_leap_taimutc : float, optional
-///     TAI minus UTC difference at NEXT_LEAP_EPOCH [s].
-///     (Conditional)
+///     TAI minus UTC difference at NEXT_LEAP_EPOCH (s).
 /// ut1mutc_at_tzero : float, optional
-///     UT1 minus UTC difference at EPOCH_TZERO [s].
-///     (Optional)
+///     UT1 minus UTC difference at EPOCH_TZERO (s).
 /// eop_source : str, optional
 ///     Source of Earth Orientation Parameters.
-///     (Optional)
 /// interp_method_eop : str, optional
 ///     Interpolation method for EOP data.
-///     (Optional)
 /// celestial_source : str, optional
 ///     Source of celestial body ephemerides.
-///     (Optional)
-/// comment : list of str, optional
+/// comment : list[str], optional
 ///     Comments for the metadata block.
-///     (Optional)
+///
+/// Attributes
+/// ----------
+/// time_system : str
+///     Time system.
+/// epoch_tzero : str
+///     Epoch T-Zero.
+/// ... (see Parameters for full list)
+
 #[pyclass]
 #[derive(Clone)]
 pub struct OcmMetadata {
@@ -1461,64 +1418,45 @@ impl OcmData {
 /// ----------
 /// center_name : str
 ///     Origin of the orbit reference frame.
-///     (Mandatory)
 /// traj_ref_frame : str
 ///     Reference frame of the trajectory state time history.
-///     (Mandatory)
 /// traj_type : str
 ///     Specifies the trajectory state element set type.
-///     (Mandatory)
-/// traj_lines : list of TrajLine
+/// traj_lines : list[TrajLine]
 ///     Contiguous set of trajectory state data lines.
-///     (Mandatory)
 /// traj_id : str, optional
 ///     Identification number for this trajectory state time history block.
-///     (Optional)
 /// traj_prev_id : str, optional
 ///     Identification number for the previous trajectory state time history.
-///     (Optional)
 /// traj_next_id : str, optional
 ///     Identification number for the next trajectory state time history.
-///     (Optional)
 /// traj_basis : str, optional
 ///     The basis of this trajectory state time history data (PREDICTED, DETERMINED, etc.).
-///     (Optional)
 /// traj_basis_id : str, optional
 ///     Identification number for the telemetry dataset, orbit determination, or simulation.
-///     (Optional)
 /// interpolation : str, optional
 ///     Recommended interpolation method for the ephemeris data.
-///     (Optional)
 /// interpolation_degree : int, optional
 ///     Recommended interpolation degree.
-///     (Conditional)
 /// propagator : str, optional
 ///     Name of the orbit propagator used to create this trajectory state time history.
-///     (Optional)
 /// traj_frame_epoch : str, optional
 ///     Epoch of the orbit data reference frame, if not intrinsic to the definition.
-///     (Conditional)
 /// useable_start_time : str, optional
 ///     Start time of the useable time span covered by the ephemeris data.
-///     (Optional)
 /// useable_stop_time : str, optional
 ///     Stop time of the useable time span covered by the ephemeris data.
-///     (Optional)
 /// orb_revnum : float, optional
 ///     The integer orbit revolution number associated with the first trajectory state.
-///     (Optional)
 /// orb_revnum_basis : str, optional
 ///     Specifies the message creator’s basis for their orbit revolution counter (0 or 1).
-///     (Conditional)
 /// orb_averaging : str, optional
 ///     Specifies whether the orbit elements are osculating elements or mean elements.
-///     (Conditional)
 /// traj_units : str, optional
 ///     Comma-delimited set of SI unit designations for the trajectory state elements.
-///     (Optional)
 /// comment : list[str], optional
 ///     Comments.
-///     (Optional)
+
 #[pyclass]
 #[derive(Clone)]
 pub struct OcmTrajState {
