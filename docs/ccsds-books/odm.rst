@@ -721,7 +721,7 @@ d) whether the item is Mandatory (M), Optional (O), or Conditional (C). Conditio
      - M
    * - MESSAGE_ID
      - ID that uniquely identifies a message from a given originator. The format and content of the message identifier value are at the discretion of the originator.
-     - OPM_201113719185, ABC-12_34
+     - OPM 201113719185, ABC-12_34
      - O
 
 .. _opm_metadata_odm:
@@ -765,23 +765,23 @@ d) whether the item is Mandatory (M), Optional (O), or Conditional (C). Conditio
      - O
    * - OBJECT_NAME
      - Spacecraft name for which orbit state data is provided. While there is no CCSDS-based restriction on the value for this keyword, it is recommended to use names from the UN Office of Outer Space Affairs designator index (reference [3], which include Object name and international designator of the participant). If OBJECT_NAME is not listed in reference [3] or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
-     - EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
+     - EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
      - M
    * - OBJECT_ID
      - Object identifier of the object for which orbit state data is provided. While there is no CCSDS-based restriction on the value for this keyword, it is recommended to use the international spacecraft designator as published in the UN Office of Outer Space Affairs designator index (reference [3]). Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one capital letter for the identification of the part brought into space by the launch. If the asset is not listed in reference [3], the UN Office of Outer Space Affairs designator index format is not used, or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
-     - 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
+     - 2000-052A 1996-068A 2000-053A 1996-008A UNKNOWN
      - M
    * - CENTER_NAME
      - Origin of the OPM reference frame, which shall be a natural solar system body (planets, asteroids, comets, and natural satellites), including any planet barycenter or the solar system barycenter. Natural bodies shall be selected from the accepted set of values indicated in annex B, subsection B2.
-     - EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN, JUPITER BARYCENTER, STS 106, EROS
+     - EARTH EARTH BARYCENTER MOON SOLAR SYSTEM BARYCENTER SUN JUPITER BARYCENTER STS 106 EROS
      - M
    * - REF_FRAME
      - Reference frame in which the state vector and optional Keplerian element data are given. Use of values other than those in 3.2.3.3 should be documented in an ICD.
-     - ICRF, EME2000, ITRF2000, TEME
+     - ICRF EME2000 ITRF2000 TEME
      - M
    * - REF_FRAME_EPOCH
      - Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See 7.5.10 for formatting rules.)
-     - 2001-11-06T11:17:33, 2002-204T15:56:23Z
+     - 2001-11-06T11:17:33 2002-204T15:56:23Z
      - C
    * - TIME_SYSTEM
      - Time system used for state vector, maneuver, and covariance data. Use of values other than those in 3.2.3.2 should be documented in an ICD.
@@ -5962,25 +5962,25 @@ position/velocity covariance matrix.
 
    CCSDS_OPM_VERS = 3.0
    CREATION_DATE = 2022-11-06T09:23:57
-   ORIGINATOR    = JAXA
-   COMMENT        GEOCENTRIC, CARTESIAN, EARTH FIXED
-   OBJECT_NAME    = OSPREY 5
-   OBJECT_ID      = 1998-999A
-   CENTER_NAME    = EARTH
-   REF_FRAME      = ITRF2000
-   TIME_SYSTEM    = UTC
-   EPOCH          = 2022-12-18T14:28:15.1172
-   X              = 6503.514000
-   Y              = 1239.647000
-   Z              = -717.490000
-   X_DOT          = -0.873160
-   Y_DOT          = 8.740420
-   Z_DOT          = -4.191076
-   MASS           = 3000.000000
+   ORIGINATOR = JAXA
+   COMMENT GEOCENTRIC, CARTESIAN, EARTH FIXED
+   OBJECT_NAME = OSPREY 5
+   OBJECT_ID = 1998-999A
+   CENTER_NAME = EARTH
+   REF_FRAME = ITRF2000
+   TIME_SYSTEM = UTC
+   EPOCH = 2022-12-18T14:28:15.1172
+   X = 6503.514000
+   Y = 1239.647000
+   Z = -717.490000
+   X_DOT = -0.873160
+   Y_DOT = 8.740420
+   Z_DOT = -4.191076
+   MASS = 3000.000000
    SOLAR_RAD_AREA = 18.770000
-   SOLAR_RAD_COEFF= 1.000000
-   DRAG_AREA      = 18.770000
-   DRAG_COEFF     = 2.500000
+   SOLAR_RAD_COEFF = 1.000000
+   DRAG_AREA = 18.770000
+   DRAG_COEFF = 2.500000
 
 .. _annex_g_omm_examples_kvn_odm:
 
