@@ -1,0 +1,30 @@
+fail_fast: true
+default_install_hook_types: [pre-commit,pre-push]
+exclude: |
+  (?x)^(
+    .*/(snapshots)/.*|
+  )$
+
+repos:
+  - repo: local
+    hooks:
+      - id: local-ruff-check
+        name: ruff check
+        entry: uv run ruff check --force-exclude --fix --exit-non-zero-on-fix
+        require_serial: true
+        language: unsupported
+        types: [python]
+
+      - id: local-ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude --exit-non-zero-on-format
+        require_serial: true
+        language: unsupported
+        types: [python]
+
+      - id: local-stub-check
+        name: stub check
+        entry: uv run stubs.py --check
+        language: system
+        pass_filenames: false
+        always_run: true

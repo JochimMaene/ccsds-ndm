@@ -1942,7 +1942,7 @@ CNDOT_N = 0.0 [m**2/s]
 CNDOT_RDOT = 0.0 [m**2/s**2]
 CNDOT_TDOT = 0.0 [m**2/s**2]
 CNDOT_NDOT = 1.0 [m**2/s**2]
- 
+
 OBJECT = OBJECT2
 OBJECT_DESIGNATOR = 00002
 CATALOG_NAME = CAT
@@ -1981,7 +1981,7 @@ CNDOT_N = 0.0 [m**2/s]
 CNDOT_RDOT = 0.0 [m**2/s**2]
 CNDOT_TDOT = 0.0 [m**2/s**2]
 CNDOT_NDOT = 1.0 [m**2/s**2]
- 
+
 "#;
         kvn.to_string()
     }
@@ -2316,7 +2316,7 @@ CNDOT_N = 0.0 [m**2/s]
 CNDOT_RDOT = 0.0 [m**2/s**2]
 CNDOT_TDOT = 0.0 [m**2/s**2]
 CNDOT_NDOT = 1.0 [m**2/s**2]
- 
+
 OBJECT = OBJECT2
 OBJECT_DESIGNATOR = 00002
 CATALOG_NAME = CAT
@@ -2355,7 +2355,7 @@ CNDOT_N = 0.0 [m**2/s]
 CNDOT_RDOT = 0.0 [m**2/s**2]
 CNDOT_TDOT = 0.0 [m**2/s**2]
 CNDOT_NDOT = 1.0 [m**2/s**2]
- 
+
 "#;
         let cdm = Cdm::from_kvn(kvn).expect("should parse with MESSAGE_FOR");
         assert_eq!(cdm.header.message_for, Some("OPERATOR".to_string()));

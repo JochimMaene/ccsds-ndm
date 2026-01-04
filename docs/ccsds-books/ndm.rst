@@ -551,7 +551,7 @@ d) If necessary, the spacecraft state is altered at some future time:
       performance of debris avoidance. This process is called ‘flight path control’.
    2) For attitudes: A maneuver is performed to modify the spacecraft attitude to meet
       mission requirements and constraints. This process is called ‘attitude adjustment’.
-      
+
 .. _navigation_data_message_exchange_framework:
 
 .. _ndm_sec_3:
@@ -625,7 +625,7 @@ a) Navigation sessions may be divided so as to accommodate constraints on data
    sent in one event. In a second example, it may be necessary to send spacecraft
    position or orientation updates from one spacecraft to another in real time. Because of
    bandwidth limitations on the telemetry, it may not be desirable to send any other
-   ancillary information at that time. In that case, the participating agencies should agree 
+   ancillary information at that time. In that case, the participating agencies should agree
    on the coordinate frames, time frames, and so on, beforehand, and commit these
    pieces of information to an Interface Control Document (ICD). This document, in
    fact, becomes part of the overall navigation session as depicted in :ref:`figure 3-2 <fig_3_2>`.
@@ -662,7 +662,7 @@ c) The content of a navigation session may be governed by more than one CCSDS
 
 .. _fig_3_3:
 
-.. figure:: ../images/ccsds_books/ndm/3_3.png  
+.. figure:: ../images/ccsds_books/ndm/3_3.png
    :alt: Figure 3-3: Navigation Session Using Multiple CCSDS Recommended Standards
    :align: center
 

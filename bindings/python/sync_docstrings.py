@@ -217,7 +217,6 @@ def collect_rust_structs(core_dir: Path) -> dict[str, RustStruct]:
 def parse_python_binding_file(filepath: Path) -> dict[str, PythonClass]:
     """Parse a Python binding Rust file and extract pyclass structs with getters."""
     content = filepath.read_text()
-    lines = content.split("\n")
     classes: dict[str, PythonClass] = {}
 
     # Find #[pyclass] structs and their docstrings
@@ -490,7 +489,6 @@ def sync_docstrings(
     for filename, classes in python_classes.items():
         filepath = binding_dir / filename
         content = filepath.read_text()
-        lines = content.split("\n")
         modified = False
         changes: list[tuple[int, int, str, str, bool]] = []
 

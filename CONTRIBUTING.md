@@ -125,7 +125,7 @@ chore: update dependencies
    cargo test
    cargo clippy --all-targets --all-features -- -D warnings
    cargo fmt -- --check
-   
+
    # Python
    cd bindings/python
    uv run maturin develop

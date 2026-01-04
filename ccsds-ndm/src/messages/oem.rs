@@ -2530,7 +2530,7 @@ COVARIANCE_STOP
     fn test_oem_version_with_comments_and_empty_lines() {
         let kvn = r#"
 COMMENT leading comment
-   
+
 CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -2701,7 +2701,7 @@ KEY = VAL
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 META_START
-     
+
 OBJECT_NAME = SAT1
 OBJECT_ID = 999
 CENTER_NAME = EARTH
@@ -2712,21 +2712,21 @@ STOP_TIME = 2023-01-02T00:00:00
 META_STOP
 
 COMMENT data comment 1
-   
+
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 
 COMMENT data comment 2
-   
+
 COVARIANCE_START
 
 COMMENT covariance comment
-   
+
 EPOCH = 2023-01-01T00:00:00
 
 1.0
 0.1 1.0
 0.1 0.1 1.0
-   
+
 COMMENT row comment
 0.01 0.01 0.01 1.0
 0.01 0.01 0.01 0.1 1.0
@@ -2734,7 +2734,7 @@ COMMENT row comment
 COVARIANCE_STOP
 
 COMMENT between segments
-   
+
 
 META_START
 OBJECT_NAME = SAT2
