@@ -14,8 +14,13 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
 
-/// Represents a CCSDS Orbit Parameter Message (OPM).
+/// Orbit Parameter Message (OPM).
 ///
+/// Orbit information may be exchanged between two participants by sending a state vector (see
+/// reference \[H1\]) for a specified epoch using an OPM. The message recipient must have an orbit
+/// propagator available that is able to propagate the OPM state vector to compute the orbit at other
+/// desired epochs. For this propagation, additional ancillary information (spacecraft properties
+/// such as mass, area, and maneuver planning data, if applicable) may be included with the message.
 ///
 /// Parameters
 /// ----------
@@ -23,18 +28,6 @@ use std::fs;
 ///     The message header.
 /// segment : OpmSegment
 ///     The data segment.
-///
-/// Parameters
-/// ----------
-/// data : str
-///     Input string/content.
-/// format : str, optional
-///     Format ('kvn' or 'xml'). Auto-detected if None.
-///
-/// Returns
-/// -------
-/// Opm
-///     The parsed OPM object.
 #[pyclass]
 #[derive(Clone)]
 pub struct Opm {
@@ -64,7 +57,13 @@ impl Opm {
         )
     }
 
-    /// The message header.
+    /// Orbit Parameter Message (OPM).
+    ///
+    /// Orbit information may be exchanged between two participants by sending a state vector (see
+    /// reference \[H1\]) for a specified epoch using an OPM. The message recipient must have an orbit
+    /// propagator available that is able to propagate the OPM state vector to compute the orbit at other
+    /// desired epochs. For this propagation, additional ancillary information (spacecraft properties
+    /// such as mass, area, and maneuver planning data, if applicable) may be included with the message.
     ///
     /// :type: OdmHeader
     #[getter]
@@ -191,7 +190,16 @@ impl Opm {
     }
 }
 
-/// Represents a single segment of an OPM.
+/// A single segment of the OPM.
+///
+/// Contains metadata and data sections.
+///
+/// Parameters
+/// ----------
+/// metadata : OpmMetadata
+///     Segment metadata.
+/// data : OpmData
+///     Segment data.
 #[pyclass]
 #[derive(Clone)]
 pub struct OpmSegment {
@@ -225,7 +233,9 @@ impl OpmSegment {
         )
     }
 
-    /// Segment metadata.
+    /// A single segment of the OPM.
+    ///
+    /// Contains metadata and data sections.
     ///
     /// :type: OpmMetadata
     #[getter]
@@ -256,7 +266,7 @@ impl OpmSegment {
     }
 }
 
-/// Create a new OPM Metadata object.
+/// OPM Metadata Section.
 ///
 /// Parameters
 /// ----------
@@ -268,11 +278,11 @@ impl OpmSegment {
 ///     Origin of the reference frame.
 /// ref_frame : str
 ///     Reference frame in which state vector data is given.
+/// time_system : str
 ///     Time system used for state vector, maneuver, and covariance data.
-///     Allowed values: 'GMST', 'GPS', 'MET', 'MRT', 'SCLK', 'TAI', 'TCB', 'TDB', 'TCG', 'TT', 'UT1', 'UTC'.
 /// ref_frame_epoch : str, optional
-///     Epoch of the reference frame, if not intrinsic to the definition.
-/// comment : list of str, optional
+///     Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
+/// comment : list[str], optional
 ///     Comments.
 #[pyclass]
 #[derive(Clone)]
@@ -309,9 +319,13 @@ impl OpmMetadata {
         format!("OpmMetadata(object_name='{}')", self.inner.object_name)
     }
 
-    /// Spacecraft name for which orbit state data is provided.
+    /// Spacecraft name for which orbit state data is provided. While there is no CCSDS-based
+    /// restriction on the value for this keyword, it is recommended to use names from the UN Office
+    /// of Outer Space Affairs designator index (reference \[3\], which include Object name and
+    /// international designator of the participant). If OBJECT_NAME is not listed in reference \[3\]
+    /// or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
     ///
-    /// While there is no CCSDS-based restriction on the value for this keyword, it is recommended to use names from the UN Office of Outer Space Affairs designator index.
+    /// Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -324,9 +338,17 @@ impl OpmMetadata {
         self.inner.object_name = value;
     }
 
-    /// Object identifier of the object for which orbit state data is provided.
+    /// Object identifier of the object for which orbit state data is provided. While there is no
+    /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
+    /// international spacecraft designator as published in the UN Office of Outer Space Affairs
+    /// designator index (reference \[3\]). Recommended values have the format YYYY-NNNP{PP}, where:
+    /// YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
+    /// zeros). P{PP} = At least one capital letter for the identification of the part brought into
+    /// space by the launch. If the asset is not listed in reference \[3\], the UN Office of Outer
+    /// Space Affairs designator index format is not used, or the content is either unknown or cannot
+    /// be disclosed, the value should be set to UNKNOWN.
     ///
-    /// Recommended values have the format YYYY-NNNP{PP}.
+    /// Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -339,9 +361,13 @@ impl OpmMetadata {
         self.inner.object_id = value;
     }
 
-    /// Origin of the OPM reference frame.
+    /// Origin of the OPM reference frame, which shall be a natural solar system body (planets,
+    /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
+    /// system barycenter. Natural bodies shall be selected from the accepted set of values
+    /// indicated in annex B, subsection B2.
     ///
-    /// Shall be a natural solar system body (planets, asteroids, comets, and natural satellites), including any planet barycenter or the solar system barycenter.
+    /// Examples: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
+    /// JUPITER BARYCENTER, STS 106, EROS
     ///
     /// :type: str
     #[getter]
@@ -354,9 +380,10 @@ impl OpmMetadata {
         self.inner.center_name = value;
     }
 
-    /// Reference frame in which the state vector and optional Keplerian element data are given.
+    /// Reference frame in which the state vector and optional Keplerian element data are given. Use
+    /// of values other than those in 3.2.3.3 should be documented in an ICD.
     ///
-    /// Examples: 'ICRF', 'EME2000', 'ITRF2000', 'TEME'.
+    /// Examples: ICRF, EME2000, ITRF2000, TEME
     ///
     /// :type: str
     #[getter]
@@ -369,7 +396,10 @@ impl OpmMetadata {
         self.inner.ref_frame = value;
     }
 
-    /// Time system used for state vector, maneuver, and covariance data.
+    /// Time system used for state vector, maneuver, and covariance data. Use of values other than
+    /// those in 3.2.3.2 should be documented in an ICD.
+    ///
+    /// Examples: UTC, TAI, TT, GPS, TDB, TCB
     ///
     /// :type: str
     #[getter]
@@ -382,7 +412,10 @@ impl OpmMetadata {
         self.inner.time_system = value;
     }
 
-    /// Epoch of the reference frame, if not intrinsic to the definition.
+    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
+    /// 7.5.10 for formatting rules.)
+    ///
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: Optional[str]
     #[getter]
@@ -399,7 +432,7 @@ impl OpmMetadata {
         Ok(())
     }
 
-    /// Comments.
+    /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
     /// :type: list[str]
     #[getter]
@@ -413,6 +446,48 @@ impl OpmMetadata {
     }
 }
 
+/// Osculating Keplerian Elements.
+///
+/// References:
+/// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
+///
+/// Parameters
+/// ----------
+/// semi_major_axis : float
+///     Semi-major axis (km).
+/// eccentricity : float
+///     Eccentricity (dimensionless).
+/// inclination : float
+///     Inclination (deg).
+/// ra_of_asc_node : float
+///     Right ascension of the ascending node (deg).
+/// arg_of_pericenter : float
+///     Argument of pericenter (deg).
+/// gm : float
+///     Gravitational coefficient (km³/s²).
+/// true_anomaly : float, optional
+///     True anomaly (deg).
+/// mean_anomaly : float, optional
+///     Mean anomaly (deg).
+///
+/// Attributes
+/// ----------
+/// semi_major_axis : float
+///     Semi-major axis. Units: km.
+/// eccentricity : float
+///     Eccentricity. Units: dimensionless.
+/// inclination : float
+///     Inclination. Units: deg.
+/// ra_of_asc_node : float
+///     Right ascension of the ascending node. Units: deg.
+/// arg_of_pericenter : float
+///     Argument of pericenter. Units: deg.
+/// gm : float
+///     Gravitational coefficient (GM). Units: km³/s².
+/// true_anomaly : float or None
+///     True anomaly. Units: deg.
+/// mean_anomaly : float or None
+///     Mean anomaly. Units: deg.
 #[pyclass]
 #[derive(Clone)]
 pub struct KeplerianElements {
@@ -468,20 +543,22 @@ impl KeplerianElements {
         )
     }
 
-    /// Comments associated with the Keplerian elements.
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 
     /// Semi-major axis.
+    ///
+    /// Examples: 6653.148
     ///
     /// Units: km
     ///
@@ -498,6 +575,8 @@ impl KeplerianElements {
 
     /// Eccentricity.
     ///
+    /// Examples: 0.001
+    ///
     /// :type: float
     #[getter]
     fn get_eccentricity(&self) -> f64 {
@@ -510,6 +589,8 @@ impl KeplerianElements {
     }
 
     /// Inclination.
+    ///
+    /// Examples: 51.6
     ///
     /// Units: deg
     ///
@@ -528,7 +609,9 @@ impl KeplerianElements {
         Ok(())
     }
 
-    /// Right ascension of the ascending node.
+    /// Right ascension of ascending node.
+    ///
+    /// Examples: 123.4
     ///
     /// Units: deg
     ///
@@ -547,6 +630,8 @@ impl KeplerianElements {
 
     /// Argument of pericenter.
     ///
+    /// Examples: 45.6
+    ///
     /// Units: deg
     ///
     /// :type: float
@@ -562,7 +647,9 @@ impl KeplerianElements {
         Ok(())
     }
 
-    /// Gravitational coefficient (GM).
+    /// Gravitational Coefficient (Gravitational Constant × Central Mass).
+    ///
+    /// Examples: 398600.4418
     ///
     /// Units: km³/s²
     ///
@@ -580,6 +667,8 @@ impl KeplerianElements {
     }
 
     /// True anomaly.
+    ///
+    /// Examples: 0.0
     ///
     /// Units: deg
     ///
@@ -600,6 +689,8 @@ impl KeplerianElements {
 
     /// Mean anomaly.
     ///
+    /// Examples: 0.0
+    ///
     /// Units: deg
     ///
     /// :type: Optional[float]
@@ -618,6 +709,62 @@ impl KeplerianElements {
     }
 }
 
+/// OPM covariance matrix block (opmCovarianceMatrixType).
+///
+/// Parameters
+/// ----------
+/// cx_x : float, optional
+///     Position X covariance [1,1]. Units: km².
+/// cy_x : float, optional
+///     Position X-Y covariance [2,1]. Units: km².
+/// cy_y : float, optional
+///     Position Y covariance [2,2]. Units: km².
+/// cz_x : float, optional
+///     Position X-Z covariance [3,1]. Units: km².
+/// cz_y : float, optional
+///     Position Y-Z covariance [3,2]. Units: km².
+/// cz_z : float, optional
+///     Position Z covariance [3,3]. Units: km².
+/// cx_dot_x : float, optional
+///     Velocity X / Position X covariance [4,1]. Units: km²/s.
+/// cx_dot_y : float, optional
+///     Velocity X / Position Y covariance [4,2]. Units: km²/s.
+/// cx_dot_z : float, optional
+///     Velocity X / Position Z covariance [4,3]. Units: km²/s.
+/// cx_dot_x_dot : float, optional
+///     Velocity X covariance [4,4]. Units: km²/s².
+/// cy_dot_x : float, optional
+///     Velocity Y / Position X covariance [5,1]. Units: km²/s.
+/// cy_dot_y : float, optional
+///     Velocity Y / Position Y covariance [5,2]. Units: km²/s.
+/// cy_dot_z : float, optional
+///     Velocity Y / Position Z covariance [5,3]. Units: km²/s.
+/// cy_dot_x_dot : float, optional
+///     Velocity Y / Velocity X covariance [5,4]. Units: km²/s².
+/// cy_dot_y_dot : float, optional
+///     Velocity Y covariance [5,5]. Units: km²/s².
+/// cz_dot_x : float, optional
+///     Velocity Z / Position X covariance [6,1]. Units: km²/s.
+/// cz_dot_y : float, optional
+///     Velocity Z / Position Y covariance [6,2]. Units: km²/s.
+/// cz_dot_z : float, optional
+///     Velocity Z / Position Z covariance [6,3]. Units: km²/s.
+/// cz_dot_x_dot : float, optional
+///     Velocity Z / Velocity X covariance [6,4]. Units: km²/s².
+/// cz_dot_y_dot : float, optional
+///     Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
+/// cz_dot_z_dot : float, optional
+///     Velocity Z covariance [6,6]. Units: km²/s².
+/// cov_ref_frame : str, optional
+///     Reference frame for the covariance matrix.
+///     comments : list[str], optional
+///     Comments.
+///
+/// Attributes
+/// ----------
+/// cx_x : float
+///     Position X covariance [1,1]. Units: km².
+///     ... (see Parameters for full list of attributes with units)
 #[pyclass]
 #[derive(Clone)]
 pub struct OpmCovarianceMatrix {
@@ -689,11 +836,8 @@ impl OpmCovarianceMatrix {
         "OpmCovarianceMatrix(...)".to_string()
     }
 
-    /// Reference frame for the covariance matrix.
-    ///
-    /// If omitted, the covariance is expressed in the same reference frame
-    /// as the state vector (REF_FRAME from metadata).
-    ///
+    /// Reference frame in which the covariance data are given. Select from the accepted set of
+    /// values indicated in 3.2.4.11.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -706,24 +850,22 @@ impl OpmCovarianceMatrix {
         self.inner.cov_ref_frame = value;
     }
 
-    /// Comments associated with this covariance matrix.
-    ///
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 
-    /// Position covariance [1,1] element (X-X variance).
+    /// Position X covariance \[1,1\].
     ///
     /// Units: km²
-    ///
     ///
     /// :type: float
     #[getter]
@@ -736,7 +878,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_x.value = value;
     }
 
-    /// Position covariance [2,1] element (Y-X covariance).
+    /// Position Y / Position X covariance \[2,1\].
     ///
     /// Units: km²
     ///
@@ -751,7 +893,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_x.value = value;
     }
 
-    /// Position covariance [2,2] element (Y-Y variance).
+    /// Position Y covariance \[2,2\].
     ///
     /// Units: km²
     ///
@@ -766,7 +908,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_y.value = value;
     }
 
-    /// Position covariance [3,1] element (Z-X covariance).
+    /// Position Z / Position X covariance \[3,1\].
     ///
     /// Units: km²
     ///
@@ -781,7 +923,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_x.value = value;
     }
 
-    /// Position covariance [3,2] element (Z-Y covariance).
+    /// Position Z / Position Y covariance \[3,2\].
     ///
     /// Units: km²
     ///
@@ -796,7 +938,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_y.value = value;
     }
 
-    /// Position covariance [3,3] element (Z-Z variance).
+    /// Position Z covariance \[3,3\].
     ///
     /// Units: km²
     ///
@@ -811,9 +953,9 @@ impl OpmCovarianceMatrix {
         self.inner.cz_z.value = value;
     }
 
-    /// Position-Velocity cross-covariance [4,1] element (X_DOT-X covariance).
+    /// Velocity X / Position X covariance \[4,1\].
     ///
-    /// Units: km·km/s
+    /// Units: km²/s
     ///
     /// :type: float
     #[getter]
@@ -826,9 +968,9 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_x.value = value;
     }
 
-    /// Position-Velocity cross-covariance [4,2] element (X_DOT-Y covariance).
+    /// Velocity X / Position Y covariance \[4,2\].
     ///
-    /// Units: km·km/s
+    /// Units: km²/s
     ///
     /// :type: float
     #[getter]
@@ -841,9 +983,9 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_y.value = value;
     }
 
-    /// Position-Velocity cross-covariance [4,3] element (X_DOT-Z covariance).
+    /// Velocity X / Position Z covariance \[4,3\].
     ///
-    /// Units: km·km/s
+    /// Units: km²/s
     ///
     /// :type: float
     #[getter]
@@ -856,9 +998,9 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_z.value = value;
     }
 
-    /// Position-Velocity cross-covariance [5,1] element (Y_DOT-X covariance).
+    /// Velocity Y / Position X covariance \[5,1\].
     ///
-    /// Units: km·km/s
+    /// Units: km²/s
     ///
     /// :type: float
     #[getter]
@@ -871,9 +1013,9 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_x.value = value;
     }
 
-    /// Position-Velocity cross-covariance [5,2] element (Y_DOT-Y covariance).
+    /// Velocity Y / Position Y covariance \[5,2\].
     ///
-    /// Units: km·km/s
+    /// Units: km²/s
     ///
     /// :type: float
     #[getter]
@@ -886,9 +1028,9 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_y.value = value;
     }
 
-    /// Position-Velocity cross-covariance [5,3] element (Y_DOT-Z covariance).
+    /// Velocity Y / Position Z covariance \[5,3\].
     ///
-    /// Units: km·km/s
+    /// Units: km²/s
     ///
     /// :type: float
     #[getter]
@@ -901,9 +1043,9 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_z.value = value;
     }
 
-    /// Position-Velocity cross-covariance [6,1] element (Z_DOT-X covariance).
+    /// Velocity Z / Position X covariance \[6,1\].
     ///
-    /// Units: km·km/s
+    /// Units: km²/s
     ///
     /// :type: float
     #[getter]
@@ -916,9 +1058,9 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_x.value = value;
     }
 
-    /// Position-Velocity cross-covariance [6,2] element (Z_DOT-Y covariance).
+    /// Velocity Z / Position Y covariance \[6,2\].
     ///
-    /// Units: km·km/s
+    /// Units: km²/s
     ///
     /// :type: float
     #[getter]
@@ -931,9 +1073,9 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_y.value = value;
     }
 
-    /// Position-Velocity cross-covariance [6,3] element (Z_DOT-Z covariance).
+    /// Velocity Z / Position Z covariance \[6,3\].
     ///
-    /// Units: km·km/s
+    /// Units: km²/s
     ///
     /// :type: float
     #[getter]
@@ -946,7 +1088,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_z.value = value;
     }
 
-    /// Velocity covariance [4,4] element (X_DOT-X_DOT variance).
+    /// Velocity X covariance \[4,4\].
     ///
     /// Units: km²/s²
     ///
@@ -961,7 +1103,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_x_dot.value = value;
     }
 
-    /// Velocity covariance [5,4] element (Y_DOT-X_DOT covariance).
+    /// Velocity Y / Velocity X covariance \[5,4\].
     ///
     /// Units: km²/s²
     ///
@@ -976,7 +1118,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_x_dot.value = value;
     }
 
-    /// Velocity covariance [5,5] element (Y_DOT-Y_DOT variance).
+    /// Velocity Y covariance \[5,5\].
     ///
     /// Units: km²/s²
     ///
@@ -991,7 +1133,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_y_dot.value = value;
     }
 
-    /// Velocity covariance [6,4] element (Z_DOT-X_DOT covariance).
+    /// Velocity Z / Velocity X covariance \[6,4\].
     ///
     /// Units: km²/s²
     ///
@@ -1006,7 +1148,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_x_dot.value = value;
     }
 
-    /// Velocity covariance [6,5] element (Z_DOT-Y_DOT covariance).
+    /// Velocity Z / Velocity Y covariance \[6,5\].
     ///
     /// Units: km²/s²
     ///
@@ -1021,7 +1163,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_y_dot.value = value;
     }
 
-    /// Velocity covariance [6,6] element (Z_DOT-Z_DOT variance).
+    /// Velocity Z covariance \[6,6\].
     ///
     /// Units: km²/s²
     ///
@@ -1037,7 +1179,7 @@ impl OpmCovarianceMatrix {
     }
 }
 
-/// Create a new OPM Data object.
+/// OPM Data Section.
 ///
 /// Parameters
 /// ----------
@@ -1073,7 +1215,7 @@ impl OpmData {
         )
     }
 
-    /// State vector.
+    /// State vector components (position and velocity).
     ///
     /// :type: StateVector
     #[getter]
@@ -1170,7 +1312,10 @@ impl OpmData {
     }
 }
 
-/// Maneuver parameters.
+/// Maneuver Parameters.
+///
+/// References:
+/// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 ///
 /// Parameters
 /// ----------
@@ -1231,20 +1376,20 @@ impl ManeuverParameters {
         )
     }
 
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 
-    /// Epoch of ignition.
+    /// Epoch of ignition (see 7.5.10 for formatting rules).
     ///
     /// :type: str
     #[getter]
@@ -1258,9 +1403,7 @@ impl ManeuverParameters {
         Ok(())
     }
 
-    /// Duration of maneuver.
-    ///
-    /// If 0, impulsive maneuver.
+    /// Maneuver duration (If = 0, impulsive maneuver).
     ///
     /// Units: s
     ///
@@ -1275,9 +1418,7 @@ impl ManeuverParameters {
         self.inner.man_duration.value = value;
     }
 
-    /// Mass change during maneuver.
-    ///
-    /// Value is < 0.
+    /// Mass change during maneuver (value is < 0).
     ///
     /// Units: kg
     ///
@@ -1292,7 +1433,8 @@ impl ManeuverParameters {
         self.inner.man_delta_mass.value = value;
     }
 
-    /// Reference frame for velocity change.
+    /// Reference frame in which the velocity increment vector data are given. The user must select
+    /// from the accepted set of values indicated in 3.2.4.11.
     ///
     /// :type: str
     #[getter]
@@ -1305,7 +1447,7 @@ impl ManeuverParameters {
         self.inner.man_ref_frame = value;
     }
 
-    /// Velocity change in 1st axis.
+    /// 1st component of the velocity increment.
     ///
     /// Units: km/s
     ///
@@ -1320,7 +1462,7 @@ impl ManeuverParameters {
         self.inner.man_dv_1.value = value;
     }
 
-    /// Velocity change in 2nd axis.
+    /// 2nd component of the velocity increment.
     ///
     /// Units: km/s
     ///
@@ -1335,7 +1477,7 @@ impl ManeuverParameters {
         self.inner.man_dv_2.value = value;
     }
 
-    /// Velocity change in 3rd axis.
+    /// 3rd component of the velocity increment.
     ///
     /// Units: km/s
     ///
@@ -1351,11 +1493,14 @@ impl ManeuverParameters {
     }
 }
 
-/// User defined parameters.
+/// USER DEFINED PARAMETERS block (`userDefinedType`).
+/// User-defined parameters.
+///
+/// Allow for the exchange of any desired orbital data not already provided in the message.
 ///
 /// Parameters
 /// ----------
-/// parameters : dict
+///     parameters : dict
 ///     Dictionary of user defined parameters. Keys should generally start with 'USER_DEFINED_'.
 #[pyclass]
 #[derive(Clone)]
@@ -1386,16 +1531,16 @@ impl UserDefined {
         format!("UserDefined(count={})", self.inner.user_defined.len())
     }
 
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 
@@ -1403,7 +1548,7 @@ impl UserDefined {
     ///
     /// :type: Dict[str, str]
     #[getter]
-    fn get_parameters(&self) -> std::collections::HashMap<String, String> {
+    fn get_user_defined(&self) -> std::collections::HashMap<String, String> {
         self.inner
             .user_defined
             .iter()
@@ -1412,7 +1557,7 @@ impl UserDefined {
     }
 
     #[setter]
-    fn set_parameters(&mut self, value: std::collections::HashMap<String, String>) {
+    fn set_user_defined(&mut self, value: std::collections::HashMap<String, String>) {
         self.inner.user_defined = value
             .into_iter()
             .map(|(k, v)| UserDefinedParameter {

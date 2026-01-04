@@ -144,7 +144,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ocm::OcmPhysicalDescription>()?;
     m.add_class::<ocm::OcmCovarianceMatrix>()?;
     m.add_class::<ocm::CovLine>()?;
-    m.add_class::<ocm::OcmManeuver>()?;
+    m.add_class::<ocm::OcmManeuverParameters>()?;
     m.add_class::<ocm::ManLine>()?;
     m.add_class::<ocm::OcmPerturbations>()?;
     m.add_class::<ocm::OcmOdParameters>()?;

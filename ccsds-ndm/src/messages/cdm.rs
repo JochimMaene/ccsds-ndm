@@ -94,12 +94,25 @@ impl Ndm for Cdm {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmHeader {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Message creation date/time in Coordinated Universal Time (UTC).
+    ///
+    /// Examples: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
     pub creation_date: Epoch,
+    /// Creating agency or owner/operator.
+    ///
+    /// Examples: JSPOC, ESA SST, CAESAR, JPL, SDC
     pub originator: String,
+    /// Spacecraft name(s) for which the CDM is provided.
+    ///
+    /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message_for: Option<String>,
+    /// ID that uniquely identifies a message from a given originator.
+    ///
+    /// Examples: 201113719185, ABC-12_34
     pub message_id: String,
 }
 
@@ -259,38 +272,64 @@ impl CdmBody {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RelativeMetadataData {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// The date and time in UTC of the closest approach.
     pub tca: Epoch,
+    /// The norm of the relative position vector.
+    ///
+    /// Units: m
     pub miss_distance: Length,
+    /// The norm of the relative velocity vector.
+    ///
+    /// Units: m/s
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub relative_speed: Option<Dv>,
+    /// The relative position and velocity of Object2 with respect to Object1.
     #[serde(
         rename = "relativeStateVector",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub relative_state_vector: Option<RelativeStateVector>,
+    /// The start time in UTC of the screening period for the conjunction assessment.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_screen_period: Option<Epoch>,
+    /// The stop time in UTC of the screening period for the conjunction assessment.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_screen_period: Option<Epoch>,
+    /// Name of the Object1 centered reference frame in which the screening volume data are given.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_frame: Option<ScreenVolumeFrameType>,
+    /// Shape of the screening volume.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_shape: Option<ScreenVolumeShapeType>,
+    /// The R or T component size of the screening volume.
+    ///
+    /// Units: m
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_x: Option<Length>,
+    /// The T or V component size of the screening volume.
+    ///
+    /// Units: m
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_y: Option<Length>,
+    /// The N component size of the screening volume.
+    ///
+    /// Units: m
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_z: Option<Length>,
+    /// The time in UTC when Object2 enters the screening volume.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_entry_time: Option<Epoch>,
+    /// The time in UTC when Object2 exits the screening volume.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_exit_time: Option<Epoch>,
+    /// The probability that Object1 and Object2 will collide.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collision_probability: Option<Probability>,
+    /// The method that was used to calculate the collision probability.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collision_probability_method: Option<String>,
 }
@@ -567,39 +606,65 @@ impl CdmSegment {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmMetadata {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// The object to which the metadata and data apply.
+    ///
+    /// Examples: OBJECT1, OBJECT2
     pub object: CdmObjectType,
+    /// The satellite catalog designator for the object.
     pub object_designator: String,
+    /// The satellite catalog used for the object.
     pub catalog_name: String,
+    /// Spacecraft name for the object.
     pub object_name: String,
+    /// The full international designator for the object.
     pub international_designator: String,
+    /// The object type.
+    ///
+    /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_type: Option<ObjectDescription>,
+    /// Contact position of the owner/operator of the object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_contact_position: Option<String>,
+    /// Contact organization of the object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_organization: Option<String>,
+    /// Phone number of the contact position or organization for the object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_phone: Option<String>,
+    /// Email address of the contact position or organization of the object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_email: Option<String>,
+    /// Unique name of the external ephemeris file used for the object or NONE.
     pub ephemeris_name: String,
+    /// Method used to calculate the covariance.
     pub covariance_method: CovarianceMethodType,
+    /// The maneuver capacity of the object.
     pub maneuverable: ManeuverableType,
+    /// The central body about which Object1 and Object2 orbit.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orbit_center: Option<String>,
+    /// Name of the reference frame in which the state vector data are given.
     pub ref_frame: ReferenceFrameType,
+    /// The gravity model used for the OD of the object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gravity_model: Option<String>,
+    /// The atmospheric density model used for the OD of the object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atmospheric_model: Option<String>,
+    /// The N-body gravitational perturbations used for the OD of the object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub n_body_perturbations: Option<String>,
+    /// Indication of whether solar radiation pressure perturbations were used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_pressure: Option<YesNo>,
+    /// Indication of whether solid Earth and ocean tides were used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub earth_tides: Option<YesNo>,
+    /// Indication of whether in-track thrust modeling was used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intrack_thrust: Option<YesNo>,
 }
@@ -966,22 +1031,27 @@ impl CdmMetadataBuilder {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmData {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Orbit Determination Parameters.
     #[serde(
         rename = "odParameters",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub od_parameters: Option<OdParameters>,
+    /// Additional Parameters.
     #[serde(
         rename = "additionalParameters",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub additional_parameters: Option<AdditionalParameters>,
+    /// State Vector.
     #[serde(rename = "stateVector")]
     pub state_vector: CdmStateVector,
+    /// Covariance Matrix.
     #[serde(rename = "covarianceMatrix")]
     pub covariance_matrix: CdmCovarianceMatrix,
 }
@@ -1246,11 +1316,29 @@ pub struct AdditionalParameters {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmStateVector {
+    /// Object Position Vector X component.
+    ///
+    /// Units: km
     pub x: PositionRequired,
+    /// Object Position Vector Y component.
+    ///
+    /// Units: km
     pub y: PositionRequired,
+    /// Object Position Vector Z component.
+    ///
+    /// Units: km
     pub z: PositionRequired,
+    /// Object Velocity Vector X component.
+    ///
+    /// Units: km/s
     pub x_dot: VelocityRequired,
+    /// Object Velocity Vector Y component.
+    ///
+    /// Units: km/s
     pub y_dot: VelocityRequired,
+    /// Object Velocity Vector Z component.
+    ///
+    /// Units: km/s
     pub z_dot: VelocityRequired,
 }
 
@@ -1268,79 +1356,214 @@ impl ToKvn for CdmStateVector {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmCovarianceMatrix {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Object covariance matrix [1,1].
+    ///
+    /// Units: m²
     pub cr_r: M2,
+    /// Object covariance matrix [2,1].
+    ///
+    /// Units: m²
     pub ct_r: M2,
+    /// Object covariance matrix [2,2].
+    ///
+    /// Units: m²
     pub ct_t: M2,
+    /// Object covariance matrix [3,1].
+    ///
+    /// Units: m²
     pub cn_r: M2,
+    /// Object covariance matrix [3,2].
+    ///
+    /// Units: m²
     pub cn_t: M2,
+    /// Object covariance matrix [3,3].
+    ///
+    /// Units: m²
     pub cn_n: M2,
+    /// Object covariance matrix [4,1].
+    ///
+    /// Units: m²/s
     pub crdot_r: M2s,
+    /// Object covariance matrix [4,2].
+    ///
+    /// Units: m²/s
     pub crdot_t: M2s,
+    /// Object covariance matrix [4,3].
+    ///
+    /// Units: m²/s
     pub crdot_n: M2s,
+    /// Object covariance matrix [4,4].
+    ///
+    /// Units: m²/s²
     pub crdot_rdot: M2s2,
+    /// Object covariance matrix [5,1].
+    ///
+    /// Units: m²/s
     pub ctdot_r: M2s,
+    /// Object covariance matrix [5,2].
+    ///
+    /// Units: m²/s
     pub ctdot_t: M2s,
+    /// Object covariance matrix [5,3].
+    ///
+    /// Units: m²/s
     pub ctdot_n: M2s,
+    /// Object covariance matrix [5,4].
+    ///
+    /// Units: m²/s²
     pub ctdot_rdot: M2s2,
+    /// Object covariance matrix [5,5].
+    ///
+    /// Units: m²/s²
     pub ctdot_tdot: M2s2,
+    /// Object covariance matrix [6,1].
+    ///
+    /// Units: m²/s
     pub cndot_r: M2s,
+    /// Object covariance matrix [6,2].
+    ///
+    /// Units: m²/s
     pub cndot_t: M2s,
+    /// Object covariance matrix [6,3].
+    ///
+    /// Units: m²/s
     pub cndot_n: M2s,
+    /// Object covariance matrix [6,4].
+    ///
+    /// Units: m²/s²
     pub cndot_rdot: M2s2,
+    /// Object covariance matrix [6,5].
+    ///
+    /// Units: m²/s²
     pub cndot_tdot: M2s2,
+    /// Object covariance matrix [6,6].
+    ///
+    /// Units: m²/s²
     pub cndot_ndot: M2s2,
 
-    // Optional terms
+    /// Object covariance matrix [7,1].
+    ///
+    /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_r: Option<M3kg>,
+    /// Object covariance matrix [7,2].
+    ///
+    /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_t: Option<M3kg>,
+    /// Object covariance matrix [7,3].
+    ///
+    /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_n: Option<M3kg>,
+    /// Object covariance matrix [7,4].
+    ///
+    /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_rdot: Option<M3kgs>,
+    /// Object covariance matrix [7,5].
+    ///
+    /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_tdot: Option<M3kgs>,
+    /// Object covariance matrix [7,6].
+    ///
+    /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_ndot: Option<M3kgs>,
+    /// Object covariance matrix [7,7].
+    ///
+    /// Units: m⁴/kg²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_drg: Option<M4kg2>,
 
+    /// Object covariance matrix [8,1].
+    ///
+    /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_r: Option<M3kg>,
+    /// Object covariance matrix [8,2].
+    ///
+    /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_t: Option<M3kg>,
+    /// Object covariance matrix [8,3].
+    ///
+    /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_n: Option<M3kg>,
+    /// Object covariance matrix [8,4].
+    ///
+    /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_rdot: Option<M3kgs>,
+    /// Object covariance matrix [8,5].
+    ///
+    /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_tdot: Option<M3kgs>,
+    /// Object covariance matrix [8,6].
+    ///
+    /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_ndot: Option<M3kgs>,
+    /// Object covariance matrix [8,7].
+    ///
+    /// Units: m⁴/kg²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_drg: Option<M4kg2>,
+    /// Object covariance matrix [8,8].
+    ///
+    /// Units: m⁴/kg²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_srp: Option<M4kg2>,
 
+    /// Object covariance matrix [9,1].
+    ///
+    /// Units: m²/s²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_r: Option<M2s2>,
+    /// Object covariance matrix [9,2].
+    ///
+    /// Units: m²/s²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_t: Option<M2s2>,
+    /// Object covariance matrix [9,3].
+    ///
+    /// Units: m²/s²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_n: Option<M2s2>,
+    /// Object covariance matrix [9,4].
+    ///
+    /// Units: m²/s³
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_rdot: Option<M2s3>,
+    /// Object covariance matrix [9,5].
+    ///
+    /// Units: m²/s³
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_tdot: Option<M2s3>,
+    /// Object covariance matrix [9,6].
+    ///
+    /// Units: m²/s³
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_ndot: Option<M2s3>,
+    /// Object covariance matrix [9,7].
+    ///
+    /// Units: m³/(kg*s²)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_drg: Option<M3kgs2>,
+    /// Object covariance matrix [9,8].
+    ///
+    /// Units: m³/(kg*s²)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_srp: Option<M3kgs2>,
+    /// Object covariance matrix [9,9].
+    ///
+    /// Units: m²/s⁴
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_thr: Option<M2s4>,
 }

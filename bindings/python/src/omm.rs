@@ -15,7 +15,10 @@ use std::fs;
 // Import OpmCovarianceMatrix from opm module (shared type)
 use crate::opm::OpmCovarianceMatrix;
 
-/// Create a new OMM message.
+/// Orbit Mean-Elements Message (OMM).
+///
+/// The OMM contains the orbital characteristics of a single object at a specified epoch,
+/// expressed in mean Keplerian elements.
 ///
 /// Parameters
 /// ----------
@@ -52,7 +55,10 @@ impl Omm {
         )
     }
 
-    /// The message header.
+    /// Orbit Mean-Elements Message (OMM).
+    ///
+    /// The OMM contains the orbital characteristics of a single object at a specified epoch,
+    /// expressed in mean Keplerian elements.
     ///
     /// :type: OdmHeader
     #[getter]
@@ -242,26 +248,26 @@ impl OmmSegment {
     }
 }
 
-/// Create a new OMM Metadata object.
+/// Metadata for the OMM.
 ///
 /// Parameters
 /// ----------
 /// object_name : str
-///     Spacecraft name.
+///     Spacecraft name for which mean element orbit state data is provided.
 /// object_id : str
-///     Object identifier.
+///     Object identifier of the object for which mean element orbit state data is provided.
 /// center_name : str
-///     Origin of the reference frame.
+///     Origin of the OMM reference frame.
 /// ref_frame : str
-///     Reference frame.
+///     Reference frame in which the Keplerian element data are given.
 /// time_system : str
-///     Time system.
+///     Time system used for Keplerian elements and covariance data.
 /// mean_element_theory : str
-///     Description of the Mean Element Theory.
+///     Description of the Mean Element Theory. Indicates the proper method to employ to propagate the state.
 /// ref_frame_epoch : str, optional
-///     Epoch of the reference frame.
+///     Epoch of reference frame, if not intrinsic to the definition of the reference frame.
 /// comment : list of str, optional
-///     Comments.
+///     Comments (allowed at the beginning of the OMM Metadata).
 #[pyclass]
 #[derive(Clone)]
 pub struct OmmMetadata {
@@ -300,7 +306,13 @@ impl OmmMetadata {
         format!("OmmMetadata(object_name='{}')", self.inner.object_name)
     }
 
-    /// Spacecraft name.
+    /// Spacecraft name for which mean element orbit state data is provided. While there is no
+    /// CCSDS-based restriction on the value for this keyword, it is recommended to use names from the
+    /// UN Office of Outer Space Affairs designator index (reference \[3\], which include Object name
+    /// and international designator of the participant). If OBJECT_NAME is not listed in reference
+    /// \[3\] or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
+    ///
+    /// Examples: Telkom 2, Spaceway 2, INMARSAT 4-F2, UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -313,7 +325,17 @@ impl OmmMetadata {
         self.inner.object_name = value;
     }
 
-    /// Object identifier.
+    /// Object identifier of the object for which mean element orbit state data is provided. While
+    /// there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+    /// the international spacecraft designator as published in the UN Office of Outer Space Affairs
+    /// designator index (reference \[3\]). Recommended values have the format YYYY-NNNP{PP}, where:
+    /// YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
+    /// zeros). P{PP} = At least one capital letter for the identification of the part brought into
+    /// space by the launch. If the asset is not listed in reference \[3\], the UN Office of Outer
+    /// Space Affairs designator index format is not used, or the content is either unknown or cannot
+    /// be disclosed, the value should be set to UNKNOWN.
+    ///
+    /// Examples: 2005-046A, 2005-046B, 2003-022A, UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -326,7 +348,12 @@ impl OmmMetadata {
         self.inner.object_id = value;
     }
 
-    /// Origin of the reference frame.
+    /// Origin of the OMM reference frame, which shall be a natural solar system body (planets,
+    /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
+    /// system barycenter. Natural bodies shall be selected from the accepted set of values
+    /// indicated in annex B, subsection B2.
+    ///
+    /// Examples: EARTH, MARS, MOON
     ///
     /// :type: str
     #[getter]
@@ -339,7 +366,15 @@ impl OmmMetadata {
         self.inner.center_name = value;
     }
 
-    /// Reference frame.
+    /// Reference frame in which the Keplerian element data are given. Use of values other than those
+    /// in 3.2.3.3 should be documented in an ICD. NOTE—NORAD Two Line Element Sets and corresponding
+    /// Simplified General Perturbations (SGP) orbit propagator ephemeris outputs are explicitly
+    /// defined to be in the True Equator Mean Equinox of Date (TEME of Date) reference frame.
+    /// Therefore, TEME of date shall be used for OMMs based on NORAD Two Line Element sets, rather
+    /// than the almost imperceptibly different TEME of Epoch (see reference \[H2\] or \[H3\] for
+    /// further details).
+    ///
+    /// Examples: ICRF, ITRF2000, EME2000, TEME
     ///
     /// :type: str
     #[getter]
@@ -352,7 +387,10 @@ impl OmmMetadata {
         self.inner.ref_frame = value;
     }
 
-    /// Time system.
+    /// Time system used for Keplerian elements and covariance data. Use of values other than those
+    /// in 3.2.3.2 should be documented in an ICD.
+    ///
+    /// Examples: UTC
     ///
     /// :type: str
     #[getter]
@@ -365,7 +403,10 @@ impl OmmMetadata {
         self.inner.time_system = value;
     }
 
-    /// Description of the Mean Element Theory.
+    /// Description of the Mean Element Theory. Indicates the proper method to employ to propagate the
+    /// state.
+    ///
+    /// Examples: SGP, SGP4, SGP4-XP, DSST, USM
     ///
     /// :type: str
     #[getter]
@@ -378,7 +419,10 @@ impl OmmMetadata {
         self.inner.mean_element_theory = value;
     }
 
-    /// Epoch of the reference frame.
+    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
+    /// 7.5.10 for formatting rules.)
+    ///
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: Optional[str]
     #[getter]
@@ -395,7 +439,7 @@ impl OmmMetadata {
         Ok(())
     }
 
-    /// Comments.
+    /// Comments (allowed at the beginning of the OMM Metadata). (See 7.8 for formatting rules.)
     ///
     /// :type: list[str]
     #[getter]
@@ -409,7 +453,7 @@ impl OmmMetadata {
     }
 }
 
-/// Create a new MeanElements object.
+/// Mean Keplerian Elements in the Specified Reference Frame.
 ///
 /// Parameters
 /// ----------
@@ -426,11 +470,11 @@ impl OmmMetadata {
 /// mean_anomaly : float
 ///     Mean anomaly (deg).
 /// semi_major_axis : float, optional
-///     Semi-major axis (km).
+///     Semi-major axis in kilometers. Preferred over MEAN_MOTION.
 /// mean_motion : float, optional
-///     Mean motion (rev/day).
+///     Keplerian Mean motion in revolutions per day. Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
 /// gm : float, optional
-///     Gravitational coefficient (km³/s²).
+///     Gravitational Coefficient (Gravitational Constant × Central Mass) in km³/s².
 #[pyclass]
 #[derive(Clone)]
 pub struct MeanElements {
@@ -482,20 +526,22 @@ impl MeanElements {
         format!("MeanElements(epoch='{}')", self.inner.epoch.as_str())
     }
 
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 
-    /// Epoch of the mean elements.
+    /// Epoch of Mean Keplerian elements. (See 7.5.10 for formatting rules.)
+    ///
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: str
     #[getter]
@@ -511,6 +557,8 @@ impl MeanElements {
 
     /// Eccentricity.
     ///
+    /// Examples: 0.7303
+    ///
     /// :type: float
     #[getter]
     fn get_eccentricity(&self) -> f64 {
@@ -523,6 +571,8 @@ impl MeanElements {
     }
 
     /// Inclination.
+    ///
+    /// Examples: 63.4
     ///
     /// Units: deg
     ///
@@ -541,7 +591,9 @@ impl MeanElements {
         Ok(())
     }
 
-    /// Right ascension of the ascending node.
+    /// Right ascension of ascending node.
+    ///
+    /// Examples: 345.0
     ///
     /// Units: deg
     ///
@@ -560,6 +612,8 @@ impl MeanElements {
 
     /// Argument of pericenter.
     ///
+    /// Examples: 270.0
+    ///
     /// Units: deg
     ///
     /// :type: float
@@ -577,6 +631,8 @@ impl MeanElements {
 
     /// Mean anomaly.
     ///
+    /// Examples: 130.0
+    ///
     /// Units: deg
     ///
     /// :type: float
@@ -592,7 +648,9 @@ impl MeanElements {
         Ok(())
     }
 
-    /// Semi-major axis.
+    /// Semi-major axis. Preferred over MEAN_MOTION.
+    ///
+    /// Examples: 28594.4
     ///
     /// Units: km
     ///
@@ -607,7 +665,11 @@ impl MeanElements {
         self.inner.semi_major_axis = value.map(|v| Distance::new(v, None));
     }
 
-    /// Mean motion.
+    /// Keplerian Mean motion.
+    ///
+    /// Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
+    ///
+    /// Examples: 1.491325
     ///
     /// Units: rev/day
     ///
@@ -622,7 +684,9 @@ impl MeanElements {
         self.inner.mean_motion = value.map(|v| core_omm::MeanMotion::new(v, None));
     }
 
-    /// Gravitational coefficient (GM).
+    /// Gravitational Coefficient (Gravitational Constant × Central Mass).
+    ///
+    /// Examples: 398600.44
     ///
     /// Units: km³/s²
     ///
@@ -642,6 +706,7 @@ impl MeanElements {
     }
 }
 
+/// OMM Data section.
 #[pyclass]
 #[derive(Clone)]
 pub struct OmmData {
@@ -677,7 +742,7 @@ impl OmmData {
         )
     }
 
-    /// Mean elements.
+    /// Mean Keplerian Elements in the Specified Reference Frame.
     ///
     /// :type: MeanElements
     #[getter]
@@ -696,16 +761,16 @@ impl OmmData {
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 
-    /// Spacecraft parameters.
+    /// Spacecraft Parameters.
     ///
     /// :type: Optional[SpacecraftParameters]
     #[getter]
@@ -721,7 +786,7 @@ impl OmmData {
         self.inner.spacecraft_parameters = value.map(|s| s.inner);
     }
 
-    /// TLE parameters.
+    /// TLE Related Parameters (Only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
     ///
     /// :type: Optional[TleParameters]
     #[getter]
@@ -737,7 +802,7 @@ impl OmmData {
         self.inner.tle_parameters = value.map(|t| t.inner);
     }
 
-    /// Covariance matrix.
+    /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form).
     ///
     /// :type: Optional[OpmCovarianceMatrix]
     #[getter]
@@ -753,7 +818,7 @@ impl OmmData {
         self.inner.covariance_matrix = value.map(|c| c.inner);
     }
 
-    /// User defined parameters.
+    /// User-Defined Parameters.
     ///
     /// :type: Optional[UserDefined]
     #[getter]
@@ -770,40 +835,32 @@ impl OmmData {
     }
 }
 
-/// Create a new TleParameters object.
+/// TLE Related Parameters.
+///
+/// This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
 ///
 /// Parameters
 /// ----------
 /// ephemeris_type : int, optional
-///     Ephemeris type.
-///     (Optional)
+///     Ephemeris Type, default value = 0.
 /// classification_type : str, optional
-///     Classification type.
-///     (Optional)
+///     Classification Type, default value = U.
 /// norad_cat_id : int, optional
-///     NORAD catalog ID.
-///     (Optional)
+///     NORAD Catalog Number ('Satellite Number').
 /// element_set_no : int, optional
-///     Element set number.
-///     (Optional)
+///     Element set number for this satellite.
 /// rev_at_epoch : int, optional
-///     Revolution number at epoch.
-///     (Optional)
+///     Revolution Number.
 /// bstar : float, optional
-///     B* drag term (1/ER).
-///     (Optional)
+///     B* drag term in 1/ER (Inverse Earth Radii). Required for SGP4.
 /// bterm : float, optional
-///     Ballistic coefficient (m²/kg).
-///     (Optional)
+///     Ballistic coefficient (m²/kg). Required for SGP4-XP.
 /// mean_motion_dot : float, optional
-///     First derivative of mean motion (rev/day²).
-///     (Optional)
+///     First derivative of mean motion (rev/day²). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
 /// mean_motion_ddot : float, optional
-///     Second derivative of mean motion (rev/day³).
-///     (Optional)
+///     Second derivative of mean motion (rev/day³). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
 /// agom : float, optional
-///     Solar radiation pressure area to mass ratio (m²/kg).
-///     (Optional)
+///     Solar radiation pressure coefficient (m²/kg). Required for SGP4-XP.
 #[pyclass]
 #[derive(Clone)]
 pub struct TleParameters {
@@ -855,20 +912,29 @@ impl TleParameters {
         "TleParameters(...)".to_string()
     }
 
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules.)
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 
-    /// Ephemeris type.
+    /// Ephemeris type. Indicates what type of propagator was used to transform the native state to
+    /// the SGP/SGP4 ephemeris state. The default is 0. (See 4.2.4.7 for numeric definitions.)
+    ///
+    /// - 0 = SGP
+    /// - 2 = SGP4
+    /// - 3 = PPT3
+    /// - 4 = SGP4-XP
+    /// - 6 = Special Perturbations
+    ///
+    /// Examples: 0
     ///
     /// :type: Optional[int]
     #[getter]
@@ -881,7 +947,10 @@ impl TleParameters {
         self.inner.ephemeris_type = value;
     }
 
-    /// Classification type.
+    /// Classification Type, default value = U. Some sources suggest the following coding for
+    /// the CLASSIFICATION_TYPE keyword: U=unclassified, S=secret
+    ///
+    /// Examples: U
     ///
     /// :type: Optional[str]
     #[getter]
@@ -894,7 +963,10 @@ impl TleParameters {
         self.inner.classification_type = value;
     }
 
-    /// NORAD catalog ID.
+    /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword is
+    /// only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
+    ///
+    /// Examples: 28893
     ///
     /// :type: Optional[int]
     #[getter]
@@ -907,7 +979,12 @@ impl TleParameters {
         self.inner.norad_cat_id = value;
     }
 
-    /// Element set number.
+    /// Element set number for this satellite. Normally incremented sequentially but may be out of
+    /// sync if it is generated from a backup source. Used to distinguish different TLEs, and
+    /// therefore only meaningful if TLE-based data is being exchanged (i.e., MEAN_ELEMENT_THEORY =
+    /// SGP/SGP4).
+    ///
+    /// Examples: 999
     ///
     /// :type: Optional[int]
     #[getter]
@@ -920,7 +997,9 @@ impl TleParameters {
         self.inner.element_set_no = value;
     }
 
-    /// Revolution number at epoch.
+    /// Number of revolutions at epoch.
+    ///
+    /// Examples: 120
     ///
     /// :type: Optional[int]
     #[getter]
@@ -933,7 +1012,10 @@ impl TleParameters {
         self.inner.rev_at_epoch = value;
     }
 
-    /// B* drag term.
+    /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
+    /// MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
+    ///
+    /// Examples: 0.0001
     ///
     /// Units: 1/ER
     ///
@@ -949,7 +1031,12 @@ impl TleParameters {
         self.inner.bstar = value.map(|v| BStar::new(v, Default::default()));
     }
 
-    /// Ballistic coefficient.
+    /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
+    /// MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag coefficient,
+    /// A = average cross-sectional area, m = mass. Example values for BTERM = 0.02 (rocket body),
+    /// 0.0015 (payload); average value spanning 20,00 catalog objects = 0.0286.
+    ///
+    /// Examples: 0.02
     ///
     /// Units: m²/kg
     ///
@@ -965,7 +1052,10 @@ impl TleParameters {
         self.inner.bterm = value.map(|v| M2kg::new(v, Default::default()));
     }
 
-    /// First derivative of mean motion.
+    /// First Time Derivative of the Mean Motion (i.e., a drag term, required when MEAN_ELEMENT_THEORY
+    /// = SGP or PPT3). (See 4.2.4.7 for important details).
+    ///
+    /// Examples: 0.000001
     ///
     /// Units: rev/day²
     ///
@@ -981,7 +1071,10 @@ impl TleParameters {
         self.inner.mean_motion_dot = value.map(|v| MeanMotionDot::new(v, Default::default()));
     }
 
-    /// Second derivative of mean motion.
+    /// MEAN_ELEMENT_THEORY= SGP or PPT3: Second Time Derivative of Mean Motion (i.e., a drag term).
+    /// (See 4.2.4.7 for important details).
+    ///
+    /// Examples: 0.0
     ///
     /// Units: rev/day³
     ///
@@ -997,7 +1090,11 @@ impl TleParameters {
         self.inner.mean_motion_ddot = value.map(|v| MeanMotionDDot::new(v, Default::default()));
     }
 
-    /// Solar radiation pressure area to mass ratio.
+    /// MEAN_ELEMENT_THEORY= SGP4-XP: Solar radiation pressure coefficient AY/m, where y =
+    /// reflectivity, A = average cross-sectional area, m = mass. Example values AGOM = 0.01 (rocket
+    /// body) and 0.001 (payload); average value spanning 20,00 catalog objects = 0.0143 m2/kg.
+    ///
+    /// Examples: 0.01
     ///
     /// Units: m²/kg
     ///
@@ -1014,11 +1111,14 @@ impl TleParameters {
     }
 }
 
-/// UserDefined object.
+/// USER DEFINED PARAMETERS block (`userDefinedType`).
+/// User-defined parameters.
+///
+/// Allow for the exchange of any desired orbital data not already provided in the message.
 ///
 /// Parameters
 /// ----------
-/// parameters : dict
+///     parameters : dict
 ///     Dictionary of user defined parameters.
 #[pyclass]
 #[derive(Clone)]
@@ -1050,16 +1150,16 @@ impl UserDefined {
         format!("UserDefined(count={})", self.inner.user_defined.len())
     }
 
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 
@@ -1067,7 +1167,7 @@ impl UserDefined {
     ///
     /// :type: Dict[str, str]
     #[getter]
-    fn get_parameters(&self) -> std::collections::HashMap<String, String> {
+    fn get_user_defined(&self) -> std::collections::HashMap<String, String> {
         self.inner
             .user_defined
             .iter()
@@ -1076,7 +1176,7 @@ impl UserDefined {
     }
 
     #[setter]
-    fn set_parameters(&mut self, value: std::collections::HashMap<String, String>) {
+    fn set_user_defined(&mut self, value: std::collections::HashMap<String, String>) {
         self.inner.user_defined = value
             .into_iter()
             .map(|(k, v)| ccsds_ndm::types::UserDefinedParameter {

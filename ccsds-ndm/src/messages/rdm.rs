@@ -22,6 +22,9 @@ use std::iter::Peekable;
 // Root RDM Structure
 //----------------------------------------------------------------------
 
+/// Re-entry Data Message (RDM).
+///
+/// A message format for use in exchanging spacecraft re-entry information.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename = "rdm")]
 pub struct Rdm {
@@ -93,13 +96,24 @@ impl Ndm for Rdm {
 // Header
 //----------------------------------------------------------------------
 
+/// The RDM Header provides information about the message.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmHeader {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// File creation date and time in UTC.
+    ///
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23
     pub creation_date: Epoch,
+    /// Creating agency or entity.
+    ///
+    /// Examples: DLR, ESA
     pub originator: String,
+    /// ID that uniquely identifies a message from a given originator.
+    ///
+    /// Examples: 201113719185, ESA20190101-3345
     pub message_id: String,
 }
 
@@ -169,6 +183,7 @@ impl FromKvnTokens for RdmHeader {
 // Body & Segment
 //----------------------------------------------------------------------
 
+/// The RDM Body consists of a single segment.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RdmBody {
     pub segment: Box<RdmSegment>,
@@ -194,7 +209,9 @@ impl RdmBody {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RdmSegment {
+    /// The metadata for this RDM segment.
     pub metadata: RdmMetadata,
+    /// The data for this RDM segment.
     pub data: RdmData,
 }
 
@@ -220,61 +237,152 @@ impl RdmSegment {
 // Metadata
 //----------------------------------------------------------------------
 
+/// The RDM Metadata provides information about the re-entry event.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmMetadata {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// The name of the object.
+    ///
+    /// Examples: FENGYUN 1C, UARS, Tiangong-1
     pub object_name: String,
+    /// The international designator of the object.
+    ///
+    /// Examples: 1999-025A, 1991-063B, 2011-053A
     pub international_designator: String,
+    /// The catalog name for the object.
+    ///
+    /// Examples: SATCAT, SPCS, MCN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub catalog_name: Option<String>,
+    /// The object designator in the catalog.
+    ///
+    /// Examples: 25730, 21574, 37820
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_designator: Option<String>,
+    /// The type of the object.
+    ///
+    /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_type: Option<ObjectDescription>,
+    /// The owner of the object.
+    ///
+    /// Examples: China, USA, France
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_owner: Option<String>,
+    /// The operator of the object.
+    ///
+    /// Examples: EUMETSAT, SES
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_operator: Option<String>,
+    /// Whether the re-entry is controlled or not.
+    ///
+    /// Examples: YES, NO, UNKNOWN
     pub controlled_reentry: ControlledType,
+    /// The celestial body the object is orbiting.
+    ///
+    /// Examples: EARTH, MOON, MARS
     pub center_name: String,
+    /// The time system used for the message.
+    ///
+    /// Examples: UTC, TAI, TDB
     pub time_system: String,
+    /// The reference epoch for the message.
+    ///
+    /// Examples: 2018-04-22T09:00:00.00
     pub epoch_tzero: Epoch,
+    /// The reference frame of the state vector and covariance matrix.
+    ///
+    /// Examples: EME2000, GCRF, ICRF, ITRF2000, TDR
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ref_frame: Option<String>,
+    /// The epoch of the reference frame.
+    ///
+    /// Examples: 2000-01-01T00:00:00.000
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ref_frame_epoch: Option<Epoch>,
+    /// The name of the ephemeris used.
+    ///
+    /// Examples: DE430, JPLEPH.405
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ephemeris_name: Option<String>,
+    /// The gravity model used.
+    ///
+    /// Examples: EGM-96, JGM-3
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gravity_model: Option<String>,
+    /// The atmospheric model used.
+    ///
+    /// Examples: Jacchia 70, MSIS-86
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atmospheric_model: Option<String>,
+    /// The solar flux and geomagnetic activity data used.
+    ///
+    /// Examples: F10.7_MEAN_81_CYCLE, SCHATTEN_ADJUSTED
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_flux_prediction: Option<String>,
+    /// The n-body perturbations used.
+    ///
+    /// Examples: MOON, SUN, JUPITER
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub n_body_perturbations: Option<String>,
+    /// Whether solar radiation pressure was used.
+    ///
+    /// Examples: YES, NO
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_pressure: Option<String>,
+    /// The Earth tides model used.
+    ///
+    /// Examples: ERS, IERS
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub earth_tides: Option<String>,
+    /// Whether there was any intrack thrust.
+    ///
+    /// Examples: YES, NO
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intrack_thrust: Option<YesNo>,
+    /// The source of the drag parameters.
+    ///
+    /// Examples: OD, DATABASE, DEFAULT
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_parameters_source: Option<String>,
+    /// The altitude at which the drag parameters were estimated.
+    ///
+    /// Units: km
+    ///
+    /// Examples: 200.0 [km]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_parameters_altitude: Option<PositionRequired>,
+    /// The method used to compute re-entry uncertainty.
+    ///
+    /// Examples: MONTE-CARLO, ANALYTICAL
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reentry_uncertainty_method: Option<String>,
+    /// The method used to model the object’s disintegration.
+    ///
+    /// Examples: MASS-LOSS, BREAK-UP, NONE
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reentry_disintegration: Option<String>,
+    /// The method used to compute impact uncertainty.
+    ///
+    /// Examples: MONTE-CARLO, ANALYTICAL
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub impact_uncertainty_method: Option<String>,
+    /// The ID of the previous message for this object.
+    ///
+    /// Examples: ESA/20180421-007
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_message_id: Option<String>,
+    /// The epoch of the previous message for this object.
+    ///
+    /// Examples: 2018-04-21T09:00:00.00
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_message_epoch: Option<Epoch>,
+    /// The epoch of the next message for this object.
+    ///
+    /// Examples: 2018-04-23T09:00:00
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_message_epoch: Option<Epoch>,
 }
@@ -623,43 +731,52 @@ fn is_rdm_data_keyword(key: &str) -> bool {
 // Data
 //----------------------------------------------------------------------
 
+/// The RDM Data section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmData {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Atmospheric re-entry parameters.
     #[serde(rename = "atmosphericReentryParameters")]
     pub atmospheric_reentry_parameters: AtmosphericReentryParameters,
+    /// Ground impact parameters.
     #[serde(
         rename = "groundImpactParameters",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub ground_impact_parameters: Option<GroundImpactParameters>,
+    /// State vector.
     #[serde(
         rename = "stateVector",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub state_vector: Option<StateVector>,
+    /// Position/velocity covariance matrix.
     #[serde(
         rename = "covarianceMatrix",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub covariance_matrix: Option<OpmCovarianceMatrix>,
+    /// Spacecraft parameters.
     #[serde(
         rename = "spacecraftParameters",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub spacecraft_parameters: Option<RdmSpacecraftParameters>,
+    /// Orbit determination parameters.
     #[serde(
         rename = "odParameters",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub od_parameters: Option<OdParameters>,
+    /// User defined parameters.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub user_defined_parameters: Vec<(String, String)>,
 }

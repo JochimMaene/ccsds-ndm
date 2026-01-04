@@ -15,6 +15,14 @@ use std::iter::Peekable;
 // Root OCM Structure
 //----------------------------------------------------------------------
 
+/// Orbit Comprehensive Message (OCM).
+///
+/// An OCM aggregates and extends OMM, OPM, and OEM content in a single hybrid message.
+/// It emphasizes flexibility and message conciseness by offering extensive optional
+/// standardized content while minimizing mandatory content.
+///
+/// References:
+/// - CCSDS 502.0-B-3, Section 5 (OCM)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename = "ocm")]
 pub struct Ocm {
@@ -89,6 +97,10 @@ impl Ndm for Ocm {
 // Body & Segment
 //----------------------------------------------------------------------
 
+/// The body of the OCM, containing a single segment.
+///
+/// This struct serves as a container for the `OcmSegment`, which holds the
+/// metadata and data for the Orbit Comprehensive Message.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OcmBody {
     #[serde(rename = "segment")]
@@ -114,6 +126,9 @@ impl OcmBody {
     }
 }
 
+/// A single segment of the OCM.
+///
+/// Contains metadata and data sections.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OcmSegment {
     pub metadata: OcmMetadata,
@@ -161,101 +176,372 @@ impl OcmSegment {
 // Metadata
 //----------------------------------------------------------------------
 
+/// OCM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmMetadata {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Spacecraft name for which OCM data is provided. While there is no CCSDS-based restriction on
+    /// the value for this keyword, it is recommended to use names from either the UN Office of Outer
+    /// Space Affairs designator index (reference \[3\]), the spacecraft operator, or a State Actor or
+    /// commercial Space Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space
+    /// catalog. If OBJECT_NAME is not listed in reference \[3\] or the content is either unknown
+    /// (uncorrelated) or cannot be disclosed, the value should be set to UNKNOWN (or this keyword
+    /// omitted).
+    ///
+    /// **Examples**: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_name: Option<String>,
+    /// COSPAR international designator for the object. Such designator values shall have the
+    /// following COSPAR format: YYYY-NNNP{PP}, where: YYYY = Year of launch; NNN = Three-digit serial
+    /// number of launch in year YYYY (with leading zeros); P{PP} = At least one capital letter for
+    /// the identification of the part brought into space by the launch. If the object has no
+    /// international designator or the content is either unknown (uncorrelated) or cannot be
+    /// disclosed, the value should be set to UNKNOWN (or this keyword omitted).
+    ///
+    /// **Examples**: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub international_designator: Option<String>,
+    /// Satellite catalog source (or source agency or operator, value to be drawn from the SANA
+    /// registry list of Space Object Catalogs at <https://sanaregistry.org/r/space_object_catalog>).
+    ///
+    /// **Examples**: NORAD, SATCAT
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub catalog_name: Option<String>,
+    /// Unique satellite identification designator for the object, as reflected in the catalog whose
+    /// name is ‘CATALOG_NAME’. If the ID is not known (uncorrelated object) or cannot be disclosed,
+    /// ‘UNKNOWN’ may be used (or this keyword omitted).
+    ///
+    /// **Examples**: 28893
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_designator: Option<String>,
+    /// Alternate name(s) of this space object, including assigned names used by spacecraft operator,
+    /// State Actors, commercial SSA providers, and/or media.
+    ///
+    /// **Examples**: CALIPSO, 2006-016B
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alternate_names: Option<String>,
+    /// Point-of-Contact (PoC) for OCM.
+    ///
+    /// **Examples**: John Doe
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub originator_poc: Option<String>,
+    /// Contact position of the originator PoC.
+    ///
+    /// **Examples**: Analyst
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub originator_position: Option<String>,
+    /// Originator PoC phone number.
+    ///
+    /// **Examples**: +1 123-456-7890
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub originator_phone: Option<String>,
+    /// Originator PoC email address.
+    ///
+    /// **Examples**: john.doe@example.com
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub originator_email: Option<String>,
+    /// Originator’s physical address.
+    ///
+    /// **Examples**: 123 Main St, Anytown, USA
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub originator_address: Option<String>,
+    /// Creating agency or operator (value should be drawn from the ‘Abbreviation’ column of the SANA
+    /// Organizations registry at <https://www.sanaregistry.org/r/organizations>).
+    ///
+    /// **Examples**: NASA, ESA, JAXA
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_org: Option<String>,
+    /// Technical PoC for OCM.
+    ///
+    /// **Examples**: Jane Smith
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_poc: Option<String>,
+    /// Contact position of the technical PoC.
+    ///
+    /// **Examples**: Engineer
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_position: Option<String>,
+    /// Technical PoC phone number.
+    ///
+    /// **Examples**: +1 987-654-3210
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_phone: Option<String>,
+    /// Technical PoC email address.
+    ///
+    /// **Examples**: jane.smith@example.com
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_email: Option<String>,
+    /// Physical address information for OCM creator.
+    ///
+    /// **Examples**: 456 Tech Park, Sometown, USA
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tech_address: Option<String>,
+    /// Message ID of the previous message from this message originator for this space object.
+    ///
+    /// **Examples**: MSG-12344
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_message_id: Option<String>,
+    /// Message ID of the next message from this message originator for this space object.
+    ///
+    /// **Examples**: MSG-12346
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_message_id: Option<String>,
+    /// Link(s) to relevant Attitude Data Message(s).
+    ///
+    /// **Examples**: ADM-2023-001
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub adm_msg_link: Option<String>,
+    /// Link(s) to relevant Conjunction Data Message(s).
+    ///
+    /// **Examples**: CDM-2023-042
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdm_msg_link: Option<String>,
+    /// Link(s) to relevant Pointing Request Message(s).
+    ///
+    /// **Examples**: PRM-2023-005
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prm_msg_link: Option<String>,
+    /// Link(s) to relevant Reentry Data Message(s).
+    ///
+    /// **Examples**: RDM-2023-010
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rdm_msg_link: Option<String>,
+    /// Link(s) to relevant Tracking Data Message(s).
+    ///
+    /// **Examples**: TDM-2023-111
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tdm_msg_link: Option<String>,
+    /// Spacecraft operator of the space object.
+    ///
+    /// **Examples**: SES, INTELSAT
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator: Option<String>,
+    /// Owner of the space object.
+    ///
+    /// **Examples**: Government of France
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
+    /// Country or country code where the owner is based.
+    ///
+    /// **Examples**: FR, USA, JP
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub country: Option<String>,
+    /// Constellation to which this space object belongs.
+    ///
+    /// **Examples**: GALILEO, STARLINK
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub constellation: Option<String>,
+    /// Type of object (value to be drawn from the SANA registry list of Object Descriptions at
+    /// <https://sanaregistry.org/r/object_types>).
+    ///
+    /// **Examples**: PAYLOAD, ROCKET BODY, DEBRIS, OTHER
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_type: Option<ObjectDescription>,
+    /// Time system used for all absolute time stamps in the message (e.g., UTC, TAI).
+    ///
+    /// **Examples**: UTC, TAI
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     pub time_system: String,
+    /// Epoch to which all relative times in the message are referenced. (For format specification,
+    /// see 7.5.10.)
+    ///
+    /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     pub epoch_tzero: Epoch,
+    /// Operational status of the space object (value to be drawn from the SANA registry list of
+    /// Operational Status at <https://sanaregistry.org/r/operational_status>).
+    ///
+    /// **Examples**: OPERATIONAL, NON-OPERATIONAL
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ops_status: Option<String>,
+    /// Orbit category of the space object (value to be drawn from the SANA registry list of Orbit
+    /// Categories at <https://sanaregistry.org/r/orbit_categories>).
+    ///
+    /// **Examples**: GEO, LEO
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orbit_category: Option<String>,
+    /// List of data elements included in the OCM message.
+    ///
+    /// **Examples**: TRAJ, PHYS, COV, MAN, PERT, OD, USER
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ocm_data_elements: Option<String>,
+    /// Spacecraft clock offset at EPOCH_TZERO.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sclk_offset_at_epoch: Option<TimeOffset>,
+    /// Spacecraft clock scale factor.
+    ///
+    /// **Examples**: 1.0
+    ///
+    /// **Units**: s/SI-s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sclk_sec_per_si_sec: Option<Duration>,
+    /// Epoch of the previous message. (See 7.5.10 for formatting rules.)
+    ///
+    /// **Examples**: 2001-11-06T11:17:33
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_message_epoch: Option<Epoch>,
+    /// Anticipated epoch of the next message. (See 7.5.10 for formatting rules.)
+    ///
+    /// **Examples**: 2001-11-06T11:17:33
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_message_epoch: Option<Epoch>,
+    /// Time of the earliest data in the message. (See 7.5.10 for formatting rules.)
+    ///
+    /// **Examples**: 2001-11-06T11:17:33
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_time: Option<Epoch>,
+    /// Time of the latest data in the message. (See 7.5.10 for formatting rules.)
+    ///
+    /// **Examples**: 2001-11-06T11:17:33
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_time: Option<Epoch>,
+    /// Approximate time span covered by the data in the message.
+    ///
+    /// **Examples**: 0.1
+    ///
+    /// **Units**: d
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub time_span: Option<DayInterval>,
+    /// TAI minus UTC difference at EPOCH_TZERO.
+    ///
+    /// **Examples**: 37.0
+    ///
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub taimutc_at_tzero: Option<TimeOffset>,
+    /// Epoch of the next leap second. (See 7.5.10 for formatting rules.)
+    ///
+    /// **Examples**: 2001-11-06T11:17:33
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_leap_epoch: Option<Epoch>,
+    /// TAI minus UTC difference at NEXT_LEAP_EPOCH.
+    ///
+    /// **Examples**: 38.0
+    ///
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_leap_taimutc: Option<TimeOffset>,
+    /// UT1 minus UTC difference at EPOCH_TZERO.
+    ///
+    /// **Examples**: 0.3
+    ///
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ut1mutc_at_tzero: Option<TimeOffset>,
+    /// Source of Earth Orientation Parameters.
+    ///
+    /// **Examples**: IERS_A
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eop_source: Option<String>,
+    /// Interpolation method for EOP data.
+    ///
+    /// **Examples**: HERMITE, LINEAR
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interp_method_eop: Option<String>,
+    /// Source of celestial body ephemerides.
+    ///
+    /// **Examples**: JPL_DE430
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub celestial_source: Option<String>,
 }
@@ -642,21 +928,33 @@ impl OcmMetadata {
 // Data
 //----------------------------------------------------------------------
 
+/// OCM Data Section.
+///
+/// This struct is the primary data container for the OCM. It holds all the
+/// different data blocks, such as trajectory, physical properties, covariance,
+/// maneuvers, and other related information.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmData {
+    /// List of trajectory state time history blocks.
     #[serde(rename = "traj", default)]
     pub traj: Vec<OcmTrajState>,
+    /// Space object physical characteristics.
     #[serde(rename = "phys", default)]
     pub phys: Option<OcmPhysicalDescription>,
+    /// List of covariance time history blocks.
     #[serde(rename = "cov", default)]
     pub cov: Vec<OcmCovarianceMatrix>,
+    /// List of maneuver specifications.
     #[serde(rename = "man", default)]
     pub man: Vec<OcmManeuverParameters>,
+    /// Perturbation parameters.
     #[serde(rename = "pert", default)]
     pub pert: Option<OcmPerturbations>,
+    /// Orbit determination data.
     #[serde(rename = "od", default)]
     pub od: Option<OcmOdParameters>,
+    /// User-defined parameters.
     #[serde(rename = "user", default)]
     pub user: Option<UserDefined>,
 }
@@ -796,44 +1094,149 @@ impl OcmData {
 // 1. Trajectory State
 //----------------------------------------------------------------------
 
+/// A block of trajectory state data, which can be a time history of states.
+///
+/// References:
+/// - CCSDS 502.0-B-3, Section 4.5.2 (OCM Trajectory State Section)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmTrajState {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Identification number for this trajectory state time history block.
+    ///
+    /// **Examples**: 1
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traj_id: Option<String>,
+    /// Identification number for the previous trajectory state time history.
+    ///
+    /// **Examples**: 0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traj_prev_id: Option<String>,
+    /// Identification number for the next trajectory state time history.
+    ///
+    /// **Examples**: 2
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traj_next_id: Option<String>,
+    /// Basis of this trajectory state time history data (e.g., PREDICTED, DETERMINED, SIMULATED).
+    ///
+    /// **Examples**: PREDICTED
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traj_basis: Option<TrajBasis>,
+    /// Identification number for the telemetry dataset, orbit determination, or simulation upon
+    /// which the TRAJ_BASIS is based.
+    ///
+    /// **Examples**: OD-123
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traj_basis_id: Option<String>,
+    /// Recommended interpolation method for the state elements (value to be drawn from the SANA
+    /// registry list of Interpolation Methods at <https://sanaregistry.org/r/interpolation_methods>).
+    ///
+    /// **Examples**: HERMITE, LINEAR
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation: Option<String>,
+    /// Recommended interpolation degree for the state elements.
+    ///
+    /// **Examples**: 5
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation_degree: Option<u32>,
+    /// Name of the propagator used in the creation of the trajectory state data.
+    ///
+    /// **Examples**: GMAT, STK
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub propagator: Option<String>,
+    /// Name of the central body (value to be drawn from the SANA registry list of Common Central Body
+    /// Names at <https://sanaregistry.org/r/central_body_name>).
+    ///
+    /// **Examples**: EARTH, MOON
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     pub center_name: String,
+    /// Orbit reference frame (value to be drawn from the SANA registry list of Reference Frames at
+    /// <https://sanaregistry.org/r/orbit_relative_reference_frames>).
+    ///
+    /// **Examples**: ICRF, EME2000
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     pub traj_ref_frame: String,
+    /// Epoch of the orbit reference frame, if TRAJ_REF_FRAME is provided and its epoch is not
+    /// intrinsic to the definition of the reference frame.
+    ///
+    /// **Examples**: 2000-01-01T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traj_frame_epoch: Option<Epoch>,
+    /// Start time of the useable time span covered by the ephemeris data.
+    ///
+    /// **Examples**: 2000-01-01T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_start_time: Option<Epoch>,
+    /// Stop time of the useable time span covered by the ephemeris data.
+    ///
+    /// **Examples**: 2000-01-02T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_stop_time: Option<Epoch>,
+    /// Integer orbit revolution number at the epoch of the first trajectory data line.
+    ///
+    /// **Examples**: 1234.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orb_revnum: Option<f64>,
+    /// Basis for the orbit revolution counter (0 or 1).
+    ///
+    /// **Examples**: 1
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orb_revnum_basis: Option<RevNumBasis>,
+    /// Specification of the trajectory state element set type (value to be drawn from the SANA
+    /// registry list of Trajectory State Types at <https://sanaregistry.org/r/orbital_elements>).
+    ///
+    /// **Examples**: CARTESIAN
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     pub traj_type: String,
+    /// Method used for orbit averaging if TRAJ_TYPE is not osculating (value to be drawn from the SANA
+    /// registry list of Orbit Averaging Methods at <https://sanaregistry.org/r/orbit_averaging>).
+    ///
+    /// **Examples**: BROUWER-LYDDANE
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orb_averaging: Option<String>,
+    /// SI unit designations for the state elements.
+    ///
+    /// **Examples**: km, km/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traj_units: Option<String>,
+    /// Contiguous set of trajectory state data lines.
     #[serde(rename = "trajLine")]
     pub traj_lines: Vec<TrajLine>,
 }
@@ -1066,109 +1469,472 @@ impl OcmTrajState {
 // 2. Physical Properties (ocmPhysicalDescriptionType)
 //----------------------------------------------------------------------
 
+/// Space Object Physical Characteristics.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmPhysicalDescription {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Free-text field containing the satellite manufacturer’s name.
+    ///
+    /// **Examples**: Boeing, Lockheed Martin
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manufacturer: Option<String>,
+    /// Free-text field containing the satellite manufacturer’s spacecraft bus model name.
+    ///
+    /// **Examples**: LS-1300, A2100
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bus_model: Option<String>,
+    /// Free-text field containing a comma-separated list of other space objects that this object is
+    /// docked to.
+    ///
+    /// **Examples**: 2021-098A, 2021-098B
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub docked_with: Option<String>,
+    /// Attitude-independent drag cross-sectional area (AD) facing the relative wind vector, not
+    /// already incorporated into the attitude-dependent ‘AREA_ALONG_OEB’ parameters.
+    ///
+    /// **Examples**: 2.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_const_area: Option<Area>,
+    /// Nominal drag Coefficient (CD NOM). If the atmospheric drag coefficient, CD, is set to zero, no
+    /// atmospheric drag shall be considered.
+    ///
+    /// **Examples**: 2.2
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_coeff_nom: Option<f64>,
+    /// Drag coefficient one sigma (1σ) percent uncertainty, where the actual range of drag
+    /// coefficients to within 1σ shall be obtained from \[1.0 ± 0.01*DRAG_UNCERTAINTY\] (CD NOM). This
+    /// factor is intended to allow operators to supply the nominal ballistic coefficient components
+    /// while accommodating ballistic coefficient uncertainties.
+    ///
+    /// **Examples**: 5.0
+    ///
+    /// **Units**: %
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_uncertainty: Option<Percentage>,
+    /// Space object total mass at beginning of life.
+    ///
+    /// **Examples**: 1000.0
+    ///
+    /// **Units**: kg
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_wet_mass: Option<Mass>,
+    /// Space object total mass (including propellant, i.e., ‘wet mass’) at the current reference epoch
+    /// ‘EPOCH_TZERO’.
+    ///
+    /// **Examples**: 950.0
+    ///
+    /// **Units**: kg
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wet_mass: Option<Mass>,
+    /// Space object dry mass (without propellant).
+    ///
+    /// **Examples**: 500.0
+    ///
+    /// **Units**: kg
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dry_mass: Option<Mass>,
+    /// Parent reference frame that maps to the OEB frame via the quaternion-based transformation
+    /// defined in annex F, subsection F1. Select from the accepted set of values indicated in annex
+    /// B, subsections B4 and B5. This keyword shall be provided if OEB_Q1,2,3,qc are specified.
+    ///
+    /// **Examples**: ICRF, EME2000
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_parent_frame: Option<String>,
+    /// Epoch of the OEB parent frame, if OEB_PARENT_FRAME is provided and its epoch is not intrinsic
+    /// to the definition of the reference frame.
+    ///
+    /// **Examples**: 2000-01-01T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_parent_frame_epoch: Option<Epoch>,
+    /// q1 = e1 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e1 = 1st component
+    /// of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to
+    /// the frame aligned with the OEB (defined in annex F, subsection F1). A value of ‘-999’ denotes
+    /// a tumbling space object.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_q1: Option<f64>,
+    /// q2 = e2 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e2 = 2nd component
+    /// of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to
+    /// the frame aligned with the Optimally Encompassing Box (defined in annex F, subsection F1). A
+    /// value of ‘-999’ denotes a tumbling space object.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_q2: Option<f64>,
+    /// q3 = e3 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e3 = 3rd component
+    /// of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to
+    /// the frame aligned with the Optimally Encompassing Box (defined in annex F, subsection F1). A
+    /// value of ‘-999’ denotes a tumbling space object.
+    ///
+    /// **Examples**: 0.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_q3: Option<f64>,
+    /// qc = cos(φ/2), where per reference [H1], φ = the Euler rotation angle for the rotation that
+    /// maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the Optimally
+    /// Encompassing Box (annex F, subsection F1). qc shall be made non-negative by convention. A
+    /// value of ‘-999’ denotes a tumbling space object.
+    ///
+    /// **Examples**: 1.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_qc: Option<f64>,
+    /// Maximum physical dimension (along Xoeb) of the OEB.
+    ///
+    /// **Examples**: 10.0
+    ///
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_max: Option<Length>,
+    /// Intermediate physical dimension (along Ŷoeb) of OEB normal to OEB_MAX direction.
+    ///
+    /// **Examples**: 5.0
+    ///
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_int: Option<Length>,
+    /// Minimum physical dimension (along Ẑoeb) of OEB in direction normal to both OEB_MAX and OEB_INT
+    /// directions.
+    ///
+    /// **Examples**: 2.0
+    ///
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_min: Option<Length>,
+    /// Attitude-dependent cross-sectional area of space object (not already included in
+    /// DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along max OEB (Xoeb) direction as defined in
+    /// annex F.
+    ///
+    /// **Examples**: 10.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_along_oeb_max: Option<Area>,
+    /// Attitude-dependent cross-sectional area of space object (not already included in
+    /// DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along intermediate OEB (Ŷoeb) direction as
+    /// defined in annex F.
+    ///
+    /// **Examples**: 20.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_along_oeb_int: Option<Area>,
+    /// Attitude-dependent cross-sectional area of space object (not already included in
+    /// DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along minimum OEB (Ẑoeb) direction as defined
+    /// in annex F.
+    ///
+    /// **Examples**: 50.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_along_oeb_min: Option<Area>,
+    /// Minimum cross-sectional area for collision probability estimation purposes.
+    ///
+    /// **Examples**: 5.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_min_for_pc: Option<Area>,
+    /// Maximum cross-sectional area for collision probability estimation purposes.
+    ///
+    /// **Examples**: 50.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_max_for_pc: Option<Area>,
+    /// Typical (50th percentile) cross-sectional area sampled over all space object orientations for
+    /// collision probability estimation purposes.
+    ///
+    /// **Examples**: 15.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_typ_for_pc: Option<Area>,
+    /// Typical (50th percentile) effective Radar Cross Section of the space object sampled over all
+    /// possible viewing angles.
+    ///
+    /// **Examples**: 10.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rcs: Option<Area>,
+    /// Minimum Radar Cross Section observed for this object.
+    ///
+    /// **Examples**: 1.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rcs_min: Option<Area>,
+    /// Maximum Radar Cross Section observed for this object.
+    ///
+    /// **Examples**: 100.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rcs_max: Option<Area>,
+    /// Attitude-independent solar radiation pressure cross-sectional area (AR) facing the Sun, not
+    /// already incorporated into the attitude-dependent ‘AREA_ALONG_OEB’ parameters.
+    ///
+    /// **Examples**: 5.0
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub srp_const_area: Option<Area>,
+    /// Nominal Solar Radiation Pressure Coefficient (CR NOM). If the solar radiation coefficient, CR,
+    /// is set to zero, no solar radiation pressure shall be considered.
+    ///
+    /// **Examples**: 1.2
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_coeff: Option<f64>,
+    /// SRP one sigma (1σ) percent uncertainty, where the actual range of SRP coefficients to within
+    /// 1σ shall be obtained from \[1.0 ± 0.01*SRP_UNCERTAINTY\] (CR NOM). This factor is intended to
+    /// allow operators to supply the nominal ballistic coefficient components while accommodating
+    /// ballistic coefficient uncertainties.
+    ///
+    /// **Examples**: 10.0
+    ///
+    /// **Units**: %
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_uncertainty: Option<Percentage>,
+    /// Typical (50th percentile) absolute Visual Magnitude of the space object sampled over all
+    /// possible viewing angles and ‘normalized’ as specified in informative annex F, subsection F2 to
+    /// a 1 AU Sun-to-target distance, a phase angle of 0°, and a 40,000 km target-to-sensor distance.
+    ///
+    /// **Examples**: 4.5
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_absolute: Option<f64>,
+    /// Minimum apparent Visual Magnitude observed for this space object. The ‘MIN’ value represents
+    /// the brightest observation, which associates with a lower Vmag.
+    ///
+    /// **Examples**: 3.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_apparent_min: Option<f64>,
+    /// Typical (50th percentile) apparent Visual Magnitude observed for this space object.
+    ///
+    /// **Examples**: 12.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_apparent: Option<f64>,
+    /// Maximum apparent Visual Magnitude observed for this space object. The ‘MAX’ value represents
+    /// the dimmest observation, which associates with a higher Vmag.
+    ///
+    /// **Examples**: 18.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_apparent_max: Option<f64>,
+    /// Typical (50th percentile) coefficient of REFLECTANCE of the space object over all possible
+    /// viewing angles, ranging from 0 (none) to 1 (perfect reflectance).
+    ///
+    /// **Examples**: 0.2
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reflectance: Option<Probability>,
+    /// Free-text specification of primary mode of attitude control for the space object.
+    ///
+    /// **Examples**: THREE_AXIS, SPIN, DUAL_SPIN, TUMBLING, GRAVITY_GRADIENT
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_control_mode: Option<String>,
+    /// Free-text specification of type of actuator for attitude control.
+    ///
+    /// **Examples**: ATT_THRUSTERS, ACTIVE_MAG_TORQUE, PASSIVE_MAG_TORQUE, REACTION_WHEELS,
+    /// MOMENTUM_WHEELS, CONTROL_MOMENT_GYROSCOPE, NONE, OTHER
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_actuator_type: Option<String>,
+    /// Accuracy of attitude knowledge.
+    ///
+    /// **Examples**: 0.01
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_knowledge: Option<Angle>,
+    /// Accuracy of attitude control system (ACS) to maintain attitude, assuming attitude knowledge
+    /// was perfect (i.e., deadbands).
+    ///
+    /// **Examples**: 0.1
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_control: Option<Angle>,
+    /// Overall accuracy of spacecraft to maintain attitude, including attitude knowledge errors and
+    /// ACS operation.
+    ///
+    /// **Examples**: 0.5
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_pointing: Option<Angle>,
+    /// Average maneuver frequency, measured in the number of orbit- or attitude-adjust maneuvers per
+    /// year.
+    ///
+    /// **Examples**: 52.0
+    ///
+    /// **Units**: #/yr
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avg_maneuver_freq: Option<ManeuverFreq>,
+    /// Maximum composite thrust the spacecraft can accomplish in any single body-fixed direction.
+    ///
+    /// **Examples**: 100.0
+    ///
+    /// **Units**: N
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_thrust: Option<Thrust>,
+    /// Total ΔV capability of the spacecraft at beginning of life.
+    ///
+    /// **Examples**: 2.0
+    ///
+    /// **Units**: km/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dv_bol: Option<Velocity>,
+    /// Total ΔV remaining for the spacecraft.
+    ///
+    /// **Examples**: 1.5
+    ///
+    /// **Units**: km/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dv_remaining: Option<Velocity>,
+    /// Moment of Inertia about the X-axis of the space object’s primary body frame.
+    ///
+    /// **Examples**: 100.0
+    ///
+    /// **Units**: kg·m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ixx: Option<Moment>,
+    /// Moment of Inertia about the Y-axis.
+    ///
+    /// **Examples**: 200.0
+    ///
+    /// **Units**: kg·m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub iyy: Option<Moment>,
+    /// Moment of Inertia about the Z-axis.
+    ///
+    /// **Examples**: 300.0
+    ///
+    /// **Units**: kg·m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub izz: Option<Moment>,
+    /// Inertia Cross Product of the X & Y axes.
+    ///
+    /// **Examples**: 1.0
+    ///
+    /// **Units**: kg·m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ixy: Option<Moment>,
+    /// Inertia Cross Product of the X & Z axes.
+    ///
+    /// **Examples**: 2.0
+    ///
+    /// **Units**: kg·m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ixz: Option<Moment>,
+    /// Inertia Cross Product of the Y & Z axes.
+    ///
+    /// **Examples**: 3.0
+    ///
+    /// **Units**: kg·m²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub iyz: Option<Moment>,
 }
@@ -1468,34 +2234,110 @@ impl OcmPhysicalDescription {
 // 3. Covariance (ocmCovarianceMatrixType)
 //----------------------------------------------------------------------
 
+/// OCM Covariance Matrix.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmCovarianceMatrix {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Identification number for this covariance time history block.
+    ///
+    /// **Examples**: 1
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_id: Option<String>,
+    /// Identification number for the previous covariance time history.
+    ///
+    /// **Examples**: 0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_prev_id: Option<String>,
+    /// Identification number for the next covariance time history.
+    ///
+    /// **Examples**: 2
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_next_id: Option<String>,
+    /// Basis of this covariance time history data (e.g., PREDICTED, DETERMINED).
+    ///
+    /// **Examples**: PREDICTED
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_basis: Option<CovBasis>,
+    /// Identification number for the telemetry dataset, orbit determination, or simulation upon
+    /// which the COV_BASIS is based.
+    ///
+    /// **Examples**: OD-123
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_basis_id: Option<String>,
+    /// Reference frame of the covariance time history (value to be drawn from the SANA registry list
+    /// of Reference Frames at <https://sanaregistry.org/r/celestial_body_reference_frames> or
+    /// <https://sanaregistry.org/r/orbit_relative_reference_frames>).
+    ///
+    /// **Examples**: ICRF, EME2000
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     pub cov_ref_frame: String,
+    /// Epoch of the covariance data reference frame, if not intrinsic to its definition.
+    ///
+    /// **Examples**: 2000-01-01T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_frame_epoch: Option<Epoch>,
+    /// Minimum scale factor to apply to this covariance data to achieve realism.
+    ///
+    /// **Examples**: 0.9
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_scale_min: Option<f64>,
+    /// Maximum scale factor to apply to this covariance data to achieve realism.
+    ///
+    /// **Examples**: 1.1
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_scale_max: Option<f64>,
+    /// A measure of the confidence in the covariance errors matching reality.
+    ///
+    /// **Examples**: 95.0
+    ///
+    /// **Units**: %
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_confidence: Option<Percentage>,
+    /// Specification of the covariance element set type (value to be drawn from the SANA registry
+    /// list of Covariance Types at <https://sanaregistry.org/r/orbital_covariance_matrix_types>).
+    ///
+    /// **Examples**: CARTESIAN
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     pub cov_type: String,
+    /// Indicates covariance ordering (LTM or UTM).
+    ///
+    /// **Examples**: LTM
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     pub cov_ordering: CovOrder,
+    /// SI unit designations for the covariance elements.
+    ///
+    /// **Examples**: km**2, km**2/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_units: Option<String>,
+    /// Contiguous set of covariance matrix data lines.
     #[serde(rename = "covLine")]
     pub cov_lines: Vec<CovLine>,
 }
@@ -1702,66 +2544,240 @@ impl OcmCovarianceMatrix {
 // 4. Maneuver (ocmManeuverParametersType)
 //----------------------------------------------------------------------
 
+/// OCM Maneuver Parameters.
+///
+/// References:
+/// - CCSDS 502.0-B-3, Section 4.5.5 (OCM Maneuver Section)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmManeuverParameters {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Unique maneuver identification number for this maneuver block.
+    ///
+    /// **Examples**: 1
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     pub man_id: String,
+    /// Identification number for the previous maneuver.
+    ///
+    /// **Examples**: 0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_prev_id: Option<String>,
+    /// Identification number for the next maneuver.
+    ///
+    /// **Examples**: 2
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_next_id: Option<String>,
+    /// Basis of this maneuver data (e.g., PREDICTED, DETERMINED, SIMULATED).
+    ///
+    /// **Examples**: PREDICTED
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_basis: Option<ManBasis>,
+    /// Identification number for the telemetry dataset, orbit determination, or simulation upon
+    /// which the MAN_BASIS is based.
+    ///
+    /// **Examples**: OD-123
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_basis_id: Option<String>,
+    /// Identification name of the maneuver device (e.g., ‘THRUSTER-1’).
+    ///
+    /// **Examples**: THRUSTER-1
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     pub man_device_id: String,
+    /// Completion time of the previous maneuver for this MAN_BASIS.
+    ///
+    /// **Examples**: 2000-01-01T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_prev_epoch: Option<Epoch>,
+    /// Start time of the next maneuver for this MAN_BASIS.
+    ///
+    /// **Examples**: 2000-01-02T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_next_epoch: Option<Epoch>,
+    /// Purpose of the maneuver (e.g., ‘WHEEL-DESAT’, ‘STATION-KEEPING’).
+    ///
+    /// **Examples**: STATION-KEEPING
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_purpose: Option<String>,
+    /// Identification (e.g., message or file) of the predicted maneuver parameters upon which this
+    /// maneuver is based.
+    ///
+    /// **Examples**: MAN-PRED-456
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_pred_source: Option<String>,
+    /// Reference frame for the maneuver thrust vector (value to be drawn from the SANA registry list
+    /// of Reference Frames at <https://sanaregistry.org/r/orbit_relative_reference_frames>).
+    ///
+    /// **Examples**: TNW, RSW
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     pub man_ref_frame: String,
+    /// Epoch of the maneuver reference frame, if not intrinsic to its definition.
+    ///
+    /// **Examples**: 2000-01-01T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_frame_epoch: Option<Epoch>,
+    /// Identification of a gravitational body that would be used for an assist maneuver (value to be
+    /// drawn from the SANA registry list of Common Central Body Names at
+    /// <https://sanaregistry.org/r/central_body_name>).
+    ///
+    /// **Examples**: EARTH, JUPITER
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grav_assist_name: Option<String>,
+    /// Duty cycle type to use for this maneuver time history section.
+    ///
+    /// **Examples**: LUSTRE
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     pub dc_type: ManDc,
+    /// Start time of the duty cycle-based maneuver window.
+    ///
+    /// **Examples**: 2000-01-01T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_win_open: Option<Epoch>,
+    /// End time of the duty cycle-based maneuver window.
+    ///
+    /// **Examples**: 2000-01-01T13:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_win_close: Option<Epoch>,
+    /// Minimum number of ‘ON’ duty cycles.
+    ///
+    /// **Examples**: 1
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_min_cycles: Option<u64>,
+    /// Maximum number of ‘ON’ duty cycles.
+    ///
+    /// **Examples**: 10
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_max_cycles: Option<u64>,
+    /// Start time of the initial duty cycle-based maneuver sequence execution.
+    ///
+    /// **Examples**: 2000-01-01T12:05:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_exec_start: Option<Epoch>,
+    /// End time of the final duty cycle-based maneuver sequence execution.
+    ///
+    /// **Examples**: 2000-01-01T12:55:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_exec_stop: Option<Epoch>,
+    /// Reference time for the THRUST duty cycle.
+    ///
+    /// **Examples**: 2000-01-01T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_ref_time: Option<Epoch>,
+    /// Thruster pulse ‘ON’ duration.
+    ///
+    /// **Examples**: 10.0
+    ///
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_time_pulse_duration: Option<Duration>,
+    /// Elapsed time between the start of one pulse and the start of the next.
+    ///
+    /// **Examples**: 100.0
+    ///
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_time_pulse_period: Option<Duration>,
+    /// Reference vector direction in the body frame for angle-initiated thruster duty cycles.
+    ///
+    /// **Examples**: 1.0 0.0 0.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_ref_dir: Option<Vec3Double>,
+    /// Body reference frame in which DC_BODY_TRIGGER will be specified.
+    ///
+    /// **Examples**: SC_BODY
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_body_frame: Option<String>,
+    /// Body frame reference vector direction for angle-based duty cycle initiation.
+    ///
+    /// **Examples**: 0.0 1.0 0.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_body_trigger: Option<Vec3Double>,
+    /// Phase angle offset of thruster pulse start.
+    ///
+    /// **Examples**: 10.0
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_pa_start_angle: Option<Angle>,
+    /// Phase angle of thruster pulse stop.
+    ///
+    /// **Examples**: 20.0
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_pa_stop_angle: Option<Angle>,
+    /// Specification of the maneuver element set type (value to be drawn from the SANA registry list
+    /// of Maneuver Types at https://sanaregistry.org/r/maneuver_type).
+    ///
+    /// **Examples**: ΔV_CARTESIAN, ΔV_SPHERICAL, THRUST_CARTESIAN
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     pub man_composition: String,
+    /// SI unit designations for the maneuver parameters.
+    ///
+    /// **Examples**: km/s, N
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_units: Option<String>,
+    /// Maneuver time history data lines.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.3.3.
     #[serde(rename = "manLine")]
     pub man_lines: Vec<ManLine>,
 }
@@ -2071,67 +3087,249 @@ impl OcmManeuverParameters {
 // 5. Perturbations (ocmPerturbationsType)
 //----------------------------------------------------------------------
 
+/// OCM Perturbations Parameters.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmPerturbations {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Name of the atmospheric model (value to be drawn from the SANA registry list of Atmospheric
+    /// Models at https://sanaregistry.org/r/atmospheric_model).
+    ///
+    /// **Examples**: JB2008, MSISE00
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atmospheric_model: Option<String>,
+    /// Name of the gravity model (value to be drawn from the SANA registry list of Gravitational
+    /// Models at https://sanaregistry.org/r/gravity_model).
+    ///
+    /// **Examples**: EGM96, EGM2008
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gravity_model: Option<String>,
+    /// Equatorial radius of the central body.
+    ///
+    /// **Examples**: 6378137.0
+    ///
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub equatorial_radius: Option<Position>,
+    /// Gravitational coefficient of the central body.
+    ///
+    /// **Examples**: 398600.4418
+    ///
+    /// **Units**: km³/s²
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gm: Option<Gm>,
+    /// List of N-body perturbations included (value(s) to be drawn from the SANA registry list of
+    /// Common Central Body Names at https://sanaregistry.org/r/central_body_name).
+    ///
+    /// **Examples**: MOON, SUN
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub n_body_perturbations: Option<String>,
+    /// Central body angular rotation rate.
+    ///
+    /// **Examples**: 0.00417807462
+    ///
+    /// **Units**: deg/s
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub central_body_rotation: Option<AngleRate>,
+    /// Oblate flattening of the central body.
+    ///
+    /// **Examples**: 0.00335281
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oblate_flattening: Option<f64>,
+    /// Name of the ocean tides model (value to be drawn from the SANA registry list of Ocean Tides
+    /// Models at https://sanaregistry.org/r/ocean_tides_model).
+    ///
+    /// **Examples**: FES2004
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ocean_tides_model: Option<String>,
+    /// Name of solid tides model (optionally specify order or constituent effects, diurnal,
+    /// semi-diurnal, etc.).
+    ///
+    /// **Examples**: DIURNAL, SEMI-DIURNAL
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solid_tides_model: Option<String>,
+    /// Specification of the reduction theory used for precession and nutation modeling. This is a
+    /// free-text field, so if the examples on the right are insufficient, others may be used.
+    ///
+    /// **Examples**: IAU1976/FK5, IAU2010
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reduction_theory: Option<String>,
+    /// Name of the albedo model.
+    ///
+    /// **Examples**: EARTH_ALBEDO
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub albedo_model: Option<String>,
+    /// Size of the albedo grid.
+    ///
+    /// **Examples**: 10
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub albedo_grid_size: Option<u64>,
+    /// Shadow model used for Solar Radiation Pressure; dual cone uses both umbra/penumbra regions.
+    //  Selected option should be one of ‘NONE’, ‘CYLINDRICAL’, ‘CONE’, or ‘DUAL_CONE’.
+    ///
+    /// **Examples**: NONE, CONE, DUAL_CONE, CYLINDRICAL
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadow_model: Option<String>,
+    /// List of bodies included in shadow calculations (value(s) to be drawn from the SANA registry
+    /// list of Orbit Centers at <https://sanaregistry.org/r/orbit_centers>).
+    ///
+    /// **Examples**: EARTH, MOON
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadow_bodies: Option<String>,
+    /// Name of the Solar Radiation Pressure (SRP) model.
+    ///
+    /// **Examples**: CANNONBALL, FLAT_PLATE, BOX_WING
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub srp_model: Option<String>,
+    /// Space weather data source.
+    ///
+    /// **Examples**: NOAA
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sw_data_source: Option<String>,
+    /// Epoch of the space weather data.
+    ///
+    /// **Examples**: 2000-01-01T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sw_data_epoch: Option<Epoch>,
+    /// Free-text field specifying the method used to select or interpolate any and all sequential
+    /// space weather data (Kp, ap, Dst, F10.7, M10.7, S10.7, Y10.7, etc.). While not constrained to
+    /// specific entries, it is anticipated that the utilized method would match methods detailed in
+    /// numerical analysis textbooks.
+    ///
+    /// **Examples**: PRECEDING_VALUE, NEAREST_NEIGHBOR, LINEAR, LAGRANGE_ORDER_5
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sw_interp_method: Option<String>,
+    /// Fixed geomagnetic Kp index.
+    ///
+    /// **Examples**: 3.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_geomag_kp: Option<Geomag>,
+    /// Fixed geomagnetic Ap index.
+    ///
+    /// **Examples**: 15.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_geomag_ap: Option<Geomag>,
+    /// Fixed geomagnetic Dst index.
+    ///
+    /// **Examples**: -20.0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_geomag_dst: Option<Geomag>,
+    /// Fixed F10.7 solar flux.
+    ///
+    /// **Examples**: 150.0
+    ///
+    /// **Units**: SFU
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_f10p7: Option<SolarFlux>,
+    /// Fixed 81-day average F10.7 solar flux.
+    ///
+    /// **Examples**: 140.0
+    ///
+    /// **Units**: SFU
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_f10p7_mean: Option<SolarFlux>,
+    /// Fixed M10.7 solar flux.
+    ///
+    /// **Examples**: 130.0
+    ///
+    /// **Units**: SFU
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_m10p7: Option<SolarFlux>,
+    /// Fixed 81-day average M10.7 solar flux.
+    ///
+    /// **Examples**: 120.0
+    ///
+    /// **Units**: SFU
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_m10p7_mean: Option<SolarFlux>,
+    /// Fixed S10.7 solar flux.
+    ///
+    /// **Examples**: 110.0
+    ///
+    /// **Units**: SFU
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_s10p7: Option<SolarFlux>,
+    /// Fixed 81-day average S10.7 solar flux.
+    ///
+    /// **Examples**: 100.0
+    ///
+    /// **Units**: SFU
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_s10p7_mean: Option<SolarFlux>,
+    /// Fixed Y10.7 solar flux.
+    ///
+    /// **Examples**: 90.0
+    ///
+    /// **Units**: SFU
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_y10p7: Option<SolarFlux>,
+    /// Fixed 81-day average Y10.7 solar flux.
+    ///
+    /// **Examples**: 85.0
+    ///
+    /// **Units**: SFU
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_y10p7_mean: Option<SolarFlux>,
 }
@@ -2310,64 +3508,246 @@ impl OcmPerturbations {
 // 6. OD (ocmOdParametersType)
 //----------------------------------------------------------------------
 
+/// OCM Orbit Determination Parameters.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmOdParameters {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Identification number for this orbit determination.
+    ///
+    /// **Examples**: 1
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     pub od_id: String,
+    /// Optional identification number for the previous orbit determination.
+    ///
+    /// **Examples**: 0
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_prev_id: Option<String>,
+    /// Type of orbit determination method used to produce the orbit estimate.
+    ///
+    /// **Examples**: LEAST_SQUARES, KALMAN_FILTER
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     pub od_method: String,
+    /// Relative or absolute time tag of the orbit determination solved-for state in the selected OCM
+    /// time system recorded by the TIME_SYSTEM keyword.
+    ///
+    /// **Examples**: 2000-01-01T12:00:00Z
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     pub od_epoch: Epoch,
+    /// Days elapsed between first accepted observation and OD_EPOCH.
+    ///
+    /// **Examples**: 1.5
+    ///
+    /// **Units**: d
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub days_since_first_obs: Option<DayInterval>,
+    /// Days elapsed between last accepted observation and OD_EPOCH.
+    ///
+    /// **Examples**: 0.1
+    ///
+    /// **Units**: d
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub days_since_last_obs: Option<DayInterval>,
+    /// Number of days of observations recommended for the OD of the object (useful only for Batch OD
+    /// systems).
+    ///
+    /// **Examples**: 5.0
+    ///
+    /// **Units**: d
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recommended_od_span: Option<DayInterval>,
+    /// Actual time span in days used for the OD of the object.
+    ///
+    /// **Examples**: 4.8
+    ///
+    /// **Units**: d
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actual_od_span: Option<DayInterval>,
+    /// The number of observations available within the actual OD time span.
+    ///
+    /// **Examples**: 100
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub obs_available: Option<u64>,
+    /// The number of observations accepted within the actual OD time span.
+    ///
+    /// **Examples**: 95
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub obs_used: Option<u64>,
+    /// The number of sensor tracks available for the OD within the actual time span (see definition
+    /// of ‘tracks’, 1.5.2).
+    ///
+    /// **Examples**: 10
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tracks_available: Option<u64>,
+    /// The number of sensor tracks accepted for the OD within the actual time span (see definition of
+    /// ‘tracks’, 1.5.2).
+    ///
+    /// **Examples**: 9
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tracks_used: Option<u64>,
+    /// The maximum time between observations in the OD of the object.
+    ///
+    /// **Examples**: 0.5
+    ///
+    /// **Units**: d
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maximum_obs_gap: Option<DayInterval>,
+    /// Positional error ellipsoid 1 sigma (1σ) major eigenvalue at the epoch of the OD.
+    ///
+    /// **Examples**: 100.0
+    ///
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_epoch_eigmaj: Option<Length>,
+    /// Positional error ellipsoid 1σ intermediate eigenvalue at the epoch of the OD.
+    ///
+    /// **Examples**: 50.0
+    ///
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_epoch_eigint: Option<Length>,
+    /// Positional error ellipsoid 1σ minor eigenvalue at the epoch of the OD.
+    ///
+    /// **Examples**: 20.0
+    ///
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_epoch_eigmin: Option<Length>,
+    /// The resulting maximum predicted major eigenvalue of the 1σ positional error ellipsoid over
+    /// the entire TIME_SPAN of the OCM, stemming from this OD.
+    ///
+    /// **Examples**: 500.0
+    ///
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_max_pred_eigmaj: Option<Length>,
+    /// The resulting minimum predicted minor eigenvalue of the 1σ positional error ellipsoid over
+    /// the entire TIME_SPAN of the OCM, stemming from this OD.
+    ///
+    /// **Examples**: 10.0
+    ///
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_min_pred_eigmin: Option<Length>,
+    /// OD confidence metric, which spans 0 to 100% (useful only for Filter-based OD systems).
+    ///
+    /// **Examples**: 99.0
+    ///
+    /// **Units**: %
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_confidence: Option<Percentage>,
+    /// Generalized Dilution Of Precision for this orbit determination.
+    ///
+    /// **Examples**: 1.5
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gdop: Option<f64>,
+    /// The number of solve-for states in the orbit determination.
+    ///
+    /// **Examples**: 6
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solve_n: Option<u64>,
+    /// Free-text comma-delimited description of the state elements solved for in the orbit
+    /// determination.
+    ///
+    /// **Examples**: X, Y, Z, X_DOT, Y_DOT, Z_DOT
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solve_states: Option<String>,
+    /// The number of consider parameters used in the orbit determination.
+    ///
+    /// **Examples**: 3
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consider_n: Option<u64>,
+    /// Free-text comma-delimited description of the consider parameters used in the orbit
+    /// determination.
+    ///
+    /// **Examples**: DRAG_COEFF, SRP_COEFF
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consider_params: Option<String>,
+    /// The Specific Energy Dissipation Rate, which is the amount of energy being removed from the
+    /// object's orbit by the non-conservative forces.
+    ///
+    /// **Examples**: 1.25e-7
+    ///
+    /// **Units**: W/kg
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sedr: Option<Wkg>,
+    /// The number of sensors used in the orbit determination.
+    ///
+    /// **Examples**: 5
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensors_n: Option<u64>,
+    /// Free-text comma-delimited description of the sensors used in the orbit determination.
+    ///
+    /// **Examples**: SENSOR1, SENSOR2
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensors: Option<String>,
+    /// (Useful/valid only for Batch OD systems.) The weighted RMS residual ratio.
+    ///
+    /// **Examples**: 0.95
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub weighted_rms: Option<f64>,
+    /// Comma-separated list of observation data types utilized in this orbit determination.
+    ///
+    /// **Examples**: RANGE, DOPPLER
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_types: Option<String>,
 }

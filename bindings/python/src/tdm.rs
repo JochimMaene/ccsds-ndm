@@ -14,12 +14,9 @@ use std::fs;
 // TDM - Tracking Data Message
 // ============================================================================
 
-/// Represents a CCSDS Tracking Data Message (TDM).
+/// Tracking Data Message (TDM).
 ///
-/// The TDM is a standard message format for use in exchanging spacecraft tracking data
-/// between space agencies. Such exchanges are used for distributing tracking data output
-/// from routine interagency cross-supports in which spacecraft missions managed by one
-/// agency are tracked from a tracking station managed by a second agency.
+/// The TDM specifies a standard message format for use in exchanging tracking data.
 ///
 /// Parameters
 /// ----------
@@ -58,7 +55,9 @@ impl Tdm {
         )
     }
 
-    /// The message header.
+    /// Tracking Data Message (TDM).
+    ///
+    /// The TDM specifies a standard message format for use in exchanging tracking data.
     ///
     /// :type: TdmHeader
     #[getter]
@@ -92,7 +91,7 @@ impl Tdm {
     ///
     /// :type: list[TdmSegment]
     #[getter]
-    fn get_segments(&self) -> Vec<TdmSegment> {
+    fn get_segment(&self) -> Vec<TdmSegment> {
         self.inner
             .body
             .segments
@@ -266,8 +265,7 @@ impl TdmHeader {
 
     /// Creating agency.
     ///
-    /// Value should be an entry from the 'Abbreviation' column in the SANA Organizations Registry.
-    /// Examples: CNES, ESA, GSFC, DLR, JPL, JAXA, etc.
+    /// Examples: CNES, ESA, GSFC, DLR, JPL, JAXA
     ///
     /// :type: str
     #[getter]
@@ -282,7 +280,7 @@ impl TdmHeader {
 
     /// Data creation date/time in UTC.
     ///
-    /// Format: ISO 8601 (e.g., "2001-11-06T11:17:33" or "2006-001T00:00:00Z")
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23.4, 2006-001T00:00:00Z
     ///
     /// :type: str
     #[getter]
@@ -298,7 +296,7 @@ impl TdmHeader {
 
     /// ID that uniquely identifies a message from a given originator.
     ///
-    /// The format and content of the message identifier value are at the discretion of the originator.
+    /// Examples: 201113719185
     ///
     /// :type: Optional[str]
     #[getter]
@@ -311,7 +309,7 @@ impl TdmHeader {
         self.inner.message_id = value;
     }
 
-    /// Comments in the Header.
+    /// Comments.
     ///
     /// :type: list[str]
     #[getter]
@@ -329,8 +327,6 @@ impl TdmHeader {
 // TDM Body
 // ============================================================================
 
-/// Represents the Body of a Tracking Data Message.
-///
 /// The TDM Body consists of one or more TDM Segments.
 ///
 /// Parameters
@@ -365,7 +361,7 @@ impl TdmBody {
     ///
     /// :type: list[TdmSegment]
     #[getter]
-    fn get_segments(&self) -> Vec<TdmSegment> {
+    fn get_segment(&self) -> Vec<TdmSegment> {
         self.inner
             .segments
             .iter()
@@ -374,7 +370,7 @@ impl TdmBody {
     }
 
     #[setter]
-    fn set_segments(&mut self, value: Vec<TdmSegment>) {
+    fn set_segment(&mut self, value: Vec<TdmSegment>) {
         self.inner.segments = value.into_iter().map(|s| s.inner).collect();
     }
 }
@@ -423,9 +419,7 @@ impl TdmSegment {
         )
     }
 
-    /// Segment metadata.
-    ///
-    /// Contains configuration details applicable to the Data Section.
+    /// Metadata section for this TDM segment.
     ///
     /// :type: TdmMetadata
     #[getter]
@@ -440,9 +434,7 @@ impl TdmSegment {
         self.inner.metadata = metadata.inner;
     }
 
-    /// Segment data.
-    ///
-    /// Contains the tracking data records.
+    /// Data section for this TDM segment.
     ///
     /// :type: TdmData
     #[getter]
@@ -683,6 +675,7 @@ impl TdmMetadata {
     }
 
     /// Comments.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -693,7 +686,10 @@ impl TdmMetadata {
         self.inner.comment = value;
     }
 
-    /// Unique identifier for the tracking data.
+    /// Unique identifier for the tracking data in the associated data section.
+    ///
+    /// Examples: 20190918_1200135-0001
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_track_id(&self) -> Option<String> {
@@ -705,6 +701,9 @@ impl TdmMetadata {
     }
 
     /// Comma-separated list of data types in the Data Section.
+    ///
+    /// Examples: RANGE, TRANSMIT_FREQ_n, RECEIVE_FREQ
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_data_types(&self) -> Option<String> {
@@ -715,7 +714,10 @@ impl TdmMetadata {
         self.inner.data_types = value;
     }
 
-    /// Time system used for timetags (e.g., UTC, TAI, GPS, SCLK).
+    /// The time system used for timetags in the associated Data Section.
+    ///
+    /// Examples: UTC, TAI, GPS, SCLK
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -726,7 +728,10 @@ impl TdmMetadata {
         self.inner.time_system = value;
     }
 
-    /// Start time of the tracking data.
+    /// The UTC start time of the total time span covered by the tracking data.
+    ///
+    /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_start_time(&self) -> Option<String> {
@@ -741,7 +746,10 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// Stop time of the tracking data.
+    /// The UTC stop time of the total time span covered by the tracking data.
+    ///
+    /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_stop_time(&self) -> Option<String> {
@@ -756,7 +764,10 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// First participant in the tracking session (Mandatory).
+    /// The first participant in a tracking data session.
+    ///
+    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name>, 1997-061A, UNKNOWN
+    ///
     /// :type: str
     #[getter]
     fn get_participant_1(&self) -> String {
@@ -767,7 +778,10 @@ impl TdmMetadata {
         self.inner.participant_1 = value;
     }
 
-    /// Second participant.
+    /// The second participant in a tracking data session.
+    ///
+    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_participant_2(&self) -> Option<String> {
@@ -778,7 +792,10 @@ impl TdmMetadata {
         self.inner.participant_2 = value;
     }
 
-    /// Third participant.
+    /// The third participant in a tracking data session.
+    ///
+    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_participant_3(&self) -> Option<String> {
@@ -789,7 +806,10 @@ impl TdmMetadata {
         self.inner.participant_3 = value;
     }
 
-    /// Fourth participant.
+    /// The fourth participant in a tracking data session.
+    ///
+    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_participant_4(&self) -> Option<String> {
@@ -800,7 +820,10 @@ impl TdmMetadata {
         self.inner.participant_4 = value;
     }
 
-    /// Fifth participant.
+    /// The fifth participant in a tracking data session.
+    ///
+    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_participant_5(&self) -> Option<String> {
@@ -811,7 +834,10 @@ impl TdmMetadata {
         self.inner.participant_5 = value;
     }
 
-    /// Tracking mode (e.g., SEQUENTIAL, SINGLE_DIFF).
+    /// The tracking mode associated with the Data Section of the segment.
+    ///
+    /// Examples: SEQUENTIAL, SINGLE_DIFF
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_mode(&self) -> Option<String> {
@@ -822,7 +848,10 @@ impl TdmMetadata {
         self.inner.mode = value;
     }
 
-    /// Signal path (comma-separated participant indices). Used with SEQUENTIAL mode.
+    /// The signal path by listing the index of each participant in order, separated by commas.
+    ///
+    /// Examples: 1,2,1
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_path(&self) -> Option<String> {
@@ -833,7 +862,10 @@ impl TdmMetadata {
         self.inner.path = value;
     }
 
-    /// First signal path for SINGLE_DIFF mode.
+    /// The first signal path where the MODE is 'SINGLE_DIFF'.
+    ///
+    /// Examples: 1,2,1
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_path_1(&self) -> Option<String> {
@@ -844,7 +876,10 @@ impl TdmMetadata {
         self.inner.path_1 = value;
     }
 
-    /// Second signal path for SINGLE_DIFF mode.
+    /// The second signal path where the MODE is 'SINGLE_DIFF'.
+    ///
+    /// Examples: 3,1
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_path_2(&self) -> Option<String> {
@@ -855,7 +890,10 @@ impl TdmMetadata {
         self.inner.path_2 = value;
     }
 
-    /// Ephemeris name for Participant 1.
+    /// Unique name of the external ephemeris file used for participant 1.
+    ///
+    /// Examples: SATELLITE_A_EPHEM27
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ephemeris_name_1(&self) -> Option<String> {
@@ -866,7 +904,10 @@ impl TdmMetadata {
         self.inner.ephemeris_name_1 = value;
     }
 
-    /// Ephemeris name for Participant 2.
+    /// Unique name of the external ephemeris file used for participant 2.
+    ///
+    /// Examples: SATELLITE_A_EPHEM27
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ephemeris_name_2(&self) -> Option<String> {
@@ -877,7 +918,10 @@ impl TdmMetadata {
         self.inner.ephemeris_name_2 = value;
     }
 
-    /// Ephemeris name for Participant 3.
+    /// Unique name of the external ephemeris file used for participant 3.
+    ///
+    /// Examples: SATELLITE_A_EPHEMERIS
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ephemeris_name_3(&self) -> Option<String> {
@@ -888,7 +932,10 @@ impl TdmMetadata {
         self.inner.ephemeris_name_3 = value;
     }
 
-    /// Ephemeris name for Participant 4.
+    /// Unique name of the external ephemeris file used for participant 4.
+    ///
+    /// Examples: SATELLITE_A_EPHEMERIS
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ephemeris_name_4(&self) -> Option<String> {
@@ -899,7 +946,10 @@ impl TdmMetadata {
         self.inner.ephemeris_name_4 = value;
     }
 
-    /// Ephemeris name for Participant 5.
+    /// Unique name of the external ephemeris file used for participant 5.
+    ///
+    /// Examples: SATELLITE_A_EPHEMERIS
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ephemeris_name_5(&self) -> Option<String> {
@@ -910,7 +960,10 @@ impl TdmMetadata {
         self.inner.ephemeris_name_5 = value;
     }
 
-    /// Frequency band for transmitted frequencies (e.g., S, X, Ka).
+    /// The frequency band for transmitted frequencies.
+    ///
+    /// Examples: S, X, Ka, L, UHF, GREEN
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_transmit_band(&self) -> Option<String> {
@@ -921,7 +974,10 @@ impl TdmMetadata {
         self.inner.transmit_band = value;
     }
 
-    /// Frequency band for received frequencies.
+    /// The frequency band for received frequencies.
+    ///
+    /// Examples: S, X, Ka, L, UHF, GREEN
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_receive_band(&self) -> Option<String> {
@@ -932,7 +988,10 @@ impl TdmMetadata {
         self.inner.receive_band = value;
     }
 
-    /// Numerator of the turnaround ratio.
+    /// The numerator of the turnaround ratio.
+    ///
+    /// Examples: 240, 880
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_turnaround_numerator(&self) -> Option<i32> {
@@ -943,7 +1002,10 @@ impl TdmMetadata {
         self.inner.turnaround_numerator = value;
     }
 
-    /// Denominator of the turnaround ratio.
+    /// The denominator of the turnaround ratio.
+    ///
+    /// Examples: 221, 749
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_turnaround_denominator(&self) -> Option<i32> {
@@ -954,7 +1016,10 @@ impl TdmMetadata {
         self.inner.turnaround_denominator = value;
     }
 
-    /// Reference for time tags (TRANSMIT or RECEIVE).
+    /// A reference for time tags in the tracking data.
+    ///
+    /// Examples: TRANSMIT, RECEIVE
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_timetag_ref(&self) -> Option<String> {
@@ -965,7 +1030,12 @@ impl TdmMetadata {
         self.inner.timetag_ref = value;
     }
 
-    /// Doppler count time in seconds.
+    /// The Doppler count time in seconds for Doppler data.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 60.0, 0.1, 1.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_integration_interval(&self) -> Option<f64> {
@@ -976,7 +1046,10 @@ impl TdmMetadata {
         self.inner.integration_interval = value;
     }
 
-    /// Relationship between INTEGRATION_INTERVAL and timetag (START, MIDDLE, END).
+    /// Indicates the relationship between the INTEGRATION_INTERVAL and the timetag.
+    ///
+    /// Examples: START, MIDDLE, END
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_integration_ref(&self) -> Option<String> {
@@ -987,7 +1060,10 @@ impl TdmMetadata {
         self.inner.integration_ref = value;
     }
 
-    /// Frequency offset in Hz.
+    /// A frequency in Hz that must be added to every RECEIVE_FREQ to reconstruct it.
+    ///
+    /// Examples: 0.0, 8415000000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_freq_offset(&self) -> Option<f64> {
@@ -998,7 +1074,10 @@ impl TdmMetadata {
         self.inner.freq_offset = value;
     }
 
-    /// Range mode (COHERENT, CONSTANT, ONE_WAY).
+    /// The range observable mode.
+    ///
+    /// Examples: COHERENT, CONSTANT, ONE_WAY
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_range_mode(&self) -> Option<String> {
@@ -1009,7 +1088,10 @@ impl TdmMetadata {
         self.inner.range_mode = value;
     }
 
-    /// Modulus of the range observable.
+    /// The modulus of the range observable.
+    ///
+    /// Examples: 32768.0, 2.0e+23, 0.0, 161.6484
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_range_modulus(&self) -> Option<f64> {
@@ -1020,7 +1102,10 @@ impl TdmMetadata {
         self.inner.range_modulus = value;
     }
 
-    /// Units for the range observable (km, s, RU).
+    /// The units for the range observable.
+    ///
+    /// Examples: km, s, RU
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_range_units(&self) -> Option<String> {
@@ -1031,7 +1116,10 @@ impl TdmMetadata {
         self.inner.range_units = value;
     }
 
-    /// Type of antenna geometry (e.g., AZEL, RADEC).
+    /// The type of antenna geometry represented in the angle data.
+    ///
+    /// Examples: AZEL, RADEC, XEYN, XSYE
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_angle_type(&self) -> Option<String> {
@@ -1042,7 +1130,10 @@ impl TdmMetadata {
         self.inner.angle_type = value;
     }
 
-    /// Inertial reference frame (e.g., EME2000). Applies if ANGLE_TYPE is RADEC.
+    /// The inertial reference frame to which the antenna frame is referenced.
+    ///
+    /// Examples: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_reference_frame(&self) -> Option<String> {
@@ -1053,7 +1144,10 @@ impl TdmMetadata {
         self.inner.reference_frame = value;
     }
 
-    /// Interpolation method (e.g., HERMITE, LAGRANGE).
+    /// The interpolation method to be used to calculate a transmit phase count.
+    ///
+    /// Examples: HERMITE, LAGRANGE, LINEAR
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_interpolation(&self) -> Option<String> {
@@ -1064,7 +1158,10 @@ impl TdmMetadata {
         self.inner.interpolation = value;
     }
 
-    /// Degree of interpolation polynomial.
+    /// The recommended degree of the interpolating polynomial for phase count data.
+    ///
+    /// Examples: 3, 5, 7, 11
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_interpolation_degree(&self) -> Option<u32> {
@@ -1075,7 +1172,12 @@ impl TdmMetadata {
         self.inner.interpolation_degree = value;
     }
 
-    /// Bias for Doppler count (Hz).
+    /// A bias that shall be subtracted from the DOPPLER_COUNT data value.
+    ///
+    /// Units: Hz
+    ///
+    /// Examples: 2.4e6, 240000000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_doppler_count_bias(&self) -> Option<f64> {
@@ -1086,7 +1188,10 @@ impl TdmMetadata {
         self.inner.doppler_count_bias = value;
     }
 
-    /// Scale factor for Doppler count.
+    /// A scale factor that the DOPPLER_COUNT data value shall be divided by.
+    ///
+    /// Examples: 1000, 1
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_doppler_count_scale(&self) -> Option<u64> {
@@ -1097,7 +1202,10 @@ impl TdmMetadata {
         self.inner.doppler_count_scale = value;
     }
 
-    /// Indicator of Doppler count rollover (YES, NO).
+    /// Flag indicating whether or not a Doppler counter rollover has occurred.
+    ///
+    /// Examples: YES, NO
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_doppler_count_rollover(&self) -> Option<String> {
@@ -1108,7 +1216,13 @@ impl TdmMetadata {
         self.inner.doppler_count_rollover = value;
     }
 
-    /// Transmit delay for Participant 1 (seconds).
+    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// transmitting electronics to the transmit point for participant 1.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00077
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_transmit_delay_1(&self) -> Option<f64> {
@@ -1119,7 +1233,13 @@ impl TdmMetadata {
         self.inner.transmit_delay_1 = value;
     }
 
-    /// Transmit delay for Participant 2 (seconds).
+    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// transmitting electronics to the transmit point for participant 2.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00077
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_transmit_delay_2(&self) -> Option<f64> {
@@ -1130,7 +1250,13 @@ impl TdmMetadata {
         self.inner.transmit_delay_2 = value;
     }
 
-    /// Transmit delay for Participant 3 (seconds).
+    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// transmitting electronics to the transmit point for participant 3.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00077
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_transmit_delay_3(&self) -> Option<f64> {
@@ -1141,7 +1267,13 @@ impl TdmMetadata {
         self.inner.transmit_delay_3 = value;
     }
 
-    /// Transmit delay for Participant 4 (seconds).
+    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// transmitting electronics to the transmit point for participant 4.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00077
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_transmit_delay_4(&self) -> Option<f64> {
@@ -1152,7 +1284,13 @@ impl TdmMetadata {
         self.inner.transmit_delay_4 = value;
     }
 
-    /// Transmit delay for Participant 5 (seconds).
+    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// transmitting electronics to the transmit point for participant 5.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00077
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_transmit_delay_5(&self) -> Option<f64> {
@@ -1163,7 +1301,13 @@ impl TdmMetadata {
         self.inner.transmit_delay_5 = value;
     }
 
-    /// Receive delay for Participant 1 (seconds).
+    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// point to the receiving electronics for participant 1.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00777
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_receive_delay_1(&self) -> Option<f64> {
@@ -1174,7 +1318,13 @@ impl TdmMetadata {
         self.inner.receive_delay_1 = value;
     }
 
-    /// Receive delay for Participant 2 (seconds).
+    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// point to the receiving electronics for participant 2.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00777
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_receive_delay_2(&self) -> Option<f64> {
@@ -1185,7 +1335,13 @@ impl TdmMetadata {
         self.inner.receive_delay_2 = value;
     }
 
-    /// Receive delay for Participant 3 (seconds).
+    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// point to the receiving electronics for participant 3.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00777
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_receive_delay_3(&self) -> Option<f64> {
@@ -1196,7 +1352,13 @@ impl TdmMetadata {
         self.inner.receive_delay_3 = value;
     }
 
-    /// Receive delay for Participant 4 (seconds).
+    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// point to the receiving electronics for participant 4.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00777
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_receive_delay_4(&self) -> Option<f64> {
@@ -1207,7 +1369,13 @@ impl TdmMetadata {
         self.inner.receive_delay_4 = value;
     }
 
-    /// Receive delay for Participant 5 (seconds).
+    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// point to the receiving electronics for participant 5.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00777
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_receive_delay_5(&self) -> Option<f64> {
@@ -1218,7 +1386,10 @@ impl TdmMetadata {
         self.inner.receive_delay_5 = value;
     }
 
-    /// Data quality (RAW, VALIDATED, DEGRADED).
+    /// An estimate of the quality of the data.
+    ///
+    /// Examples: RAW, VALIDATED, DEGRADED
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_data_quality(&self) -> Option<String> {
@@ -1229,7 +1400,10 @@ impl TdmMetadata {
         self.inner.data_quality = value;
     }
 
-    /// Angle 1 correction (degrees).
+    /// A correction value to be added to the ANGLE_1 data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_correction_angle_1(&self) -> Option<f64> {
@@ -1240,7 +1414,10 @@ impl TdmMetadata {
         self.inner.correction_angle_1 = value;
     }
 
-    /// Angle 2 correction (degrees).
+    /// A correction value to be added to the ANGLE_2 data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_correction_angle_2(&self) -> Option<f64> {
@@ -1251,7 +1428,10 @@ impl TdmMetadata {
         self.inner.correction_angle_2 = value;
     }
 
-    /// Doppler correction (km/s).
+    /// A correction value to be added to the Doppler data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_correction_doppler(&self) -> Option<f64> {
@@ -1262,7 +1442,10 @@ impl TdmMetadata {
         self.inner.correction_doppler = value;
     }
 
-    /// Magnitude correction.
+    /// A correction value to be added to the magnitude data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_correction_mag(&self) -> Option<f64> {
@@ -1273,7 +1456,10 @@ impl TdmMetadata {
         self.inner.correction_mag = value;
     }
 
-    /// Range correction (Range Units, km, or s).
+    /// A correction value to be added to the range data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_correction_range(&self) -> Option<f64> {
@@ -1284,7 +1470,10 @@ impl TdmMetadata {
         self.inner.correction_range = value;
     }
 
-    /// RCS correction (m²).
+    /// A correction value to be added to the RCS data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_correction_rcs(&self) -> Option<f64> {
@@ -1295,7 +1484,10 @@ impl TdmMetadata {
         self.inner.correction_rcs = value;
     }
 
-    /// Receive correction (Hz).
+    /// A correction value to be added to the received frequency or phase count data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_correction_receive(&self) -> Option<f64> {
@@ -1306,7 +1498,10 @@ impl TdmMetadata {
         self.inner.correction_receive = value;
     }
 
-    /// Transmit correction (Hz).
+    /// A correction value to be added to the transmitted frequency or phase count data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_correction_transmit(&self) -> Option<f64> {
@@ -1317,7 +1512,10 @@ impl TdmMetadata {
         self.inner.correction_transmit = value;
     }
 
-    /// Yearly aberration correction (deg).
+    /// A correction value for yearly aberration.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_correction_aberration_yearly(&self) -> Option<f64> {
@@ -1328,7 +1526,10 @@ impl TdmMetadata {
         self.inner.correction_aberration_yearly = value;
     }
 
-    /// Diurnal aberration correction (deg).
+    /// A correction value for diurnal aberration.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_correction_aberration_diurnal(&self) -> Option<f64> {
@@ -1339,7 +1540,10 @@ impl TdmMetadata {
         self.inner.correction_aberration_diurnal = value;
     }
 
-    /// Indication if corrections have been applied (YES, NO).
+    /// Indicates whether or not the correction values have been applied to the tracking data.
+    ///
+    /// Examples: YES, NO
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_corrections_applied(&self) -> Option<String> {
@@ -1355,9 +1559,7 @@ impl TdmMetadata {
 // TDM Data
 // ============================================================================
 
-/// Represents the Data Section of a TDM Segment.
-///
-/// Contains one or more Tracking Data Records.
+/// The Data Section of the TDM Segment consists of one or more Tracking Data Records.
 ///
 /// Parameters
 /// ----------
@@ -1392,7 +1594,7 @@ impl TdmData {
         format!("TdmData(observations={})", self.inner.observations.len())
     }
 
-    /// List of tracking observations.
+    /// Tracking data records.
     ///
     /// :type: list[TdmObservation]
     #[getter]
@@ -1409,13 +1611,6 @@ impl TdmData {
         self.inner.observations = value.into_iter().map(|o| o.inner).collect();
     }
 
-    /// Count of observations.
-    ///
-    /// :type: int
-    #[getter]
-    fn get_observation_count(&self) -> usize {
-        self.inner.observations.len()
-    }
 
     /// Comments.
     ///
@@ -1435,9 +1630,7 @@ impl TdmData {
 // TDM Observation
 // ============================================================================
 
-/// Represents a single Tracking Data Record (TDR).
-///
-/// A TDR consists of a keyword (data type), a timetag (epoch), and a measurement.
+/// A single tracking data record consisting of a timetag and a measurement.
 ///
 /// Parameters
 /// ----------
@@ -1538,7 +1731,7 @@ impl TdmObservation {
         )
     }
 
-    /// Epoch of the observation.
+    /// Time associated with the tracking observable.
     ///
     /// :type: str
     #[getter]

@@ -16,6 +16,9 @@ use std::iter::Peekable;
 // Root TDM Structure
 //----------------------------------------------------------------------
 
+/// Tracking Data Message (TDM).
+///
+/// The TDM specifies a standard message format for use in exchanging tracking data.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename = "tdm")]
 pub struct Tdm {
@@ -93,10 +96,20 @@ impl Ndm for Tdm {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TdmHeader {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Data creation date/time in UTC.
+    ///
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23.4, 2006-001T00:00:00Z
     pub creation_date: Epoch,
+    /// Creating agency.
+    ///
+    /// Examples: CNES, ESA, GSFC, DLR, JPL, JAXA
     pub originator: String,
+    /// ID that uniquely identifies a message from a given originator.
+    ///
+    /// Examples: 201113719185
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message_id: Option<String>,
 }
@@ -171,6 +184,7 @@ impl FromKvnTokens for TdmHeader {
 // Body & Segment
 //----------------------------------------------------------------------
 
+/// The TDM Body consists of one or more TDM Segments.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TdmBody {
     #[serde(rename = "segment")]
@@ -241,7 +255,9 @@ impl TdmBody {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TdmSegment {
+    /// Metadata section for this TDM segment.
     pub metadata: TdmMetadata,
+    /// Data section for this TDM segment.
     pub data: TdmData,
 }
 
@@ -287,122 +303,334 @@ impl TdmSegment {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TdmMetadata {
+    /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Unique identifier for the tracking data in the associated data section.
+    ///
+    /// Examples: 20190918_1200135-0001
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub track_id: Option<String>,
+    /// Comma-separated list of data types in the Data Section.
+    ///
+    /// Examples: RANGE, TRANSMIT_FREQ_n, RECEIVE_FREQ
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_types: Option<String>,
+    /// The time system used for timetags in the associated Data Section.
+    ///
+    /// Examples: UTC, TAI, GPS, SCLK
     pub time_system: String,
+    /// The UTC start time of the total time span covered by the tracking data.
+    ///
+    /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_time: Option<Epoch>,
+    /// The UTC stop time of the total time span covered by the tracking data.
+    ///
+    /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_time: Option<Epoch>,
+    /// The first participant in a tracking data session.
+    ///
+    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name>, 1997-061A, UNKNOWN
     pub participant_1: String,
+    /// The second participant in a tracking data session.
+    ///
+    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participant_2: Option<String>,
+    /// The third participant in a tracking data session.
+    ///
+    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participant_3: Option<String>,
+    /// The fourth participant in a tracking data session.
+    ///
+    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participant_4: Option<String>,
+    /// The fifth participant in a tracking data session.
+    ///
+    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participant_5: Option<String>,
+    /// The tracking mode associated with the Data Section of the segment.
+    ///
+    /// Examples: SEQUENTIAL, SINGLE_DIFF
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
+    /// The signal path by listing the index of each participant in order, separated by commas.
+    ///
+    /// Examples: 1,2,1
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// The first signal path where the MODE is 'SINGLE_DIFF'.
+    ///
+    /// Examples: 1,2,1
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path_1: Option<String>,
+    /// The second signal path where the MODE is 'SINGLE_DIFF'.
+    ///
+    /// Examples: 3,1
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path_2: Option<String>,
+    /// The frequency band for transmitted frequencies.
+    ///
+    /// Examples: S, X, Ka, L, UHF, GREEN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_band: Option<String>,
+    /// The frequency band for received frequencies.
+    ///
+    /// Examples: S, X, Ka, L, UHF, GREEN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_band: Option<String>,
+    /// The numerator of the turnaround ratio.
+    ///
+    /// Examples: 240, 880
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turnaround_numerator: Option<i32>,
+    /// The denominator of the turnaround ratio.
+    ///
+    /// Examples: 221, 749
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turnaround_denominator: Option<i32>,
+    /// A reference for time tags in the tracking data.
+    ///
+    /// Examples: TRANSMIT, RECEIVE
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timetag_ref: Option<String>,
+    /// The Doppler count time in seconds for Doppler data.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 60.0, 0.1, 1.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub integration_interval: Option<f64>,
+    /// Indicates the relationship between the INTEGRATION_INTERVAL and the timetag.
+    ///
+    /// Examples: START, MIDDLE, END
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub integration_ref: Option<String>,
+    /// A frequency in Hz that must be added to every RECEIVE_FREQ to reconstruct it.
+    ///
+    /// Examples: 0.0, 8415000000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub freq_offset: Option<f64>,
+    /// The range observable mode.
+    ///
+    /// Examples: COHERENT, CONSTANT, ONE_WAY
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range_mode: Option<String>,
+    /// The modulus of the range observable.
+    ///
+    /// Examples: 32768.0, 2.0e+23, 0.0, 161.6484
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range_modulus: Option<f64>,
+    /// The units for the range observable.
+    ///
+    /// Examples: km, s, RU
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range_units: Option<String>,
+    /// The type of antenna geometry represented in the angle data.
+    ///
+    /// Examples: AZEL, RADEC, XEYN, XSYE
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub angle_type: Option<String>,
+    /// The inertial reference frame to which the antenna frame is referenced.
+    ///
+    /// Examples: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reference_frame: Option<String>,
+    /// The interpolation method to be used to calculate a transmit phase count.
+    ///
+    /// Examples: HERMITE, LAGRANGE, LINEAR
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation: Option<String>,
+    /// The recommended degree of the interpolating polynomial for phase count data.
+    ///
+    /// Examples: 3, 5, 7, 11
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation_degree: Option<u32>,
+    /// A bias that shall be subtracted from the DOPPLER_COUNT data value.
+    ///
+    /// Units: Hz
+    ///
+    /// Examples: 2.4e6, 240000000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doppler_count_bias: Option<f64>,
+    /// A scale factor that the DOPPLER_COUNT data value shall be divided by.
+    ///
+    /// Examples: 1000, 1
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doppler_count_scale: Option<u64>,
+    /// Flag indicating whether or not a Doppler counter rollover has occurred.
+    ///
+    /// Examples: YES, NO
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doppler_count_rollover: Option<String>,
+    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// transmitting electronics to the transmit point for participant 1.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00077
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_delay_1: Option<f64>,
+    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// transmitting electronics to the transmit point for participant 2.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00077
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_delay_2: Option<f64>,
+    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// transmitting electronics to the transmit point for participant 3.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00077
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_delay_3: Option<f64>,
+    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// transmitting electronics to the transmit point for participant 4.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00077
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_delay_4: Option<f64>,
+    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// transmitting electronics to the transmit point for participant 5.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00077
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_delay_5: Option<f64>,
+    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// point to the receiving electronics for participant 1.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00777
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_delay_1: Option<f64>,
+    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// point to the receiving electronics for participant 2.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00777
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_delay_2: Option<f64>,
+    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// point to the receiving electronics for participant 3.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00777
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_delay_3: Option<f64>,
+    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// point to the receiving electronics for participant 4.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00777
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_delay_4: Option<f64>,
+    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// point to the receiving electronics for participant 5.
+    ///
+    /// Units: s
+    ///
+    /// Examples: 1.23, 0.0326, 0.00777
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_delay_5: Option<f64>,
+    /// An estimate of the quality of the data.
+    ///
+    /// Examples: RAW, VALIDATED, DEGRADED
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_quality: Option<String>,
+    /// A correction value to be added to the ANGLE_1 data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_angle_1: Option<f64>,
+    /// A correction value to be added to the ANGLE_2 data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_angle_2: Option<f64>,
+    /// A correction value to be added to the Doppler data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_doppler: Option<f64>,
+    /// A correction value to be added to the magnitude data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_mag: Option<f64>,
+    /// A correction value to be added to the range data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_range: Option<f64>,
+    /// A correction value to be added to the RCS data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_rcs: Option<f64>,
+    /// A correction value to be added to the received frequency or phase count data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_receive: Option<f64>,
+    /// A correction value to be added to the transmitted frequency or phase count data.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_transmit: Option<f64>,
+    /// A correction value for yearly aberration.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_aberration_yearly: Option<f64>,
+    /// A correction value for diurnal aberration.
+    ///
+    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_aberration_diurnal: Option<f64>,
+    /// Indicates whether or not the correction values have been applied to the tracking data.
+    ///
+    /// Examples: YES, NO
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub corrections_applied: Option<String>,
+    /// Unique name of the external ephemeris file used for participant 1.
+    ///
+    /// Examples: SATELLITE_A_EPHEM27
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ephemeris_name_1: Option<String>,
+    /// Unique name of the external ephemeris file used for participant 2.
+    ///
+    /// Examples: SATELLITE_A_EPHEM27
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ephemeris_name_2: Option<String>,
+    /// Unique name of the external ephemeris file used for participant 3.
+    ///
+    /// Examples: SATELLITE_A_EPHEMERIS
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ephemeris_name_3: Option<String>,
+    /// Unique name of the external ephemeris file used for participant 4.
+    ///
+    /// Examples: SATELLITE_A_EPHEMERIS
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ephemeris_name_4: Option<String>,
+    /// Unique name of the external ephemeris file used for participant 5.
+    ///
+    /// Examples: SATELLITE_A_EPHEMERIS
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ephemeris_name_5: Option<String>,
 }
@@ -718,10 +946,13 @@ impl TdmMetadata {
 // Data
 //----------------------------------------------------------------------
 
+/// The Data Section of the TDM Segment consists of one or more Tracking Data Records.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TdmData {
+    /// Comments.
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Tracking data records.
     #[serde(rename = "observation")]
     pub observations: Vec<TdmObservation>,
 }
@@ -817,10 +1048,13 @@ impl TdmData {
 // Observation
 //----------------------------------------------------------------------
 
+/// A single tracking data record consisting of a timetag and a measurement.
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct TdmObservation {
+    /// Time associated with the tracking observable.
     #[serde(rename = "EPOCH")]
     pub epoch: Epoch,
+    /// The tracking observable (measurement or calculation).
     #[serde(rename = "$value")]
     pub data: TdmObservationData,
 }
@@ -1023,79 +1257,196 @@ impl<'de> Deserialize<'de> for TdmObservation {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TdmObservationData {
+    /// Azimuth, right ascension, or 'X' angle of the measurement.
+    ///
+    /// Units: deg
     Angle1(f64),
+    /// Elevation, declination, or 'Y' angle of the measurement.
+    ///
+    /// Units: deg
     Angle2(f64),
+    /// The strength of the radio signal transmitted by the spacecraft.
+    ///
+    /// Units: dBW
     CarrierPower(f64),
+    /// Clock bias.
+    ///
+    /// Units: s
     ClockBias(f64),
+    /// Clock drift.
+    ///
+    /// Units: s/s
     ClockDrift(f64),
+    /// A count of the number of times the phase of a received signal slips one cycle.
     DopplerCount(f64),
+    /// The instantaneous range rate of the spacecraft.
+    ///
+    /// Units: km/s
     DopplerInstantaneous(f64),
+    /// The mean range rate of the spacecraft over the INTEGRATION_INTERVAL.
+    ///
+    /// Units: km/s
     DopplerIntegrated(f64),
+    /// Delta-DOR observable.
+    ///
+    /// Units: s
     Dor(f64),
+    /// The apparent visual magnitude of an object.
     Mag(f64),
+    /// Carrier power to noise spectral density ratio.
+    ///
+    /// Units: dBHz
     #[serde(rename = "PC_N0")]
     PcN0(f64),
+    /// Ranging power to noise spectral density ratio.
+    ///
+    /// Units: dBHz
     #[serde(rename = "PR_N0")]
     PrN0(f64),
+    /// Atmospheric pressure observable.
+    ///
+    /// Units: hPa
     Pressure(f64),
+    /// The range observable.
+    ///
+    /// Units: km, s, or RU
     Range(f64),
+    /// Radar Cross Section.
+    ///
+    /// Units: m²
     Rcs(f64),
+    /// Received frequency.
+    ///
+    /// Units: Hz
     ReceiveFreq(f64),
+    /// Received frequency for channel 1.
+    ///
+    /// Units: Hz
     #[serde(rename = "RECEIVE_FREQ_1")]
     ReceiveFreq1(f64),
+    /// Received frequency for channel 2.
+    ///
+    /// Units: Hz
     #[serde(rename = "RECEIVE_FREQ_2")]
     ReceiveFreq2(f64),
+    /// Received frequency for channel 3.
+    ///
+    /// Units: Hz
     #[serde(rename = "RECEIVE_FREQ_3")]
     ReceiveFreq3(f64),
+    /// Received frequency for channel 4.
+    ///
+    /// Units: Hz
     #[serde(rename = "RECEIVE_FREQ_4")]
     ReceiveFreq4(f64),
+    /// Received frequency for channel 5.
+    ///
+    /// Units: Hz
     #[serde(rename = "RECEIVE_FREQ_5")]
     ReceiveFreq5(f64),
+    /// Received phase count for channel 1.
     #[serde(rename = "RECEIVE_PHASE_CT_1")]
     ReceivePhaseCt1(String),
+    /// Received phase count for channel 2.
     #[serde(rename = "RECEIVE_PHASE_CT_2")]
     ReceivePhaseCt2(String),
+    /// Received phase count for channel 3.
     #[serde(rename = "RECEIVE_PHASE_CT_3")]
     ReceivePhaseCt3(String),
+    /// Received phase count for channel 4.
     #[serde(rename = "RECEIVE_PHASE_CT_4")]
     ReceivePhaseCt4(String),
+    /// Received phase count for channel 5.
     #[serde(rename = "RECEIVE_PHASE_CT_5")]
     ReceivePhaseCt5(String),
+    /// Relative humidity observable.
+    ///
+    /// Units: %
     Rhumidity(Percentage),
+    /// Slant Total Electron Count (STEC).
+    ///
+    /// Units: TECU
     Stec(f64),
+    /// Temperature observable.
+    ///
+    /// Units: K
     Temperature(f64),
+    /// Transmitted frequency for channel 1.
+    ///
+    /// Units: Hz
     #[serde(rename = "TRANSMIT_FREQ_1")]
     TransmitFreq1(f64),
+    /// Transmitted frequency for channel 2.
+    ///
+    /// Units: Hz
     #[serde(rename = "TRANSMIT_FREQ_2")]
     TransmitFreq2(f64),
+    /// Transmitted frequency for channel 3.
+    ///
+    /// Units: Hz
     #[serde(rename = "TRANSMIT_FREQ_3")]
     TransmitFreq3(f64),
+    /// Transmitted frequency for channel 4.
+    ///
+    /// Units: Hz
     #[serde(rename = "TRANSMIT_FREQ_4")]
     TransmitFreq4(f64),
+    /// Transmitted frequency for channel 5.
+    ///
+    /// Units: Hz
     #[serde(rename = "TRANSMIT_FREQ_5")]
     TransmitFreq5(f64),
+    /// Linear rate of change of the frequency for channel 1.
+    ///
+    /// Units: Hz/s
     #[serde(rename = "TRANSMIT_FREQ_RATE_1")]
     TransmitFreqRate1(f64),
+    /// Linear rate of change of the frequency for channel 2.
+    ///
+    /// Units: Hz/s
     #[serde(rename = "TRANSMIT_FREQ_RATE_2")]
     TransmitFreqRate2(f64),
+    /// Linear rate of change of the frequency for channel 3.
+    ///
+    /// Units: Hz/s
     #[serde(rename = "TRANSMIT_FREQ_RATE_3")]
     TransmitFreqRate3(f64),
+    /// Linear rate of change of the frequency for channel 4.
+    ///
+    /// Units: Hz/s
     #[serde(rename = "TRANSMIT_FREQ_RATE_4")]
     TransmitFreqRate4(f64),
+    /// Linear rate of change of the frequency for channel 5.
+    ///
+    /// Units: Hz/s
     #[serde(rename = "TRANSMIT_FREQ_RATE_5")]
     TransmitFreqRate5(f64),
+    /// Transmitted phase count for channel 1.
     #[serde(rename = "TRANSMIT_PHASE_CT_1")]
     TransmitPhaseCt1(String),
+    /// Transmitted phase count for channel 2.
     #[serde(rename = "TRANSMIT_PHASE_CT_2")]
     TransmitPhaseCt2(String),
+    /// Transmitted phase count for channel 3.
     #[serde(rename = "TRANSMIT_PHASE_CT_3")]
     TransmitPhaseCt3(String),
+    /// Transmitted phase count for channel 4.
     #[serde(rename = "TRANSMIT_PHASE_CT_4")]
     TransmitPhaseCt4(String),
+    /// Transmitted phase count for channel 5.
     #[serde(rename = "TRANSMIT_PHASE_CT_5")]
     TransmitPhaseCt5(String),
+    /// Dry zenith delay through the troposphere.
+    ///
+    /// Units: m
     TropoDry(f64),
+    /// Wet zenith delay through the troposphere.
+    ///
+    /// Units: m
     TropoWet(f64),
+    /// VLBI delay.
+    ///
+    /// Units: s
     VlbiDelay(f64),
 }
 

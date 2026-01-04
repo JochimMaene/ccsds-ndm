@@ -19,12 +19,9 @@ use std::fs;
 // RDM - Re-entry Data Message
 // ============================================================================
 
-/// Represents a CCSDS Re-entry Data Message (RDM).
+/// Re-entry Data Message (RDM).
 ///
-/// The RDM specifies a standard message format to be used in the exchange of
-/// spacecraft re-entry information between Space Situational Awareness (SSA)
-/// or Space Surveillance and Tracking (SST) data providers, satellite
-/// owners/operators, and other parties.
+/// A message format for use in exchanging spacecraft re-entry information.
 ///
 /// Parameters
 /// ----------
@@ -64,7 +61,9 @@ impl Rdm {
         )
     }
 
-    /// The message header.
+    /// Re-entry Data Message (RDM).
+    ///
+    /// A message format for use in exchanging spacecraft re-entry information.
     ///
     /// :type: RdmHeader
     #[getter]
@@ -225,7 +224,7 @@ impl Rdm {
 // RDM Header
 // ============================================================================
 
-/// Represents the Header of a Re-entry Data Message.
+/// The RDM Header provides information about the message.
 ///
 /// Parameters
 /// ----------
@@ -273,7 +272,7 @@ impl RdmHeader {
 
     /// Creating agency or entity.
     ///
-    /// Value should be an entry from the SANA Organizations Registry.
+    /// Examples: DLR, ESA
     ///
     /// :type: str
     #[getter]
@@ -287,7 +286,7 @@ impl RdmHeader {
 
     /// File creation date and time in UTC.
     ///
-    /// Format: ISO 8601.
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23
     ///
     /// :type: str
     #[getter]
@@ -301,6 +300,8 @@ impl RdmHeader {
     }
 
     /// ID that uniquely identifies a message from a given originator.
+    ///
+    /// Examples: 201113719185, ESA20190101-3345
     ///
     /// :type: str
     #[getter]
@@ -367,7 +368,7 @@ impl RdmSegment {
         )
     }
 
-    /// Segment metadata.
+    /// The metadata for this RDM segment.
     ///
     /// :type: RdmMetadata
     #[getter]
@@ -381,7 +382,7 @@ impl RdmSegment {
         self.inner.metadata = v.inner;
     }
 
-    /// Segment data.
+    /// The data for this RDM segment.
     ///
     /// :type: RdmData
     #[getter]
@@ -400,11 +401,9 @@ impl RdmSegment {
 // RDM Metadata
 // ============================================================================
 
-/// Represents the Metadata Section of an RDM Segment.
+/// The RDM Metadata provides information about the re-entry event.
 ///
-/// Contains configuration details and object identification for the re-entry data.
-///
-/// Mandatory Parameters
+/// Parameters
 /// --------------------
 /// object_name : str
 ///     Object name for which the orbit state is provided.
@@ -419,9 +418,7 @@ impl RdmSegment {
 /// epoch_tzero : str
 ///     Epoch from which the ORBIT_LIFETIME is calculated.
 ///
-/// Optional Parameters
-/// -------------------
-/// See the CCSDS RDM Blue Book for details on optional parameters.
+///     Optional
 #[pyclass]
 #[derive(Clone)]
 pub struct RdmMetadata {
@@ -557,7 +554,9 @@ impl RdmMetadata {
         format!("RdmMetadata(object_name='{}')", self.inner.object_name)
     }
 
-    /// Object name.
+    /// The name of the object.
+    ///
+    /// Examples: FENGYUN 1C, UARS, Tiangong-1
     ///
     /// :type: str
     #[getter]
@@ -569,7 +568,9 @@ impl RdmMetadata {
         self.inner.object_name = v;
     }
 
-    /// International designator (COSPAR ID).
+    /// The international designator of the object.
+    ///
+    /// Examples: 1999-025A, 1991-063B, 2011-053A
     ///
     /// :type: str
     #[getter]
@@ -581,7 +582,9 @@ impl RdmMetadata {
         self.inner.international_designator = v;
     }
 
-    /// Catalog name.
+    /// The catalog name for the object.
+    ///
+    /// Examples: SATCAT, SPCS, MCN
     ///
     /// :type: Optional[str]
     #[getter]
@@ -593,7 +596,9 @@ impl RdmMetadata {
         self.inner.catalog_name = v;
     }
 
-    /// Object designator.
+    /// The object designator in the catalog.
+    ///
+    /// Examples: 25730, 21574, 37820
     ///
     /// :type: Optional[str]
     #[getter]
@@ -605,7 +610,9 @@ impl RdmMetadata {
         self.inner.object_designator = v;
     }
 
-    /// Object type.
+    /// The type of the object.
+    ///
+    /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
     ///
     /// :type: Optional[str]
     #[getter]
@@ -625,7 +632,9 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// Object owner.
+    /// The owner of the object.
+    ///
+    /// Examples: China, USA, France
     ///
     /// :type: Optional[str]
     #[getter]
@@ -637,7 +646,9 @@ impl RdmMetadata {
         self.inner.object_owner = v;
     }
 
-    /// Object operator.
+    /// The operator of the object.
+    ///
+    /// Examples: EUMETSAT, SES
     ///
     /// :type: Optional[str]
     #[getter]
@@ -649,7 +660,9 @@ impl RdmMetadata {
         self.inner.object_operator = v;
     }
 
-    /// Controlled re-entry status.
+    /// Whether the re-entry is controlled or not.
+    ///
+    /// Examples: YES, NO, UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -664,7 +677,9 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// Center name (e.g., EARTH).
+    /// The celestial body the object is orbiting.
+    ///
+    /// Examples: EARTH, MOON, MARS
     ///
     /// :type: str
     #[getter]
@@ -676,7 +691,9 @@ impl RdmMetadata {
         self.inner.center_name = v;
     }
 
-    /// Time system.
+    /// The time system used for the message.
+    ///
+    /// Examples: UTC, TAI, TDB
     ///
     /// :type: str
     #[getter]
@@ -688,7 +705,9 @@ impl RdmMetadata {
         self.inner.time_system = v;
     }
 
-    /// Epoch from which the orbit lifetime is calculated.
+    /// The reference epoch for the message.
+    ///
+    /// Examples: 2018-04-22T09:00:00.00
     ///
     /// :type: str
     #[getter]
@@ -701,7 +720,9 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// Reference frame.
+    /// The reference frame of the state vector and covariance matrix.
+    ///
+    /// Examples: EME2000, GCRF, ICRF, ITRF2000, TDR
     ///
     /// :type: Optional[str]
     #[getter]
@@ -713,7 +734,9 @@ impl RdmMetadata {
         self.inner.ref_frame = v;
     }
 
-    /// Reference frame epoch.
+    /// The epoch of the reference frame.
+    ///
+    /// Examples: 2000-01-01T00:00:00.000
     ///
     /// :type: Optional[str]
     #[getter]
@@ -729,7 +752,9 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// Ephemeris name.
+    /// The name of the ephemeris used.
+    ///
+    /// Examples: DE430, JPLEPH.405
     ///
     /// :type: Optional[str]
     #[getter]
@@ -741,7 +766,9 @@ impl RdmMetadata {
         self.inner.ephemeris_name = v;
     }
 
-    /// Gravity model.
+    /// The gravity model used.
+    ///
+    /// Examples: EGM-96, JGM-3
     ///
     /// :type: Optional[str]
     #[getter]
@@ -753,7 +780,9 @@ impl RdmMetadata {
         self.inner.gravity_model = v;
     }
 
-    /// Atmospheric model.
+    /// The atmospheric model used.
+    ///
+    /// Examples: Jacchia 70, MSIS-86
     ///
     /// :type: Optional[str]
     #[getter]
@@ -765,7 +794,9 @@ impl RdmMetadata {
         self.inner.atmospheric_model = v;
     }
 
-    /// Solar flux prediction methodology.
+    /// The solar flux and geomagnetic activity data used.
+    ///
+    /// Examples: F10.7_MEAN_81_CYCLE, SCHATTEN_ADJUSTED
     ///
     /// :type: Optional[str]
     #[getter]
@@ -777,7 +808,9 @@ impl RdmMetadata {
         self.inner.solar_flux_prediction = v;
     }
 
-    /// N-body perturbations.
+    /// The n-body perturbations used.
+    ///
+    /// Examples: MOON, SUN, JUPITER
     ///
     /// :type: Optional[str]
     #[getter]
@@ -789,7 +822,9 @@ impl RdmMetadata {
         self.inner.n_body_perturbations = v;
     }
 
-    /// Solar radiation pressure model.
+    /// Whether solar radiation pressure was used.
+    ///
+    /// Examples: YES, NO
     ///
     /// :type: Optional[str]
     #[getter]
@@ -801,7 +836,9 @@ impl RdmMetadata {
         self.inner.solar_rad_pressure = v;
     }
 
-    /// Earth tides model.
+    /// The Earth tides model used.
+    ///
+    /// Examples: ERS, IERS
     ///
     /// :type: Optional[str]
     #[getter]
@@ -813,7 +850,9 @@ impl RdmMetadata {
         self.inner.earth_tides = v;
     }
 
-    /// In-track thrust status.
+    /// Whether there was any intrack thrust.
+    ///
+    /// Examples: YES, NO
     ///
     /// :type: Optional[str]
     #[getter]
@@ -830,7 +869,9 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// Drag parameters source.
+    /// The source of the drag parameters.
+    ///
+    /// Examples: OD, DATABASE, DEFAULT
     ///
     /// :type: Optional[str]
     #[getter]
@@ -842,7 +883,11 @@ impl RdmMetadata {
         self.inner.drag_parameters_source = v;
     }
 
-    /// Drag parameters altitude (km).
+    /// The altitude at which the drag parameters were estimated.
+    ///
+    /// Units: km
+    ///
+    /// Examples: 200.0 [km]
     ///
     /// :type: Optional[float]
     #[getter]
@@ -857,7 +902,9 @@ impl RdmMetadata {
         self.inner.drag_parameters_altitude = v.map(PositionRequired::new);
     }
 
-    /// Reentry uncertainty method.
+    /// The method used to compute re-entry uncertainty.
+    ///
+    /// Examples: MONTE-CARLO, ANALYTICAL
     ///
     /// :type: Optional[str]
     #[getter]
@@ -869,7 +916,9 @@ impl RdmMetadata {
         self.inner.reentry_uncertainty_method = v;
     }
 
-    /// Reentry disintegration.
+    /// The method used to model the object’s disintegration.
+    ///
+    /// Examples: MASS-LOSS, BREAK-UP, NONE
     ///
     /// :type: Optional[str]
     #[getter]
@@ -881,7 +930,9 @@ impl RdmMetadata {
         self.inner.reentry_disintegration = v;
     }
 
-    /// Impact uncertainty method.
+    /// The method used to compute impact uncertainty.
+    ///
+    /// Examples: MONTE-CARLO, ANALYTICAL
     ///
     /// :type: Optional[str]
     #[getter]
@@ -893,7 +944,9 @@ impl RdmMetadata {
         self.inner.impact_uncertainty_method = v;
     }
 
-    /// Previous message ID.
+    /// The ID of the previous message for this object.
+    ///
+    /// Examples: ESA/20180421-007
     ///
     /// :type: Optional[str]
     #[getter]
@@ -905,7 +958,9 @@ impl RdmMetadata {
         self.inner.previous_message_id = v;
     }
 
-    /// Previous message epoch.
+    /// The epoch of the previous message for this object.
+    ///
+    /// Examples: 2018-04-21T09:00:00.00
     ///
     /// :type: Optional[str]
     #[getter]
@@ -921,7 +976,9 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// Next message epoch.
+    /// The epoch of the next message for this object.
+    ///
+    /// Examples: 2018-04-23T09:00:00
     ///
     /// :type: Optional[str]
     #[getter]
@@ -954,10 +1011,7 @@ impl RdmMetadata {
 // RDM Data
 // ============================================================================
 
-/// Represents the Data Section of an RDM Segment.
-///
-/// Contains logical blocks for atmospheric re-entry, ground impact, state vector,
-/// covariance, object parameters, OD parameters, and user-defined parameters.
+/// The RDM Data section.
 ///
 /// Parameters
 /// ----------
@@ -1150,7 +1204,7 @@ impl RdmData {
 // Atmospheric Reentry Parameters
 // ============================================================================
 
-/// Atmospheric re-entry information.
+/// Atmospheric reentry parameters (atmosphericReentryParametersType, RDM).
 ///
 /// Parameters
 /// ----------
@@ -1370,7 +1424,7 @@ impl AtmosphericReentryParameters {
 // Ground Impact Parameters
 // ============================================================================
 
-/// Ground impact and burn-up data parameters.
+/// Ground impact parameters (groundImpactParametersType, RDM).
 #[pyclass]
 #[derive(Clone)]
 pub struct GroundImpactParameters {
@@ -1639,7 +1693,7 @@ impl GroundImpactParameters {
 // RDM Spacecraft Parameters
 // ============================================================================
 
-/// Object physical parameters.
+/// RDM spacecraft parameters (rdmSpacecraftParametersType).
 #[pyclass]
 #[derive(Clone)]
 pub struct RdmSpacecraftParameters {
@@ -2074,12 +2128,12 @@ impl RdmStateVector {
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, comments: Vec<String>) {
+    fn set_comment(&mut self, comments: Vec<String>) {
         self.inner.comment = comments;
     }
 
@@ -2281,12 +2335,12 @@ impl RdmCovarianceMatrix {
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, comments: Vec<String>) {
+    fn set_comment(&mut self, comments: Vec<String>) {
         self.inner.comment = comments;
     }
 
@@ -2313,9 +2367,6 @@ impl RdmCovarianceMatrix {
     fn set_cx_x(&mut self, v: f64) {
         self.inner.cx_x.value = v;
     }
-
-    // ... Implement all other covariance elements ...
-    // Since there are 21 elements, providing a few examples. The pattern is identical.
 
     /// CY_X covariance element.
     ///
@@ -2559,15 +2610,5 @@ impl RdmCovarianceMatrix {
         self.inner.cz_dot_z_dot.value = v;
     }
 
-    /// Comments for the covariance matrix.
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
-    }
-    #[setter]
-    fn set_comment(&mut self, v: Vec<String>) {
-        self.inner.comment = v;
-    }
+
 }

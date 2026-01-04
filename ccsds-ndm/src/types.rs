@@ -1647,11 +1647,20 @@ pub struct TimeSystemType(pub String);
 pub struct AngVelFrameType(pub String);
 
 /// USER DEFINED PARAMETERS block (`userDefinedType`).
+/// User-defined parameters.
+///
+/// Allow for the exchange of any desired orbital data not already provided in the message.
+///
+/// **CCSDS Reference**: 502.0-B-3, Section 3.2.4 (OPM), Section 4.2.4 (OMM), Section 6.2.9 (OCM).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UserDefined {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// List of user-defined parameters.
     #[serde(
         rename = "USER_DEFINED",
         default,
@@ -1660,11 +1669,15 @@ pub struct UserDefined {
     pub user_defined: Vec<UserDefinedParameter>,
 }
 
-/// Single USER_DEFINED parameter (`userDefinedParameterType`).
+/// Single USER_DEFINED parameter.
+///
+/// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct UserDefinedParameter {
+    /// Value of the user-defined parameter.
     #[serde(rename = "$value")]
     pub value: String,
+    /// Name of the user-defined parameter.
     #[serde(rename = "@parameter")]
     pub parameter: String,
 }

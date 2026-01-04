@@ -12,6 +12,8 @@ extensions = [
     "sphinx_tabs.tabs",
 ]
 
+napoleon_custom_sections = [("Units", "units")]
+
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", ".venv", "README.md"]
 
