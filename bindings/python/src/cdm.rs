@@ -274,7 +274,9 @@ impl CdmHeader {
         })
     }
 
-    /// Message creation date/time in UTC.
+    /// Message creation date/time in Coordinated Universal Time (UTC).
+    ///
+    /// Examples: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
     ///
     /// :type: str
     #[getter]
@@ -289,6 +291,8 @@ impl CdmHeader {
 
     /// Creating agency or owner/operator.
     ///
+    /// Examples: JSPOC, ESA SST, CAESAR, JPL, SDC
+    ///
     /// :type: str
     #[getter]
     fn originator(&self) -> String {
@@ -299,7 +303,9 @@ impl CdmHeader {
         self.inner.originator = value;
     }
 
-    /// ID used to uniquely identify this message.
+    /// ID that uniquely identifies a message from a given originator.
+    ///
+    /// Examples: 201113719185, ABC-12_34
     ///
     /// :type: str
     #[getter]
@@ -313,6 +319,8 @@ impl CdmHeader {
 
     /// Spacecraft name(s) for which the CDM is provided.
     ///
+    /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
+    ///
     /// :type: Optional[str]
     #[getter]
     fn message_for(&self) -> Option<String> {
@@ -323,7 +331,7 @@ impl CdmHeader {
         self.inner.message_for = value;
     }
 
-    /// Explanatory comments.
+    /// Comments.
     ///
     /// :type: list[str]
     #[getter]
@@ -562,7 +570,9 @@ impl RelativeMetadataData {
         Ok(())
     }
 
-    /// The norm of the relative position vector at TCA.
+    /// The norm of the relative position vector.
+    ///
+    /// Units: m
     ///
     /// :type: float
     #[getter]
@@ -573,7 +583,9 @@ impl RelativeMetadataData {
     fn set_miss_distance(&mut self, value: f64) {
         self.inner.miss_distance = Length::new(value, None);
     }
-    /// The norm of the relative velocity vector at TCA.
+    /// The norm of the relative velocity vector.
+    ///
+    /// Units: m/s
     ///
     /// :type: Optional[float]
     #[getter]
@@ -585,7 +597,7 @@ impl RelativeMetadataData {
         self.inner.relative_speed = value.map(|v| Dv::new(v, None));
     }
 
-    /// The probability (denoted 'p' where 0.0<=p<=1.0) that the two objects will collide.
+    /// The probability that Object1 and Object2 will collide.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -601,7 +613,7 @@ impl RelativeMetadataData {
         Ok(())
     }
 
-    /// The method used to calculate the collision probability.
+    /// The method that was used to calculate the collision probability.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -673,6 +685,8 @@ impl RelativeMetadataData {
 
     /// The R or T component size of the screening volume.
     ///
+    /// Units: m
+    ///
     /// :type: Optional[float]
     #[getter]
     fn screen_volume_x(&self) -> Option<f64> {
@@ -680,6 +694,8 @@ impl RelativeMetadataData {
     }
 
     /// The T or V component size of the screening volume.
+    ///
+    /// Units: m
     ///
     /// :type: Optional[float]
     #[getter]
@@ -689,13 +705,15 @@ impl RelativeMetadataData {
 
     /// The N component size of the screening volume.
     ///
+    /// Units: m
+    ///
     /// :type: Optional[float]
     #[getter]
     fn screen_volume_z(&self) -> Option<f64> {
         self.inner.screen_volume_z.as_ref().map(|v| v.value)
     }
 
-    /// Explanatory comments.
+    /// Comments.
     ///
     /// :type: list[str]
     #[getter]
@@ -974,7 +992,7 @@ impl CdmMetadata {
         self.inner.catalog_name = value;
     }
 
-    /// The full international designator (YYYY-NNNP{PP}).
+    /// The full international designator for the object.
     ///
     /// :type: str
     #[getter]
@@ -986,7 +1004,7 @@ impl CdmMetadata {
         self.inner.international_designator = value;
     }
 
-    /// Unique name of the external ephemeris file or 'NONE'.
+    /// Unique name of the external ephemeris file used for the object or NONE.
     ///
     /// :type: str
     #[getter]
@@ -998,7 +1016,7 @@ impl CdmMetadata {
         self.inner.ephemeris_name = value;
     }
 
-    /// Contact position of the owner/operator.
+    /// Contact position of the owner/operator of the object.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1010,7 +1028,7 @@ impl CdmMetadata {
         self.inner.operator_contact_position = value;
     }
 
-    /// Contact organization.
+    /// Contact organization of the object.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1022,7 +1040,7 @@ impl CdmMetadata {
         self.inner.operator_organization = value;
     }
 
-    /// Phone number of the contact.
+    /// Phone number of the contact position or organization for the object.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1034,7 +1052,7 @@ impl CdmMetadata {
         self.inner.operator_phone = value;
     }
 
-    /// Email address of the contact.
+    /// Email address of the contact position or organization of the object.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1046,7 +1064,7 @@ impl CdmMetadata {
         self.inner.operator_email = value;
     }
 
-    /// The central body (e.g., EARTH, SUN).
+    /// The central body about which Object1 and Object2 orbit.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1058,7 +1076,7 @@ impl CdmMetadata {
         self.inner.orbit_center = value;
     }
 
-    /// The gravity model used for the OD.
+    /// The gravity model used for the OD of the object.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1070,7 +1088,7 @@ impl CdmMetadata {
         self.inner.gravity_model = value;
     }
 
-    /// The atmospheric density model used for the OD.
+    /// The atmospheric density model used for the OD of the object.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1082,7 +1100,7 @@ impl CdmMetadata {
         self.inner.atmospheric_model = value;
     }
 
-    /// N-body gravitational perturbations used.
+    /// The N-body gravitational perturbations used for the OD of the object.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1150,7 +1168,7 @@ impl CdmData {
         }
     }
 
-    /// Object position and velocity at TCA.
+    /// State Vector.
     ///
     /// :type: CdmStateVector
     #[getter]
@@ -1160,7 +1178,7 @@ impl CdmData {
         }
     }
 
-    /// Object covariance at TCA.
+    /// Covariance Matrix.
     ///
     /// :type: CdmCovarianceMatrix
     #[getter]
@@ -1230,7 +1248,9 @@ impl CdmStateVector {
         }
     }
 
-    /// Position X component.
+    /// Object Position Vector X component.
+    ///
+    /// Units: km
     ///
     /// :type: float
     #[getter]
@@ -1242,7 +1262,9 @@ impl CdmStateVector {
         self.inner.x = PositionRequired::new(value);
     }
 
-    /// Position Y component.
+    /// Object Position Vector Y component.
+    ///
+    /// Units: km
     ///
     /// :type: float
     #[getter]
@@ -1254,7 +1276,9 @@ impl CdmStateVector {
         self.inner.y = PositionRequired::new(value);
     }
 
-    /// Position Z component.
+    /// Object Position Vector Z component.
+    ///
+    /// Units: km
     ///
     /// :type: float
     #[getter]
@@ -1266,7 +1290,9 @@ impl CdmStateVector {
         self.inner.z = PositionRequired::new(value);
     }
 
-    /// Velocity X component.
+    /// Object Velocity Vector X component.
+    ///
+    /// Units: km/s
     ///
     /// :type: float
     #[getter]
@@ -1278,7 +1304,9 @@ impl CdmStateVector {
         self.inner.x_dot = VelocityRequired::new(value);
     }
 
-    /// Velocity Y component.
+    /// Object Velocity Vector Y component.
+    ///
+    /// Units: km/s
     ///
     /// :type: float
     #[getter]
@@ -1290,7 +1318,9 @@ impl CdmStateVector {
         self.inner.y_dot = VelocityRequired::new(value);
     }
 
-    /// Velocity Z component.
+    /// Object Velocity Vector Z component.
+    ///
+    /// Units: km/s
     ///
     /// :type: float
     #[getter]
@@ -1326,12 +1356,12 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, comments: Vec<String>) {
+    fn set_comment(&mut self, comments: Vec<String>) {
         self.inner.comment = comments;
     }
 

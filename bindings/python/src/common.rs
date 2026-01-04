@@ -7,9 +7,7 @@ use ccsds_ndm::common as core_common;
 use ccsds_ndm::types::{Acc, Position, Velocity};
 use pyo3::prelude::*;
 
-/// Represents the header of a CCSDS Orbit Data Message (ODM).
-///
-/// The header contains metadata common to all ODM message types.
+/// Represents the `odmHeader` complex type.
 ///
 /// Parameters
 /// ----------
@@ -58,7 +56,9 @@ impl OdmHeader {
         )
     }
 
-    /// File creation date/time in UTC.
+    /// File creation date/time in UTC. (For format specification, see 7.5.10.)
+    ///
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: str
     #[getter]
@@ -72,7 +72,12 @@ impl OdmHeader {
         Ok(())
     }
 
-    /// Creating agency or operator.
+    /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
+    /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
+    /// Abbreviation column is not populated. If desired organization is not listed there, follow
+    /// procedures to request that originator be added to SANA registry.
+    ///
+    /// Examples: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     ///
     /// :type: str
     #[getter]
@@ -85,7 +90,10 @@ impl OdmHeader {
         self.inner.originator = value;
     }
 
-    /// ID that uniquely identifies a message from a given originator.
+    /// ID that uniquely identifies a message from a given originator. The format and content of the
+    /// message identifier value are at the discretion of the originator.
+    ///
+    /// Examples: OPM_201113719185, ABC-12_34
     ///
     /// :type: Optional[str]
     #[getter]
@@ -98,7 +106,10 @@ impl OdmHeader {
         self.inner.message_id = value;
     }
 
-    /// User-defined free-text message classification/caveats.
+    /// User-defined free-text message classification/caveats of this ODM. It is recommended
+    /// that selected values be pre-coordinated between exchanging entities by mutual agreement.
+    ///
+    /// Examples: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
     ///
     /// :type: Optional[str]
     #[getter]
@@ -111,25 +122,21 @@ impl OdmHeader {
         self.inner.classification = value;
     }
 
-    // Note: Using "comments" (plural) to match existing stub
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 }
 
-/// Position and velocity (and optionally acceleration) at a specific epoch.
-///
-/// Used in OEM to represent object state.
-/// Units: Position in km, Velocity in km/s, Acceleration in km/s² (by default)
+/// Represents the `stateVectorType` and `stateVectorAccType` from the XSD.
 ///
 /// Parameters
 /// ----------
@@ -231,7 +238,9 @@ impl StateVectorAcc {
         )
     }
 
-    /// Epoch of the state vector.
+    /// Epoch of state vector (see 7.5.10 for formatting rules).
+    ///
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: str
     #[getter]
@@ -245,7 +254,11 @@ impl StateVectorAcc {
         Ok(())
     }
 
-    /// Position vector X-component (km).
+    /// Position vector X-component.
+    ///
+    /// Examples: 6653.148
+    ///
+    /// Units: km
     ///
     /// :type: float
     #[getter]
@@ -258,7 +271,11 @@ impl StateVectorAcc {
         self.inner.x.value = value;
     }
 
-    /// Position vector Y-component (km).
+    /// Position vector Y-component.
+    ///
+    /// Examples: -20.0
+    ///
+    /// Units: km
     ///
     /// :type: float
     #[getter]
@@ -271,7 +288,11 @@ impl StateVectorAcc {
         self.inner.y.value = value;
     }
 
-    /// Position vector Z-component (km).
+    /// Position vector Z-component.
+    ///
+    /// Examples: 0.0
+    ///
+    /// Units: km
     ///
     /// :type: float
     #[getter]
@@ -284,7 +305,11 @@ impl StateVectorAcc {
         self.inner.z.value = value;
     }
 
-    /// Velocity vector X-component (km/s).
+    /// Velocity vector X-component.
+    ///
+    /// Examples: 0.0
+    ///
+    /// Units: km/s
     ///
     /// :type: float
     #[getter]
@@ -297,7 +322,11 @@ impl StateVectorAcc {
         self.inner.x_dot.value = value;
     }
 
-    /// Velocity vector Y-component (km/s).
+    /// Velocity vector Y-component.
+    ///
+    /// Examples: 7.7
+    ///
+    /// Units: km/s
     ///
     /// :type: float
     #[getter]
@@ -310,7 +339,11 @@ impl StateVectorAcc {
         self.inner.y_dot.value = value;
     }
 
-    /// Velocity vector Z-component (km/s).
+    /// Velocity vector Z-component.
+    ///
+    /// Examples: 0.0
+    ///
+    /// Units: km/s
     ///
     /// :type: float
     #[getter]
@@ -323,7 +356,11 @@ impl StateVectorAcc {
         self.inner.z_dot.value = value;
     }
 
-    /// Acceleration vector X-component (km/s²).
+    /// Acceleration vector X-component.
+    ///
+    /// Examples: 0.001
+    ///
+    /// Units: km/s²
     ///
     /// :type: Optional[float]
     #[getter]
@@ -339,7 +376,11 @@ impl StateVectorAcc {
         });
     }
 
-    /// Acceleration vector Y-component (km/s²).
+    /// Acceleration vector Y-component.
+    ///
+    /// Examples: 0.0
+    ///
+    /// Units: km/s²
     ///
     /// :type: Optional[float]
     #[getter]
@@ -355,7 +396,11 @@ impl StateVectorAcc {
         });
     }
 
-    /// Acceleration vector Z-component (km/s²).
+    /// Acceleration vector Z-component.
+    ///
+    /// Examples: 0.0
+    ///
+    /// Units: km/s²
     ///
     /// :type: Optional[float]
     #[getter]
@@ -457,20 +502,22 @@ impl StateVector {
         )
     }
 
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 
-    /// Epoch of the state vector.
+    /// Epoch of state vector (see 7.5.10 for formatting rules).
+    ///
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: str
     #[getter]
@@ -484,7 +531,11 @@ impl StateVector {
         Ok(())
     }
 
-    /// Position vector X-component (km).
+    /// Position vector X-component.
+    ///
+    /// Examples: 6653.148
+    ///
+    /// Units: km
     ///
     /// :type: float
     #[getter]
@@ -497,7 +548,11 @@ impl StateVector {
         self.inner.x.value = value;
     }
 
-    /// Position vector Y-component (km).
+    /// Position vector Y-component.
+    ///
+    /// Examples: -20.0
+    ///
+    /// Units: km
     ///
     /// :type: float
     #[getter]
@@ -510,7 +565,11 @@ impl StateVector {
         self.inner.y.value = value;
     }
 
-    /// Position vector Z-component (km).
+    /// Position vector Z-component.
+    ///
+    /// Examples: 0.0
+    ///
+    /// Units: km
     ///
     /// :type: float
     #[getter]
@@ -523,7 +582,11 @@ impl StateVector {
         self.inner.z.value = value;
     }
 
-    /// Velocity vector X-component (km/s).
+    /// Velocity vector X-component.
+    ///
+    /// Examples: 0.0
+    ///
+    /// Units: km/s
     ///
     /// :type: float
     #[getter]
@@ -536,7 +599,11 @@ impl StateVector {
         self.inner.x_dot.value = value;
     }
 
-    /// Velocity vector Y-component (km/s).
+    /// Velocity vector Y-component.
+    ///
+    /// Examples: 7.7
+    ///
+    /// Units: km/s
     ///
     /// :type: float
     #[getter]
@@ -549,7 +616,11 @@ impl StateVector {
         self.inner.y_dot.value = value;
     }
 
-    /// Velocity vector Z-component (km/s).
+    /// Velocity vector Z-component.
+    ///
+    /// Examples: 0.0
+    ///
+    /// Units: km/s
     ///
     /// :type: float
     #[getter]
@@ -563,9 +634,10 @@ impl StateVector {
     }
 }
 
-/// Spacecraft parameters.
+/// Spacecraft physical parameters (mass, area, coefficients).
 ///
-/// Used in OPM and OMM.
+/// References:
+/// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 ///
 /// Parameters
 /// ----------
@@ -621,20 +693,22 @@ impl SpacecraftParameters {
         "SpacecraftParameters(...)".to_string()
     }
 
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_comments(&self) -> Vec<String> {
+    fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
 
     #[setter]
-    fn set_comments(&mut self, value: Vec<String>) {
+    fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
 
     /// Spacecraft mass.
+    ///
+    /// Examples: 1850.2, 3352.0
     ///
     /// Units: kg
     ///
@@ -653,7 +727,9 @@ impl SpacecraftParameters {
         });
     }
 
-    /// Solar radiation pressure area.
+    /// Solar Radiation Pressure Area (AR).
+    ///
+    /// Examples: 14, 20.0
     ///
     /// Units: m²
     ///
@@ -672,7 +748,9 @@ impl SpacecraftParameters {
         });
     }
 
-    /// Solar radiation pressure coefficient.
+    /// Solar Radiation Pressure Coefficient (CR).
+    ///
+    /// Examples: 1, 1.34
     ///
     /// :type: Optional[float]
     #[getter]
@@ -685,7 +763,9 @@ impl SpacecraftParameters {
         self.inner.solar_rad_coeff = value;
     }
 
-    /// Drag area.
+    /// Drag Area (AD).
+    ///
+    /// Examples: 14, 20.0
     ///
     /// Units: m²
     ///
@@ -704,7 +784,9 @@ impl SpacecraftParameters {
         });
     }
 
-    /// Drag coefficient.
+    /// Drag Coefficient (CD).
+    ///
+    /// Examples: 2, 2.1
     ///
     /// :type: Optional[float]
     #[getter]
