@@ -20,6 +20,12 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from binding_mappings import (
+    PYTHON_ONLY_FIELDS,
+    get_rust_path,
+    get_rust_struct_name,
+)
+
 # ---------------------------------------------------------------------------
 # Data Classes
 # ---------------------------------------------------------------------------
@@ -477,6 +483,50 @@ def extract_type_hint(docstring: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def _clean_rust_type(type_str: str) -> str:
+    """Extract inner type from Option<T>, Vec<T>, etc. to find struct name."""
+    type_str = type_str.strip()
+    if "<" in type_str and type_str.endswith(">"):
+        struct_match = re.search(r"^\w+\s*<(.+)>$", type_str)
+        if struct_match:
+            return _clean_rust_type(struct_match.group(1))
+    return type_str
+
+
+def _resolve_rust_field(
+    root_struct: RustStruct,
+    field_path: str,
+    all_structs: dict[str, RustStruct],
+) -> RustField | None:
+    """Resolve a dot-separated field path (e.g. 'body.segment') to a RustField."""
+    current_struct = root_struct
+    parts = field_path.split(".")
+
+    for i, part in enumerate(parts):
+        field = current_struct.fields.get(part)
+        if not field:
+            return None
+
+        if i == len(parts) - 1:
+            return field
+
+        # Navigate to next struct
+        type_name = _clean_rust_type(field.rust_type)
+
+        # Determine strict name lookup (ignore crate prefixes if any)
+        if "::" in type_name:
+            type_name = type_name.split("::")[-1]
+
+        next_struct = all_structs.get(type_name)
+        if not next_struct:
+            # Handle some common renames if necessary, or just fail
+            return None
+
+        current_struct = next_struct
+
+    return None
+
+
 def sync_docstrings(
     rust_structs: dict[str, RustStruct],
     python_classes: dict[str, dict[str, PythonClass]],
@@ -493,8 +543,9 @@ def sync_docstrings(
         changes: list[tuple[int, int, str, str, bool]] = []
 
         for class_name, py_class in classes.items():
-            # Find matching Rust struct - exact match only
-            rust_struct = rust_structs.get(class_name)
+            # Find matching Rust struct
+            rust_struct_name = get_rust_struct_name(class_name)
+            rust_struct = rust_structs.get(rust_struct_name)
 
             if not rust_struct:
                 results.append(
@@ -548,8 +599,19 @@ def sync_docstrings(
 
             # 2. Sync field (getter) docstrings
             for field_name, getter in py_class.getters.items():
-                # Exact field match only
-                rust_field = rust_struct.fields.get(field_name)
+                # Skip Python-only fields
+                if field_name in PYTHON_ONLY_FIELDS.get(class_name, []):
+                    continue
+
+                # Resolve Rust field path using mappings
+                rust_field_path = get_rust_path(class_name, field_name)
+
+                # Skip if Rust field is marked as skipped (though usually this means not exposed)
+                # We check anyway if we can resolve it
+
+                rust_field = _resolve_rust_field(
+                    rust_struct, rust_field_path, rust_structs
+                )
 
                 if not rust_field:
                     results.append(

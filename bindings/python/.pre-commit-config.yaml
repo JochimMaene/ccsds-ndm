@@ -24,7 +24,21 @@ repos:
 
       - id: local-stub-check
         name: stub check
-        entry: uv run stubs.py --check
+        entry: uv run python stubs.py --check
         language: system
         pass_filenames: false
         always_run: true
+
+      - id: sync-docstrings
+        name: sync docstrings check
+        entry: uv run python sync_docstrings.py --check
+        language: system
+        pass_filenames: false
+        files: ^(src/.*\.rs|../../ccsds-ndm/src/.*)$
+
+      - id: audit-bindings
+        name: audit bindings
+        entry: uv run python audit_bindings.py --strict
+        language: system
+        pass_filenames: false
+        files: ^(src/.*\.rs|../../ccsds-ndm/src/.*)$

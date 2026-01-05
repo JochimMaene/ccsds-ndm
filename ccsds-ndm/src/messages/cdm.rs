@@ -1293,22 +1293,78 @@ impl CdmData {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdditionalParameters {
+    /// Comments (see 6.3.4 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+
+    /// The actual area of the object. (See annex E for definition.)
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_pc: Option<Area>,
+    /// The effective area of the object exposed to atmospheric drag. (See annex E for
+    /// definition.)
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_drg: Option<Area>,
+
+    /// The effective area of the object exposed to solar radiation pressure. (See annex E for
+    /// definition.)
+    ///
+    /// **Units**: m²
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub area_srp: Option<Area>,
+
+    /// The mass of the object.
+    ///
+    /// **Units**: kg
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mass: Option<Mass>,
+
+    /// The object's CD•A/m used to propagate the state vector and covariance to TCA. (See
+    /// annex E for definition.)
+    ///
+    /// **Units**: m²/kg
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cd_area_over_mass: Option<M2kg>,
+
+    /// The object's CR•A/m used to propagate the state vector and covariance to TCA. (See
+    /// annex E for definition.)
+    ///
+    /// **Units**: m²/kg
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cr_area_over_mass: Option<M2kg>,
+
+    /// The object's acceleration due to in-track thrust used to propagate the state vector and
+    /// covariance to TCA. (See annex E for definition.)
+    ///
+    /// **Units**: m/s²
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thrust_acceleration: Option<Ms2>,
+
+    /// The amount of energy being removed from the object's orbit by atmospheric drag. This
+    /// value is an average calculated during the OD.
+    ///
+    /// **Units**: W/kg
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sedr: Option<Wkg>,
 }

@@ -41,6 +41,152 @@ def from_str(data):
     """
     ...
 
+class AdditionalParameters:
+    """
+    Additional Parameters.
+
+    Parameters
+    ----------
+    area_pc : float, optional
+        Projected area. Units: m^2
+    area_drg : float, optional
+        Drag area. Units: m^2
+    area_srp : float, optional
+        SRP area. Units: m^2
+    mass : float, optional
+        Mass. Units: kg
+    cd_area_over_mass : float, optional
+        Drag coefficient * Area / Mass. Units: m^2/kg
+    cr_area_over_mass : float, optional
+        Reflectivity coefficient * Area / Mass. Units: m^2/kg
+    thrust_acceleration : float, optional
+        Thrust acceleration. Units: m/s^2
+    sedr : float, optional
+        Solar energy dissipation rate. Units: W/kg
+    comment : list of str, optional
+        Comments.
+    """
+    def __init__(
+        area_pc,
+        area_drg,
+        area_srp,
+        mass,
+        cd_area_over_mass,
+        cr_area_over_mass,
+        thrust_acceleration,
+        sedr,
+        comment,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def area_drg(self) -> float:
+        """
+        The effective area of the object exposed to atmospheric drag. (See annex E for
+        definition.)
+
+        Units: m²
+        """
+        ...
+
+    @area_drg.setter
+    def area_drg(self, value: float) -> None: ...
+    @property
+    def area_pc(self) -> float:
+        """
+        The actual area of the object. (See annex E for definition.)
+
+        Units: m²
+        """
+        ...
+
+    @area_pc.setter
+    def area_pc(self, value: float) -> None: ...
+    @property
+    def area_srp(self) -> float:
+        """
+        The effective area of the object exposed to solar radiation pressure. (See annex E for
+        definition.)
+
+        Units: m²
+        """
+        ...
+
+    @area_srp.setter
+    def area_srp(self, value: float) -> None: ...
+    @property
+    def cd_area_over_mass(self) -> float:
+        """
+        The object's CD•A/m used to propagate the state vector and covariance to TCA. (See
+        annex E for definition.)
+
+        Units: m²/kg
+        """
+        ...
+
+    @cd_area_over_mass.setter
+    def cd_area_over_mass(self, value: float) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments (see 6.3.4 for formatting rules).
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def cr_area_over_mass(self) -> float:
+        """
+        The object's CR•A/m used to propagate the state vector and covariance to TCA. (See
+        annex E for definition.)
+
+        Units: m²/kg
+        """
+        ...
+
+    @cr_area_over_mass.setter
+    def cr_area_over_mass(self, value: float) -> None: ...
+    @property
+    def mass(self) -> float:
+        """
+        The mass of the object.
+
+        Units: kg
+        """
+        ...
+
+    @mass.setter
+    def mass(self, value: float) -> None: ...
+    @property
+    def sedr(self) -> float:
+        """
+        The amount of energy being removed from the object's orbit by atmospheric drag. This
+        value is an average calculated during the OD.
+
+        Units: W/kg
+        """
+        ...
+
+    @sedr.setter
+    def sedr(self, value: float) -> None: ...
+    @property
+    def thrust_acceleration(self) -> float:
+        """
+        The object's acceleration due to in-track thrust used to propagate the state vector and
+        covariance to TCA. (See annex E for definition.)
+
+        Units: m/s²
+        """
+        ...
+
+    @thrust_acceleration.setter
+    def thrust_acceleration(self, value: float) -> None: ...
+
 class AtmosphericReentryParameters:
     """
     Atmospheric reentry parameters (atmosphericReentryParametersType, RDM).
@@ -340,17 +486,333 @@ class CdmBody:
 
 class CdmCovarianceMatrix:
     """
-    Covariance Matrix at TCA.
+    Covariance Matrix.
 
-    Provides uncertainty information for the state vector.
-    Can be converted to a NumPy array using `to_numpy()`.
+    Parameters
+    ----------
+    cr_r : float
+        Radial position variance. Units: m^2
+    ct_r : float
+        Transverse-Radial position covariance. Units: m^2
+    ct_t : float
+        Transverse position variance. Units: m^2
+    cn_r : float
+        Normal-Radial position covariance. Units: m^2
+    cn_t : float
+        Normal-Transverse position covariance. Units: m^2
+    cn_n : float
+        Normal position variance. Units: m^2
+    crdot_r : float
+        Radial velocity - Radial position covariance. Units: m^2/s
+    crdot_t : float
+        Radial velocity - Transverse position covariance. Units: m^2/s
+    crdot_n : float
+        Radial velocity - Normal position covariance. Units: m^2/s
+    crdot_rdot : float
+        Radial velocity variance. Units: m^2/s^2
+    ctdot_r : float
+        Transverse velocity - Radial position covariance. Units: m^2/s
+    ctdot_t : float
+        Transverse velocity - Transverse position covariance. Units: m^2/s
+    ctdot_n : float
+        Transverse velocity - Normal position covariance. Units: m^2/s
+    ctdot_rdot : float
+        Transverse velocity - Radial velocity covariance. Units: m^2/s^2
+    ctdot_tdot : float
+        Transverse velocity variance. Units: m^2/s^2
+    cndot_r : float
+        Normal velocity - Radial position covariance. Units: m^2/s
+    cndot_t : float
+        Normal velocity - Transverse position covariance. Units: m^2/s
+    cndot_n : float
+        Normal velocity - Normal position covariance. Units: m^2/s
+    cndot_rdot : float
+        Normal velocity - Radial velocity covariance. Units: m^2/s^2
+    cndot_tdot : float
+        Normal velocity - Transverse velocity covariance. Units: m^2/s^2
+    cndot_ndot : float
+        Normal velocity variance. Units: m^2/s^2
+    cdrg_r : float
+        Drag coeff - Radial position covariance.
+    cdrg_t : float
+        Drag coeff - Transverse position covariance.
+    cdrg_n : float
+        Drag coeff - Normal position covariance.
+    cdrg_rdot : float
+        Drag coeff - Radial velocity covariance.
+    cdrg_tdot : float
+        Drag coeff - Transverse velocity covariance.
+    cdrg_ndot : float
+        Drag coeff - Normal velocity covariance.
+    cdrg_drg : float
+        Drag coeff variance.
+    csrp_r : float
+        SRP coeff - Radial position covariance.
+    csrp_t : float
+        SRP coeff - Transverse position covariance.
+    csrp_n : float
+        SRP coeff - Normal position covariance.
+    csrp_rdot : float
+        SRP coeff - Radial velocity covariance.
+    csrp_tdot : float
+        SRP coeff - Transverse velocity covariance.
+    csrp_ndot : float
+        SRP coeff - Normal velocity covariance.
+    csrp_drg : float
+        SRP coeff - Drag coeff covariance.
+    csrp_srp : float
+        SRP coeff variance.
+    cthr_r : float
+        Thrust - Radial position covariance.
+    cthr_t : float
+        Thrust - Transverse position covariance.
+    cthr_n : float
+        Thrust - Normal position covariance.
+    cthr_rdot : float
+        Thrust - Radial velocity covariance.
+    cthr_tdot : float
+        Thrust - Transverse velocity covariance.
+    cthr_ndot : float
+        Thrust - Normal velocity covariance.
+    cthr_drg : float
+        Thrust - Drag coeff covariance.
+    cthr_srp : float
+        Thrust - SRP coeff covariance.
+    cthr_thr : float
+        Thrust variance.
+    comment : list of str, optional
+        Comments.
     """
+    def __init__(
+        cr_r,
+        ct_r,
+        ct_t,
+        cn_r,
+        cn_t,
+        cn_n,
+        crdot_r,
+        crdot_t,
+        crdot_n,
+        crdot_rdot,
+        ctdot_r,
+        ctdot_t,
+        ctdot_n,
+        ctdot_rdot,
+        ctdot_tdot,
+        cndot_r,
+        cndot_t,
+        cndot_n,
+        cndot_rdot,
+        cndot_tdot,
+        cndot_ndot,
+        cdrg_r,
+        cdrg_t,
+        cdrg_n,
+        cdrg_rdot,
+        cdrg_tdot,
+        cdrg_ndot,
+        cdrg_drg,
+        csrp_r,
+        csrp_t,
+        csrp_n,
+        csrp_rdot,
+        csrp_tdot,
+        csrp_ndot,
+        csrp_drg,
+        csrp_srp,
+        cthr_r,
+        cthr_t,
+        cthr_n,
+        cthr_rdot,
+        cthr_tdot,
+        cthr_ndot,
+        cthr_drg,
+        cthr_srp,
+        cthr_thr,
+        comment,
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
         """
         ...
 
+    @property
+    def cdrg_drg(self) -> float:
+        """
+        Object covariance matrix [7,7].
+
+        Units: m⁴/kg²
+        """
+        ...
+
+    @cdrg_drg.setter
+    def cdrg_drg(self, value: float) -> None: ...
+    @property
+    def cdrg_n(self) -> float:
+        """
+        Object covariance matrix [7,3].
+
+        Units: m³/kg
+        """
+        ...
+
+    @cdrg_n.setter
+    def cdrg_n(self, value: float) -> None: ...
+    @property
+    def cdrg_ndot(self) -> float:
+        """
+        Object covariance matrix [7,6].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @cdrg_ndot.setter
+    def cdrg_ndot(self, value: float) -> None: ...
+    @property
+    def cdrg_r(self) -> float:
+        """
+        Object covariance matrix [7,1].
+
+        Units: m³/kg
+        """
+        ...
+
+    @cdrg_r.setter
+    def cdrg_r(self, value: float) -> None: ...
+    @property
+    def cdrg_rdot(self) -> float:
+        """
+        Object covariance matrix [7,4].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @cdrg_rdot.setter
+    def cdrg_rdot(self, value: float) -> None: ...
+    @property
+    def cdrg_t(self) -> float:
+        """
+        Object covariance matrix [7,2].
+
+        Units: m³/kg
+        """
+        ...
+
+    @cdrg_t.setter
+    def cdrg_t(self, value: float) -> None: ...
+    @property
+    def cdrg_tdot(self) -> float:
+        """
+        Object covariance matrix [7,5].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @cdrg_tdot.setter
+    def cdrg_tdot(self, value: float) -> None: ...
+    @property
+    def cn_n(self) -> float:
+        """
+        Object covariance matrix [3,3].
+
+        Units: m²
+        """
+        ...
+
+    @cn_n.setter
+    def cn_n(self, value: float) -> None: ...
+    @property
+    def cn_r(self) -> float:
+        """
+        Object covariance matrix [3,1].
+
+        Units: m²
+        """
+        ...
+
+    @cn_r.setter
+    def cn_r(self, value: float) -> None: ...
+    @property
+    def cn_t(self) -> float:
+        """
+        Object covariance matrix [3,2].
+
+        Units: m²
+        """
+        ...
+
+    @cn_t.setter
+    def cn_t(self, value: float) -> None: ...
+    @property
+    def cndot_n(self) -> float:
+        """
+        Object covariance matrix [6,3].
+
+        Units: m²/s
+        """
+        ...
+
+    @cndot_n.setter
+    def cndot_n(self, value: float) -> None: ...
+    @property
+    def cndot_ndot(self) -> float:
+        """
+        Object covariance matrix [6,6].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cndot_ndot.setter
+    def cndot_ndot(self, value: float) -> None: ...
+    @property
+    def cndot_r(self) -> float:
+        """
+        Object covariance matrix [6,1].
+
+        Units: m²/s
+        """
+        ...
+
+    @cndot_r.setter
+    def cndot_r(self, value: float) -> None: ...
+    @property
+    def cndot_rdot(self) -> float:
+        """
+        Object covariance matrix [6,4].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cndot_rdot.setter
+    def cndot_rdot(self, value: float) -> None: ...
+    @property
+    def cndot_t(self) -> float:
+        """
+        Object covariance matrix [6,2].
+
+        Units: m²/s
+        """
+        ...
+
+    @cndot_t.setter
+    def cndot_t(self, value: float) -> None: ...
+    @property
+    def cndot_tdot(self) -> float:
+        """
+        Object covariance matrix [6,5].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cndot_tdot.setter
+    def cndot_tdot(self, value: float) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -360,6 +822,325 @@ class CdmCovarianceMatrix:
 
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
+    @property
+    def cr_r(self) -> float:
+        """
+        Object covariance matrix [1,1].
+
+        Units: m²
+        """
+        ...
+
+    @cr_r.setter
+    def cr_r(self, value: float) -> None: ...
+    @property
+    def crdot_n(self) -> float:
+        """
+        Object covariance matrix [4,3].
+
+        Units: m²/s
+        """
+        ...
+
+    @crdot_n.setter
+    def crdot_n(self, value: float) -> None: ...
+    @property
+    def crdot_r(self) -> float:
+        """
+        Object covariance matrix [4,1].
+
+        Units: m²/s
+        """
+        ...
+
+    @crdot_r.setter
+    def crdot_r(self, value: float) -> None: ...
+    @property
+    def crdot_rdot(self) -> float:
+        """
+        Object covariance matrix [4,4].
+
+        Units: m²/s²
+        """
+        ...
+
+    @crdot_rdot.setter
+    def crdot_rdot(self, value: float) -> None: ...
+    @property
+    def crdot_t(self) -> float:
+        """
+        Object covariance matrix [4,2].
+
+        Units: m²/s
+        """
+        ...
+
+    @crdot_t.setter
+    def crdot_t(self, value: float) -> None: ...
+    @property
+    def csrp_drg(self) -> float:
+        """
+        Object covariance matrix [8,7].
+
+        Units: m⁴/kg²
+        """
+        ...
+
+    @csrp_drg.setter
+    def csrp_drg(self, value: float) -> None: ...
+    @property
+    def csrp_n(self) -> float:
+        """
+        Object covariance matrix [8,3].
+
+        Units: m³/kg
+        """
+        ...
+
+    @csrp_n.setter
+    def csrp_n(self, value: float) -> None: ...
+    @property
+    def csrp_ndot(self) -> float:
+        """
+        Object covariance matrix [8,6].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @csrp_ndot.setter
+    def csrp_ndot(self, value: float) -> None: ...
+    @property
+    def csrp_r(self) -> float:
+        """
+        Object covariance matrix [8,1].
+
+        Units: m³/kg
+        """
+        ...
+
+    @csrp_r.setter
+    def csrp_r(self, value: float) -> None: ...
+    @property
+    def csrp_rdot(self) -> float:
+        """
+        Object covariance matrix [8,4].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @csrp_rdot.setter
+    def csrp_rdot(self, value: float) -> None: ...
+    @property
+    def csrp_srp(self) -> float:
+        """
+        Object covariance matrix [8,8].
+
+        Units: m⁴/kg²
+        """
+        ...
+
+    @csrp_srp.setter
+    def csrp_srp(self, value: float) -> None: ...
+    @property
+    def csrp_t(self) -> float:
+        """
+        Object covariance matrix [8,2].
+
+        Units: m³/kg
+        """
+        ...
+
+    @csrp_t.setter
+    def csrp_t(self, value: float) -> None: ...
+    @property
+    def csrp_tdot(self) -> float:
+        """
+        Object covariance matrix [8,5].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @csrp_tdot.setter
+    def csrp_tdot(self, value: float) -> None: ...
+    @property
+    def ct_r(self) -> float:
+        """
+        Object covariance matrix [2,1].
+
+        Units: m²
+        """
+        ...
+
+    @ct_r.setter
+    def ct_r(self, value: float) -> None: ...
+    @property
+    def ct_t(self) -> float:
+        """
+        Object covariance matrix [2,2].
+
+        Units: m²
+        """
+        ...
+
+    @ct_t.setter
+    def ct_t(self, value: float) -> None: ...
+    @property
+    def ctdot_n(self) -> float:
+        """
+        Object covariance matrix [5,3].
+
+        Units: m²/s
+        """
+        ...
+
+    @ctdot_n.setter
+    def ctdot_n(self, value: float) -> None: ...
+    @property
+    def ctdot_r(self) -> float:
+        """
+        Object covariance matrix [5,1].
+
+        Units: m²/s
+        """
+        ...
+
+    @ctdot_r.setter
+    def ctdot_r(self, value: float) -> None: ...
+    @property
+    def ctdot_rdot(self) -> float:
+        """
+        Object covariance matrix [5,4].
+
+        Units: m²/s²
+        """
+        ...
+
+    @ctdot_rdot.setter
+    def ctdot_rdot(self, value: float) -> None: ...
+    @property
+    def ctdot_t(self) -> float:
+        """
+        Object covariance matrix [5,2].
+
+        Units: m²/s
+        """
+        ...
+
+    @ctdot_t.setter
+    def ctdot_t(self, value: float) -> None: ...
+    @property
+    def ctdot_tdot(self) -> float:
+        """
+        Object covariance matrix [5,5].
+
+        Units: m²/s²
+        """
+        ...
+
+    @ctdot_tdot.setter
+    def ctdot_tdot(self, value: float) -> None: ...
+    @property
+    def cthr_drg(self) -> float:
+        """
+        Object covariance matrix [9,7].
+
+        Units: m³/(kg*s²)
+        """
+        ...
+
+    @cthr_drg.setter
+    def cthr_drg(self, value: float) -> None: ...
+    @property
+    def cthr_n(self) -> float:
+        """
+        Object covariance matrix [9,3].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cthr_n.setter
+    def cthr_n(self, value: float) -> None: ...
+    @property
+    def cthr_ndot(self) -> float:
+        """
+        Object covariance matrix [9,6].
+
+        Units: m²/s³
+        """
+        ...
+
+    @cthr_ndot.setter
+    def cthr_ndot(self, value: float) -> None: ...
+    @property
+    def cthr_r(self) -> float:
+        """
+        Object covariance matrix [9,1].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cthr_r.setter
+    def cthr_r(self, value: float) -> None: ...
+    @property
+    def cthr_rdot(self) -> float:
+        """
+        Object covariance matrix [9,4].
+
+        Units: m²/s³
+        """
+        ...
+
+    @cthr_rdot.setter
+    def cthr_rdot(self, value: float) -> None: ...
+    @property
+    def cthr_srp(self) -> float:
+        """
+        Object covariance matrix [9,8].
+
+        Units: m³/(kg*s²)
+        """
+        ...
+
+    @cthr_srp.setter
+    def cthr_srp(self, value: float) -> None: ...
+    @property
+    def cthr_t(self) -> float:
+        """
+        Object covariance matrix [9,2].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cthr_t.setter
+    def cthr_t(self, value: float) -> None: ...
+    @property
+    def cthr_tdot(self) -> float:
+        """
+        Object covariance matrix [9,5].
+
+        Units: m²/s³
+        """
+        ...
+
+    @cthr_tdot.setter
+    def cthr_tdot(self, value: float) -> None: ...
+    @property
+    def cthr_thr(self) -> float:
+        """
+        Object covariance matrix [9,9].
+
+        Units: m²/s⁴
+        """
+        ...
+
+    @cthr_thr.setter
+    def cthr_thr(self, value: float) -> None: ...
     def to_numpy(self):
         """
         Returns the full 9x9 covariance matrix as a NumPy array.
@@ -389,6 +1170,15 @@ class CdmData:
         ...
 
     @property
+    def additional_parameters(self) -> Optional[AdditionalParameters]:
+        """
+        Additional Parameters.
+        """
+        ...
+
+    @additional_parameters.setter
+    def additional_parameters(self, value: Optional[AdditionalParameters]) -> None: ...
+    @property
     def comment(self) -> list[str]:
         """
         Comments.
@@ -406,6 +1196,15 @@ class CdmData:
 
     @covariance_matrix.setter
     def covariance_matrix(self, value: CdmCovarianceMatrix) -> None: ...
+    @property
+    def od_parameters(self) -> Optional[OdParameters]:
+        """
+        Orbit Determination Parameters.
+        """
+        ...
+
+    @od_parameters.setter
+    def od_parameters(self, value: Optional[OdParameters]) -> None: ...
     @property
     def state_vector(self) -> CdmStateVector:
         """
@@ -611,6 +1410,24 @@ class CdmMetadata:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
+    def covariance_method(self) -> CovarianceMethodType:
+        """
+        Method used to calculate the covariance.
+        """
+        ...
+
+    @covariance_method.setter
+    def covariance_method(self, value: CovarianceMethodType) -> None: ...
+    @property
+    def earth_tides(self) -> Optional[str]:
+        """
+        Indication of whether solid Earth and ocean tides were used.
+        """
+        ...
+
+    @earth_tides.setter
+    def earth_tides(self, value: Optional[str]) -> None: ...
+    @property
     def ephemeris_name(self) -> str:
         """
         Unique name of the external ephemeris file used for the object or NONE.
@@ -638,6 +1455,24 @@ class CdmMetadata:
     @international_designator.setter
     def international_designator(self, value: str) -> None: ...
     @property
+    def intrack_thrust(self) -> Optional[str]:
+        """
+        Indication of whether in-track thrust modeling was used.
+        """
+        ...
+
+    @intrack_thrust.setter
+    def intrack_thrust(self, value: Optional[str]) -> None: ...
+    @property
+    def maneuverable(self) -> ManeuverableType:
+        """
+        The maneuver capacity of the object.
+        """
+        ...
+
+    @maneuverable.setter
+    def maneuverable(self, value: ManeuverableType) -> None: ...
+    @property
     def n_body_perturbations(self) -> Optional[str]:
         """
         The N-body gravitational perturbations used for the OD of the object.
@@ -646,6 +1481,17 @@ class CdmMetadata:
 
     @n_body_perturbations.setter
     def n_body_perturbations(self, value: Optional[str]) -> None: ...
+    @property
+    def object(self) -> CdmObjectType:
+        """
+        The object to which the metadata and data apply.
+
+        Examples: OBJECT1, OBJECT2
+        """
+        ...
+
+    @object.setter
+    def object(self, value: CdmObjectType) -> None: ...
     @property
     def object_designator(self) -> str:
         """
@@ -664,6 +1510,17 @@ class CdmMetadata:
 
     @object_name.setter
     def object_name(self, value: str) -> None: ...
+    @property
+    def object_type(self) -> Optional[ObjectDescription]:
+        """
+        The object type.
+
+        Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
+        """
+        ...
+
+    @object_type.setter
+    def object_type(self, value: Optional[ObjectDescription]) -> None: ...
     @property
     def operator_contact_position(self) -> Optional[str]:
         """
@@ -709,8 +1566,32 @@ class CdmMetadata:
 
     @orbit_center.setter
     def orbit_center(self, value: Optional[str]) -> None: ...
+    @property
+    def ref_frame(self) -> ReferenceFrameType:
+        """
+        Name of the reference frame in which the state vector data are given.
+        """
+        ...
+
+    @ref_frame.setter
+    def ref_frame(self, value: ReferenceFrameType) -> None: ...
+    @property
+    def solar_rad_pressure(self) -> Optional[str]:
+        """
+        Indication of whether solar radiation pressure perturbations were used.
+        """
+        ...
+
+    @solar_rad_pressure.setter
+    def solar_rad_pressure(self, value: Optional[str]) -> None: ...
 
 class CdmObjectType:
+    """
+    Covariance Matrix at TCA.
+
+    Provides uncertainty information for the state vector.
+    Can be converted to a NumPy array using `to_numpy()`.
+    """
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -887,9 +1768,104 @@ class CovarianceMethodType:
 class GroundImpactParameters:
     """
     Ground impact parameters (groundImpactParametersType, RDM).
+
+    Parameters
+    ----------
+    probability_of_impact : float, optional
+        Probability of impact.
+    probability_of_burn_up : float, optional
+        Probability of burn up.
+    probability_of_break_up : float, optional
+        Probability of break up.
+    probability_of_land_impact : float, optional
+        Probability of land impact.
+    probability_of_casualty : float, optional
+        Probability of casualty.
+    nominal_impact_epoch : str, optional
+        Nominal impact epoch.
+    impact_window_start : str, optional
+        Impact window start.
+    impact_window_end : str, optional
+        Impact window end.
+    impact_ref_frame : str, optional
+        Impact reference frame.
+    nominal_impact_lon : float, optional
+        Nominal impact longitude. Units: deg
+    nominal_impact_lat : float, optional
+        Nominal impact latitude. Units: deg
+    nominal_impact_alt : float, optional
+        Nominal impact altitude. Units: km
+    impact_1_confidence : float, optional
+        Impact 1 confidence. Units: %
+    impact_1_start_lon : float, optional
+        Impact 1 start longitude. Units: deg
+    impact_1_start_lat : float, optional
+        Impact 1 start latitude. Units: deg
+    impact_1_stop_lon : float, optional
+        Impact 1 stop longitude. Units: deg
+    impact_1_stop_lat : float, optional
+        Impact 1 stop latitude. Units: deg
+    impact_1_cross_track : float, optional
+        Impact 1 cross track. Units: km
+    impact_2_confidence : float, optional
+        Impact 2 confidence. Units: %
+    impact_2_start_lon : float, optional
+        Impact 2 start longitude. Units: deg
+    impact_2_start_lat : float, optional
+        Impact 2 start latitude. Units: deg
+    impact_2_stop_lon : float, optional
+        Impact 2 stop longitude. Units: deg
+    impact_2_stop_lat : float, optional
+        Impact 2 stop latitude. Units: deg
+    impact_2_cross_track : float, optional
+        Impact 2 cross track. Units: km
+    impact_3_confidence : float, optional
+        Impact 3 confidence. Units: %
+    impact_3_start_lon : float, optional
+        Impact 3 start longitude. Units: deg
+    impact_3_start_lat : float, optional
+        Impact 3 start latitude. Units: deg
+    impact_3_stop_lon : float, optional
+        Impact 3 stop longitude. Units: deg
+    impact_3_stop_lat : float, optional
+        Impact 3 stop latitude. Units: deg
+    impact_3_cross_track : float, optional
+        Impact 3 cross track. Units: km
+    comment : list of str, optional
+        Comments.
     """
     def __init__(
-        *, probability_of_impact=None, probability_of_burn_up=None, comment=None
+        probability_of_impact,
+        probability_of_burn_up,
+        probability_of_break_up,
+        probability_of_land_impact,
+        probability_of_casualty,
+        nominal_impact_epoch,
+        impact_window_start,
+        impact_window_end,
+        impact_ref_frame,
+        nominal_impact_lon,
+        nominal_impact_lat,
+        nominal_impact_alt,
+        impact_1_confidence,
+        impact_1_start_lon,
+        impact_1_start_lat,
+        impact_1_stop_lon,
+        impact_1_stop_lat,
+        impact_1_cross_track,
+        impact_2_confidence,
+        impact_2_start_lon,
+        impact_2_start_lat,
+        impact_2_stop_lon,
+        impact_2_stop_lat,
+        impact_2_cross_track,
+        impact_3_confidence,
+        impact_3_start_lon,
+        impact_3_start_lat,
+        impact_3_stop_lon,
+        impact_3_stop_lat,
+        impact_3_cross_track,
+        comment,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -900,12 +1876,204 @@ class GroundImpactParameters:
     @property
     def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
+    @property
+    def impact_1_confidence(self) -> Optional[float]:
+        """
+        Confidence of impact prediction 1.
+        """
+        ...
+
+    @impact_1_confidence.setter
+    def impact_1_confidence(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_1_cross_track(self) -> Optional[float]:
+        """
+        Impact 1 cross track distance.
+
+        Units: km
+        """
+        ...
+
+    @impact_1_cross_track.setter
+    def impact_1_cross_track(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_1_start_lat(self) -> Optional[float]:
+        """
+        Impact 1 start latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_1_start_lat.setter
+    def impact_1_start_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_1_start_lon(self) -> Optional[float]:
+        """
+        Impact 1 start longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_1_start_lon.setter
+    def impact_1_start_lon(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_1_stop_lat(self) -> Optional[float]:
+        """
+        Impact stops latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_1_stop_lat.setter
+    def impact_1_stop_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_1_stop_lon(self) -> Optional[float]:
+        """
+        Impact 1 stop longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_1_stop_lon.setter
+    def impact_1_stop_lon(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_confidence(self) -> Optional[float]:
+        """
+        Confidence of impact prediction 2.
+        """
+        ...
+
+    @impact_2_confidence.setter
+    def impact_2_confidence(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_cross_track(self) -> Optional[float]:
+        """
+        Impact 2 cross track distance.
+
+        Units: km
+        """
+        ...
+
+    @impact_2_cross_track.setter
+    def impact_2_cross_track(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_start_lat(self) -> Optional[float]:
+        """
+        Impact 2 start latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_2_start_lat.setter
+    def impact_2_start_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_start_lon(self) -> Optional[float]:
+        """
+        Impact 2 start longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_2_start_lon.setter
+    def impact_2_start_lon(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_stop_lat(self) -> Optional[float]:
+        """
+        Impact 2 stop latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_2_stop_lat.setter
+    def impact_2_stop_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_stop_lon(self) -> Optional[float]:
+        """
+        Impact 2 stop longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_2_stop_lon.setter
+    def impact_2_stop_lon(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_confidence(self) -> Optional[float]:
+        """
+        Confidence of impact prediction 3.
+        """
+        ...
+
+    @impact_3_confidence.setter
+    def impact_3_confidence(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_cross_track(self) -> Optional[float]:
+        """
+        Impact 3 cross track distance.
+
+        Units: km
+        """
+        ...
+
+    @impact_3_cross_track.setter
+    def impact_3_cross_track(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_start_lat(self) -> Optional[float]:
+        """
+        Impact 3 start latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_3_start_lat.setter
+    def impact_3_start_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_start_lon(self) -> Optional[float]:
+        """
+        Impact 3 start longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_3_start_lon.setter
+    def impact_3_start_lon(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_stop_lat(self) -> Optional[float]:
+        """
+        Impact 3 stop latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_3_stop_lat.setter
+    def impact_3_stop_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_stop_lon(self) -> Optional[float]:
+        """
+        Impact 3 stop longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_3_stop_lon.setter
+    def impact_3_stop_lon(self, value: Optional[float]) -> None: ...
     @property
     def impact_ref_frame(self) -> Optional[str]:
         """
@@ -918,7 +2086,7 @@ class GroundImpactParameters:
     @property
     def impact_window_end(self) -> Optional[str]:
         """
-        End of the impact window.
+        Impact window end epoch.
         """
         ...
 
@@ -927,7 +2095,7 @@ class GroundImpactParameters:
     @property
     def impact_window_start(self) -> Optional[str]:
         """
-        Start of the impact window.
+        Impact window start epoch.
         """
         ...
 
@@ -936,7 +2104,9 @@ class GroundImpactParameters:
     @property
     def nominal_impact_alt(self) -> Optional[float]:
         """
-        Nominal impact altitude (km).
+        Nominal impact altitude.
+
+        Units: km
         """
         ...
 
@@ -954,7 +2124,9 @@ class GroundImpactParameters:
     @property
     def nominal_impact_lat(self) -> Optional[float]:
         """
-        Nominal impact latitude (degrees).
+        Nominal impact latitude.
+
+        Units: deg
         """
         ...
 
@@ -963,7 +2135,9 @@ class GroundImpactParameters:
     @property
     def nominal_impact_lon(self) -> Optional[float]:
         """
-        Nominal impact longitude (degrees).
+        Nominal impact longitude.
+
+        Units: deg
         """
         ...
 
@@ -4998,8 +6172,45 @@ class OcmTrajState:
 class OdParameters:
     """
     Orbit Determination Parameters.
+
+    Parameters
+    ----------
+    time_lastob_start : str, optional
+        Time of last observation start.
+    time_lastob_end : str, optional
+        Time of last observation end.
+    recommended_od_span : float, optional
+        Recommended OD span. Units: d
+    actual_od_span : float, optional
+        Actual OD span. Units: d
+    obs_available : int, optional
+        Observations available.
+    obs_used : int, optional
+        Observations used.
+    tracks_available : int, optional
+        Tracks available.
+    tracks_used : int, optional
+        Tracks used.
+    residuals_accepted : float, optional
+        Residuals accepted. Units: %
+    weighted_rms : float, optional
+        Weighted RMS.
+    comment : list of str, optional
+        Comments.
     """
-    def __init__(comment) -> None: ...
+    def __init__(
+        time_lastob_start,
+        time_lastob_end,
+        recommended_od_span,
+        actual_od_span,
+        obs_available,
+        obs_used,
+        tracks_available,
+        tracks_used,
+        residuals_accepted,
+        weighted_rms,
+        comment,
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -5009,7 +6220,12 @@ class OdParameters:
     @property
     def actual_od_span(self) -> Optional[float]:
         """
-        Actual orbit determination span (days).
+        Based on the observations available and the RECOMMENDED_OD_SPAN, the actual
+        time span used for the OD of the object. (See annex E for definition.)
+
+        Examples: 14, 20.0
+
+        Units: days
         """
         ...
 
@@ -5018,7 +6234,7 @@ class OdParameters:
     @property
     def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 6.3.4 for formatting rules).
         """
         ...
 
@@ -5027,7 +6243,7 @@ class OdParameters:
     @property
     def obs_available(self) -> Optional[int]:
         """
-        Number of observations available.
+        The total number of observations available for orbit determination.
         """
         ...
 
@@ -5036,7 +6252,7 @@ class OdParameters:
     @property
     def obs_used(self) -> Optional[int]:
         """
-        Number of observations used.
+        The number of observations used in the orbit determination.
         """
         ...
 
@@ -5045,7 +6261,11 @@ class OdParameters:
     @property
     def recommended_od_span(self) -> Optional[float]:
         """
-        Recommended orbit determination span (days).
+        The recommended OD time span calculated for the object.
+
+        Examples: 14, 20.0
+
+        Units: days
         """
         ...
 
@@ -5054,7 +6274,7 @@ class OdParameters:
     @property
     def residuals_accepted(self) -> Optional[float]:
         """
-        Residuals accepted (percentage).
+        The percentage of residuals accepted during orbit determination.
         """
         ...
 
@@ -5063,7 +6283,9 @@ class OdParameters:
     @property
     def time_lastob_end(self) -> Optional[str]:
         """
-        Time of last observation end.
+        The end of a time interval (UTC) that contains the time of the last accepted
+        observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+        of zero duration (i.e., same value as that of TIME_LASTOB_START).
         """
         ...
 
@@ -5072,7 +6294,9 @@ class OdParameters:
     @property
     def time_lastob_start(self) -> Optional[str]:
         """
-        Time of last observation start.
+        The start of a time interval (UTC) that contains the time of the last accepted
+        observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+        of zero duration (i.e., same value as that of TIME_LASTOB_END).
         """
         ...
 
@@ -5081,7 +6305,7 @@ class OdParameters:
     @property
     def tracks_available(self) -> Optional[int]:
         """
-        Number of tracks available.
+        The total number of tracks available for orbit determination.
         """
         ...
 
@@ -5090,7 +6314,7 @@ class OdParameters:
     @property
     def tracks_used(self) -> Optional[int]:
         """
-        Number of tracks used.
+        The number of tracks used in the orbit determination.
         """
         ...
 
@@ -5099,7 +6323,7 @@ class OdParameters:
     @property
     def weighted_rms(self) -> Optional[float]:
         """
-        Weighted RMS.
+        The weighted root mean square (RMS) of the residuals.
         """
         ...
 
@@ -6856,13 +8080,22 @@ class OpmData:
     state_vector : StateVector
         State vector.
     """
-    def __init__(state_vector) -> None: ...
+    def __init__(state_vector, comment) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
         """
         ...
 
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def covariance_matrix(self) -> Optional[OpmCovarianceMatrix]:
         """
@@ -7166,7 +8399,7 @@ class Rdm:
     @property
     def segment(self) -> RdmSegment:
         """
-        The message segment.
+        The RDM Body consists of a single segment.
         """
         ...
 
@@ -7223,225 +8456,6 @@ class Rdm:
         """
         ...
 
-class RdmCovarianceMatrix:
-    """
-    Position/velocity covariance matrix.
-    """
-    def __init__(cov_ref_frame, comment) -> None: ...
-    def __getstate__(self, /):
-        """
-        Helper for pickle.
-        """
-        ...
-
-    @property
-    def comment(self) -> list[str]:
-        """
-        Comments.
-        """
-        ...
-
-    @comment.setter
-    def comment(self, value: list[str]) -> None: ...
-    @property
-    def cov_ref_frame(self) -> Optional[str]:
-        """
-        Covariance reference frame.
-        """
-        ...
-
-    @cov_ref_frame.setter
-    def cov_ref_frame(self, value: Optional[str]) -> None: ...
-    @property
-    def cx_dot_x(self) -> float:
-        """
-        CX_DOT_X covariance element.
-        """
-        ...
-
-    @cx_dot_x.setter
-    def cx_dot_x(self, value: float) -> None: ...
-    @property
-    def cx_dot_x_dot(self) -> float:
-        """
-        CX_DOT_X_DOT covariance element.
-        """
-        ...
-
-    @cx_dot_x_dot.setter
-    def cx_dot_x_dot(self, value: float) -> None: ...
-    @property
-    def cx_dot_y(self) -> float:
-        """
-        CX_DOT_Y covariance element.
-        """
-        ...
-
-    @cx_dot_y.setter
-    def cx_dot_y(self, value: float) -> None: ...
-    @property
-    def cx_dot_z(self) -> float:
-        """
-        CX_DOT_Z covariance element.
-        """
-        ...
-
-    @cx_dot_z.setter
-    def cx_dot_z(self, value: float) -> None: ...
-    @property
-    def cx_x(self) -> float:
-        """
-        CX_X covariance element.
-        """
-        ...
-
-    @cx_x.setter
-    def cx_x(self, value: float) -> None: ...
-    @property
-    def cy_dot_x(self) -> float:
-        """
-        CY_DOT_X covariance element.
-        """
-        ...
-
-    @cy_dot_x.setter
-    def cy_dot_x(self, value: float) -> None: ...
-    @property
-    def cy_dot_x_dot(self) -> float:
-        """
-        CY_DOT_X_DOT covariance element.
-        """
-        ...
-
-    @cy_dot_x_dot.setter
-    def cy_dot_x_dot(self, value: float) -> None: ...
-    @property
-    def cy_dot_y(self) -> float:
-        """
-        CY_DOT_Y covariance element.
-        """
-        ...
-
-    @cy_dot_y.setter
-    def cy_dot_y(self, value: float) -> None: ...
-    @property
-    def cy_dot_y_dot(self) -> float:
-        """
-        CY_DOT_Y_DOT covariance element.
-        """
-        ...
-
-    @cy_dot_y_dot.setter
-    def cy_dot_y_dot(self, value: float) -> None: ...
-    @property
-    def cy_dot_z(self) -> float:
-        """
-        CY_DOT_Z covariance element.
-        """
-        ...
-
-    @cy_dot_z.setter
-    def cy_dot_z(self, value: float) -> None: ...
-    @property
-    def cy_x(self) -> float:
-        """
-        CY_X covariance element.
-        """
-        ...
-
-    @cy_x.setter
-    def cy_x(self, value: float) -> None: ...
-    @property
-    def cy_y(self) -> float:
-        """
-        CY_Y covariance element.
-        """
-        ...
-
-    @cy_y.setter
-    def cy_y(self, value: float) -> None: ...
-    @property
-    def cz_dot_x(self) -> float:
-        """
-        CZ_DOT_X covariance element.
-        """
-        ...
-
-    @cz_dot_x.setter
-    def cz_dot_x(self, value: float) -> None: ...
-    @property
-    def cz_dot_x_dot(self) -> float:
-        """
-        CZ_DOT_X_DOT covariance element.
-        """
-        ...
-
-    @cz_dot_x_dot.setter
-    def cz_dot_x_dot(self, value: float) -> None: ...
-    @property
-    def cz_dot_y(self) -> float:
-        """
-        CZ_DOT_Y covariance element.
-        """
-        ...
-
-    @cz_dot_y.setter
-    def cz_dot_y(self, value: float) -> None: ...
-    @property
-    def cz_dot_y_dot(self) -> float:
-        """
-        CZ_DOT_Y_DOT covariance element.
-        """
-        ...
-
-    @cz_dot_y_dot.setter
-    def cz_dot_y_dot(self, value: float) -> None: ...
-    @property
-    def cz_dot_z(self) -> float:
-        """
-        CZ_DOT_Z covariance element.
-        """
-        ...
-
-    @cz_dot_z.setter
-    def cz_dot_z(self, value: float) -> None: ...
-    @property
-    def cz_dot_z_dot(self) -> float:
-        """
-        CZ_DOT_Z_DOT covariance element.
-        """
-        ...
-
-    @cz_dot_z_dot.setter
-    def cz_dot_z_dot(self, value: float) -> None: ...
-    @property
-    def cz_x(self) -> float:
-        """
-        CZ_X covariance element.
-        """
-        ...
-
-    @cz_x.setter
-    def cz_x(self, value: float) -> None: ...
-    @property
-    def cz_y(self) -> float:
-        """
-        CZ_Y covariance element.
-        """
-        ...
-
-    @cz_y.setter
-    def cz_y(self, value: float) -> None: ...
-    @property
-    def cz_z(self) -> float:
-        """
-        CZ_Z covariance element.
-        """
-        ...
-
-    @cz_z.setter
-    def cz_z(self, value: float) -> None: ...
-
 class RdmData:
     """
     The RDM Data section.
@@ -7452,9 +8466,9 @@ class RdmData:
         Mandatory atmospheric re-entry data.
     ground_impact_parameters : GroundImpactParameters, optional
         Ground impact and burn-up data.
-    state_vector : RdmStateVector, optional
+    state_vector : StateVector, optional
         Spacecraft state vector.
-    covariance_matrix : RdmCovarianceMatrix, optional
+    covariance_matrix : OpmCovarianceMatrix, optional
         Position/velocity covariance matrix.
     spacecraft_parameters : RdmSpacecraftParameters, optional
         Object physical parameters.
@@ -7503,14 +8517,14 @@ class RdmData:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def covariance_matrix(self) -> Optional[RdmCovarianceMatrix]:
+    def covariance_matrix(self) -> Optional[OpmCovarianceMatrix]:
         """
         Covariance matrix.
         """
         ...
 
     @covariance_matrix.setter
-    def covariance_matrix(self, value: Optional[RdmCovarianceMatrix]) -> None: ...
+    def covariance_matrix(self, value: Optional[OpmCovarianceMatrix]) -> None: ...
     @property
     def ground_impact_parameters(self) -> Optional[GroundImpactParameters]:
         """
@@ -7543,14 +8557,14 @@ class RdmData:
         self, value: Optional[RdmSpacecraftParameters]
     ) -> None: ...
     @property
-    def state_vector(self) -> Optional[RdmStateVector]:
+    def state_vector(self) -> Optional[StateVector]:
         """
         State vector.
         """
         ...
 
     @state_vector.setter
-    def state_vector(self, value: Optional[RdmStateVector]) -> None: ...
+    def state_vector(self, value: Optional[StateVector]) -> None: ...
     @property
     def user_defined_parameters(self) -> list[tuple[str, str]]:
         """
@@ -8173,90 +9187,6 @@ class RdmSpacecraftParameters:
     @wet_mass.setter
     def wet_mass(self, value: Optional[float]) -> None: ...
 
-class RdmStateVector:
-    """
-    Spacecraft State Vector.
-    """
-    def __init__(*, epoch, x, y, z, x_dot, y_dot, z_dot, comment=None) -> None: ...
-    def __getstate__(self, /):
-        """
-        Helper for pickle.
-        """
-        ...
-
-    @property
-    def comment(self) -> list[str]:
-        """
-        Comments.
-        """
-        ...
-
-    @comment.setter
-    def comment(self, value: list[str]) -> None: ...
-    @property
-    def epoch(self) -> str:
-        """
-        Epoch.
-        """
-        ...
-
-    @epoch.setter
-    def epoch(self, value: str) -> None: ...
-    @property
-    def x(self) -> float:
-        """
-        X position (km).
-        """
-        ...
-
-    @x.setter
-    def x(self, value: float) -> None: ...
-    @property
-    def x_dot(self) -> float:
-        """
-        X velocity (km/s).
-        """
-        ...
-
-    @x_dot.setter
-    def x_dot(self, value: float) -> None: ...
-    @property
-    def y(self) -> float:
-        """
-        Y position (km).
-        """
-        ...
-
-    @y.setter
-    def y(self, value: float) -> None: ...
-    @property
-    def y_dot(self) -> float:
-        """
-        Y velocity (km/s).
-        """
-        ...
-
-    @y_dot.setter
-    def y_dot(self, value: float) -> None: ...
-    @property
-    def z(self) -> float:
-        """
-        Z position (km).
-        """
-        ...
-
-    @z.setter
-    def z(self, value: float) -> None: ...
-    @property
-    def z_dot(self) -> float:
-        """
-        Z velocity (km/s).
-        """
-        ...
-
-    @z_dot.setter
-    def z_dot(self, value: float) -> None: ...
-
 class ReferenceFrameType:
     def __getstate__(self, /):
         """
@@ -8375,6 +9305,15 @@ class RelativeMetadataData:
     @miss_distance.setter
     def miss_distance(self, value: float) -> None: ...
     @property
+    def relative_position(self) -> Optional[list[float]]:
+        """
+        Relative position [R, T, N].
+        """
+        ...
+
+    @relative_position.setter
+    def relative_position(self, value: Optional[list[float]]) -> None: ...
+    @property
     def relative_speed(self) -> Optional[float]:
         """
         The norm of the relative velocity vector.
@@ -8385,6 +9324,15 @@ class RelativeMetadataData:
 
     @relative_speed.setter
     def relative_speed(self, value: Optional[float]) -> None: ...
+    @property
+    def relative_velocity(self) -> Optional[list[float]]:
+        """
+        Relative velocity [R, T, N].
+        """
+        ...
+
+    @relative_velocity.setter
+    def relative_velocity(self, value: Optional[list[float]]) -> None: ...
     @property
     def screen_entry_time(self) -> Optional[str]:
         """
@@ -8403,6 +9351,24 @@ class RelativeMetadataData:
 
     @screen_exit_time.setter
     def screen_exit_time(self, value: Optional[str]) -> None: ...
+    @property
+    def screen_volume_frame(self) -> Optional[ScreenVolumeFrameType]:
+        """
+        Name of the Object1 centered reference frame in which the screening volume data are given.
+        """
+        ...
+
+    @screen_volume_frame.setter
+    def screen_volume_frame(self, value: Optional[ScreenVolumeFrameType]) -> None: ...
+    @property
+    def screen_volume_shape(self) -> Optional[ScreenVolumeShapeType]:
+        """
+        Shape of the screening volume.
+        """
+        ...
+
+    @screen_volume_shape.setter
+    def screen_volume_shape(self, value: Optional[ScreenVolumeShapeType]) -> None: ...
     @property
     def screen_volume_x(self) -> Optional[float]:
         """
@@ -9041,14 +10007,14 @@ class TdmData:
         ...
 
     @property
-    def comment(self) -> list[str]:
+    def comment(self) -> list[TdmObservation]:
         """
         Comments.
         """
         ...
 
     @comment.setter
-    def comment(self, value: list[str]) -> None: ...
+    def comment(self, value: list[TdmObservation]) -> None: ...
     @property
     def observations(self) -> list[TdmObservation]:
         """

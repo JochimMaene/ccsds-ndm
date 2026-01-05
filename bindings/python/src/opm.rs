@@ -1194,10 +1194,10 @@ pub struct OpmData {
 #[pymethods]
 impl OpmData {
     #[new]
-    fn new(state_vector: StateVector) -> Self {
+    fn new(state_vector: StateVector, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_opm::OpmData {
-                comment: vec![],
+                comment: comment.unwrap_or_default(),
                 state_vector: state_vector.inner,
                 keplerian_elements: None,
                 spacecraft_parameters: None,
@@ -1206,6 +1206,19 @@ impl OpmData {
                 user_defined_parameters: None,
             },
         }
+    }
+
+    /// Comments.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 
     fn __repr__(&self) -> String {
