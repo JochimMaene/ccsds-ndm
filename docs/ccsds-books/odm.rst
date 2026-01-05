@@ -4660,6 +4660,2896 @@ N/A should be used. If a mandatory requirement is not satisfied, exception infor
 be supplied by entering a reference Xi, where i is a unique identifier, to an accompanying
 rationale for the noncompliance.
 
+.. _annex_a_ics_proforma_odm:
+
+A2 ICS PROFORMA FOR ORBIT DATA MESSAGES
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _annex_a_identification_ics_odm:
+
+A2.1 IDENTIFICATION OF ICS
+"""""""""""""""""""""""""""
+
+.. list-table::
+   :widths: 50 50
+   :header-rows: 0
+
+   * - Date of Statement (DD/MM/YYYY)
+     -
+   * - ICS serial number
+     -
+   * - System Conformance statement cross-reference
+     -
+
+.. _annex_a_identification_iut_odm:
+
+A2.2 IDENTIFICATION OF IMPLEMENTATION UNDER TEST
+"""""""""""""""""""""""""""""""""""""""""""""""""
+
+.. list-table::
+   :widths: 50 50
+   :header-rows: 0
+
+   * - Implementation name
+     -
+   * - Implementation version
+     -
+   * - Special Configuration
+     -
+   * - Other Information
+     -
+
+.. _annex_a_identification_supplier_odm:
+
+A2.3 IDENTIFICATION OF SUPPLIES
+""""""""""""""""""""""""""""""""
+
+.. list-table::
+   :widths: 75 25
+   :header-rows: 0
+
+   * - Supplier
+     -
+   * - Contact Point for Queries
+     -
+   * - Implementation Name(s) and Versions
+     -
+   * - Other information necessary for full identification, for example, name(s) and version(s) for machines and/or operating systems; System Name(s)
+     -
+
+.. _annex_a_document_versions_odm:
+
+A2.4 DOCUMENT VERSIONS
+"""""""""""""""""""""""
+
+.. list-table::
+   :widths: 75 25
+   :header-rows: 0
+
+   * - CCSDS 502.0 Document Version
+     - 3
+   * - Have any exceptions been required?
+       NOTE – A YES answer means that the implementation does not conform to the Recommended Standard. Non-supported mandatory capabilities are to be identified in the ICS, with an explanation of why the implementation is non-conforming.
+     - Yes _____ No_____
+
+.. _annex_a_requirements_lists_odm:
+
+A2.5 REQUIREMENTS LISTS
+""""""""""""""""""""""""
+
+.. _annex_a_opm_requirements_list_odm:
+
+A2.5.1 Orbit Parameter Message Requirements List
+++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - OPM Header
+     - N/A
+     - Table 3-1
+     - M
+     -
+   * - 2
+     - OPM Version
+     - CCSDS_OPM_VERS
+     - Table 3-1
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 3-1
+     - O
+     -
+   * - 4
+     - Message classification/caveats
+     - CLASSIFICATION
+     - Table 3-1
+     - O
+     -
+   * - 5
+     - Message creation date and time
+     - CREATION_DATE
+     - Table 3-1
+     - M
+     -
+   * - 6
+     - Message originator
+     - ORIGINATOR
+     - Table 3-1
+     - M
+     -
+   * - 7
+     - Unique message identifier
+     - MESSAGE_ID
+     - Table 3-1
+     - O
+     -
+   * - 8
+     - OPM Metadata
+     - N/A
+     - Table 3-2
+     - M
+     -
+   * - 9
+     - Comment
+     - COMMENT
+     - Table 3-2
+     - O
+     -
+   * - 10
+     - Name of space object
+     - OBJECT_NAME
+     - Table 3-2
+     - M
+     -
+   * - 11
+     - Identifier of space object
+     - OBJECT_ID
+     - Table 3-2
+     - M
+     -
+   * - 12
+     - Orbit center
+     - CENTER_NAME
+     - Table 3-2
+     - M
+     -
+   * - 13
+     - Reference frame
+     - REF_FRAME
+     - Table 3-2
+     - M
+     -
+   * - 14
+     - Epoch of reference frame
+     - REF_FRAME_EPOCH
+     - Table 3-2
+     - C
+     -
+   * - 15
+     - Time system applicable to data
+     - TIME_SYSTEM
+     - Table 3-2
+     - M
+     -
+   * - 16
+     - OPM Data
+     - N/A
+     - Table 3-3
+     - M
+     -
+   * - 17
+     - State Vector logical block
+     - N/A
+     - Table 3-3
+     - M
+     -
+   * - 18
+     - Comment
+     - COMMENT
+     - Table 3-3
+     - O
+     -
+   * - 19
+     - Epoch of the state vector
+     - EPOCH
+     - Table 3-3
+     - M
+     -
+   * - 20
+     - X component of position
+     - X
+     - Table 3-3
+     - M
+     -
+   * - 21
+     - Y component of position
+     - Y
+     - Table 3-3
+     - M
+     -
+   * - 22
+     - Z component of position
+     - Z
+     - Table 3-3
+     - M
+     -
+   * - 23
+     - X component of velocity
+     - X_DOT
+     - Table 3-3
+     - M
+     -
+   * - 24
+     - Y component of velocity
+     - Y_DOT
+     - Table 3-3
+     - M
+     -
+   * - 25
+     - Z component of velocity
+     - Z_DOT
+     - Table 3-3
+     - M
+     -
+   * - 26
+     - Keplerian Elements logical block
+     - N/A
+     - Table 3-3
+     - O
+     -
+   * - 27
+     - Comment
+     - COMMENT
+     - Table 3-3
+     - O
+     -
+   * - 28
+     - Semi-major axis of orbit
+     - SEMI_MAJOR_AXIS
+     - Table 3-3
+     - C
+     -
+   * - 29
+     - Eccentricity of orbit
+     - ECCENTRICITY
+     - Table 3-3
+     - C
+     -
+   * - 30
+     - Inclination of orbit
+     - INCLINATION
+     - Table 3-3
+     - C
+     -
+   * - 31
+     - Right ascension of ascending node of orbit
+     - RA_OF_ASC_NODE
+     - Table 3-3
+     - C
+     -
+   * - 32
+     - Argument of pericenter of orbit
+     - ARG_OF_PERICENTER
+     - Table 3-3
+     - C
+     -
+   * - 33
+     - True or mean anomaly of orbit
+     - TRUE_ANOMALY or MEAN_ANOMALY
+     - Table 3-3
+     - C
+     -
+   * - 34
+     - Gravitational coefficient of the central body
+     - GM
+     - Table 3-3
+     - C
+     -
+   * - 35
+     - Spacecraft Parameters logical block
+     - N/A
+     - Table 3-3
+     - O
+     -
+   * - 36
+     - Comment
+     - COMMENT
+     - Table 3-3
+     - O
+     -
+   * - 37
+     - Mass of the spacecraft
+     - MASS
+     - Table 3-3
+     - C
+     -
+   * - 38
+     - Solar radiation area of the spacecraft
+     - SOLAR_RAD_AREA
+     - Table 3-3
+     - C
+     -
+   * - 39
+     - Solar radiation coefficient of the spacecraft
+     - SOLAR_RAD_COEFF
+     - Table 3-3
+     - C
+     -
+   * - 40
+     - Drag area of the spacecraft
+     - DRAG_AREA
+     - Table 3-3
+     - C
+     -
+   * - 41
+     - Drag coefficient of the spacecraft
+     - DRAG_COEFF
+     - Table 3-3
+     - C
+     -
+   * - 42
+     - Position/velocity Covariance Matrix logical block
+     - N/A
+     - Table 3-3
+     - O
+     -
+   * - 43
+     - Comment
+     - COMMENT
+     - Table 3-3
+     - O
+     -
+   * - 44
+     - Cov reference frame
+     - COV_REF_FRAME
+     - Table 3-3
+     - C
+     -
+   * - 45
+     - Covariance matrix [1,1]
+     - CX_X
+     - Table 3-3
+     - C
+     -
+   * - 46
+     - Covariance matrix [2,1]
+     - CY_X
+     - Table 3-3
+     - C
+     -
+   * - 47
+     - Covariance matrix [2,2]
+     - CY_Y
+     - Table 3-3
+     - C
+     -
+   * - 48
+     - Covariance matrix [3,1]
+     - CZ_X
+     - Table 3-3
+     - C
+     -
+   * - 49
+     - Covariance matrix [3,2]
+     - CZ_Y
+     - Table 3-3
+     - C
+     -
+   * - 50
+     - Covariance matrix [3,3]
+     - CZ_Z
+     - Table 3-3
+     - C
+     -
+   * - 51
+     - Covariance matrix [4,1]
+     - CX_DOT_X
+     - Table 3-3
+     - C
+     -
+   * - 52
+     - Covariance matrix [4,2]
+     - CX_DOT_Y
+     - Table 3-3
+     - C
+     -
+   * - 53
+     - Covariance matrix [4,3]
+     - CX_DOT_Z
+     - Table 3-3
+     - C
+     -
+   * - 54
+     - Covariance matrix [4,4]
+     - CX_DOT_X_DOT
+     - Table 3-3
+     - C
+     -
+   * - 55
+     - Covariance matrix [5,1]
+     - CY_DOT_X
+     - Table 3-3
+     - C
+     -
+   * - 56
+     - Covariance matrix [5,2]
+     - CY_DOT_Y
+     - Table 3-3
+     - C
+     -
+   * - 57
+     - Covariance matrix [5,3]
+     - CY_DOT_Z
+     - Table 3-3
+     - C
+     -
+   * - 58
+     - Covariance matrix [5,4]
+     - CY_DOT_X_DOT
+     - Table 3-3
+     - C
+     -
+   * - 59
+     - Covariance matrix [5,5]
+     - CY_DOT_Y_DOT
+     - Table 3-3
+     - C
+     -
+   * - 60
+     - Covariance matrix [6,1]
+     - CZ_DOT_X
+     - Table 3-3
+     - C
+     -
+   * - 61
+     - Covariance matrix [6,2]
+     - CZ_DOT_Y
+     - Table 3-3
+     - C
+     -
+   * - 62
+     - Covariance matrix [6,3]
+     - CZ_DOT_Z
+     - Table 3-3
+     - C
+     -
+   * - 63
+     - Covariance matrix [6,4]
+     - CZ_DOT_X_DOT
+     - Table 3-3
+     - C
+     -
+   * - 64
+     - Covariance matrix [6,5]
+     - CY_DOT_Y_DOT
+     - Table 3-3
+     - C
+     -
+   * - 65
+     - Covariance matrix [6,6]
+     - CZ_DOT_Z_DOT
+     - Table 3-3
+     - C
+     -
+   * - 66
+     - Maneuver Parameters logical block
+     - N/A
+     - Table 3-3
+     - O
+     -
+   * - 67
+     - Comment
+     - COMMENT
+     - Table 3-3
+     - O
+     -
+   * - 68
+     - Time of maneuver start
+     - MAN_EPOCH_IGNITION
+     - Table 3-3
+     - O
+     -
+   * - 69
+     - Duration of maneuver
+     - MAN_DURATION
+     - Table 3-3
+     - O
+     -
+   * - 70
+     - Change of mass due to maneuver
+     - MAN_DELTA_MASS
+     - Table 3-3
+     - O
+     -
+   * - 71
+     - Relevant reference frame for maneuver
+     - MAN_REF_FRAME
+     - Table 3-3
+     - O
+     -
+   * - 72
+     - 1st component of velocity change
+     - MAN_DV_1
+     - Table 3-3
+     - O
+     -
+   * - 73
+     - 2nd component of velocity change
+     - MAN_DV_2
+     - Table 3-3
+     - O
+     -
+   * - 74
+     - 3rd component of velocity change
+     - MAN_DV_3
+     - Table 3-3
+     - O
+     -
+   * - 75
+     - User-Defined Parameters logical block
+     - N/A
+     - Table 3-3
+     - O
+     -
+   * - 76
+     - As defined by user, ‘essential information that cannot be conveyed in COMMENT statements’
+     - USER_DEFINED_x
+     - Table 3-3
+     - O
+     -
+
+.. _annex_a_omm_requirements_list_odm:
+
+A2.5.2 Orbit Mean Elements Message Requirements List
+++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - OMM Header
+     - N/A
+     - Table 4-1
+     - M
+     -
+   * - 2
+     - OMM Version
+     - CCSDS_OMM_VERS
+     - Table 4-1
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 4-1
+     - O
+     -
+   * - 4
+     - Message classification/caveats
+     - CLASSIFICATION
+     - Table 4-1
+     - O
+     -
+   * - 5
+     - Message creation date and time
+     - CREATION_DATE
+     - Table 4-1
+     - M
+     -
+   * - 6
+     - Message originator
+     - ORIGINATOR
+     - Table 4-1
+     - M
+     -
+   * - 7
+     - Unique message identifier
+     - MESSAGE_ID
+     - Table 4-1
+     - O
+     -
+   * - 8
+     - OMM Metadata
+     - N/A
+     - Table 4-2
+     - M
+     -
+   * - 9
+     - Comment
+     - COMMENT
+     - Table 4-2
+     - O
+     -
+   * - 10
+     - Name of space object
+     - OBJECT_NAME
+     - Table 4-2
+     - M
+     -
+   * - 11
+     - Identifier of space object
+     - OBJECT_ID
+     - Table 4-2
+     - M
+     -
+   * - 12
+     - Orbit center
+     - CENTER_NAME
+     - Table 4-2
+     - M
+     -
+   * - 13
+     - Reference frame
+     - REF_FRAME
+     - Table 4-2
+     - M
+     -
+   * - 14
+     - Epoch of reference frame
+     - REF_FRAME_EPOCH
+     - Table 4-2
+     - C
+     -
+   * - 15
+     - Time system applicable to data
+     - TIME_SYSTEM
+     - Table 4-2
+     - M
+     -
+   * - 16
+     - Mean element set theory of data
+     - MEAN_ELEMENT_THEORY
+     - Table 4-2
+     - M
+     -
+   * - 17
+     - OMM Data
+     - N/A
+     - Table 4-3
+     - M
+     -
+   * - 18
+     - Mean Keplerian elements logical block
+     - N/A
+     - Table 4-3
+     - M
+     -
+   * - 19
+     - Comment
+     - COMMENT
+     - Table 4-3
+     - O
+     -
+   * - 20
+     - Epoch of the orbital elements
+     - EPOCH
+     - Table 4-3
+     - M
+     -
+   * - 21
+     - Semi-major axis or mean motion
+     - SEMI_MAJOR_AXIS or MEAN_MOTION
+     - Table 4-3
+     - M
+     -
+   * - 22
+     - Eccentricity
+     - ECCENTRICITY
+     - Table 4-3
+     - M
+     -
+   * - 23
+     - Inclination
+     - INCLINATION
+     - Table 4-3
+     - M
+     -
+   * - 24
+     - Right ascension of ascending node
+     - RA_OF_ASC_NODE
+     - Table 4-3
+     - M
+     -
+   * - 25
+     - Argument of pericenter
+     - ARG_OF_PERICENTER
+     - Table 4-3
+     - M
+     -
+   * - 26
+     - Mean anomaly
+     - MEAN_ANOMALY
+     - Table 4-3
+     - M
+     -
+   * - 27
+     - Gravitational Coefficient
+     - GM
+     - Table 4-3
+     - O
+     -
+   * - 28
+     - Spacecraft Parameters logical block
+     - N/A
+     - Table 4-3
+     - O
+     -
+   * - 29
+     - Comment
+     - COMMENT
+     - Table 4-3
+     - O
+     -
+   * - 30
+     - Spacecraft Mass
+     - MASS
+     - Table 4-3
+     - O
+     -
+   * - 31
+     - Solar Radiation Pressure Area
+     - SOLAR_RAD_AREA
+     - Table 4-3
+     - O
+     -
+   * - 32
+     - Solar Radiation Pressure Coefficient
+     - SOLAR_RAD_COEFF
+     - Table 4-3
+     - O
+     -
+   * - 33
+     - Drag Area
+     - DRAG_AREA
+     - Table 4-3
+     - O
+     -
+   * - 34
+     - Drag Coefficient
+     - DRAG_COEFF
+     - Table 4-3
+     - O
+     -
+   * - 35
+     - TLE logical block
+     - N/A
+     - Table 4-3
+     - O
+     -
+   * - 36
+     - Comment
+     - COMMENT
+     - Table 4-3
+     - O
+     -
+   * - 37
+     - Ephemeris Type
+     - EPHEMERIS_TYPE
+     - Table 4-3
+     - O
+     -
+   * - 38
+     - Classification Type
+     - CLASSIFICATION_TYPE
+     - Table 4-3
+     - O
+     -
+   * - 39
+     - NORAD Catalog Number
+     - NORAD_CAT_ID
+     - Table 4-3
+     - O
+     -
+   * - 40
+     - Element set number
+     - ELEMENT_SET_NO
+     - Table 4-3
+     - O
+     -
+   * - 41
+     - Revolution Number
+     - REV_AT_EPOCH
+     - Table 4-3
+     - O
+     -
+   * - 42
+     - SGP/SGP4 drag-like coefficient
+     - BSTAR or BTERM
+     - Table 4-3
+     - C
+     -
+   * - 43
+     - First Time Derivative of the Mean Motion
+     - MEAN_MOTION_DOT
+     - Table 4-3
+     - C
+     -
+   * - 44
+     - Second Time Derivative of Mean Motion
+     - MEAN_MOTION_DDOT or AGOM
+     - Table 4-3
+     - C
+     -
+   * - 45
+     - Pos/Vel/Cov logical block
+     - N/A
+     - Table 4-3
+     - O
+     -
+   * - 46
+     - Comment
+     - COMMENT
+     - Table 4-3
+     - O
+     -
+   * - 47
+     - Cov reference frame
+     - COV_REF_FRAME
+     - Table 4-3
+     - C
+     -
+   * - 48
+     - Covariance [1,1]
+     - CX_X
+     - Table 4-3
+     - C
+     -
+   * - 49
+     - Covariance [2,1]
+     - CY_X
+     - Table 4-3
+     - C
+     -
+   * - 50
+     - Covariance [2,2]
+     - CY_Y
+     - Table 4-3
+     - C
+     -
+   * - 51
+     - Covariance [3,1]
+     - CZ_X
+     - Table 4-3
+     - C
+     -
+   * - 52
+     - Covariance [3,2]
+     - CZ_Y
+     - Table 4-3
+     - C
+     -
+   * - 53
+     - Covariance [3,3]
+     - CZ_Z
+     - Table 4-3
+     - C
+     -
+   * - 54
+     - Covariance [4,1]
+     - CX_DOT_X
+     - Table 4-3
+     - C
+     -
+   * - 55
+     - Covariance [4,2]
+     - CX_DOT_Y
+     - Table 4-3
+     - C
+     -
+   * - 56
+     - Covariance [4,3]
+     - CX_DOT_Z
+     - Table 4-3
+     - C
+     -
+   * - 57
+     - Covariance [4,4]
+     - CX_DOT_X_DOT
+     - Table 4-3
+     - C
+     -
+   * - 58
+     - Covariance [5,1]
+     - CY_DOT_X
+     - Table 4-3
+     - C
+     -
+   * - 59
+     - Covariance [5,2]
+     - CY_DOT_Y
+     - Table 4-3
+     - C
+     -
+   * - 60
+     - Covariance [5,3]
+     - CY_DOT_Z
+     - Table 4-3
+     - C
+     -
+   * - 61
+     - Covariance [5,4]
+     - CY_DOT_X_DOT
+     - Table 4-3
+     - C
+     -
+   * - 62
+     - Covariance [5,5]
+     - CY_DOT_Y_DOT
+     - Table 4-3
+     - C
+     -
+   * - 63
+     - Covariance [6,1]
+     - CZ_DOT_X
+     - Table 4-3
+     - C
+     -
+   * - 64
+     - Covariance [6,2]
+     - CZ_DOT_Y
+     - Table 4-3
+     - C
+     -
+   * - 65
+     - Covariance [6,3]
+     - CZ_DOT_Z
+     - Table 4-3
+     - C
+     -
+   * - 66
+     - Covariance [6,4]
+     - CZ_DOT_X_DOT
+     - Table 4-3
+     - C
+     -
+   * - 67
+     - Covariance [6,5]
+     - CY_DOT_Y_DOT
+     - Table 4-3
+     - C
+     -
+   * - 68
+     - Covariance [6,6]
+     - CZ_DOT_Z_DOT
+     - Table 4-3
+     - C
+     -
+   * - 69
+     - User-Defined Parameters logical block
+     - N/A
+     - Table 4-3
+     - O
+     -
+   * - 70
+     - As defined by user, ‘essential information that cannot be conveyed in COMMENT statements’
+     - USER_DEFINED_x
+     - Table 4-3
+     - O
+     -
+
+.. _annex_a_oem_requirements_list_odm:
+
+A2.5.3 Orbit Ephemeris Message Requirements List
+++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - OEM Header
+     - N/A
+     - Table 5-2
+     - M
+     -
+   * - 2
+     - OEM Version
+     - CCSDS_OEM_VERS
+     - Table 5-2
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 5-2
+     - O
+     -
+   * - 4
+     - Message classification/caveats
+     - CLASSIFICATION
+     - Table 5-2
+     - O
+     -
+   * - 5
+     - Message creation date and time
+     - CREATION_DATE
+     - Table 5-2
+     - M
+     -
+   * - 6
+     - Message originator
+     - ORIGINATOR
+     - Table 5-2
+     - M
+     -
+   * - 7
+     - Unique message identifier
+     - MESSAGE_ID
+     - Table 5-2
+     - O
+     -
+   * - 8
+     - Metadata logical block
+     - N/A
+     - Table 5-3
+     - M
+     -
+   * - 9
+     - Start of OEM Metadata
+     - META_START
+     - Table 5-3
+     - M
+     -
+   * - 10
+     - Comment
+     - COMMENT
+     - Table 5-3
+     - O
+     -
+   * - 11
+     - Name of space object
+     - OBJECT_NAME
+     - Table 5-3
+     - M
+     -
+   * - 12
+     - Identifier of space object
+     - OBJECT_ID
+     - Table 5-3
+     - M
+     -
+   * - 13
+     - Orbit center
+     - CENTER_NAME
+     - Table 5-3
+     - M
+     -
+   * - 14
+     - Reference frame
+     - REF_FRAME
+     - Table 5-3
+     - M
+     -
+   * - 15
+     - Epoch of reference frame
+     - REF_FRAME_EPOCH
+     - Table 5-3
+     - C
+     -
+   * - 16
+     - Time system applicable to data
+     - TIME_SYSTEM
+     - Table 5-3
+     - M
+     -
+   * - 17
+     - Start of TOTAL time span covered by data
+     - START_TIME
+     - Table 5-3
+     - M
+     -
+   * - 18
+     - Start of useable orbit data
+     - USEABLE_START_TIME
+     - Table 5-3
+     - O
+     -
+   * - 19
+     - End of useable orbit data
+     - USEABLE_STOP_TIME
+     - Table 5-3
+     - O
+     -
+   * - 20
+     - End of TOTAL time span covered by data
+     - STOP_TIME
+     - Table 5-3
+     - M
+     -
+   * - 21
+     - Recommended interpolation method
+     - INTERPOLATION
+     - Table 5-3
+     - O
+     -
+   * - 22
+     - Recommended interpolation degree
+     - INTERPOLATION_DEGREE
+     - Table 5-3
+     - C
+     -
+   * - 23
+     - End of OEM Metadata
+     - META_STOP
+     - Table 5-3
+     - M
+     -
+   * - 24
+     - OEM Data logical block
+     - N/A
+     - Table 5-3
+     - M
+     -
+   * - 25
+     - Ephemeris lines
+     - … <insert ephemeris data lines here.>
+     - Table 5-3
+     - M
+     -
+   * - 26
+     - OEM Covariance logical block
+     - N/A
+     - Table 5-3
+     - O
+     -
+   * - 27
+     - Start of OEM Covariance logical block
+     - COVARIANCE_START
+     - Table 5-3
+     - M
+     -
+   * - 28
+     - Epoch of the navigation solution related to the covariance matrix
+     - EPOCH
+     - Table 5-3
+     - C
+     -
+   * - 29
+     - Reference frame of the covariance matrix, if different from that of the states in the ephemeris
+     - COV_REF_FRAME
+     - Table 5-3
+     - C
+     -
+   * - 30
+     - Covariance lines
+     - … <insert covariance matrices here>
+     - Table 5-3
+     - O
+     -
+   * - 31
+     - End of OEM Covariance logical block
+     - COVARIANCE_STOP
+     - Table 5-3
+     - M
+     -
+
+.. _annex_a_ocm_requirements_list_odm:
+
+A2.5.4 Orbit Comprehensive Message Requirements List
+++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. _annex_a_ocm_header_odm:
+
+A2.5.4.1 OCM Header
+~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - OCM Header
+     - N/A
+     - Table 6-2
+     - M
+     -
+   * - 2
+     - OCM Version
+     - CCSDS_OCM_VERS
+     - Table 6-2
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 6-2
+     - O
+     -
+   * - 4
+     - Message classification/caveats
+     - CLASSIFICATION
+     - Table 6-2
+     - O
+     -
+   * - 5
+     - Message creation date and time
+     - CREATION_DATE
+     - Table 6-2
+     - M
+     -
+   * - 6
+     - Message originator
+     - ORIGINATOR
+     - Table 6-2
+     - M
+     -
+   * - 7
+     - Unique message identifier
+     - MESSAGE_ID
+     - Table 6-2
+     - O
+     -
+
+.. _annex_a_ocm_metadata_odm:
+
+A2.5.4.2 OCM Metadata
+~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - Metadata logical block
+     - N/A
+     - Table 6-3
+     - M
+     -
+   * - 2
+     - OCM Metadata Start
+     - META_START
+     - Table 6-3
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 6-3
+     - O
+     -
+   * - 4
+     - Spacecraft name for the object
+     - OBJECT_NAME
+     - Table 6-3
+     - O
+     -
+   * - 5
+     - International designator for the object
+     - INTERNATIONAL_DESIGNATOR
+     - Table 6-3
+     - O
+     -
+   * - 6
+     - Satellite catalog source
+     - CATALOG_NAME
+     - Table 6-3
+     - O
+     -
+   * - 7
+     - Unique satellite identification designator
+     - OBJECT_DESIGNATOR
+     - Table 6-3
+     - O
+     -
+   * - 8
+     - Alternate name(s) of space object used by spacecraft operator, State Actors, commercial SSA providers and/or media.
+     - ALTERNATE_NAMES
+     - Table 6-3
+     - O
+     -
+   * - 9
+     - Message originator or programmatic Point-of-Contact
+     - ORIGINATOR_POC
+     - Table 6-3
+     - O
+     -
+   * - 10
+     - Contact position of the originator PoC
+     - ORIGINATOR_POSITION
+     - Table 6-3
+     - O
+     -
+   * - 11
+     - Originator PoC phone number
+     - ORIGINATOR_PHONE
+     - Table 6-3
+     - O
+     -
+   * - 12
+     - Originator PoC email address
+     - ORIGINATOR_EMAIL
+     - Table 6-3
+     - O
+     -
+   * - 13
+     - Originator PoC physical address
+     - ORIGINATOR_ADDRESS
+     - Table 6-3
+     - O
+     -
+   * - 14
+     - Creating agency or operator
+     - TECH_ORG
+     - Table 6-3
+     - O
+     -
+   * - 15
+     - Technical Point-of-Contact
+     - TECH_POC
+     - Table 6-3
+     - O
+     -
+   * - 16
+     - Contact position of the technical PoC
+     - TECH_POSITION
+     - Table 6-3
+     - O
+     -
+   * - 17
+     - Technical PoC phone number
+     - TECH_PHONE
+     - Table 6-3
+     - O
+     -
+   * - 18
+     - Technical PoC email address
+     - TECH_EMAIL
+     - Table 6-3
+     - O
+     -
+   * - 19
+     - Technical PoC physical address
+     - TECH_ADDRESS
+     - Table 6-3
+     - O
+     -
+   * - 20
+     - ID that uniquely identifies the previous message from this message originator for this particular space object
+     - PREVIOUS_MESSAGE_ID
+     - Table 6-3
+     - O
+     -
+   * - 21
+     - ID that uniquely identifies the next message from this message originator for this particular space object
+     - NEXT_MESSAGE_ID
+     - Table 6-3
+     - O
+     -
+   * - 22
+     - Unique identifier of linked Attitude Data Message(s)
+     - ADM_MSG_LINK
+     - Table 6-3
+     - O
+     -
+   * - 23
+     - Unique identifier of linked Conjunction Data Message(s)
+     - CDM_MSG_LINK
+     - Table 6-3
+     - O
+     -
+   * - 24
+     - Unique identifier of linked Pointing Request Message(s)
+     - PRM_MSG_LINK
+     - Table 6-3
+     - O
+     -
+   * - 25
+     - Unique identifier of linked Reentry Data Message(s)
+     - RDM_MSG_LINK
+     - Table 6-3
+     - O
+     -
+   * - 26
+     - Unique identifier of linked Tracking Data Message(s) (reference [9])
+     - TDM_MSG_LINK
+     - Table 6-3
+     - O
+     -
+   * - 27
+     - Operator of the space object
+     - OPERATOR
+     - Table 6-3
+     - O
+     -
+   * - 28
+     - Owner of the space object
+     - OWNER
+     - Table 6-3
+     - O
+     -
+   * - 29
+     - Country where the owner or responsible party is based
+     - COUNTRY
+     - Table 6-3
+     - O
+     -
+   * - 30
+     - Name of the constellation
+     - CONSTELLATION
+     - Table 6-3
+     - O
+     -
+   * - 31
+     - Type of object
+     - OBJECT_TYPE
+     - Table 6-3
+     - O
+     -
+   * - 32
+     - Time system for all absolute time stamps in this OCM including EPOCH_TZERO
+     - TIME_SYSTEM
+     - Table 6-3
+     - M
+     -
+   * - 33
+     - Default epoch to which all relative times are referenced
+     - EPOCH_TZERO
+     - Table 6-3
+     - M
+     -
+   * - 34
+     - Operational status of the space object
+     - OPS_STATUS
+     - Table 6-3
+     - O
+     -
+   * - 35
+     - Type of orbit
+     - ORBIT_CATEGORY
+     - Table 6-3
+     - O
+     -
+   * - 36
+     - Elements of information included in this message
+     - OCM_DATA_ELEMENTS
+     - Table 6-3
+     - O
+     -
+   * - 37
+     - Spacecraft clock epoch
+     - SCLK_OFFSET_AT_EPOCH
+     - Table 6-3
+     - C
+     -
+   * - 38
+     - Spacecraft clock rate
+     - SCLK_SEC_PER_SI_SEC
+     - Table 6-3
+     - C
+     -
+   * - 39
+     - Creation epoch of the previous message from this originator for this particular space object
+     - PREVIOUS_MESSAGE_EPOCH
+     - Table 6-3
+     - O
+     -
+   * - 40
+     - Anticipated (or actual) epoch of the next message from this originator for this particular space object
+     - NEXT_MESSAGE_EPOCH
+     - Table 6-3
+     - O
+     -
+   * - 41
+     - Time of the earliest data
+     - START_TIME
+     - Table 6-3
+     - O
+     -
+   * - 42
+     - Time of the latest data
+     - STOP_TIME
+     - Table 6-3
+     - O
+     -
+   * - 43
+     - Span of time that the OCM covers, measured in days
+     - TIME_SPAN
+     - Table 6-3
+     - O
+     -
+   * - 44
+     - Difference (TAI – UTC) in seconds
+     - TAIMUTC_AT_TZERO
+     - Table 6-3
+     - O
+     -
+   * - 45
+     - Epoch of next leap second(s)
+     - NEXT_LEAP_EPOCH
+     - Table 6-3
+     - O
+     -
+   * - 46
+     - Difference (TAI – UTC) after next leap second(s) are introduced
+     - NEXT_LEAP_TAIMUTC
+     - Table 6-3
+     - O
+     -
+   * - 47
+     - Difference (UT1 – UTC) in seconds
+     - UT1MUTC_AT_TZERO
+     - Table 6-3
+     - O
+     -
+   * - 48
+     - Source and version of the message originator’s EOP
+     - EOP_SOURCE
+     - Table 6-3
+     - O
+     -
+   * - 49
+     - Method used to select or interpolate sequential EOP data
+     - INTERP_METHOD_EOP
+     - Table 6-3
+     - O
+     -
+   * - 50
+     - Source and version of the message originator’s celestial body (e.g., Sun/Earth/Planetary) ephemeris data
+     - CELESTIAL_SOURCE
+     - Table 6-3
+     - O
+     -
+   * - 51
+     - Metadata Stop
+     - META_STOP
+     - Table 6-3
+     - M
+     -
+
+.. _annex_a_ocm_trajectory_odm:
+
+A2.5.4.3 OCM Data: Trajectory State Time History
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - Trajectory state time history logical block
+     - N/A
+     - Table 6-4
+     - O
+     -
+   * - 2
+     - Trajectory state time history start
+     - TRAJ_START
+     - Table 6-4
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 6-4
+     - O
+     -
+   * - 4
+     - Identification number for this trajectory state time history block
+     - TRAJ_ID
+     - Table 6-4
+     - O
+     -
+   * - 5
+     - Identification number for the previous trajectory state time history
+     - TRAJ_PREV_ID
+     - Table 6-4
+     - O
+     -
+   * - 6
+     - Identification number for the next trajectory state time history
+     - TRAJ_NEXT_ID
+     - Table 6-4
+     - O
+     -
+   * - 7
+     - Basis of this Trajectory state time history data
+     - TRAJ_BASIS
+     - Table 6-4
+     - O
+     -
+   * - 8
+     - Identification number for the orbit determination, navigation solution, or simulation
+     - TRAJ_BASIS_ID
+     - Table 6-4
+     - O
+     -
+   * - 9
+     - Recommended interpolation method
+     - INTERPOLATION
+     - Table 6-4
+     - O
+     -
+   * - 10
+     - Recommended interpolation degree
+     - INTERPOLATION_DEGREE
+     - Table 6-4
+     - C
+     -
+   * - 11
+     - Orbit propagator used
+     - PROPAGATOR
+     - Table 6-4
+     - O
+     -
+   * - 12
+     - Origin of the orbit reference frame
+     - CENTER_NAME
+     - Table 6-4
+     - M
+     -
+   * - 13
+     - Reference frame of the trajectory state time history
+     - TRAJ_REF_FRAME
+     - Table 6-4
+     - M
+     -
+   * - 14
+     - Epoch of the orbit data reference frame
+     - TRAJ_FRAME_EPOCH
+     - Table 6-4
+     - C
+     -
+   * - 15
+     - Start of useable orbit data
+     - USEABLE_START_TIME
+     - Table 6-4
+     - O
+     -
+   * - 16
+     - End of useable orbit data
+     - USEABLE_STOP_TIME
+     - Table 6-4
+     - O
+     -
+   * - 17
+     - Orbit revolution number (an integer)
+     - ORB_REVNUM
+     - Table 6-4
+     - O
+     -
+   * - 18
+     - Orbit revolution basis number
+     - ORB_REVNUM_BASIS
+     - Table 6-4
+     - C
+     -
+   * - 19
+     - Orbit element set type
+     - TRAJ_TYPE
+     - Table 6-4
+     - M
+     -
+   * - 20
+     - Orbit averaging technique used
+     - ORB_AVERAGING
+     - Table 6-4
+     - C
+     -
+   * - 21
+     - Orbital element units for data elements that follow the time tag
+     - TRAJ_UNITS
+     - Table 6-4
+     - O
+     -
+   * - 22
+     - OCM trajectory state time history
+     - … <insert trajectory state time history here>
+     - Table 6-4
+     - M
+     -
+   * - 23
+     - Trajectory state time history end
+     - TRAJ_STOP
+     - Table 6-4
+     - M
+     -
+
+.. _annex_a_ocm_physical_odm:
+
+A2.5.4.4 OCM Data: Space Object Physical Characteristics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - Space Object Physical Characteristics logical block
+     - N/A
+     - Table 6-5
+     - O
+     -
+   * - 2
+     - Start of a Space Object Physical Characteristics specification
+     - PHYS_START
+     - Table 6-5
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 6-5
+     - O
+     -
+   * - 4
+     - Satellite manufacturer name
+     - MANUFACTURER
+     - Table 6-5
+     - O
+     -
+   * - 5
+     - Satellite manufacturer’s spacecraft bus model name
+     - BUS_MODEL
+     - Table 6-5
+     - O
+     -
+   * - 6
+     - Space objects that this object is docked to
+     - DOCKED_WITH
+     - Table 6-5
+     - O
+     -
+   * - 7
+     - Additional drag Area facing the relative wind vector beyond that represented by AREA_ALONG_OEB_<MAX, INT, MIN>
+     - DRAG_CONST_AREA
+     - Table 6-5
+     - O
+     -
+   * - 8
+     - Drag coefficient
+     - DRAG_COEFF_NOM
+     - Table 6-5
+     - O
+     -
+   * - 9
+     - Drag coeff. 1σ uncertainty
+     - DRAG_UNCERTAINTY
+     - Table 6-5
+     - O
+     -
+   * - 10
+     - Space object total mass at beginning of life
+     - INITIAL_WET_MASS
+     - Table 6-5
+     - O
+     -
+   * - 11
+     - Space object wet mass
+     - WET_MASS
+     - Table 6-5
+     - O
+     -
+   * - 12
+     - Space object dry mass
+     - DRY_MASS
+     - Table 6-5
+     - O
+     -
+   * - 13
+     - Parent reference frame which maps to the OEB frame
+     - OEB_PARENT_FRAME
+     - Table 6-5
+     - C
+     -
+   * - 14
+     - Epoch of the OEB parent reference frame
+     - OEB_PARENT_FRAME_EPOCH
+     - Table 6-5
+     - C
+     -
+   * - 15
+     - Quaternion q₁
+     - OEB_Q1
+     - Table 6-5
+     - O
+     -
+   * - 16
+     - Quaternion q₂
+     - OEB_Q2
+     - Table 6-5
+     - O
+     -
+   * - 17
+     - Quaternion q₃
+     - OEB_Q3
+     - Table 6-5
+     - O
+     -
+   * - 18
+     - Quaternion q_c
+     - OEB_QC
+     - Table 6-5
+     - O
+     -
+   * - 19
+     - Maximum physical OEB dimension
+     - OEB_MAX
+     - Table 6-5
+     - O
+     -
+   * - 20
+     - Intermediate physical OEB dimension
+     - OEB_INT
+     - Table 6-5
+     - O
+     -
+   * - 21
+     - Minimum physical dimension
+     - OEB_MIN
+     - Table 6-5
+     - O
+     -
+   * - 22
+     - Cross-sectional area viewed along max OEB dimension
+     - AREA_ALONG_OEB_MAX
+     - Table 6-5
+     - O
+     -
+   * - 23
+     - Cross-sectional area viewed along intermediate OEB dimension
+     - AREA_ALONG_OEB_INT
+     - Table 6-5
+     - O
+     -
+   * - 24
+     - Cross-sectional area viewed along min OEB dimension
+     - AREA_ALONG_OEB_MIN
+     - Table 6-5
+     - O
+     -
+   * - 25
+     - Minimum cross-sectional area for collision probability
+     - AREA_MIN_FOR_PC
+     - Table 6-5
+     - O
+     -
+   * - 26
+     - Maximum cross-sectional area for collision probability
+     - AREA_MAX_FOR_PC
+     - Table 6-5
+     - O
+     -
+   * - 27
+     - Typical cross-sectional area for collision probability
+     - AREA_TYP_FOR_PC
+     - Table 6-5
+     - O
+     -
+   * - 28
+     - Typical (50th percentile) effective Radar Cross Section
+     - RCS
+     - Table 6-5
+     - O
+     -
+   * - 29
+     - Minimum Radar Cross Section
+     - RCS_MIN
+     - Table 6-5
+     - O
+     -
+   * - 30
+     - Maximum Radar Cross Section
+     - RCS_MAX
+     - Table 6-5
+     - O
+     -
+   * - 31
+     - SRP additional area
+     - SRP_CONST_AREA
+     - Table 6-5
+     - O
+     -
+   * - 32
+     - Solar Radiation Pressure Coefficient
+     - SOLAR_RAD_COEFF
+     - Table 6-5
+     - O
+     -
+   * - 33
+     - Solar Radiation Pressure 1σ percent uncertainty
+     - SOLAR_RAD_UNCERTAINTY
+     - Table 6-5
+     - O
+     -
+   * - 34
+     - Typical (50th percentile) absolute Visual Magnitude
+     - VM_ABSOLUTE
+     - Table 6-5
+     - O
+     -
+   * - 35
+     - Minimum apparent Visual Magnitude
+     - VM_APPARENT_MIN
+     - Table 6-5
+     - O
+     -
+   * - 36
+     - Typical (50th percentile) apparent Visual Magnitude
+     - VM_APPARENT
+     - Table 6-5
+     - O
+     -
+   * - 37
+     - Maximum apparent Visual Magnitude
+     - VM_APPARENT_MAX
+     - Table 6-5
+     - O
+     -
+   * - 38
+     - Typical (50th percentile) object surface reflectance
+     - REFLECTANCE
+     - Table 6-5
+     - O
+     -
+   * - 39
+     - Primary mode of attitude control
+     - ATT_CONTROL_MODE
+     - Table 6-5
+     - O
+     -
+   * - 40
+     - Type of actuator for attitude control
+     - ATT_ACTUATOR_TYPE
+     - Table 6-5
+     - O
+     -
+   * - 41
+     - Accuracy of attitude knowledge
+     - ATT_KNOWLEDGE
+     - Table 6-5
+     - O
+     -
+   * - 42
+     - Ability (e.g., deadband) to control attitude
+     - ATT_CONTROL
+     - Table 6-5
+     - O
+     -
+   * - 43
+     - Combined ability to both knowledge and control attitude
+     - ATT_POINTING
+     - Table 6-5
+     - O
+     -
+   * - 44
+     - Average maneuver frequency
+     - AVG_MANEUVER_FREQ
+     - Table 6-5
+     - O
+     -
+   * - 45
+     - Maximum composite thrust
+     - MAX_THRUST
+     - Table 6-5
+     - O
+     -
+   * - 46
+     - Total ΔV capability of the spacecraft at beginning of life
+     - DV_BOL
+     - Table 6-5
+     - O
+     -
+   * - 47
+     - Total ΔV remaining
+     - DV_REMAINING
+     - Table 6-5
+     - O
+     -
+   * - 48
+     - Moment of Inertia about the X-axis
+     - IXX
+     - Table 6-5
+     - O
+     -
+   * - 49
+     - Moment of Inertia about the Y-axis
+     - IYY
+     - Table 6-5
+     - O
+     -
+   * - 50
+     - Moment of Inertia about the Z-axis
+     - IZZ
+     - Table 6-5
+     - O
+     -
+   * - 51
+     - Inertia Cross Product of the X & Y axes
+     - IXY
+     - Table 6-5
+     - O
+     -
+   * - 52
+     - Inertia Cross Product of the X & Z axes
+     - IXZ
+     - Table 6-5
+     - O
+     -
+   * - 53
+     - Inertia Cross Product of the Y & Z axes
+     - IYZ
+     - Table 6-5
+     - O
+     -
+   * - 54
+     - End of the Space Object Physical Characteristics specification
+     - PHYS_STOP
+     - Table 6-5
+     - M
+     -
+
+.. _annex_a_ocm_covariance_odm:
+
+A2.5.4.5 OCM Data: Covariance Time History
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - Covariance time history logical block
+     - N/A
+     - Table 6-6
+     - O
+     -
+   * - 2
+     - OCM start of a covariance time history section
+     - COV_START
+     - Table 6-6
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 6-6
+     - O
+     -
+   * - 4
+     - Identification number for this covariance time history block
+     - COV_ID
+     - Table 6-6
+     - O
+     -
+   * - 5
+     - Identification number for the previous covariance time history
+     - COV_PREV_ID
+     - Table 6-6
+     - O
+     -
+   * - 6
+     - Identification number for the next covariance time history
+     - COV_NEXT_ID
+     - Table 6-6
+     - O
+     -
+   * - 7
+     - Basis of this covariance time history
+     - COV_BASIS
+     - Table 6-6
+     - O
+     -
+   * - 8
+     - Identification number for the orbit determination, navigation solution, or simulation
+     - COV_BASIS_ID
+     - Table 6-6
+     - O
+     -
+   * - 9
+     - Reference frame of the covariance time history
+     - COV_REF_FRAME
+     - Table 6-6
+     - M
+     -
+   * - 10
+     - Epoch of the covariance data reference frame
+     - COV_FRAME_EPOCH
+     - Table 6-6
+     - C
+     -
+   * - 11
+     - Minimum scale factor to apply to this covariance data
+     - COV_SCALE_MIN
+     - Table 6-6
+     - O
+     -
+   * - 12
+     - Maximum scale factor to apply to this covariance data
+     - COV_SCALE_MAX
+     - Table 6-6
+     - O
+     -
+   * - 13
+     - Confidence in the covariance errors matching reality
+     - COV_CONFIDENCE
+     - Table 6-6
+     - O
+     -
+   * - 14
+     - Covariance composition
+     - COV_TYPE
+     - Table 6-6
+     - M
+     -
+   * - 15
+     - Covariance element ordering
+     - COV_ORDERING
+     - Table 6-6
+     - M
+     -
+   * - 16
+     - Units of covariance data line standard deviations (i.e., the square root of the variances supplied in the covariance matrix diagonal elements) that follow the time tag
+     - COV_UNITS
+     - Table 6-6
+     - O
+     -
+   * - 17
+     - Covariance data
+     - … <Insert covariance data here>
+     - Table 6-6
+     - M
+     -
+   * - 18
+     - End of a covariance time history section
+     - COV_STOP
+     - Table 6-6
+     - M
+     -
+
+.. _annex_a_ocm_maneuver_odm:
+
+A2.5.4.6 OCM Data: Maneuver Specification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - Maneuver time history logical block
+     - N/A
+     - Table 6-7
+     - O
+     -
+   * - 2
+     - Start of a maneuver data block
+     - MAN_START
+     - Table 6-7
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 6-7
+     - O
+     -
+   * - 4
+     - Identification number for this maneuver
+     - MAN_ID
+     - Table 6-7
+     - M
+     -
+   * - 5
+     - Identification number for the previous maneuver
+     - MAN_PREV_ID
+     - Table 6-7
+     - O
+     -
+   * - 6
+     - Identification number for the next maneuver
+     - MAN_NEXT_ID
+     - Table 6-7
+     - O
+     -
+   * - 7
+     - Basis of this maneuver time history data
+     - MAN_BASIS
+     - Table 6-7
+     - O
+     -
+   * - 8
+     - Identification number of the orbit determination
+     - MAN_BASIS_ID
+     - Table 6-7
+     - O
+     -
+   * - 9
+     - Maneuver device identifier
+     - MAN_DEVICE_ID
+     - Table 6-7
+     - M
+     -
+   * - 10
+     - Completion time of the previous maneuver
+     - MAN_PREV_EPOCH
+     - Table 6-7
+     - O
+     -
+   * - 11
+     - Start time of the next maneuver
+     - MAN_NEXT_EPOCH
+     - Table 6-7
+     - O
+     -
+   * - 12
+     - Specifies the purpose of the maneuver
+     - MAN_PURPOSE
+     - Table 6-7
+     - O
+     -
+   * - 13
+     - Specifies the source of the orbit and/or attitude state(s)
+     - MAN_PRED_SOURCE
+     - Table 6-7
+     - O
+     -
+   * - 14
+     - Reference frame in which the maneuver vector direction data is provided
+     - MAN_REF_FRAME
+     - Table 6-7
+     - M
+     -
+   * - 15
+     - Epoch of the maneuver data reference frame
+     - MAN_FRAME_EPOCH
+     - Table 6-7
+     - C
+     -
+   * - 16
+     - Origin of maneuver gravitational assist body
+     - GRAV_ASSIST_NAME
+     - Table 6-7
+     - O
+     -
+   * - 17
+     - Duty cycle type to use for this maneuver time history
+     - DC_TYPE
+     - Table 6-7
+     - M
+     -
+   * - 18
+     - Start time of the duty cycle-based maneuver window
+     - DC_WIN_OPEN
+     - Table 6-7
+     - C
+     -
+   * - 19
+     - End time of the duty cycle-based maneuver window
+     - DC_WIN_CLOSE
+     - Table 6-7
+     - C
+     -
+   * - 20
+     - Minimum number of ‘ON’ duty cycles
+     - DC_MIN_CYCLES
+     - Table 6-7
+     - O
+     -
+   * - 21
+     - Maximum number of ‘ON’ duty cycles
+     - DC_MAX_CYCLES
+     - Table 6-7
+     - O
+     -
+   * - 22
+     - Start time of the initial duty cycle-based maneuver sequence
+     - DC_EXEC_START
+     - Table 6-7
+     - C
+     -
+   * - 23
+     - End time of the final duty cycle-based maneuver sequence
+     - DC_EXEC_STOP
+     - Table 6-7
+     - C
+     -
+   * - 24
+     - THRUST duty cycle reference time tag
+     - DC_REF_TIME
+     - Table 6-7
+     - C
+     -
+   * - 25
+     - Thruster pulse ‘ON’ duration
+     - DC_TIME_PULSE_DURATION
+     - Table 6-7
+     - C
+     -
+   * - 26
+     - Elapsed time between the start of one pulse and the start of the next
+     - DC_TIME_PULSE_PERIOD
+     - Table 6-7
+     - C
+     -
+   * - 27
+     - Specifies the ‘ON’ reference unit vector direction
+     - DC_REF_DIR
+     - Table 6-7
+     - C
+     -
+   * - 28
+     - Body reference frame that DC_BODY_TRIGGER direction is expressed in
+     - DC_BODY_FRAME
+     - Table 6-7
+     - C
+     -
+   * - 29
+     - Body frame reference unit vector ‘trigger’ direction
+     - DC_BODY_TRIGGER
+     - Table 6-7
+     - C
+     -
+   * - 30
+     - Phase angle offset of thruster pulse start
+     - DC_PA_START_ANGLE
+     - Table 6-7
+     - C
+     -
+   * - 31
+     - Phase angle of thruster pulse stop
+     - DC_PA_STOP_ANGLE
+     - Table 6-7
+     - C
+     -
+   * - 32
+     - Set of maneuver elements of information to follow the maneuver time tag
+     - MAN_COMPOSITION
+     - Table 6-7
+     - M
+     -
+   * - 33
+     - Units of maneuver data line elements that follow the time tag(s)
+     - MAN_UNITS
+     - Table 6-7
+     - O
+     -
+   * - 34
+     - Maneuver time history data
+     - … < Insert maneuver data here>
+     - Table 6-7
+     - M
+     -
+   * - 35
+     - End maneuver data block
+     - MAN_STOP
+     - Table 6-7
+     - M
+     -
+
+.. _annex_a_ocm_perturbations_odm:
+
+A2.5.4.7 OCM Data: Perturbations Specification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - Orbit perturbations parameters
+     - N/A
+     - Table 6-10
+     - O
+     -
+   * - 2
+     - Start of the Perturbations Specification
+     - PERT_START
+     - Table 6-10
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 6-10
+     - O
+     -
+   * - 4
+     - Atmosphere model used in the simulation
+     - ATMOSPHERIC_MODEL
+     - Table 6-10
+     - O
+     -
+   * - 5
+     - Gravity model used in the simulation
+     - GRAVITY_MODEL
+     - Table 6-10
+     - O
+     -
+   * - 6
+     - Oblate spheroid equatorial radius
+     - EQUATORIAL_RADIUS
+     - Table 6-10
+     - O
+     -
+   * - 7
+     - Gravitational coefficient of attracting body
+     - GM
+     - Table 6-10
+     - O
+     -
+   * - 8
+     - ‘N-body’ gravitational perturbations bodies used
+     - N_BODY_PERTURBATIONS
+     - Table 6-10
+     - O
+     -
+   * - 9
+     - Central body angular rotation rate
+     - CENTRAL_BODY_ROTATION
+     - Table 6-10
+     - O
+     -
+   * - 10
+     - Inverse of the central body’s oblate spheroid oblateness
+     - OBLATE_FLATTENING
+     - Table 6-10
+     - O
+     -
+   * - 11
+     - Ocean tides model
+     - OCEAN_TIDES_MODEL
+     - Table 6-10
+     - O
+     -
+   * - 12
+     - Solid tides model
+     - SOLID_TIDES_MODEL
+     - Table 6-10
+     - O
+     -
+   * - 13
+     - Reduction theory used for precession and nutation modeling
+     - REDUCTION_THEORY
+     - Table 6-10
+     - O
+     -
+   * - 14
+     - Albedo model
+     - ALBEDO_MODEL
+     - Table 6-10
+     - O
+     -
+   * - 15
+     - Number of grid points used in the albedo model
+     - ALBEDO_GRID_SIZE
+     - Table 6-10
+     - O
+     -
+   * - 16
+     - Shadow model used for Solar Radiation Pressure
+     - SHADOW_MODEL
+     - Table 6-10
+     - O
+     -
+   * - 17
+     - List of planetary bodies for which SRP shadowing is modeled
+     - SHADOW_BODIES
+     - Table 6-10
+     - O
+     -
+   * - 18
+     - SRP model used
+     - SRP_MODEL
+     - Table 6-10
+     - O
+     -
+   * - 19
+     - Source and version of the Space Weather data used in the creation of this message
+     - SW_DATA_SOURCE
+     - Table 6-10
+     - O
+     -
+   * - 20
+     - Epoch of the Space Weather data
+     - SW_DATA_EPOCH
+     - Table 6-10
+     - O
+     -
+   * - 21
+     - Method used to select or interpolate any and all sequential space weather data
+     - SW_INTERP_METHOD
+     - Table 6-10
+     - O
+     -
+   * - 22
+     - A fixed (time invariant) value of the planetary 3hour-range geomagnetic index Kp
+     - FIXED_GEOMAG_KP
+     - Table 6-10
+     - O
+     -
+   * - 23
+     - A fixed (time invariant) value of the 3-hourly (equivalent range) geomagnetic index Ap
+     - FIXED_GEOMAG_AP
+     - Table 6-10
+     - O
+     -
+   * - 24
+     - A fixed (time invariant) value of the planetary 1hour-range geomagnetic index Dst
+     - FIXED_GEOMAG_DST
+     - Table 6-10
+     - O
+     -
+   * - 25
+     - A fixed (time invariant) value of the solar flux daily proxy F10.7
+     - FIXED_F10P7
+     - Table 6-10
+     - O
+     -
+   * - 26
+     - A fixed (time invariant) value of the solar flux 81‐day running centeraveraged proxy F10.7
+     - FIXED_F10P7_MEAN
+     - Table 6-10
+     - O
+     -
+   * - 27
+     - A fixed (time invariant) value of the solar flux daily proxy M10.7
+     - FIXED_M10P7
+     - Table 6-10
+     - O
+     -
+   * - 28
+     - A fixed (time invariant) value of the solar flux 81‐day running centeraveraged proxy M10.7
+     - FIXED_M10P7_MEAN
+     - Table 6-10
+     - O
+     -
+   * - 29
+     - A fixed (time invariant) value of the solar flux daily proxy S10.7
+     - FIXED_S10P7
+     - Table 6-10
+     - O
+     -
+   * - 30
+     - A fixed (time invariant) value of the solar flux 81‐day running centeraveraged proxy S10.7
+     - FIXED_S10P7_MEAN
+     - Table 6-10
+     - O
+     -
+   * - 31
+     - A fixed (time invariant) value of the solar flux daily proxy Y10.7
+     - FIXED_Y10P7
+     - Table 6-10
+     - O
+     -
+   * - 32
+     - A fixed (time invariant) value of the solar flux 81‐day running centeraveraged proxy Y10.7
+     - FIXED_Y10P7_MEAN
+     - Table 6-10
+     - O
+     -
+   * - 33
+     - Perturbations Data Block Stop
+     - PERT_STOP
+     - Table 6-10
+     - M
+     -
+
+.. _annex_a_ocm_od_odm:
+
+A2.5.4.8 OCM Data: Orbit Determination Data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - Orbit determination parameters logical block
+     - N/A
+     - Table 6-11
+     - O
+     -
+   * - 2
+     - Start of an orbit determination data section
+     - OD_START
+     - Table 6-11
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 6-11
+     - O
+     -
+   * - 4
+     - Identification number for this orbit determination
+     - OD_ID
+     - Table 6-11
+     - M
+     -
+   * - 5
+     - Identification number for the previous orbit determination
+     - OD_PREV_ID
+     - Table 6-11
+     - O
+     -
+   * - 6
+     - Type of orbit determination method used
+     - OD_METHOD
+     - Table 6-11
+     - M
+     -
+   * - 7
+     - UTC epoch of the orbit determination solved-for state
+     - OD_EPOCH
+     - Table 6-11
+     - M
+     -
+   * - 8
+     - Days elapsed between first accepted observation and OD_EPOCH
+     - DAYS_SINCE_FIRST_OBS
+     - Table 6-11
+     - O
+     -
+   * - 9
+     - Days elapsed between last accepted observation and OD_EPOCH
+     - DAYS_SINCE_LAST_OBS
+     - Table 6-11
+     - O
+     -
+   * - 10
+     - Number of days of observations recommended for the OD
+     - RECOMMENDED_OD_SPAN
+     - Table 6-11
+     - O
+     -
+   * - 11
+     - Actual time span in days used for the OD
+     - ACTUAL_OD_SPAN
+     - Table 6-11
+     - O
+     -
+   * - 12
+     - Number of observations available within the actual OD time span
+     - OBS_AVAILABLE
+     - Table 6-11
+     - O
+     -
+   * - 13
+     - Number of observations accepted within the actual OD time span
+     - OBS_USED
+     - Table 6-11
+     - O
+     -
+   * - 14
+     - Number of sensor tracks available for the OD within the actual time span
+     - TRACKS_AVAILABLE
+     - Table 6-11
+     - O
+     -
+   * - 15
+     - Number of sensor tracks accepted for the OD within the actual time span
+     - TRACKS_USED
+     - Table 6-11
+     - O
+     -
+   * - 16
+     - Maximum time between observations in the OD
+     - MAXIMUM_OBS_GAP
+     - Table 6-11
+     - O
+     -
+   * - 17
+     - Positional error ellipsoid 1𝜎 major eigenvalue at OD
+     - OD_EPOCH_EIGMAJ
+     - Table 6-11
+     - O
+     -
+   * - 18
+     - Positional error ellipsoid 1𝜎 intermediate eigenvalue at OD
+     - OD_EPOCH_EIGINT
+     - Table 6-11
+     - O
+     -
+   * - 19
+     - Positional error ellipsoid 1𝜎 minor eigenvalue at OD
+     - OD_EPOCH_EIGMIN
+     - Table 6-11
+     - O
+     -
+   * - 20
+     - Max positional error ellipsoid 1𝜎 major eigenvalue
+     - OD_MAX_PRED_EIGMAJ
+     - Table 6-11
+     - O
+     -
+   * - 21
+     - Min positional error ellipsoid 1𝜎 minor eigenvalue
+     - OD_MIN_PRED_EIGMIN
+     - Table 6-11
+     - O
+     -
+   * - 22
+     - OD confidence metric, which by definition spans 0 to 100%
+     - OD_CONFIDENCE
+     - Table 6-11
+     - O
+     -
+   * - 23
+     - Generalized Dilution of Precision for this orbit determination
+     - GDOP
+     - Table 6-11
+     - O
+     -
+   * - 24
+     - Number of solve-for states in the orbit determination
+     - SOLVE_N
+     - Table 6-11
+     - O
+     -
+   * - 25
+     - State elements solved for in the orbit determination
+     - SOLVE_STATES
+     - Table 6-11
+     - O
+     -
+   * - 26
+     - Number of consider parameters used in the orbit determination
+     - CONSIDER_N
+     - Table 6-11
+     - O
+     -
+   * - 27
+     - Consider parameters used in the orbit determination
+     - CONSIDER_PARAMS
+     - Table 6-11
+     - O
+     -
+   * - 28
+     - Specific Energy Dissipation Rate
+     - SEDR
+     - Table 6-11
+     - O
+     -
+   * - 29
+     - Number of sensors used in the orbit determination
+     - SENSORS_N
+     - Table 6-11
+     - O
+     -
+   * - 30
+     - Sensors used in the orbit determination
+     - SENSORS
+     - Table 6-11
+     - O
+     -
+   * - 31
+     - Weighted RMS residual ratio
+     - WEIGHTED_RMS
+     - Table 6-11
+     - O
+     -
+   * - 32
+     - Observation data types utilized in this orbit determination
+     - DATA_TYPES
+     - Table 6-11
+     - O
+     -
+   * - 33
+     - End of an orbit determination data section
+     - OD_STOP
+     - Table 6-11
+     - M
+     -
+
+.. _annex_a_ocm_user_defined_odm:
+
+A2.5.4.9 OCM Data: User-Defined Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 10 35 25 10 10 10
+   :header-rows: 1
+
+   * - Item
+     - Feature
+     - Keyword
+     - Reference
+     - Status M/O/C
+     - Support
+   * - 1
+     - User-Defined Parameters logical block
+     - N/A
+     - Table 6-12
+     - O
+     -
+   * - 2
+     - OCM User-Defined Parameters start
+     - USER_START
+     - Table 6-12
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - Table 6-12
+     - O
+     -
+   * - 4
+     - As defined by user, ‘essential information that cannot be conveyed in COMMENT statements’
+     - USER_DEFINED_x (user-defined keywords)
+     - Table 6-12
+     - M
+     -
+   * - 5
+     - OCM User-Defined Parameters end
+     - USER_STOP
+     - Table 6-12
+     - M
+     -
+
 .. _annex_b_odm:
 
 ANNEX B
@@ -4934,6 +7824,104 @@ Privacy of data formatted in compliance with the specifications of this Recommen
 Standard should be assured by the systems and networks on which this Recommended
 Standard is implemented.
 
+.. _annex_c_data_integrity_odm:
+
+C3.3 DATA INTEGRITY
+""""""""""""""""""""
+
+Integrity of data formatted in compliance with the specifications of this Recommended
+Standard should be assured by the systems and networks on which this Recommended
+Standard is implemented.
+
+.. _annex_c_authentication_odm:
+
+C3.4 AUTHENTICATION OF COMMUNICATING ENTITIES
+""""""""""""""""""""""""""""""""""""""""""""""
+
+Authentication of communicating entities involved in the transport of data that complies with
+the specifications of this Recommended Standard should be provided by the systems and
+networks on which this Recommended Standard is implemented.
+
+.. _annex_c_data_transfer_odm:
+
+C3.5 DATA TRANSFER BETWEEN COMMUNICATING ENTITIES
+""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The transfer of data formatted in compliance with this Recommended Standard between
+communicating entities should be accomplished via secure mechanisms approved by the
+Information Technology Security functionaries of exchange participants.
+
+.. _annex_c_control_access_odm:
+
+C3.6 CONTROL OF ACCESS TO RESOURCES
+""""""""""""""""""""""""""""""""""""
+
+Control of access to resources should be managed by the systems upon which originator
+formatting and recipient processing are performed.
+
+.. _annex_c_auditing_odm:
+
+C3.7 AUDITING OF RESOURCE USAGE
+""""""""""""""""""""""""""""""""
+
+Auditing of resource usage should be handled by the management of systems and networks
+on which this Recommended Standard is implemented.
+
+.. _annex_c_unauthorized_access_odm:
+
+C3.8 UNAUTHORIZED ACCESS
+"""""""""""""""""""""""""
+
+Unauthorized access to the programs/processes that generate and interpret the messages
+should be prohibited in order to minimize potential threats and attack scenarios.
+
+.. _annex_c_security_implementation_odm:
+
+C3.9 DATA SECURITY IMPLEMENTATION SPECIFICS
+""""""""""""""""""""""""""""""""""""""""""""
+
+Specific information-security interoperability provisions that may apply between agencies and
+other independent users involved in an exchange of data formatted in compliance with this
+Recommended Standard could be specified in an ICD.
+
+.. _annex_c_sana_considerations_odm:
+
+C4 SANA CONSIDERATIONS
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The following ODM-related items have been registered with the SANA Operator.
+
+- The ODM/XML schema (see section 8).
+
+The following normative ODM elements should be selected from the SANA registry (see
+annex B):
+
+- ODM originators;
+- spacecraft identifiers;
+- Reference Frame Center and Third-Body Perturbations;
+- time systems;
+- Reference Frames (inertial, quasi-inertial, orbit-relative, spacecraft and attitude
+  frames);
+- orbital element set and covariance matrix composition definitions;
+- atmosphere models;
+- gravity models;
+- object types;
+- operational status;
+- orbit averaging techniques;
+- orbit types.
+
+The registration rule for new entries in the SANA registry is the approval of new requests by the
+CCSDS Area or Working Group responsible for the maintenance of the ODM at the time of the
+request. New requests for this registry should be sent to SANA
+(mailto:info@sanaregistry.org).
+
+.. _annex_c_patent_considerations_odm:
+
+C5 PATENT CONSIDERATIONS
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The recommendations of this document have no patent issues.
+
 .. _annex_d_odm:
 
 ANNEX D
@@ -4986,7 +7974,7 @@ This annex lists the abbreviations and acronyms used in this Recommended Standar
      - International Organization for Standardization
    * - ITRF
      - International Terrestrial Reference Frame
-   * - GDOP
+   * - GDoP
      - generalized dilution of precision
    * - GRC
      - Greenwich Rotating Coordinate Frame
@@ -5029,7 +8017,7 @@ This annex lists the abbreviations and acronyms used in this Recommended Standar
    * - RMS
      - Root Mean Square
    * - RTN
-     - Radial, Transverse (along-track), and Normal
+     - Radial, Transverse, Normal
    * - RSO
      - Resident Space Object
    * - SEDR
@@ -5037,7 +8025,7 @@ This annex lists the abbreviations and acronyms used in this Recommended Standar
    * - SGP
      - Simplified General Perturbations
    * - SGP4
-     - US Air Force Simplified General Perturbations No. 4
+     - Simplified General Perturbations No. 4
    * - SP
      - Sequential Processing
    * - SPK
@@ -5061,9 +8049,9 @@ This annex lists the abbreviations and acronyms used in this Recommended Standar
    * - TLE
      - Two Line Element
    * - TOD
-     - True Equator and Equinox of Date
+     - True of Date
    * - TT
-     - Terrestrial Dynamical Time (see also ‘TDT’)
+     - Terrestrial Time
    * - USM
      - Universal Semi-analytical Method
    * - UTC
@@ -5206,6 +8194,218 @@ E2.1 PRIMARY REQUIREMENTS
      - A means to convey information about the uncertainty of the state shall be provided.
      - Y
      - Y
+     - Y
+     - Y
+
+.. _annex_e_heritage_requirements_odm:
+
+E2.2 HERITAGE REQUIREMENTS
+""""""""""""""""""""""""""
+
+.. list-table:: Heritage Requirements
+   :widths: 10 50 10 10 10 10
+   :header-rows: 1
+
+   * - #
+     - Requirement
+     - OPM?
+     - OMM?
+     - OEM?
+     - OCM?
+   * - H1
+     - Ephemeris data is reliably convertible into the SPICE SPK (NASA) format (reference [H4]) and IIRV (NASA) format (reference [H5]) using a standard, multi-mission, unsupervised pipeline process. A complete ephemeris, not subject to integration or propagation by the customer, must be provided.
+     - N
+     - N
+     - Y
+     - Y
+   * - H2
+     - Ephemeris data provided for scheduling or operations (metric predicts) is to be certified by the providing Agency as correct and complete for the intended purpose. The receiving Agency cannot provide evaluation, trajectory propagation, or other usability services.
+     - N
+     - N
+     - Y
+     - Y
+   * - H3
+     - The ODM shall provide a mechanism by which messages may be uniquely identified and clearly annotated. It facilitates discussion between the recipient and the message originator, should that be necessary.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - H4
+     - The ODM shall provide a mechanism by which maneuvers may be uniquely identified and clearly annotated. It facilitates discussion between the recipient and the message originator, should that be necessary.
+     - N
+     - N
+     - N
+     - Y
+   * - H5
+     - The Recommended Standard is, or includes, an ASCII format.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - H6
+     - The Recommended Standard does not require software supplied by other Agencies.
+     - Y
+     - N
+     - Y
+     - Y
+
+.. _annex_e_desirable_characteristics_odm:
+
+E2.3 DESIRABLE CHARACTERISTICS
+""""""""""""""""""""""""""""""
+
+.. list-table:: Desirable Characteristics
+   :widths: 10 50 10 10 10 10
+   :header-rows: 1
+
+   * - #
+     - Requirement
+     - OPM?
+     - OMM?
+     - OEM?
+     - OCM?
+   * - DC1
+     - The Recommended Standard applies to non-traditional objects, such as landers, rovers, balloons, and natural bodies (e.g., asteroids, comets).
+     - Y
+     - N
+     - Y
+     - Y
+   * - DC2
+     - The Recommended Standard allows state vectors to be provided in other than the traditional J2000 inertial reference frame; one example is the International Astronomical Union (IAU) Mars body-fixed frame. (In such a case, provision or ready availability of supplemental information needed to transform data into a standard frame must be arranged.)
+     - Y
+     - Y
+     - Y
+     - Y
+   * - DC3
+     - The Recommended Standard is extensible with no disruption to existing users/uses.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - DC4
+     - The Recommended Standard is consistent with, and ideally a part of, ephemeris products and processes used for other space science purposes.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - DC5
+     - The Recommended Standard is as consistent as reasonable with any related CCSDS ephemeris Recommended Standards used for Earth-to-spacecraft or spacecraft-to-spacecraft applications.
+     - Y
+     - Y
+     - Y
+     - Y
+
+.. _annex_e_applicability_odm:
+
+E2.4 APPLICABILITY OF CRITERIA TO MESSAGE OPTIONS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The selection of one message will depend on the optimization criteria in the given
+application. The following table compares the four recommended messages in terms of the
+relevant selection criteria identified by the CCSDS.
+
+.. _annex_e_applicability_criteria_odm:
+
+E2.5 APPLICABILITY OF THE CRITERIA TO ORBIT DATA MESSAGES
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table:: Applicability of Criteria to Orbit Data Messages
+   :widths: 20 40 10 10 10 10
+   :header-rows: 1
+
+   * - Criteria
+     - Definition
+     - OPM?
+     - OMM?
+     - OEM?
+     - OCM?
+   * - Modeling Fidelity
+     - Permits modeling of any dynamic perturbation to the trajectory.
+     - N
+     - N
+     - Y
+     - Y
+   * - Human Readability
+     - Provides an easily readable message corresponding to a widely used orbit representation.
+     - Y
+     - Y
+     - Y
+     - Y
+   * - Remote Body Extensibility
+     - Permits use for assets on remote solar system bodies.
+     - Y
+     - N
+     - Y
+     - Y
+   * - Lander/Rover Compatibility
+     - Permits exchange of non-orbit trajectories.
+     - N
+     - N
+     - Y
+     - Y
+
+.. _annex_e_increasing_fidelity_odm:
+
+E3 INCREASING ORBIT PROPAGATION FIDELITY OF AN OPM OR OMM
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Some OPM or OMM users may desire/require a higher fidelity propagation of the state
+vector or Keplerian elements. A higher fidelity technique may be desired/required to
+minimize inconsistencies in predictions generated by diverse, often operator-unique
+propagation schemes. Nominally, the OPM and OMM are engineered only for low- to
+medium-fidelity orbit propagation. However, with the inclusion of additional context
+information, it is possible for users to provide data that could be used to provide a relatively
+higher fidelity orbit propagation. For this relatively higher fidelity orbit propagation, a much
+greater amount of ancillary information regarding spacecraft properties and dynamical
+models should be provided. Higher fidelity orbit propagations may be useful in special
+studies such as orbit conjunction studies.
+
+Spacecraft orbit determination is a stochastic estimation problems; observations are inherently
+uncertain, and not all of the phenomena that influence satellite motion are clearly discernible.
+State vectors and Keplerian elements with their respective covariances are best propagated
+with models that include the same forces and phenomena that were used for determining the
+orbit. Including this information in an OPM or OMM allows exchange partners to compare
+the results of their respective orbit propagations.
+
+With additional context information, the OPM and OMM may be used for assessing mutual
+physical or electromagnetic interference among Earth-orbiting spacecraft, developing
+collaborative maneuvers, and propagating the orbits of active satellites, inactive man-made
+objects, and near-Earth debris fragments. The additional information facilitates dynamic
+modeling of any user’s approach to conservative and non-conservative phenomena.
+
+The primary vehicle for the provision of additional optional ancillary information to be used
+when propagating an OPM or OMM is the COMMENT mechanism. Alternatively, the
+‘USER_DEFINED_’ keyword prefix may be used, though this usage is not encouraged.
+
+.. _annex_e_services_odm:
+
+E4 SERVICES RELATED TO THE DIFFERENT ORBIT DATA MESSAGE FORMATS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The different orbit data messages have been distinguished by the self-interpretability of the
+messages. The different services that can be achieved without special arrangements between
+users of the CCSDS orbit data messages are listed in table E-1.
+
+.. list-table:: Table E-1: Services Available with Orbit Data Messages
+   :widths: 25 45 10 10 10 10
+   :header-rows: 1
+
+   * - Service
+     - Definition
+     - OPM?
+     - OMM?
+     - OEM?
+     - OCM?
+   * - Absolute Orbit Interpretation
+     - State availability at specific times for use in additional computations (geometry, event detection, etc.).
+     - Y
+     - Y
+     - Y
+     - Y
+   * - Relative Orbit Interpretation
+     - Trajectory comparison and differencing for events based on the same time source.
+     - Only at time specified at Epoch
+     - Only at time specified at Epoch
      - Y
      - Y
 
@@ -5498,7 +8698,7 @@ c) The orthonormal rotation matrix [M(t)] is then:
 
 .. math::
 
-   \begin{bmatrix} (1-\cos\phi)\hat{e}_x^2 + \cos\phi & (1-\cos\phi)\hat{e}_x\hat{e}_y - \hat{e}_z\sin\phi & (1-\cos\phi)\hat{e}_x\hat{e}_z + \hat{e}_y\sin\phi \\ (1-\cos\phi)\hat{e}_y\hat{e}_x + \hat{e}_z\sin\phi & (1-\cos\phi)\hat{e}_y^2 + \cos\phi & (1-\cos\phi)\hat{e}_y\hate_z - \hat{e}_x\sin\phi \\ (1-\cos\phi)\hat{e}_z\hat{e}_x - \hat{e}_y\sin\phi & (1-\cos\phi)\hat{e}_z\hat{e}_y + \hat{e}_x\sin\phi & (1-\cos\phi)\hat{e}_z^2 + \cos\phi \end{bmatrix}
+   \begin{bmatrix} (1-\cos\phi)\hat{e}_x^2 + \cos\phi & (1-\cos\phi)\hat{e}_x\hat{e}_y - \hat{e}_z\sin\phi & (1-\cos\phi)\hat{e}_x\hat{e}_z + \hat{e}_y\sin\phi \\ (1-\cos\phi)\hat{e}_y\hat{e}_x + \hat{e}_z\sin\phi & (1-\cos\phi)\hat{e}_y^2 + \cos\phi & (1-\cos\phi)\hat{e}_y\hat{e}_z - \hat{e}_x\sin\phi \\ (1-\cos\phi)\hat{e}_z\hat{e}_x - \hat{e}_y\sin\phi & (1-\cos\phi)\hat{e}_z\hat{e}_y + \hat{e}_x\sin\phi & (1-\cos\phi)\hat{e}_z^2 + \cos\phi \end{bmatrix}
 
 d) From which the interpolated vector at time t is then v(t) = [M(t)]vA;
 e) The accompanying vector magnitudes (e.g., eigenvalues or thrust or acceleration
@@ -5716,7 +8916,7 @@ employs past and current observations to infer the future of the signal.
 .. _annex_f_initial_od_odm:
 
 F8.2 INITIAL OD
-""""""""""""""
+""""""""""""""""
 
 Initial OD (IOD) methods input tracking measurements with tracking platform locations, and
 output spacecraft position and velocity estimates. No a priori orbit estimate is required.
@@ -5724,212 +8924,151 @@ Associated solution error magnitudes can be very large. IOD methods are sometime
 nonlinear methods and are often trivial to implement. Measurement editing is typically not
 performed during IOD calculations because there are insufficient observations.
 
-.. figure:: ../images/ccsds_books/odm/F_4.png
-   :align: center
+F8.3 METHODS FOR SUBSEQUENT OD
+""""""""""""""""""""""""""""""
 
-   Figure F-4: Diagram of a Rotating Spacecraft Body’s Progression through an Inertial Clock Angle-based Duty Cycle (DC_TYPE = ‘TIME_AND_ANGLE’)
+F8.3.1 Least Squares Differential Correction
 
-.. _annex_f_gpod_formulation_odm:
+Least Squares (LS) methods input tracking measurements with tracking platform locations and an a priori orbit estimate and output a refined orbit estimate. Associated solution error magnitudes are small when compared to IOD outputs. LS methods consist of an iterative sequence of corrections where sequence convergence is defined as a function of tracking measurement residual Root Mean Square (RMS). Each correction is characterized by a minimization of the sum of squares of tracking measurement residuals. The LS method was derived first by Gauss in 1795 and then independently by Legendre.
 
-F4 ORBIT DETERMINATION GENERALIZED DILUTION OF PRECISION (GDOP) FORMULATION
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+F8.3.2 Sequential Processing
 
-This section of the informative technical annex defines the Generalized Dilution of Precision
-(GDoP) formulation used in the orbit determination section of the OCM.
+Sequential Processing (SP) methods are distinguished from LS processing methods in that batches of data are considered sequentially, collecting a set of observations over a specified time interval and batch-processing one interval after the next. SP can be thought of as a moving time window whose contents are captured and processed at intervals, independent of previously processed batches of data. The analysis does not include process noise inputs and calculations. It is in no way equivalent to filter processing, in which each new observation is added to past observations, improving estimates in a rigorous, traceable manner.
 
-As described in reference [H16], GDoP provides a method to assess the navigation
-performance over a time-integrated orbit solution. GDoP broadens the DoP concept from the
-more common instantaneous geometric or kinematic solution of multiple transmit sources at
-one time to a scenario associated with a receiver that can integrate metric range and/or
-Doppler (or range-rate) measurements over time, potentially from different transmit sources,
-to estimate the user’s orbital position and velocity state. It is defined as a function of the sum
-of information matrices to obtain an observability grammian associated with a set of metric
-tracking measurements collected over time.
-
-The following equation for GDoP represents the uncertainty of an orbit state estimate as
-observed over time.
+F8.3.3 Filter Processing
 
-.. math::
+Filter methods output refined state estimates sequentially at each observation time. Filter methods are forward-time recursive sequential methods consisting of a repeating pattern of time updates of the state of motion estimate and measurement updates of the state of motion estimate. The filter time update propagates the state estimate forward, and the filter measurement update incorporates the next measurement. The recursive pattern includes an important interval of filter initialization. Filter-smoother methods are backward-time recursive sequential methods consisting of a repeating pattern of state estimate refinement using filter outputs and backwards transition. Time transitions for both filter and smoother are dominated most significantly by numerical orbit propagators. The search for sequential processing was begun by Wiener, Kalman, Bucy, and others.
 
-   GDoP = \sqrt{max \text{ eig} \left( \left[ \sum_{t_0}^{t_n} (H^T W H)_i \right]^{-1} \right)}
+F8.4 REQUIRED INFORMATION FOR ORBIT DETERMINATION
+""""""""""""""""""""""""""""""""""""""""""""""""""
+F8.4.1 Observations
 
-Where H is the measurement matrix modeled in the state estimate at the update time (i.e., the
-product of the observation and state transition matrices such that :math:`\tilde{H} = H \cdot \Phi`), and W is a
-diagonal matrix of relative weights that represents the accuracy of the measurements.
-:math:`H^TWH_i` represents the information matrix, the inverse of which is the covariance matrix. By
-summing over time, one obtains an estimate of the state uncertainty from the time-derived
-measurement set.
+When observation data are communicated for collaborative or independent determination of satellite orbits, it is important to convey the observation types upon which that information is based. Ground-based, airborne, and space-based sensor observations are routinely used in orbit determination. These are conveyed in the CCSDS navigation family of messages using the TDM (reference [9]). Many of these parameters are discussed in greater detail in reference [H7].
 
-.. _annex_f_euler_axis_angle_interpolation_odm:
+The following table describes some of the various observation types and sources.
 
-F5 EULER AXIS/ANGLE INTERPOLATION
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Table F-1: Space Surveillance Observation Product Description**
 
-The Euler Axis and Angle representation of Euler’s Theorem (see reference [H17] 10–14) is
-an effective way to interpolate a series of covariance matrices, reference frames or
-maneuvers, thrust, or acceleration vector directions.
+.. list-table::
+   :header-rows: 1
 
-Interpolation of a series of three-dimensional vectors:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""
+   * - Content
+     - Source
+   * - two angles and slant range
+     - Radars
+   * - two angles
+     - Baker-Nunn cameras, telescopes, binoculars, visual sightings
+   * - Azimuth
+     - Direction finders, radio antenna, Radio telescope
+   * - Time of closest approach
+     - Radars, radio receivers [for transmitting (Doppler) satellites], relay satellite
+   * - Range, angles, and rates
+     - Radars, radio antenna, radio telescope
+   * - Pseudorange and carrier phase, as well as single, double, and triple differences of these basic measurement types
+     - GPS or onboard inertial sensors
+   * - Direction cosines
+     - Interferometric radars
 
-As presented in reference [H17], and consistent with the nomenclature of reference [H1]
-where e₁, e₂, and e₃ represent the three vector components of axis of rotation ê and φ
-represents the angle of rotation, a time-based interpolation of adjacent unit vectors ÛA and ÛB
-in a reference frame can be undertaken as:
+F8.4.2 Observation Location Information
 
-a) The axis of rotation ê can be obtained as: :math:`\hat{e} = \frac{\vec{U}_A \times \vec{U}_B}{|\vec{U}_A \times \vec{U}_B|}`.
-b) Assuming a constant rotational rate during this interval, :math:`\phi(t) = \frac{(t-t_1)}{(t_2-t_1)} \cos^{-1}(\vec{U}_A \cdot \vec{U}_B)`.
-c) The orthonormal rotation matrix [M(t)] is then:
+When data are communicated for collaborative or independent determination of satellite orbits, the following information about the observation location and measuring devices is important:
 
-.. math::
+* facility location latitude, longitude, altitude, and the reference from which such are measured, (e.g., WGS-84);
+* calibration/correction values associated with the ground path;
+* tracking station identification (ID);
+* elevation cutoff;
+* measurement biases;
+* clock and/or almanac information.
 
-   \begin{bmatrix} (1-\cos\phi)\hat{e}_x^2 + \cos\phi & (1-\cos\phi)\hat{e}_x\hat{e}_y - \hat{e}_z\sin\phi & (1-\cos\phi)\hat{e}_x\hat{e}_z + \hat{e}_y\sin\phi \\ (1-\cos\phi)\hat{e}_y\hat{e}_x + \hat{e}_z\sin\phi & (1-\cos\phi)\hat{e}_y^2 + \cos\phi & (1-\cos\phi)\hat{e}_y\hate_z - \hat{e}_x\sin\phi \\ (1-\cos\phi)\hat{e}_z\hat{e}_x - \hat{e}_y\sin\phi & (1-\cos\phi)\hat{e}_z\hat{e}_y + \hat{e}_x\sin\phi & (1-\cos\phi)\hat{e}_z^2 + \cos\phi \end{bmatrix}
+F8.4.3 Satellite Information
 
-d) From which the interpolated vector at time t is then v(t) = [M(t)]vA;
-e) The accompanying vector magnitudes (e.g., eigenvalues or thrust or acceleration
-   magnitudes) may be interpolated using Lagrange polynomials or linear expressions.
+When performing OD using active transponder ranging, the transponder delay must be provided.
 
-Interpolation of a series of reference (or covariance eigenvector) frames:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+F8.4.4 Estimation Parameters and Control
 
-The eigenvector matrix [E(t)] contains the row-wise storage of the major, intermediate, and
-minor eigenvectors at time t, taking care to ensure that this ordered ‘triad’ of vectors adheres
-to the righthand rule. When interpolating between two eigenvector matrices [E₁] and [E₂],
-derived from two adjacent covariance matrices, respectively, [E(t)] can be evaluated as:
+When data are communicated for collaborative or independent determination of satellite orbits, the following information about estimation parameters and control are necessary, as described in 6.2.10:
 
-a) The rotation occurring between [E₁] and [E₂] is: [MBA] = [E₂][E₁]ᵀ;
-b) Compute σ = (MBA₁₁ + MBA₂₂ + MBA₃₃);
-c) The angle of rotation from A to B is: :math:`\phi_{BA} = \cos^{-1}[\frac{1}{2}(\sigma - 1)]`;
-d) Exercising caution to accommodate nonunique cases (when sin φ = 0) as described
-   in reference [H17], the axis of rotation
+* estimation parameters;
+* global force model controls;
+* integration controls;
+* database controls;
+* observation uncertainties.
 
-   .. math::
+F8.4.5 Force Model Settings
 
-      \hat{e} = [\frac{(MBA_{23}-MBA_{32})}{2\sin\phi} \frac{(MBA_{31}-MBA_{13})}{2\sin\phi} \frac{(MBA_{12}-MBA_{21})}{2\sin\phi}]
+F8.4.5.1 General
 
-e) The angle of rotation at time t is :math:`\phi(t) = (\frac{t-t_1}{t_2-t_1})\phi_{BA}`;
-f) [M(t)] can be computed using the above expression in step (3);
-g) And finally, the eigenvector matrix [E(t)] = [M(t)][E₁];
-h) When interpolating a series of covariance matrices, the accompanying eigenvalues
-   may be interpolated using Lagrange polynomials or linear expressions.
+Spacecraft are affected by conservative and non-conservative forces. Non-conservative phenomena dissipate spacecraft energy, for example by doing work on and heating the atmosphere, as described in 6.2.9.
 
+F8.4.5.2 Gravity
 
-.. _annex_f_apparent_to_absolute_visual_magnitude_relationship_odm:
+Central body gravitational fields are typically described using terms of a Jacobi polynomial expansion of finite order and degree. Jacobi polynomials are a complete, orthonormal set over the unit sphere. There are two angular degrees of freedom, equivalent to latitude and longitude. Any analytic function within that space can be represented by a weighted doubly infinite series of Jacobi polynomials.
 
-F2 APPARENT-TO-ABSOLUTE VISUAL MAGNITUDE RELATIONSHIP
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Two-body motion or Keplerian motion considers only the point-mass gravity of the attracting body. Both the spacecraft and the central body are considered point masses, with all mass concentrated at their centres of mass. This is the lowest-order zonal harmonic approximation.
 
-This section of the informative technical annex presents the relationships to be used to map
-apparent to absolute visual magnitude for inclusion in an OCM. These equations, based on
-reference [H8], examine signal magnitude for reflected illumination by a Resident Space
-Object (RSO) that is exoatmospheric, meaning that its illumination by the Sun is not reduced
-or impeded by atmospheric transmission losses. The equations do not account for spatial
-distribution across multiple detectors, which involves characterizing the Point Spread
-Function of the system.
+A J2 zonal perturbation (first order) accounts for secular (constant rate over time) variations in the orbit elements due to central body oblateness, mainly nodal precession and rotation of the semi-major axis of orbit elements that are otherwise those of unperturbed, Newtonian orbits. J2 is a zonal harmonic coefficient in an infinite Jacobi polynomial series representation of the central body’s gravity field. The even zonal harmonic coefficients of the gravity field are the only coefficients that result in secular changes in satellite orbital elements. The J2 propagator includes only the dominant first-order secular effects.
 
-Definitions:
+For generalized spherical harmonics, it is impractical to determine the weights (coefficients) for a mathematically complete Jacobi polynomial series representation; therefore the series is truncated at meaningful (in terms of precision of the representation of the gravity field) order (latitudinal) and degree (longitudinal). Whenever practical, it is recommended to use the full degree and order of the determined spherical harmonics field, as further truncation leads to introduction of non-conservative forces and deviation from the intended fidelity of the gravitational model.
 
-- :math:`A_{Target}`: Effective area of the target [m²].
-- :math:`E_{EntranceAperture}`: The point source irradiance reaching the sensor aperture [W/m²].
-- :math:`d_{sunToTarget}`: Distance from the sun to the target [m] (e.g., 1 AU = 1.4959787066 × 10¹¹ m).
-- :math:`d_{TargetToSensor}`: Distance from target to sensor [m].
-- :math:`dia_{Target}`: Effective diameter of the target, [m].
-- :math:`E_{sun}`: Exoatmospheric solar irradiance, nominally 1380 [W/m²] at 1 AU.
-- :math:`E_{target}`: Target Irradiance at Sensor without atmospheric loss [W/m²].
-- :math:`E_o`: Ref. Visual Magnitude (Vega) Irradiance [2.77894× 10⁻⁸ W/m²].
-- F: General shadowing term accounting for the penumbra region’s influence [unitless, 0 ≤ F ≤1, 0 = umbra, and 1 = full Sun illumination].
-- :math:`I_{sun}`: Solar Intensity ≈ 3.088374161 × 10²⁵ [W/sr].
-- :math:`I_{Target}`: Intensity of reflected energy from target treated as a point source [W/sr].
-- :math:`Phase(\phi)`: Geometric reflectance phase function [unitless, 0 < Phase(φ) ≤1].
-- :math:`\phi`: Critical Angle to the Sun (CATS) from sun to the sensor, as shown in figure F-2 and referenced to the observed target [rad].
-- :math:`\pi`: Pi constant.
-- :math:`\rho`: Reflectance of the target [between 0 (none) and 1 (perfect reflectance)].
-- :math:`\tau_{Atmosphere}`: Effective transmission of the atmosphere [unitless, 0 < τ ≤ 1].
+If the order and degree are equal, the truncation is ‘square’. Since gravitational and other perturbations are not necessarily symmetrical in latitude and longitude, the best approximation for a given application is not necessarily square. The GRAVITY_MODEL keyword in 6.2.9 can specify (independently) the degree and order that are used.
 
-Given an optical sensor’s measured target entrance aperture radiance:
+Static elements of the gravity field are the gravitation of the fixed portions of the distribution of the Earth’s mass. The static gravity field is not uniform. Dynamic elements of the gravity are caused by the fluid elements of the Earth’s core and by variations in the distribution of water. There are solid and ocean tides. The OCEAN_TIDES_MODEL and SOLID_TIDES_MODEL of 6.2.9 can be used to specify these settings.
 
-.. math::
+Multibody gravitation: Certain phenomena only exist with more than two gravitationally interacting bodies. It is therefore important to describe information about third-body or multiple-body gravitational interactions if such are considered. The N_BODY_PERTURBATIONS keyword in 6.2.9 is used to specify which bodies were modelled.
 
-   E_{target} = \frac{E_{EntranceAperture}}{ \tau_{Atmosphere}} [W/m^2]
+F8.4.5.3 Atmospheric Resistance (‘Drag’)
 
-.. math::
+F8.4.5.3.1 General
 
-   VM_{apparent} = -2.5 \log_{10} (\frac{E_{target}}{E_o}), \text{measured on the visual magnitude scale}
+Gas-dynamic resistance can be a significant dissipative force in low altitude orbits about any body with a significant atmosphere, for example, Earth (LEOs), Venus, and Mars. It is usually sufficient to represent it as aerodynamic drag, the product of dynamic pressure, aggregated drag coefficient, and cross-sectional area.
 
-or if :math:`VM_{apparent}` known: :math:`E_{target} = E_o 10^{[- \frac{VM_{apparent}}{2.5}]}`
+F8.4.5.3.2 Drag Coefficient
 
-.. math::
+Drag coefficient depends upon satellite geometry, orientation, and gas-dynamic regime described by Knudsen number (ratio of object characteristic dimension to gas mean free path) and Mach number (ratio of object speed to acoustic propagation speed). When describing how atmospheric resistance is represented, data providers provide the value of drag coefficient employed using the keyword in 6.2.9.
 
-   I_{target} = E_{target} d_{TargetToSensor}^2 [W]
+F8.4.5.3.3 Atmospheric Density Model
 
-.. math::
+Density within the Earth’s atmosphere varies temporally and spatially. Those variations are important in LEO. Some acceptable and most-often used atmospheric density models are as follows (although many may be utilized, as specified by the ATMOSPHERIC_MODEL keyword in 6.2.9):
 
-   E_{sun} = \frac{I_{sun}}{d_{sunToTarget}^2} [W/m^2]
+* 1976 Standard Harris-Priester;
+* Jacchia 1970 and 1971;
+* Jaccia-Roberts;
+* Mass-Spectrometer-Incoherent-Scatter (MSIS) model, in several versions and extensions;
+* Mars Global Reference Atmosphere Model (MARSGRAM);
+* Venus Global Reference Atmosphere Model (VENUSGRAM).
 
-.. math::
+These models typically require measurable input parameters that are ‘proxies’ for the variation of atmospheric parameters. These include solar flux/geomagnetic particle flux, which can be inferred from the meteorological observables as set by the keyword SW_DATA_SOURCE or FIXED_YYYYY of 6.2.9:
 
-   Phase(\phi) = \frac{\sin \phi + (\pi - \phi) \cos \phi}{\pi}
+* daily F10.7;
+* average F10.7; and
+* geomagnetic index.
 
-.. math::
+F8.4.5.4 Radiation Pressure
 
-   A_{Target} = \frac{\pi I_{Target}}{ \rho F E_{sun} Phase(\phi)} [m^2]
+Momentum transfer from photons to satellites can be an important force for High Earth Orbits (HEOs), cislunar trajectories, and interplanetary trajectories. For solar sail missions, such radiation pressure is the primary source of propulsion. Radiation pressure depends on the area and surface characteristics of the satellite and the nature of the incident radiative fluxes. The Sun is the predominant direct source of electromagnetic radiation, but the Earth and the Moon also emit and reflect electromagnetic radiation. The keywords provided in 6.2.9 (SHADOW_BODIES, SRP_MODEL, ALBEDO_MODEL, ALBEDO_GRID_SIZE) allow the user to specify radiation pressure settings used in the OD and orbit propagation regarding:
 
-.. NOTE::
+* solar radiation pressure coefficient;
+* area-to-mass ratio;
+* satellite reflectivity;
+* shadow and shape factor models;
+* eclipse models (cylindrical, dual-cone);
+* albedo and intensity at the satellite.
 
-   1. :math:`A_{Target}` is undefined in umbra (F=0=darkness), or no reflection (ρ = 0).
-   2. If reflectance is unknown, one may assume a standard reference reflectance of fifteen percent.
+F8.4.6 Orbit Propagation
 
-From which an effective diameter of the physical object can be roughly approximated as:
+Orbit propagation or prediction has evolved synchronously with advances in computational capability. Initially, force models were greatly simplified, and most important non-gravitational forces were approximated analytically. These generally linearized approaches were valid only over short intervals or for small variations from two-body Keplerian motion.
 
-.. math::
+Even when more precise numerical integration became feasible, execution times were often too long, and computation was too expensive to employ numerical integration on a regular basis. Semi-analytical techniques emerged that reduced numerical complexity and maintained run speed efficiency (with some compromise to precision) by providing formulae from which significant elements of the propagation workflow could be extracted.
 
-   dia_{Target} \approx \sqrt{\frac{4 A_{Target}}{\pi}}
+Purely numerical integration of force models (i.e., not employing singly or doubly averaged physical approximations to describe important physical phenomena) are degraded primarily to the numerical phenomena degradation common to all discrete computations.
 
-From the above equations, :math:`VM_{absolute}` ‘normalized’ to a 1 AU Sun-to-target distance, a phase
-angle of 0° and an example reference 40,000 km target-to-sensor distance (equivalent to a
-GEO satellite tracked at 15.6° elevation above the optical site’s local horizon), is obtained as:
+Analytical, numerical, and semi-analytical orbit propagation techniques are all known as ‘orbit propagators’.
 
-.. math::
+F8.4.7 Orbit Elements
 
-   VM_{absolute} = -2.5 \log_{10} (\frac{E_{target}}{E_o}), \text{from which:}
+Orbit elements are the sets of parameters that emerge from the smoothing, filtering, or predictive estimation schemes. Six independent quantities and orbit elements describe the orbit of a satellite. A seventh variable designates the satellite position at a specific time of interest (epoch). There are many different sets of orbit elements (see orbit element set type; selected per annex B, subsection B7). Each is best suited for a particular application, such as aiming antennas, ease of manipulation in various coordinate systems, or estimating orbits from different types of measurements.
 
-.. math::
-
-   VM_{absolute} = -2.5 \log_{10} ( \frac{[E_{Sun,1AU=1380W/m^2}] [Phase(0 rad)=1.0] [\rho A_{Target} \text{from above, in } m^2]}{\pi [E_o=2.77894 \times 10^{-8} W/m^2] [(40,000,000^2) m^2]} )
-
-.. figure:: ../images/ccsds_books/odm/F_2.png
-   :align: center
-
-   Figure F-2: Depiction of Optical Viewing CATS Angle Geometry
-
-.. _annex_f_maneuver_and_duty_cycle_diagrams_odm:
-
-F3 MANEUVER AND DUTY CYCLE DIAGRAMS
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-This section of the informative technical annex defines time-based and phase-angle-based
-duty cycle parameters.
-
-A ‘duty cycle’ is a cycle of thruster operation that operates intermittently rather than
-continuously, having an ‘on’ interval followed by an ‘off’ interval.
-
-Time-based duty cycle parameters
-""""""""""""""""""""""""""""""""
-
-Time-based duty cycle parameters define a window of duty cycle operations, the actual
-execution interval and ‘ON’ and ‘OFF’ intervals, as shown in figure F-3.
-
-.. figure:: ../images/ccsds_books/odm/F_3.png
-   :align: center
-
-   Figure F-3: Diagram of Time-based Duty Cycle (DC_TYPE = ‘TIME’)
-
-Angle-based duty cycle parameters
-"""""""""""""""""""""""""""""""""
-
-Angle-based duty cycle parameters also define a window of duty cycle operations and actual
-execution interval and ‘ON’ and ‘OFF’ intervals, but in this case the ‘ON’ and ‘OFF’
-intervals are triggered by angular limits as shown in figure F-4.
+The traditionally used set of orbital elements is called the set of Keplerian elements. Keplerian elements parameters can be encoded as text in several formats. In semi-analytical propagation, mean orbit elements are often used; the most common of them is as conveyed in the NASA/NORAD TLE format, originally designed for use with 80-column punched cards (but still in use because it is the most common format).
 
 
 .. _annex_g_odm:
@@ -6029,8 +9168,9 @@ The following figures are examples of OMMs in KVN format.
 G6 OEM EXAMPLES IN KVN
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The following figures are examples of OEMs in KVN format. Some ephemeris data lines
-have been omitted to save space.
+The following figures are examples of OEMs in KVN format. Some ephemeris data lines have been omitted to save space.
+
+**Figure G-11: OEM Example with No Acceleration, No Covariance**
 
 .. code-block::
 
@@ -6090,6 +9230,383 @@ object characteristics and Perturbations Specifications; the third includes a ti
 maneuvers, a time history of Cartesian position and velocity trajectory states, followed by a
 time history of Keplerian elements; and the fourth includes a time series of covariance
 matrices.
+
+G10 AGGREGATING MULTIPLE ODMS IN A SINGLE NDM XML FILE
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The following examples illustrate how multiple Orbit Data Messages can be aggregated in a single XML file using the NDM ‘combined instantiation’ schema.
+
+**Figure G-21: Aggregating Multiple ODMs into a Single NDM File**
+
+.. code-block:: xml
+
+   <?xml version="1.0" encoding="UTF-8"?>
+   <ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-3.0.0-master-3.0.xsd"
+        version="3.0">
+     <header>
+       <COMMENT>GENERATED VIA SPACE-TRACK.ORG API</COMMENT>
+       <CREATION_DATE>2020-05-16T14:00:01</CREATION_DATE>
+       <ORIGINATOR>18 SPCS</ORIGINATOR>
+     </header>
+     <body>
+       <segment>
+         <metadata>
+           <OBJECT_NAME>STARLINK-1073</OBJECT_NAME>
+           <OBJECT_ID>2020-001A</OBJECT_ID>
+           <CENTER_NAME>EARTH</CENTER_NAME>
+           <REF_FRAME>TEME</REF_FRAME>
+           <TIME_SYSTEM>UTC</TIME_SYSTEM>
+           <MEAN_ELEMENT_THEORY>SGP4</MEAN_ELEMENT_THEORY>
+         </metadata>
+         <data>
+           <meanElements>
+             <EPOCH>2020-05-16T14:00:01</EPOCH>
+             <MEAN_MOTION>15.05566242</MEAN_MOTION>
+             <ECCENTRICITY>0.0001225</ECCENTRICITY>
+             <INCLINATION>52.9981</INCLINATION>
+             <RA_OF_ASC_NODE>157.6133</RA_OF_ASC_NODE>
+             <ARG_OF_PERICENTER>93.35</ARG_OF_PERICENTER>
+             <MEAN_ANOMALY>295.8599</MEAN_ANOMALY>
+           </meanElements>
+           <tleParameters>
+             <EPHEMERIS_TYPE>0</EPHEMERIS_TYPE>
+             <CLASSIFICATION_TYPE>U</CLASSIFICATION_TYPE>
+             <NORAD_CAT_ID>44914</NORAD_CAT_ID>
+             <ELEMENT_SET_NO>999</ELEMENT_SET_NO>
+             <REV_AT_EPOCH>176</REV_AT_EPOCH>
+             <BSTAR>0.00057678</BSTAR>
+             <MEAN_MOTION_DOT>0.00008131</MEAN_MOTION_DOT>
+             <MEAN_MOTION_DDOT>0</MEAN_MOTION_DDOT>
+           </tleParameters>
+           <userDefinedParameters>
+             <USER_DEFINED parameter="TLE_LINE0">0 STARLINK-1073</USER_DEFINED>
+             <USER_DEFINED parameter="TLE_LINE1">1 44914U 20211A 20137.58334491 +.00008131 +00000-0 +57678-3 0 9994</USER_DEFINED>
+             <USER_DEFINED parameter="TLE_LINE2">2 44914 052.9981 157.6133 0001225 093.3500 295.8599 15.05566242001761</USER_DEFINED>
+           </userDefinedParameters>
+         </data>
+       </segment>
+       <segment>
+         <metadata>
+           <OBJECT_NAME>STARLINK-1084</OBJECT_NAME>
+           <OBJECT_ID>2020-001B</OBJECT_ID>
+           <CENTER_NAME>EARTH</CENTER_NAME>
+           <REF_FRAME>TEME</REF_FRAME>
+           <TIME_SYSTEM>UTC</TIME_SYSTEM>
+           <MEAN_ELEMENT_THEORY>SGP4</MEAN_ELEMENT_THEORY>
+         </metadata>
+         <data>
+           <meanElements>
+             <EPOCH>2020-05-16T14:00:01</EPOCH>
+             <MEAN_MOTION>15.05603711</MEAN_MOTION>
+             <ECCENTRICITY>0.000126</ECCENTRICITY>
+             <INCLINATION>52.9991</INCLINATION>
+             <RA_OF_ASC_NODE>157.611</RA_OF_ASC_NODE>
+             <ARG_OF_PERICENTER>75.9191</ARG_OF_PERICENTER>
+             <MEAN_ANOMALY>151.2104</MEAN_ANOMALY>
+           </meanElements>
+           <tleParameters>
+             <EPHEMERIS_TYPE>0</EPHEMERIS_TYPE>
+             <CLASSIFICATION_TYPE>U</CLASSIFICATION_TYPE>
+             <NORAD_CAT_ID>44915</NORAD_CAT_ID>
+             <ELEMENT_SET_NO>999</ELEMENT_SET_NO>
+             <REV_AT_EPOCH>1986</REV_AT_EPOCH>
+             <BSTAR>0.0006442</BSTAR>
+             <MEAN_MOTION_DOT>0.00009125</MEAN_MOTION_DOT>
+             <MEAN_MOTION_DDOT>0</MEAN_MOTION_DDOT>
+           </tleParameters>
+           <userDefinedParameters>
+             <USER_DEFINED parameter="TLE_LINE0">0 STARLINK-1084</USER_DEFINED>
+             <USER_DEFINED parameter="TLE_LINE1">1 44915U 20211B 20137.58334491 +.00009125 +00000-0 +64420-3 0 9992</USER_DEFINED>
+             <USER_DEFINED parameter="TLE_LINE2">2 44915 052.9991 157.6110 0001260 075.9191 151.2104 15.05603711019869</USER_DEFINED>
+           </userDefinedParameters>
+         </data>
+       </segment>
+       <!-- Figure G-21: Aggregating Multiple ODMs into a Single NDM File (Continued) -->
+       <segment>
+         <metadata>
+           <OBJECT_NAME>STARLINK-1097</OBJECT_NAME>
+           <OBJECT_ID>2020-001C</OBJECT_ID>
+           <CENTER_NAME>EARTH</CENTER_NAME>
+           <REF_FRAME>TEME</REF_FRAME>
+           <TIME_SYSTEM>UTC</TIME_SYSTEM>
+           <MEAN_ELEMENT_THEORY>SGP4</MEAN_ELEMENT_THEORY>
+         </metadata>
+         <data>
+           <meanElements>
+             <EPOCH>2020-05-16T14:00:01</EPOCH>
+             <MEAN_MOTION>15.05559315</MEAN_MOTION>
+             <ECCENTRICITY>0.0001361</ECCENTRICITY>
+             <INCLINATION>52.999</INCLINATION>
+             <RA_OF_ASC_NODE>157.6123</RA_OF_ASC_NODE>
+             <ARG_OF_PERICENTER>94.2334</ARG_OF_PERICENTER>
+             <MEAN_ANOMALY>78.9025</MEAN_ANOMALY>
+           </meanElements>
+           <tleParameters>
+             <EPHEMERIS_TYPE>0</EPHEMERIS_TYPE>
+             <CLASSIFICATION_TYPE>U</CLASSIFICATION_TYPE>
+             <NORAD_CAT_ID>44916</NORAD_CAT_ID>
+             <ELEMENT_SET_NO>999</ELEMENT_SET_NO>
+             <REV_AT_EPOCH>1986</REV_AT_EPOCH>
+             <BSTAR>0.00072742</BSTAR>
+             <MEAN_MOTION_DOT>0.00010329</MEAN_MOTION_DOT>
+             <MEAN_MOTION_DDOT>0</MEAN_MOTION_DDOT>
+           </tleParameters>
+           <userDefinedParameters>
+             <USER_DEFINED parameter="TLE_LINE0">0 STARLINK-1097</USER_DEFINED>
+             <USER_DEFINED parameter="TLE_LINE1">1 44916U 20211C 20137.58334491 +.00010329 +00000-0 +72742-3 0 9997</USER_DEFINED>
+             <USER_DEFINED parameter="TLE_LINE2">2 44916 052.9990 157.6123 0001361 094.2334 078.9025 15.05559315019865</USER_DEFINED>
+           </userDefinedParameters>
+         </data>
+       </segment>
+     </body>
+   </ndm>
+
+**Figure G-22: Aggregating OPM, OMM, OEM, and OCM in a Single Navigation Data Message XML**
+
+.. code-block:: xml
+
+   <?xml version="1.0" encoding="UTF-8"?>
+   <ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-3.0.0-master-3.0.xsd"
+        version="3.0">
+     <header>
+       <COMMENT>This example combines an OPM, OMM, OEM, and OCM in a single Navigation Data Message XML.</COMMENT>
+       <COMMENT>NOTE - In this case the messages are unrelated, but show how, in principle, related </COMMENT>
+       <COMMENT>messages could be combined to satisfy a specific use case.</COMMENT>
+     </header>
+     <body>
+       <opm id="CCSDS_OPM_VERS" version="3.0">
+         <header>
+           <COMMENT>Example Orbit Parameter Message</COMMENT>
+           <COMMENT>The OPM includes a set of orbital elements at time t, and an impulsive maneuver design with MAN_EPOCH_IGNITION = t.</COMMENT>
+           <CREATION_DATE>2009-05-12T13:06:00</CREATION_DATE>
+           <ORIGINATOR>NASA</ORIGINATOR>
+         </header>
+         <segment>
+           <metadata>
+             <OBJECT_NAME>SOHO</OBJECT_NAME>
+             <OBJECT_ID>2009-000A</OBJECT_ID>
+             <CENTER_NAME>EARTH</CENTER_NAME>
+             <REF_FRAME>EME2000</REF_FRAME>
+             <TIME_SYSTEM>UTC</TIME_SYSTEM>
+           </metadata>
+           <data>
+             <stateVector>
+               <EPOCH>2009-05-12T15:30:00</EPOCH>
+               <X>687754.36358524448</X>
+               <Y>941287.85553999904</Y>
+               <Z>520080.81101286016</Z>
+               <X_DOT>-0.41396551860286032</X_DOT>
+               <Y_DOT>0.29174462217893128</Y_DOT>
+               <Z_DOT>0.11756781919443198</Z_DOT>
+             </stateVector>
+             <maneuverParameters>
+               <COMMENT>The below contains information for the impulsive maneuver.</COMMENT>
+               <MAN_EPOCH_IGNITION>2009-05-12T15:30:00</MAN_EPOCH_IGNITION>
+               <MAN_DURATION>0</MAN_DURATION>
+               <MAN_DELTA_MASS>-0.0252069575402913408</MAN_DELTA_MASS>
+               <MAN_REF_FRAME>EME2000</MAN_REF_FRAME>
+               <MAN_DV_1>0.000028562811624</MAN_DV_1>
+               <MAN_DV_2>3.0883529021E-7</MAN_DV_2>
+               <MAN_DV_3>1.4646782842E-8</MAN_DV_3>
+             </maneuverParameters>
+           </data>
+         </segment>
+       </opm>
+       <omm id="CCSDS_OMM_VERS" version="3.0">
+         <header>
+           <COMMENT>Example Orbit Mean-Elements Message</COMMENT>
+           <COMMENT>ODM PROTOTYPING FOR CCSDS 502.0-P-1.1 - TEST NUMBER 4</COMMENT>
+           <CREATION_DATE>2009-091T16:00:00</CREATION_DATE>
+           <ORIGINATOR>CNES</ORIGINATOR>
+         </header>
+         <segment>
+           <metadata>
+             <OBJECT_NAME>ISS-ZARYA</OBJECT_NAME>
+             <OBJECT_ID>2022-067A</OBJECT_ID>
+             <CENTER_NAME>EARTH</CENTER_NAME>
+             <REF_FRAME>TEME</REF_FRAME>
+             <TIME_SYSTEM>UTC</TIME_SYSTEM>
+             <MEAN_ELEMENT_THEORY>SGP4</MEAN_ELEMENT_THEORY>
+           </metadata>
+           <data>
+             <COMMENT>USAF SGP4 IS THE ONLY PROPAGATOR THAT SHOULD BE USED FOR THIS DATA</COMMENT>
+             <meanElements>
+               <EPOCH>2009-087T11:58:23.211264</EPOCH>
+               <MEAN_MOTION>15.71784080</MEAN_MOTION>
+               <ECCENTRICITY>0.0009738</ECCENTRICITY>
+               <INCLINATION>51.6429</INCLINATION>
+               <RA_OF_ASC_NODE>0.4159</RA_OF_ASC_NODE>
+               <ARG_OF_PERICENTER>166.5533</ARG_OF_PERICENTER>
+               <MEAN_ANOMALY>354.9076</MEAN_ANOMALY>
+             </meanElements>
+             <tleParameters>
+               <EPHEMERIS_TYPE>0</EPHEMERIS_TYPE>
+               <CLASSIFICATION_TYPE>U</CLASSIFICATION_TYPE>
+               <NORAD_CAT_ID>25544</NORAD_CAT_ID>
+               <ELEMENT_SET_NO>557</ELEMENT_SET_NO>
+               <REV_AT_EPOCH>59325</REV_AT_EPOCH>
+               <BSTAR>-0.21414E-3</BSTAR>
+               <MEAN_MOTION_DOT>0.00027894</MEAN_MOTION_DOT>
+               <MEAN_MOTION_DDOT>0.0</MEAN_MOTION_DDOT>
+             </tleParameters>
+           </data>
+         </segment>
+       </omm>
+       <!-- Figure G-22: Aggregating OPM, OMM, OEM, and OCM in a Single Navigation Data Message XML (Continued) -->
+       <oem id="CCSDS_OEM_VERS" version="3.0">
+         <header>
+           <COMMENT>Example Orbit Ephemeris Message</COMMENT>
+           <CREATION_DATE>2009-02-05T10:09:12</CREATION_DATE>
+           <ORIGINATOR>JAXA</ORIGINATOR>
+         </header>
+         <segment>
+           <metadata>
+             <OBJECT_NAME>SELENE</OBJECT_NAME>
+             <OBJECT_ID>131</OBJECT_ID>
+             <CENTER_NAME>EARTH</CENTER_NAME>
+             <REF_FRAME>EME2000</REF_FRAME>
+             <TIME_SYSTEM>UTC</TIME_SYSTEM>
+             <START_TIME>2007-09-14T10:43:00.000000</START_TIME>
+             <STOP_TIME>2007-09-14T10:47:00.000000</STOP_TIME>
+             <INTERPOLATION>HERMITE</INTERPOLATION>
+             <INTERPOLATION_DEGREE>7</INTERPOLATION_DEGREE>
+           </metadata>
+           <data>
+             <stateVector>
+               <EPOCH>2007-09-14T10:43:00.000000</EPOCH>
+               <X>1.336886031675458E+03</X>
+               <Y>9.480146566872711E+04</Y>
+               <Z>3.266088528177066E+04</Z>
+               <X_DOT>-6.305293974707967E-01</X_DOT>
+               <Y_DOT>1.848864859994888E+00</Y_DOT>
+               <Z_DOT>9.377640352829226E-01</Z_DOT>
+             </stateVector>
+             <stateVector>
+               <EPOCH>2007-09-14T10:44:00.000000</EPOCH>
+               <X>1.299053338219702E+03</X>
+               <Y>9.491233015399727E+04</Y>
+               <Z>3.271712789822781E+04</Z>
+               <X_DOT>-6.305602161673365E-01</X_DOT>
+               <Y_DOT>1.846618917569059E+00</Y_DOT>
+               <Z_DOT>9.369900978163187E-01</Z_DOT>
+             </stateVector>
+             <stateVector>
+               <EPOCH>2007-09-14T10:45:00.000000</EPOCH>
+               <X>1.261218825877070E+03</X>
+               <Y>9.502306005072314E+04</Y>
+               <Z>3.277324123553684E+04</Z>
+               <X_DOT>-6.305900282238581E-01</X_DOT>
+               <Y_DOT>1.844378570838882E+00</Y_DOT>
+               <Z_DOT>9.362176632629805E-01</Z_DOT>
+             </stateVector>
+             <stateVector>
+               <EPOCH>2007-09-14T10:46:00.000000</EPOCH>
+               <X>1.223382554832220E+03</X>
+               <Y>9.513365569386665E+04</Y>
+               <Z>3.282947404774766E+04</Z>
+               <X_DOT>-6.306188407720047E-01</X_DOT>
+               <Y_DOT>1.842143793832282E+00</Y_DOT>
+               <Z_DOT>9.354467257772656E-01</Z_DOT>
+             </stateVector>
+             <stateVector>
+               <EPOCH>2007-09-14T10:47:00.000000</EPOCH>
+               <X>1.185544584842622E+03</X>
+               <Y>9.524411741683590E+04</Y>
+               <Z>3.288557776045905E+04</Z>
+               <X_DOT>-6.30646660867719E-01</X_DOT>
+               <Y_DOT>1.839914560746108E+00</Y_DOT>
+               <Z_DOT>9.346772795446093E-01</Z_DOT>
+             </stateVector>
+           </data>
+         </segment>
+       </oem>
+       <!-- Figure G-22: Aggregating OPM, OMM, OEM, and OCM in a Single Navigation Data Message XML (Continued) -->
+       <ocm id="CCSDS_OCM_VERS" version="3.0">
+         <header>
+           <COMMENT>Example G-4 from OCM P2.40</COMMENT>
+           <COMMENT>OCM example with multiple trajectory state time histories, a maneuver, OD, Cartesian and Keplerian ephemeris</COMMENT>
+           <CREATION_DATE>2022-11-06T09:23:57</CREATION_DATE>
+           <ORIGINATOR>JAPAN AEROSPACE EXPLORATION AGENCY</ORIGINATOR>
+         </header>
+         <body>
+           <segment>
+             <metadata>
+               <OBJECT_NAME>OSPREY 5</OBJECT_NAME>
+               <INTERNATIONAL_DESIGNATOR>2022-999A</INTERNATIONAL_DESIGNATOR>
+               <CATALOG_NAME>CSPOC</CATALOG_NAME>
+               <OBJECT_DESIGNATOR>98765</OBJECT_DESIGNATOR>
+               <TIME_SYSTEM>UTC</TIME_SYSTEM>
+               <EPOCH_TZERO>2022-12-18T14:28:15.1172</EPOCH_TZERO>
+             </metadata>
+             <data>
+               <traj>
+                 <TRAJ_BASIS>PREDICTED</TRAJ_BASIS>
+                 <CENTER_NAME>EARTH</CENTER_NAME>
+                 <TRAJ_REF_FRAME>TOD_EARTH</TRAJ_REF_FRAME>
+                 <TRAJ_FRAME_EPOCH>2022-12-18T14:28:15.1172</TRAJ_FRAME_EPOCH>
+                 <USEABLE_START_TIME>2022-12-18T14:28:15.1172</USEABLE_START_TIME>
+                 <USEABLE_STOP_TIME>2022-12-18T14:28:45.1172</USEABLE_STOP_TIME>
+                 <TRAJ_TYPE>CARTPVA</TRAJ_TYPE>
+                 <TRAJ_UNITS>[km, km, km, km/s, km/s, km/s, km/s**2, km/s**2, km/s**2]</TRAJ_UNITS>
+                 <trajLine>0.0 2854.5 -2916.2 -5360.7 5.90 4.86 0.52 0.0037 -0.0038 -0.0070</trajLine>
+                 <trajLine>120.0 5478.6 434.3 -3862.5 2.50 5.87 4.29 0.0072 0.0006 -0.0051</trajLine>
+                 <trajLine>240.0 4146.0 -1655.8 -5038.3 4.80 5.58 2.16 0.0054 -0.0022 -0.0066</trajLine>
+                 <trajLine>500.0 -1553.4 -4848.7 -4406.5 6.73 1.01 -3.53 -0.002 -0.0063 -0.0058</trajLine>
+               </traj>
+               <traj>
+                 <TRAJ_BASIS>DETERMINED</TRAJ_BASIS>
+                 <CENTER_NAME>EARTH</CENTER_NAME>
+                 <TRAJ_REF_FRAME>J2000</TRAJ_REF_FRAME>
+                 <TRAJ_TYPE>KEPLERIAN</TRAJ_TYPE>
+                 <ORB_AVERAGING>OSCULATING</ORB_AVERAGING>
+                 <TRAJ_UNITS>[km, n/a, deg, deg, deg, deg, deg]</TRAJ_UNITS>
+                 <trajLine>0.000000 6600.0 .03 28.5 50.0 30.0 10.0</trajLine>
+                 <trajLine>120.000000 6600.0 .03 28.5 50.0 30.0 10.1</trajLine>
+                 <trajLine>240.000000 6600.0 .03 28.5 50.0 30.0 10.2</trajLine>
+                 <trajLine>500.000000 6600.0 .03 28.5 50.0 30.0 35.0</trajLine>
+               </traj>
+               <phys>
+                 <COMMENT>Spacecraft Physical Characteristics</COMMENT>
+                 <DRAG_CONST_AREA units="m**2">10.00</DRAG_CONST_AREA>
+                 <DRAG_COEFF_NOM>2.300</DRAG_COEFF_NOM>
+                 <WET_MASS units="kg">100.0</WET_MASS>
+                 <SRP_CONST_AREA units="m**2">4</SRP_CONST_AREA>
+                 <SOLAR_RAD_COEFF>1.3</SOLAR_RAD_COEFF>
+               </phys>
+               <man>
+                 <COMMENT>200 s of 10N thrust (in-track transitioning to radial)</COMMENT>
+                 <COMMENT>w/effic η=0.95, Isp=300s, 5% 1-sigma error</COMMENT>
+                 <MAN_ID>E W 20160305B</MAN_ID>
+                 <MAN_BASIS>CANDIDATE</MAN_BASIS>
+                 <MAN_DEVICE_ID>THR_01</MAN_DEVICE_ID>
+                 <MAN_PURPOSE>ORBIT</MAN_PURPOSE>
+                 <MAN_REF_FRAME>RSW_ROTATING</MAN_REF_FRAME>
+                 <MAN_COMPOSITION>TIME RELATIVE, MAN_DURA, THR_X, THR_Y, THR_Z, THR_EFFIC, THR_INTERP, ISP, THR_MAG_SIGMA</MAN_COMPOSITION>
+                 <MAN_UNITS>[s, N, N, N, n/a, n/a, s, %]</MAN_UNITS>
+                 <manLine>500.0 200.0 0.0 10.0 0.0 0.95 ON 300.0 5.0</manLine>
+                 <manLine>700.0 200.0 0.0 10.0 0.0 0.95 OFF 300.0 5.0</manLine>
+               </man>
+               <pert>
+                 <COMMENT>Perturbations specification</COMMENT>
+                 <GM>398600.4415</GM>
+               </pert>
+               <od>
+                 <COMMENT>Orbit Determination information</COMMENT>
+                 <OD_ID>OD #10059</OD_ID>
+                 <OD_PREV_ID>OD #10058</OD_PREV_ID>
+                 <OD_METHOD>BWLS: BAHN</OD_METHOD>
+                 <OD_EPOCH>2001-11-06T11:17:33</OD_EPOCH>
+                 <OBS_USED>273</OBS_USED>
+                 <TRACKS_USED>91</TRACKS_USED>
+               </od>
+             </data>
+           </segment>
+         </body>
+       </ocm>
+     </body>
+   </ndm>
 
 
 .. _annex_h_odm:
@@ -6231,4 +9748,3 @@ J2 CHANGES IN THE DOCUMENT
    address, such as third-body perturbations, solar pressure model, solid tides, ocean tides,
    Earth albedo, and polar motion, has now been replaced by the material that can be
    specified in the Orbit Comprehensive Message.
-
