@@ -448,10 +448,11 @@ impl RelativeMetadataData {
                                 "RTN" => ScreenVolumeFrameType::Rtn,
                                 "TVN" => ScreenVolumeFrameType::Tvn,
                                 _ => {
-                                    return Err(CcsdsNdmError::Validation(format!(
-                                        "Invalid SCREEN_VOLUME_FRAME: {}",
-                                        val
-                                    )))
+                                    return Err(CcsdsNdmError::InvalidCcsdsValue {
+                                        key: "SCREEN_VOLUME_FRAME".to_string(),
+                                        value: val.to_string(),
+                                        expected: "RTN or TVN".to_string(),
+                                    })
                                 }
                             })
                         }
@@ -460,10 +461,11 @@ impl RelativeMetadataData {
                                 "ELLIPSOID" => ScreenVolumeShapeType::Ellipsoid,
                                 "BOX" => ScreenVolumeShapeType::Box,
                                 _ => {
-                                    return Err(CcsdsNdmError::Validation(format!(
-                                        "Invalid SCREEN_VOLUME_SHAPE: {}",
-                                        val
-                                    )))
+                                    return Err(CcsdsNdmError::InvalidCcsdsValue {
+                                        key: "SCREEN_VOLUME_SHAPE".to_string(),
+                                        value: val.to_string(),
+                                        expected: "ELLIPSOID or BOX".to_string(),
+                                    })
                                 }
                             })
                         }
@@ -473,11 +475,9 @@ impl RelativeMetadataData {
                         "SCREEN_ENTRY_TIME" => entry_time = Some(Epoch::new(val)?),
                         "SCREEN_EXIT_TIME" => exit_time = Some(Epoch::new(val)?),
                         "COLLISION_PROBABILITY" => {
-                            coll_prob = Some(Probability::new(val.parse().map_err(
-                                |e: std::num::ParseFloatError| {
-                                    CcsdsNdmError::KvnParse(e.to_string())
-                                },
-                            )?)?);
+                            coll_prob = Some(Probability::new(
+                                val.parse().map_err(CcsdsNdmError::from)?,
+                            )?);
                         }
                         "COLLISION_PROBABILITY_METHOD" => coll_method = Some(val.to_string()),
                         _ => {
@@ -879,10 +879,11 @@ impl CdmMetadataBuilder {
                     "OBJECT1" => CdmObjectType::Object1,
                     "OBJECT2" => CdmObjectType::Object2,
                     _ => {
-                        return Err(CcsdsNdmError::Validation(format!(
-                            "Invalid OBJECT: {}",
-                            val
-                        )))
+                        return Err(CcsdsNdmError::InvalidCcsdsValue {
+                            key: "OBJECT".to_string(),
+                            value: val.to_string(),
+                            expected: "OBJECT1 or OBJECT2".to_string(),
+                        })
                     }
                 })
             }
@@ -910,10 +911,11 @@ impl CdmMetadataBuilder {
                     "CALCULATED" => CovarianceMethodType::Calculated,
                     "DEFAULT" => CovarianceMethodType::Default,
                     _ => {
-                        return Err(CcsdsNdmError::Validation(format!(
-                            "Invalid COV_METHOD: {}",
-                            val
-                        )))
+                        return Err(CcsdsNdmError::InvalidCcsdsValue {
+                            key: "COV_METHOD".to_string(),
+                            value: val.to_string(),
+                            expected: "CALCULATED or DEFAULT".to_string(),
+                        })
                     }
                 })
             }
@@ -923,10 +925,11 @@ impl CdmMetadataBuilder {
                     "NO" => ManeuverableType::No,
                     "N/A" => ManeuverableType::NA,
                     _ => {
-                        return Err(CcsdsNdmError::Validation(format!(
-                            "Invalid MANEUVERABLE: {}",
-                            val
-                        )))
+                        return Err(CcsdsNdmError::InvalidCcsdsValue {
+                            key: "MANEUVERABLE".to_string(),
+                            value: val.to_string(),
+                            expected: "YES, NO, or N/A".to_string(),
+                        })
                     }
                 })
             }
@@ -937,10 +940,11 @@ impl CdmMetadataBuilder {
                     "GCRF" => ReferenceFrameType::Gcrf,
                     "ITRF" => ReferenceFrameType::Itrf,
                     _ => {
-                        return Err(CcsdsNdmError::Validation(format!(
-                            "Invalid REF_FRAME: {}",
-                            val
-                        )))
+                        return Err(CcsdsNdmError::InvalidCcsdsValue {
+                            key: "REF_FRAME".to_string(),
+                            value: val.to_string(),
+                            expected: "EME2000, GCRF, or ITRF".to_string(),
+                        })
                     }
                 })
             }
@@ -2194,7 +2198,7 @@ CNDOT_NDOT = 1 [m**2/s**2]
         kvn = kvn.replace("SCREEN_VOLUME_FRAME = RTN", "SCREEN_VOLUME_FRAME = BAD");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("SCREEN_VOLUME_FRAME")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "SCREEN_VOLUME_FRAME"),
             _ => panic!("unexpected error: {:?}", err),
         }
 
@@ -2203,7 +2207,7 @@ CNDOT_NDOT = 1 [m**2/s**2]
         kvn2 = kvn2.replace("SCREEN_VOLUME_SHAPE = BOX", "SCREEN_VOLUME_SHAPE = BALL");
         let err2 = Cdm::from_kvn(&kvn2).unwrap_err();
         match err2 {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("SCREEN_VOLUME_SHAPE")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "SCREEN_VOLUME_SHAPE"),
             _ => panic!("unexpected error: {:?}", err2),
         }
     }
@@ -2416,7 +2420,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(_) => {}
+            CcsdsNdmError::ParseFloat(_) => {}
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2571,7 +2575,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("OBJECT = OBJECT1", "OBJECT = OBJECT3");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("Invalid OBJECT")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "OBJECT"),
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2585,7 +2589,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("Invalid COV_METHOD")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "COV_METHOD"),
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2607,7 +2611,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("MANEUVERABLE = YES", "MANEUVERABLE = MAYBE");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("Invalid MANEUVERABLE")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "MANEUVERABLE"),
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2639,7 +2643,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = INVALID");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("Invalid REF_FRAME")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "REF_FRAME"),
             _ => panic!("unexpected error: {:?}", err),
         }
     }

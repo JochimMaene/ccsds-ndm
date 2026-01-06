@@ -33,10 +33,7 @@ impl FromStr for InvErUnits {
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "1/ER" => Ok(InvErUnits::InvEr),
-            _ => Err(CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown unit: {}",
-                s
-            ))),
+            _ => Err(CcsdsNdmError::UnknownUnit(s.to_string())),
         }
     }
 }
@@ -65,10 +62,7 @@ impl FromStr for RevPerDayUnits {
         match s {
             "rev/day" => Ok(RevPerDayUnits::RevPerDay),
             "REV/DAY" => Ok(RevPerDayUnits::RevPerDayUpper),
-            _ => Err(CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown unit: {}",
-                s
-            ))),
+            _ => Err(CcsdsNdmError::UnknownUnit(s.to_string())),
         }
     }
 }
@@ -97,10 +91,7 @@ impl FromStr for RevPerDay2Units {
         match s {
             "rev/day**2" => Ok(RevPerDay2Units::RevPerDay2),
             "REV/DAY**2" => Ok(RevPerDay2Units::RevPerDay2Upper),
-            _ => Err(CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown unit: {}",
-                s
-            ))),
+            _ => Err(CcsdsNdmError::UnknownUnit(s.to_string())),
         }
     }
 }
@@ -129,10 +120,7 @@ impl FromStr for RevPerDay3Units {
         match s {
             "rev/day**3" => Ok(RevPerDay3Units::RevPerDay3),
             "REV/DAY**3" => Ok(RevPerDay3Units::RevPerDay3Upper),
-            _ => Err(CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown unit: {}",
-                s
-            ))),
+            _ => Err(CcsdsNdmError::UnknownUnit(s.to_string())),
         }
     }
 }
@@ -824,10 +812,11 @@ impl MeanElementsBuilder {
             .eccentricity
             .ok_or(CcsdsNdmError::MissingField("ECCENTRICITY".into()))?;
         if eccentricity < 0.0 {
-            return Err(CcsdsNdmError::Validation(format!(
-                "ECCENTRICITY must be >= 0.0, found {}",
-                eccentricity
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "ECCENTRICITY".to_string(),
+                value: eccentricity.to_string(),
+                expected: ">= 0".to_string(),
+            });
         }
 
         let inclination = self
@@ -1111,10 +1100,11 @@ impl TleParametersBuilder {
         // Validate ELEMENT_SET_NO range [0, 9999] per XSD
         if let Some(esn) = self.element_set_no {
             if esn > 9999 {
-                return Err(CcsdsNdmError::Validation(format!(
-                    "ELEMENT_SET_NO must be <= 9999, found {}",
-                    esn
-                )));
+                return Err(CcsdsNdmError::OutOfRange {
+                    name: "ELEMENT_SET_NO".to_string(),
+                    value: esn.to_string(),
+                    expected: "[0, 9999]".to_string(),
+                });
             }
         }
 

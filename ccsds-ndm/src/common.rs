@@ -454,19 +454,18 @@ pub fn parse_state_vector_raw(line: &str) -> Result<StateVectorAcc> {
     let mut tokens = line.split_whitespace();
 
     // Parse epoch first (most likely to fail, fail fast)
-    let epoch_str = tokens.next().ok_or_else(|| {
-        CcsdsNdmError::KvnParse("State vector line is empty or missing EPOCH".to_string())
-    })?;
-    let epoch = Epoch::from_str(epoch_str)
-        .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid epoch in state vector: {}", e)))?;
+    let epoch_str = tokens
+        .next()
+        .ok_or_else(|| CcsdsNdmError::MissingField("EPOCH".to_string()))?;
+    let epoch = Epoch::from_str(epoch_str).map_err(CcsdsNdmError::from)?;
 
     // Helper to parse next f64
     let mut next_f64 = |field: &'static str| -> Result<f64> {
         tokens
             .next()
-            .ok_or_else(|| CcsdsNdmError::KvnParse(format!("Missing field: {}", field)))?
+            .ok_or_else(|| CcsdsNdmError::MissingField(field.to_string()))?
             .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid {} value: {}", field, e)))
+            .map_err(CcsdsNdmError::from)
     };
 
     // Parse mandatory fields
@@ -479,21 +478,19 @@ pub fn parse_state_vector_raw(line: &str) -> Result<StateVectorAcc> {
 
     // Check if acceleration exists
     let (x_ddot, y_ddot, z_ddot) = if let Some(x_ddot_str) = tokens.next() {
-        let x_acc = x_ddot_str
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid X_DDOT: {}", e)))?;
+        let x_acc = x_ddot_str.parse::<f64>().map_err(CcsdsNdmError::from)?;
 
         let y_acc = tokens
             .next()
-            .ok_or_else(|| CcsdsNdmError::KvnParse("Missing Y_DDOT".to_string()))?
+            .ok_or_else(|| CcsdsNdmError::MissingField("Y_DDOT".to_string()))?
             .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid Y_DDOT: {}", e)))?;
+            .map_err(CcsdsNdmError::from)?;
 
         let z_acc = tokens
             .next()
-            .ok_or_else(|| CcsdsNdmError::KvnParse("Missing Z_DDOT".to_string()))?
+            .ok_or_else(|| CcsdsNdmError::MissingField("Z_DDOT".to_string()))?
             .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid Z_DDOT: {}", e)))?;
+            .map_err(CcsdsNdmError::from)?;
 
         // Validate no extra tokens
         if tokens.next().is_some() {
@@ -564,10 +561,11 @@ impl Quaternion {
     pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> Result<Self> {
         for (name, v) in [("Q1", q1), ("Q2", q2), ("Q3", q3), ("QC", qc)] {
             if !(-1.0..=1.0).contains(&v) {
-                return Err(CcsdsNdmError::Validation(format!(
-                    "{} component out of range [-1,1]: {}",
-                    name, v
-                )));
+                return Err(CcsdsNdmError::OutOfRange {
+                    name: name.to_string(),
+                    value: v.to_string(),
+                    expected: "[-1, 1]".to_string(),
+                });
             }
         }
         Ok(Self { q1, q2, q3, qc })

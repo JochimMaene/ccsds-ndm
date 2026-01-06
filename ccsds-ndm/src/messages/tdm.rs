@@ -283,8 +283,8 @@ impl TdmSegment {
             }
             Some(Err(e)) => return Err(e),
             None => {
-                return Err(CcsdsNdmError::KvnParse(
-                    "Unexpected EOF before TDM segment".into(),
+                return Err(CcsdsNdmError::UnexpectedEof(
+                    "before TDM segment".into(),
                 ))
             }
         }
@@ -986,8 +986,8 @@ impl TdmData {
             }
             Some(Err(e)) => return Err(e),
             None => {
-                return Err(CcsdsNdmError::KvnParse(
-                    "Unexpected EOF before TDM data".into(),
+                return Err(CcsdsNdmError::UnexpectedEof(
+                    "before TDM data".into(),
                 ))
             }
         }

@@ -813,6 +813,13 @@ impl KeplerianElementsBuilder {
         let eccentricity = self
             .eccentricity
             .ok_or(CcsdsNdmError::MissingField("ECCENTRICITY".into()))?;
+        if eccentricity < 0.0 {
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "ECCENTRICITY".to_string(),
+                value: eccentricity.to_string(),
+                expected: ">= 0".to_string(),
+            });
+        }
         let inclination = self
             .inclination
             .ok_or(CcsdsNdmError::MissingField("INCLINATION".into()))?;
@@ -2139,7 +2146,7 @@ MAN_DV_2 = 0.0 [km/s]
 MAN_DV_3 = 0.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::Validation(_)));
+        assert!(matches!(err, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "DeltaMassZ" && expected == "<= 0"));
     }
 
     #[test]

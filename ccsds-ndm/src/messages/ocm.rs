@@ -162,7 +162,7 @@ impl OcmSegment {
                     .expect("Peeked error should exist")
                     .unwrap_err())
             }
-            None => return Err(CcsdsNdmError::KvnParse("Unexpected EOF".into())),
+            None => return Err(CcsdsNdmError::UnexpectedEof("before OcmSegment".into())),
         }
 
         let metadata = OcmMetadata::from_kvn_tokens(tokens)?;
@@ -1390,9 +1390,7 @@ impl OcmTrajState {
                     "TRAJ_BASIS_ID" => traj.traj_basis_id = Some(val.into()),
                     "INTERPOLATION" => traj.interpolation = Some(val.into()),
                     "INTERPOLATION_DEGREE" => {
-                        traj.interpolation_degree = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid INTERPOLATION_DEGREE: {}", e))
-                        })?)
+                        traj.interpolation_degree = Some(val.parse().map_err(CcsdsNdmError::from)?)
                     }
                     "PROPAGATOR" => traj.propagator = Some(val.into()),
                     "CENTER_NAME" => traj.center_name = val.into(),
@@ -1406,11 +1404,7 @@ impl OcmTrajState {
                     "USEABLE_STOP_TIME" => {
                         traj.useable_stop_time = Some(FromKvnValue::from_kvn_value(val)?)
                     }
-                    "ORB_REVNUM" => {
-                        traj.orb_revnum = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid ORB_REVNUM: {}", e))
-                        })?)
-                    }
+                    "ORB_REVNUM" => traj.orb_revnum = Some(val.parse()?),
                     "ORB_REVNUM_BASIS" => {
                         traj.orb_revnum_basis = Some(FromKvnValue::from_kvn_value(val)?)
                     }
@@ -1423,10 +1417,7 @@ impl OcmTrajState {
                     let mut parts = line.split_whitespace();
                     if let Some(epoch) = parts.next() {
                         let values: Result<Vec<f64>> = parts
-                            .map(|s| {
-                                s.parse::<f64>()
-                                    .map_err(|e| CcsdsNdmError::KvnParse(e.to_string()))
-                            })
+                            .map(|s| s.parse::<f64>().map_err(CcsdsNdmError::from))
                             .collect();
                         traj.traj_lines.push(TrajLine {
                             epoch: epoch.to_string(),
@@ -2114,11 +2105,7 @@ impl OcmPhysicalDescription {
                     "BUS_MODEL" => phys.bus_model = Some(val.into()),
                     "DOCKED_WITH" => phys.docked_with = Some(val.into()),
                     "DRAG_CONST_AREA" => phys.drag_const_area = Some(Area::from_kvn(val, unit)?),
-                    "DRAG_COEFF_NOM" => {
-                        phys.drag_coeff_nom = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid DRAG_COEFF_NOM: {}", e))
-                        })?)
-                    }
+                    "DRAG_COEFF_NOM" => phys.drag_coeff_nom = Some(val.parse()?),
                     "DRAG_UNCERTAINTY" => {
                         phys.drag_uncertainty = Some(Percentage::from_kvn(val, unit)?)
                     }
@@ -2129,26 +2116,10 @@ impl OcmPhysicalDescription {
                     "OEB_PARENT_FRAME_EPOCH" => {
                         phys.oeb_parent_frame_epoch = Some(FromKvnValue::from_kvn_value(val)?)
                     }
-                    "OEB_Q1" => {
-                        phys.oeb_q1 = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid OEB_Q1: {}", e))
-                        })?)
-                    }
-                    "OEB_Q2" => {
-                        phys.oeb_q2 = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid OEB_Q2: {}", e))
-                        })?)
-                    }
-                    "OEB_Q3" => {
-                        phys.oeb_q3 = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid OEB_Q3: {}", e))
-                        })?)
-                    }
-                    "OEB_QC" => {
-                        phys.oeb_qc = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid OEB_QC: {}", e))
-                        })?)
-                    }
+                    "OEB_Q1" => phys.oeb_q1 = Some(val.parse()?),
+                    "OEB_Q2" => phys.oeb_q2 = Some(val.parse()?),
+                    "OEB_Q3" => phys.oeb_q3 = Some(val.parse()?),
+                    "OEB_QC" => phys.oeb_qc = Some(val.parse()?),
                     "OEB_MAX" => phys.oeb_max = Some(Length::from_kvn(val, unit)?),
                     "OEB_INT" => phys.oeb_int = Some(Length::from_kvn(val, unit)?),
                     "OEB_MIN" => phys.oeb_min = Some(Length::from_kvn(val, unit)?),
@@ -2168,38 +2139,16 @@ impl OcmPhysicalDescription {
                     "RCS_MIN" => phys.rcs_min = Some(Area::from_kvn(val, unit)?),
                     "RCS_MAX" => phys.rcs_max = Some(Area::from_kvn(val, unit)?),
                     "SRP_CONST_AREA" => phys.srp_const_area = Some(Area::from_kvn(val, unit)?),
-                    "SOLAR_RAD_COEFF" => {
-                        phys.solar_rad_coeff = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid SOLAR_RAD_COEFF: {}", e))
-                        })?)
-                    }
+                    "SOLAR_RAD_COEFF" => phys.solar_rad_coeff = Some(val.parse()?),
                     "SOLAR_RAD_UNCERTAINTY" => {
                         phys.solar_rad_uncertainty = Some(Percentage::from_kvn(val, unit)?)
                     }
-                    "VM_ABSOLUTE" => {
-                        phys.vm_absolute = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid VM_ABSOLUTE: {}", e))
-                        })?)
-                    }
-                    "VM_APPARENT_MIN" => {
-                        phys.vm_apparent_min = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid VM_APPARENT_MIN: {}", e))
-                        })?)
-                    }
-                    "VM_APPARENT" => {
-                        phys.vm_apparent = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid VM_APPARENT: {}", e))
-                        })?)
-                    }
-                    "VM_APPARENT_MAX" => {
-                        phys.vm_apparent_max = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid VM_APPARENT_MAX: {}", e))
-                        })?)
-                    }
+                    "VM_ABSOLUTE" => phys.vm_absolute = Some(val.parse()?),
+                    "VM_APPARENT_MIN" => phys.vm_apparent_min = Some(val.parse()?),
+                    "VM_APPARENT" => phys.vm_apparent = Some(val.parse()?),
+                    "VM_APPARENT_MAX" => phys.vm_apparent_max = Some(val.parse()?),
                     "REFLECTANCE" => {
-                        phys.reflectance = Some(Probability::new(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid REFLECTANCE: {}", e))
-                        })?)?)
+                        phys.reflectance = Some(Probability::new(val.parse()?)?)
                     }
                     "ATT_CONTROL_MODE" => phys.att_control_mode = Some(val.into()),
                     "ATT_ACTUATOR_TYPE" => phys.att_actuator_type = Some(val.into()),
@@ -3948,26 +3897,10 @@ impl OcmOdParameters {
                     "ACTUAL_OD_SPAN" => {
                         builder.actual_od_span = Some(DayInterval::from_kvn(val, unit)?)
                     }
-                    "OBS_AVAILABLE" => {
-                        builder.obs_available = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid OBS_AVAILABLE: {}", e))
-                        })?)
-                    }
-                    "OBS_USED" => {
-                        builder.obs_used = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid OBS_USED: {}", e))
-                        })?)
-                    }
-                    "TRACKS_AVAILABLE" => {
-                        builder.tracks_available = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid TRACKS_AVAILABLE: {}", e))
-                        })?)
-                    }
-                    "TRACKS_USED" => {
-                        builder.tracks_used = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid TRACKS_USED: {}", e))
-                        })?)
-                    }
+                    "OBS_AVAILABLE" => builder.obs_available = Some(val.parse()?),
+                    "OBS_USED" => builder.obs_used = Some(val.parse()?),
+                    "TRACKS_AVAILABLE" => builder.tracks_available = Some(val.parse()?),
+                    "TRACKS_USED" => builder.tracks_used = Some(val.parse()?),
                     "MAXIMUM_OBS_GAP" => {
                         builder.maximum_obs_gap = Some(DayInterval::from_kvn(val, unit)?)
                     }
@@ -3990,34 +3923,23 @@ impl OcmOdParameters {
                         builder.od_confidence = Some(Percentage::from_kvn(val, unit)?)
                     }
                     "GDOP" => {
-                        builder.gdop =
-                            Some(val.parse().map_err(|e| {
-                                CcsdsNdmError::KvnParse(format!("Invalid GDOP: {}", e))
-                            })?)
+                        builder.gdop = Some(val.parse()?)
                     }
                     "SOLVE_N" => {
-                        builder.solve_n = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid SOLVE_N: {}", e))
-                        })?)
+                        builder.solve_n = Some(val.parse()?)
                     }
                     "SOLVE_STATES" => builder.solve_states = Some(val.into()),
                     "CONSIDER_N" => {
-                        builder.consider_n = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid CONSIDER_N: {}", e))
-                        })?)
+                        builder.consider_n = Some(val.parse()?)
                     }
                     "CONSIDER_PARAMS" => builder.consider_params = Some(val.into()),
                     "SEDR" => builder.sedr = Some(Wkg::from_kvn(val, unit)?),
                     "SENSORS_N" => {
-                        builder.sensors_n = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid SENSORS_N: {}", e))
-                        })?)
+                        builder.sensors_n = Some(val.parse()?)
                     }
                     "SENSORS" => builder.sensors = Some(val.into()),
                     "WEIGHTED_RMS" => {
-                        builder.weighted_rms = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid WEIGHTED_RMS: {}", e))
-                        })?)
+                        builder.weighted_rms = Some(val.parse()?)
                     }
                     "DATA_TYPES" => builder.data_types = Some(val.into()),
                     _ => {}
@@ -5349,9 +5271,7 @@ DRAG_COEFF_NOM = NOT_A_FLOAT
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid DRAG_COEFF_NOM"))
-        );
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -5365,7 +5285,7 @@ OEB_Q1 = NOT_A_FLOAT
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid OEB_Q1")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]
@@ -5475,14 +5395,14 @@ COV_STOP
 
     #[test]
     fn test_eof_after_meta_start() {
-        // Cover line 150: EOF after META_START check
+        // Cover line 150: EOF before OcmSegment check
         let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        // This should hit the "Unexpected EOF" branch since no META_START
-        assert!(matches!(err, CcsdsNdmError::KvnParse(_)));
+        // This should hit the "Unexpected EOF" branch
+        assert!(matches!(err, CcsdsNdmError::UnexpectedEof(_)));
     }
 
     #[test]
@@ -5834,9 +5754,7 @@ INTERPOLATION_DEGREE = NOT_A_NUMBER
 TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid INTERPOLATION_DEGREE"))
-        );
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]
@@ -5858,7 +5776,7 @@ ORB_REVNUM = NOT_A_NUMBER
 TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid ORB_REVNUM")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]
@@ -5876,7 +5794,7 @@ OEB_Q2 = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid OEB_Q2")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]
@@ -5894,7 +5812,7 @@ OEB_Q3 = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid OEB_Q3")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]
@@ -5912,7 +5830,7 @@ OEB_QC = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid OEB_QC")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]
@@ -5930,9 +5848,7 @@ SOLAR_RAD_COEFF = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid SOLAR_RAD_COEFF"))
-        );
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]
@@ -5950,25 +5866,19 @@ VM_ABSOLUTE = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid VM_ABSOLUTE")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         let kvn2 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT_MIN");
         let err2 = Ocm::from_kvn(&kvn2).unwrap_err();
-        assert!(
-            matches!(err2, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid VM_APPARENT_MIN"))
-        );
+        assert!(matches!(err2, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         let kvn3 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT");
         let err3 = Ocm::from_kvn(&kvn3).unwrap_err();
-        assert!(
-            matches!(err3, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid VM_APPARENT"))
-        );
+        assert!(matches!(err3, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         let kvn4 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT_MAX");
         let err4 = Ocm::from_kvn(&kvn4).unwrap_err();
-        assert!(
-            matches!(err4, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid VM_APPARENT_MAX"))
-        );
+        assert!(matches!(err4, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]
@@ -5986,7 +5896,7 @@ REFLECTANCE = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid REFLECTANCE")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]
@@ -6097,53 +6007,47 @@ OD_EPOCH = 2023-01-01T00:00:00
         // OBS_AVAILABLE invalid
         let kvn = format!("{base}OBS_AVAILABLE = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid OBS_AVAILABLE"))
-        );
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         // OBS_USED invalid
         let kvn = format!("{base}OBS_USED = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid OBS_USED")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         // TRACKS_AVAILABLE invalid
         let kvn = format!("{base}TRACKS_AVAILABLE = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid TRACKS_AVAILABLE"))
-        );
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         // TRACKS_USED invalid
         let kvn = format!("{base}TRACKS_USED = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid TRACKS_USED")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         // GDOP invalid
         let kvn = format!("{base}GDOP = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid GDOP")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         // SOLVE_N invalid
         let kvn = format!("{base}SOLVE_N = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid SOLVE_N")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         // CONSIDER_N invalid
         let kvn = format!("{base}CONSIDER_N = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid CONSIDER_N")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         // SENSORS_N invalid
         let kvn = format!("{base}SENSORS_N = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid SENSORS_N")));
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
 
         // WEIGHTED_RMS invalid
         let kvn = format!("{base}WEIGHTED_RMS = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid WEIGHTED_RMS"))
-        );
+        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]

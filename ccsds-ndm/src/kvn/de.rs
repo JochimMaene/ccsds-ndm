@@ -90,10 +90,10 @@ impl<'a> Iterator for KvnTokenizer<'a> {
 
             // Validation: Keys must not contain spaces
             if key.contains(char::is_whitespace) {
-                return Some(Err(CcsdsNdmError::KvnParse(format!(
-                    "Line {}: Keyword '{}' contains invalid whitespace",
-                    line_num, key
-                ))));
+                return Some(Err(CcsdsNdmError::KvnParseWithLine {
+                    line: line_num,
+                    message: format!("Keyword '{}' contains invalid whitespace", key),
+                }));
             }
 
             let mut val_raw = val_part.trim();
@@ -106,10 +106,10 @@ impl<'a> Iterator for KvnTokenizer<'a> {
                     let value_str = val_raw[..open_bracket].trim();
 
                     if unit_str.is_empty() {
-                        return Some(Err(CcsdsNdmError::KvnParse(format!(
-                            "Line {}: Empty unit brackets",
-                            line_num
-                        ))));
+                        return Some(Err(CcsdsNdmError::KvnParseWithLine {
+                            line: line_num,
+                            message: "Empty unit brackets".to_string(),
+                        }));
                     }
 
                     val_raw = value_str;

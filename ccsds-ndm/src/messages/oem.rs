@@ -177,7 +177,9 @@ impl OemSegment {
         // Expect META_START
         match tokens.next() {
             Some(Ok(KvnLine::BlockStart("META"))) => {}
-            _ => return Err(CcsdsNdmError::KvnParse("Expected META_START".into())),
+            Some(Err(e)) => return Err(e),
+            Some(Ok(_)) => return Err(CcsdsNdmError::KvnParse("Expected META_START".into())),
+            None => return Err(CcsdsNdmError::UnexpectedEof("Expected META_START".into())),
         }
 
         let metadata = OemMetadata::from_kvn_tokens(tokens)?;
@@ -409,9 +411,11 @@ impl OemMetadataBuilder {
             "INTERPOLATION_DEGREE" => {
                 let parsed_u32: u32 = FromKvnValue::from_kvn_value(val)?;
                 self.interpolation_degree = Some(NonZeroU32::new(parsed_u32).ok_or_else(|| {
-                    CcsdsNdmError::KvnParse(
-                        "INTERPOLATION_DEGREE must be a positive integer but was 0".into(),
-                    )
+                    CcsdsNdmError::OutOfRange {
+                        name: "INTERPOLATION_DEGREE".to_string(),
+                        value: parsed_u32.to_string(),
+                        expected: ">= 1".to_string(),
+                    }
                 })?);
             }
             _ => {
@@ -607,8 +611,8 @@ impl OemData {
                                 covariance_matrix.push(cov);
                             }
                             None => {
-                                return Err(CcsdsNdmError::KvnParse(
-                                    "Unexpected EOF within COVARIANCE block".into(),
+                                return Err(CcsdsNdmError::UnexpectedEof(
+                                    "within COVARIANCE block".into(),
                                 ))
                             }
                             Some(Err(_)) => {
@@ -925,11 +929,16 @@ impl OemCovarianceMatrix {
             })) => {
                 epoch = Some(FromKvnValue::from_kvn_value(val)?);
             }
-            t => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Expected EPOCH for covariance matrix, found {:?}",
-                    t
-                )))
+            Some(Err(e)) => return Err(e),
+            Some(Ok(_)) => {
+                return Err(CcsdsNdmError::KvnParse(
+                    "Expected EPOCH for covariance matrix".into(),
+                ))
+            }
+            None => {
+                return Err(CcsdsNdmError::UnexpectedEof(
+                    "Expected EPOCH for covariance matrix".into(),
+                ))
             }
         }
 
@@ -964,12 +973,7 @@ impl OemCovarianceMatrix {
                         }
 
                         for part in parts {
-                            floats.push(part.parse::<f64>().map_err(|_| {
-                                CcsdsNdmError::KvnParse(format!(
-                                    "Invalid float in covariance: {}",
-                                    part
-                                ))
-                            })?);
+                            floats.push(part.parse::<f64>().map_err(CcsdsNdmError::from)?);
                         }
                         row_idx += 1;
                     }
@@ -977,11 +981,17 @@ impl OemCovarianceMatrix {
                 Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
                     tokens.next();
                 }
-                t => {
+                Some(Err(_)) => return Err(tokens.next().unwrap().unwrap_err()),
+                Some(Ok(_)) => {
                     return Err(CcsdsNdmError::KvnParse(format!(
-                        "Expected covariance data row {}, found {:?}",
+                        "Expected covariance data row {}",
                         row_idx + 1,
-                        t
+                    )))
+                }
+                None => {
+                    return Err(CcsdsNdmError::UnexpectedEof(format!(
+                        "Expected covariance data row {}",
+                        row_idx + 1,
                     )))
                 }
             }
@@ -1305,7 +1315,7 @@ COMMENT Another data comment
     "#;
         let err = Oem::from_kvn(kvn_bad_degree).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("INTERPOLATION_DEGREE"))
+            matches!(err, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "INTERPOLATION_DEGREE" && expected == ">= 1")
         );
     }
 
@@ -2388,7 +2398,7 @@ META_STOP
 "#;
         let err = Oem::from_kvn(kvn_zero).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("INTERPOLATION_DEGREE"))
+            matches!(err, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "INTERPOLATION_DEGREE" && expected == ">= 1")
         );
     }
 
@@ -2641,7 +2651,7 @@ EPOCH = 2023-01-01T00:00:00
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Unexpected EOF within COVARIANCE block"))
+            matches!(err, CcsdsNdmError::UnexpectedEof(msg) if msg.contains("within COVARIANCE block"))
         );
     }
 
@@ -2666,7 +2676,7 @@ NOT_A_FLOAT
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Invalid float in covariance"))
+            matches!(err, CcsdsNdmError::ParseFloat(_))
         );
     }
 
