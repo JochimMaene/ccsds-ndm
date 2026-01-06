@@ -410,13 +410,14 @@ impl OemMetadataBuilder {
             "INTERPOLATION" => self.interpolation = Some(val.into()),
             "INTERPOLATION_DEGREE" => {
                 let parsed_u32: u32 = FromKvnValue::from_kvn_value(val)?;
-                self.interpolation_degree = Some(NonZeroU32::new(parsed_u32).ok_or_else(|| {
-                    CcsdsNdmError::OutOfRange {
-                        name: "INTERPOLATION_DEGREE".to_string(),
-                        value: parsed_u32.to_string(),
-                        expected: ">= 1".to_string(),
-                    }
-                })?);
+                self.interpolation_degree =
+                    Some(
+                        NonZeroU32::new(parsed_u32).ok_or_else(|| CcsdsNdmError::OutOfRange {
+                            name: "INTERPOLATION_DEGREE".to_string(),
+                            value: parsed_u32.to_string(),
+                            expected: ">= 1".to_string(),
+                        })?,
+                    );
             }
             _ => {
                 return Err(CcsdsNdmError::KvnParse(format!(
@@ -2675,9 +2676,7 @@ EPOCH = 2023-01-01T00:00:00
 NOT_A_FLOAT
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::ParseFloat(_))
-        );
+        assert!(matches!(err, CcsdsNdmError::ParseFloat(_)));
     }
 
     #[test]

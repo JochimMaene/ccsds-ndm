@@ -475,9 +475,8 @@ impl RelativeMetadataData {
                         "SCREEN_ENTRY_TIME" => entry_time = Some(Epoch::new(val)?),
                         "SCREEN_EXIT_TIME" => exit_time = Some(Epoch::new(val)?),
                         "COLLISION_PROBABILITY" => {
-                            coll_prob = Some(Probability::new(
-                                val.parse().map_err(CcsdsNdmError::from)?,
-                            )?);
+                            coll_prob =
+                                Some(Probability::new(val.parse().map_err(CcsdsNdmError::from)?)?);
                         }
                         "COLLISION_PROBABILITY_METHOD" => coll_method = Some(val.to_string()),
                         _ => {

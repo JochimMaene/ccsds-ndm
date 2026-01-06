@@ -1250,7 +1250,9 @@ impl std::str::FromStr for ManBasis {
             _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
                 key: "MAN_BASIS".to_string(),
                 value: s.to_string(),
-                expected: "CANDIDATE, PLANNED, ANTICIPATED, TELEMETRY, DETERMINED, SIMULATED, or OTHER".to_string(),
+                expected:
+                    "CANDIDATE, PLANNED, ANTICIPATED, TELEMETRY, DETERMINED, SIMULATED, or OTHER"
+                        .to_string(),
             }),
         }
     }

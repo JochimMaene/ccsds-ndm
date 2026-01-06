@@ -282,11 +282,7 @@ impl TdmSegment {
                 )))
             }
             Some(Err(e)) => return Err(e),
-            None => {
-                return Err(CcsdsNdmError::UnexpectedEof(
-                    "before TDM segment".into(),
-                ))
-            }
+            None => return Err(CcsdsNdmError::UnexpectedEof("before TDM segment".into())),
         }
 
         let metadata = TdmMetadata::from_kvn_tokens(tokens)?;
@@ -985,11 +981,7 @@ impl TdmData {
                 )))
             }
             Some(Err(e)) => return Err(e),
-            None => {
-                return Err(CcsdsNdmError::UnexpectedEof(
-                    "before TDM data".into(),
-                ))
-            }
+            None => return Err(CcsdsNdmError::UnexpectedEof("before TDM data".into())),
         }
 
         let mut comment = Vec::new();

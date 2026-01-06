@@ -2147,9 +2147,7 @@ impl OcmPhysicalDescription {
                     "VM_APPARENT_MIN" => phys.vm_apparent_min = Some(val.parse()?),
                     "VM_APPARENT" => phys.vm_apparent = Some(val.parse()?),
                     "VM_APPARENT_MAX" => phys.vm_apparent_max = Some(val.parse()?),
-                    "REFLECTANCE" => {
-                        phys.reflectance = Some(Probability::new(val.parse()?)?)
-                    }
+                    "REFLECTANCE" => phys.reflectance = Some(Probability::new(val.parse()?)?),
                     "ATT_CONTROL_MODE" => phys.att_control_mode = Some(val.into()),
                     "ATT_ACTUATOR_TYPE" => phys.att_actuator_type = Some(val.into()),
                     "ATT_KNOWLEDGE" => phys.att_knowledge = Some(Angle::from_kvn(val, unit)?),
@@ -3922,25 +3920,15 @@ impl OcmOdParameters {
                     "OD_CONFIDENCE" => {
                         builder.od_confidence = Some(Percentage::from_kvn(val, unit)?)
                     }
-                    "GDOP" => {
-                        builder.gdop = Some(val.parse()?)
-                    }
-                    "SOLVE_N" => {
-                        builder.solve_n = Some(val.parse()?)
-                    }
+                    "GDOP" => builder.gdop = Some(val.parse()?),
+                    "SOLVE_N" => builder.solve_n = Some(val.parse()?),
                     "SOLVE_STATES" => builder.solve_states = Some(val.into()),
-                    "CONSIDER_N" => {
-                        builder.consider_n = Some(val.parse()?)
-                    }
+                    "CONSIDER_N" => builder.consider_n = Some(val.parse()?),
                     "CONSIDER_PARAMS" => builder.consider_params = Some(val.into()),
                     "SEDR" => builder.sedr = Some(Wkg::from_kvn(val, unit)?),
-                    "SENSORS_N" => {
-                        builder.sensors_n = Some(val.parse()?)
-                    }
+                    "SENSORS_N" => builder.sensors_n = Some(val.parse()?),
                     "SENSORS" => builder.sensors = Some(val.into()),
-                    "WEIGHTED_RMS" => {
-                        builder.weighted_rms = Some(val.parse()?)
-                    }
+                    "WEIGHTED_RMS" => builder.weighted_rms = Some(val.parse()?),
                     "DATA_TYPES" => builder.data_types = Some(val.into()),
                     _ => {}
                 },
@@ -5271,7 +5259,10 @@ DRAG_COEFF_NOM = NOT_A_FLOAT
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -5285,7 +5276,10 @@ OEB_Q1 = NOT_A_FLOAT
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
     }
 
     #[test]
@@ -5754,7 +5748,10 @@ INTERPOLATION_DEGREE = NOT_A_NUMBER
 TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
     }
 
     #[test]
@@ -5776,7 +5773,10 @@ ORB_REVNUM = NOT_A_NUMBER
 TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
     }
 
     #[test]
@@ -5794,7 +5794,10 @@ OEB_Q2 = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
     }
 
     #[test]
@@ -5812,7 +5815,10 @@ OEB_Q3 = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
     }
 
     #[test]
@@ -5830,7 +5836,10 @@ OEB_QC = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
     }
 
     #[test]
@@ -5848,7 +5857,10 @@ SOLAR_RAD_COEFF = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
     }
 
     #[test]
@@ -5866,19 +5878,31 @@ VM_ABSOLUTE = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         let kvn2 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT_MIN");
         let err2 = Ocm::from_kvn(&kvn2).unwrap_err();
-        assert!(matches!(err2, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err2,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         let kvn3 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT");
         let err3 = Ocm::from_kvn(&kvn3).unwrap_err();
-        assert!(matches!(err3, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err3,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         let kvn4 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT_MAX");
         let err4 = Ocm::from_kvn(&kvn4).unwrap_err();
-        assert!(matches!(err4, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err4,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
     }
 
     #[test]
@@ -5896,7 +5920,10 @@ REFLECTANCE = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
     }
 
     #[test]
@@ -6007,47 +6034,74 @@ OD_EPOCH = 2023-01-01T00:00:00
         // OBS_AVAILABLE invalid
         let kvn = format!("{base}OBS_AVAILABLE = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         // OBS_USED invalid
         let kvn = format!("{base}OBS_USED = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         // TRACKS_AVAILABLE invalid
         let kvn = format!("{base}TRACKS_AVAILABLE = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         // TRACKS_USED invalid
         let kvn = format!("{base}TRACKS_USED = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         // GDOP invalid
         let kvn = format!("{base}GDOP = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         // SOLVE_N invalid
         let kvn = format!("{base}SOLVE_N = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         // CONSIDER_N invalid
         let kvn = format!("{base}CONSIDER_N = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         // SENSORS_N invalid
         let kvn = format!("{base}SENSORS_N = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
 
         // WEIGHTED_RMS invalid
         let kvn = format!("{base}WEIGHTED_RMS = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)));
+        assert!(matches!(
+            err,
+            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_)
+        ));
     }
 
     #[test]

@@ -2146,7 +2146,9 @@ MAN_DV_2 = 0.0 [km/s]
 MAN_DV_3 = 0.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "DeltaMassZ" && expected == "<= 0"));
+        assert!(
+            matches!(err, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "DeltaMassZ" && expected == "<= 0")
+        );
     }
 
     #[test]
