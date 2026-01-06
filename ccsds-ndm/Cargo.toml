@@ -26,4 +26,3 @@ tempfile = "3"
 [[bench]]
 name = "kvn_benches"
 harness = false
-

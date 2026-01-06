@@ -1,0 +1,15 @@
+fail_fast: true
+default_install_hook_types: [pre-push]
+exclude: |
+  (?x)^(
+    .*/(snapshots)/.*|
+  )$
+
+repos:
+  - repo: builtin
+    hooks:
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer

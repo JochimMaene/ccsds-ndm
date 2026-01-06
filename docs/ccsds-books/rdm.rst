@@ -1570,14 +1570,14 @@ vector, position/velocity covariance matrix.
    CREATION_DATE = 2018-04-22T09:31:34.00
    ORIGINATOR = ESA
    MESSAGE_ID = ESA/20180422-001
-   
+
    OBJECT_NAME = SPACEOBJECT
    INTERNATIONAL_DESIGNATOR = 2018-099B
    CONTROLLED_REENTRY = NO
    CENTER_NAME = EARTH
    TIME_SYSTEM = UTC
    EPOCH_TZERO = 2018-04-22T00:00:00.00
-   
+
    ORBIT_LIFETIME = 23.0 [d]
    REENTRY_ALTITUDE = 150.0 [km]
 
@@ -1589,7 +1589,7 @@ vector, position/velocity covariance matrix.
    CREATION_DATE = 2018-04-22T09:31:34.00
    ORIGINATOR = ESA
    MESSAGE_ID = ESA/20180422-001
-   
+
    OBJECT_NAME = SPACEOBJECT
    INTERNATIONAL_DESIGNATOR = 2018-099B
    CATALOG_NAME = SATCAT
@@ -1610,7 +1610,7 @@ vector, position/velocity covariance matrix.
    REENTRY_DISINTEGRATION = MASS-LOSS + BREAK-UP
    PREVIOUS_MESSAGE_ID = ESA/20180421-007
    NEXT_MESSAGE_EPOCH = 2018-04-23T09:00:00
-   
+
    COMMENT Short term re-entry prediction results
    ORBIT_LIFETIME = 5.5 [d]
    REENTRY_ALTITUDE = 80.0 [km]
@@ -1619,7 +1619,7 @@ vector, position/velocity covariance matrix.
    REENTRY_WINDOW_END = 2018-04-27T22:12:56
    PROBABILITY_OF_IMPACT = 0.0
    PROBABILITY_OF_BURN_UP = 1.0
-   
+
    COMMENT State vector at the last OD epoch
    EPOCH = 2018-04-22T09:30:12
    X = 4000.000000 [km]
@@ -1628,7 +1628,7 @@ vector, position/velocity covariance matrix.
    X_DOT = 7.000000 [km/s]
    Y_DOT = 7.000000 [km/s]
    Z_DOT = 7.000000 [km/s]
-   
+
    COMMENT Position/velocity covariance matrix at last OD epoch
    COV_REF_FRAME = RTN
    CX_X = 0.10000 [km**2]
@@ -1652,12 +1652,12 @@ vector, position/velocity covariance matrix.
    CZ_DOT_X_DOT = 0.00400 [km**2/s**2]
    CZ_DOT_Y_DOT = 0.00400 [km**2/s**2]
    CZ_DOT_Z_DOT = 0.00400 [km**2/s**2]
-   
+
    COMMENT Spacecraft parameters used in OD and re-entry prediction
    WET_MASS = 3582 [kg]
    DRAG_AREA = 23.3565 [m**2]
    DRAG_COEFF = 2.2634
-   
+
    COMMENT OD parameters from batch orbit determination
    ACTUAL_OD_SPAN = 3.4554 [d]
    TRACKS_AVAILABLE = 18

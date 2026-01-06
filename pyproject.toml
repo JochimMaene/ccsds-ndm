@@ -22,4 +22,3 @@ members = [
 
 [tool.uv.sources]
 ccsds-ndm-py = { workspace = true }
-

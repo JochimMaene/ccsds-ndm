@@ -39,7 +39,7 @@ jobs:
       - name: Linting
         working-directory: ccsds-ndm
         run: cargo clippy -- -D warnings
-      
+
 
 
   coverage:

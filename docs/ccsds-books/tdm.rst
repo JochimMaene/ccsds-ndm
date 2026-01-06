@@ -1011,7 +1011,7 @@ statement that would convey the multiple signal paths.
    * - META_STOP
      - The META_STOP keyword shall delineate the end of the TDM Metadata Section within the message. It must appear on a line by itself; that is, it shall have no parameters, timetags, or values.
      - N/A
-     - 
+     -
      - Yes
 
 3.3.2 MODE AND PATH SETTINGS FOR TYPICAL TRACKING SESSIONS
@@ -3372,7 +3372,7 @@ EXAMPLE TRACKING DATA MESSAGES
    COMMENT StarTrek 1-way data, Ka band down
    CREATION_DATE = 2005-160T20:15:00Z
    ORIGINATOR = NASA
-   
+
    META_START
    COMMENT Data quality degraded by antenna pointing problem...
    COMMENT Slightly noisy data
@@ -3388,7 +3388,7 @@ EXAMPLE TRACKING DATA MESSAGES
    RECEIVE_DELAY_1 = 0.000077
    DATA_QUALITY = DEGRADED
    META_STOP
-   
+
    DATA_START
    COMMENT TRANSMIT_FREQ_2 is spacecraft reference downlink
    TRANSMIT_FREQ_2 = 2005-159T17:41:00 32023442781.733
@@ -3432,7 +3432,7 @@ EXAMPLE TRACKING DATA MESSAGES
    COMMENT StarTrek 1-way data, Ka band down
    CREATION_DATE = 2005-160T20:15:00
    ORIGINATOR = NASA
-   
+
    META_START
    TIME_SYSTEM = UTC
    START_TIME = 2005-159T17:41:00
@@ -3448,7 +3448,7 @@ EXAMPLE TRACKING DATA MESSAGES
    RECEIVE_DELAY_1 = 0.000077
    DATA_QUALITY = RAW
    META_STOP
-   
+
    DATA_START
    TRANSMIT_FREQ_2 = 2005-159T17:41:00 32023442781.733
    RECEIVE_FREQ_1 = 2005-159T17:41:00 -409.2735
@@ -3729,43 +3729,43 @@ EXAMPLE TRACKING DATA MESSAGES
    ANGLE_2 = 1998-06-10T00:57:37 13.38100016
    TRANSMIT_FREQ_1 = 1998-06-10T00:57:37 2106395199.07917
    RECEIVE_FREQ = 1998-06-10T00:57:37 2287487999.0
-   
+
    RANGE = 1998-06-10T00:57:38 80452.7368
    ANGLE_1 = 1998-06-10T00:57:38 256.64002393
    ANGLE_2 = 1998-06-10T00:57:38 13.38100016
    TRANSMIT_FREQ_1 = 1998-06-10T00:57:38 2106395199.07917
    RECEIVE_FREQ = 1998-06-10T00:57:38 2287487999.0
-   
+
    RANGE = 1998-06-10T00:57:39 80452.7197
    ANGLE_1 = 1998-06-10T00:57:39 256.64002393
    ANGLE_2 = 1998-06-10T00:57:39 13.38100016
    TRANSMIT_FREQ_1 = 1998-06-10T00:57:39 2106395199.07917
    RECEIVE_FREQ = 1998-06-10T00:57:39 2287487999.0
-   
+
    RANGE = 1998-06-10T00:57:40 80452.7025
    ANGLE_1 = 1998-06-10T00:57:40 256.64002393
    ANGLE_2 = 1998-06-10T00:57:40 13.38100016
    TRANSMIT_FREQ_1 = 1998-06-10T00:57:40 2106395199.07917
    RECEIVE_FREQ = 1998-06-10T00:57:40 2287487999.0
-   
+
    RANGE = 1998-06-10T00:57:41 80452.6854
    ANGLE_1 = 1998-06-10T00:57:41 256.64002393
    ANGLE_2 = 1998-06-10T00:57:41 13.38100016
    TRANSMIT_FREQ_1 = 1998-06-10T00:57:41 2106395199.07917
    RECEIVE_FREQ = 1998-06-10T00:57:41 2287487999.0
-   
+
    RANGE = 1998-06-10T00:57:42 80452.6680
    ANGLE_1 = 1998-06-10T00:57:42 256.64002393
    ANGLE_2 = 1998-06-10T00:57:42 13.38100016
    TRANSMIT_FREQ_1 = 1998-06-10T00:57:42 2106395199.07917
    RECEIVE_FREQ = 1998-06-10T00:57:42 2287487999.0
-   
+
    RANGE = 1998-06-10T00:57:43 80452.6503
    ANGLE_1 = 1998-06-10T00:57:43 256.64002393
    ANGLE_2 = 1998-06-10T00:57:43 13.38100016
    TRANSMIT_FREQ_1 = 1998-06-10T00:57:43 2106395199.07917
    RECEIVE_FREQ = 1998-06-10T00:57:43 2287487999.0
-   
+
    RANGE = 1998-06-10T00:57:44 80452.6331
    ANGLE_1 = 1998-06-10T00:57:44 256.64002393
    ANGLE_2 = 1998-06-10T00:57:44 13.38100016
@@ -4562,7 +4562,7 @@ EXAMPLE TRACKING DATA MESSAGES
    xmlns:ndm="urn:ccsds:schema:ndmxml"
    xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-master-2.0.xsd"
     id="CCSDS_TDM_VERS" version="2.0">
-    
+
     <header>
     <CREATION_DATE>2007-094T23:53:59.659</CREATION_DATE>
     <ORIGINATOR>NASA</ORIGINATOR>
@@ -5046,12 +5046,12 @@ constructing a TDM that captures the data from a specific measurement session.
    :widths: 10 20 20 20 20 20
    :header-rows: 2
 
-   * - 
+   * -
      - Range Data
      - Doppler Data
-     - 
-     - 
-     - 
+     -
+     -
+     -
    * - Data Keywords [unit]
      - RANGE [km, s, or RU]
      - DOPPLER_INSTANTANEOUS [km/s]
@@ -5210,10 +5210,10 @@ constructing a TDM that captures the data from a specific measurement session.
    :widths: 10 30 30 30
    :header-rows: 2
 
-   * - 
+   * -
      - Range Data
      - Doppler Data
-     - 
+     -
    * - Data Keywords [unit]
      - RANGE [km, s, or RU]
      - RECEIVE_FREQ_n [Hz]
@@ -5317,7 +5317,7 @@ constructing a TDM that captures the data from a specific measurement session.
    :widths: 10 30 30 30
    :header-rows: 2
 
-   * - 
+   * -
      - Angle Data
      - Media Related Data
      - Optical Data
@@ -5387,11 +5387,11 @@ constructing a TDM that captures the data from a specific measurement session.
    :widths: 10 20 20 20 20
    :header-rows: 2
 
-   * - 
+   * -
      - Range Data
      - Doppler Data
      - VLBI Data
-     - 
+     -
    * - Data Keywords [unit]
      - RANGE [km, s, or RU]
      - RECEIVE_FREQ_n [Hz]
@@ -5516,7 +5516,7 @@ constructing a TDM that captures the data from a specific measurement session.
    :widths: 10 30 30 30
    :header-rows: 2
 
-   * - 
+   * -
      - Time Data
      - Media Related Data
      - Meteorological Data

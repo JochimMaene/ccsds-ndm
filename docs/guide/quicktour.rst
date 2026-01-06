@@ -70,7 +70,7 @@ Once parsed, you can access the nested data structures.
         for segment in ndm.segments:
             meta = segment.metadata
             print(f"Object: {meta.object_name} ({meta.object_id})")
-            
+
             # State vectors are in segment.data.state_vectors
             for sv in segment.data.state_vectors:
                 print(f"Epoch: {sv.epoch}, X: {sv.x}")
@@ -81,7 +81,7 @@ Once parsed, you can access the nested data structures.
             for segment in oem.segments {
                 let meta = segment.metadata;
                 println!("Object: {} ({})", meta.object_name, meta.object_id);
-                
+
                 // State vectors are in segment.data.state_vectors
                 for sv in segment.data.state_vectors {
                     println!("Epoch: {}, X: {}", sv.epoch, sv.x);
@@ -100,7 +100,7 @@ You can convert the in-memory structures back to KVN or XML.
 
         # Convert to XML string
         xml_string = ndm.to_str("xml")
-        
+
         # Write to KVN file
         ndm.to_file("output.kvn", "kvn")
 
@@ -108,6 +108,6 @@ You can convert the in-memory structures back to KVN or XML.
 
         // Convert to XML string
         let xml_string = ndm.to_xml()?;
-        
+
         // Write to KVN file
         ndm.to_kvn_file("output.kvn")?;
