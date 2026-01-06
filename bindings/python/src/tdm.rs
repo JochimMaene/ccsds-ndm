@@ -1594,6 +1594,19 @@ impl TdmData {
         format!("TdmData(observations={})", self.inner.observations.len())
     }
 
+    /// Comments.
+    ///
+    /// :type: list[TdmObservation]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
+
     /// Tracking data records.
     ///
     /// :type: list[TdmObservation]
@@ -1612,18 +1625,7 @@ impl TdmData {
     }
 
 
-    /// Comments.
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
-    }
 
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
-    }
 }
 
 // ============================================================================

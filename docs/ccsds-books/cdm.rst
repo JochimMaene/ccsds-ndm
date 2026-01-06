@@ -2028,11 +2028,11 @@ of the CDM/XML XSLT converter is:
 .. _figure_4-1_cdm:
 
 .. figure:: /images/placeholder.png
-   
+
    Figure 4-1: CDM XML Basic Structure
 
 .. code-block::
-   
+
    <header>
    </header>
    <body>
@@ -2078,7 +2078,7 @@ reference [6]).
 The first line in the instantiation shall specify the XML version:
 
 .. code-block:: xml
-   
+
    <?xml version="1.0" encoding="UTF-8"?>
 
 This line must appear on the first line of each instantiation, exactly as shown.
@@ -2095,14 +2095,14 @@ using the standard attributes documented in reference [3].
 of all CDM/XML instantiations, exactly as shown:
 
 .. code-block::
-   
+
    xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"
 
 4.3.3.3 For messages with elements qualified with respect to a namespace, the NDM/XML
 namespace must next be coded, exactly as shown:
 
 .. code-block::
-   
+
    xmlns:ndm="urn:ccsds:schema:ndmxml"
 
 The value that follows the ‘xmlns:' in the NDM/XML name space (‘ndm' in this case) is a
@@ -2122,7 +2122,7 @@ characters, with no line breaks, exactly as shown:
    xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_unqualified/n
    dmxml-2.0.0-master-2.0.xsd" for messages with elements not qualified with respect
    to a namespace;
-   
+
    xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_qualified/ndm
    xml-2.0.0-master-2.0.xsd" for messages with elements qualified with respect to a
    namespace.
@@ -2150,21 +2150,21 @@ the local server.
    1. The following example root element tag for a CDM instantiation combines all the
       directions in the preceding several subsections for messages with elements not
       qualified with respect to a namespace:
-   
+
       .. code-block:: xml
-      
+
          <?xml version="1.0" encoding="UTF-8"?>
          <cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation=
          "https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-2.0.0-master-2.0.xs
          id="CCSDS_CDM_VERS" version="1.0">
-   
+
    2. The following example root element tag for a CDM instantiation combines all the
       directions in the preceding several subsections for messages with elements qualified
       with respect to a namespace:
-      
+
       .. code-block:: xml
-      
+
          <?xml version="1.0" encoding="UTF-8"?>
          <cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xmlns:ndm="urn:ccsds:schema:ndmxml"
@@ -2191,9 +2191,9 @@ d) <MESSAGE_ID>.
 
 .. NOTE::
    The rules for these keywords are specified in 3.2. The header would look like this:
-   
+
    .. code-block:: xml
-   
+
       <header>
          <COMMENT>Some comment string.</COMMENT>
          <CREATION_DATE>2010-03-12T22:31:12.000</CREATION_DATE>
@@ -2332,7 +2332,7 @@ important information associated with the given data element (see 6.4.3 for exam
 The following is a sample of a CDM in XML format:
 
 .. code-block:: xml
-   
+
    <?xml version="1.0" encoding="UTF-8"?>
    <cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
    xmlns:ndm="urn:ccsds:schema:ndmxml"
@@ -2537,7 +2537,7 @@ The following is a sample of a CDM in XML format:
          </segment>
       </body>
    </cdm>
-   
+
 .. _general_data_cdm:
 
 5 CDM DATA IN GENERAL

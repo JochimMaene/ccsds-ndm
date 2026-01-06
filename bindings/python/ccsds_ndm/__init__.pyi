@@ -41,9 +41,155 @@ def from_str(data):
     """
     ...
 
+class AdditionalParameters:
+    """
+    Additional Parameters.
+
+    Parameters
+    ----------
+    area_pc : float, optional
+        Projected area. Units: m^2
+    area_drg : float, optional
+        Drag area. Units: m^2
+    area_srp : float, optional
+        SRP area. Units: m^2
+    mass : float, optional
+        Mass. Units: kg
+    cd_area_over_mass : float, optional
+        Drag coefficient * Area / Mass. Units: m^2/kg
+    cr_area_over_mass : float, optional
+        Reflectivity coefficient * Area / Mass. Units: m^2/kg
+    thrust_acceleration : float, optional
+        Thrust acceleration. Units: m/s^2
+    sedr : float, optional
+        Solar energy dissipation rate. Units: W/kg
+    comment : list of str, optional
+        Comments.
+    """
+    def __init__(
+        area_pc,
+        area_drg,
+        area_srp,
+        mass,
+        cd_area_over_mass,
+        cr_area_over_mass,
+        thrust_acceleration,
+        sedr,
+        comment,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def area_drg(self) -> float:
+        """
+        The effective area of the object exposed to atmospheric drag. (See annex E for
+        definition.)
+
+        Units: m²
+        """
+        ...
+
+    @area_drg.setter
+    def area_drg(self, value: float) -> None: ...
+    @property
+    def area_pc(self) -> float:
+        """
+        The actual area of the object. (See annex E for definition.)
+
+        Units: m²
+        """
+        ...
+
+    @area_pc.setter
+    def area_pc(self, value: float) -> None: ...
+    @property
+    def area_srp(self) -> float:
+        """
+        The effective area of the object exposed to solar radiation pressure. (See annex E for
+        definition.)
+
+        Units: m²
+        """
+        ...
+
+    @area_srp.setter
+    def area_srp(self, value: float) -> None: ...
+    @property
+    def cd_area_over_mass(self) -> float:
+        """
+        The object's CD•A/m used to propagate the state vector and covariance to TCA. (See
+        annex E for definition.)
+
+        Units: m²/kg
+        """
+        ...
+
+    @cd_area_over_mass.setter
+    def cd_area_over_mass(self, value: float) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments (see 6.3.4 for formatting rules).
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def cr_area_over_mass(self) -> float:
+        """
+        The object's CR•A/m used to propagate the state vector and covariance to TCA. (See
+        annex E for definition.)
+
+        Units: m²/kg
+        """
+        ...
+
+    @cr_area_over_mass.setter
+    def cr_area_over_mass(self, value: float) -> None: ...
+    @property
+    def mass(self) -> float:
+        """
+        The mass of the object.
+
+        Units: kg
+        """
+        ...
+
+    @mass.setter
+    def mass(self, value: float) -> None: ...
+    @property
+    def sedr(self) -> float:
+        """
+        The amount of energy being removed from the object's orbit by atmospheric drag. This
+        value is an average calculated during the OD.
+
+        Units: W/kg
+        """
+        ...
+
+    @sedr.setter
+    def sedr(self, value: float) -> None: ...
+    @property
+    def thrust_acceleration(self) -> float:
+        """
+        The object's acceleration due to in-track thrust used to propagate the state vector and
+        covariance to TCA. (See annex E for definition.)
+
+        Units: m/s²
+        """
+        ...
+
+    @thrust_acceleration.setter
+    def thrust_acceleration(self, value: float) -> None: ...
+
 class AtmosphericReentryParameters:
     """
-    Atmospheric re-entry information.
+    Atmospheric reentry parameters (atmosphericReentryParametersType, RDM).
 
     Parameters
     ----------
@@ -340,11 +486,151 @@ class CdmBody:
 
 class CdmCovarianceMatrix:
     """
-    Covariance Matrix at TCA.
+    Covariance Matrix.
 
-    Provides uncertainty information for the state vector.
-    Can be converted to a NumPy array using `to_numpy()`.
+    Parameters
+    ----------
+    cr_r : float
+        Radial position variance. Units: m^2
+    ct_r : float
+        Transverse-Radial position covariance. Units: m^2
+    ct_t : float
+        Transverse position variance. Units: m^2
+    cn_r : float
+        Normal-Radial position covariance. Units: m^2
+    cn_t : float
+        Normal-Transverse position covariance. Units: m^2
+    cn_n : float
+        Normal position variance. Units: m^2
+    crdot_r : float
+        Radial velocity - Radial position covariance. Units: m^2/s
+    crdot_t : float
+        Radial velocity - Transverse position covariance. Units: m^2/s
+    crdot_n : float
+        Radial velocity - Normal position covariance. Units: m^2/s
+    crdot_rdot : float
+        Radial velocity variance. Units: m^2/s^2
+    ctdot_r : float
+        Transverse velocity - Radial position covariance. Units: m^2/s
+    ctdot_t : float
+        Transverse velocity - Transverse position covariance. Units: m^2/s
+    ctdot_n : float
+        Transverse velocity - Normal position covariance. Units: m^2/s
+    ctdot_rdot : float
+        Transverse velocity - Radial velocity covariance. Units: m^2/s^2
+    ctdot_tdot : float
+        Transverse velocity variance. Units: m^2/s^2
+    cndot_r : float
+        Normal velocity - Radial position covariance. Units: m^2/s
+    cndot_t : float
+        Normal velocity - Transverse position covariance. Units: m^2/s
+    cndot_n : float
+        Normal velocity - Normal position covariance. Units: m^2/s
+    cndot_rdot : float
+        Normal velocity - Radial velocity covariance. Units: m^2/s^2
+    cndot_tdot : float
+        Normal velocity - Transverse velocity covariance. Units: m^2/s^2
+    cndot_ndot : float
+        Normal velocity variance. Units: m^2/s^2
+    cdrg_r : float
+        Drag coeff - Radial position covariance.
+    cdrg_t : float
+        Drag coeff - Transverse position covariance.
+    cdrg_n : float
+        Drag coeff - Normal position covariance.
+    cdrg_rdot : float
+        Drag coeff - Radial velocity covariance.
+    cdrg_tdot : float
+        Drag coeff - Transverse velocity covariance.
+    cdrg_ndot : float
+        Drag coeff - Normal velocity covariance.
+    cdrg_drg : float
+        Drag coeff variance.
+    csrp_r : float
+        SRP coeff - Radial position covariance.
+    csrp_t : float
+        SRP coeff - Transverse position covariance.
+    csrp_n : float
+        SRP coeff - Normal position covariance.
+    csrp_rdot : float
+        SRP coeff - Radial velocity covariance.
+    csrp_tdot : float
+        SRP coeff - Transverse velocity covariance.
+    csrp_ndot : float
+        SRP coeff - Normal velocity covariance.
+    csrp_drg : float
+        SRP coeff - Drag coeff covariance.
+    csrp_srp : float
+        SRP coeff variance.
+    cthr_r : float
+        Thrust - Radial position covariance.
+    cthr_t : float
+        Thrust - Transverse position covariance.
+    cthr_n : float
+        Thrust - Normal position covariance.
+    cthr_rdot : float
+        Thrust - Radial velocity covariance.
+    cthr_tdot : float
+        Thrust - Transverse velocity covariance.
+    cthr_ndot : float
+        Thrust - Normal velocity covariance.
+    cthr_drg : float
+        Thrust - Drag coeff covariance.
+    cthr_srp : float
+        Thrust - SRP coeff covariance.
+    cthr_thr : float
+        Thrust variance.
+    comment : list of str, optional
+        Comments.
     """
+    def __init__(
+        cr_r,
+        ct_r,
+        ct_t,
+        cn_r,
+        cn_t,
+        cn_n,
+        crdot_r,
+        crdot_t,
+        crdot_n,
+        crdot_rdot,
+        ctdot_r,
+        ctdot_t,
+        ctdot_n,
+        ctdot_rdot,
+        ctdot_tdot,
+        cndot_r,
+        cndot_t,
+        cndot_n,
+        cndot_rdot,
+        cndot_tdot,
+        cndot_ndot,
+        cdrg_r,
+        cdrg_t,
+        cdrg_n,
+        cdrg_rdot,
+        cdrg_tdot,
+        cdrg_ndot,
+        cdrg_drg,
+        csrp_r,
+        csrp_t,
+        csrp_n,
+        csrp_rdot,
+        csrp_tdot,
+        csrp_ndot,
+        csrp_drg,
+        csrp_srp,
+        cthr_r,
+        cthr_t,
+        cthr_n,
+        cthr_rdot,
+        cthr_tdot,
+        cthr_ndot,
+        cthr_drg,
+        cthr_srp,
+        cthr_thr,
+        comment,
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -352,14 +638,509 @@ class CdmCovarianceMatrix:
         ...
 
     @property
-    def comments(self) -> list[str]:
+    def cdrg_drg(self) -> float:
+        """
+        Object covariance matrix [7,7].
+
+        Units: m⁴/kg²
+        """
+        ...
+
+    @cdrg_drg.setter
+    def cdrg_drg(self, value: float) -> None: ...
+    @property
+    def cdrg_n(self) -> float:
+        """
+        Object covariance matrix [7,3].
+
+        Units: m³/kg
+        """
+        ...
+
+    @cdrg_n.setter
+    def cdrg_n(self, value: float) -> None: ...
+    @property
+    def cdrg_ndot(self) -> float:
+        """
+        Object covariance matrix [7,6].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @cdrg_ndot.setter
+    def cdrg_ndot(self, value: float) -> None: ...
+    @property
+    def cdrg_r(self) -> float:
+        """
+        Object covariance matrix [7,1].
+
+        Units: m³/kg
+        """
+        ...
+
+    @cdrg_r.setter
+    def cdrg_r(self, value: float) -> None: ...
+    @property
+    def cdrg_rdot(self) -> float:
+        """
+        Object covariance matrix [7,4].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @cdrg_rdot.setter
+    def cdrg_rdot(self, value: float) -> None: ...
+    @property
+    def cdrg_t(self) -> float:
+        """
+        Object covariance matrix [7,2].
+
+        Units: m³/kg
+        """
+        ...
+
+    @cdrg_t.setter
+    def cdrg_t(self, value: float) -> None: ...
+    @property
+    def cdrg_tdot(self) -> float:
+        """
+        Object covariance matrix [7,5].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @cdrg_tdot.setter
+    def cdrg_tdot(self, value: float) -> None: ...
+    @property
+    def cn_n(self) -> float:
+        """
+        Object covariance matrix [3,3].
+
+        Units: m²
+        """
+        ...
+
+    @cn_n.setter
+    def cn_n(self, value: float) -> None: ...
+    @property
+    def cn_r(self) -> float:
+        """
+        Object covariance matrix [3,1].
+
+        Units: m²
+        """
+        ...
+
+    @cn_r.setter
+    def cn_r(self, value: float) -> None: ...
+    @property
+    def cn_t(self) -> float:
+        """
+        Object covariance matrix [3,2].
+
+        Units: m²
+        """
+        ...
+
+    @cn_t.setter
+    def cn_t(self, value: float) -> None: ...
+    @property
+    def cndot_n(self) -> float:
+        """
+        Object covariance matrix [6,3].
+
+        Units: m²/s
+        """
+        ...
+
+    @cndot_n.setter
+    def cndot_n(self, value: float) -> None: ...
+    @property
+    def cndot_ndot(self) -> float:
+        """
+        Object covariance matrix [6,6].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cndot_ndot.setter
+    def cndot_ndot(self, value: float) -> None: ...
+    @property
+    def cndot_r(self) -> float:
+        """
+        Object covariance matrix [6,1].
+
+        Units: m²/s
+        """
+        ...
+
+    @cndot_r.setter
+    def cndot_r(self, value: float) -> None: ...
+    @property
+    def cndot_rdot(self) -> float:
+        """
+        Object covariance matrix [6,4].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cndot_rdot.setter
+    def cndot_rdot(self, value: float) -> None: ...
+    @property
+    def cndot_t(self) -> float:
+        """
+        Object covariance matrix [6,2].
+
+        Units: m²/s
+        """
+        ...
+
+    @cndot_t.setter
+    def cndot_t(self, value: float) -> None: ...
+    @property
+    def cndot_tdot(self) -> float:
+        """
+        Object covariance matrix [6,5].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cndot_tdot.setter
+    def cndot_tdot(self, value: float) -> None: ...
+    @property
+    def comment(self) -> list[str]:
         """
         Comments.
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def cr_r(self) -> float:
+        """
+        Object covariance matrix [1,1].
+
+        Units: m²
+        """
+        ...
+
+    @cr_r.setter
+    def cr_r(self, value: float) -> None: ...
+    @property
+    def crdot_n(self) -> float:
+        """
+        Object covariance matrix [4,3].
+
+        Units: m²/s
+        """
+        ...
+
+    @crdot_n.setter
+    def crdot_n(self, value: float) -> None: ...
+    @property
+    def crdot_r(self) -> float:
+        """
+        Object covariance matrix [4,1].
+
+        Units: m²/s
+        """
+        ...
+
+    @crdot_r.setter
+    def crdot_r(self, value: float) -> None: ...
+    @property
+    def crdot_rdot(self) -> float:
+        """
+        Object covariance matrix [4,4].
+
+        Units: m²/s²
+        """
+        ...
+
+    @crdot_rdot.setter
+    def crdot_rdot(self, value: float) -> None: ...
+    @property
+    def crdot_t(self) -> float:
+        """
+        Object covariance matrix [4,2].
+
+        Units: m²/s
+        """
+        ...
+
+    @crdot_t.setter
+    def crdot_t(self, value: float) -> None: ...
+    @property
+    def csrp_drg(self) -> float:
+        """
+        Object covariance matrix [8,7].
+
+        Units: m⁴/kg²
+        """
+        ...
+
+    @csrp_drg.setter
+    def csrp_drg(self, value: float) -> None: ...
+    @property
+    def csrp_n(self) -> float:
+        """
+        Object covariance matrix [8,3].
+
+        Units: m³/kg
+        """
+        ...
+
+    @csrp_n.setter
+    def csrp_n(self, value: float) -> None: ...
+    @property
+    def csrp_ndot(self) -> float:
+        """
+        Object covariance matrix [8,6].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @csrp_ndot.setter
+    def csrp_ndot(self, value: float) -> None: ...
+    @property
+    def csrp_r(self) -> float:
+        """
+        Object covariance matrix [8,1].
+
+        Units: m³/kg
+        """
+        ...
+
+    @csrp_r.setter
+    def csrp_r(self, value: float) -> None: ...
+    @property
+    def csrp_rdot(self) -> float:
+        """
+        Object covariance matrix [8,4].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @csrp_rdot.setter
+    def csrp_rdot(self, value: float) -> None: ...
+    @property
+    def csrp_srp(self) -> float:
+        """
+        Object covariance matrix [8,8].
+
+        Units: m⁴/kg²
+        """
+        ...
+
+    @csrp_srp.setter
+    def csrp_srp(self, value: float) -> None: ...
+    @property
+    def csrp_t(self) -> float:
+        """
+        Object covariance matrix [8,2].
+
+        Units: m³/kg
+        """
+        ...
+
+    @csrp_t.setter
+    def csrp_t(self, value: float) -> None: ...
+    @property
+    def csrp_tdot(self) -> float:
+        """
+        Object covariance matrix [8,5].
+
+        Units: m³/(kg*s)
+        """
+        ...
+
+    @csrp_tdot.setter
+    def csrp_tdot(self, value: float) -> None: ...
+    @property
+    def ct_r(self) -> float:
+        """
+        Object covariance matrix [2,1].
+
+        Units: m²
+        """
+        ...
+
+    @ct_r.setter
+    def ct_r(self, value: float) -> None: ...
+    @property
+    def ct_t(self) -> float:
+        """
+        Object covariance matrix [2,2].
+
+        Units: m²
+        """
+        ...
+
+    @ct_t.setter
+    def ct_t(self, value: float) -> None: ...
+    @property
+    def ctdot_n(self) -> float:
+        """
+        Object covariance matrix [5,3].
+
+        Units: m²/s
+        """
+        ...
+
+    @ctdot_n.setter
+    def ctdot_n(self, value: float) -> None: ...
+    @property
+    def ctdot_r(self) -> float:
+        """
+        Object covariance matrix [5,1].
+
+        Units: m²/s
+        """
+        ...
+
+    @ctdot_r.setter
+    def ctdot_r(self, value: float) -> None: ...
+    @property
+    def ctdot_rdot(self) -> float:
+        """
+        Object covariance matrix [5,4].
+
+        Units: m²/s²
+        """
+        ...
+
+    @ctdot_rdot.setter
+    def ctdot_rdot(self, value: float) -> None: ...
+    @property
+    def ctdot_t(self) -> float:
+        """
+        Object covariance matrix [5,2].
+
+        Units: m²/s
+        """
+        ...
+
+    @ctdot_t.setter
+    def ctdot_t(self, value: float) -> None: ...
+    @property
+    def ctdot_tdot(self) -> float:
+        """
+        Object covariance matrix [5,5].
+
+        Units: m²/s²
+        """
+        ...
+
+    @ctdot_tdot.setter
+    def ctdot_tdot(self, value: float) -> None: ...
+    @property
+    def cthr_drg(self) -> float:
+        """
+        Object covariance matrix [9,7].
+
+        Units: m³/(kg*s²)
+        """
+        ...
+
+    @cthr_drg.setter
+    def cthr_drg(self, value: float) -> None: ...
+    @property
+    def cthr_n(self) -> float:
+        """
+        Object covariance matrix [9,3].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cthr_n.setter
+    def cthr_n(self, value: float) -> None: ...
+    @property
+    def cthr_ndot(self) -> float:
+        """
+        Object covariance matrix [9,6].
+
+        Units: m²/s³
+        """
+        ...
+
+    @cthr_ndot.setter
+    def cthr_ndot(self, value: float) -> None: ...
+    @property
+    def cthr_r(self) -> float:
+        """
+        Object covariance matrix [9,1].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cthr_r.setter
+    def cthr_r(self, value: float) -> None: ...
+    @property
+    def cthr_rdot(self) -> float:
+        """
+        Object covariance matrix [9,4].
+
+        Units: m²/s³
+        """
+        ...
+
+    @cthr_rdot.setter
+    def cthr_rdot(self, value: float) -> None: ...
+    @property
+    def cthr_srp(self) -> float:
+        """
+        Object covariance matrix [9,8].
+
+        Units: m³/(kg*s²)
+        """
+        ...
+
+    @cthr_srp.setter
+    def cthr_srp(self, value: float) -> None: ...
+    @property
+    def cthr_t(self) -> float:
+        """
+        Object covariance matrix [9,2].
+
+        Units: m²/s²
+        """
+        ...
+
+    @cthr_t.setter
+    def cthr_t(self, value: float) -> None: ...
+    @property
+    def cthr_tdot(self) -> float:
+        """
+        Object covariance matrix [9,5].
+
+        Units: m²/s³
+        """
+        ...
+
+    @cthr_tdot.setter
+    def cthr_tdot(self, value: float) -> None: ...
+    @property
+    def cthr_thr(self) -> float:
+        """
+        Object covariance matrix [9,9].
+
+        Units: m²/s⁴
+        """
+        ...
+
+    @cthr_thr.setter
+    def cthr_thr(self, value: float) -> None: ...
     def to_numpy(self):
         """
         Returns the full 9x9 covariance matrix as a NumPy array.
@@ -389,6 +1170,15 @@ class CdmData:
         ...
 
     @property
+    def additional_parameters(self) -> Optional[AdditionalParameters]:
+        """
+        Additional Parameters.
+        """
+        ...
+
+    @additional_parameters.setter
+    def additional_parameters(self, value: Optional[AdditionalParameters]) -> None: ...
+    @property
     def comment(self) -> list[str]:
         """
         Comments.
@@ -400,16 +1190,25 @@ class CdmData:
     @property
     def covariance_matrix(self) -> CdmCovarianceMatrix:
         """
-        Object covariance at TCA.
+        Covariance Matrix.
         """
         ...
 
     @covariance_matrix.setter
     def covariance_matrix(self, value: CdmCovarianceMatrix) -> None: ...
     @property
+    def od_parameters(self) -> Optional[OdParameters]:
+        """
+        Orbit Determination Parameters.
+        """
+        ...
+
+    @od_parameters.setter
+    def od_parameters(self, value: Optional[OdParameters]) -> None: ...
+    @property
     def state_vector(self) -> CdmStateVector:
         """
-        Object position and velocity at TCA.
+        State Vector.
         """
         ...
 
@@ -448,7 +1247,7 @@ class CdmHeader:
     @property
     def comment(self) -> list[str]:
         """
-        Explanatory comments.
+        Comments.
         """
         ...
 
@@ -457,7 +1256,9 @@ class CdmHeader:
     @property
     def creation_date(self) -> str:
         """
-        Message creation date/time in UTC.
+        Message creation date/time in Coordinated Universal Time (UTC).
+
+        Examples: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
         """
         ...
 
@@ -467,6 +1268,8 @@ class CdmHeader:
     def message_for(self) -> Optional[str]:
         """
         Spacecraft name(s) for which the CDM is provided.
+
+        Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
         """
         ...
 
@@ -475,7 +1278,9 @@ class CdmHeader:
     @property
     def message_id(self) -> str:
         """
-        ID used to uniquely identify this message.
+        ID that uniquely identifies a message from a given originator.
+
+        Examples: 201113719185, ABC-12_34
         """
         ...
 
@@ -485,6 +1290,8 @@ class CdmHeader:
     def originator(self) -> str:
         """
         Creating agency or owner/operator.
+
+        Examples: JSPOC, ESA SST, CAESAR, JPL, SDC
         """
         ...
 
@@ -578,7 +1385,7 @@ class CdmMetadata:
     @property
     def atmospheric_model(self) -> Optional[str]:
         """
-        The atmospheric density model used for the OD.
+        The atmospheric density model used for the OD of the object.
         """
         ...
 
@@ -603,9 +1410,27 @@ class CdmMetadata:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
+    def covariance_method(self) -> CovarianceMethodType:
+        """
+        Method used to calculate the covariance.
+        """
+        ...
+
+    @covariance_method.setter
+    def covariance_method(self, value: CovarianceMethodType) -> None: ...
+    @property
+    def earth_tides(self) -> Optional[str]:
+        """
+        Indication of whether solid Earth and ocean tides were used.
+        """
+        ...
+
+    @earth_tides.setter
+    def earth_tides(self, value: Optional[str]) -> None: ...
+    @property
     def ephemeris_name(self) -> str:
         """
-        Unique name of the external ephemeris file or 'NONE'.
+        Unique name of the external ephemeris file used for the object or NONE.
         """
         ...
 
@@ -614,7 +1439,7 @@ class CdmMetadata:
     @property
     def gravity_model(self) -> Optional[str]:
         """
-        The gravity model used for the OD.
+        The gravity model used for the OD of the object.
         """
         ...
 
@@ -623,21 +1448,50 @@ class CdmMetadata:
     @property
     def international_designator(self) -> str:
         """
-        The full international designator (YYYY-NNNP{PP}).
+        The full international designator for the object.
         """
         ...
 
     @international_designator.setter
     def international_designator(self, value: str) -> None: ...
     @property
+    def intrack_thrust(self) -> Optional[str]:
+        """
+        Indication of whether in-track thrust modeling was used.
+        """
+        ...
+
+    @intrack_thrust.setter
+    def intrack_thrust(self, value: Optional[str]) -> None: ...
+    @property
+    def maneuverable(self) -> ManeuverableType:
+        """
+        The maneuver capacity of the object.
+        """
+        ...
+
+    @maneuverable.setter
+    def maneuverable(self, value: ManeuverableType) -> None: ...
+    @property
     def n_body_perturbations(self) -> Optional[str]:
         """
-        N-body gravitational perturbations used.
+        The N-body gravitational perturbations used for the OD of the object.
         """
         ...
 
     @n_body_perturbations.setter
     def n_body_perturbations(self, value: Optional[str]) -> None: ...
+    @property
+    def object(self) -> CdmObjectType:
+        """
+        The object to which the metadata and data apply.
+
+        Examples: OBJECT1, OBJECT2
+        """
+        ...
+
+    @object.setter
+    def object(self, value: CdmObjectType) -> None: ...
     @property
     def object_designator(self) -> str:
         """
@@ -657,9 +1511,20 @@ class CdmMetadata:
     @object_name.setter
     def object_name(self, value: str) -> None: ...
     @property
+    def object_type(self) -> Optional[ObjectDescription]:
+        """
+        The object type.
+
+        Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
+        """
+        ...
+
+    @object_type.setter
+    def object_type(self, value: Optional[ObjectDescription]) -> None: ...
+    @property
     def operator_contact_position(self) -> Optional[str]:
         """
-        Contact position of the owner/operator.
+        Contact position of the owner/operator of the object.
         """
         ...
 
@@ -668,7 +1533,7 @@ class CdmMetadata:
     @property
     def operator_email(self) -> Optional[str]:
         """
-        Email address of the contact.
+        Email address of the contact position or organization of the object.
         """
         ...
 
@@ -677,7 +1542,7 @@ class CdmMetadata:
     @property
     def operator_organization(self) -> Optional[str]:
         """
-        Contact organization.
+        Contact organization of the object.
         """
         ...
 
@@ -686,7 +1551,7 @@ class CdmMetadata:
     @property
     def operator_phone(self) -> Optional[str]:
         """
-        Phone number of the contact.
+        Phone number of the contact position or organization for the object.
         """
         ...
 
@@ -695,14 +1560,38 @@ class CdmMetadata:
     @property
     def orbit_center(self) -> Optional[str]:
         """
-        The central body (e.g., EARTH, SUN).
+        The central body about which Object1 and Object2 orbit.
         """
         ...
 
     @orbit_center.setter
     def orbit_center(self, value: Optional[str]) -> None: ...
+    @property
+    def ref_frame(self) -> ReferenceFrameType:
+        """
+        Name of the reference frame in which the state vector data are given.
+        """
+        ...
+
+    @ref_frame.setter
+    def ref_frame(self, value: ReferenceFrameType) -> None: ...
+    @property
+    def solar_rad_pressure(self) -> Optional[str]:
+        """
+        Indication of whether solar radiation pressure perturbations were used.
+        """
+        ...
+
+    @solar_rad_pressure.setter
+    def solar_rad_pressure(self, value: Optional[str]) -> None: ...
 
 class CdmObjectType:
+    """
+    Covariance Matrix at TCA.
+
+    Provides uncertainty information for the state vector.
+    Can be converted to a NumPy array using `to_numpy()`.
+    """
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -768,7 +1657,9 @@ class CdmStateVector:
     @property
     def x(self) -> float:
         """
-        Position X component.
+        Object Position Vector X component.
+
+        Units: km
         """
         ...
 
@@ -777,7 +1668,9 @@ class CdmStateVector:
     @property
     def x_dot(self) -> float:
         """
-        Velocity X component.
+        Object Velocity Vector X component.
+
+        Units: km/s
         """
         ...
 
@@ -786,7 +1679,9 @@ class CdmStateVector:
     @property
     def y(self) -> float:
         """
-        Position Y component.
+        Object Position Vector Y component.
+
+        Units: km
         """
         ...
 
@@ -795,7 +1690,9 @@ class CdmStateVector:
     @property
     def y_dot(self) -> float:
         """
-        Velocity Y component.
+        Object Velocity Vector Y component.
+
+        Units: km/s
         """
         ...
 
@@ -804,7 +1701,9 @@ class CdmStateVector:
     @property
     def z(self) -> float:
         """
-        Position Z component.
+        Object Position Vector Z component.
+
+        Units: km
         """
         ...
 
@@ -813,7 +1712,9 @@ class CdmStateVector:
     @property
     def z_dot(self) -> float:
         """
-        Velocity Z component.
+        Object Velocity Vector Z component.
+
+        Units: km/s
         """
         ...
 
@@ -866,10 +1767,105 @@ class CovarianceMethodType:
 
 class GroundImpactParameters:
     """
-    Ground impact and burn-up data parameters.
+    Ground impact parameters (groundImpactParametersType, RDM).
+
+    Parameters
+    ----------
+    probability_of_impact : float, optional
+        Probability of impact.
+    probability_of_burn_up : float, optional
+        Probability of burn up.
+    probability_of_break_up : float, optional
+        Probability of break up.
+    probability_of_land_impact : float, optional
+        Probability of land impact.
+    probability_of_casualty : float, optional
+        Probability of casualty.
+    nominal_impact_epoch : str, optional
+        Nominal impact epoch.
+    impact_window_start : str, optional
+        Impact window start.
+    impact_window_end : str, optional
+        Impact window end.
+    impact_ref_frame : str, optional
+        Impact reference frame.
+    nominal_impact_lon : float, optional
+        Nominal impact longitude. Units: deg
+    nominal_impact_lat : float, optional
+        Nominal impact latitude. Units: deg
+    nominal_impact_alt : float, optional
+        Nominal impact altitude. Units: km
+    impact_1_confidence : float, optional
+        Impact 1 confidence. Units: %
+    impact_1_start_lon : float, optional
+        Impact 1 start longitude. Units: deg
+    impact_1_start_lat : float, optional
+        Impact 1 start latitude. Units: deg
+    impact_1_stop_lon : float, optional
+        Impact 1 stop longitude. Units: deg
+    impact_1_stop_lat : float, optional
+        Impact 1 stop latitude. Units: deg
+    impact_1_cross_track : float, optional
+        Impact 1 cross track. Units: km
+    impact_2_confidence : float, optional
+        Impact 2 confidence. Units: %
+    impact_2_start_lon : float, optional
+        Impact 2 start longitude. Units: deg
+    impact_2_start_lat : float, optional
+        Impact 2 start latitude. Units: deg
+    impact_2_stop_lon : float, optional
+        Impact 2 stop longitude. Units: deg
+    impact_2_stop_lat : float, optional
+        Impact 2 stop latitude. Units: deg
+    impact_2_cross_track : float, optional
+        Impact 2 cross track. Units: km
+    impact_3_confidence : float, optional
+        Impact 3 confidence. Units: %
+    impact_3_start_lon : float, optional
+        Impact 3 start longitude. Units: deg
+    impact_3_start_lat : float, optional
+        Impact 3 start latitude. Units: deg
+    impact_3_stop_lon : float, optional
+        Impact 3 stop longitude. Units: deg
+    impact_3_stop_lat : float, optional
+        Impact 3 stop latitude. Units: deg
+    impact_3_cross_track : float, optional
+        Impact 3 cross track. Units: km
+    comment : list of str, optional
+        Comments.
     """
     def __init__(
-        *, probability_of_impact=None, probability_of_burn_up=None, comment=None
+        probability_of_impact,
+        probability_of_burn_up,
+        probability_of_break_up,
+        probability_of_land_impact,
+        probability_of_casualty,
+        nominal_impact_epoch,
+        impact_window_start,
+        impact_window_end,
+        impact_ref_frame,
+        nominal_impact_lon,
+        nominal_impact_lat,
+        nominal_impact_alt,
+        impact_1_confidence,
+        impact_1_start_lon,
+        impact_1_start_lat,
+        impact_1_stop_lon,
+        impact_1_stop_lat,
+        impact_1_cross_track,
+        impact_2_confidence,
+        impact_2_start_lon,
+        impact_2_start_lat,
+        impact_2_stop_lon,
+        impact_2_stop_lat,
+        impact_2_cross_track,
+        impact_3_confidence,
+        impact_3_start_lon,
+        impact_3_start_lat,
+        impact_3_stop_lon,
+        impact_3_stop_lat,
+        impact_3_cross_track,
+        comment,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -880,12 +1876,204 @@ class GroundImpactParameters:
     @property
     def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
+    @property
+    def impact_1_confidence(self) -> Optional[float]:
+        """
+        Confidence of impact prediction 1.
+        """
+        ...
+
+    @impact_1_confidence.setter
+    def impact_1_confidence(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_1_cross_track(self) -> Optional[float]:
+        """
+        Impact 1 cross track distance.
+
+        Units: km
+        """
+        ...
+
+    @impact_1_cross_track.setter
+    def impact_1_cross_track(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_1_start_lat(self) -> Optional[float]:
+        """
+        Impact 1 start latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_1_start_lat.setter
+    def impact_1_start_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_1_start_lon(self) -> Optional[float]:
+        """
+        Impact 1 start longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_1_start_lon.setter
+    def impact_1_start_lon(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_1_stop_lat(self) -> Optional[float]:
+        """
+        Impact stops latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_1_stop_lat.setter
+    def impact_1_stop_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_1_stop_lon(self) -> Optional[float]:
+        """
+        Impact 1 stop longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_1_stop_lon.setter
+    def impact_1_stop_lon(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_confidence(self) -> Optional[float]:
+        """
+        Confidence of impact prediction 2.
+        """
+        ...
+
+    @impact_2_confidence.setter
+    def impact_2_confidence(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_cross_track(self) -> Optional[float]:
+        """
+        Impact 2 cross track distance.
+
+        Units: km
+        """
+        ...
+
+    @impact_2_cross_track.setter
+    def impact_2_cross_track(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_start_lat(self) -> Optional[float]:
+        """
+        Impact 2 start latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_2_start_lat.setter
+    def impact_2_start_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_start_lon(self) -> Optional[float]:
+        """
+        Impact 2 start longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_2_start_lon.setter
+    def impact_2_start_lon(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_stop_lat(self) -> Optional[float]:
+        """
+        Impact 2 stop latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_2_stop_lat.setter
+    def impact_2_stop_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_2_stop_lon(self) -> Optional[float]:
+        """
+        Impact 2 stop longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_2_stop_lon.setter
+    def impact_2_stop_lon(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_confidence(self) -> Optional[float]:
+        """
+        Confidence of impact prediction 3.
+        """
+        ...
+
+    @impact_3_confidence.setter
+    def impact_3_confidence(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_cross_track(self) -> Optional[float]:
+        """
+        Impact 3 cross track distance.
+
+        Units: km
+        """
+        ...
+
+    @impact_3_cross_track.setter
+    def impact_3_cross_track(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_start_lat(self) -> Optional[float]:
+        """
+        Impact 3 start latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_3_start_lat.setter
+    def impact_3_start_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_start_lon(self) -> Optional[float]:
+        """
+        Impact 3 start longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_3_start_lon.setter
+    def impact_3_start_lon(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_stop_lat(self) -> Optional[float]:
+        """
+        Impact 3 stop latitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_3_stop_lat.setter
+    def impact_3_stop_lat(self, value: Optional[float]) -> None: ...
+    @property
+    def impact_3_stop_lon(self) -> Optional[float]:
+        """
+        Impact 3 stop longitude.
+
+        Units: deg
+        """
+        ...
+
+    @impact_3_stop_lon.setter
+    def impact_3_stop_lon(self, value: Optional[float]) -> None: ...
     @property
     def impact_ref_frame(self) -> Optional[str]:
         """
@@ -898,7 +2086,7 @@ class GroundImpactParameters:
     @property
     def impact_window_end(self) -> Optional[str]:
         """
-        End of the impact window.
+        Impact window end epoch.
         """
         ...
 
@@ -907,7 +2095,7 @@ class GroundImpactParameters:
     @property
     def impact_window_start(self) -> Optional[str]:
         """
-        Start of the impact window.
+        Impact window start epoch.
         """
         ...
 
@@ -916,7 +2104,9 @@ class GroundImpactParameters:
     @property
     def nominal_impact_alt(self) -> Optional[float]:
         """
-        Nominal impact altitude (km).
+        Nominal impact altitude.
+
+        Units: km
         """
         ...
 
@@ -934,7 +2124,9 @@ class GroundImpactParameters:
     @property
     def nominal_impact_lat(self) -> Optional[float]:
         """
-        Nominal impact latitude (degrees).
+        Nominal impact latitude.
+
+        Units: deg
         """
         ...
 
@@ -943,7 +2135,9 @@ class GroundImpactParameters:
     @property
     def nominal_impact_lon(self) -> Optional[float]:
         """
-        Nominal impact longitude (degrees).
+        Nominal impact longitude.
+
+        Units: deg
         """
         ...
 
@@ -998,6 +2192,9 @@ class GroundImpactParameters:
 class KeplerianElements:
     """
     Osculating Keplerian Elements.
+
+    References:
+    - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 
     Parameters
     ----------
@@ -1058,6 +2255,8 @@ class KeplerianElements:
         """
         Argument of pericenter.
 
+        Examples: 45.6
+
         Units: deg
         """
         ...
@@ -1065,18 +2264,20 @@ class KeplerianElements:
     @arg_of_pericenter.setter
     def arg_of_pericenter(self, value: float) -> None: ...
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
-        Comments associated with the Keplerian elements.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def eccentricity(self) -> float:
         """
         Eccentricity.
+
+        Examples: 0.001
         """
         ...
 
@@ -1085,7 +2286,9 @@ class KeplerianElements:
     @property
     def gm(self) -> float:
         """
-        Gravitational coefficient (GM).
+        Gravitational Coefficient (Gravitational Constant × Central Mass).
+
+        Examples: 398600.4418
 
         Units: km³/s²
         """
@@ -1098,6 +2301,8 @@ class KeplerianElements:
         """
         Inclination.
 
+        Examples: 51.6
+
         Units: deg
         """
         ...
@@ -1109,6 +2314,8 @@ class KeplerianElements:
         """
         Mean anomaly.
 
+        Examples: 0.0
+
         Units: deg
         """
         ...
@@ -1118,7 +2325,9 @@ class KeplerianElements:
     @property
     def ra_of_asc_node(self) -> float:
         """
-        Right ascension of the ascending node.
+        Right ascension of ascending node.
+
+        Examples: 123.4
 
         Units: deg
         """
@@ -1131,6 +2340,8 @@ class KeplerianElements:
         """
         Semi-major axis.
 
+        Examples: 6653.148
+
         Units: km
         """
         ...
@@ -1141,6 +2352,8 @@ class KeplerianElements:
     def true_anomaly(self) -> Optional[float]:
         """
         True anomaly.
+
+        Examples: 0.0
 
         Units: deg
         """
@@ -1188,7 +2401,10 @@ class ManLine:
 
 class ManeuverParameters:
     """
-    Maneuver parameters.
+    Maneuver Parameters.
+
+    References:
+    - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 
     Parameters
     ----------
@@ -1223,20 +2439,18 @@ class ManeuverParameters:
         ...
 
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def man_delta_mass(self) -> float:
         """
-        Mass change during maneuver.
-
-        Value is < 0.
+        Mass change during maneuver (value is < 0).
 
         Units: kg
         """
@@ -1247,9 +2461,7 @@ class ManeuverParameters:
     @property
     def man_duration(self) -> float:
         """
-        Duration of maneuver.
-
-        If 0, impulsive maneuver.
+        Maneuver duration (If = 0, impulsive maneuver).
 
         Units: s
         """
@@ -1260,7 +2472,7 @@ class ManeuverParameters:
     @property
     def man_dv_1(self) -> float:
         """
-        Velocity change in 1st axis.
+        1st component of the velocity increment.
 
         Units: km/s
         """
@@ -1271,7 +2483,7 @@ class ManeuverParameters:
     @property
     def man_dv_2(self) -> float:
         """
-        Velocity change in 2nd axis.
+        2nd component of the velocity increment.
 
         Units: km/s
         """
@@ -1282,7 +2494,7 @@ class ManeuverParameters:
     @property
     def man_dv_3(self) -> float:
         """
-        Velocity change in 3rd axis.
+        3rd component of the velocity increment.
 
         Units: km/s
         """
@@ -1293,7 +2505,7 @@ class ManeuverParameters:
     @property
     def man_epoch_ignition(self) -> str:
         """
-        Epoch of ignition.
+        Epoch of ignition (see 7.5.10 for formatting rules).
         """
         ...
 
@@ -1302,7 +2514,8 @@ class ManeuverParameters:
     @property
     def man_ref_frame(self) -> str:
         """
-        Reference frame for velocity change.
+        Reference frame in which the velocity increment vector data are given. The user must select
+        from the accepted set of values indicated in 3.2.4.11.
         """
         ...
 
@@ -1363,6 +2576,8 @@ class MeanElements:
         """
         Argument of pericenter.
 
+        Examples: 270.0
+
         Units: deg
         """
         ...
@@ -1370,18 +2585,20 @@ class MeanElements:
     @arg_of_pericenter.setter
     def arg_of_pericenter(self, value: float) -> None: ...
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def eccentricity(self) -> float:
         """
         Eccentricity.
+
+        Examples: 0.7303
         """
         ...
 
@@ -1390,7 +2607,9 @@ class MeanElements:
     @property
     def epoch(self) -> str:
         """
-        Epoch of Mean Keplerian elements.
+        Epoch of Mean Keplerian elements. (See 7.5.10 for formatting rules.)
+
+        Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
         """
         ...
 
@@ -1399,7 +2618,9 @@ class MeanElements:
     @property
     def gm(self) -> Optional[float]:
         """
-        Gravitational coefficient (GM).
+        Gravitational Coefficient (Gravitational Constant × Central Mass).
+
+        Examples: 398600.44
 
         Units: km³/s²
         """
@@ -1412,6 +2633,8 @@ class MeanElements:
         """
         Inclination.
 
+        Examples: 63.4
+
         Units: deg
         """
         ...
@@ -1423,6 +2646,8 @@ class MeanElements:
         """
         Mean anomaly.
 
+        Examples: 130.0
+
         Units: deg
         """
         ...
@@ -1432,9 +2657,11 @@ class MeanElements:
     @property
     def mean_motion(self) -> Optional[float]:
         """
-        Mean motion.
+        Keplerian Mean motion.
 
         Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
+
+        Examples: 1.491325
 
         Units: rev/day
         """
@@ -1445,7 +2672,9 @@ class MeanElements:
     @property
     def ra_of_asc_node(self) -> float:
         """
-        Right ascension of the ascending node.
+        Right ascension of ascending node.
+
+        Examples: 345.0
 
         Units: deg
         """
@@ -1456,9 +2685,9 @@ class MeanElements:
     @property
     def semi_major_axis(self) -> Optional[float]:
         """
-        Semi-major axis.
+        Semi-major axis. Preferred over MEAN_MOTION.
 
-        Preferred over MEAN_MOTION.
+        Examples: 28594.4
 
         Units: km
         """
@@ -1476,11 +2705,14 @@ class ObjectDescription:
 
 class Ocm:
     """
-    Represents a CCSDS Orbit Comprehensive Message (OCM).
+    Orbit Comprehensive Message (OCM).
 
-    The OCM aggregates and extends OMM, OPM, and OEM content in a single hybrid message.
+    An OCM aggregates and extends OMM, OPM, and OEM content in a single hybrid message.
     It emphasizes flexibility and message conciseness by offering extensive optional
     standardized content while minimizing mandatory content.
+
+    References:
+    - CCSDS 502.0-B-3, Section 5 (OCM)
 
     Parameters
     ----------
@@ -1537,7 +2769,14 @@ class Ocm:
     @property
     def header(self) -> OdmHeader:
         """
-        The message header.
+        Orbit Comprehensive Message (OCM).
+
+        An OCM aggregates and extends OMM, OPM, and OEM content in a single hybrid message.
+        It emphasizes flexibility and message conciseness by offering extensive optional
+        standardized content while minimizing mandatory content.
+
+        References:
+        - CCSDS 502.0-B-3, Section 5 (OCM)
         """
         ...
 
@@ -1583,14 +2822,11 @@ class Ocm:
 
 class OcmCovarianceMatrix:
     """
-    OCM Covariance Matrix Time History segment.
-
-    This block contains covariance matrices for a single object, optionally
-    spanning fictitious nodes for interpolation smoothness.
+    OCM Covariance Matrix.
 
     Parameters
     ----------
-    epoch : str
+        epoch : str
         Epoch of the covariance matrix.
         (Mandatory)
     cov_ref_frame : str
@@ -1599,7 +2835,7 @@ class OcmCovarianceMatrix:
     cov_type : str
         Specifies the covariance element set type.
         (Mandatory)
-    cov_matrix : list of float
+        cov_matrix : list of float
         Upper triangular part of the covariance matrix.
         (Mandatory)
     cov_id : str, optional
@@ -1620,7 +2856,7 @@ class OcmCovarianceMatrix:
     cov_confidence : float, optional
         The confidence level associated with the covariance [0-100].
         (Optional)
-    cov_scale_factor : float, optional
+        cov_scale_factor : float, optional
         Scale factor to be applied to the covariance matrix.
         (Optional)
     cov_units : str, optional
@@ -1657,7 +2893,7 @@ class OcmCovarianceMatrix:
     @property
     def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
@@ -1666,7 +2902,9 @@ class OcmCovarianceMatrix:
     @property
     def cov_basis(self) -> Optional[str]:
         """
-        Covariance basis.
+        Basis of this covariance time history data (e.g., PREDICTED, DETERMINED).
+
+        Examples: PREDICTED
         """
         ...
 
@@ -1675,7 +2913,10 @@ class OcmCovarianceMatrix:
     @property
     def cov_basis_id(self) -> Optional[str]:
         """
-        Covariance basis identifier.
+        Identification number for the telemetry dataset, orbit determination, or simulation upon
+        which the COV_BASIS is based.
+
+        Examples: OD-123
         """
         ...
 
@@ -1684,7 +2925,11 @@ class OcmCovarianceMatrix:
     @property
     def cov_confidence(self) -> Optional[float]:
         """
-        The confidence level associated with the covariance [0-100].
+        A measure of the confidence in the covariance errors matching reality.
+
+        Examples: 95.0
+
+        Units: %
         """
         ...
 
@@ -1693,7 +2938,9 @@ class OcmCovarianceMatrix:
     @property
     def cov_frame_epoch(self) -> Optional[str]:
         """
-        Epoch of the covariance reference frame, if not intrinsic to the definition.
+        Epoch of the covariance data reference frame, if not intrinsic to its definition.
+
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -1702,7 +2949,9 @@ class OcmCovarianceMatrix:
     @property
     def cov_id(self) -> Optional[str]:
         """
-        Identification number for this covariance matrix time history block.
+        Identification number for this covariance time history block.
+
+        Examples: 1
         """
         ...
 
@@ -1711,7 +2960,7 @@ class OcmCovarianceMatrix:
     @property
     def cov_lines(self) -> list[CovLine]:
         """
-        A list of covariance data lines.
+        Contiguous set of covariance matrix data lines.
         """
         ...
 
@@ -1720,7 +2969,9 @@ class OcmCovarianceMatrix:
     @property
     def cov_next_id(self) -> Optional[str]:
         """
-        Identification number for the next covariance matrix time history.
+        Identification number for the next covariance time history.
+
+        Examples: 2
         """
         ...
 
@@ -1729,7 +2980,9 @@ class OcmCovarianceMatrix:
     @property
     def cov_ordering(self) -> str:
         """
-        The ordering of the covariance matrix elements.
+        Indicates covariance ordering (LTM or UTM).
+
+        Examples: LTM
         """
         ...
 
@@ -1738,7 +2991,9 @@ class OcmCovarianceMatrix:
     @property
     def cov_prev_id(self) -> Optional[str]:
         """
-        Identification number for the previous covariance matrix time history.
+        Identification number for the previous covariance time history.
+
+        Examples: 0
         """
         ...
 
@@ -1747,9 +3002,11 @@ class OcmCovarianceMatrix:
     @property
     def cov_ref_frame(self) -> str:
         """
-        Reference frame for the covariance matrix.
+        Reference frame of the covariance time history (value to be drawn from the SANA registry list
+        of Reference Frames at <https://sanaregistry.org/r/celestial_body_reference_frames> or
+        <https://sanaregistry.org/r/orbit_relative_reference_frames>).
 
-        Standard values: "ICRF", "EME2000", "ITRF", "TEME", "GCRF"
+        Examples: ICRF, EME2000
         """
         ...
 
@@ -1758,7 +3015,9 @@ class OcmCovarianceMatrix:
     @property
     def cov_scale_max(self) -> Optional[float]:
         """
-        Scale factor maximum.
+        Maximum scale factor to apply to this covariance data to achieve realism.
+
+        Examples: 1.1
         """
         ...
 
@@ -1767,7 +3026,9 @@ class OcmCovarianceMatrix:
     @property
     def cov_scale_min(self) -> Optional[float]:
         """
-        Scale factor minimum.
+        Minimum scale factor to apply to this covariance data to achieve realism.
+
+        Examples: 0.9
         """
         ...
 
@@ -1776,9 +3037,10 @@ class OcmCovarianceMatrix:
     @property
     def cov_type(self) -> str:
         """
-        Specifies the covariance element set type.
+        Specification of the covariance element set type (value to be drawn from the SANA registry
+        list of Covariance Types at <https://sanaregistry.org/r/orbital_covariance_matrix_types>).
 
-        Standard values: "CARTPV", "KEPLERIAN", "EQUINOCTIAL"
+        Examples: CARTESIAN
         """
         ...
 
@@ -1787,7 +3049,9 @@ class OcmCovarianceMatrix:
     @property
     def cov_units(self) -> Optional[str]:
         """
-        Comma-delimited set of SI unit designations for the covariance elements.
+        SI unit designations for the covariance elements.
+
+        Examples: km**2, km**2/s
         """
         ...
 
@@ -1796,11 +3060,11 @@ class OcmCovarianceMatrix:
 
 class OcmData:
     """
-    OCM Data blocks.
+    OCM Data Section.
 
-    This class holds the various data sections of an OCM, including trajectory states,
-    physical properties, covariance matrices, maneuvers, perturbations, and
-    orbit determination parameters.
+    This struct is the primary data container for the OCM. It holds all the
+    different data blocks, such as trajectory, physical properties, covariance,
+    maneuvers, and other related information.
     """
     def __init__() -> None: ...
     def __getstate__(self, /):
@@ -1819,32 +3083,14 @@ class OcmData:
     @cov.setter
     def cov(self, value: list[OcmCovarianceMatrix]) -> None: ...
     @property
-    def cov_count(self) -> int:
-        """
-        Number of covariance time history blocks.
-        """
-        ...
-
-    @cov_count.setter
-    def cov_count(self, value: int) -> None: ...
-    @property
-    def has_user(self) -> bool:
-        """
-        Whether user-defined parameters are present.
-        """
-        ...
-
-    @has_user.setter
-    def has_user(self, value: bool) -> None: ...
-    @property
-    def man(self) -> list[OcmManeuver]:
+    def man(self) -> list[OcmManeuverParameters]:
         """
         List of maneuver specifications.
         """
         ...
 
     @man.setter
-    def man(self, value: list[OcmManeuver]) -> None: ...
+    def man(self, value: list[OcmManeuverParameters]) -> None: ...
     @property
     def od(self) -> Optional[OcmOdParameters]:
         """
@@ -1891,9 +3137,12 @@ class OcmData:
     @user.setter
     def user(self, value: Optional[UserDefined]) -> None: ...
 
-class OcmManeuver:
+class OcmManeuverParameters:
     """
-    Maneuver Parameters segment.
+    OCM Maneuver Parameters.
+
+    References:
+    - CCSDS 502.0-B-3, Section 4.5.5 (OCM Maneuver Section)
 
     Parameters
     ----------
@@ -1978,7 +3227,7 @@ class OcmManeuver:
     @property
     def comment(self) -> list[str]:
         """
-        Comments for this maneuver block.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
@@ -1987,7 +3236,9 @@ class OcmManeuver:
     @property
     def dc_body_frame(self) -> Optional[str]:
         """
-        Body frame for duty cycle.
+        Body reference frame in which DC_BODY_TRIGGER will be specified.
+
+        Examples: SC_BODY
         """
         ...
 
@@ -1996,7 +3247,9 @@ class OcmManeuver:
     @property
     def dc_body_trigger(self) -> Optional[list[float]]:
         """
-        Body trigger for duty cycle.
+        Body frame reference vector direction for angle-based duty cycle initiation.
+
+        Examples: 0.0 1.0 0.0
         """
         ...
 
@@ -2005,7 +3258,9 @@ class OcmManeuver:
     @property
     def dc_exec_start(self) -> Optional[str]:
         """
-        Start time of duty cycle execution.
+        Start time of the initial duty cycle-based maneuver sequence execution.
+
+        Examples: 2000-01-01T12:05:00Z
         """
         ...
 
@@ -2014,7 +3269,9 @@ class OcmManeuver:
     @property
     def dc_exec_stop(self) -> Optional[str]:
         """
-        Stop time of duty cycle execution.
+        End time of the final duty cycle-based maneuver sequence execution.
+
+        Examples: 2000-01-01T12:55:00Z
         """
         ...
 
@@ -2023,7 +3280,9 @@ class OcmManeuver:
     @property
     def dc_max_cycles(self) -> Optional[int]:
         """
-        Maximum number of duty cycles.
+        Maximum number of ‘ON’ duty cycles.
+
+        Examples: 10
         """
         ...
 
@@ -2032,7 +3291,9 @@ class OcmManeuver:
     @property
     def dc_min_cycles(self) -> Optional[int]:
         """
-        Minimum number of duty cycles.
+        Minimum number of ‘ON’ duty cycles.
+
+        Examples: 1
         """
         ...
 
@@ -2041,7 +3302,11 @@ class OcmManeuver:
     @property
     def dc_pa_start_angle(self) -> Optional[float]:
         """
-        Phase angle start for duty cycle.
+        Phase angle offset of thruster pulse start.
+
+        Examples: 10.0
+
+        Units: deg
         """
         ...
 
@@ -2050,7 +3315,11 @@ class OcmManeuver:
     @property
     def dc_pa_stop_angle(self) -> Optional[float]:
         """
-        Phase angle stop for duty cycle.
+        Phase angle of thruster pulse stop.
+
+        Examples: 20.0
+
+        Units: deg
         """
         ...
 
@@ -2059,7 +3328,9 @@ class OcmManeuver:
     @property
     def dc_ref_dir(self) -> Optional[list[float]]:
         """
-        Reference direction for duty cycle.
+        Reference vector direction in the body frame for angle-initiated thruster duty cycles.
+
+        Examples: 1.0 0.0 0.0
         """
         ...
 
@@ -2068,7 +3339,9 @@ class OcmManeuver:
     @property
     def dc_ref_time(self) -> Optional[str]:
         """
-        Reference time for duty cycle.
+        Reference time for the THRUST duty cycle.
+
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -2077,7 +3350,11 @@ class OcmManeuver:
     @property
     def dc_time_pulse_duration(self) -> Optional[float]:
         """
-        Duration of the duty cycle pulse.
+        Thruster pulse ‘ON’ duration.
+
+        Examples: 10.0
+
+        Units: s
         """
         ...
 
@@ -2086,7 +3363,11 @@ class OcmManeuver:
     @property
     def dc_time_pulse_period(self) -> Optional[float]:
         """
-        Period of the duty cycle pulse.
+        Elapsed time between the start of one pulse and the start of the next.
+
+        Examples: 100.0
+
+        Units: s
         """
         ...
 
@@ -2095,7 +3376,9 @@ class OcmManeuver:
     @property
     def dc_type(self) -> str:
         """
-        Type of duty cycle ('Continuous', 'Impulsive', 'Duration').
+        Duty cycle type to use for this maneuver time history section.
+
+        Examples: LUSTRE
         """
         ...
 
@@ -2104,7 +3387,9 @@ class OcmManeuver:
     @property
     def dc_win_close(self) -> Optional[str]:
         """
-        End of the duty cycle window.
+        End time of the duty cycle-based maneuver window.
+
+        Examples: 2000-01-01T13:00:00Z
         """
         ...
 
@@ -2113,7 +3398,9 @@ class OcmManeuver:
     @property
     def dc_win_open(self) -> Optional[str]:
         """
-        Start of the duty cycle window.
+        Start time of the duty cycle-based maneuver window.
+
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -2122,7 +3409,11 @@ class OcmManeuver:
     @property
     def grav_assist_name(self) -> Optional[str]:
         """
-        Name of the gravity assist body.
+        Identification of a gravitational body that would be used for an assist maneuver (value to be
+        drawn from the SANA registry list of Common Central Body Names at
+        <https://sanaregistry.org/r/central_body_name>).
+
+        Examples: EARTH, JUPITER
         """
         ...
 
@@ -2131,7 +3422,9 @@ class OcmManeuver:
     @property
     def man_basis(self) -> Optional[str]:
         """
-        Basis of the maneuver data ('Observed', 'Predicted', etc.).
+        Basis of this maneuver data (e.g., PREDICTED, DETERMINED, SIMULATED).
+
+        Examples: PREDICTED
         """
         ...
 
@@ -2140,7 +3433,10 @@ class OcmManeuver:
     @property
     def man_basis_id(self) -> Optional[str]:
         """
-        Identifier for the orbit determination or simulation basis.
+        Identification number for the telemetry dataset, orbit determination, or simulation upon
+        which the MAN_BASIS is based.
+
+        Examples: OD-123
         """
         ...
 
@@ -2149,7 +3445,10 @@ class OcmManeuver:
     @property
     def man_composition(self) -> str:
         """
-        Specifies the maneuver composition (e.g., 'VECTOR', 'SCALAR').
+        Specification of the maneuver element set type (value to be drawn from the SANA registry list
+        of Maneuver Types at https://sanaregistry.org/r/maneuver_type).
+
+        Examples: ΔV_CARTESIAN, ΔV_SPHERICAL, THRUST_CARTESIAN
         """
         ...
 
@@ -2158,7 +3457,9 @@ class OcmManeuver:
     @property
     def man_device_id(self) -> str:
         """
-        Identifier for the maneuver device (e.g., thruster name).
+        Identification name of the maneuver device (e.g., ‘THRUSTER-1’).
+
+        Examples: THRUSTER-1
         """
         ...
 
@@ -2167,7 +3468,9 @@ class OcmManeuver:
     @property
     def man_frame_epoch(self) -> Optional[str]:
         """
-        Epoch of the maneuver reference frame, if not intrinsic to the definition.
+        Epoch of the maneuver reference frame, if not intrinsic to its definition.
+
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -2176,7 +3479,9 @@ class OcmManeuver:
     @property
     def man_id(self) -> str:
         """
-        Identification number for the maneuver block.
+        Unique maneuver identification number for this maneuver block.
+
+        Examples: 1
         """
         ...
 
@@ -2185,7 +3490,7 @@ class OcmManeuver:
     @property
     def man_lines(self) -> list[ManLine]:
         """
-        A list of maneuver data lines.
+        Maneuver time history data lines.
         """
         ...
 
@@ -2194,7 +3499,9 @@ class OcmManeuver:
     @property
     def man_next_epoch(self) -> Optional[str]:
         """
-        Epoch of the next maneuver.
+        Start time of the next maneuver for this MAN_BASIS.
+
+        Examples: 2000-01-02T12:00:00Z
         """
         ...
 
@@ -2203,7 +3510,9 @@ class OcmManeuver:
     @property
     def man_next_id(self) -> Optional[str]:
         """
-        Identification number for the next maneuver block.
+        Identification number for the next maneuver.
+
+        Examples: 2
         """
         ...
 
@@ -2212,7 +3521,10 @@ class OcmManeuver:
     @property
     def man_pred_source(self) -> Optional[str]:
         """
-        Source of the predicted maneuver data.
+        Identification (e.g., message or file) of the predicted maneuver parameters upon which this
+        maneuver is based.
+
+        Examples: MAN-PRED-456
         """
         ...
 
@@ -2221,7 +3533,9 @@ class OcmManeuver:
     @property
     def man_prev_epoch(self) -> Optional[str]:
         """
-        Epoch of the previous maneuver.
+        Completion time of the previous maneuver for this MAN_BASIS.
+
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -2230,7 +3544,9 @@ class OcmManeuver:
     @property
     def man_prev_id(self) -> Optional[str]:
         """
-        Identification number for the previous maneuver block.
+        Identification number for the previous maneuver.
+
+        Examples: 0
         """
         ...
 
@@ -2239,7 +3555,9 @@ class OcmManeuver:
     @property
     def man_purpose(self) -> Optional[str]:
         """
-        Purpose of the maneuver.
+        Purpose of the maneuver (e.g., ‘WHEEL-DESAT’, ‘STATION-KEEPING’).
+
+        Examples: STATION-KEEPING
         """
         ...
 
@@ -2248,9 +3566,10 @@ class OcmManeuver:
     @property
     def man_ref_frame(self) -> str:
         """
-        Reference frame for the maneuver data.
+        Reference frame for the maneuver thrust vector (value to be drawn from the SANA registry list
+        of Reference Frames at <https://sanaregistry.org/r/orbit_relative_reference_frames>).
 
-        Standard values: "ICRF", "EME2000", "ITRF", "TEME", "GCRF", "RSW", "RTN", "TNW"
+        Examples: TNW, RSW
         """
         ...
 
@@ -2259,7 +3578,9 @@ class OcmManeuver:
     @property
     def man_units(self) -> Optional[str]:
         """
-        SI unit designations for the maneuver elements.
+        SI unit designations for the maneuver parameters.
+
+        Examples: km/s, N
         """
         ...
 
@@ -2268,10 +3589,7 @@ class OcmManeuver:
 
 class OcmMetadata:
     """
-    OCM Metadata
-
-    This section contains data about the object and the message itself,
-    including time systems, object identifiers, and Point-of-Contact (POC) information.
+    OCM Metadata Section.
 
     Parameters
     ----------
@@ -2378,7 +3696,7 @@ class OcmMetadata:
         Time system.
     epoch_tzero : str
         Epoch T-Zero.
-    ... (see Parameters for full list)
+        ... (see Parameters for full list)
     """
     def __init__(
         *,
@@ -2440,7 +3758,9 @@ class OcmMetadata:
     @property
     def adm_msg_link(self) -> Optional[str]:
         """
-        Unique identifier of an Attitude Data Message associated with the OCM.
+        Link(s) to relevant Attitude Data Message(s).
+
+        Examples: ADM-2023-001
         """
         ...
 
@@ -2449,9 +3769,10 @@ class OcmMetadata:
     @property
     def alternate_names(self) -> Optional[str]:
         """
-        Alternate name(s) by which the space object is known.
+        Alternate name(s) of this space object, including assigned names used by spacecraft operator,
+        State Actors, commercial SSA providers, and/or media.
 
-        Examples: "SV08", "IN8"
+        Examples: CALIPSO, 2006-016B
         """
         ...
 
@@ -2460,9 +3781,10 @@ class OcmMetadata:
     @property
     def catalog_name(self) -> Optional[str]:
         """
-        Satellite catalog source (or source agency or operator).
+        Satellite catalog source (or source agency or operator, value to be drawn from the SANA
+        registry list of Space Object Catalogs at <https://sanaregistry.org/r/space_object_catalog>).
 
-        Examples: "CSPOC", "RFSA", "ESA", "COMSPOC"
+        Examples: NORAD, SATCAT
         """
         ...
 
@@ -2471,7 +3793,9 @@ class OcmMetadata:
     @property
     def cdm_msg_link(self) -> Optional[str]:
         """
-        Unique identifier of a Conjunction Data Message associated with the OCM.
+        Link(s) to relevant Conjunction Data Message(s).
+
+        Examples: CDM-2023-042
         """
         ...
 
@@ -2480,7 +3804,9 @@ class OcmMetadata:
     @property
     def celestial_source(self) -> Optional[str]:
         """
-        Source of celestial body ephemeris data used in the OCM.
+        Source of celestial body ephemerides.
+
+        Examples: JPL_DE430
         """
         ...
 
@@ -2489,7 +3815,7 @@ class OcmMetadata:
     @property
     def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
@@ -2498,9 +3824,9 @@ class OcmMetadata:
     @property
     def constellation(self) -> Optional[str]:
         """
-        The name of the constellation that the space object belongs to.
+        Constellation to which this space object belongs.
 
-        Example: "SPIRE"
+        Examples: GALILEO, STARLINK
         """
         ...
 
@@ -2509,9 +3835,9 @@ class OcmMetadata:
     @property
     def country(self) -> Optional[str]:
         """
-        The country/jurisdiction of the owner or operator of the space object.
+        Country or country code where the owner is based.
 
-        Examples: "US", "SPAIN"
+        Examples: FR, USA, JP
         """
         ...
 
@@ -2520,9 +3846,9 @@ class OcmMetadata:
     @property
     def eop_source(self) -> Optional[str]:
         """
-        Source and version of the Earth Orientation Parameters used.
+        Source of Earth Orientation Parameters.
 
-        Example: "CELESTRAK_20201028"
+        Examples: IERS_A
         """
         ...
 
@@ -2531,9 +3857,10 @@ class OcmMetadata:
     @property
     def epoch_tzero(self) -> str:
         """
-        Epoch to which all relative times in the message are referenced.
+        Epoch to which all relative times in the message are referenced. (For format specification,
+        see 7.5.10.)
 
-        Format: ISO 8601 (e.g., "2023-01-01T00:00:00" or "2023-001T00:00:00Z")
+        Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
         """
         ...
 
@@ -2542,12 +3869,14 @@ class OcmMetadata:
     @property
     def international_designator(self) -> Optional[str]:
         """
-        The COSPAR international designator of the space object.
+        COSPAR international designator for the object. Such designator values shall have the
+        following COSPAR format: YYYY-NNNP{PP}, where: YYYY = Year of launch; NNN = Three-digit serial
+        number of launch in year YYYY (with leading zeros); P{PP} = At least one capital letter for
+        the identification of the part brought into space by the launch. If the object has no
+        international designator or the content is either unknown (uncorrelated) or cannot be
+        disclosed, the value should be set to UNKNOWN (or this keyword omitted).
 
-        Format: YYYY-NNNP{PP}. If the object has no international designator or the content
-        is either unknown or cannot be disclosed, use "UNKNOWN".
-
-        Examples: "2000-052A", "1996-068A", "UNKNOWN"
+        Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
         """
         ...
 
@@ -2556,7 +3885,9 @@ class OcmMetadata:
     @property
     def interp_method_eop(self) -> Optional[str]:
         """
-        Method used to interpolate the EOP data.
+        Interpolation method for EOP data.
+
+        Examples: HERMITE, LINEAR
         """
         ...
 
@@ -2565,7 +3896,9 @@ class OcmMetadata:
     @property
     def next_leap_epoch(self) -> Optional[str]:
         """
-        Epoch of the next leap second.
+        Epoch of the next leap second. (See 7.5.10 for formatting rules.)
+
+        Examples: 2001-11-06T11:17:33
         """
         ...
 
@@ -2574,9 +3907,11 @@ class OcmMetadata:
     @property
     def next_leap_taimutc(self) -> Optional[float]:
         """
-        Difference between TAI and UTC at NEXT_LEAP_EPOCH.
+        TAI minus UTC difference at NEXT_LEAP_EPOCH.
 
-        :unit: s
+        Examples: 38.0
+
+        Units: s
         """
         ...
 
@@ -2585,7 +3920,9 @@ class OcmMetadata:
     @property
     def next_message_epoch(self) -> Optional[str]:
         """
-        The anticipated creation epoch of the next OCM message for this space object.
+        Anticipated epoch of the next message. (See 7.5.10 for formatting rules.)
+
+        Examples: 2001-11-06T11:17:33
         """
         ...
 
@@ -2594,7 +3931,9 @@ class OcmMetadata:
     @property
     def next_message_id(self) -> Optional[str]:
         """
-        Unique identifier for the anticipated next OCM message for this space object.
+        Message ID of the next message from this message originator for this space object.
+
+        Examples: MSG-12346
         """
         ...
 
@@ -2603,9 +3942,11 @@ class OcmMetadata:
     @property
     def object_designator(self) -> Optional[str]:
         """
-        Unique satellite identification designator from the specified catalog.
+        Unique satellite identification designator for the object, as reflected in the catalog whose
+        name is ‘CATALOG_NAME’. If the ID is not known (uncorrelated object) or cannot be disclosed,
+        ‘UNKNOWN’ may be used (or this keyword omitted).
 
-        Examples: "22444", "18SPCS 18571", "UNKNOWN"
+        Examples: 28893
         """
         ...
 
@@ -2614,13 +3955,15 @@ class OcmMetadata:
     @property
     def object_name(self) -> Optional[str]:
         """
-        Name of the space object that the message is associated with.
+        Spacecraft name for which OCM data is provided. While there is no CCSDS-based restriction on
+        the value for this keyword, it is recommended to use names from either the UN Office of Outer
+        Space Affairs designator index (reference \[3\]), the spacecraft operator, or a State Actor or
+        commercial Space Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space
+        catalog. If OBJECT_NAME is not listed in reference \[3\] or the content is either unknown
+        (uncorrelated) or cannot be disclosed, the value should be set to UNKNOWN (or this keyword
+        omitted).
 
-        While there is no CCSDS-based restriction on the value, it is recommended to use names
-        from the UN Office of Outer Space Affairs designator index. If not listed or unknown,
-        use "UNKNOWN".
-
-        Examples: "SPOT-7", "ENVISAT", "IRIDIUM NEXT-8", "INTELSAT G-15", "UNKNOWN"
+        Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
         """
         ...
 
@@ -2629,9 +3972,10 @@ class OcmMetadata:
     @property
     def object_type(self) -> Optional[str]:
         """
-        The type of space object.
+        Type of object (value to be drawn from the SANA registry list of Object Descriptions at
+        <https://sanaregistry.org/r/object_types>).
 
-        Standard values: "PAYLOAD", "ROCKET_BODY", "DEBRIS", "UNKNOWN"
+        Examples: PAYLOAD, ROCKET BODY, DEBRIS, OTHER
         """
         ...
 
@@ -2640,9 +3984,9 @@ class OcmMetadata:
     @property
     def ocm_data_elements(self) -> Optional[str]:
         """
-        Comma-delimited list of data elements included in the OCM message.
+        List of data elements included in the OCM message.
 
-        Values: "ORB", "PHYS", "COV", "MAN", "PERT", "OD", "USER"
+        Examples: TRAJ, PHYS, COV, MAN, PERT, OD, USER
         """
         ...
 
@@ -2651,9 +3995,9 @@ class OcmMetadata:
     @property
     def operator(self) -> Optional[str]:
         """
-        The organization that conducts the operational control of the space object.
+        Spacecraft operator of the space object.
 
-        Example: "INTELSAT"
+        Examples: SES, INTELSAT
         """
         ...
 
@@ -2662,9 +4006,10 @@ class OcmMetadata:
     @property
     def ops_status(self) -> Optional[str]:
         """
-        The operational status of the space object.
+        Operational status of the space object (value to be drawn from the SANA registry list of
+        Operational Status at <https://sanaregistry.org/r/operational_status>).
 
-        Standard values: "OPERATIONAL", "NONOPERATIONAL", "PARTIALLY_OPERATIONAL", "UNKNOWN"
+        Examples: OPERATIONAL, NON-OPERATIONAL
         """
         ...
 
@@ -2673,9 +4018,10 @@ class OcmMetadata:
     @property
     def orbit_category(self) -> Optional[str]:
         """
-        The category of orbit of the space object.
+        Orbit category of the space object (value to be drawn from the SANA registry list of Orbit
+        Categories at <https://sanaregistry.org/r/orbit_categories>).
 
-        Standard values: "GEO", "LEO", "MEO", "HEO", "NGO", "OTHER"
+        Examples: GEO, LEO
         """
         ...
 
@@ -2684,7 +4030,9 @@ class OcmMetadata:
     @property
     def originator_address(self) -> Optional[str]:
         """
-        Physical address of the Programmatic Point of Contact at the OCM originator's organization.
+        Originator’s physical address.
+
+        Examples: 123 Main St, Anytown, USA
         """
         ...
 
@@ -2693,7 +4041,9 @@ class OcmMetadata:
     @property
     def originator_email(self) -> Optional[str]:
         """
-        Email address of the Programmatic Point of Contact at the OCM originator's organization.
+        Originator PoC email address.
+
+        Examples: john.doe@example.com
         """
         ...
 
@@ -2702,7 +4052,9 @@ class OcmMetadata:
     @property
     def originator_phone(self) -> Optional[str]:
         """
-        Phone number of the Programmatic Point of Contact at the OCM originator's organization.
+        Originator PoC phone number.
+
+        Examples: +1 123-456-7890
         """
         ...
 
@@ -2711,9 +4063,9 @@ class OcmMetadata:
     @property
     def originator_poc(self) -> Optional[str]:
         """
-        Programmatic Point of Contact at the OCM originator's organization.
+        Point-of-Contact (PoC) for OCM.
 
-        Example: "Mr. Rodgers"
+        Examples: John Doe
         """
         ...
 
@@ -2722,9 +4074,9 @@ class OcmMetadata:
     @property
     def originator_position(self) -> Optional[str]:
         """
-        Position of the Programmatic Point of Contact at the OCM originator's organization.
+        Contact position of the originator PoC.
 
-        Example: "Flight Dynamics, Mission Design Lead"
+        Examples: Analyst
         """
         ...
 
@@ -2733,9 +4085,9 @@ class OcmMetadata:
     @property
     def owner(self) -> Optional[str]:
         """
-        The organization that owns the space object.
+        Owner of the space object.
 
-        Example: "SIRIUS"
+        Examples: Government of France
         """
         ...
 
@@ -2744,7 +4096,9 @@ class OcmMetadata:
     @property
     def previous_message_epoch(self) -> Optional[str]:
         """
-        The creation epoch of the previous OCM for this space object.
+        Epoch of the previous message. (See 7.5.10 for formatting rules.)
+
+        Examples: 2001-11-06T11:17:33
         """
         ...
 
@@ -2753,7 +4107,9 @@ class OcmMetadata:
     @property
     def previous_message_id(self) -> Optional[str]:
         """
-        Unique identifier for the previous OCM message for this space object.
+        Message ID of the previous message from this message originator for this space object.
+
+        Examples: MSG-12344
         """
         ...
 
@@ -2762,7 +4118,9 @@ class OcmMetadata:
     @property
     def prm_msg_link(self) -> Optional[str]:
         """
-        Unique identifier of a Pointing Request Message associated with the OCM.
+        Link(s) to relevant Pointing Request Message(s).
+
+        Examples: PRM-2023-005
         """
         ...
 
@@ -2771,7 +4129,9 @@ class OcmMetadata:
     @property
     def rdm_msg_link(self) -> Optional[str]:
         """
-        Unique identifier of a Reentry Data Message associated with the OCM.
+        Link(s) to relevant Reentry Data Message(s).
+
+        Examples: RDM-2023-010
         """
         ...
 
@@ -2780,9 +4140,11 @@ class OcmMetadata:
     @property
     def sclk_offset_at_epoch(self) -> Optional[float]:
         """
-        Spacecraft clock count offset at EPOCH_TZERO.
+        Spacecraft clock offset at EPOCH_TZERO.
 
-        :unit: s
+        Examples: 0.0
+
+        Units: s
         """
         ...
 
@@ -2791,9 +4153,11 @@ class OcmMetadata:
     @property
     def sclk_sec_per_si_sec(self) -> Optional[float]:
         """
-        Number of spacecraft clock seconds per SI second.
+        Spacecraft clock scale factor.
 
-        :unit: s/SI-s
+        Examples: 1.0
+
+        Units: s/SI-s
         """
         ...
 
@@ -2802,7 +4166,9 @@ class OcmMetadata:
     @property
     def start_time(self) -> Optional[str]:
         """
-        The time of the earliest data in the message.
+        Time of the earliest data in the message. (See 7.5.10 for formatting rules.)
+
+        Examples: 2001-11-06T11:17:33
         """
         ...
 
@@ -2811,7 +4177,9 @@ class OcmMetadata:
     @property
     def stop_time(self) -> Optional[str]:
         """
-        The time of the latest data in the message.
+        Time of the latest data in the message. (See 7.5.10 for formatting rules.)
+
+        Examples: 2001-11-06T11:17:33
         """
         ...
 
@@ -2820,9 +4188,11 @@ class OcmMetadata:
     @property
     def taimutc_at_tzero(self) -> Optional[float]:
         """
-        Difference between TAI and UTC at EPOCH_TZERO.
+        TAI minus UTC difference at EPOCH_TZERO.
 
-        :unit: s
+        Examples: 37.0
+
+        Units: s
         """
         ...
 
@@ -2831,7 +4201,9 @@ class OcmMetadata:
     @property
     def tdm_msg_link(self) -> Optional[str]:
         """
-        Unique identifier of a Tracking Data Message associated with the OCM.
+        Link(s) to relevant Tracking Data Message(s).
+
+        Examples: TDM-2023-111
         """
         ...
 
@@ -2840,7 +4212,9 @@ class OcmMetadata:
     @property
     def tech_address(self) -> Optional[str]:
         """
-        Physical address of the technical Point of Contact at the creating agency or operator.
+        Physical address information for OCM creator.
+
+        Examples: 456 Tech Park, Sometown, USA
         """
         ...
 
@@ -2849,7 +4223,9 @@ class OcmMetadata:
     @property
     def tech_email(self) -> Optional[str]:
         """
-        Email address of the technical Point of Contact at the creating agency or operator.
+        Technical PoC email address.
+
+        Examples: jane.smith@example.com
         """
         ...
 
@@ -2858,9 +4234,10 @@ class OcmMetadata:
     @property
     def tech_org(self) -> Optional[str]:
         """
-        Technical organization (creating agency or operator) that can answer questions about the message.
+        Creating agency or operator (value should be drawn from the ‘Abbreviation’ column of the SANA
+        Organizations registry at <https://www.sanaregistry.org/r/organizations>).
 
-        Example: "NASA"
+        Examples: NASA, ESA, JAXA
         """
         ...
 
@@ -2869,7 +4246,9 @@ class OcmMetadata:
     @property
     def tech_phone(self) -> Optional[str]:
         """
-        Phone number of the technical Point of Contact at the creating agency or operator.
+        Technical PoC phone number.
+
+        Examples: +1 987-654-3210
         """
         ...
 
@@ -2878,9 +4257,9 @@ class OcmMetadata:
     @property
     def tech_poc(self) -> Optional[str]:
         """
-        Technical Point of Contact at the creating agency or operator.
+        Technical PoC for OCM.
 
-        Example: "John Doe"
+        Examples: Jane Smith
         """
         ...
 
@@ -2889,7 +4268,9 @@ class OcmMetadata:
     @property
     def tech_position(self) -> Optional[str]:
         """
-        Position of the technical Point of Contact at the creating agency or operator.
+        Contact position of the technical PoC.
+
+        Examples: Engineer
         """
         ...
 
@@ -2898,7 +4279,11 @@ class OcmMetadata:
     @property
     def time_span(self) -> Optional[float]:
         """
-        The approximate span of time covered by the data in the message [d].
+        Approximate time span covered by the data in the message.
+
+        Examples: 0.1
+
+        Units: d
         """
         ...
 
@@ -2907,10 +4292,9 @@ class OcmMetadata:
     @property
     def time_system(self) -> str:
         """
-        Time system that shall be used for all absolute time stamps in the message.
+        Time system used for all absolute time stamps in the message (e.g., UTC, TAI).
 
-        Standard values: "UTC", "TAI", "TT", "GPS", "TDB", "TCB", "MET", "MRT", "SCLK"
-        Use of other values should be documented in an ICD.
+        Examples: UTC, TAI
         """
         ...
 
@@ -2919,9 +4303,11 @@ class OcmMetadata:
     @property
     def ut1mutc_at_tzero(self) -> Optional[float]:
         """
-        Difference between UT1 and UTC at EPOCH_TZERO.
+        UT1 minus UTC difference at EPOCH_TZERO.
 
-        :unit: s
+        Examples: 0.3
+
+        Units: s
         """
         ...
 
@@ -2930,9 +4316,7 @@ class OcmMetadata:
 
 class OcmOdParameters:
     """
-    Orbit Determination Parameters.
-
-    This block describes the orbit determination process and metadata.
+    OCM Orbit Determination Parameters.
 
     Parameters
     ----------
@@ -2964,9 +4348,11 @@ class OcmOdParameters:
     @property
     def actual_od_span(self) -> Optional[float]:
         """
-        Actual time span of the observations used in the orbit determination.
+        Actual time span in days used for the OD of the object.
 
-        :unit: d
+        Examples: 4.8
+
+        Units: d
         """
         ...
 
@@ -2975,7 +4361,7 @@ class OcmOdParameters:
     @property
     def comment(self) -> list[str]:
         """
-        Comments for the orbit determination parameters section.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
@@ -2984,7 +4370,9 @@ class OcmOdParameters:
     @property
     def consider_n(self) -> Optional[int]:
         """
-        Number of consider parameters.
+        The number of consider parameters used in the orbit determination.
+
+        Examples: 3
         """
         ...
 
@@ -2993,7 +4381,10 @@ class OcmOdParameters:
     @property
     def consider_params(self) -> Optional[str]:
         """
-        A list of the consider parameters.
+        Free-text comma-delimited description of the consider parameters used in the orbit
+        determination.
+
+        Examples: DRAG_COEFF, SRP_COEFF
         """
         ...
 
@@ -3002,7 +4393,9 @@ class OcmOdParameters:
     @property
     def data_types(self) -> Optional[str]:
         """
-        A list of tracking data types used.
+        Comma-separated list of observation data types utilized in this orbit determination.
+
+        Examples: RANGE, DOPPLER
         """
         ...
 
@@ -3011,7 +4404,11 @@ class OcmOdParameters:
     @property
     def days_since_first_obs(self) -> Optional[float]:
         """
-        Time elapsed since the first observation [d].
+        Days elapsed between first accepted observation and OD_EPOCH.
+
+        Examples: 1.5
+
+        Units: d
         """
         ...
 
@@ -3020,7 +4417,11 @@ class OcmOdParameters:
     @property
     def days_since_last_obs(self) -> Optional[float]:
         """
-        Time elapsed since the last observation [d].
+        Days elapsed between last accepted observation and OD_EPOCH.
+
+        Examples: 0.1
+
+        Units: d
         """
         ...
 
@@ -3029,7 +4430,9 @@ class OcmOdParameters:
     @property
     def gdop(self) -> Optional[float]:
         """
-        Geometric Dilution of Precision.
+        Generalized Dilution Of Precision for this orbit determination.
+
+        Examples: 1.5
         """
         ...
 
@@ -3038,9 +4441,11 @@ class OcmOdParameters:
     @property
     def maximum_obs_gap(self) -> Optional[float]:
         """
-        Maximum gap between observations.
+        The maximum time between observations in the OD of the object.
 
-        :unit: s
+        Examples: 0.5
+
+        Units: d
         """
         ...
 
@@ -3049,7 +4454,9 @@ class OcmOdParameters:
     @property
     def obs_available(self) -> Optional[int]:
         """
-        Total number of individual observations available.
+        The number of observations available within the actual OD time span.
+
+        Examples: 100
         """
         ...
 
@@ -3058,7 +4465,9 @@ class OcmOdParameters:
     @property
     def obs_used(self) -> Optional[int]:
         """
-        Total number of individual observations used.
+        The number of observations accepted within the actual OD time span.
+
+        Examples: 95
         """
         ...
 
@@ -3067,9 +4476,11 @@ class OcmOdParameters:
     @property
     def od_confidence(self) -> Optional[float]:
         """
-        Confidence level of the orbit determination [%].
+        OD confidence metric, which spans 0 to 100% (useful only for Filter-based OD systems).
 
-        :unit: %
+        Examples: 99.0
+
+        Units: %
         """
         ...
 
@@ -3078,7 +4489,10 @@ class OcmOdParameters:
     @property
     def od_epoch(self) -> str:
         """
-        Epoch of the orbit determination.
+        Relative or absolute time tag of the orbit determination solved-for state in the selected OCM
+        time system recorded by the TIME_SYSTEM keyword.
+
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -3087,9 +4501,11 @@ class OcmOdParameters:
     @property
     def od_epoch_eigint(self) -> Optional[float]:
         """
-        Intermediate axis of the OD epoch uncertainty ellipse.
+        Positional error ellipsoid 1σ intermediate eigenvalue at the epoch of the OD.
 
-        :unit: m
+        Examples: 50.0
+
+        Units: m
         """
         ...
 
@@ -3098,9 +4514,11 @@ class OcmOdParameters:
     @property
     def od_epoch_eigmaj(self) -> Optional[float]:
         """
-        Semi-major axis of the OD epoch uncertainty ellipse.
+        Positional error ellipsoid 1 sigma (1σ) major eigenvalue at the epoch of the OD.
 
-        :unit: m
+        Examples: 100.0
+
+        Units: m
         """
         ...
 
@@ -3109,9 +4527,11 @@ class OcmOdParameters:
     @property
     def od_epoch_eigmin(self) -> Optional[float]:
         """
-        Semi-minor axis of the OD epoch uncertainty ellipse.
+        Positional error ellipsoid 1σ minor eigenvalue at the epoch of the OD.
 
-        :unit: m
+        Examples: 20.0
+
+        Units: m
         """
         ...
 
@@ -3120,7 +4540,9 @@ class OcmOdParameters:
     @property
     def od_id(self) -> str:
         """
-        Identifier for the orbit determination parameters block.
+        Identification number for this orbit determination.
+
+        Examples: 1
         """
         ...
 
@@ -3129,9 +4551,12 @@ class OcmOdParameters:
     @property
     def od_max_pred_eigmaj(self) -> Optional[float]:
         """
-        Maximum predicted semi-major axis of the error ellipsoid.
+        The resulting maximum predicted major eigenvalue of the 1σ positional error ellipsoid over
+        the entire TIME_SPAN of the OCM, stemming from this OD.
 
-        :unit: m
+        Examples: 500.0
+
+        Units: m
         """
         ...
 
@@ -3140,7 +4565,9 @@ class OcmOdParameters:
     @property
     def od_method(self) -> str:
         """
-        Specifies the method used for the orbit determination.
+        Type of orbit determination method used to produce the orbit estimate.
+
+        Examples: LEAST_SQUARES, KALMAN_FILTER
         """
         ...
 
@@ -3149,9 +4576,12 @@ class OcmOdParameters:
     @property
     def od_min_pred_eigmin(self) -> Optional[float]:
         """
-        Minimum predicted semi-minor axis of the error ellipsoid.
+        The resulting minimum predicted minor eigenvalue of the 1σ positional error ellipsoid over
+        the entire TIME_SPAN of the OCM, stemming from this OD.
 
-        :unit: m
+        Examples: 10.0
+
+        Units: m
         """
         ...
 
@@ -3160,7 +4590,9 @@ class OcmOdParameters:
     @property
     def od_prev_id(self) -> Optional[str]:
         """
-        Identification number for the previous orbit determination block.
+        Optional identification number for the previous orbit determination.
+
+        Examples: 0
         """
         ...
 
@@ -3169,9 +4601,12 @@ class OcmOdParameters:
     @property
     def recommended_od_span(self) -> Optional[float]:
         """
-        Recommended time span for the orbit determination.
+        Number of days of observations recommended for the OD of the object (useful only for Batch OD
+        systems).
 
-        :unit: d
+        Examples: 5.0
+
+        Units: d
         """
         ...
 
@@ -3180,9 +4615,12 @@ class OcmOdParameters:
     @property
     def sedr(self) -> Optional[float]:
         """
-        Standard Energy Dissipation Rate [W/kg].
+        The Specific Energy Dissipation Rate, which is the amount of energy being removed from the
+        object's orbit by the non-conservative forces.
 
-        :unit: W/kg
+        Examples: 1.25e-7
+
+        Units: W/kg
         """
         ...
 
@@ -3191,7 +4629,9 @@ class OcmOdParameters:
     @property
     def sensors(self) -> Optional[str]:
         """
-        A list of sensors used.
+        Free-text comma-delimited description of the sensors used in the orbit determination.
+
+        Examples: SENSOR1, SENSOR2
         """
         ...
 
@@ -3200,7 +4640,9 @@ class OcmOdParameters:
     @property
     def sensors_n(self) -> Optional[int]:
         """
-        Number of tracking sensors used.
+        The number of sensors used in the orbit determination.
+
+        Examples: 5
         """
         ...
 
@@ -3209,7 +4651,9 @@ class OcmOdParameters:
     @property
     def solve_n(self) -> Optional[int]:
         """
-        Number of states solved for.
+        The number of solve-for states in the orbit determination.
+
+        Examples: 6
         """
         ...
 
@@ -3218,7 +4662,10 @@ class OcmOdParameters:
     @property
     def solve_states(self) -> Optional[str]:
         """
-        A list of the states solved for.
+        Free-text comma-delimited description of the state elements solved for in the orbit
+        determination.
+
+        Examples: X, Y, Z, X_DOT, Y_DOT, Z_DOT
         """
         ...
 
@@ -3227,7 +4674,10 @@ class OcmOdParameters:
     @property
     def tracks_available(self) -> Optional[int]:
         """
-        Total number of observation tracks available.
+        The number of sensor tracks available for the OD within the actual time span (see definition
+        of ‘tracks’, 1.5.2).
+
+        Examples: 10
         """
         ...
 
@@ -3236,7 +4686,10 @@ class OcmOdParameters:
     @property
     def tracks_used(self) -> Optional[int]:
         """
-        Total number of observation tracks used.
+        The number of sensor tracks accepted for the OD within the actual time span (see definition of
+        ‘tracks’, 1.5.2).
+
+        Examples: 9
         """
         ...
 
@@ -3245,7 +4698,9 @@ class OcmOdParameters:
     @property
     def weighted_rms(self) -> Optional[float]:
         """
-        Weighted Root Mean Square error.
+        (Useful/valid only for Batch OD systems.) The weighted RMS residual ratio.
+
+        Examples: 0.95
         """
         ...
 
@@ -3254,9 +4709,7 @@ class OcmOdParameters:
 
 class OcmPerturbations:
     """
-    Perturbation Model Specification.
-
-    This block describes the force models used in the orbit propagation.
+    OCM Perturbations Parameters.
 
     Parameters
     ----------
@@ -3274,7 +4727,9 @@ class OcmPerturbations:
     @property
     def albedo_grid_size(self) -> Optional[int]:
         """
-        Size of the grid used for albedo calculations.
+        Size of the albedo grid.
+
+        Examples: 10
         """
         ...
 
@@ -3283,7 +4738,9 @@ class OcmPerturbations:
     @property
     def albedo_model(self) -> Optional[str]:
         """
-        Method and version of albedo model used.
+        Name of the albedo model.
+
+        Examples: EARTH_ALBEDO
         """
         ...
 
@@ -3292,7 +4749,10 @@ class OcmPerturbations:
     @property
     def atmospheric_model(self) -> Optional[str]:
         """
-        Specifies the atmospheric model used for drag.
+        Name of the atmospheric model (value to be drawn from the SANA registry list of Atmospheric
+        Models at https://sanaregistry.org/r/atmospheric_model).
+
+        Examples: JB2008, MSISE00
         """
         ...
 
@@ -3301,9 +4761,11 @@ class OcmPerturbations:
     @property
     def central_body_rotation(self) -> Optional[float]:
         """
-        Rotation rate of the central body.
+        Central body angular rotation rate.
 
-        :unit: deg/s
+        Examples: 0.00417807462
+
+        Units: deg/s
         """
         ...
 
@@ -3312,7 +4774,7 @@ class OcmPerturbations:
     @property
     def comment(self) -> list[str]:
         """
-        Comments for the perturbations section.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
@@ -3321,9 +4783,11 @@ class OcmPerturbations:
     @property
     def equatorial_radius(self) -> Optional[float]:
         """
-        Equatorial radius of the central body [km].
+        Equatorial radius of the central body.
 
-        :unit: km
+        Examples: 6378137.0
+
+        Units: m
         """
         ...
 
@@ -3332,9 +4796,11 @@ class OcmPerturbations:
     @property
     def fixed_f10p7(self) -> Optional[float]:
         """
-        Fixed solar flux index F10.7.
+        Fixed F10.7 solar flux.
 
-        :unit: sfu
+        Examples: 150.0
+
+        Units: SFU
         """
         ...
 
@@ -3343,9 +4809,11 @@ class OcmPerturbations:
     @property
     def fixed_f10p7_mean(self) -> Optional[float]:
         """
-        Fixed mean solar flux index F10.7.
+        Fixed 81-day average F10.7 solar flux.
 
-        :unit: sfu
+        Examples: 140.0
+
+        Units: SFU
         """
         ...
 
@@ -3354,9 +4822,9 @@ class OcmPerturbations:
     @property
     def fixed_geomag_ap(self) -> Optional[float]:
         """
-        Fixed geomagnetic index Ap.
+        Fixed geomagnetic Ap index.
 
-        :unit: Ap
+        Examples: 15.0
         """
         ...
 
@@ -3365,9 +4833,9 @@ class OcmPerturbations:
     @property
     def fixed_geomag_dst(self) -> Optional[float]:
         """
-        Fixed geomagnetic index Dst.
+        Fixed geomagnetic Dst index.
 
-        :unit: nT
+        Examples: -20.0
         """
         ...
 
@@ -3376,9 +4844,9 @@ class OcmPerturbations:
     @property
     def fixed_geomag_kp(self) -> Optional[float]:
         """
-        Fixed geomagnetic planetary index Kp.
+        Fixed geomagnetic Kp index.
 
-        :unit: Kp
+        Examples: 3.0
         """
         ...
 
@@ -3387,9 +4855,11 @@ class OcmPerturbations:
     @property
     def fixed_m10p7(self) -> Optional[float]:
         """
-        Fixed solar flux index M10.7.
+        Fixed M10.7 solar flux.
 
-        :unit: sfu
+        Examples: 130.0
+
+        Units: SFU
         """
         ...
 
@@ -3398,9 +4868,11 @@ class OcmPerturbations:
     @property
     def fixed_m10p7_mean(self) -> Optional[float]:
         """
-        Fixed mean solar flux index M10.7.
+        Fixed 81-day average M10.7 solar flux.
 
-        :unit: sfu
+        Examples: 120.0
+
+        Units: SFU
         """
         ...
 
@@ -3409,9 +4881,11 @@ class OcmPerturbations:
     @property
     def fixed_s10p7(self) -> Optional[float]:
         """
-        Fixed solar flux index S10.7.
+        Fixed S10.7 solar flux.
 
-        :unit: sfu
+        Examples: 110.0
+
+        Units: SFU
         """
         ...
 
@@ -3420,9 +4894,11 @@ class OcmPerturbations:
     @property
     def fixed_s10p7_mean(self) -> Optional[float]:
         """
-        Fixed mean solar flux index S10.7.
+        Fixed 81-day average S10.7 solar flux.
 
-        :unit: sfu
+        Examples: 100.0
+
+        Units: SFU
         """
         ...
 
@@ -3431,9 +4907,11 @@ class OcmPerturbations:
     @property
     def fixed_y10p7(self) -> Optional[float]:
         """
-        Fixed solar flux index Y10.7.
+        Fixed Y10.7 solar flux.
 
-        :unit: sfu
+        Examples: 90.0
+
+        Units: SFU
         """
         ...
 
@@ -3442,9 +4920,11 @@ class OcmPerturbations:
     @property
     def fixed_y10p7_mean(self) -> Optional[float]:
         """
-        Fixed mean solar flux index Y10.7.
+        Fixed 81-day average Y10.7 solar flux.
 
-        :unit: sfu
+        Examples: 85.0
+
+        Units: SFU
         """
         ...
 
@@ -3453,9 +4933,11 @@ class OcmPerturbations:
     @property
     def gm(self) -> Optional[float]:
         """
-        Mass of the central body times the gravitational constant [km**3/s**2].
+        Gravitational coefficient of the central body.
 
-        :unit: km³/s²
+        Examples: 398600.4418
+
+        Units: km³/s²
         """
         ...
 
@@ -3464,7 +4946,10 @@ class OcmPerturbations:
     @property
     def gravity_model(self) -> Optional[str]:
         """
-        Specifies the gravity model used.
+        Name of the gravity model (value to be drawn from the SANA registry list of Gravitational
+        Models at https://sanaregistry.org/r/gravity_model).
+
+        Examples: EGM96, EGM2008
         """
         ...
 
@@ -3473,7 +4958,10 @@ class OcmPerturbations:
     @property
     def n_body_perturbations(self) -> Optional[str]:
         """
-        Specifies the celestial bodies used for n-body perturbations.
+        List of N-body perturbations included (value(s) to be drawn from the SANA registry list of
+        Common Central Body Names at https://sanaregistry.org/r/central_body_name).
+
+        Examples: MOON, SUN
         """
         ...
 
@@ -3482,7 +4970,9 @@ class OcmPerturbations:
     @property
     def oblate_flattening(self) -> Optional[float]:
         """
-        Oblateness/flattening of the central body.
+        Oblate flattening of the central body.
+
+        Examples: 0.00335281
         """
         ...
 
@@ -3491,7 +4981,10 @@ class OcmPerturbations:
     @property
     def ocean_tides_model(self) -> Optional[str]:
         """
-        Specifies the ocean tides model used.
+        Name of the ocean tides model (value to be drawn from the SANA registry list of Ocean Tides
+        Models at https://sanaregistry.org/r/ocean_tides_model).
+
+        Examples: FES2004
         """
         ...
 
@@ -3500,7 +4993,10 @@ class OcmPerturbations:
     @property
     def reduction_theory(self) -> Optional[str]:
         """
-        Specifies the IAU celestial body reduction theory used (e.g., IAU-2000).
+        Specification of the reduction theory used for precession and nutation modeling. This is a
+        free-text field, so if the examples on the right are insufficient, others may be used.
+
+        Examples: IAU1976/FK5, IAU2010
         """
         ...
 
@@ -3509,7 +5005,10 @@ class OcmPerturbations:
     @property
     def shadow_bodies(self) -> Optional[str]:
         """
-        List of celestial bodies that contribute to shadows.
+        List of bodies included in shadow calculations (value(s) to be drawn from the SANA registry
+        list of Orbit Centers at <https://sanaregistry.org/r/orbit_centers>).
+
+        Examples: EARTH, MOON
         """
         ...
 
@@ -3518,7 +5017,7 @@ class OcmPerturbations:
     @property
     def shadow_model(self) -> Optional[str]:
         """
-        Method and version of shadow model used.
+        Examples: NONE, CONE, DUAL_CONE, CYLINDRICAL
         """
         ...
 
@@ -3527,7 +5026,10 @@ class OcmPerturbations:
     @property
     def solid_tides_model(self) -> Optional[str]:
         """
-        Specifies the solid tides model used.
+        Name of solid tides model (optionally specify order or constituent effects, diurnal,
+        semi-diurnal, etc.).
+
+        Examples: DIURNAL, SEMI-DIURNAL
         """
         ...
 
@@ -3536,7 +5038,9 @@ class OcmPerturbations:
     @property
     def srp_model(self) -> Optional[str]:
         """
-        Method and version of solar radiation pressure model used.
+        Name of the Solar Radiation Pressure (SRP) model.
+
+        Examples: CANNONBALL, FLAT_PLATE, BOX_WING
         """
         ...
 
@@ -3546,6 +5050,8 @@ class OcmPerturbations:
     def sw_data_epoch(self) -> Optional[str]:
         """
         Epoch of the space weather data.
+
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -3554,7 +5060,9 @@ class OcmPerturbations:
     @property
     def sw_data_source(self) -> Optional[str]:
         """
-        Source of space weather data used.
+        Space weather data source.
+
+        Examples: NOAA
         """
         ...
 
@@ -3563,7 +5071,12 @@ class OcmPerturbations:
     @property
     def sw_interp_method(self) -> Optional[str]:
         """
-        Method used to interpolate space weather data.
+        Free-text field specifying the method used to select or interpolate any and all sequential
+        space weather data (Kp, ap, Dst, F10.7, M10.7, S10.7, Y10.7, etc.). While not constrained to
+        specific entries, it is anticipated that the utilized method would match methods detailed in
+        numerical analysis textbooks.
+
+        Examples: PRECEDING_VALUE, NEAREST_NEIGHBOR, LINEAR, LAGRANGE_ORDER_5
         """
         ...
 
@@ -3573,9 +5086,6 @@ class OcmPerturbations:
 class OcmPhysicalDescription:
     """
     Space Object Physical Characteristics.
-
-    This block describes mass, drag, solar radiation pressure,
-    and other physical properties of the space object.
 
     Parameters
     ----------
@@ -3649,9 +5159,13 @@ class OcmPhysicalDescription:
     @property
     def area_along_oeb_int(self) -> Optional[float]:
         """
-        The cross-sectional area along the intermediate OEB axis.
+        Attitude-dependent cross-sectional area of space object (not already included in
+        DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along intermediate OEB (Ŷoeb) direction as
+        defined in annex F.
 
-        :unit: m²
+        Examples: 20.0
+
+        Units: m²
         """
         ...
 
@@ -3660,9 +5174,13 @@ class OcmPhysicalDescription:
     @property
     def area_along_oeb_max(self) -> Optional[float]:
         """
-        The cross-sectional area along the maximum OEB axis.
+        Attitude-dependent cross-sectional area of space object (not already included in
+        DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along max OEB (Xoeb) direction as defined in
+        annex F.
 
-        :unit: m²
+        Examples: 10.0
+
+        Units: m²
         """
         ...
 
@@ -3671,9 +5189,13 @@ class OcmPhysicalDescription:
     @property
     def area_along_oeb_min(self) -> Optional[float]:
         """
-        The cross-sectional area along the minimum OEB axis.
+        Attitude-dependent cross-sectional area of space object (not already included in
+        DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along minimum OEB (Ẑoeb) direction as defined
+        in annex F.
 
-        :unit: m²
+        Examples: 50.0
+
+        Units: m²
         """
         ...
 
@@ -3682,9 +5204,11 @@ class OcmPhysicalDescription:
     @property
     def area_max_for_pc(self) -> Optional[float]:
         """
-        The maximum cross-sectional area for probability of collision.
+        Maximum cross-sectional area for collision probability estimation purposes.
 
-        :unit: m²
+        Examples: 50.0
+
+        Units: m²
         """
         ...
 
@@ -3693,9 +5217,11 @@ class OcmPhysicalDescription:
     @property
     def area_min_for_pc(self) -> Optional[float]:
         """
-        The minimum cross-sectional area for probability of collision.
+        Minimum cross-sectional area for collision probability estimation purposes.
 
-        :unit: m²
+        Examples: 5.0
+
+        Units: m²
         """
         ...
 
@@ -3704,9 +5230,12 @@ class OcmPhysicalDescription:
     @property
     def area_typ_for_pc(self) -> Optional[float]:
         """
-        The typical cross-sectional area for probability of collision.
+        Typical (50th percentile) cross-sectional area sampled over all space object orientations for
+        collision probability estimation purposes.
 
-        :unit: m²
+        Examples: 15.0
+
+        Units: m²
         """
         ...
 
@@ -3715,9 +5244,10 @@ class OcmPhysicalDescription:
     @property
     def att_actuator_type(self) -> Optional[str]:
         """
-        Type of actuator for attitude control.
+        Free-text specification of type of actuator for attitude control.
 
-        Examples: "ATT_THRUSTERS", "REACTION_WHEELS", "MAGNETIC_TORQUERS"
+        Examples: ATT_THRUSTERS, ACTIVE_MAG_TORQUE, PASSIVE_MAG_TORQUE, REACTION_WHEELS,
+        MOMENTUM_WHEELS, CONTROL_MOMENT_GYROSCOPE, NONE, OTHER
         """
         ...
 
@@ -3726,9 +5256,12 @@ class OcmPhysicalDescription:
     @property
     def att_control(self) -> Optional[float]:
         """
-        The accuracy of the attitude control.
+        Accuracy of attitude control system (ACS) to maintain attitude, assuming attitude knowledge
+        was perfect (i.e., deadbands).
 
-        :unit: deg
+        Examples: 0.1
+
+        Units: deg
         """
         ...
 
@@ -3737,9 +5270,9 @@ class OcmPhysicalDescription:
     @property
     def att_control_mode(self) -> Optional[str]:
         """
-        Primary mode of attitude control.
+        Free-text specification of primary mode of attitude control for the space object.
 
-        Examples: "THREE_AXIS", "SPIN", "GRAVITY_GRADIENT"
+        Examples: THREE_AXIS, SPIN, DUAL_SPIN, TUMBLING, GRAVITY_GRADIENT
         """
         ...
 
@@ -3748,9 +5281,11 @@ class OcmPhysicalDescription:
     @property
     def att_knowledge(self) -> Optional[float]:
         """
-        The accuracy of the attitude knowledge.
+        Accuracy of attitude knowledge.
 
-        :unit: deg
+        Examples: 0.01
+
+        Units: deg
         """
         ...
 
@@ -3759,9 +5294,12 @@ class OcmPhysicalDescription:
     @property
     def att_pointing(self) -> Optional[float]:
         """
-        The accuracy of the attitude pointing.
+        Overall accuracy of spacecraft to maintain attitude, including attitude knowledge errors and
+        ACS operation.
 
-        :unit: deg
+        Examples: 0.5
+
+        Units: deg
         """
         ...
 
@@ -3770,7 +5308,12 @@ class OcmPhysicalDescription:
     @property
     def avg_maneuver_freq(self) -> Optional[float]:
         """
-        The average frequency of maneuvers [# / year].
+        Average maneuver frequency, measured in the number of orbit- or attitude-adjust maneuvers per
+        year.
+
+        Examples: 52.0
+
+        Units: #/yr
         """
         ...
 
@@ -3779,7 +5322,9 @@ class OcmPhysicalDescription:
     @property
     def bus_model(self) -> Optional[str]:
         """
-        The model name of the space object bus.
+        Free-text field containing the satellite manufacturer’s spacecraft bus model name.
+
+        Examples: LS-1300, A2100
         """
         ...
 
@@ -3788,7 +5333,7 @@ class OcmPhysicalDescription:
     @property
     def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
@@ -3797,7 +5342,10 @@ class OcmPhysicalDescription:
     @property
     def docked_with(self) -> Optional[str]:
         """
-        Identifier for another space object that is docked with the space object.
+        Free-text field containing a comma-separated list of other space objects that this object is
+        docked to.
+
+        Examples: 2021-098A, 2021-098B
         """
         ...
 
@@ -3806,7 +5354,10 @@ class OcmPhysicalDescription:
     @property
     def drag_coeff_nom(self) -> Optional[float]:
         """
-        The nominal drag coefficient (CD).
+        Nominal drag Coefficient (CD NOM). If the atmospheric drag coefficient, CD, is set to zero, no
+        atmospheric drag shall be considered.
+
+        Examples: 2.2
         """
         ...
 
@@ -3815,9 +5366,12 @@ class OcmPhysicalDescription:
     @property
     def drag_const_area(self) -> Optional[float]:
         """
-        The constant (nominal) drag cross-sectional area.
+        Attitude-independent drag cross-sectional area (AD) facing the relative wind vector, not
+        already incorporated into the attitude-dependent ‘AREA_ALONG_OEB’ parameters.
 
-        :unit: m²
+        Examples: 2.0
+
+        Units: m²
         """
         ...
 
@@ -3826,9 +5380,14 @@ class OcmPhysicalDescription:
     @property
     def drag_uncertainty(self) -> Optional[float]:
         """
-        The uncertainty in the drag coefficient.
+        Drag coefficient one sigma (1σ) percent uncertainty, where the actual range of drag
+        coefficients to within 1σ shall be obtained from \[1.0 ± 0.01*DRAG_UNCERTAINTY\] (CD NOM). This
+        factor is intended to allow operators to supply the nominal ballistic coefficient components
+        while accommodating ballistic coefficient uncertainties.
 
-        :unit: %
+        Examples: 5.0
+
+        Units: %
         """
         ...
 
@@ -3837,7 +5396,11 @@ class OcmPhysicalDescription:
     @property
     def dry_mass(self) -> Optional[float]:
         """
-        The dry mass of the spacecraft [kg].
+        Space object dry mass (without propellant).
+
+        Examples: 500.0
+
+        Units: kg
         """
         ...
 
@@ -3846,7 +5409,11 @@ class OcmPhysicalDescription:
     @property
     def dv_bol(self) -> Optional[float]:
         """
-        The total delta-v capability at Beginning-of-Life [km/s].
+        Total ΔV capability of the spacecraft at beginning of life.
+
+        Examples: 2.0
+
+        Units: km/s
         """
         ...
 
@@ -3855,7 +5422,11 @@ class OcmPhysicalDescription:
     @property
     def dv_remaining(self) -> Optional[float]:
         """
-        The estimated delta-v remaining [km/s].
+        Total ΔV remaining for the spacecraft.
+
+        Examples: 1.5
+
+        Units: km/s
         """
         ...
 
@@ -3864,9 +5435,11 @@ class OcmPhysicalDescription:
     @property
     def initial_wet_mass(self) -> Optional[float]:
         """
-        The total spacecraft mass at the start of the message.
+        Space object total mass at beginning of life.
 
-        :unit: kg
+        Examples: 1000.0
+
+        Units: kg
         """
         ...
 
@@ -3875,9 +5448,11 @@ class OcmPhysicalDescription:
     @property
     def ixx(self) -> Optional[float]:
         """
-        The moment of inertia Ixx.
+        Moment of Inertia about the X-axis of the space object’s primary body frame.
 
-        :unit: kg·m²
+        Examples: 100.0
+
+        Units: kg·m²
         """
         ...
 
@@ -3886,9 +5461,11 @@ class OcmPhysicalDescription:
     @property
     def ixy(self) -> Optional[float]:
         """
-        The product of inertia Ixy.
+        Inertia Cross Product of the X & Y axes.
 
-        :unit: kg·m²
+        Examples: 1.0
+
+        Units: kg·m²
         """
         ...
 
@@ -3897,9 +5474,11 @@ class OcmPhysicalDescription:
     @property
     def ixz(self) -> Optional[float]:
         """
-        The product of inertia Ixz.
+        Inertia Cross Product of the X & Z axes.
 
-        :unit: kg·m²
+        Examples: 2.0
+
+        Units: kg·m²
         """
         ...
 
@@ -3908,9 +5487,11 @@ class OcmPhysicalDescription:
     @property
     def iyy(self) -> Optional[float]:
         """
-        The moment of inertia Iyy.
+        Moment of Inertia about the Y-axis.
 
-        :unit: kg·m²
+        Examples: 200.0
+
+        Units: kg·m²
         """
         ...
 
@@ -3919,9 +5500,11 @@ class OcmPhysicalDescription:
     @property
     def iyz(self) -> Optional[float]:
         """
-        The product of inertia Iyz.
+        Inertia Cross Product of the Y & Z axes.
 
-        :unit: kg·m²
+        Examples: 3.0
+
+        Units: kg·m²
         """
         ...
 
@@ -3930,9 +5513,11 @@ class OcmPhysicalDescription:
     @property
     def izz(self) -> Optional[float]:
         """
-        The moment of inertia Izz.
+        Moment of Inertia about the Z-axis.
 
-        :unit: kg·m²
+        Examples: 300.0
+
+        Units: kg·m²
         """
         ...
 
@@ -3941,7 +5526,9 @@ class OcmPhysicalDescription:
     @property
     def manufacturer(self) -> Optional[str]:
         """
-        The manufacturer of the space object.
+        Free-text field containing the satellite manufacturer’s name.
+
+        Examples: Boeing, Lockheed Martin
         """
         ...
 
@@ -3950,7 +5537,11 @@ class OcmPhysicalDescription:
     @property
     def max_thrust(self) -> Optional[float]:
         """
-        The maximum thrust capability [N].
+        Maximum composite thrust the spacecraft can accomplish in any single body-fixed direction.
+
+        Examples: 100.0
+
+        Units: N
         """
         ...
 
@@ -3959,9 +5550,11 @@ class OcmPhysicalDescription:
     @property
     def oeb_int(self) -> Optional[float]:
         """
-        The intermediate dimension of the optimally enclosing box.
+        Intermediate physical dimension (along Ŷoeb) of OEB normal to OEB_MAX direction.
 
-        :unit: m
+        Examples: 5.0
+
+        Units: m
         """
         ...
 
@@ -3970,9 +5563,11 @@ class OcmPhysicalDescription:
     @property
     def oeb_max(self) -> Optional[float]:
         """
-        The maximum dimension of the optimally enclosing box.
+        Maximum physical dimension (along Xoeb) of the OEB.
 
-        :unit: m
+        Examples: 10.0
+
+        Units: m
         """
         ...
 
@@ -3981,9 +5576,12 @@ class OcmPhysicalDescription:
     @property
     def oeb_min(self) -> Optional[float]:
         """
-        The minimum dimension of the optimally enclosing box.
+        Minimum physical dimension (along Ẑoeb) of OEB in direction normal to both OEB_MAX and OEB_INT
+        directions.
 
-        :unit: m
+        Examples: 2.0
+
+        Units: m
         """
         ...
 
@@ -3992,7 +5590,11 @@ class OcmPhysicalDescription:
     @property
     def oeb_parent_frame(self) -> Optional[str]:
         """
-        The parent reference frame for the optimally enclosing box.
+        Parent reference frame that maps to the OEB frame via the quaternion-based transformation
+        defined in annex F, subsection F1. Select from the accepted set of values indicated in annex
+        B, subsections B4 and B5. This keyword shall be provided if OEB_Q1,2,3,qc are specified.
+
+        Examples: ICRF, EME2000
         """
         ...
 
@@ -4001,7 +5603,10 @@ class OcmPhysicalDescription:
     @property
     def oeb_parent_frame_epoch(self) -> Optional[str]:
         """
-        The epoch of the parent reference frame.
+        Epoch of the OEB parent frame, if OEB_PARENT_FRAME is provided and its epoch is not intrinsic
+        to the definition of the reference frame.
+
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -4010,7 +5615,12 @@ class OcmPhysicalDescription:
     @property
     def oeb_q1(self) -> Optional[float]:
         """
-        1st component of quaternion from parent frame to OEB frame.
+        q1 = e1 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e1 = 1st component
+        of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to
+        the frame aligned with the OEB (defined in annex F, subsection F1). A value of ‘-999’ denotes
+        a tumbling space object.
+
+        Examples: 0.0
         """
         ...
 
@@ -4019,7 +5629,12 @@ class OcmPhysicalDescription:
     @property
     def oeb_q2(self) -> Optional[float]:
         """
-        2nd component of quaternion from parent frame to OEB frame.
+        q2 = e2 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e2 = 2nd component
+        of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to
+        the frame aligned with the Optimally Encompassing Box (defined in annex F, subsection F1). A
+        value of ‘-999’ denotes a tumbling space object.
+
+        Examples: 0.0
         """
         ...
 
@@ -4028,7 +5643,12 @@ class OcmPhysicalDescription:
     @property
     def oeb_q3(self) -> Optional[float]:
         """
-        3rd component of quaternion from parent frame to OEB frame.
+        q3 = e3 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e3 = 3rd component
+        of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to
+        the frame aligned with the Optimally Encompassing Box (defined in annex F, subsection F1). A
+        value of ‘-999’ denotes a tumbling space object.
+
+        Examples: 0.0
         """
         ...
 
@@ -4037,7 +5657,12 @@ class OcmPhysicalDescription:
     @property
     def oeb_qc(self) -> Optional[float]:
         """
-        scalar component of quaternion from parent frame to OEB frame.
+        qc = cos(φ/2), where per reference [H1], φ = the Euler rotation angle for the rotation that
+        maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the Optimally
+        Encompassing Box (annex F, subsection F1). qc shall be made non-negative by convention. A
+        value of ‘-999’ denotes a tumbling space object.
+
+        Examples: 1.0
         """
         ...
 
@@ -4046,9 +5671,12 @@ class OcmPhysicalDescription:
     @property
     def rcs(self) -> Optional[float]:
         """
-        The typical Radar Cross Section.
+        Typical (50th percentile) effective Radar Cross Section of the space object sampled over all
+        possible viewing angles.
 
-        :unit: m²
+        Examples: 10.0
+
+        Units: m²
         """
         ...
 
@@ -4057,7 +5685,11 @@ class OcmPhysicalDescription:
     @property
     def rcs_max(self) -> Optional[float]:
         """
-        The maximum Radar Cross Section observed [m**2].
+        Maximum Radar Cross Section observed for this object.
+
+        Examples: 100.0
+
+        Units: m²
         """
         ...
 
@@ -4066,7 +5698,11 @@ class OcmPhysicalDescription:
     @property
     def rcs_min(self) -> Optional[float]:
         """
-        The minimum Radar Cross Section observed [m**2].
+        Minimum Radar Cross Section observed for this object.
+
+        Examples: 1.0
+
+        Units: m²
         """
         ...
 
@@ -4075,9 +5711,10 @@ class OcmPhysicalDescription:
     @property
     def reflectance(self) -> Optional[float]:
         """
-        The reflectance of the space object.
+        Typical (50th percentile) coefficient of REFLECTANCE of the space object over all possible
+        viewing angles, ranging from 0 (none) to 1 (perfect reflectance).
 
-        :range: 0 to 1
+        Examples: 0.2
         """
         ...
 
@@ -4086,7 +5723,10 @@ class OcmPhysicalDescription:
     @property
     def solar_rad_coeff(self) -> Optional[float]:
         """
-        The nominal solar radiation pressure coefficient (CR).
+        Nominal Solar Radiation Pressure Coefficient (CR NOM). If the solar radiation coefficient, CR,
+        is set to zero, no solar radiation pressure shall be considered.
+
+        Examples: 1.2
         """
         ...
 
@@ -4095,9 +5735,14 @@ class OcmPhysicalDescription:
     @property
     def solar_rad_uncertainty(self) -> Optional[float]:
         """
-        The uncertainty in the solar radiation pressure coefficient.
+        SRP one sigma (1σ) percent uncertainty, where the actual range of SRP coefficients to within
+        1σ shall be obtained from \[1.0 ± 0.01*SRP_UNCERTAINTY\] (CR NOM). This factor is intended to
+        allow operators to supply the nominal ballistic coefficient components while accommodating
+        ballistic coefficient uncertainties.
 
-        :unit: %
+        Examples: 10.0
+
+        Units: %
         """
         ...
 
@@ -4106,9 +5751,12 @@ class OcmPhysicalDescription:
     @property
     def srp_const_area(self) -> Optional[float]:
         """
-        The constant (nominal) solar radiation pressure cross-sectional area.
+        Attitude-independent solar radiation pressure cross-sectional area (AR) facing the Sun, not
+        already incorporated into the attitude-dependent ‘AREA_ALONG_OEB’ parameters.
 
-        :unit: m²
+        Examples: 5.0
+
+        Units: m²
         """
         ...
 
@@ -4117,7 +5765,11 @@ class OcmPhysicalDescription:
     @property
     def vm_absolute(self) -> Optional[float]:
         """
-        The absolute Visual Magnitude.
+        Typical (50th percentile) absolute Visual Magnitude of the space object sampled over all
+        possible viewing angles and ‘normalized’ as specified in informative annex F, subsection F2 to
+        a 1 AU Sun-to-target distance, a phase angle of 0°, and a 40,000 km target-to-sensor distance.
+
+        Examples: 4.5
         """
         ...
 
@@ -4126,7 +5778,9 @@ class OcmPhysicalDescription:
     @property
     def vm_apparent(self) -> Optional[float]:
         """
-        The apparent Visual Magnitude.
+        Typical (50th percentile) apparent Visual Magnitude observed for this space object.
+
+        Examples: 12.0
         """
         ...
 
@@ -4135,7 +5789,10 @@ class OcmPhysicalDescription:
     @property
     def vm_apparent_max(self) -> Optional[float]:
         """
-        The maximum apparent Visual Magnitude.
+        Maximum apparent Visual Magnitude observed for this space object. The ‘MAX’ value represents
+        the dimmest observation, which associates with a higher Vmag.
+
+        Examples: 18.0
         """
         ...
 
@@ -4144,7 +5801,10 @@ class OcmPhysicalDescription:
     @property
     def vm_apparent_min(self) -> Optional[float]:
         """
-        The minimum apparent Visual Magnitude.
+        Minimum apparent Visual Magnitude observed for this space object. The ‘MIN’ value represents
+        the brightest observation, which associates with a lower Vmag.
+
+        Examples: 3.0
         """
         ...
 
@@ -4153,7 +5813,12 @@ class OcmPhysicalDescription:
     @property
     def wet_mass(self) -> Optional[float]:
         """
-        Total spacecraft mass at the current state epoch [kg].
+        Space object total mass (including propellant, i.e., ‘wet mass’) at the current reference epoch
+        ‘EPOCH_TZERO’.
+
+        Examples: 950.0
+
+        Units: kg
         """
         ...
 
@@ -4162,9 +5827,9 @@ class OcmPhysicalDescription:
 
 class OcmSegment:
     """
-    OCM Segment containing metadata and data.
+    A single segment of the OCM.
 
-    In OCM, a single segment is used to represent orbit data for a single space object.
+    Contains metadata and data sections.
 
     Parameters
     ----------
@@ -4192,7 +5857,9 @@ class OcmSegment:
     @property
     def metadata(self) -> OcmMetadata:
         """
-        Segment metadata.
+        A single segment of the OCM.
+
+        Contains metadata and data sections.
         """
         ...
 
@@ -4201,10 +5868,10 @@ class OcmSegment:
 
 class OcmTrajState:
     """
-    OCM Trajectory State Time History segment.
+    A block of trajectory state data, which can be a time history of states.
 
-    This block contains orbit states for a single object, optionally
-    spanning fictitious nodes for interpolation smoothness.
+    References:
+    - CCSDS 502.0-B-3, Section 4.5.2 (OCM Trajectory State Section)
 
     Parameters
     ----------
@@ -4281,9 +5948,10 @@ class OcmTrajState:
     @property
     def center_name(self) -> str:
         """
-        Origin of the orbit reference frame.
+        Name of the central body (value to be drawn from the SANA registry list of Common Central Body
+        Names at <https://sanaregistry.org/r/central_body_name>).
 
-        Standard values include natural solar system bodies (e.g., "EARTH", "MOON", "SUN").
+        Examples: EARTH, MOON
         """
         ...
 
@@ -4292,7 +5960,7 @@ class OcmTrajState:
     @property
     def comment(self) -> list[str]:
         """
-        Comments for this trajectory block.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
@@ -4301,7 +5969,10 @@ class OcmTrajState:
     @property
     def interpolation(self) -> Optional[str]:
         """
-        Recommended interpolation method for the state elements.
+        Recommended interpolation method for the state elements (value to be drawn from the SANA
+        registry list of Interpolation Methods at <https://sanaregistry.org/r/interpolation_methods>).
+
+        Examples: HERMITE, LINEAR
         """
         ...
 
@@ -4311,6 +5982,8 @@ class OcmTrajState:
     def interpolation_degree(self) -> Optional[int]:
         """
         Recommended interpolation degree for the state elements.
+
+        Examples: 5
         """
         ...
 
@@ -4319,7 +5992,10 @@ class OcmTrajState:
     @property
     def orb_averaging(self) -> Optional[str]:
         """
-        Specifies the averaging method for orbital elements.
+        Method used for orbit averaging if TRAJ_TYPE is not osculating (value to be drawn from the SANA
+        registry list of Orbit Averaging Methods at <https://sanaregistry.org/r/orbit_averaging>).
+
+        Examples: BROUWER-LYDDANE
         """
         ...
 
@@ -4329,6 +6005,8 @@ class OcmTrajState:
     def orb_revnum(self) -> Optional[float]:
         """
         Integer orbit revolution number at the epoch of the first trajectory data line.
+
+        Examples: 1234.0
         """
         ...
 
@@ -4338,6 +6016,8 @@ class OcmTrajState:
     def orb_revnum_basis(self) -> Optional[str]:
         """
         Basis for the orbit revolution counter (0 or 1).
+
+        Examples: 1
         """
         ...
 
@@ -4346,7 +6026,9 @@ class OcmTrajState:
     @property
     def propagator(self) -> Optional[str]:
         """
-        The name of the propagator used in the creation of the trajectory state data.
+        Name of the propagator used in the creation of the trajectory state data.
+
+        Examples: GMAT, STK
         """
         ...
 
@@ -4355,9 +6037,9 @@ class OcmTrajState:
     @property
     def traj_basis(self) -> Optional[str]:
         """
-        The basis of this trajectory state time history data.
+        Basis of this trajectory state time history data (e.g., PREDICTED, DETERMINED, SIMULATED).
 
-        Standard values: "PREDICTED", "DETERMINED", "SIMULATED", "OTHER"
+        Examples: PREDICTED
         """
         ...
 
@@ -4366,7 +6048,10 @@ class OcmTrajState:
     @property
     def traj_basis_id(self) -> Optional[str]:
         """
-        Identification number for the telemetry dataset, orbit determination, or simulation.
+        Identification number for the telemetry dataset, orbit determination, or simulation upon
+        which the TRAJ_BASIS is based.
+
+        Examples: OD-123
         """
         ...
 
@@ -4375,7 +6060,10 @@ class OcmTrajState:
     @property
     def traj_frame_epoch(self) -> Optional[str]:
         """
-        Epoch of the orbit data reference frame, if not intrinsic to the definition.
+        Epoch of the orbit reference frame, if TRAJ_REF_FRAME is provided and its epoch is not
+        intrinsic to the definition of the reference frame.
+
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -4385,6 +6073,8 @@ class OcmTrajState:
     def traj_id(self) -> Optional[str]:
         """
         Identification number for this trajectory state time history block.
+
+        Examples: 1
         """
         ...
 
@@ -4403,6 +6093,8 @@ class OcmTrajState:
     def traj_next_id(self) -> Optional[str]:
         """
         Identification number for the next trajectory state time history.
+
+        Examples: 2
         """
         ...
 
@@ -4412,6 +6104,8 @@ class OcmTrajState:
     def traj_prev_id(self) -> Optional[str]:
         """
         Identification number for the previous trajectory state time history.
+
+        Examples: 0
         """
         ...
 
@@ -4420,9 +6114,10 @@ class OcmTrajState:
     @property
     def traj_ref_frame(self) -> str:
         """
-        Reference frame of the trajectory state time history.
+        Orbit reference frame (value to be drawn from the SANA registry list of Reference Frames at
+        <https://sanaregistry.org/r/orbit_relative_reference_frames>).
 
-        Standard values: "ICRF", "EME2000", "ITRF", "TEME", "GCRF"
+        Examples: ICRF, EME2000
         """
         ...
 
@@ -4431,9 +6126,10 @@ class OcmTrajState:
     @property
     def traj_type(self) -> str:
         """
-        Specifies the trajectory state element set type.
+        Specification of the trajectory state element set type (value to be drawn from the SANA
+        registry list of Trajectory State Types at <https://sanaregistry.org/r/orbital_elements>).
 
-        Standard values: "CARTPV", "KEPLERIAN", "EQUINOCTIAL", "TLE"
+        Examples: CARTESIAN
         """
         ...
 
@@ -4443,6 +6139,8 @@ class OcmTrajState:
     def traj_units(self) -> Optional[str]:
         """
         SI unit designations for the state elements.
+
+        Examples: km, km/s
         """
         ...
 
@@ -4452,6 +6150,8 @@ class OcmTrajState:
     def useable_start_time(self) -> Optional[str]:
         """
         Start time of the useable time span covered by the ephemeris data.
+
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -4461,6 +6161,8 @@ class OcmTrajState:
     def useable_stop_time(self) -> Optional[str]:
         """
         Stop time of the useable time span covered by the ephemeris data.
+
+        Examples: 2000-01-02T12:00:00Z
         """
         ...
 
@@ -4470,8 +6172,45 @@ class OcmTrajState:
 class OdParameters:
     """
     Orbit Determination Parameters.
+
+    Parameters
+    ----------
+    time_lastob_start : str, optional
+        Time of last observation start.
+    time_lastob_end : str, optional
+        Time of last observation end.
+    recommended_od_span : float, optional
+        Recommended OD span. Units: d
+    actual_od_span : float, optional
+        Actual OD span. Units: d
+    obs_available : int, optional
+        Observations available.
+    obs_used : int, optional
+        Observations used.
+    tracks_available : int, optional
+        Tracks available.
+    tracks_used : int, optional
+        Tracks used.
+    residuals_accepted : float, optional
+        Residuals accepted. Units: %
+    weighted_rms : float, optional
+        Weighted RMS.
+    comment : list of str, optional
+        Comments.
     """
-    def __init__(comment) -> None: ...
+    def __init__(
+        time_lastob_start,
+        time_lastob_end,
+        recommended_od_span,
+        actual_od_span,
+        obs_available,
+        obs_used,
+        tracks_available,
+        tracks_used,
+        residuals_accepted,
+        weighted_rms,
+        comment,
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -4481,7 +6220,12 @@ class OdParameters:
     @property
     def actual_od_span(self) -> Optional[float]:
         """
-        Actual orbit determination span (days).
+        Based on the observations available and the RECOMMENDED_OD_SPAN, the actual
+        time span used for the OD of the object. (See annex E for definition.)
+
+        Examples: 14, 20.0
+
+        Units: days
         """
         ...
 
@@ -4490,7 +6234,7 @@ class OdParameters:
     @property
     def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 6.3.4 for formatting rules).
         """
         ...
 
@@ -4499,7 +6243,7 @@ class OdParameters:
     @property
     def obs_available(self) -> Optional[int]:
         """
-        Number of observations available.
+        The total number of observations available for orbit determination.
         """
         ...
 
@@ -4508,7 +6252,7 @@ class OdParameters:
     @property
     def obs_used(self) -> Optional[int]:
         """
-        Number of observations used.
+        The number of observations used in the orbit determination.
         """
         ...
 
@@ -4517,7 +6261,11 @@ class OdParameters:
     @property
     def recommended_od_span(self) -> Optional[float]:
         """
-        Recommended orbit determination span (days).
+        The recommended OD time span calculated for the object.
+
+        Examples: 14, 20.0
+
+        Units: days
         """
         ...
 
@@ -4526,7 +6274,7 @@ class OdParameters:
     @property
     def residuals_accepted(self) -> Optional[float]:
         """
-        Residuals accepted (percentage).
+        The percentage of residuals accepted during orbit determination.
         """
         ...
 
@@ -4535,7 +6283,9 @@ class OdParameters:
     @property
     def time_lastob_end(self) -> Optional[str]:
         """
-        Time of last observation end.
+        The end of a time interval (UTC) that contains the time of the last accepted
+        observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+        of zero duration (i.e., same value as that of TIME_LASTOB_START).
         """
         ...
 
@@ -4544,7 +6294,9 @@ class OdParameters:
     @property
     def time_lastob_start(self) -> Optional[str]:
         """
-        Time of last observation start.
+        The start of a time interval (UTC) that contains the time of the last accepted
+        observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+        of zero duration (i.e., same value as that of TIME_LASTOB_END).
         """
         ...
 
@@ -4553,7 +6305,7 @@ class OdParameters:
     @property
     def tracks_available(self) -> Optional[int]:
         """
-        Number of tracks available.
+        The total number of tracks available for orbit determination.
         """
         ...
 
@@ -4562,7 +6314,7 @@ class OdParameters:
     @property
     def tracks_used(self) -> Optional[int]:
         """
-        Number of tracks used.
+        The number of tracks used in the orbit determination.
         """
         ...
 
@@ -4571,7 +6323,7 @@ class OdParameters:
     @property
     def weighted_rms(self) -> Optional[float]:
         """
-        Weighted RMS.
+        The weighted root mean square (RMS) of the residuals.
         """
         ...
 
@@ -4580,9 +6332,7 @@ class OdParameters:
 
 class OdmHeader:
     """
-    Represents the header of a CCSDS Orbit Data Message (ODM).
-
-    The header contains metadata common to all ODM message types.
+    Represents the `odmHeader` complex type.
 
     Parameters
     ----------
@@ -4609,25 +6359,30 @@ class OdmHeader:
     @property
     def classification(self) -> Optional[str]:
         """
-        User-defined free-text message classification/caveats.
+        User-defined free-text message classification/caveats of this ODM. It is recommended
+        that selected values be pre-coordinated between exchanging entities by mutual agreement.
+
+        Examples: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
         """
         ...
 
     @classification.setter
     def classification(self, value: Optional[str]) -> None: ...
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def creation_date(self) -> str:
         """
-        File creation date/time in UTC.
+        File creation date/time in UTC. (For format specification, see 7.5.10.)
+
+        Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
         """
         ...
 
@@ -4636,7 +6391,10 @@ class OdmHeader:
     @property
     def message_id(self) -> Optional[str]:
         """
-        ID that uniquely identifies a message from a given originator.
+        ID that uniquely identifies a message from a given originator. The format and content of the
+        message identifier value are at the discretion of the originator.
+
+        Examples: OPM_201113719185, ABC-12_34
         """
         ...
 
@@ -4645,7 +6403,12 @@ class OdmHeader:
     @property
     def originator(self) -> str:
         """
-        Creating agency or operator.
+        Creating agency or operator. Select from the accepted set of values indicated in annex B,
+        subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
+        Abbreviation column is not populated. If desired organization is not listed there, follow
+        procedures to request that originator be added to SANA registry.
+
+        Examples: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
         """
         ...
 
@@ -4654,11 +6417,12 @@ class OdmHeader:
 
 class Oem:
     """
-    Represents a CCSDS Orbit Ephemeris Message (OEM).
+    Orbit Ephemeris Message (OEM).
 
-    The OEM specifies the position and velocity of a single object at multiple epochs contained
-    within a specified time range. It allows for dynamic modeling of any number of gravitational
-    and non-gravitational accelerations.
+    Ephemeris information may be exchanged between two participants by sending a state vector (see
+    reference \[1\]) for multiple epochs using an Orbit Ephemeris Message (OEM). The OEM also contains
+    an optional covariance matrix that reflects the uncertainty of the orbit solution used to
+    generate states in the ephemeris.
 
     Parameters
     ----------
@@ -4763,17 +6527,16 @@ class Oem:
 
 class OemCovarianceMatrix:
     """
-    Represents a covariance matrix at a specific epoch.
+    OEM Covariance Matrix.
 
-    The matrix provides uncertainty information for the state vector at the
-    same epoch. The lower triangular portion is typically stored in the file,
-    but here it is represented as a structured object.
+    Represents a 6x6 symmetric covariance matrix for position and velocity at a specific epoch.
+    The lower triangular portion is stored/transmitted.
 
     Parameters
     ----------
     epoch : str
         Epoch of the covariance matrix (ISO 8601).
-    values : numpy.ndarray
+        values : numpy.ndarray
         Flat NumPy array of length 21 containing the covariance values.
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
@@ -4835,23 +6598,21 @@ class OemCovarianceMatrix:
         ...
 
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
-        Comments associated with this covariance matrix.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def cov_ref_frame(self) -> Optional[str]:
         """
-        Reference frame for the covariance matrix.
+        Reference frame in which the covariance data are given. Select from the accepted set of
+        values indicated in 3.2.3.3 or 3.2.4.11.
 
-        If omitted, the covariance is expressed in the same reference frame
-        as the state vector (REF_FRAME from metadata).
-
-        Examples: "GCRF", "EME2000", "ITRF2000", "RTN" (Radial-Tangential-Normal)
+        Examples: ICRF, EME2000
         """
         ...
 
@@ -4860,7 +6621,9 @@ class OemCovarianceMatrix:
     @property
     def cx_dot_x(self) -> float:
         """
-        Position-velocity covariance [4,1] element (X_DOT-X covariance).
+        Velocity X / Position X covariance [4,1].
+
+        Examples: 0.001
 
         Units: km²/s
         """
@@ -4871,7 +6634,9 @@ class OemCovarianceMatrix:
     @property
     def cx_dot_x_dot(self) -> float:
         """
-        Velocity covariance [4,4] element (X_DOT-X_DOT variance).
+        Velocity X covariance [4,4].
+
+        Examples: 0.00001
 
         Units: km²/s²
         """
@@ -4882,7 +6647,9 @@ class OemCovarianceMatrix:
     @property
     def cx_dot_y(self) -> float:
         """
-        Position-velocity covariance [4,2] element (X_DOT-Y covariance).
+        Velocity X / Position Y covariance [4,2].
+
+        Examples: 0.0001
 
         Units: km²/s
         """
@@ -4893,7 +6660,9 @@ class OemCovarianceMatrix:
     @property
     def cx_dot_z(self) -> float:
         """
-        Position-velocity covariance [4,3] element (X_DOT-Z covariance).
+        Velocity X / Position Z covariance [4,3].
+
+        Examples: 0.0001
 
         Units: km²/s
         """
@@ -4904,7 +6673,9 @@ class OemCovarianceMatrix:
     @property
     def cx_x(self) -> float:
         """
-        Position covariance [1,1] element (X-X variance).
+        Position X covariance [1,1].
+
+        Examples: 1.0
 
         Units: km²
         """
@@ -4915,7 +6686,9 @@ class OemCovarianceMatrix:
     @property
     def cy_dot_x(self) -> float:
         """
-        Position-velocity covariance [5,1] element (Y_DOT-X covariance).
+        Velocity Y / Position X covariance [5,1].
+
+        Examples: 0.0001
 
         Units: km²/s
         """
@@ -4926,7 +6699,9 @@ class OemCovarianceMatrix:
     @property
     def cy_dot_x_dot(self) -> float:
         """
-        Velocity covariance [5,4] element (Y_DOT-X_DOT covariance).
+        Velocity Y / Velocity X covariance [5,4].
+
+        Examples: 0.00001
 
         Units: km²/s²
         """
@@ -4937,7 +6712,9 @@ class OemCovarianceMatrix:
     @property
     def cy_dot_y(self) -> float:
         """
-        Position-velocity covariance [5,2] element (Y_DOT-Y covariance).
+        Velocity Y / Position Y covariance [5,2].
+
+        Examples: 0.001
 
         Units: km²/s
         """
@@ -4948,7 +6725,9 @@ class OemCovarianceMatrix:
     @property
     def cy_dot_y_dot(self) -> float:
         """
-        Velocity covariance [5,5] element (Y_DOT-Y_DOT variance).
+        Velocity Y covariance [5,5].
+
+        Examples: 0.00001
 
         Units: km²/s²
         """
@@ -4959,7 +6738,9 @@ class OemCovarianceMatrix:
     @property
     def cy_dot_z(self) -> float:
         """
-        Position-velocity covariance [5,3] element (Y_DOT-Z covariance).
+        Velocity Y / Position Z covariance [5,3].
+
+        Examples: 0.0001
 
         Units: km²/s
         """
@@ -4970,7 +6751,9 @@ class OemCovarianceMatrix:
     @property
     def cy_x(self) -> float:
         """
-        Position covariance [2,1] element (Y-X covariance).
+        Position X-Y covariance [2,1].
+
+        Examples: 0.1
 
         Units: km²
         """
@@ -4981,7 +6764,9 @@ class OemCovarianceMatrix:
     @property
     def cy_y(self) -> float:
         """
-        Position covariance [2,2] element (Y-Y variance).
+        Position Y covariance [2,2].
+
+        Examples: 1.0
 
         Units: km²
         """
@@ -4992,7 +6777,9 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_x(self) -> float:
         """
-        Position-velocity covariance [6,1] element (Z_DOT-X covariance).
+        Velocity Z / Position X covariance [6,1].
+
+        Examples: 0.0001
 
         Units: km²/s
         """
@@ -5003,7 +6790,9 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_x_dot(self) -> float:
         """
-        Velocity covariance [6,4] element (Z_DOT-X_DOT covariance).
+        Velocity Z / Velocity X covariance [6,4].
+
+        Examples: 0.00001
 
         Units: km²/s²
         """
@@ -5014,7 +6803,9 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_y(self) -> float:
         """
-        Position-velocity covariance [6,2] element (Z_DOT-Y covariance).
+        Velocity Z / Position Y covariance [6,2].
+
+        Examples: 0.0001
 
         Units: km²/s
         """
@@ -5025,7 +6816,9 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_y_dot(self) -> float:
         """
-        Velocity covariance [6,5] element (Z_DOT-Y_DOT covariance).
+        Velocity Z / Velocity Y covariance [6,5].
+
+        Examples: 0.00001
 
         Units: km²/s²
         """
@@ -5036,7 +6829,9 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_z(self) -> float:
         """
-        Position-velocity covariance [6,3] element (Z_DOT-Z covariance).
+        Velocity Z / Position Z covariance [6,3].
+
+        Examples: 0.001
 
         Units: km²/s
         """
@@ -5047,7 +6842,9 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_z_dot(self) -> float:
         """
-        Velocity covariance [6,6] element (Z_DOT-Z_DOT variance).
+        Velocity Z covariance [6,6].
+
+        Examples: 0.00001
 
         Units: km²/s²
         """
@@ -5058,7 +6855,9 @@ class OemCovarianceMatrix:
     @property
     def cz_x(self) -> float:
         """
-        Position covariance [3,1] element (Z-X covariance).
+        Position X-Z covariance [3,1].
+
+        Examples: 0.1
 
         Units: km²
         """
@@ -5069,7 +6868,9 @@ class OemCovarianceMatrix:
     @property
     def cz_y(self) -> float:
         """
-        Position covariance [3,2] element (Z-Y covariance).
+        Position Y-Z covariance [3,2].
+
+        Examples: 0.1
 
         Units: km²
         """
@@ -5080,7 +6881,9 @@ class OemCovarianceMatrix:
     @property
     def cz_z(self) -> float:
         """
-        Position covariance [3,3] element (Z-Z variance).
+        Position Z covariance [3,3].
+
+        Examples: 1.0
 
         Units: km²
         """
@@ -5091,12 +6894,9 @@ class OemCovarianceMatrix:
     @property
     def epoch(self) -> str:
         """
-        Epoch of the covariance matrix.
+        Epoch of covariance matrix. (See 7.5.10 for formatting rules.)
 
-        Time at which the covariance matrix applies, given in the time system
-        specified in the metadata.
-
-        Format: ISO 8601 (e.g., "2023-01-01T00:00:00")
+        Examples: 2000-01-01T12:00:00Z
         """
         ...
 
@@ -5105,16 +6905,13 @@ class OemCovarianceMatrix:
 
 class OemData:
     """
-    Contains the ephemeris data for an OEM segment.
-
-    This includes a list of state vectors and an optional list of
-    corresponding covariance matrices.
+    OEM Data Section.
 
     Parameters
     ----------
-    state_vectors : list[StateVectorAcc]
+        state_vectors : list[StateVectorAcc]
         List of state vectors.
-    comments : list[str], optional
+        comments : list[str], optional
         Comments.
     """
     def __init__(state_vectors, comments) -> None: ...
@@ -5125,19 +6922,16 @@ class OemData:
         ...
 
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
-        List of comments in the data section.
-
-        Comments can appear between state vectors and covariance matrices to provide
-        additional context or annotations about the ephemeris data.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
-    def covariance_matrices(self) -> list[OemCovarianceMatrix]:
+    def covariance_matrix(self) -> list[OemCovarianceMatrix]:
         """
         List of covariance matrices associated with the state vectors.
 
@@ -5150,10 +6944,10 @@ class OemData:
         """
         ...
 
-    @covariance_matrices.setter
-    def covariance_matrices(self, value: list[OemCovarianceMatrix]) -> None: ...
+    @covariance_matrix.setter
+    def covariance_matrix(self, value: list[OemCovarianceMatrix]) -> None: ...
     @property
-    def covariance_matrices_numpy(self) -> tuple[list[str], numpy.ndarray]:
+    def covariance_matrix_numpy(self) -> tuple[list[str], numpy.ndarray]:
         """
         Get covariance matrices as a tuple associated with a NumPy array.
 
@@ -5162,28 +6956,25 @@ class OemData:
         """
         ...
 
-    @covariance_matrices_numpy.setter
-    def covariance_matrices_numpy(
+    @covariance_matrix_numpy.setter
+    def covariance_matrix_numpy(
         self, value: tuple[list[str], numpy.ndarray]
     ) -> None: ...
     @property
-    def state_vectors(self) -> list[StateVectorAcc]:
+    def state_vector(self) -> list[StateVectorAcc]:
         """
-        List of state vectors (position, velocity, and optionally acceleration).
+        List of state vectors. Each vector contains position, velocity, and optional acceleration.
 
-        Each state vector includes:
-        - Position components (X, Y, Z) in km
-        - Velocity components (X_DOT, Y_DOT, Z_DOT) in km/s
-        - Optional acceleration components (X_DDOT, Y_DDOT, Z_DDOT) in km/s²
+        Examples: 2020-01-01T00:00:00.000 1234.567 2345.678 3456.789 1.234 2.345 3.456
 
-        All components are expressed in the reference frame specified in the metadata.
+        Units: km, km/s, km/s²
         """
         ...
 
-    @state_vectors.setter
-    def state_vectors(self, value: list[StateVectorAcc]) -> None: ...
+    @state_vector.setter
+    def state_vector(self, value: list[StateVectorAcc]) -> None: ...
     @property
-    def state_vectors_numpy(self) -> tuple[list[str], numpy.ndarray]:
+    def state_vector_numpy(self) -> tuple[list[str], numpy.ndarray]:
         """
         State vectors as a tuple of epochs and a NumPy array.
 
@@ -5206,15 +6997,15 @@ class OemData:
         """
         ...
 
-    @state_vectors_numpy.setter
-    def state_vectors_numpy(self, value: tuple[list[str], numpy.ndarray]) -> None: ...
+    @state_vector_numpy.setter
+    def state_vector_numpy(self, value: tuple[list[str], numpy.ndarray]) -> None: ...
 
 class OemMetadata:
     """
-    Represents the metadata for a single OEM segment.
+    OEM Metadata Section.
 
-    This metadata provides context for the ephemeris data in the segment,
-    such as the object being described, the reference frame, and the time system.
+    This section contains descriptive information about the object and the ephemeris data,
+    such as reference frames, time systems, and validation intervals.
 
     Parameters
     ----------
@@ -5269,26 +7060,37 @@ class OemMetadata:
     @property
     def center_name(self) -> str:
         """
-        Origin of the reference frame.
+        Origin of the OEM reference frame, which may be a natural solar system body (planets,
+        asteroids, comets, and natural satellites), including any planet barycenter or the solar
+        system barycenter, or another reference frame center (such as a spacecraft, formation flying
+        reference ‘chief’ spacecraft, etc.). Natural bodies shall be selected from the accepted set of
+        values indicated in annex B, subsection B2. For spacecraft, it is recommended to use either
+        the OBJECT_ID or international designator of the participant as catalogued in the UN Office of
+        Outer Space Affairs designator index (reference \[3\]).
 
-        Must be a natural solar system body (planets, asteroids, comets, and natural satellites),
-        including any planet barycenter or the solar system barycenter.
-
-        Examples: "EARTH", "EARTH_BARYCENTER", "MOON", "SOLAR_SYSTEM_BARYCENTER", "SUN", "MARS", "JUPITER_BARYCENTER"
+        Examples: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
+        JUPITER BARYCENTER, STS 106, EROS
         """
         ...
 
     @center_name.setter
     def center_name(self, value: str) -> None: ...
     @property
+    def comment(self) -> list[str]:
+        """
+        Comments (see 7.8 for formatting rules).
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
     def interpolation(self) -> Optional[str]:
         """
-        Recommended interpolation method for ephemeris data.
+        This keyword may be used to specify the recommended interpolation method for ephemeris data in
+        the immediately following set of ephemeris lines.
 
-        Specifies the interpolation technique to be used when estimating state vectors
-        at times between the provided data points.
-
-        Common values: "HERMITE", "LAGRANGE", "LINEAR", "CHEBYSHEV"
+        Examples: HERMITE, LINEAR, LAGRANGE
         """
         ...
 
@@ -5297,10 +7099,11 @@ class OemMetadata:
     @property
     def interpolation_degree(self) -> Optional[int]:
         """
-        Degree of the interpolation polynomial.
+        Recommended interpolation degree for ephemeris data in the immediately following set of
+        ephemeris lines. Must be an integer value. This keyword must be used if the ‘INTERPOLATION’
+        keyword is used.
 
-        Specifies the polynomial degree to use for interpolation methods that require it
-        (e.g., HERMITE, LAGRANGE). Must be a positive integer.
+        Examples: 5, 8
         """
         ...
 
@@ -5309,13 +7112,18 @@ class OemMetadata:
     @property
     def object_id(self) -> str:
         """
-        Object identifier of the object for which orbit state data is provided.
+        Object identifier of the object for which ephemeris data is provided. While there is no
+        CCSDS-based restriction on the value for this keyword, it is recommended to use the
+        international spacecraft designator as published in the UN Office of Outer Space Affairs
+        designator index. Recommended values have the format YYYY-NNNP{PP}, where:
+        YYYY = Year of launch.
+        NNN = Three-digit serial number of launch in year YYYY (with leading zeros).
+        P{PP} = At least one capital letter for the identification of the part brought into
+        space by the launch. If the asset is not listed, the UN Office of Outer Space Affairs
+        designator index format is not used, or the content is either unknown or cannot be
+        disclosed, the value should be set to UNKNOWN.
 
-        It is recommended to use the international spacecraft designator as published in the
-        UN Office of Outer Space Affairs designator index. Format: YYYY-NNNP{PP}.
-        If not listed or unknown, use "UNKNOWN".
-
-        Examples: "1998-067A", "2011-037A", "UNKNOWN"
+        Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
         """
         ...
 
@@ -5324,13 +7132,13 @@ class OemMetadata:
     @property
     def object_name(self) -> str:
         """
-        Spacecraft name for which orbit state data is provided.
+        Spacecraft name for which ephemeris data is provided. While there is no CCSDS-based
+        restriction on the value for this keyword, it is recommended to use names from the UN Office
+        of Outer Space Affairs designator index (reference \[3\], which include Object name and
+        international designator of the participant). If OBJECT_NAME is not listed in reference \[3\]
+        or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
 
-        While there is no CCSDS-based restriction on the value, it is recommended to use names
-        from the UN Office of Outer Space Affairs designator index. If not listed or unknown,
-        use "UNKNOWN".
-
-        Examples: "EUTELSAT W1", "MARS PATHFINDER", "STS_106", "NEAR", "UNKNOWN"
+        Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
         """
         ...
 
@@ -5339,10 +7147,10 @@ class OemMetadata:
     @property
     def ref_frame(self) -> str:
         """
-        Reference frame in which state vector data is given.
+        Reference frame in which the ephemeris data are given. Use of values other than those in
+        3.2.3.3 should be documented in an ICD.
 
-        Standard values: "ICRF", "EME2000", "ITRF2000", "TEME", "GCRF"
-        Use of other values should be documented in an ICD.
+        Examples: ICRF, ITRF2000, EME2000, TEME
         """
         ...
 
@@ -5351,12 +7159,10 @@ class OemMetadata:
     @property
     def ref_frame_epoch(self) -> Optional[str]:
         """
-        Epoch of the reference frame, if not intrinsic to the definition.
+        Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
+        7.5.10 for formatting rules.)
 
-        This field is conditional and only required if the reference frame definition
-        requires an explicit epoch (e.g., for precessing frames).
-
-        Format: ISO 8601 (e.g., "2000-01-01T00:00:00")
+        Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
         """
         ...
 
@@ -5365,9 +7171,10 @@ class OemMetadata:
     @property
     def start_time(self) -> str:
         """
-        Start time of the total time span covered by the ephemeris data.
+        Start of TOTAL time span covered by ephemeris data and covariance data immediately following
+        this metadata block. (For format specification, see 7.5.10.)
 
-        Format: ISO 8601 (e.g., "2023-01-01T00:00:00" or "2023-001T00:00:00Z")
+        Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
         """
         ...
 
@@ -5376,9 +7183,10 @@ class OemMetadata:
     @property
     def stop_time(self) -> str:
         """
-        Stop time of the total time span covered by the ephemeris data.
+        End of TOTAL time span covered by ephemeris data and covariance data immediately following
+        this metadata block. (For format specification, see 7.5.10.)
 
-        Format: ISO 8601 (e.g., "2023-01-02T00:00:00" or "2023-002T00:00:00Z")
+        Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
         """
         ...
 
@@ -5387,10 +7195,10 @@ class OemMetadata:
     @property
     def time_system(self) -> str:
         """
-        Time system used for state vector, maneuver, and covariance data.
+        Time system used for ephemeris and covariance data. Use of values other than those in 3.2.3.2
+        should be documented in an ICD.
 
-        Standard values: "UTC", "TAI", "TT", "GPS", "TDB", "TCB", "MET", "MRT", "SCLK"
-        Use of other values should be documented in an ICD.
+        Examples: UTC, TAI, TT, GPS, TDB, TCB
         """
         ...
 
@@ -5399,12 +7207,14 @@ class OemMetadata:
     @property
     def useable_start_time(self) -> Optional[str]:
         """
-        Start of the recommended time span for use of the ephemeris data.
+        Start time of USEABLE time span covered by ephemeris data immediately following this metadata
+        block. (For format specification, see 7.5.10.) This optional keyword allows the message
+        creator to introduce fictitious (but numerically smooth) data nodes prior to the actual data
+        time history to support interpolation methods requiring more than two nodes (e.g., pure
+        higher-order Lagrange interpolation methods). The use of this keyword and introduction of
+        fictitious node points are optional and may not be necessary.
 
-        Indicates the earliest time at which the ephemeris data is recommended for use.
-        The data may be less accurate outside the useable time range.
-
-        Format: ISO 8601 (e.g., "2023-01-01T01:00:00")
+        Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
         """
         ...
 
@@ -5413,12 +7223,14 @@ class OemMetadata:
     @property
     def useable_stop_time(self) -> Optional[str]:
         """
-        End of the recommended time span for use of the ephemeris data.
+        Stop time of USEABLE time span covered by ephemeris data immediately following this metadata
+        block. (For format specification, see 7.5.10.) This optional keyword allows the message
+        creator to introduce fictitious (but numerically smooth) data nodes following the actual data
+        time history to support interpolation methods requiring more than two nodes (e.g., pure
+        higher-order Lagrange interpolation methods). The use of this keyword and introduction of
+        fictitious node points are optional and may not be necessary.
 
-        Indicates the latest time at which the ephemeris data is recommended for use.
-        The data may be less accurate outside the useable time range.
-
-        Format: ISO 8601 (e.g., "2023-01-01T23:00:00")
+        Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
         """
         ...
 
@@ -5427,7 +7239,7 @@ class OemMetadata:
 
 class OemSegment:
     """
-    Represents a single segment of an OEM.
+    A single segment of the OEM.
 
     Each segment contains metadata (context) and a list of ephemeris data points.
 
@@ -5457,7 +7269,9 @@ class OemSegment:
     @property
     def metadata(self) -> OemMetadata:
         """
-        Segment metadata.
+        A single segment of the OEM.
+
+        Each segment contains metadata (context) and a list of ephemeris data points.
         """
         ...
 
@@ -5512,7 +7326,10 @@ class Omm:
     @property
     def header(self) -> OdmHeader:
         """
-        The message header.
+        Orbit Mean-Elements Message (OMM).
+
+        The OMM contains the orbital characteristics of a single object at a specified epoch,
+        expressed in mean Keplerian elements.
         """
         ...
 
@@ -5569,14 +7386,14 @@ class OmmData:
         ...
 
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
         Comments.
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def covariance_matrix(self) -> Optional[OpmCovarianceMatrix]:
         """
@@ -5665,7 +7482,12 @@ class OmmMetadata:
     @property
     def center_name(self) -> str:
         """
-        Origin of the OMM reference frame.
+        Origin of the OMM reference frame, which shall be a natural solar system body (planets,
+        asteroids, comets, and natural satellites), including any planet barycenter or the solar
+        system barycenter. Natural bodies shall be selected from the accepted set of values
+        indicated in annex B, subsection B2.
+
+        Examples: EARTH, MARS, MOON
         """
         ...
 
@@ -5674,7 +7496,7 @@ class OmmMetadata:
     @property
     def comment(self) -> list[str]:
         """
-        Comments (allowed at the beginning of the OMM Metadata).
+        Comments (allowed at the beginning of the OMM Metadata). (See 7.8 for formatting rules.)
         """
         ...
 
@@ -5683,7 +7505,10 @@ class OmmMetadata:
     @property
     def mean_element_theory(self) -> str:
         """
-        Description of the Mean Element Theory. Indicates the proper method to employ to propagate the state.
+        Description of the Mean Element Theory. Indicates the proper method to employ to propagate the
+        state.
+
+        Examples: SGP, SGP4, SGP4-XP, DSST, USM
         """
         ...
 
@@ -5692,7 +7517,17 @@ class OmmMetadata:
     @property
     def object_id(self) -> str:
         """
-        Object identifier of the object for which mean element orbit state data is provided.
+        Object identifier of the object for which mean element orbit state data is provided. While
+        there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+        the international spacecraft designator as published in the UN Office of Outer Space Affairs
+        designator index (reference \[3\]). Recommended values have the format YYYY-NNNP{PP}, where:
+        YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
+        zeros). P{PP} = At least one capital letter for the identification of the part brought into
+        space by the launch. If the asset is not listed in reference \[3\], the UN Office of Outer
+        Space Affairs designator index format is not used, or the content is either unknown or cannot
+        be disclosed, the value should be set to UNKNOWN.
+
+        Examples: 2005-046A, 2005-046B, 2003-022A, UNKNOWN
         """
         ...
 
@@ -5701,7 +7536,13 @@ class OmmMetadata:
     @property
     def object_name(self) -> str:
         """
-        Spacecraft name for which mean element orbit state data is provided.
+        Spacecraft name for which mean element orbit state data is provided. While there is no
+        CCSDS-based restriction on the value for this keyword, it is recommended to use names from the
+        UN Office of Outer Space Affairs designator index (reference \[3\], which include Object name
+        and international designator of the participant). If OBJECT_NAME is not listed in reference
+        \[3\] or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
+
+        Examples: Telkom 2, Spaceway 2, INMARSAT 4-F2, UNKNOWN
         """
         ...
 
@@ -5710,7 +7551,15 @@ class OmmMetadata:
     @property
     def ref_frame(self) -> str:
         """
-        Reference frame in which the Keplerian element data are given.
+        Reference frame in which the Keplerian element data are given. Use of values other than those
+        in 3.2.3.3 should be documented in an ICD. NOTE—NORAD Two Line Element Sets and corresponding
+        Simplified General Perturbations (SGP) orbit propagator ephemeris outputs are explicitly
+        defined to be in the True Equator Mean Equinox of Date (TEME of Date) reference frame.
+        Therefore, TEME of date shall be used for OMMs based on NORAD Two Line Element sets, rather
+        than the almost imperceptibly different TEME of Epoch (see reference \[H2\] or \[H3\] for
+        further details).
+
+        Examples: ICRF, ITRF2000, EME2000, TEME
         """
         ...
 
@@ -5719,7 +7568,10 @@ class OmmMetadata:
     @property
     def ref_frame_epoch(self) -> Optional[str]:
         """
-        Epoch of reference frame, if not intrinsic to the definition of the reference frame.
+        Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
+        7.5.10 for formatting rules.)
+
+        Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
         """
         ...
 
@@ -5728,7 +7580,10 @@ class OmmMetadata:
     @property
     def time_system(self) -> str:
         """
-        Time system used for Keplerian elements and covariance data.
+        Time system used for Keplerian elements and covariance data. Use of values other than those
+        in 3.2.3.2 should be documented in an ICD.
+
+        Examples: UTC
         """
         ...
 
@@ -5774,8 +7629,13 @@ class OmmSegment:
 
 class Opm:
     """
-    Represents a CCSDS Orbit Parameter Message (OPM).
+    Orbit Parameter Message (OPM).
 
+    Orbit information may be exchanged between two participants by sending a state vector (see
+    reference \[H1\]) for a specified epoch using an OPM. The message recipient must have an orbit
+    propagator available that is able to propagate the OPM state vector to compute the orbit at other
+    desired epochs. For this propagation, additional ancillary information (spacecraft properties
+    such as mass, area, and maneuver planning data, if applicable) may be included with the message.
 
     Parameters
     ----------
@@ -5820,7 +7680,13 @@ class Opm:
     @property
     def header(self) -> OdmHeader:
         """
-        The message header.
+        Orbit Parameter Message (OPM).
+
+        Orbit information may be exchanged between two participants by sending a state vector (see
+        reference \[H1\]) for a specified epoch using an OPM. The message recipient must have an orbit
+        propagator available that is able to propagate the OPM state vector to compute the orbit at other
+        desired epochs. For this propagation, additional ancillary information (spacecraft properties
+        such as mass, area, and maneuver planning data, if applicable) may be included with the message.
         """
         ...
 
@@ -5866,7 +7732,7 @@ class Opm:
 
 class OpmCovarianceMatrix:
     """
-    Represents a covariance matrix for position and velocity.
+    OPM covariance matrix block (opmCovarianceMatrixType).
 
     Parameters
     ----------
@@ -5914,14 +7780,14 @@ class OpmCovarianceMatrix:
         Velocity Z covariance [6,6]. Units: km²/s².
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
-    comments : list[str], optional
+        comments : list[str], optional
         Comments.
 
     Attributes
     ----------
     cx_x : float
         Position X covariance [1,1]. Units: km².
-    ... (see Parameters for full list of attributes with units)
+        ... (see Parameters for full list of attributes with units)
     """
     def __init__(
         cx_x,
@@ -5955,21 +7821,19 @@ class OpmCovarianceMatrix:
         ...
 
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
-        Comments associated with this covariance matrix.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def cov_ref_frame(self) -> Optional[str]:
         """
-        Reference frame for the covariance matrix.
-
-        If omitted, the covariance is expressed in the same reference frame
-        as the state vector (REF_FRAME from metadata).
+        Reference frame in which the covariance data are given. Select from the accepted set of
+        values indicated in 3.2.4.11.
         """
         ...
 
@@ -5978,9 +7842,9 @@ class OpmCovarianceMatrix:
     @property
     def cx_dot_x(self) -> float:
         """
-        Position-Velocity cross-covariance [4,1] element (X_DOT-X covariance).
+        Velocity X / Position X covariance \[4,1\].
 
-        Units: km·km/s
+        Units: km²/s
         """
         ...
 
@@ -5989,7 +7853,7 @@ class OpmCovarianceMatrix:
     @property
     def cx_dot_x_dot(self) -> float:
         """
-        Velocity covariance [4,4] element (X_DOT-X_DOT variance).
+        Velocity X covariance \[4,4\].
 
         Units: km²/s²
         """
@@ -6000,9 +7864,9 @@ class OpmCovarianceMatrix:
     @property
     def cx_dot_y(self) -> float:
         """
-        Position-Velocity cross-covariance [4,2] element (X_DOT-Y covariance).
+        Velocity X / Position Y covariance \[4,2\].
 
-        Units: km·km/s
+        Units: km²/s
         """
         ...
 
@@ -6011,9 +7875,9 @@ class OpmCovarianceMatrix:
     @property
     def cx_dot_z(self) -> float:
         """
-        Position-Velocity cross-covariance [4,3] element (X_DOT-Z covariance).
+        Velocity X / Position Z covariance \[4,3\].
 
-        Units: km·km/s
+        Units: km²/s
         """
         ...
 
@@ -6022,7 +7886,7 @@ class OpmCovarianceMatrix:
     @property
     def cx_x(self) -> float:
         """
-        Position covariance [1,1] element (X-X variance).
+        Position X covariance \[1,1\].
 
         Units: km²
         """
@@ -6033,9 +7897,9 @@ class OpmCovarianceMatrix:
     @property
     def cy_dot_x(self) -> float:
         """
-        Position-Velocity cross-covariance [5,1] element (Y_DOT-X covariance).
+        Velocity Y / Position X covariance \[5,1\].
 
-        Units: km·km/s
+        Units: km²/s
         """
         ...
 
@@ -6044,7 +7908,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_dot_x_dot(self) -> float:
         """
-        Velocity covariance [5,4] element (Y_DOT-X_DOT covariance).
+        Velocity Y / Velocity X covariance \[5,4\].
 
         Units: km²/s²
         """
@@ -6055,9 +7919,9 @@ class OpmCovarianceMatrix:
     @property
     def cy_dot_y(self) -> float:
         """
-        Position-Velocity cross-covariance [5,2] element (Y_DOT-Y covariance).
+        Velocity Y / Position Y covariance \[5,2\].
 
-        Units: km·km/s
+        Units: km²/s
         """
         ...
 
@@ -6066,7 +7930,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_dot_y_dot(self) -> float:
         """
-        Velocity covariance [5,5] element (Y_DOT-Y_DOT variance).
+        Velocity Y covariance \[5,5\].
 
         Units: km²/s²
         """
@@ -6077,9 +7941,9 @@ class OpmCovarianceMatrix:
     @property
     def cy_dot_z(self) -> float:
         """
-        Position-Velocity cross-covariance [5,3] element (Y_DOT-Z covariance).
+        Velocity Y / Position Z covariance \[5,3\].
 
-        Units: km·km/s
+        Units: km²/s
         """
         ...
 
@@ -6088,7 +7952,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_x(self) -> float:
         """
-        Position covariance [2,1] element (Y-X covariance).
+        Position Y / Position X covariance \[2,1\].
 
         Units: km²
         """
@@ -6099,7 +7963,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_y(self) -> float:
         """
-        Position covariance [2,2] element (Y-Y variance).
+        Position Y covariance \[2,2\].
 
         Units: km²
         """
@@ -6110,9 +7974,9 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_x(self) -> float:
         """
-        Position-Velocity cross-covariance [6,1] element (Z_DOT-X covariance).
+        Velocity Z / Position X covariance \[6,1\].
 
-        Units: km·km/s
+        Units: km²/s
         """
         ...
 
@@ -6121,7 +7985,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_x_dot(self) -> float:
         """
-        Velocity covariance [6,4] element (Z_DOT-X_DOT covariance).
+        Velocity Z / Velocity X covariance \[6,4\].
 
         Units: km²/s²
         """
@@ -6132,9 +7996,9 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_y(self) -> float:
         """
-        Position-Velocity cross-covariance [6,2] element (Z_DOT-Y covariance).
+        Velocity Z / Position Y covariance \[6,2\].
 
-        Units: km·km/s
+        Units: km²/s
         """
         ...
 
@@ -6143,7 +8007,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_y_dot(self) -> float:
         """
-        Velocity covariance [6,5] element (Z_DOT-Y_DOT covariance).
+        Velocity Z / Velocity Y covariance \[6,5\].
 
         Units: km²/s²
         """
@@ -6154,9 +8018,9 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_z(self) -> float:
         """
-        Position-Velocity cross-covariance [6,3] element (Z_DOT-Z covariance).
+        Velocity Z / Position Z covariance \[6,3\].
 
-        Units: km·km/s
+        Units: km²/s
         """
         ...
 
@@ -6165,7 +8029,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_z_dot(self) -> float:
         """
-        Velocity covariance [6,6] element (Z_DOT-Z_DOT variance).
+        Velocity Z covariance \[6,6\].
 
         Units: km²/s²
         """
@@ -6176,7 +8040,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_x(self) -> float:
         """
-        Position covariance [3,1] element (Z-X covariance).
+        Position Z / Position X covariance \[3,1\].
 
         Units: km²
         """
@@ -6187,7 +8051,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_y(self) -> float:
         """
-        Position covariance [3,2] element (Z-Y covariance).
+        Position Z / Position Y covariance \[3,2\].
 
         Units: km²
         """
@@ -6198,7 +8062,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_z(self) -> float:
         """
-        Position covariance [3,3] element (Z-Z variance).
+        Position Z covariance \[3,3\].
 
         Units: km²
         """
@@ -6209,20 +8073,29 @@ class OpmCovarianceMatrix:
 
 class OpmData:
     """
-    Create a new OPM Data object.
+    OPM Data Section.
 
     Parameters
     ----------
     state_vector : StateVector
         State vector.
     """
-    def __init__(state_vector) -> None: ...
+    def __init__(state_vector, comment) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
         """
         ...
 
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def covariance_matrix(self) -> Optional[OpmCovarianceMatrix]:
         """
@@ -6262,7 +8135,7 @@ class OpmData:
     @property
     def state_vector(self) -> StateVector:
         """
-        State vector.
+        State vector components (position and velocity).
         """
         ...
 
@@ -6280,7 +8153,7 @@ class OpmData:
 
 class OpmMetadata:
     """
-    Create a new OPM Metadata object.
+    OPM Metadata Section.
 
     Parameters
     ----------
@@ -6317,9 +8190,13 @@ class OpmMetadata:
     @property
     def center_name(self) -> str:
         """
-        Origin of the OPM reference frame.
+        Origin of the OPM reference frame, which shall be a natural solar system body (planets,
+        asteroids, comets, and natural satellites), including any planet barycenter or the solar
+        system barycenter. Natural bodies shall be selected from the accepted set of values
+        indicated in annex B, subsection B2.
 
-        Shall be a natural solar system body (planets, asteroids, comets, and natural satellites), including any planet barycenter or the solar system barycenter.
+        Examples: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
+        JUPITER BARYCENTER, STS 106, EROS
         """
         ...
 
@@ -6328,7 +8205,7 @@ class OpmMetadata:
     @property
     def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
         """
         ...
 
@@ -6337,9 +8214,17 @@ class OpmMetadata:
     @property
     def object_id(self) -> str:
         """
-        Object identifier of the object for which orbit state data is provided.
+        Object identifier of the object for which orbit state data is provided. While there is no
+        CCSDS-based restriction on the value for this keyword, it is recommended to use the
+        international spacecraft designator as published in the UN Office of Outer Space Affairs
+        designator index (reference \[3\]). Recommended values have the format YYYY-NNNP{PP}, where:
+        YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
+        zeros). P{PP} = At least one capital letter for the identification of the part brought into
+        space by the launch. If the asset is not listed in reference \[3\], the UN Office of Outer
+        Space Affairs designator index format is not used, or the content is either unknown or cannot
+        be disclosed, the value should be set to UNKNOWN.
 
-        Recommended values have the format YYYY-NNNP{PP}.
+        Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
         """
         ...
 
@@ -6348,9 +8233,13 @@ class OpmMetadata:
     @property
     def object_name(self) -> str:
         """
-        Spacecraft name for which orbit state data is provided.
+        Spacecraft name for which orbit state data is provided. While there is no CCSDS-based
+        restriction on the value for this keyword, it is recommended to use names from the UN Office
+        of Outer Space Affairs designator index (reference \[3\], which include Object name and
+        international designator of the participant). If OBJECT_NAME is not listed in reference \[3\]
+        or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
 
-        While there is no CCSDS-based restriction on the value for this keyword, it is recommended to use names from the UN Office of Outer Space Affairs designator index.
+        Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
         """
         ...
 
@@ -6359,9 +8248,10 @@ class OpmMetadata:
     @property
     def ref_frame(self) -> str:
         """
-        Reference frame in which the state vector and optional Keplerian element data are given.
+        Reference frame in which the state vector and optional Keplerian element data are given. Use
+        of values other than those in 3.2.3.3 should be documented in an ICD.
 
-        Examples: 'ICRF', 'EME2000', 'ITRF2000', 'TEME'.
+        Examples: ICRF, EME2000, ITRF2000, TEME
         """
         ...
 
@@ -6370,7 +8260,10 @@ class OpmMetadata:
     @property
     def ref_frame_epoch(self) -> Optional[str]:
         """
-        Epoch of the reference frame, if not intrinsic to the definition.
+        Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
+        7.5.10 for formatting rules.)
+
+        Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
         """
         ...
 
@@ -6379,7 +8272,10 @@ class OpmMetadata:
     @property
     def time_system(self) -> str:
         """
-        Time system used for state vector, maneuver, and covariance data.
+        Time system used for state vector, maneuver, and covariance data. Use of values other than
+        those in 3.2.3.2 should be documented in an ICD.
+
+        Examples: UTC, TAI, TT, GPS, TDB, TCB
         """
         ...
 
@@ -6388,7 +8284,7 @@ class OpmMetadata:
 
 class OpmSegment:
     """
-    Represents a single segment of an OPM.
+    A single segment of the OPM.
 
     Contains metadata and data sections.
 
@@ -6418,7 +8314,9 @@ class OpmSegment:
     @property
     def metadata(self) -> OpmMetadata:
         """
-        Segment metadata.
+        A single segment of the OPM.
+
+        Contains metadata and data sections.
         """
         ...
 
@@ -6427,12 +8325,9 @@ class OpmSegment:
 
 class Rdm:
     """
-    Represents a CCSDS Re-entry Data Message (RDM).
+    Re-entry Data Message (RDM).
 
-    The RDM specifies a standard message format to be used in the exchange of
-    spacecraft re-entry information between Space Situational Awareness (SSA)
-    or Space Surveillance and Tracking (SST) data providers, satellite
-    owners/operators, and other parties.
+    A message format for use in exchanging spacecraft re-entry information.
 
     Parameters
     ----------
@@ -6493,7 +8388,9 @@ class Rdm:
     @property
     def header(self) -> RdmHeader:
         """
-        The message header.
+        Re-entry Data Message (RDM).
+
+        A message format for use in exchanging spacecraft re-entry information.
         """
         ...
 
@@ -6502,7 +8399,7 @@ class Rdm:
     @property
     def segment(self) -> RdmSegment:
         """
-        The message segment.
+        The RDM Body consists of a single segment.
         """
         ...
 
@@ -6559,240 +8456,9 @@ class Rdm:
         """
         ...
 
-class RdmCovarianceMatrix:
-    """
-    Position/velocity covariance matrix.
-    """
-    def __init__(cov_ref_frame, comment) -> None: ...
-    def __getstate__(self, /):
-        """
-        Helper for pickle.
-        """
-        ...
-
-    @property
-    def comment(self) -> list[str]:
-        """
-        Comments for the covariance matrix.
-        """
-        ...
-
-    @comment.setter
-    def comment(self, value: list[str]) -> None: ...
-    @property
-    def comments(self) -> list[str]:
-        """
-        Comments.
-        """
-        ...
-
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
-    @property
-    def cov_ref_frame(self) -> Optional[str]:
-        """
-        Covariance reference frame.
-        """
-        ...
-
-    @cov_ref_frame.setter
-    def cov_ref_frame(self, value: Optional[str]) -> None: ...
-    @property
-    def cx_dot_x(self) -> float:
-        """
-        CX_DOT_X covariance element.
-        """
-        ...
-
-    @cx_dot_x.setter
-    def cx_dot_x(self, value: float) -> None: ...
-    @property
-    def cx_dot_x_dot(self) -> float:
-        """
-        CX_DOT_X_DOT covariance element.
-        """
-        ...
-
-    @cx_dot_x_dot.setter
-    def cx_dot_x_dot(self, value: float) -> None: ...
-    @property
-    def cx_dot_y(self) -> float:
-        """
-        CX_DOT_Y covariance element.
-        """
-        ...
-
-    @cx_dot_y.setter
-    def cx_dot_y(self, value: float) -> None: ...
-    @property
-    def cx_dot_z(self) -> float:
-        """
-        CX_DOT_Z covariance element.
-        """
-        ...
-
-    @cx_dot_z.setter
-    def cx_dot_z(self, value: float) -> None: ...
-    @property
-    def cx_x(self) -> float:
-        """
-        CX_X covariance element.
-        """
-        ...
-
-    @cx_x.setter
-    def cx_x(self, value: float) -> None: ...
-    @property
-    def cy_dot_x(self) -> float:
-        """
-        CY_DOT_X covariance element.
-        """
-        ...
-
-    @cy_dot_x.setter
-    def cy_dot_x(self, value: float) -> None: ...
-    @property
-    def cy_dot_x_dot(self) -> float:
-        """
-        CY_DOT_X_DOT covariance element.
-        """
-        ...
-
-    @cy_dot_x_dot.setter
-    def cy_dot_x_dot(self, value: float) -> None: ...
-    @property
-    def cy_dot_y(self) -> float:
-        """
-        CY_DOT_Y covariance element.
-        """
-        ...
-
-    @cy_dot_y.setter
-    def cy_dot_y(self, value: float) -> None: ...
-    @property
-    def cy_dot_y_dot(self) -> float:
-        """
-        CY_DOT_Y_DOT covariance element.
-        """
-        ...
-
-    @cy_dot_y_dot.setter
-    def cy_dot_y_dot(self, value: float) -> None: ...
-    @property
-    def cy_dot_z(self) -> float:
-        """
-        CY_DOT_Z covariance element.
-        """
-        ...
-
-    @cy_dot_z.setter
-    def cy_dot_z(self, value: float) -> None: ...
-    @property
-    def cy_x(self) -> float:
-        """
-        CY_X covariance element.
-        """
-        ...
-
-    @cy_x.setter
-    def cy_x(self, value: float) -> None: ...
-    @property
-    def cy_y(self) -> float:
-        """
-        CY_Y covariance element.
-        """
-        ...
-
-    @cy_y.setter
-    def cy_y(self, value: float) -> None: ...
-    @property
-    def cz_dot_x(self) -> float:
-        """
-        CZ_DOT_X covariance element.
-        """
-        ...
-
-    @cz_dot_x.setter
-    def cz_dot_x(self, value: float) -> None: ...
-    @property
-    def cz_dot_x_dot(self) -> float:
-        """
-        CZ_DOT_X_DOT covariance element.
-        """
-        ...
-
-    @cz_dot_x_dot.setter
-    def cz_dot_x_dot(self, value: float) -> None: ...
-    @property
-    def cz_dot_y(self) -> float:
-        """
-        CZ_DOT_Y covariance element.
-        """
-        ...
-
-    @cz_dot_y.setter
-    def cz_dot_y(self, value: float) -> None: ...
-    @property
-    def cz_dot_y_dot(self) -> float:
-        """
-        CZ_DOT_Y_DOT covariance element.
-        """
-        ...
-
-    @cz_dot_y_dot.setter
-    def cz_dot_y_dot(self, value: float) -> None: ...
-    @property
-    def cz_dot_z(self) -> float:
-        """
-        CZ_DOT_Z covariance element.
-        """
-        ...
-
-    @cz_dot_z.setter
-    def cz_dot_z(self, value: float) -> None: ...
-    @property
-    def cz_dot_z_dot(self) -> float:
-        """
-        CZ_DOT_Z_DOT covariance element.
-        """
-        ...
-
-    @cz_dot_z_dot.setter
-    def cz_dot_z_dot(self, value: float) -> None: ...
-    @property
-    def cz_x(self) -> float:
-        """
-        CZ_X covariance element.
-        """
-        ...
-
-    @cz_x.setter
-    def cz_x(self, value: float) -> None: ...
-    @property
-    def cz_y(self) -> float:
-        """
-        CZ_Y covariance element.
-        """
-        ...
-
-    @cz_y.setter
-    def cz_y(self, value: float) -> None: ...
-    @property
-    def cz_z(self) -> float:
-        """
-        CZ_Z covariance element.
-        """
-        ...
-
-    @cz_z.setter
-    def cz_z(self, value: float) -> None: ...
-
 class RdmData:
     """
-    Represents the Data Section of an RDM Segment.
-
-    Contains logical blocks for atmospheric re-entry, ground impact, state vector,
-    covariance, object parameters, OD parameters, and user-defined parameters.
+    The RDM Data section.
 
     Parameters
     ----------
@@ -6800,9 +8466,9 @@ class RdmData:
         Mandatory atmospheric re-entry data.
     ground_impact_parameters : GroundImpactParameters, optional
         Ground impact and burn-up data.
-    state_vector : RdmStateVector, optional
+    state_vector : StateVector, optional
         Spacecraft state vector.
-    covariance_matrix : RdmCovarianceMatrix, optional
+    covariance_matrix : OpmCovarianceMatrix, optional
         Position/velocity covariance matrix.
     spacecraft_parameters : RdmSpacecraftParameters, optional
         Object physical parameters.
@@ -6851,14 +8517,14 @@ class RdmData:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def covariance_matrix(self) -> Optional[RdmCovarianceMatrix]:
+    def covariance_matrix(self) -> Optional[OpmCovarianceMatrix]:
         """
         Covariance matrix.
         """
         ...
 
     @covariance_matrix.setter
-    def covariance_matrix(self, value: Optional[RdmCovarianceMatrix]) -> None: ...
+    def covariance_matrix(self, value: Optional[OpmCovarianceMatrix]) -> None: ...
     @property
     def ground_impact_parameters(self) -> Optional[GroundImpactParameters]:
         """
@@ -6891,14 +8557,14 @@ class RdmData:
         self, value: Optional[RdmSpacecraftParameters]
     ) -> None: ...
     @property
-    def state_vector(self) -> Optional[RdmStateVector]:
+    def state_vector(self) -> Optional[StateVector]:
         """
         State vector.
         """
         ...
 
     @state_vector.setter
-    def state_vector(self, value: Optional[RdmStateVector]) -> None: ...
+    def state_vector(self, value: Optional[StateVector]) -> None: ...
     @property
     def user_defined_parameters(self) -> list[tuple[str, str]]:
         """
@@ -6911,7 +8577,7 @@ class RdmData:
 
 class RdmHeader:
     """
-    Represents the Header of a Re-entry Data Message.
+    The RDM Header provides information about the message.
 
     Parameters
     ----------
@@ -6949,7 +8615,7 @@ class RdmHeader:
         """
         File creation date and time in UTC.
 
-        Format: ISO 8601.
+        Examples: 2001-11-06T11:17:33, 2002-204T15:56:23
         """
         ...
 
@@ -6959,6 +8625,8 @@ class RdmHeader:
     def message_id(self) -> str:
         """
         ID that uniquely identifies a message from a given originator.
+
+        Examples: 201113719185, ESA20190101-3345
         """
         ...
 
@@ -6969,7 +8637,7 @@ class RdmHeader:
         """
         Creating agency or entity.
 
-        Value should be an entry from the SANA Organizations Registry.
+        Examples: DLR, ESA
         """
         ...
 
@@ -6978,11 +8646,9 @@ class RdmHeader:
 
 class RdmMetadata:
     """
-    Represents the Metadata Section of an RDM Segment.
+    The RDM Metadata provides information about the re-entry event.
 
-    Contains configuration details and object identification for the re-entry data.
-
-    Mandatory Parameters
+    Parameters
     --------------------
     object_name : str
         Object name for which the orbit state is provided.
@@ -6997,9 +8663,7 @@ class RdmMetadata:
     epoch_tzero : str
         Epoch from which the ORBIT_LIFETIME is calculated.
 
-    Optional Parameters
-    -------------------
-    See the CCSDS RDM Blue Book for details on optional parameters.
+        Optional
     """
     def __init__(
         *,
@@ -7043,7 +8707,9 @@ class RdmMetadata:
     @property
     def atmospheric_model(self) -> Optional[str]:
         """
-        Atmospheric model.
+        The atmospheric model used.
+
+        Examples: Jacchia 70, MSIS-86
         """
         ...
 
@@ -7052,7 +8718,9 @@ class RdmMetadata:
     @property
     def catalog_name(self) -> Optional[str]:
         """
-        Catalog name.
+        The catalog name for the object.
+
+        Examples: SATCAT, SPCS, MCN
         """
         ...
 
@@ -7061,7 +8729,9 @@ class RdmMetadata:
     @property
     def center_name(self) -> str:
         """
-        Center name (e.g., EARTH).
+        The celestial body the object is orbiting.
+
+        Examples: EARTH, MOON, MARS
         """
         ...
 
@@ -7079,7 +8749,9 @@ class RdmMetadata:
     @property
     def controlled_reentry(self) -> str:
         """
-        Controlled re-entry status.
+        Whether the re-entry is controlled or not.
+
+        Examples: YES, NO, UNKNOWN
         """
         ...
 
@@ -7088,7 +8760,11 @@ class RdmMetadata:
     @property
     def drag_parameters_altitude(self) -> Optional[float]:
         """
-        Drag parameters altitude (km).
+        The altitude at which the drag parameters were estimated.
+
+        Units: km
+
+        Examples: 200.0 [km]
         """
         ...
 
@@ -7097,7 +8773,9 @@ class RdmMetadata:
     @property
     def drag_parameters_source(self) -> Optional[str]:
         """
-        Drag parameters source.
+        The source of the drag parameters.
+
+        Examples: OD, DATABASE, DEFAULT
         """
         ...
 
@@ -7106,7 +8784,9 @@ class RdmMetadata:
     @property
     def earth_tides(self) -> Optional[str]:
         """
-        Earth tides model.
+        The Earth tides model used.
+
+        Examples: ERS, IERS
         """
         ...
 
@@ -7115,7 +8795,9 @@ class RdmMetadata:
     @property
     def ephemeris_name(self) -> Optional[str]:
         """
-        Ephemeris name.
+        The name of the ephemeris used.
+
+        Examples: DE430, JPLEPH.405
         """
         ...
 
@@ -7124,7 +8806,9 @@ class RdmMetadata:
     @property
     def epoch_tzero(self) -> str:
         """
-        Epoch from which the orbit lifetime is calculated.
+        The reference epoch for the message.
+
+        Examples: 2018-04-22T09:00:00.00
         """
         ...
 
@@ -7133,7 +8817,9 @@ class RdmMetadata:
     @property
     def gravity_model(self) -> Optional[str]:
         """
-        Gravity model.
+        The gravity model used.
+
+        Examples: EGM-96, JGM-3
         """
         ...
 
@@ -7142,7 +8828,9 @@ class RdmMetadata:
     @property
     def impact_uncertainty_method(self) -> Optional[str]:
         """
-        Impact uncertainty method.
+        The method used to compute impact uncertainty.
+
+        Examples: MONTE-CARLO, ANALYTICAL
         """
         ...
 
@@ -7151,7 +8839,9 @@ class RdmMetadata:
     @property
     def international_designator(self) -> str:
         """
-        International designator (COSPAR ID).
+        The international designator of the object.
+
+        Examples: 1999-025A, 1991-063B, 2011-053A
         """
         ...
 
@@ -7160,7 +8850,9 @@ class RdmMetadata:
     @property
     def intrack_thrust(self) -> Optional[str]:
         """
-        In-track thrust status.
+        Whether there was any intrack thrust.
+
+        Examples: YES, NO
         """
         ...
 
@@ -7169,7 +8861,9 @@ class RdmMetadata:
     @property
     def n_body_perturbations(self) -> Optional[str]:
         """
-        N-body perturbations.
+        The n-body perturbations used.
+
+        Examples: MOON, SUN, JUPITER
         """
         ...
 
@@ -7178,7 +8872,9 @@ class RdmMetadata:
     @property
     def next_message_epoch(self) -> Optional[str]:
         """
-        Next message epoch.
+        The epoch of the next message for this object.
+
+        Examples: 2018-04-23T09:00:00
         """
         ...
 
@@ -7187,7 +8883,9 @@ class RdmMetadata:
     @property
     def object_designator(self) -> Optional[str]:
         """
-        Object designator.
+        The object designator in the catalog.
+
+        Examples: 25730, 21574, 37820
         """
         ...
 
@@ -7196,7 +8894,9 @@ class RdmMetadata:
     @property
     def object_name(self) -> str:
         """
-        Object name.
+        The name of the object.
+
+        Examples: FENGYUN 1C, UARS, Tiangong-1
         """
         ...
 
@@ -7205,7 +8905,9 @@ class RdmMetadata:
     @property
     def object_operator(self) -> Optional[str]:
         """
-        Object operator.
+        The operator of the object.
+
+        Examples: EUMETSAT, SES
         """
         ...
 
@@ -7214,7 +8916,9 @@ class RdmMetadata:
     @property
     def object_owner(self) -> Optional[str]:
         """
-        Object owner.
+        The owner of the object.
+
+        Examples: China, USA, France
         """
         ...
 
@@ -7223,7 +8927,9 @@ class RdmMetadata:
     @property
     def object_type(self) -> Optional[str]:
         """
-        Object type.
+        The type of the object.
+
+        Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
         """
         ...
 
@@ -7232,7 +8938,9 @@ class RdmMetadata:
     @property
     def previous_message_epoch(self) -> Optional[str]:
         """
-        Previous message epoch.
+        The epoch of the previous message for this object.
+
+        Examples: 2018-04-21T09:00:00.00
         """
         ...
 
@@ -7241,7 +8949,9 @@ class RdmMetadata:
     @property
     def previous_message_id(self) -> Optional[str]:
         """
-        Previous message ID.
+        The ID of the previous message for this object.
+
+        Examples: ESA/20180421-007
         """
         ...
 
@@ -7250,7 +8960,9 @@ class RdmMetadata:
     @property
     def reentry_disintegration(self) -> Optional[str]:
         """
-        Reentry disintegration.
+        The method used to model the object’s disintegration.
+
+        Examples: MASS-LOSS, BREAK-UP, NONE
         """
         ...
 
@@ -7259,7 +8971,9 @@ class RdmMetadata:
     @property
     def reentry_uncertainty_method(self) -> Optional[str]:
         """
-        Reentry uncertainty method.
+        The method used to compute re-entry uncertainty.
+
+        Examples: MONTE-CARLO, ANALYTICAL
         """
         ...
 
@@ -7268,7 +8982,9 @@ class RdmMetadata:
     @property
     def ref_frame(self) -> Optional[str]:
         """
-        Reference frame.
+        The reference frame of the state vector and covariance matrix.
+
+        Examples: EME2000, GCRF, ICRF, ITRF2000, TDR
         """
         ...
 
@@ -7277,7 +8993,9 @@ class RdmMetadata:
     @property
     def ref_frame_epoch(self) -> Optional[str]:
         """
-        Reference frame epoch.
+        The epoch of the reference frame.
+
+        Examples: 2000-01-01T00:00:00.000
         """
         ...
 
@@ -7286,7 +9004,9 @@ class RdmMetadata:
     @property
     def solar_flux_prediction(self) -> Optional[str]:
         """
-        Solar flux prediction methodology.
+        The solar flux and geomagnetic activity data used.
+
+        Examples: F10.7_MEAN_81_CYCLE, SCHATTEN_ADJUSTED
         """
         ...
 
@@ -7295,7 +9015,9 @@ class RdmMetadata:
     @property
     def solar_rad_pressure(self) -> Optional[str]:
         """
-        Solar radiation pressure model.
+        Whether solar radiation pressure was used.
+
+        Examples: YES, NO
         """
         ...
 
@@ -7304,7 +9026,9 @@ class RdmMetadata:
     @property
     def time_system(self) -> str:
         """
-        Time system.
+        The time system used for the message.
+
+        Examples: UTC, TAI, TDB
         """
         ...
 
@@ -7336,7 +9060,7 @@ class RdmSegment:
     @property
     def data(self) -> RdmData:
         """
-        Segment data.
+        The data for this RDM segment.
         """
         ...
 
@@ -7345,7 +9069,7 @@ class RdmSegment:
     @property
     def metadata(self) -> RdmMetadata:
         """
-        Segment metadata.
+        The metadata for this RDM segment.
         """
         ...
 
@@ -7354,7 +9078,7 @@ class RdmSegment:
 
 class RdmSpacecraftParameters:
     """
-    Object physical parameters.
+    RDM spacecraft parameters (rdmSpacecraftParametersType).
     """
     def __init__(*, wet_mass=None, dry_mass=None, comment=None) -> None: ...
     def __getstate__(self, /):
@@ -7463,90 +9187,6 @@ class RdmSpacecraftParameters:
     @wet_mass.setter
     def wet_mass(self, value: Optional[float]) -> None: ...
 
-class RdmStateVector:
-    """
-    Spacecraft State Vector.
-    """
-    def __init__(*, epoch, x, y, z, x_dot, y_dot, z_dot, comment=None) -> None: ...
-    def __getstate__(self, /):
-        """
-        Helper for pickle.
-        """
-        ...
-
-    @property
-    def comments(self) -> list[str]:
-        """
-        Comments.
-        """
-        ...
-
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
-    @property
-    def epoch(self) -> str:
-        """
-        Epoch.
-        """
-        ...
-
-    @epoch.setter
-    def epoch(self, value: str) -> None: ...
-    @property
-    def x(self) -> float:
-        """
-        X position (km).
-        """
-        ...
-
-    @x.setter
-    def x(self, value: float) -> None: ...
-    @property
-    def x_dot(self) -> float:
-        """
-        X velocity (km/s).
-        """
-        ...
-
-    @x_dot.setter
-    def x_dot(self, value: float) -> None: ...
-    @property
-    def y(self) -> float:
-        """
-        Y position (km).
-        """
-        ...
-
-    @y.setter
-    def y(self, value: float) -> None: ...
-    @property
-    def y_dot(self) -> float:
-        """
-        Y velocity (km/s).
-        """
-        ...
-
-    @y_dot.setter
-    def y_dot(self, value: float) -> None: ...
-    @property
-    def z(self) -> float:
-        """
-        Z position (km).
-        """
-        ...
-
-    @z.setter
-    def z(self, value: float) -> None: ...
-    @property
-    def z_dot(self) -> float:
-        """
-        Z velocity (km/s).
-        """
-        ...
-
-    @z_dot.setter
-    def z_dot(self, value: float) -> None: ...
-
 class ReferenceFrameType:
     def __getstate__(self, /):
         """
@@ -7629,7 +9269,7 @@ class RelativeMetadataData:
     @property
     def collision_probability(self) -> Optional[float]:
         """
-        The probability (denoted 'p' where 0.0<=p<=1.0) that the two objects will collide.
+        The probability that Object1 and Object2 will collide.
         """
         ...
 
@@ -7638,7 +9278,7 @@ class RelativeMetadataData:
     @property
     def collision_probability_method(self) -> Optional[str]:
         """
-        The method used to calculate the collision probability.
+        The method that was used to calculate the collision probability.
         """
         ...
 
@@ -7647,7 +9287,7 @@ class RelativeMetadataData:
     @property
     def comment(self) -> list[str]:
         """
-        Explanatory comments.
+        Comments.
         """
         ...
 
@@ -7656,21 +9296,43 @@ class RelativeMetadataData:
     @property
     def miss_distance(self) -> float:
         """
-        The norm of the relative position vector at TCA.
+        The norm of the relative position vector.
+
+        Units: m
         """
         ...
 
     @miss_distance.setter
     def miss_distance(self, value: float) -> None: ...
     @property
+    def relative_position(self) -> Optional[list[float]]:
+        """
+        Relative position [R, T, N].
+        """
+        ...
+
+    @relative_position.setter
+    def relative_position(self, value: Optional[list[float]]) -> None: ...
+    @property
     def relative_speed(self) -> Optional[float]:
         """
-        The norm of the relative velocity vector at TCA.
+        The norm of the relative velocity vector.
+
+        Units: m/s
         """
         ...
 
     @relative_speed.setter
     def relative_speed(self, value: Optional[float]) -> None: ...
+    @property
+    def relative_velocity(self) -> Optional[list[float]]:
+        """
+        Relative velocity [R, T, N].
+        """
+        ...
+
+    @relative_velocity.setter
+    def relative_velocity(self, value: Optional[list[float]]) -> None: ...
     @property
     def screen_entry_time(self) -> Optional[str]:
         """
@@ -7690,9 +9352,29 @@ class RelativeMetadataData:
     @screen_exit_time.setter
     def screen_exit_time(self, value: Optional[str]) -> None: ...
     @property
+    def screen_volume_frame(self) -> Optional[ScreenVolumeFrameType]:
+        """
+        Name of the Object1 centered reference frame in which the screening volume data are given.
+        """
+        ...
+
+    @screen_volume_frame.setter
+    def screen_volume_frame(self, value: Optional[ScreenVolumeFrameType]) -> None: ...
+    @property
+    def screen_volume_shape(self) -> Optional[ScreenVolumeShapeType]:
+        """
+        Shape of the screening volume.
+        """
+        ...
+
+    @screen_volume_shape.setter
+    def screen_volume_shape(self, value: Optional[ScreenVolumeShapeType]) -> None: ...
+    @property
     def screen_volume_x(self) -> Optional[float]:
         """
         The R or T component size of the screening volume.
+
+        Units: m
         """
         ...
 
@@ -7702,6 +9384,8 @@ class RelativeMetadataData:
     def screen_volume_y(self) -> Optional[float]:
         """
         The T or V component size of the screening volume.
+
+        Units: m
         """
         ...
 
@@ -7711,6 +9395,8 @@ class RelativeMetadataData:
     def screen_volume_z(self) -> Optional[float]:
         """
         The N component size of the screening volume.
+
+        Units: m
         """
         ...
 
@@ -7760,9 +9446,10 @@ class ScreenVolumeShapeType:
 
 class SpacecraftParameters:
     """
-    Spacecraft parameters.
+    Spacecraft physical parameters (mass, area, coefficients).
 
-    Used in OPM and OMM.
+    References:
+    - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 
     Parameters
     ----------
@@ -7787,18 +9474,20 @@ class SpacecraftParameters:
         ...
 
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def drag_area(self) -> Optional[float]:
         """
-        Drag area.
+        Drag Area (AD).
+
+        Examples: 14, 20.0
 
         Units: m²
         """
@@ -7809,7 +9498,9 @@ class SpacecraftParameters:
     @property
     def drag_coeff(self) -> Optional[float]:
         """
-        Drag coefficient.
+        Drag Coefficient (CD).
+
+        Examples: 2, 2.1
         """
         ...
 
@@ -7820,6 +9511,8 @@ class SpacecraftParameters:
         """
         Spacecraft mass.
 
+        Examples: 1850.2, 3352.0
+
         Units: kg
         """
         ...
@@ -7829,7 +9522,9 @@ class SpacecraftParameters:
     @property
     def solar_rad_area(self) -> Optional[float]:
         """
-        Solar radiation pressure area.
+        Solar Radiation Pressure Area (AR).
+
+        Examples: 14, 20.0
 
         Units: m²
         """
@@ -7840,7 +9535,9 @@ class SpacecraftParameters:
     @property
     def solar_rad_coeff(self) -> Optional[float]:
         """
-        Solar radiation pressure coefficient.
+        Solar Radiation Pressure Coefficient (CR).
+
+        Examples: 1, 1.34
         """
         ...
 
@@ -7878,18 +9575,20 @@ class StateVector:
         ...
 
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def epoch(self) -> str:
         """
-        Epoch of the state vector.
+        Epoch of state vector (see 7.5.10 for formatting rules).
+
+        Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
         """
         ...
 
@@ -7898,7 +9597,11 @@ class StateVector:
     @property
     def x(self) -> float:
         """
-        Position vector X-component (km).
+        Position vector X-component.
+
+        Examples: 6653.148
+
+        Units: km
         """
         ...
 
@@ -7907,7 +9610,11 @@ class StateVector:
     @property
     def x_dot(self) -> float:
         """
-        Velocity vector X-component (km/s).
+        Velocity vector X-component.
+
+        Examples: 0.0
+
+        Units: km/s
         """
         ...
 
@@ -7916,7 +9623,11 @@ class StateVector:
     @property
     def y(self) -> float:
         """
-        Position vector Y-component (km).
+        Position vector Y-component.
+
+        Examples: -20.0
+
+        Units: km
         """
         ...
 
@@ -7925,7 +9636,11 @@ class StateVector:
     @property
     def y_dot(self) -> float:
         """
-        Velocity vector Y-component (km/s).
+        Velocity vector Y-component.
+
+        Examples: 7.7
+
+        Units: km/s
         """
         ...
 
@@ -7934,7 +9649,11 @@ class StateVector:
     @property
     def z(self) -> float:
         """
-        Position vector Z-component (km).
+        Position vector Z-component.
+
+        Examples: 0.0
+
+        Units: km
         """
         ...
 
@@ -7943,7 +9662,11 @@ class StateVector:
     @property
     def z_dot(self) -> float:
         """
-        Velocity vector Z-component (km/s).
+        Velocity vector Z-component.
+
+        Examples: 0.0
+
+        Units: km/s
         """
         ...
 
@@ -7952,10 +9675,7 @@ class StateVector:
 
 class StateVectorAcc:
     """
-    Position and velocity (and optionally acceleration) at a specific epoch.
-
-    Used in OEM to represent object state.
-    Units: Position in km, Velocity in km/s, Acceleration in km/s² (by default)
+    Represents the `stateVectorType` and `stateVectorAccType` from the XSD.
 
     Parameters
     ----------
@@ -7992,7 +9712,9 @@ class StateVectorAcc:
     @property
     def epoch(self) -> str:
         """
-        Epoch of the state vector.
+        Epoch of state vector (see 7.5.10 for formatting rules).
+
+        Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
         """
         ...
 
@@ -8001,7 +9723,11 @@ class StateVectorAcc:
     @property
     def x(self) -> float:
         """
-        Position vector X-component (km).
+        Position vector X-component.
+
+        Examples: 6653.148
+
+        Units: km
         """
         ...
 
@@ -8010,7 +9736,11 @@ class StateVectorAcc:
     @property
     def x_ddot(self) -> Optional[float]:
         """
-        Acceleration vector X-component (km/s²).
+        Acceleration vector X-component.
+
+        Examples: 0.001
+
+        Units: km/s²
         """
         ...
 
@@ -8019,7 +9749,11 @@ class StateVectorAcc:
     @property
     def x_dot(self) -> float:
         """
-        Velocity vector X-component (km/s).
+        Velocity vector X-component.
+
+        Examples: 0.0
+
+        Units: km/s
         """
         ...
 
@@ -8028,7 +9762,11 @@ class StateVectorAcc:
     @property
     def y(self) -> float:
         """
-        Position vector Y-component (km).
+        Position vector Y-component.
+
+        Examples: -20.0
+
+        Units: km
         """
         ...
 
@@ -8037,7 +9775,11 @@ class StateVectorAcc:
     @property
     def y_ddot(self) -> Optional[float]:
         """
-        Acceleration vector Y-component (km/s²).
+        Acceleration vector Y-component.
+
+        Examples: 0.0
+
+        Units: km/s²
         """
         ...
 
@@ -8046,7 +9788,11 @@ class StateVectorAcc:
     @property
     def y_dot(self) -> float:
         """
-        Velocity vector Y-component (km/s).
+        Velocity vector Y-component.
+
+        Examples: 7.7
+
+        Units: km/s
         """
         ...
 
@@ -8055,7 +9801,11 @@ class StateVectorAcc:
     @property
     def z(self) -> float:
         """
-        Position vector Z-component (km).
+        Position vector Z-component.
+
+        Examples: 0.0
+
+        Units: km
         """
         ...
 
@@ -8064,7 +9814,11 @@ class StateVectorAcc:
     @property
     def z_ddot(self) -> Optional[float]:
         """
-        Acceleration vector Z-component (km/s²).
+        Acceleration vector Z-component.
+
+        Examples: 0.0
+
+        Units: km/s²
         """
         ...
 
@@ -8073,7 +9827,11 @@ class StateVectorAcc:
     @property
     def z_dot(self) -> float:
         """
-        Velocity vector Z-component (km/s).
+        Velocity vector Z-component.
+
+        Examples: 0.0
+
+        Units: km/s
         """
         ...
 
@@ -8082,12 +9840,9 @@ class StateVectorAcc:
 
 class Tdm:
     """
-    Represents a CCSDS Tracking Data Message (TDM).
+    Tracking Data Message (TDM).
 
-    The TDM is a standard message format for use in exchanging spacecraft tracking data
-    between space agencies. Such exchanges are used for distributing tracking data output
-    from routine interagency cross-supports in which spacecraft missions managed by one
-    agency are tracked from a tracking station managed by a second agency.
+    The TDM specifies a standard message format for use in exchanging tracking data.
 
     Parameters
     ----------
@@ -8157,21 +9912,23 @@ class Tdm:
     @property
     def header(self) -> TdmHeader:
         """
-        The message header.
+        Tracking Data Message (TDM).
+
+        The TDM specifies a standard message format for use in exchanging tracking data.
         """
         ...
 
     @header.setter
     def header(self, value: TdmHeader) -> None: ...
     @property
-    def segments(self) -> list[TdmSegment]:
+    def segment(self) -> list[TdmSegment]:
         """
         Shortcut to access segments directly from the body.
         """
         ...
 
-    @segments.setter
-    def segments(self, value: list[TdmSegment]) -> None: ...
+    @segment.setter
+    def segment(self, value: list[TdmSegment]) -> None: ...
     def to_file(self, path, format):
         """
         Write to file.
@@ -8203,8 +9960,6 @@ class Tdm:
 
 class TdmBody:
     """
-    Represents the Body of a Tracking Data Message.
-
     The TDM Body consists of one or more TDM Segments.
 
     Parameters
@@ -8220,7 +9975,7 @@ class TdmBody:
         ...
 
     @property
-    def segments(self) -> list[TdmSegment]:
+    def segment(self) -> list[TdmSegment]:
         """
         List of TDM segments.
 
@@ -8228,14 +9983,12 @@ class TdmBody:
         """
         ...
 
-    @segments.setter
-    def segments(self, value: list[TdmSegment]) -> None: ...
+    @segment.setter
+    def segment(self, value: list[TdmSegment]) -> None: ...
 
 class TdmData:
     """
-    Represents the Data Section of a TDM Segment.
-
-    Contains one or more Tracking Data Records.
+    The Data Section of the TDM Segment consists of one or more Tracking Data Records.
 
     Parameters
     ----------
@@ -8254,27 +10007,18 @@ class TdmData:
         ...
 
     @property
-    def comment(self) -> list[str]:
+    def comment(self) -> list[TdmObservation]:
         """
         Comments.
         """
         ...
 
     @comment.setter
-    def comment(self, value: list[str]) -> None: ...
-    @property
-    def observation_count(self) -> int:
-        """
-        Count of observations.
-        """
-        ...
-
-    @observation_count.setter
-    def observation_count(self, value: int) -> None: ...
+    def comment(self, value: list[TdmObservation]) -> None: ...
     @property
     def observations(self) -> list[TdmObservation]:
         """
-        List of tracking observations.
+        Tracking data records.
         """
         ...
 
@@ -8312,7 +10056,7 @@ class TdmHeader:
     @property
     def comment(self) -> list[str]:
         """
-        Comments in the Header.
+        Comments.
         """
         ...
 
@@ -8323,7 +10067,7 @@ class TdmHeader:
         """
         Data creation date/time in UTC.
 
-        Format: ISO 8601 (e.g., "2001-11-06T11:17:33" or "2006-001T00:00:00Z")
+        Examples: 2001-11-06T11:17:33, 2002-204T15:56:23.4, 2006-001T00:00:00Z
         """
         ...
 
@@ -8334,7 +10078,7 @@ class TdmHeader:
         """
         ID that uniquely identifies a message from a given originator.
 
-        The format and content of the message identifier value are at the discretion of the originator.
+        Examples: 201113719185
         """
         ...
 
@@ -8345,8 +10089,7 @@ class TdmHeader:
         """
         Creating agency.
 
-        Value should be an entry from the 'Abbreviation' column in the SANA Organizations Registry.
-        Examples: CNES, ESA, GSFC, DLR, JPL, JAXA, etc.
+        Examples: CNES, ESA, GSFC, DLR, JPL, JAXA
         """
         ...
 
@@ -8443,7 +10186,9 @@ class TdmMetadata:
     @property
     def angle_type(self) -> Optional[str]:
         """
-        Type of antenna geometry (e.g., AZEL, RADEC).
+        The type of antenna geometry represented in the angle data.
+
+        Examples: AZEL, RADEC, XEYN, XSYE
         """
         ...
 
@@ -8461,7 +10206,9 @@ class TdmMetadata:
     @property
     def correction_aberration_diurnal(self) -> Optional[float]:
         """
-        Diurnal aberration correction (deg).
+        A correction value for diurnal aberration.
+
+        Examples: -1.35, 0.23, -3.0e-1, 150000.0
         """
         ...
 
@@ -8470,7 +10217,9 @@ class TdmMetadata:
     @property
     def correction_aberration_yearly(self) -> Optional[float]:
         """
-        Yearly aberration correction (deg).
+        A correction value for yearly aberration.
+
+        Examples: -1.35, 0.23, -3.0e-1, 150000.0
         """
         ...
 
@@ -8479,7 +10228,9 @@ class TdmMetadata:
     @property
     def correction_angle_1(self) -> Optional[float]:
         """
-        Angle 1 correction (degrees).
+        A correction value to be added to the ANGLE_1 data.
+
+        Examples: -1.35, 0.23, -3.0e-1, 150000.0
         """
         ...
 
@@ -8488,7 +10239,9 @@ class TdmMetadata:
     @property
     def correction_angle_2(self) -> Optional[float]:
         """
-        Angle 2 correction (degrees).
+        A correction value to be added to the ANGLE_2 data.
+
+        Examples: -1.35, 0.23, -3.0e-1, 150000.0
         """
         ...
 
@@ -8497,7 +10250,9 @@ class TdmMetadata:
     @property
     def correction_doppler(self) -> Optional[float]:
         """
-        Doppler correction (km/s).
+        A correction value to be added to the Doppler data.
+
+        Examples: -1.35, 0.23, -3.0e-1, 150000.0
         """
         ...
 
@@ -8506,7 +10261,9 @@ class TdmMetadata:
     @property
     def correction_mag(self) -> Optional[float]:
         """
-        Magnitude correction.
+        A correction value to be added to the magnitude data.
+
+        Examples: -1.35, 0.23, -3.0e-1, 150000.0
         """
         ...
 
@@ -8515,7 +10272,9 @@ class TdmMetadata:
     @property
     def correction_range(self) -> Optional[float]:
         """
-        Range correction (Range Units, km, or s).
+        A correction value to be added to the range data.
+
+        Examples: -1.35, 0.23, -3.0e-1, 150000.0
         """
         ...
 
@@ -8524,7 +10283,9 @@ class TdmMetadata:
     @property
     def correction_rcs(self) -> Optional[float]:
         """
-        RCS correction (m²).
+        A correction value to be added to the RCS data.
+
+        Examples: -1.35, 0.23, -3.0e-1, 150000.0
         """
         ...
 
@@ -8533,7 +10294,9 @@ class TdmMetadata:
     @property
     def correction_receive(self) -> Optional[float]:
         """
-        Receive correction (Hz).
+        A correction value to be added to the received frequency or phase count data.
+
+        Examples: -1.35, 0.23, -3.0e-1, 150000.0
         """
         ...
 
@@ -8542,7 +10305,9 @@ class TdmMetadata:
     @property
     def correction_transmit(self) -> Optional[float]:
         """
-        Transmit correction (Hz).
+        A correction value to be added to the transmitted frequency or phase count data.
+
+        Examples: -1.35, 0.23, -3.0e-1, 150000.0
         """
         ...
 
@@ -8551,7 +10316,9 @@ class TdmMetadata:
     @property
     def corrections_applied(self) -> Optional[str]:
         """
-        Indication if corrections have been applied (YES, NO).
+        Indicates whether or not the correction values have been applied to the tracking data.
+
+        Examples: YES, NO
         """
         ...
 
@@ -8560,7 +10327,9 @@ class TdmMetadata:
     @property
     def data_quality(self) -> Optional[str]:
         """
-        Data quality (RAW, VALIDATED, DEGRADED).
+        An estimate of the quality of the data.
+
+        Examples: RAW, VALIDATED, DEGRADED
         """
         ...
 
@@ -8570,6 +10339,8 @@ class TdmMetadata:
     def data_types(self) -> Optional[str]:
         """
         Comma-separated list of data types in the Data Section.
+
+        Examples: RANGE, TRANSMIT_FREQ_n, RECEIVE_FREQ
         """
         ...
 
@@ -8578,7 +10349,11 @@ class TdmMetadata:
     @property
     def doppler_count_bias(self) -> Optional[float]:
         """
-        Bias for Doppler count (Hz).
+        A bias that shall be subtracted from the DOPPLER_COUNT data value.
+
+        Units: Hz
+
+        Examples: 2.4e6, 240000000.0
         """
         ...
 
@@ -8587,7 +10362,9 @@ class TdmMetadata:
     @property
     def doppler_count_rollover(self) -> Optional[str]:
         """
-        Indicator of Doppler count rollover (YES, NO).
+        Flag indicating whether or not a Doppler counter rollover has occurred.
+
+        Examples: YES, NO
         """
         ...
 
@@ -8596,7 +10373,9 @@ class TdmMetadata:
     @property
     def doppler_count_scale(self) -> Optional[int]:
         """
-        Scale factor for Doppler count.
+        A scale factor that the DOPPLER_COUNT data value shall be divided by.
+
+        Examples: 1000, 1
         """
         ...
 
@@ -8605,7 +10384,9 @@ class TdmMetadata:
     @property
     def ephemeris_name_1(self) -> Optional[str]:
         """
-        Ephemeris name for Participant 1.
+        Unique name of the external ephemeris file used for participant 1.
+
+        Examples: SATELLITE_A_EPHEM27
         """
         ...
 
@@ -8614,7 +10395,9 @@ class TdmMetadata:
     @property
     def ephemeris_name_2(self) -> Optional[str]:
         """
-        Ephemeris name for Participant 2.
+        Unique name of the external ephemeris file used for participant 2.
+
+        Examples: SATELLITE_A_EPHEM27
         """
         ...
 
@@ -8623,7 +10406,9 @@ class TdmMetadata:
     @property
     def ephemeris_name_3(self) -> Optional[str]:
         """
-        Ephemeris name for Participant 3.
+        Unique name of the external ephemeris file used for participant 3.
+
+        Examples: SATELLITE_A_EPHEMERIS
         """
         ...
 
@@ -8632,7 +10417,9 @@ class TdmMetadata:
     @property
     def ephemeris_name_4(self) -> Optional[str]:
         """
-        Ephemeris name for Participant 4.
+        Unique name of the external ephemeris file used for participant 4.
+
+        Examples: SATELLITE_A_EPHEMERIS
         """
         ...
 
@@ -8641,7 +10428,9 @@ class TdmMetadata:
     @property
     def ephemeris_name_5(self) -> Optional[str]:
         """
-        Ephemeris name for Participant 5.
+        Unique name of the external ephemeris file used for participant 5.
+
+        Examples: SATELLITE_A_EPHEMERIS
         """
         ...
 
@@ -8650,7 +10439,9 @@ class TdmMetadata:
     @property
     def freq_offset(self) -> Optional[float]:
         """
-        Frequency offset in Hz.
+        A frequency in Hz that must be added to every RECEIVE_FREQ to reconstruct it.
+
+        Examples: 0.0, 8415000000.0
         """
         ...
 
@@ -8659,7 +10450,11 @@ class TdmMetadata:
     @property
     def integration_interval(self) -> Optional[float]:
         """
-        Doppler count time in seconds.
+        The Doppler count time in seconds for Doppler data.
+
+        Units: s
+
+        Examples: 60.0, 0.1, 1.0
         """
         ...
 
@@ -8668,7 +10463,9 @@ class TdmMetadata:
     @property
     def integration_ref(self) -> Optional[str]:
         """
-        Relationship between INTEGRATION_INTERVAL and timetag (START, MIDDLE, END).
+        Indicates the relationship between the INTEGRATION_INTERVAL and the timetag.
+
+        Examples: START, MIDDLE, END
         """
         ...
 
@@ -8677,7 +10474,9 @@ class TdmMetadata:
     @property
     def interpolation(self) -> Optional[str]:
         """
-        Interpolation method (e.g., HERMITE, LAGRANGE).
+        The interpolation method to be used to calculate a transmit phase count.
+
+        Examples: HERMITE, LAGRANGE, LINEAR
         """
         ...
 
@@ -8686,7 +10485,9 @@ class TdmMetadata:
     @property
     def interpolation_degree(self) -> Optional[int]:
         """
-        Degree of interpolation polynomial.
+        The recommended degree of the interpolating polynomial for phase count data.
+
+        Examples: 3, 5, 7, 11
         """
         ...
 
@@ -8695,7 +10496,9 @@ class TdmMetadata:
     @property
     def mode(self) -> Optional[str]:
         """
-        Tracking mode (e.g., SEQUENTIAL, SINGLE_DIFF).
+        The tracking mode associated with the Data Section of the segment.
+
+        Examples: SEQUENTIAL, SINGLE_DIFF
         """
         ...
 
@@ -8704,7 +10507,9 @@ class TdmMetadata:
     @property
     def participant_1(self) -> str:
         """
-        First participant in the tracking session (Mandatory).
+        The first participant in a tracking data session.
+
+        Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name>, 1997-061A, UNKNOWN
         """
         ...
 
@@ -8713,7 +10518,9 @@ class TdmMetadata:
     @property
     def participant_2(self) -> Optional[str]:
         """
-        Second participant.
+        The second participant in a tracking data session.
+
+        Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
         """
         ...
 
@@ -8722,7 +10529,9 @@ class TdmMetadata:
     @property
     def participant_3(self) -> Optional[str]:
         """
-        Third participant.
+        The third participant in a tracking data session.
+
+        Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
         """
         ...
 
@@ -8731,7 +10540,9 @@ class TdmMetadata:
     @property
     def participant_4(self) -> Optional[str]:
         """
-        Fourth participant.
+        The fourth participant in a tracking data session.
+
+        Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
         """
         ...
 
@@ -8740,7 +10551,9 @@ class TdmMetadata:
     @property
     def participant_5(self) -> Optional[str]:
         """
-        Fifth participant.
+        The fifth participant in a tracking data session.
+
+        Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
         """
         ...
 
@@ -8749,7 +10562,9 @@ class TdmMetadata:
     @property
     def path(self) -> Optional[str]:
         """
-        Signal path (comma-separated participant indices). Used with SEQUENTIAL mode.
+        The signal path by listing the index of each participant in order, separated by commas.
+
+        Examples: 1,2,1
         """
         ...
 
@@ -8758,7 +10573,9 @@ class TdmMetadata:
     @property
     def path_1(self) -> Optional[str]:
         """
-        First signal path for SINGLE_DIFF mode.
+        The first signal path where the MODE is 'SINGLE_DIFF'.
+
+        Examples: 1,2,1
         """
         ...
 
@@ -8767,7 +10584,9 @@ class TdmMetadata:
     @property
     def path_2(self) -> Optional[str]:
         """
-        Second signal path for SINGLE_DIFF mode.
+        The second signal path where the MODE is 'SINGLE_DIFF'.
+
+        Examples: 3,1
         """
         ...
 
@@ -8776,7 +10595,9 @@ class TdmMetadata:
     @property
     def range_mode(self) -> Optional[str]:
         """
-        Range mode (COHERENT, CONSTANT, ONE_WAY).
+        The range observable mode.
+
+        Examples: COHERENT, CONSTANT, ONE_WAY
         """
         ...
 
@@ -8785,7 +10606,9 @@ class TdmMetadata:
     @property
     def range_modulus(self) -> Optional[float]:
         """
-        Modulus of the range observable.
+        The modulus of the range observable.
+
+        Examples: 32768.0, 2.0e+23, 0.0, 161.6484
         """
         ...
 
@@ -8794,7 +10617,9 @@ class TdmMetadata:
     @property
     def range_units(self) -> Optional[str]:
         """
-        Units for the range observable (km, s, RU).
+        The units for the range observable.
+
+        Examples: km, s, RU
         """
         ...
 
@@ -8803,7 +10628,9 @@ class TdmMetadata:
     @property
     def receive_band(self) -> Optional[str]:
         """
-        Frequency band for received frequencies.
+        The frequency band for received frequencies.
+
+        Examples: S, X, Ka, L, UHF, GREEN
         """
         ...
 
@@ -8812,7 +10639,12 @@ class TdmMetadata:
     @property
     def receive_delay_1(self) -> Optional[float]:
         """
-        Receive delay for Participant 1 (seconds).
+        A fixed interval of time, in seconds, required for the signal to travel from the tracking
+        point to the receiving electronics for participant 1.
+
+        Units: s
+
+        Examples: 1.23, 0.0326, 0.00777
         """
         ...
 
@@ -8821,7 +10653,12 @@ class TdmMetadata:
     @property
     def receive_delay_2(self) -> Optional[float]:
         """
-        Receive delay for Participant 2 (seconds).
+        A fixed interval of time, in seconds, required for the signal to travel from the tracking
+        point to the receiving electronics for participant 2.
+
+        Units: s
+
+        Examples: 1.23, 0.0326, 0.00777
         """
         ...
 
@@ -8830,7 +10667,12 @@ class TdmMetadata:
     @property
     def receive_delay_3(self) -> Optional[float]:
         """
-        Receive delay for Participant 3 (seconds).
+        A fixed interval of time, in seconds, required for the signal to travel from the tracking
+        point to the receiving electronics for participant 3.
+
+        Units: s
+
+        Examples: 1.23, 0.0326, 0.00777
         """
         ...
 
@@ -8839,7 +10681,12 @@ class TdmMetadata:
     @property
     def receive_delay_4(self) -> Optional[float]:
         """
-        Receive delay for Participant 4 (seconds).
+        A fixed interval of time, in seconds, required for the signal to travel from the tracking
+        point to the receiving electronics for participant 4.
+
+        Units: s
+
+        Examples: 1.23, 0.0326, 0.00777
         """
         ...
 
@@ -8848,7 +10695,12 @@ class TdmMetadata:
     @property
     def receive_delay_5(self) -> Optional[float]:
         """
-        Receive delay for Participant 5 (seconds).
+        A fixed interval of time, in seconds, required for the signal to travel from the tracking
+        point to the receiving electronics for participant 5.
+
+        Units: s
+
+        Examples: 1.23, 0.0326, 0.00777
         """
         ...
 
@@ -8857,7 +10709,9 @@ class TdmMetadata:
     @property
     def reference_frame(self) -> Optional[str]:
         """
-        Inertial reference frame (e.g., EME2000). Applies if ANGLE_TYPE is RADEC.
+        The inertial reference frame to which the antenna frame is referenced.
+
+        Examples: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
         """
         ...
 
@@ -8866,7 +10720,9 @@ class TdmMetadata:
     @property
     def start_time(self) -> Optional[str]:
         """
-        Start time of the tracking data.
+        The UTC start time of the total time span covered by the tracking data.
+
+        Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
         """
         ...
 
@@ -8875,7 +10731,9 @@ class TdmMetadata:
     @property
     def stop_time(self) -> Optional[str]:
         """
-        Stop time of the tracking data.
+        The UTC stop time of the total time span covered by the tracking data.
+
+        Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
         """
         ...
 
@@ -8884,7 +10742,9 @@ class TdmMetadata:
     @property
     def time_system(self) -> str:
         """
-        Time system used for timetags (e.g., UTC, TAI, GPS, SCLK).
+        The time system used for timetags in the associated Data Section.
+
+        Examples: UTC, TAI, GPS, SCLK
         """
         ...
 
@@ -8893,7 +10753,9 @@ class TdmMetadata:
     @property
     def timetag_ref(self) -> Optional[str]:
         """
-        Reference for time tags (TRANSMIT or RECEIVE).
+        A reference for time tags in the tracking data.
+
+        Examples: TRANSMIT, RECEIVE
         """
         ...
 
@@ -8902,7 +10764,9 @@ class TdmMetadata:
     @property
     def track_id(self) -> Optional[str]:
         """
-        Unique identifier for the tracking data.
+        Unique identifier for the tracking data in the associated data section.
+
+        Examples: 20190918_1200135-0001
         """
         ...
 
@@ -8911,7 +10775,9 @@ class TdmMetadata:
     @property
     def transmit_band(self) -> Optional[str]:
         """
-        Frequency band for transmitted frequencies (e.g., S, X, Ka).
+        The frequency band for transmitted frequencies.
+
+        Examples: S, X, Ka, L, UHF, GREEN
         """
         ...
 
@@ -8920,7 +10786,12 @@ class TdmMetadata:
     @property
     def transmit_delay_1(self) -> Optional[float]:
         """
-        Transmit delay for Participant 1 (seconds).
+        A fixed interval of time, in seconds, required for the signal to travel from the
+        transmitting electronics to the transmit point for participant 1.
+
+        Units: s
+
+        Examples: 1.23, 0.0326, 0.00077
         """
         ...
 
@@ -8929,7 +10800,12 @@ class TdmMetadata:
     @property
     def transmit_delay_2(self) -> Optional[float]:
         """
-        Transmit delay for Participant 2 (seconds).
+        A fixed interval of time, in seconds, required for the signal to travel from the
+        transmitting electronics to the transmit point for participant 2.
+
+        Units: s
+
+        Examples: 1.23, 0.0326, 0.00077
         """
         ...
 
@@ -8938,7 +10814,12 @@ class TdmMetadata:
     @property
     def transmit_delay_3(self) -> Optional[float]:
         """
-        Transmit delay for Participant 3 (seconds).
+        A fixed interval of time, in seconds, required for the signal to travel from the
+        transmitting electronics to the transmit point for participant 3.
+
+        Units: s
+
+        Examples: 1.23, 0.0326, 0.00077
         """
         ...
 
@@ -8947,7 +10828,12 @@ class TdmMetadata:
     @property
     def transmit_delay_4(self) -> Optional[float]:
         """
-        Transmit delay for Participant 4 (seconds).
+        A fixed interval of time, in seconds, required for the signal to travel from the
+        transmitting electronics to the transmit point for participant 4.
+
+        Units: s
+
+        Examples: 1.23, 0.0326, 0.00077
         """
         ...
 
@@ -8956,7 +10842,12 @@ class TdmMetadata:
     @property
     def transmit_delay_5(self) -> Optional[float]:
         """
-        Transmit delay for Participant 5 (seconds).
+        A fixed interval of time, in seconds, required for the signal to travel from the
+        transmitting electronics to the transmit point for participant 5.
+
+        Units: s
+
+        Examples: 1.23, 0.0326, 0.00077
         """
         ...
 
@@ -8965,7 +10856,9 @@ class TdmMetadata:
     @property
     def turnaround_denominator(self) -> Optional[int]:
         """
-        Denominator of the turnaround ratio.
+        The denominator of the turnaround ratio.
+
+        Examples: 221, 749
         """
         ...
 
@@ -8974,7 +10867,9 @@ class TdmMetadata:
     @property
     def turnaround_numerator(self) -> Optional[int]:
         """
-        Numerator of the turnaround ratio.
+        The numerator of the turnaround ratio.
+
+        Examples: 240, 880
         """
         ...
 
@@ -8983,9 +10878,7 @@ class TdmMetadata:
 
 class TdmObservation:
     """
-    Represents a single Tracking Data Record (TDR).
-
-    A TDR consists of a keyword (data type), a timetag (epoch), and a measurement.
+    A single tracking data record consisting of a timetag and a measurement.
 
     Parameters
     ----------
@@ -9008,7 +10901,7 @@ class TdmObservation:
     @property
     def epoch(self) -> str:
         """
-        Epoch of the observation.
+        Time associated with the tracking observable.
         """
         ...
 
@@ -9072,9 +10965,7 @@ class TdmSegment:
     @property
     def data(self) -> TdmData:
         """
-        Segment data.
-
-        Contains the tracking data records.
+        Data section for this TDM segment.
         """
         ...
 
@@ -9083,9 +10974,7 @@ class TdmSegment:
     @property
     def metadata(self) -> TdmMetadata:
         """
-        Segment metadata.
-
-        Contains configuration details applicable to the Data Section.
+        Metadata section for this TDM segment.
         """
         ...
 
@@ -9142,9 +11031,11 @@ class TleParameters:
     @property
     def agom(self) -> Optional[float]:
         """
-        Solar radiation pressure area to mass ratio.
+        MEAN_ELEMENT_THEORY= SGP4-XP: Solar radiation pressure coefficient AY/m, where y =
+        reflectivity, A = average cross-sectional area, m = mass. Example values AGOM = 0.01 (rocket
+        body) and 0.001 (payload); average value spanning 20,00 catalog objects = 0.0143 m2/kg.
 
-        Required for SGP4-XP.
+        Examples: 0.01
 
         Units: m²/kg
         """
@@ -9155,7 +11046,10 @@ class TleParameters:
     @property
     def bstar(self) -> Optional[float]:
         """
-        B* drag term.
+        Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
+        MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
+
+        Examples: 0.0001
 
         Units: 1/ER
         """
@@ -9166,9 +11060,12 @@ class TleParameters:
     @property
     def bterm(self) -> Optional[float]:
         """
-        Ballistic coefficient.
+        Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
+        MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag coefficient,
+        A = average cross-sectional area, m = mass. Example values for BTERM = 0.02 (rocket body),
+        0.0015 (payload); average value spanning 20,00 catalog objects = 0.0286.
 
-        Required for SGP4-XP.
+        Examples: 0.02
 
         Units: m²/kg
         """
@@ -9179,25 +11076,33 @@ class TleParameters:
     @property
     def classification_type(self) -> Optional[str]:
         """
-        Classification Type, default value = U.
+        Classification Type, default value = U. Some sources suggest the following coding for
+        the CLASSIFICATION_TYPE keyword: U=unclassified, S=secret
+
+        Examples: U
         """
         ...
 
     @classification_type.setter
     def classification_type(self, value: Optional[str]) -> None: ...
     @property
-    def comments(self) -> list[str]:
+    def comment(self) -> list[str]:
         """
-        Comments.
+        Comments (see 7.8 for formatting rules.)
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @property
     def element_set_no(self) -> Optional[int]:
         """
-        Element set number for this satellite.
+        Element set number for this satellite. Normally incremented sequentially but may be out of
+        sync if it is generated from a backup source. Used to distinguish different TLEs, and
+        therefore only meaningful if TLE-based data is being exchanged (i.e., MEAN_ELEMENT_THEORY =
+        SGP/SGP4).
+
+        Examples: 999
         """
         ...
 
@@ -9206,7 +11111,16 @@ class TleParameters:
     @property
     def ephemeris_type(self) -> Optional[int]:
         """
-        Ephemeris Type, default value = 0.
+        Ephemeris type. Indicates what type of propagator was used to transform the native state to
+        the SGP/SGP4 ephemeris state. The default is 0. (See 4.2.4.7 for numeric definitions.)
+
+        - 0 = SGP
+        - 2 = SGP4
+        - 3 = PPT3
+        - 4 = SGP4-XP
+        - 6 = Special Perturbations
+
+        Examples: 0
         """
         ...
 
@@ -9215,7 +11129,10 @@ class TleParameters:
     @property
     def mean_motion_ddot(self) -> Optional[float]:
         """
-        Second Time Derivative of Mean Motion.
+        MEAN_ELEMENT_THEORY= SGP or PPT3: Second Time Derivative of Mean Motion (i.e., a drag term).
+        (See 4.2.4.7 for important details).
+
+        Examples: 0.0
 
         Units: rev/day³
         """
@@ -9226,7 +11143,10 @@ class TleParameters:
     @property
     def mean_motion_dot(self) -> Optional[float]:
         """
-        First Time Derivative of the Mean Motion.
+        First Time Derivative of the Mean Motion (i.e., a drag term, required when MEAN_ELEMENT_THEORY
+        = SGP or PPT3). (See 4.2.4.7 for important details).
+
+        Examples: 0.000001
 
         Units: rev/day²
         """
@@ -9237,7 +11157,10 @@ class TleParameters:
     @property
     def norad_cat_id(self) -> Optional[int]:
         """
-        NORAD Catalog Number ('Satellite Number').
+        NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword is
+        only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
+
+        Examples: 28893
         """
         ...
 
@@ -9246,7 +11169,9 @@ class TleParameters:
     @property
     def rev_at_epoch(self) -> Optional[int]:
         """
-        Revolution Number.
+        Number of revolutions at epoch.
+
+        Examples: 120
         """
         ...
 
@@ -9294,14 +11219,14 @@ class TrajLine:
 
 class UserDefined:
     """
-    User-Defined Parameters.
+    USER DEFINED PARAMETERS block (`userDefinedType`).
+    User-defined parameters.
 
-    This section contains any user-defined metadata and data that cannot be
-    accommodated in other sections.
+    Allow for the exchange of any desired orbital data not already provided in the message.
 
     Parameters
     ----------
-    params : dict[str, str]
+        params : dict[str, str]
         A dictionary of user-defined parameters and their values.
         (Mandatory)
     comment : list[str], optional
@@ -9318,18 +11243,18 @@ class UserDefined:
     @property
     def comment(self) -> list[str]:
         """
-        Comments for the user-defined section.
+        Comments (see 7.8 for formatting rules).
         """
         ...
 
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def parameters(self) -> dict[str, str]:
+    def user_defined(self) -> dict[str, str]:
         """
         User-defined parameters.
         """
         ...
 
-    @parameters.setter
-    def parameters(self, value: dict[str, str]) -> None: ...
+    @user_defined.setter
+    def user_defined(self, value: dict[str, str]) -> None: ...

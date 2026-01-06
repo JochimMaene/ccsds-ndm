@@ -69,7 +69,7 @@ fn main() -> ccsds_ndm::error::Result<()> {
     if let MessageType::Opm(opm) = ndm {
         let meta = &opm.body.segment.metadata;
         let sv = &opm.body.segment.data.state_vector;
-        
+
         println!("Object: {}", meta.object_name);
         println!("Position: ({}, {}, {})", sv.x, sv.y, sv.z);
     }

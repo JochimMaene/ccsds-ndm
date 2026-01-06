@@ -166,11 +166,9 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<rdm::RdmMetadata>()?;
     m.add_class::<rdm::RdmData>()?;
     m.add_class::<rdm::AtmosphericReentryParameters>()?;
-    m.add_class::<rdm::GroundImpactParameters>()?;
+    m.add_class::<common::GroundImpactParameters>()?;
     m.add_class::<rdm::RdmSpacecraftParameters>()?;
-    m.add_class::<rdm::RdmCovarianceMatrix>()?;
-    m.add_class::<rdm::RdmStateVector>()?;
-    m.add_class::<rdm::OdParameters>()?;
+    m.add_class::<common::OdParameters>()?;
 
     // Register CDM wrapper classes
     // CDM Classes
@@ -183,6 +181,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<RelativeMetadataData>()?;
     m.add_class::<CdmStateVector>()?;
     m.add_class::<CdmCovarianceMatrix>()?;
+    m.add_class::<AdditionalParameters>()?;
 
     // CDM Enums
     m.add_class::<CdmObjectType>()?;

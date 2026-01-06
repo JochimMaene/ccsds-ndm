@@ -779,7 +779,7 @@ impl OemData {
     ///     - 2D NumPy array of shape (N, 6) or (N, 9):
     ///       - N x 6: [X, Y, Z, X_DOT, Y_DOT, Z_DOT] if no accelerations.
     ///       - N x 9: [X, Y, Z, X_DOT, Y_DOT, Z_DOT, X_DDOT, Y_DDOT, Z_DDOT] if accelerations present.
-    ///     
+    ///
     ///     Units:
     ///     - Position: km
     ///     - Velocity: km/s

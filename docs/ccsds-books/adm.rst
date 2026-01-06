@@ -3138,19 +3138,19 @@ via the ‘version’ attribute. The ‘version’ attribute shall be ‘version
 .. NOTE::
    The following example root element tags for an APM instantiation combine all
    the directions in the preceding several subsections:
-   
+
    .. code-block:: xml
-   
+
       <?xml version="1.0" encoding="UTF-8"?>
       <apm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_
       unqualified/ndmxml-4.0.0-master-4.0.xsd"
       id="CCSDS_APM_VERS" version="2.0">
-   
+
    and
-   
+
    .. code-block:: xml
-   
+
       <?xml version="1.0" encoding="UTF-8"?>
       <apm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_
@@ -3176,9 +3176,9 @@ via the ‘version’ attribute. The ‘version’ attribute shall be ‘version
 .. NOTE::
    The rules for these keywords are specified in tables 3-1, 4-2, and 5-2. An
    example ``<header>`` section is shown immediately below:
-   
+
    .. code-block:: xml
-   
+
       <header>
          <COMMENT>This is the common ADM/XML Header.</COMMENT>
          <COMMENT>I can put as many comments here as I want,</COMMENT>
@@ -3733,9 +3733,9 @@ and schema location attributes are associated only with the ``<ndm>`` root eleme
 
 
 .. code-block::
-  
+
   Single Message APM      NDM Combined Instantiation
-  
+
   <apm>                     <ndm>
       <header>                  <apm>
       </header>                 </header>
@@ -3761,7 +3761,7 @@ shown in figure 7-3 below.
 
 
   .. code-block:: xml
-  
+
     <?xml version="1.0" encoding="UTF-8"?>
     <ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-
@@ -3812,19 +3812,19 @@ shown in figure 7-3 below.
 .. NOTE::
    The following example root element tags for an APM instantiation combine all
    the directions in the preceding several subsections:
-   
+
    .. code-block:: xml
-   
+
       <?xml version="1.0" encoding="UTF-8"?>
       <apm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_
       unqualified/ndmxml-4.0.0-master-4.0.xsd"
       id="CCSDS_APM_VERS" version="2.0">
-   
+
    and
-   
+
    .. code-block:: xml
-   
+
       <?xml version="1.0" encoding="UTF-8"?>
       <apm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_
@@ -3850,9 +3850,9 @@ shown in figure 7-3 below.
 .. NOTE::
    The rules for these keywords are specified in tables 3-1, 4-2, and 5-2. An
    example ``<header>`` section is shown immediately below:
-   
+
    .. code-block:: xml
-   
+
       <header>
          <COMMENT>This is the common ADM/XML Header.</COMMENT>
          <COMMENT>I can put as many comments here as I want,</COMMENT>
@@ -4973,11 +4973,11 @@ the rotation.
 
 The quaternion is defined by four components:
 
-.. math:: 
+.. math::
 
-   Q_1 = \sin(\phi/2) \cdot e_1 \ 
-   Q_2 = \sin(\phi/2) \cdot e_2 \ 
-   Q_3 = \sin(\phi/2) \cdot e_3 \ 
+   Q_1 = \sin(\phi/2) \cdot e_1 \
+   Q_2 = \sin(\phi/2) \cdot e_2 \
+   Q_3 = \sin(\phi/2) \cdot e_3 \
    Q_c = \cos(\phi/2)
 
 where:
@@ -4991,18 +4991,18 @@ With :math:`X_A` being the coordinates of some vector in frame A, and :math:`X_B
 the same vector in frame B, the frame transformation matrix :math:`M_{BA}` that transforms coordinates
 in frame A to coordinates in frame B is defined by
 
-.. math:: 
+.. math::
 
    X_B = M_{BA} \cdot X_A
 
 where :math:`M_{BA}` is a function of the quaternion components
 
-.. math:: 
+.. math::
 
    M_{BA} =
    \begin{bmatrix}
-   Q_1^2 - Q_2^2 - Q_3^2 + Q_c^2 & 2(Q_1 Q_2 + Q_3 Q_c) & 2(Q_1 Q_3 - Q_2 Q_c) \ 
-   2(Q_1 Q_2 - Q_3 Q_c) & -Q_1^2 + Q_2^2 - Q_3^2 + Q_c^2 & 2(Q_2 Q_3 + Q_1 Q_c) \ 
+   Q_1^2 - Q_2^2 - Q_3^2 + Q_c^2 & 2(Q_1 Q_2 + Q_3 Q_c) & 2(Q_1 Q_3 - Q_2 Q_c) \
+   2(Q_1 Q_2 - Q_3 Q_c) & -Q_1^2 + Q_2^2 - Q_3^2 + Q_c^2 & 2(Q_2 Q_3 + Q_1 Q_c) \
    2(Q_1 Q_3 + Q_2 Q_c) & 2(Q_2 Q_3 - Q_1 Q_c) & -Q_1^2 - Q_2^2 + Q_3^2 + Q_c^2
    \end{bmatrix}
 
@@ -5017,12 +5017,12 @@ then:
 
 :math:`M_{BA}` is equal to:
 
-.. math:: 
+.. math::
 
    M_{BA} =
    \begin{bmatrix}
-   0 & 1 & 0 \ 
-   -1 & 0 & 0 \ 
+   0 & 1 & 0 \
+   -1 & 0 & 0 \
    0 & 0 & 1
    \end{bmatrix}
 
@@ -5046,10 +5046,10 @@ respective basis vectors of frame B.
 F3.2 EXAMPLE
 ^^^^^^^^^^^^^
 
-With the three successive rotations around axes :math:`a_1 = X, a_2 = Y, a_3 = Z` of respective angles :math:`\theta_1, 
+With the three successive rotations around axes :math:`a_1 = X, a_2 = Y, a_3 = Z` of respective angles :math:`\theta_1,
 \theta_2, \theta_3`, the frame transformation matrix M can be defined such that
 
-.. math:: 
+.. math::
 
    X_B = M_{BA} \cdot X_A
 
@@ -5058,22 +5058,22 @@ same vector in frame B.
 
 That results in
 
-.. math:: 
+.. math::
 
    M_{BA} =
    \begin{bmatrix}
-   \cos\theta_3 & \sin\theta_3 & 0 \ 
-   -\sin\theta_3 & \cos\theta_3 & 0 \ 
+   \cos\theta_3 & \sin\theta_3 & 0 \
+   -\sin\theta_3 & \cos\theta_3 & 0 \
    0 & 0 & 1
    \end{bmatrix}
    \begin{bmatrix}
-   \cos\theta_2 & 0 & -\sin\theta_2 \ 
-   0 & 1 & 0 \ 
+   \cos\theta_2 & 0 & -\sin\theta_2 \
+   0 & 1 & 0 \
    \sin\theta_2 & 0 & \cos\theta_2
    \end{bmatrix}
    \begin{bmatrix}
-   1 & 0 & 0 \ 
-   0 & \cos\theta_1 & \sin\theta_1 \ 
+   1 & 0 & 0 \
+   0 & \cos\theta_1 & \sin\theta_1 \
    0 & -\sin\theta_1 & \cos\theta_1
    \end{bmatrix}
 
@@ -5166,9 +5166,9 @@ NUTATION_PHASE is defined such that the coordinates of the angular momentum vect
 
 which gives:
 
-.. math:: 
+.. math::
 
-   \text{NUTATION} = 90 - \text{asin}(Z_B) \ 
+   \text{NUTATION} = 90 - \text{asin}(Z_B) \
    \text{NUTATION_PHASE} = -\text{atan}(Y_B / X_B)
 
 where ‘asin’ and ‘atan’ are supposed to return a value in degrees.
@@ -5297,12 +5297,12 @@ Inertia data consist of:
 -  moments of inertia (diagonal terms);
 -  inertial cross products (off diagonal terms);
 
-.. math:: 
+.. math::
 
    I =
    \begin{bmatrix}
-   I_{xx} & -I_{xy} & -I_{xz} \ 
-   -I_{xy} & I_{yy} & -I_{yz} \ 
+   I_{xx} & -I_{xy} & -I_{xz} \
+   -I_{xy} & I_{yy} & -I_{yz} \
    -I_{xz} & -I_{yz} & I_{zz}
    \end{bmatrix}
 
@@ -5333,7 +5333,7 @@ Figure G-1 is a simple example with one quaternion.
    CREATION_DATE = 2003-09-30T19:23:57
    ORIGINATOR    = GSFC
    MESSAGE_ID    = A701521
-   
+
    COMMENT GEOCENTRIC, CARTESIAN, EARTH FIXED
    COMMENT OBJECT_ID: 1997-074A
    COMMENT $ITIM = 1997 NOV 21 22:26:18.40000000, $ original launch time
@@ -5341,12 +5341,12 @@ Figure G-1 is a simple example with one quaternion.
    OBJECT_ID   = 1997-074A
    CENTER_NAME = EARTH
    TIME_SYSTEM = UTC
-   
+
    COMMENT Current attitude for orbit 335
    COMMENT Attitude state quaternion
    COMMENT Accuracy of this attitude is 0.02 deg RSS.
    EPOCH = 2003-09-30T14:28:15.1172
-   
+
    QUAT_START
    REF_FRAME_A = SC_BODY_1
    REF_FRAME_B = ITRF1997
@@ -5366,19 +5366,19 @@ Figure G-2 is a simple example with Euler angles.
    CREATION_DATE = 2006-03-13T13:13:33
    ORIGINATOR    = GSFC
    MESSAGE_ID    = A701522
-   
+
    OBJECT_NAME  = GOES-P
    OBJECT_ID    = 2006-003A
    CENTER_NAME  = EARTH
    TIME_SYSTEM  = UTC
    COMMENT GEOSYNCHRONOUS, CARTESIAN, EARTH FIXED
-   
+
    COMMENT OBJECT ID: 2006-003A
    COMMENT $ITIM = 2006 FEB 5 03:23:45.60000000, $ original launch time
    COMMENT Attitude given by Euler angles
-   
+
    EPOCH = 2006-03-12T09:56:39.4987
-   
+
    EULER_START
    COMMENT Euler angles
    REF_FRAME_A   = BODY_FRAME_A
@@ -5399,20 +5399,20 @@ Figure G-3 is a more complex example with several data blocks.
    CREATION_DATE = 2004-02-14T19:23:57
    ORIGINATOR    = JPL
    MESSAGE_ID    = 900018
-   
+
    OBJECT_NAME = MARS_SPIRIT
    OBJECT_ID   = 2004-003A
    CENTER_NAME = EARTH
    TIME_SYSTEM = UTC
    COMMENT     GEOCENTRIC, CARTESIAN, EARTH FIXED
-   
+
    COMMENT OBJECT ID: 2004-003
    COMMENT $ITIM = 2004 JAN 14 22:26:18.400000, $ original launch time 14:36
    COMMENT Generated by JPL
    COMMENT Current attitude for orbit 20 and attitude maneuver
    COMMENT planning data.
    EPOCH = 2004-02-14T14:28:15.1172
-   
+
    QUAT_START
    COMMENT Attitude state quaternion (ref frame = ITRF1997)
    REF_FRAME_A = ITRF1997
@@ -5422,7 +5422,7 @@ Figure G-3 is a more complex example with several data blocks.
    Q3 = 0.39158
    QC = 0.47832
    QUAT_STOP
-   
+
    QUAT_START
    COMMENT Attitude state quaternion (ref frame = ICRF)
    REF_FRAME_A = ICRF
@@ -5432,7 +5432,7 @@ Figure G-3 is a more complex example with several data blocks.
    Q3 = 0.39552
    QC = 0.47491
    QUAT_STOP
-   
+
    INERTIA_START
    COMMENT Spacecraft Inertia Parameters
    INERTIA_REF_FRAME = SC_BODY_1
@@ -5443,7 +5443,7 @@ Figure G-3 is a more complex example with several data blocks.
    IXZ = 89.3 [kg*m**2]
    IYZ = -90.7 [kg*m**2]
    INERTIA_STOP
-   
+
    MAN_START
    COMMENT Data follows for 1 planned maneuver.
    COMMENT First attitude maneuver for: MARS_SPIRIT
@@ -5472,7 +5472,7 @@ were omitted.
    CREATION_DATE = 2002-11-04T17:22:31
    ORIGINATOR    = NASA/JPL
    MESSAGE_ID    = A701523
-   
+
    META_START
    COMMENT This file was produced by M.R. Somebody, MSOO NAV/JPL.
    COMMENT It is to be used for attitude reconstruction only. The relative accuracy of these
@@ -5491,7 +5491,7 @@ were omitted.
    INTERPOLATION_METHOD = HERMITE
    INTERPOLATION_DEGREE = 7
    META_STOP
-   
+
    DATA_START
    1996-11-28T21:29:07.2555 0.56748 0.03146 0.45689 0.68427
    1996-11-28T22:08:03.5555 0.42319 -0.45697 0.23784 0.74533
@@ -5499,7 +5499,7 @@ were omitted.
    < intervening data records omitted here >
    1996-11-30T01:28:02.5555 0.74563 -0.45375 0.36875 0.31964
    DATA_STOP
-   
+
    META_START
    COMMENT This block begins after trajectory correction maneuver TCM-3.
    OBJECT_NAME       = mars_global_surveyor
@@ -5514,7 +5514,7 @@ were omitted.
    STOP_TIME         = 1996-12-28T21:28:00.5555
    ATTITUDE_TYPE     = QUATERNION
    META_STOP
-   
+
    DATA_START
    1996-12-18T12:05:00.5555 -0.64585 0.018542 -0.23854 0.72501
    1996-12-18T12:10:05.5555 0.87451 -0.43475 0.13458 0.16767
@@ -5534,7 +5534,7 @@ some attitude ephemeris lines were omitted.
    CREATION_DATE = 2008-071T17:09:49
    ORIGINATOR    = GSFC
    MESSAGE_ID    = 7077456
-   
+
    META_START
    OBJECT_NAME = ST5-224
    OBJECT_ID   = 2006-224A
@@ -5548,7 +5548,7 @@ some attitude ephemeris lines were omitted.
    STOP_TIME          = 2006-090T05:00:00.946
    ATTITUDE_TYPE      = SPIN
    META_STOP
-   
+
    DATA_START
    COMMENT Spin KF ground solution, SPINKF rates
    2006-090T05:00:00.071 2.6862511e+002 6.8448486e+001 1.5969509e+002 -1.0996528e+002
@@ -5577,14 +5577,14 @@ content ACM.
    CREATION_DATE = 1998-11-06T09:23:57
    ORIGINATOR    = JAXA
    MESSAGE_ID    = A701524
-   
+
    META_START
    OBJECT_NAME       = EUROBIRD-4A
    INTERNATIONAL_DESIGNATOR = 2000-052A
    TIME_SYSTEM       = UTC
    EPOCH_TZERO       = 1998-12-18T14:28:15.1172
    META_STOP
-   
+
    ATT_START
    REF_FRAME_A   = J2000
    REF_FRAME_B   = SC_BODY_1
@@ -5607,14 +5607,14 @@ history.
    CREATION_DATE  = 2017-12-01T00:00:00
    ORIGINATOR     = NASA
    MESSAGE_ID     = A701525
-   
+
    META_START
    OBJECT_NAME        = SDO
    INTERNATIONAL_DESIGNATOR = 2010-005A
    TIME_SYSTEM        = UTC
    EPOCH_TZERO        = 2017-12-26T19:40:00.000
    META_STOP
-   
+
    ATT_START
    COMMENT       OBC Attitude and Bias during momentum management maneuver
    REF_FRAME_A   = J2000
@@ -5629,7 +5629,7 @@ history.
    < intervening data records omitted here >
    599.80275 0.1152 -0.1423 0.8704 0.4571 2.48e-06 -4.350e-06 -3.779e-06
    ATT_STOP
-   
+
    MAN_START
    COMMENT         Momentum management maneuver
    MAN_PURPOSE     = MOM_DESAT
@@ -5639,7 +5639,7 @@ history.
    TARGET_MOMENTUM = 1.30 -16.400 -11.350
    TARGET_MOM_FRAME = J2000
    MAN_STOP
-   
+
    AD_START
    COMMENT       SDO Onboard Filter
    AD_METHOD     = EKF
@@ -5676,7 +5676,7 @@ Figure G-8 is an example of ACM which includes object’s physical characteristi
    CREATION_DATE  = 1998-11-06T09:23:57
    ORIGINATOR     = JAXA
    MESSAGE_ID     = A701526
-   
+
    META_START
    OBJECT_NAME     = TEST_SAT
    ORIGINATOR_POC  = Ms. Rodgers, (719)555-5555, email@email.XXX
@@ -5684,7 +5684,7 @@ Figure G-8 is an example of ACM which includes object’s physical characteristi
    EPOCH_TZERO     = 1998-12-18T14:28:15.1172
    TAIMUTC_AT_TZERO = 36 [s]
    META_STOP
-   
+
    PHYS_START
    COMMENT      Spacecraft Physical Parameters
    WET_MASS     = 1916 [kg]
@@ -5709,7 +5709,7 @@ determination data.
    CREATION_DATE  = 2017-12-30T00:00:00
    ORIGINATOR     = NASA
    MESSAGE_ID     = A701527
-   
+
    META_START
    OBJECT_NAME        = LRO
    INTERNATIONAL_DESIGNATOR = 2009-031A
@@ -5717,7 +5717,7 @@ determination data.
    EPOCH_TZERO        = 2017-12-30T00:00:00.0
    ACM_DATA_ELEMENTS  = COV, AD
    META_STOP
-   
+
    COV_START
    COMMENT Diagonal Covariance for LRO Onboard Kalman Filter
    COV_BASIS     = DETERMINED_OBC
@@ -5728,7 +5728,7 @@ determination data.
    < intervening data records omitted here >
    59.896697 6.74E-11 8.10E-11 9.22E-11 1.11E-15 1.11E-15 1.12E-15
    COV_STOP
-   
+
    AD_START
    COMMENT LRO Onboard Filter, A Multiplicative Extended Kalman Filter
    AD_METHOD       = EKF

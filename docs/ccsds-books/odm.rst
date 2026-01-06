@@ -6231,4 +6231,3 @@ J2 CHANGES IN THE DOCUMENT
    address, such as third-body perturbations, solar pressure model, solid tides, ocean tides,
    Earth albedo, and polar motion, has now been replaced by the material that can be
    specified in the Orbit Comprehensive Message.
-

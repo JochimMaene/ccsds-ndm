@@ -285,27 +285,72 @@ pub struct SpacecraftParameters {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdParameters {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Comments (see 6.3.4 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub comment: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    /// The start of a time interval (UTC) that contains the time of the last accepted
+    /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+    /// of zero duration (i.e., same value as that of TIME_LASTOB_END).
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub time_lastob_start: Option<Epoch>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    /// The end of a time interval (UTC) that contains the time of the last accepted
+    /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+    /// of zero duration (i.e., same value as that of TIME_LASTOB_START).
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub time_lastob_end: Option<Epoch>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    /// The recommended OD time span calculated for the object.
+    ///
+    /// **Examples**: 14, 20.0
+    ///
+    /// **Units**: days
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub recommended_od_span: Option<DayInterval>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    /// Based on the observations available and the RECOMMENDED_OD_SPAN, the actual
+    /// time span used for the OD of the object. (See annex E for definition.)
+    ///
+    /// **Examples**: 14, 20.0
+    ///
+    /// **Units**: days
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub actual_od_span: Option<DayInterval>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    /// The total number of observations available for orbit determination.
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub obs_available: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    /// The number of observations used in the orbit determination.
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub obs_used: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    /// The total number of tracks available for orbit determination.
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub tracks_available: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    /// The number of tracks used in the orbit determination.
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub tracks_used: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    /// The percentage of residuals accepted during orbit determination.
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub residuals_accepted: Option<Percentage>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+
+    /// The weighted root mean square (RMS) of the residuals.
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     pub weighted_rms: Option<f64>,
 }
 
@@ -319,6 +364,7 @@ pub struct StateVectorAcc {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub epoch: Epoch,
+
     /// Position vector X-component.
     ///
     /// **Examples**: 6653.148
@@ -327,6 +373,7 @@ pub struct StateVectorAcc {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub x: Position,
+
     /// Position vector Y-component.
     ///
     /// **Examples**: -20.0
@@ -335,6 +382,7 @@ pub struct StateVectorAcc {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub y: Position,
+
     /// Position vector Z-component.
     ///
     /// **Examples**: 0.0
@@ -343,6 +391,7 @@ pub struct StateVectorAcc {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub z: Position,
+
     /// Velocity vector X-component.
     ///
     /// **Examples**: 0.0
@@ -351,6 +400,7 @@ pub struct StateVectorAcc {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub x_dot: Velocity,
+
     /// Velocity vector Y-component.
     ///
     /// **Examples**: 7.7
@@ -359,6 +409,7 @@ pub struct StateVectorAcc {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub y_dot: Velocity,
+
     /// Velocity vector Z-component.
     ///
     /// **Examples**: 0.0
@@ -367,6 +418,7 @@ pub struct StateVectorAcc {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub z_dot: Velocity,
+
     /// Acceleration vector X-component.
     ///
     /// **Examples**: 0.001
@@ -376,6 +428,7 @@ pub struct StateVectorAcc {
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub x_ddot: Option<Acc>,
+
     /// Acceleration vector Y-component.
     ///
     /// **Examples**: 0.0
@@ -385,6 +438,7 @@ pub struct StateVectorAcc {
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub y_ddot: Option<Acc>,
+
     /// Acceleration vector Z-component.
     ///
     /// **Examples**: 0.0
