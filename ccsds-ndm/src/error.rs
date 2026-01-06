@@ -6,6 +6,7 @@ use crate::types::EpochError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum CcsdsNdmError {
     /// Errors occurring during I/O operations.
     #[error("I/O error: {0}")]
@@ -26,6 +27,14 @@ pub enum CcsdsNdmError {
     /// Errors occurring during KVN parsing at a specific line.
     #[error("KVN parsing error at line {line}: {message}")]
     KvnParse { line: usize, message: String },
+
+    /// Contextual error wrapping another error with a line number.
+    #[error("Error at line {line}: {source}")]
+    LineContext {
+        line: usize,
+        #[source]
+        source: Box<CcsdsNdmError>,
+    },
 
     /// Errors related to CCSDS Epochs.
     #[error("Epoch error: {0}")]
@@ -59,6 +68,10 @@ pub enum CcsdsNdmError {
     #[error("Unknown unit: {0}")]
     UnknownUnit(String),
 
+    /// Error when the format of a value or segment is invalid.
+    #[error("Invalid format: {0}")]
+    InvalidFormat(String),
+
     /// Error when parsing a floating point number fails.
     #[error("Parse float error: {0}")]
     ParseFloat(#[from] std::num::ParseFloatError),
@@ -71,9 +84,27 @@ pub enum CcsdsNdmError {
     #[error("Missing required KVN field: {0}")]
     MissingField(String),
 
+    /// Error when a required segment is missing.
+    #[error("Missing required segment: {0}")]
+    MissingSegment(String),
+
+    /// Error when fields are conflicting.
+    #[error("Conflicting fields: {0}")]
+    ConflictingFields(String),
+
     /// Error when an unexpected end of input is reached.
     #[error("Unexpected end of input: {context}")]
     UnexpectedEof { context: String },
+}
+
+impl CcsdsNdmError {
+    /// Wraps the error with line context.
+    pub fn at_line(self, line: usize) -> Self {
+        CcsdsNdmError::LineContext {
+            line,
+            source: Box::new(self),
+        }
+    }
 }
 
 pub type Result<T> = std::result::Result<T, CcsdsNdmError>;

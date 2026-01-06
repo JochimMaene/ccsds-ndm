@@ -336,7 +336,12 @@ impl OpmMetadataBuilder {
             "OBJECT_ID" => self.object_id = Some(val.to_string()),
             "CENTER_NAME" => self.center_name = Some(val.to_string()),
             "REF_FRAME" => self.ref_frame = Some(val.to_string()),
-            "REF_FRAME_EPOCH" => self.ref_frame_epoch = Some(FromKvnValue::from_kvn_value(val)?),
+            "REF_FRAME_EPOCH" => {
+                self.ref_frame_epoch = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
             "TIME_SYSTEM" => self.time_system = Some(val.to_string()),
             _ => {
                 return Err(CcsdsNdmError::KvnParse {
@@ -529,28 +534,28 @@ impl OpmData {
                     // Route the key to the correct builder
 
                     // State Vector
-                    if sv_builder.try_match(key, val)? {
+                    if sv_builder.try_match(key, val, line)? {
                         sv_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Keplerian Elements
-                    if ke_builder.try_match(key, val, *unit)? {
+                    if ke_builder.try_match(key, val, *unit, line)? {
                         ke_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Spacecraft Parameters
-                    if sp_builder.try_match(key, val, *unit)? {
+                    if sp_builder.try_match(key, val, *unit, line)? {
                         sp_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Covariance
-                    if cov_builder.try_match(key, val, *unit)? {
+                    if cov_builder.try_match(key, val, *unit, line)? {
                         cov_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
@@ -561,7 +566,7 @@ impl OpmData {
                         maneuvers.push(current_maneuver.build()?);
                         current_maneuver = ManeuverParametersBuilder::default();
                     }
-                    if current_maneuver.try_match(key, val, *unit)? {
+                    if current_maneuver.try_match(key, val, *unit, line)? {
                         current_maneuver.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
@@ -640,15 +645,35 @@ impl StateVectorBuilder {
         self.epoch.is_some()
     }
 
-    fn try_match(&mut self, key: &str, val: &str) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, line: usize) -> Result<bool> {
         match key {
-            "EPOCH" => self.epoch = Some(FromKvnValue::from_kvn_value(val)?),
-            "X" => self.x = Some(Position::from_kvn(val, Some("km"))?),
-            "Y" => self.y = Some(Position::from_kvn(val, Some("km"))?),
-            "Z" => self.z = Some(Position::from_kvn(val, Some("km"))?),
-            "X_DOT" => self.x_dot = Some(Velocity::from_kvn(val, Some("km/s"))?),
-            "Y_DOT" => self.y_dot = Some(Velocity::from_kvn(val, Some("km/s"))?),
-            "Z_DOT" => self.z_dot = Some(Velocity::from_kvn(val, Some("km/s"))?),
+            "EPOCH" => {
+                self.epoch = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "X" => {
+                self.x = Some(Position::from_kvn(val, Some("km")).map_err(|e| e.at_line(line))?)
+            }
+            "Y" => {
+                self.y = Some(Position::from_kvn(val, Some("km")).map_err(|e| e.at_line(line))?)
+            }
+            "Z" => {
+                self.z = Some(Position::from_kvn(val, Some("km")).map_err(|e| e.at_line(line))?)
+            }
+            "X_DOT" => {
+                self.x_dot =
+                    Some(Velocity::from_kvn(val, Some("km/s")).map_err(|e| e.at_line(line))?)
+            }
+            "Y_DOT" => {
+                self.y_dot =
+                    Some(Velocity::from_kvn(val, Some("km/s")).map_err(|e| e.at_line(line))?)
+            }
+            "Z_DOT" => {
+                self.z_dot =
+                    Some(Velocity::from_kvn(val, Some("km/s")).map_err(|e| e.at_line(line))?)
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -786,18 +811,37 @@ struct KeplerianElementsBuilder {
 }
 
 impl KeplerianElementsBuilder {
-    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
         match key {
-            "SEMI_MAJOR_AXIS" => self.semi_major_axis = Some(Distance::from_kvn(val, unit)?),
-            "ECCENTRICITY" => self.eccentricity = Some(val.parse()?),
-            "INCLINATION" => self.inclination = Some(Inclination::from_kvn(val, unit)?),
-            "RA_OF_ASC_NODE" => self.ra_of_asc_node = Some(Angle::from_kvn(val, unit)?),
-            "ARG_OF_PERICENTER" => self.arg_of_pericenter = Some(Angle::from_kvn(val, unit)?),
-            "TRUE_ANOMALY" => self.true_anomaly = Some(Angle::from_kvn(val, unit)?),
-            "MEAN_ANOMALY" => self.mean_anomaly = Some(Angle::from_kvn(val, unit)?),
+            "SEMI_MAJOR_AXIS" => {
+                self.semi_major_axis =
+                    Some(Distance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "ECCENTRICITY" => {
+                self.eccentricity = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "INCLINATION" => {
+                self.inclination = Some(Inclination::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "RA_OF_ASC_NODE" => {
+                self.ra_of_asc_node = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "ARG_OF_PERICENTER" => {
+                self.arg_of_pericenter = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "TRUE_ANOMALY" => {
+                self.true_anomaly = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "MEAN_ANOMALY" => {
+                self.mean_anomaly = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
             "GM" => {
-                let uv = UnitValue::<f64, GmUnits>::from_kvn(val, unit)?;
-                self.gm = Some(Gm::new(uv.value, uv.units)?);
+                let uv = UnitValue::<f64, GmUnits>::from_kvn(val, unit)
+                    .map_err(|e| e.at_line(line))?;
+                self.gm = Some(Gm::new(uv.value, uv.units).map_err(|e| e.at_line(line))?);
             }
             _ => return Ok(false),
         }
@@ -880,13 +924,27 @@ struct SpacecraftParametersBuilder {
 }
 
 impl SpacecraftParametersBuilder {
-    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
         match key {
-            "MASS" => self.mass = Some(Mass::from_kvn(val, unit)?),
-            "SOLAR_RAD_AREA" => self.solar_rad_area = Some(Area::from_kvn(val, unit)?),
-            "SOLAR_RAD_COEFF" => self.solar_rad_coeff = Some(val.parse()?),
-            "DRAG_AREA" => self.drag_area = Some(Area::from_kvn(val, unit)?),
-            "DRAG_COEFF" => self.drag_coeff = Some(val.parse()?),
+            "MASS" => self.mass = Some(Mass::from_kvn(val, unit).map_err(|e| e.at_line(line))?),
+            "SOLAR_RAD_AREA" => {
+                self.solar_rad_area = Some(Area::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "SOLAR_RAD_COEFF" => {
+                self.solar_rad_coeff = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "DRAG_AREA" => {
+                self.drag_area = Some(Area::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "DRAG_COEFF" => {
+                self.drag_coeff = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -941,30 +999,87 @@ pub struct OpmCovarianceMatrixBuilder {
 }
 
 impl OpmCovarianceMatrixBuilder {
-    pub fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    pub fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
         match key {
             "COV_REF_FRAME" => self.cov_ref_frame = Some(val.to_string()),
-            "CX_X" => self.cx_x = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CY_X" => self.cy_x = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CY_Y" => self.cy_y = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CZ_X" => self.cz_x = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CZ_Y" => self.cz_y = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CZ_Z" => self.cz_z = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CX_DOT_X" => self.cx_dot_x = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CX_DOT_Y" => self.cx_dot_y = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CX_DOT_Z" => self.cx_dot_z = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CX_DOT_X_DOT" => self.cx_dot_x_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
-            "CY_DOT_X" => self.cy_dot_x = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CY_DOT_Y" => self.cy_dot_y = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CY_DOT_Z" => self.cy_dot_z = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CY_DOT_X_DOT" => self.cy_dot_x_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
-            "CY_DOT_Y_DOT" => self.cy_dot_y_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_X" => self.cz_dot_x = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_Y" => self.cz_dot_y = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_Z" => self.cz_dot_z = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_X_DOT" => self.cz_dot_x_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_Y_DOT" => self.cz_dot_y_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_Z_DOT" => self.cz_dot_z_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
+            "CX_X" => {
+                self.cx_x = Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_X" => {
+                self.cy_x = Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_Y" => {
+                self.cy_y = Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_X" => {
+                self.cz_x = Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_Y" => {
+                self.cz_y = Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_Z" => {
+                self.cz_z = Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CX_DOT_X" => {
+                self.cx_dot_x =
+                    Some(PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CX_DOT_Y" => {
+                self.cx_dot_y =
+                    Some(PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CX_DOT_Z" => {
+                self.cx_dot_z =
+                    Some(PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CX_DOT_X_DOT" => {
+                self.cx_dot_x_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_DOT_X" => {
+                self.cy_dot_x =
+                    Some(PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_DOT_Y" => {
+                self.cy_dot_y =
+                    Some(PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_DOT_Z" => {
+                self.cy_dot_z =
+                    Some(PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_DOT_X_DOT" => {
+                self.cy_dot_x_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_DOT_Y_DOT" => {
+                self.cy_dot_y_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_DOT_X" => {
+                self.cz_dot_x =
+                    Some(PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_DOT_Y" => {
+                self.cz_dot_y =
+                    Some(PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_DOT_Z" => {
+                self.cz_dot_z =
+                    Some(PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_DOT_X_DOT" => {
+                self.cz_dot_x_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_DOT_Y_DOT" => {
+                self.cz_dot_y_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_DOT_Z_DOT" => {
+                self.cz_dot_z_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -1135,21 +1250,34 @@ impl ManeuverParametersBuilder {
             || self.man_delta_mass.is_some()
     }
 
-    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
         match key {
             "MAN_EPOCH_IGNITION" => {
-                self.man_epoch_ignition = Some(FromKvnValue::from_kvn_value(val)?)
+                self.man_epoch_ignition = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
             }
-            "MAN_DURATION" => self.man_duration = Some(Duration::from_kvn(val, unit)?),
+            "MAN_DURATION" => {
+                self.man_duration = Some(Duration::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
             "MAN_DELTA_MASS" => {
-                let uv = UnitValue::<f64, MassUnits>::from_kvn(val, unit)?;
+                let uv = UnitValue::<f64, MassUnits>::from_kvn(val, unit)
+                    .map_err(|e| e.at_line(line))?;
                 // DeltaMassZ validation handled by ::new() (value <= 0)
-                self.man_delta_mass = Some(DeltaMassZ::new(uv.value, uv.units)?);
+                self.man_delta_mass =
+                    Some(DeltaMassZ::new(uv.value, uv.units).map_err(|e| e.at_line(line))?);
             }
             "MAN_REF_FRAME" => self.man_ref_frame = Some(val.to_string()),
-            "MAN_DV_1" => self.man_dv_1 = Some(Velocity::from_kvn(val, unit)?),
-            "MAN_DV_2" => self.man_dv_2 = Some(Velocity::from_kvn(val, unit)?),
-            "MAN_DV_3" => self.man_dv_3 = Some(Velocity::from_kvn(val, unit)?),
+            "MAN_DV_1" => {
+                self.man_dv_1 = Some(Velocity::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "MAN_DV_2" => {
+                self.man_dv_2 = Some(Velocity::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "MAN_DV_3" => {
+                self.man_dv_3 = Some(Velocity::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -2158,9 +2286,19 @@ MAN_DV_2 = 0.0 [km/s]
 MAN_DV_3 = 0.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "DeltaMassZ" && expected == "<= 0")
-        );
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "DeltaMassZ" && expected == "<= 0"));
+            }
+            CcsdsNdmError::OutOfRange {
+                ref name,
+                ref expected,
+                ..
+            } => {
+                assert!(name == "DeltaMassZ" && expected == "<= 0");
+            }
+            _ => panic!("Expected OutOfRange or LineContext(OutOfRange), got {:?}", err),
+        }
     }
 
     #[test]

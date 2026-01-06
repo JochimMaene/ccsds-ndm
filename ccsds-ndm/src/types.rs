@@ -122,7 +122,7 @@ impl<V, U> UnitValue<V, U> {
 impl<V, U> FromKvn for UnitValue<V, U>
 where
     V: FromStr,
-    V::Err: std::error::Error + 'static,
+    CcsdsNdmError: From<V::Err>,
     U: FromStr<Err = CcsdsNdmError>,
 {
     /// Parses a `UnitValue` from a value string and an optional unit string.
@@ -130,9 +130,7 @@ where
     /// The value is parsed using its `FromStr` implementation. If a unit string
     /// is provided, it is parsed using the unit type's `FromStr` implementation.
     fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let value = value
-            .parse::<V>()
-            .map_err(|e| CcsdsNdmError::Validation(e.to_string()))?;
+        let value = value.parse::<V>()?;
 
         let units = match unit {
             Some(u_str) => Some(u_str.parse::<U>()?),
@@ -1845,7 +1843,7 @@ impl FromKvnValue for Vec3Double {
     fn from_kvn_value(val: &str) -> Result<Self> {
         let parts: Vec<&str> = val.split_whitespace().collect();
         if parts.len() != 3 {
-            return Err(CcsdsNdmError::Validation(format!(
+            return Err(CcsdsNdmError::InvalidFormat(format!(
                 "Vec3Double requires 3 values, got {}: {}",
                 parts.len(),
                 val

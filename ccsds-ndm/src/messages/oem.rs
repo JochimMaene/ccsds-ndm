@@ -411,26 +411,48 @@ impl OemMetadataBuilder {
             "OBJECT_ID" => self.object_id = Some(val.into()),
             "CENTER_NAME" => self.center_name = Some(val.into()),
             "REF_FRAME" => self.ref_frame = Some(val.into()),
-            "REF_FRAME_EPOCH" => self.ref_frame_epoch = Some(FromKvnValue::from_kvn_value(val)?),
+            "REF_FRAME_EPOCH" => {
+                self.ref_frame_epoch = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
             "TIME_SYSTEM" => self.time_system = Some(val.into()),
-            "START_TIME" => self.start_time = Some(FromKvnValue::from_kvn_value(val)?),
+            "START_TIME" => {
+                self.start_time = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
             "USEABLE_START_TIME" => {
-                self.useable_start_time = Some(FromKvnValue::from_kvn_value(val)?)
+                self.useable_start_time = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
             }
             "USEABLE_STOP_TIME" => {
-                self.useable_stop_time = Some(FromKvnValue::from_kvn_value(val)?)
+                self.useable_stop_time = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
             }
-            "STOP_TIME" => self.stop_time = Some(FromKvnValue::from_kvn_value(val)?),
+            "STOP_TIME" => {
+                self.stop_time = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
             "INTERPOLATION" => self.interpolation = Some(val.into()),
             "INTERPOLATION_DEGREE" => {
-                let parsed_u32: u32 = FromKvnValue::from_kvn_value(val)?;
+                let parsed_u32: u32 = FromKvnValue::from_kvn_value(val)
+                    .map_err(|e| CcsdsNdmError::from(e).at_line(line))?;
                 self.interpolation_degree =
                     Some(
                         NonZeroU32::new(parsed_u32).ok_or_else(|| CcsdsNdmError::OutOfRange {
                             name: "INTERPOLATION_DEGREE".to_string(),
                             value: parsed_u32.to_string(),
                             expected: ">= 1".to_string(),
-                        })?,
+                        }.at_line(line))?,
                     );
             }
             _ => {
@@ -972,8 +994,12 @@ impl OemCovarianceMatrix {
                 line_number,
                 ..
             })) => {
-                last_line = line_number;
-                epoch = Some(FromKvnValue::from_kvn_value(val)?);
+                let line_num = line_number;
+                last_line = line_num;
+                epoch = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line_num))?,
+                );
             }
             Some(Err(e)) => return Err(e),
             Some(Ok(t)) => {
@@ -1027,7 +1053,10 @@ impl OemCovarianceMatrix {
                         }
 
                         for part in parts {
-                            floats.push(part.parse::<f64>().map_err(CcsdsNdmError::from)?);
+                            floats.push(
+                                part.parse::<f64>()
+                                    .map_err(|e| CcsdsNdmError::from(e).at_line(raw_line_number))?,
+                            );
                         }
                         row_idx += 1;
                     }
@@ -1056,10 +1085,11 @@ impl OemCovarianceMatrix {
         }
 
         if floats.len() != 21 {
-            return Err(CcsdsNdmError::Validation(format!(
+            return Err(CcsdsNdmError::InvalidFormat(format!(
                 "Covariance matrix requires 21 values, found {}",
                 floats.len()
-            )));
+            ))
+            .at_line(last_line));
         }
 
         let epoch = epoch.ok_or(CcsdsNdmError::MissingField("EPOCH in covariance".into()))?;
@@ -1371,13 +1401,25 @@ COMMENT Another data comment
     META_STOP
     2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
     "#;
-        let err = Oem::from_kvn(kvn_bad_degree).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "INTERPOLATION_DEGREE" && expected == ">= 1")
-        );
-    }
-
-    #[test]
+            let err = Oem::from_kvn(kvn_bad_degree).unwrap_err();
+            match err {
+                CcsdsNdmError::LineContext { source, .. } => {
+                    assert!(matches!(*source, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "INTERPOLATION_DEGREE" && expected == ">= 1"));
+                }
+                CcsdsNdmError::OutOfRange {
+                    ref name,
+                    ref expected,
+                    ..
+                } => {
+                    assert!(name == "INTERPOLATION_DEGREE" && expected == ">= 1");
+                }
+                _ => panic!(
+                    "Expected OutOfRange or LineContext(OutOfRange), got {:?}",
+                    err
+                ),
+            }
+        }
+            #[test]
     fn test_covariance_block_start_stop_and_optional_ref_frame() {
         // A2.5.3 Items 26–31: Covariance block optional; start/stop required; COV_REF_FRAME optional
         let kvn = r#"CCSDS_OEM_VERS = 3.0
@@ -1670,7 +1712,9 @@ bad-epoch 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::Epoch(_)) | matches!(err, CcsdsNdmError::KvnParse { .. })
+            matches!(err, CcsdsNdmError::Epoch(_))
+                | matches!(err, CcsdsNdmError::KvnParse { .. })
+                | matches!(err, CcsdsNdmError::LineContext { .. })
         );
     }
 
@@ -2461,9 +2505,22 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn_zero).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "INTERPOLATION_DEGREE" && expected == ">= 1")
-        );
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "INTERPOLATION_DEGREE" && expected == ">= 1"));
+            }
+            CcsdsNdmError::OutOfRange {
+                ref name,
+                ref expected,
+                ..
+            } => {
+                assert!(name == "INTERPOLATION_DEGREE" && expected == ">= 1");
+            }
+            _ => panic!(
+                "Expected OutOfRange or LineContext(OutOfRange), got {:?}",
+                err
+            ),
+        }
     }
 
     #[test]
@@ -2741,7 +2798,13 @@ EPOCH = 2023-01-01T00:00:00
 NOT_A_FLOAT
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::ParseFloat(_)));
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::ParseFloat(_)));
+            }
+            CcsdsNdmError::ParseFloat(_) => {}
+            _ => panic!("Expected ParseFloat or LineContext(ParseFloat), got {:?}", err),
+        }
     }
 
     #[test]

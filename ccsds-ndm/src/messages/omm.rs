@@ -424,7 +424,12 @@ impl OmmMetadataBuilder {
             "OBJECT_ID" => self.object_id = Some(val.to_string()),
             "CENTER_NAME" => self.center_name = Some(val.to_string()),
             "REF_FRAME" => self.ref_frame = Some(val.to_string()),
-            "REF_FRAME_EPOCH" => self.ref_frame_epoch = Some(FromKvnValue::from_kvn_value(val)?),
+            "REF_FRAME_EPOCH" => {
+                self.ref_frame_epoch = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
             "TIME_SYSTEM" => self.time_system = Some(val.to_string()),
             "MEAN_ELEMENT_THEORY" => self.mean_element_theory = Some(val.to_string()),
             _ => {
@@ -602,28 +607,28 @@ impl OmmData {
                     let line = *line_number;
 
                     // Mean Elements
-                    if me_builder.try_match(key, val, *unit)? {
+                    if me_builder.try_match(key, val, *unit, line)? {
                         me_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Spacecraft Params
-                    if sp_builder.try_match(key, val, *unit)? {
+                    if sp_builder.try_match(key, val, *unit, line)? {
                         sp_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // TLE Params
-                    if tle_builder.try_match(key, val, *unit)? {
+                    if tle_builder.try_match(key, val, *unit, line)? {
                         tle_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Covariance
-                    if cov_builder.try_match(key, val, *unit)? {
+                    if cov_builder.try_match(key, val, *unit, line)? {
                         cov_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
@@ -788,19 +793,43 @@ impl MeanElementsBuilder {
         self.epoch.is_some()
     }
 
-    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
         match key {
-            "EPOCH" => self.epoch = Some(FromKvnValue::from_kvn_value(val)?),
-            "SEMI_MAJOR_AXIS" => self.semi_major_axis = Some(Distance::from_kvn(val, unit)?),
-            "MEAN_MOTION" => self.mean_motion = Some(MeanMotion::from_kvn(val, unit)?),
-            "ECCENTRICITY" => self.eccentricity = Some(val.parse()?),
-            "INCLINATION" => self.inclination = Some(Inclination::from_kvn(val, unit)?),
-            "RA_OF_ASC_NODE" => self.ra_of_asc_node = Some(Angle::from_kvn(val, unit)?),
-            "ARG_OF_PERICENTER" => self.arg_of_pericenter = Some(Angle::from_kvn(val, unit)?),
-            "MEAN_ANOMALY" => self.mean_anomaly = Some(Angle::from_kvn(val, unit)?),
+            "EPOCH" => {
+                self.epoch = Some(
+                    FromKvnValue::from_kvn_value(val)
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "SEMI_MAJOR_AXIS" => {
+                self.semi_major_axis =
+                    Some(Distance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "MEAN_MOTION" => {
+                self.mean_motion = Some(MeanMotion::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "ECCENTRICITY" => {
+                self.eccentricity = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "INCLINATION" => {
+                self.inclination = Some(Inclination::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "RA_OF_ASC_NODE" => {
+                self.ra_of_asc_node = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "ARG_OF_PERICENTER" => {
+                self.arg_of_pericenter = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "MEAN_ANOMALY" => {
+                self.mean_anomaly = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
             "GM" => {
-                let uv = UnitValue::<f64, GmUnits>::from_kvn(val, unit)?;
-                self.gm = Some(Gm::new(uv.value, uv.units)?);
+                let uv = UnitValue::<f64, GmUnits>::from_kvn(val, unit)
+                    .map_err(|e| e.at_line(line))?;
+                self.gm = Some(Gm::new(uv.value, uv.units).map_err(|e| e.at_line(line))?);
             }
             _ => return Ok(false),
         }
@@ -872,13 +901,27 @@ struct SpacecraftParametersBuilder {
 }
 
 impl SpacecraftParametersBuilder {
-    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
         match key {
-            "MASS" => self.mass = Some(Mass::from_kvn(val, unit)?),
-            "SOLAR_RAD_AREA" => self.solar_rad_area = Some(Area::from_kvn(val, unit)?),
-            "SOLAR_RAD_COEFF" => self.solar_rad_coeff = Some(val.parse()?),
-            "DRAG_AREA" => self.drag_area = Some(Area::from_kvn(val, unit)?),
-            "DRAG_COEFF" => self.drag_coeff = Some(val.parse()?),
+            "MASS" => self.mass = Some(Mass::from_kvn(val, unit).map_err(|e| e.at_line(line))?),
+            "SOLAR_RAD_AREA" => {
+                self.solar_rad_area = Some(Area::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "SOLAR_RAD_COEFF" => {
+                self.solar_rad_coeff = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "DRAG_AREA" => {
+                self.drag_area = Some(Area::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "DRAG_COEFF" => {
+                self.drag_coeff = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -1073,20 +1116,44 @@ struct TleParametersBuilder {
 }
 
 impl TleParametersBuilder {
-    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
         match key {
-            "EPHEMERIS_TYPE" => self.ephemeris_type = Some(val.parse()?),
-            "CLASSIFICATION_TYPE" => self.classification_type = Some(val.to_string()),
-            "NORAD_CAT_ID" => self.norad_cat_id = Some(val.parse()?),
-            "ELEMENT_SET_NO" => self.element_set_no = Some(val.parse()?),
-            "REV_AT_EPOCH" => self.rev_at_epoch = Some(val.parse()?),
-            "BSTAR" => self.bstar = Some(BStar::from_kvn(val, unit)?),
-            "BTERM" => self.bterm = Some(M2kg::from_kvn(val, unit)?),
-            "MEAN_MOTION_DOT" => self.mean_motion_dot = Some(MeanMotionDot::from_kvn(val, unit)?),
-            "MEAN_MOTION_DDOT" => {
-                self.mean_motion_ddot = Some(MeanMotionDDot::from_kvn(val, unit)?)
+            "EPHEMERIS_TYPE" => {
+                self.ephemeris_type = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
             }
-            "AGOM" => self.agom = Some(M2kg::from_kvn(val, unit)?),
+            "CLASSIFICATION_TYPE" => self.classification_type = Some(val.to_string()),
+            "NORAD_CAT_ID" => {
+                self.norad_cat_id = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "ELEMENT_SET_NO" => {
+                self.element_set_no = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "REV_AT_EPOCH" => {
+                self.rev_at_epoch = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "BSTAR" => self.bstar = Some(BStar::from_kvn(val, unit).map_err(|e| e.at_line(line))?),
+            "BTERM" => self.bterm = Some(M2kg::from_kvn(val, unit).map_err(|e| e.at_line(line))?),
+            "MEAN_MOTION_DOT" => {
+                self.mean_motion_dot =
+                    Some(MeanMotionDot::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "MEAN_MOTION_DDOT" => {
+                self.mean_motion_ddot =
+                    Some(MeanMotionDDot::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "AGOM" => self.agom = Some(M2kg::from_kvn(val, unit).map_err(|e| e.at_line(line))?),
             _ => return Ok(false),
         }
         Ok(true)
