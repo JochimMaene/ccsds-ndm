@@ -174,7 +174,7 @@ impl Ndm for Omm {
                     }
                     unreachable!();
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { content: _, .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next(); // skip
                 }
                 Some(_) => {
@@ -377,20 +377,25 @@ impl OmmMetadata {
                 .as_ref()
                 .expect("Peeked value should be Ok")
             {
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     builder.comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, .. } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    line_number,
+                    ..
+                } => {
                     // Stop when we hit a Data keyword (e.g. EPOCH)
                     // The standard usually puts EPOCH first in data.
                     if key == &"EPOCH" {
                         break;
                     }
-                    builder.match_pair(key, val)?;
+                    builder.match_pair(key, val, *line_number)?;
                     tokens.next();
                 }
                 _ => break,
@@ -413,7 +418,7 @@ struct OmmMetadataBuilder {
 }
 
 impl OmmMetadataBuilder {
-    fn match_pair(&mut self, key: &str, val: &str) -> Result<()> {
+    fn match_pair(&mut self, key: &str, val: &str, line: usize) -> Result<()> {
         match key {
             "OBJECT_NAME" => self.object_name = Some(val.to_string()),
             "OBJECT_ID" => self.object_id = Some(val.to_string()),
@@ -423,10 +428,10 @@ impl OmmMetadataBuilder {
             "TIME_SYSTEM" => self.time_system = Some(val.to_string()),
             "MEAN_ELEMENT_THEORY" => self.mean_element_theory = Some(val.to_string()),
             _ => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Unexpected OMM Metadata key: {}",
-                    key
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line,
+                    message: format!("Unexpected OMM Metadata key: {}", key),
+                })
             }
         }
         Ok(())
@@ -576,7 +581,7 @@ impl OmmData {
                 .as_ref()
                 .expect("Peeked value should be Ok")
             {
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     if !me_builder.has_started() {
                         comment.push(c.to_string());
                     } else {
@@ -584,11 +589,17 @@ impl OmmData {
                     }
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, unit } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => {
                     let key = *key;
+                    let line = *line_number;
 
                     // Mean Elements
                     if me_builder.try_match(key, val, *unit)? {
@@ -629,10 +640,10 @@ impl OmmData {
                         continue;
                     }
 
-                    return Err(CcsdsNdmError::KvnParse(format!(
-                        "Unexpected OMM Data field: {}",
-                        key
-                    )));
+                    return Err(CcsdsNdmError::KvnParse {
+                        line,
+                        message: format!("Unexpected OMM Data field: {}", key),
+                    });
                 }
                 _ => break,
             }
@@ -798,8 +809,8 @@ impl MeanElementsBuilder {
 
     fn build(self) -> Result<MeanElements> {
         if self.semi_major_axis.is_some() && self.mean_motion.is_some() {
-            return Err(CcsdsNdmError::KvnParse(
-                "Cannot have both SEMI_MAJOR_AXIS and MEAN_MOTION".into(),
+            return Err(CcsdsNdmError::Validation(
+                "Cannot have both SEMI_MAJOR_AXIS and MEAN_MOTION".to_string(),
             ));
         }
         if self.semi_major_axis.is_none() && self.mean_motion.is_none() {
@@ -1110,8 +1121,8 @@ impl TleParametersBuilder {
 
         // Check Choice: BSTAR vs BTERM
         if self.bstar.is_some() && self.bterm.is_some() {
-            return Err(CcsdsNdmError::KvnParse(
-                "Cannot have both BSTAR and BTERM".into(),
+            return Err(CcsdsNdmError::Validation(
+                "Cannot have both BSTAR and BTERM".to_string(),
             ));
         }
         if self.bstar.is_none() && self.bterm.is_none() {
@@ -1129,8 +1140,8 @@ impl TleParametersBuilder {
 
         // Check Choice: MEAN_MOTION_DDOT vs AGOM
         if self.mean_motion_ddot.is_some() && self.agom.is_some() {
-            return Err(CcsdsNdmError::KvnParse(
-                "Cannot have both MEAN_MOTION_DDOT and AGOM".into(),
+            return Err(CcsdsNdmError::Validation(
+                "Cannot have both MEAN_MOTION_DDOT and AGOM".to_string(),
             ));
         }
         if self.mean_motion_ddot.is_none() && self.agom.is_none() {

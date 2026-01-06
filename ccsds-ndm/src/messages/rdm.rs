@@ -60,7 +60,7 @@ impl Ndm for Rdm {
                     }
                     unreachable!();
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { content: _, .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next();
                 }
                 Some(_) => {
@@ -149,11 +149,11 @@ impl FromKvnTokens for RdmHeader {
                 .as_ref()
                 .expect("Peeked value should be Ok")
             {
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
                 KvnLine::Pair { key, val, .. } => {
@@ -521,19 +521,25 @@ impl RdmMetadata {
                 .expect("Peeked value should be Ok")
             {
                 // No META_STOP expectation
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, .. } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    line_number,
+                    ..
+                } => {
                     // If we hit a Data keyword, stop.
                     if is_rdm_data_keyword(key) {
                         break;
                     }
 
+                    let line = *line_number;
                     let key = *key;
                     let val = *val;
                     match key {
@@ -579,10 +585,10 @@ impl RdmMetadata {
                             next_message_epoch = Some(Epoch::from_kvn_value(val)?)
                         }
                         _ => {
-                            return Err(CcsdsNdmError::KvnParse(format!(
-                                "Unexpected RDM Metadata key: {}",
-                                key
-                            )))
+                            return Err(CcsdsNdmError::KvnParse {
+                                line,
+                                message: format!("Unexpected RDM Metadata key: {}", key),
+                            })
                         }
                     }
                     tokens.next();
@@ -1052,11 +1058,11 @@ impl RdmData {
                 .expect("Peeked value should be Ok")
             {
                 // No DATA_STOP expected
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
                 KvnLine::Pair { key, val, .. } => {
@@ -2988,7 +2994,7 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(msg) => {
+            CcsdsNdmError::KvnParse { message: msg, .. } => {
                 assert!(msg.contains("Unexpected RDM Metadata key"));
             }
             _ => panic!("Expected KvnParse error, got: {:?}", err),

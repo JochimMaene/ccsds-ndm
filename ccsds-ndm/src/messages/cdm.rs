@@ -53,7 +53,7 @@ impl Ndm for Cdm {
                     }
                     unreachable!();
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { content: _, .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next(); // skip
                 }
                 Some(_) => {
@@ -148,12 +148,12 @@ impl FromKvnTokens for CdmHeader {
             }
 
             match peeked.as_ref().expect("checked is_err above") {
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                KvnLine::Comment { content: _, .. } => {
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
                 KvnLine::Pair {
@@ -239,12 +239,12 @@ impl CdmBody {
                     }
                     segments.push(segment);
                 }
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                KvnLine::Comment { content: _, .. } => {
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         pending_comments.push(c.to_string());
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
                 _ => break,
@@ -417,16 +417,21 @@ impl RelativeMetadataData {
             }
 
             match peeked.as_ref().expect("checked is_err above") {
-                KvnLine::BlockStart("META") => break,
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                KvnLine::BlockStart { tag: "META", .. } => break,
+                KvnLine::Comment { content: _, .. } => {
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, unit } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => {
                     if *key == "OBJECT" {
                         // Start of segment metadata in CDM 1.0 style (no META block)
                         break;
@@ -480,10 +485,10 @@ impl RelativeMetadataData {
                         }
                         "COLLISION_PROBABILITY_METHOD" => coll_method = Some(val.to_string()),
                         _ => {
-                            return Err(CcsdsNdmError::KvnParse(format!(
-                                "Unexpected field in Relative Metadata: {}",
-                                key
-                            )))
+                            return Err(CcsdsNdmError::KvnParse {
+                                line: *line_number,
+                                message: format!("Unexpected field in Relative Metadata: {}", key),
+                            })
                         }
                     }
                     tokens.next();
@@ -582,10 +587,10 @@ impl CdmSegment {
         let metadata = match tokens.peek() {
             Some(Ok(KvnLine::Pair { key: "OBJECT", .. })) => CdmMetadata::from_kvn_tokens(tokens)?,
             Some(Ok(other)) => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Expected segment start, found {:?}",
-                    other
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line: other.line_number(),
+                    message: format!("Expected segment start, found {:?}", other),
+                })
             }
             Some(Err(_)) => {
                 // Advance and return the owned error
@@ -594,7 +599,11 @@ impl CdmSegment {
                 }
                 unreachable!();
             }
-            None => return Err(CcsdsNdmError::KvnParse("Unexpected end of input".into())),
+            None => {
+                return Err(CcsdsNdmError::UnexpectedEof {
+                    context: "Expected CDM segment start".to_string(),
+                })
+            }
         };
         let data = CdmData::from_kvn_tokens(tokens)?;
 
@@ -813,30 +822,35 @@ impl CdmMetadata {
                 unreachable!("peeked.is_err() was true but next() didn't return Err");
             }
             match peeked.as_ref().expect("checked is_err above") {
-                KvnLine::BlockEnd("META") => {
+                KvnLine::BlockEnd { tag: "META", .. } => {
                     tokens.next();
                     break;
                 }
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     builder.comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, .. } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    line_number,
+                    ..
+                } => {
                     if is_data_key(key) {
                         // Start of data section; do not consume, let data parser handle
                         break;
                     }
-                    builder.match_pair(key, val)?;
+                    builder.match_pair(key, val, *line_number)?;
                     tokens.next();
                 }
                 t => {
-                    return Err(CcsdsNdmError::KvnParse(format!(
-                        "Unexpected token in metadata: {:?}",
-                        t
-                    )))
+                    return Err(CcsdsNdmError::KvnParse {
+                        line: t.line_number(),
+                        message: format!("Unexpected token in metadata: {:?}", t),
+                    })
                 }
             }
         }
@@ -871,7 +885,7 @@ struct CdmMetadataBuilder {
 }
 
 impl CdmMetadataBuilder {
-    fn match_pair(&mut self, key: &str, val: &str) -> Result<()> {
+    fn match_pair(&mut self, key: &str, val: &str, line: usize) -> Result<()> {
         match key {
             "OBJECT" => {
                 self.object = Some(match val.to_uppercase().as_str() {
@@ -972,10 +986,10 @@ impl CdmMetadataBuilder {
                 })
             }
             _ => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Unknown META key: {}",
-                    key
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line,
+                    message: format!("Unknown META key: {}", key),
+                })
             }
         }
         Ok(())
@@ -1158,16 +1172,21 @@ impl CdmData {
                 unreachable!("peeked.is_err() was true but next() didn't return Err");
             }
             match peeked.as_ref().expect("checked is_err above") {
-                KvnLine::BlockStart("META") => break,
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                KvnLine::BlockStart { tag: "META", .. } => break,
+                KvnLine::Comment { content: _, .. } => {
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, unit } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => {
                     // In CDM 1.0 style, a new segment starts when encountering OBJECT.
                     // Data section must stop here and let the next segment parse metadata.
                     if *key == "OBJECT" {
@@ -1249,10 +1268,10 @@ impl CdmData {
                         // Covariance - delegate to builder
                         _ => {
                             if !cov.try_match_pair(key, val, *unit)? {
-                                return Err(CcsdsNdmError::KvnParse(format!(
-                                    "Unexpected field in Segment Data: {}",
-                                    key
-                                )));
+                                return Err(CcsdsNdmError::KvnParse {
+                                    line: *line_number,
+                                    message: format!("Unexpected field in Segment Data: {}", key),
+                                });
                             }
                         }
                     }
@@ -2490,7 +2509,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(msg) => {
+            CcsdsNdmError::KvnParse { message: msg, .. } => {
                 assert!(msg.contains("Unexpected field in Relative Metadata"))
             }
             _ => panic!("unexpected error: {:?}", err),
@@ -2712,7 +2731,9 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(msg) => assert!(msg.contains("Unknown META key")),
+            CcsdsNdmError::KvnParse { message: msg, .. } => {
+                assert!(msg.contains("Unknown META key"))
+            }
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2907,7 +2928,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(msg) => {
+            CcsdsNdmError::KvnParse { message: msg, .. } => {
                 assert!(msg.contains("Unexpected field in Segment Data"))
             }
             _ => panic!("unexpected error: {:?}", err),

@@ -62,7 +62,7 @@ impl Ndm for Opm {
                     }
                     unreachable!();
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { content: _, .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next(); // skip
                 }
                 Some(_) => {
@@ -261,18 +261,24 @@ impl OpmMetadata {
                 .as_ref()
                 .expect("Peeked value should be Ok")
             {
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     builder.comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, .. } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    line_number,
+                    ..
+                } => {
                     if is_opm_data_keyword(key) {
                         break;
                     }
-                    builder.match_pair(key, val)?;
+                    let line = *line_number;
+                    builder.match_pair(key, val, line)?;
                     tokens.next();
                 }
                 _ => break,
@@ -324,7 +330,7 @@ struct OpmMetadataBuilder {
 }
 
 impl OpmMetadataBuilder {
-    fn match_pair(&mut self, key: &str, val: &str) -> Result<()> {
+    fn match_pair(&mut self, key: &str, val: &str, line: usize) -> Result<()> {
         match key {
             "OBJECT_NAME" => self.object_name = Some(val.to_string()),
             "OBJECT_ID" => self.object_id = Some(val.to_string()),
@@ -333,10 +339,10 @@ impl OpmMetadataBuilder {
             "REF_FRAME_EPOCH" => self.ref_frame_epoch = Some(FromKvnValue::from_kvn_value(val)?),
             "TIME_SYSTEM" => self.time_system = Some(val.to_string()),
             _ => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Unexpected OPM Metadata key: {}",
-                    key
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line,
+                    message: format!("Unexpected OPM Metadata key: {}", key),
+                })
             }
         }
         Ok(())
@@ -501,7 +507,7 @@ impl OpmData {
                 .as_ref()
                 .expect("Peeked value should be Ok")
             {
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     if !sv_builder.has_started() {
                         comment.push(c.to_string());
                     } else {
@@ -509,11 +515,17 @@ impl OpmData {
                     }
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, unit } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => {
                     let key = *key;
+                    let line = *line_number;
                     // Route the key to the correct builder
 
                     // State Vector
@@ -566,10 +578,10 @@ impl OpmData {
                         continue;
                     }
 
-                    return Err(CcsdsNdmError::KvnParse(format!(
-                        "Unexpected OPM Data field: {}",
-                        key
-                    )));
+                    return Err(CcsdsNdmError::KvnParse {
+                        line,
+                        message: format!("Unexpected OPM Data field: {}", key),
+                    });
                 }
                 _ => break,
             }
@@ -832,7 +844,7 @@ impl KeplerianElementsBuilder {
         let gm = self.gm.ok_or(CcsdsNdmError::MissingField("GM".into()))?;
 
         if self.true_anomaly.is_some() && self.mean_anomaly.is_some() {
-            return Err(CcsdsNdmError::KvnParse(
+            return Err(CcsdsNdmError::Validation(
                 "Cannot have both TRUE_ANOMALY and MEAN_ANOMALY".into(),
             ));
         }

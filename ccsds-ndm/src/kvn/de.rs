@@ -9,21 +9,42 @@ use std::str::Lines;
 #[derive(Debug, Clone, PartialEq)]
 pub enum KvnLine<'a> {
     /// A comment line (starts with COMMENT). Content is trimmed.
-    Comment(&'a str),
+    Comment {
+        line_number: usize,
+        content: &'a str,
+    },
     /// A Key-Value pair, optionally with a Unit.
     Pair {
+        line_number: usize,
         key: &'a str,
         val: &'a str,
         unit: Option<&'a str>,
     },
     /// A block start tag (e.g., META_START).
-    BlockStart(&'a str),
+    BlockStart { line_number: usize, tag: &'a str },
     /// A block end tag (e.g., META_STOP).
-    BlockEnd(&'a str),
+    BlockEnd { line_number: usize, tag: &'a str },
     /// A raw data line (space-delimited numbers, no equals sign).
-    Raw(&'a str),
+    Raw {
+        line_number: usize,
+        content: &'a str,
+    },
     /// An empty or whitespace-only line.
-    Empty,
+    Empty { line_number: usize },
+}
+
+impl<'a> KvnLine<'a> {
+    /// Returns the line number where this token was found.
+    pub fn line_number(&self) -> usize {
+        match self {
+            KvnLine::Comment { line_number, .. } => *line_number,
+            KvnLine::Pair { line_number, .. } => *line_number,
+            KvnLine::BlockStart { line_number, .. } => *line_number,
+            KvnLine::BlockEnd { line_number, .. } => *line_number,
+            KvnLine::Raw { line_number, .. } => *line_number,
+            KvnLine::Empty { line_number } => *line_number,
+        }
+    }
 }
 
 /// Tokenizer for CCSDS KVN data.
@@ -49,17 +70,25 @@ impl<'a> Iterator for KvnTokenizer<'a> {
         let line = raw_line.trim();
 
         if line.is_empty() {
-            return Some(Ok(KvnLine::Empty));
+            return Some(Ok(KvnLine::Empty {
+                line_number: line_num,
+            }));
         }
 
         if let Some(stripped) = line.strip_prefix("COMMENT") {
             // Check boundary: "COMMENT" must be the whole line OR followed by whitespace
             if stripped.is_empty() {
-                return Some(Ok(KvnLine::Comment("")));
+                return Some(Ok(KvnLine::Comment {
+                    line_number: line_num,
+                    content: "",
+                }));
             }
             if stripped.as_bytes()[0].is_ascii_whitespace() {
                 let content = stripped.trim();
-                return Some(Ok(KvnLine::Comment(content)));
+                return Some(Ok(KvnLine::Comment {
+                    line_number: line_num,
+                    content,
+                }));
             }
         }
 
@@ -68,7 +97,10 @@ impl<'a> Iterator for KvnTokenizer<'a> {
             let tag = line.trim_end_matches("_START");
             // Validation: Keyword must not contain spaces
             if !tag.contains(char::is_whitespace) {
-                return Some(Ok(KvnLine::BlockStart(tag)));
+                return Some(Ok(KvnLine::BlockStart {
+                    line_number: line_num,
+                    tag,
+                }));
             }
         }
 
@@ -80,7 +112,10 @@ impl<'a> Iterator for KvnTokenizer<'a> {
             };
 
             if !tag.contains(char::is_whitespace) {
-                return Some(Ok(KvnLine::BlockEnd(tag)));
+                return Some(Ok(KvnLine::BlockEnd {
+                    line_number: line_num,
+                    tag,
+                }));
             }
         }
 
@@ -90,7 +125,7 @@ impl<'a> Iterator for KvnTokenizer<'a> {
 
             // Validation: Keys must not contain spaces
             if key.contains(char::is_whitespace) {
-                return Some(Err(CcsdsNdmError::KvnParseWithLine {
+                return Some(Err(CcsdsNdmError::KvnParse {
                     line: line_num,
                     message: format!("Keyword '{}' contains invalid whitespace", key),
                 }));
@@ -106,7 +141,7 @@ impl<'a> Iterator for KvnTokenizer<'a> {
                     let value_str = val_raw[..open_bracket].trim();
 
                     if unit_str.is_empty() {
-                        return Some(Err(CcsdsNdmError::KvnParseWithLine {
+                        return Some(Err(CcsdsNdmError::KvnParse {
                             line: line_num,
                             message: "Empty unit brackets".to_string(),
                         }));
@@ -118,6 +153,7 @@ impl<'a> Iterator for KvnTokenizer<'a> {
             }
 
             return Some(Ok(KvnLine::Pair {
+                line_number: line_num,
                 key,
                 val: val_raw,
                 unit,
@@ -125,6 +161,9 @@ impl<'a> Iterator for KvnTokenizer<'a> {
         }
 
         // If it's not empty, not a comment, not a block tag, and has no equals, it's raw data.
-        Some(Ok(KvnLine::Raw(line)))
+        Some(Ok(KvnLine::Raw {
+            line_number: line_num,
+            content: line,
+        }))
     }
 }

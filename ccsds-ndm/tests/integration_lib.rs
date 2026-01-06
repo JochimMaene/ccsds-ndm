@@ -481,7 +481,7 @@ fn test_from_str_empty_kvn() {
     let result = from_str("");
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, CcsdsNdmError::UnexpectedEof(_)));
+    assert!(matches!(err, CcsdsNdmError::UnexpectedEof { .. }));
 }
 
 #[test]

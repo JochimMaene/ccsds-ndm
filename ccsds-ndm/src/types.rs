@@ -132,7 +132,7 @@ where
     fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
         let value = value
             .parse::<V>()
-            .map_err(|e| CcsdsNdmError::KvnParse(e.to_string()))?;
+            .map_err(|e| CcsdsNdmError::Validation(e.to_string()))?;
 
         let units = match unit {
             Some(u_str) => Some(u_str.parse::<U>()?),
@@ -530,9 +530,7 @@ impl AltitudeRequired {
 }
 impl FromKvn for AltitudeRequired {
     fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value
-            .parse()
-            .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
+        let v: f64 = value.parse()?;
         Self::new(v)
     }
 }
@@ -579,9 +577,7 @@ impl WkgRequired {
 }
 impl FromKvn for WkgRequired {
     fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value
-            .parse()
-            .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
+        let v: f64 = value.parse()?;
         Self::new(v)
     }
 }
@@ -801,9 +797,7 @@ impl std::fmt::Display for PercentageRequired {
 }
 impl FromKvn for PercentageRequired {
     fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value
-            .parse()
-            .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
+        let v: f64 = value.parse()?;
         Self::new(v)
     }
 }
@@ -1851,21 +1845,15 @@ impl FromKvnValue for Vec3Double {
     fn from_kvn_value(val: &str) -> Result<Self> {
         let parts: Vec<&str> = val.split_whitespace().collect();
         if parts.len() != 3 {
-            return Err(CcsdsNdmError::KvnParse(format!(
+            return Err(CcsdsNdmError::Validation(format!(
                 "Vec3Double requires 3 values, got {}: {}",
                 parts.len(),
                 val
             )));
         }
-        let x = parts[0]
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid Vec3Double x: {}", e)))?;
-        let y = parts[1]
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid Vec3Double y: {}", e)))?;
-        let z = parts[2]
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid Vec3Double z: {}", e)))?;
+        let x = parts[0].parse::<f64>()?;
+        let y = parts[1].parse::<f64>()?;
+        let z = parts[2].parse::<f64>()?;
         Ok(Self { x, y, z })
     }
 }

@@ -58,7 +58,7 @@ impl Ndm for Ocm {
                     }
                     unreachable!();
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { content: _, .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next();
                 }
                 Some(_) => {
@@ -149,12 +149,12 @@ impl OcmSegment {
     {
         // Expect META_START
         match tokens.peek() {
-            Some(Ok(KvnLine::BlockStart("META"))) => {}
+            Some(Ok(KvnLine::BlockStart { tag: "META", .. })) => {}
             Some(Ok(t)) => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Expected META_START, found {:?}",
-                    t
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line: t.line_number(),
+                    message: format!("Expected META_START, found {:?}", t),
+                })
             }
             Some(Err(_)) => {
                 return Err(tokens
@@ -162,7 +162,11 @@ impl OcmSegment {
                     .expect("Peeked error should exist")
                     .unwrap_err())
             }
-            None => return Err(CcsdsNdmError::UnexpectedEof("before OcmSegment".into())),
+            None => {
+                return Err(CcsdsNdmError::UnexpectedEof {
+                    context: "before OcmSegment".into(),
+                })
+            }
         }
 
         let metadata = OcmMetadata::from_kvn_tokens(tokens)?;
@@ -697,8 +701,19 @@ impl OcmMetadata {
         I: Iterator<Item = Result<KvnLine<'a>>>,
     {
         match tokens.next() {
-            Some(Ok(KvnLine::BlockStart("META"))) => {}
-            _ => return Err(CcsdsNdmError::KvnParse("Expected META_START".into())),
+            Some(Ok(KvnLine::BlockStart { tag: "META", .. })) => {}
+            Some(Ok(t)) => {
+                return Err(CcsdsNdmError::KvnParse {
+                    line: t.line_number(),
+                    message: "Expected META_START".to_string(),
+                })
+            }
+            Some(Err(e)) => return Err(e),
+            None => {
+                return Err(CcsdsNdmError::UnexpectedEof {
+                    context: "Expected META_START".into(),
+                })
+            }
         }
 
         let mut comment: Vec<String> = vec![];
@@ -763,18 +778,23 @@ impl OcmMetadata {
                 .as_ref()
                 .expect("Peeked value should be Ok")
             {
-                KvnLine::BlockEnd("META") => {
+                KvnLine::BlockEnd { tag: "META", .. } => {
                     tokens.next();
                     break;
                 }
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, unit } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => {
                     match *key {
                         "OBJECT_NAME" => object_name = Some(val.to_string()),
                         "INTERNATIONAL_DESIGNATOR" => {
@@ -842,10 +862,10 @@ impl OcmMetadata {
                         "INTERP_METHOD_EOP" => interp_method_eop = Some(val.to_string()),
                         "CELESTIAL_SOURCE" => celestial_source = Some(val.to_string()),
                         _ => {
-                            return Err(CcsdsNdmError::KvnParse(format!(
-                                "Unexpected OCM Metadata key: {}",
-                                key
-                            )))
+                            return Err(CcsdsNdmError::KvnParse {
+                                line: *line_number,
+                                message: format!("Unexpected OCM Metadata key: {}", key),
+                            })
                         }
                     }
                     tokens.next();
@@ -1011,49 +1031,49 @@ impl OcmData {
                 .as_ref()
                 .expect("Peeked value should be Ok")
             {
-                KvnLine::BlockStart("TRAJ") => {
+                KvnLine::BlockStart { tag: "TRAJ", .. } => {
                     let mut block = OcmTrajState::from_kvn_tokens(tokens)?;
                     if !pending_comments.is_empty() {
                         block.comment.splice(0..0, pending_comments.drain(..));
                     }
                     data.traj.push(block);
                 }
-                KvnLine::BlockStart("PHYS") => {
+                KvnLine::BlockStart { tag: "PHYS", .. } => {
                     let mut block = OcmPhysicalDescription::from_kvn_tokens(tokens)?;
                     if !pending_comments.is_empty() {
                         block.comment.splice(0..0, pending_comments.drain(..));
                     }
                     data.phys = Some(block);
                 }
-                KvnLine::BlockStart("COV") => {
+                KvnLine::BlockStart { tag: "COV", .. } => {
                     let mut block = OcmCovarianceMatrix::from_kvn_tokens(tokens)?;
                     if !pending_comments.is_empty() {
                         block.comment.splice(0..0, pending_comments.drain(..));
                     }
                     data.cov.push(block);
                 }
-                KvnLine::BlockStart("MAN") => {
+                KvnLine::BlockStart { tag: "MAN", .. } => {
                     let mut block = OcmManeuverParameters::from_kvn_tokens(tokens)?;
                     if !pending_comments.is_empty() {
                         block.comment.splice(0..0, pending_comments.drain(..));
                     }
                     data.man.push(block);
                 }
-                KvnLine::BlockStart("PERT") => {
+                KvnLine::BlockStart { tag: "PERT", .. } => {
                     let mut block = OcmPerturbations::from_kvn_tokens(tokens)?;
                     if !pending_comments.is_empty() {
                         block.comment.splice(0..0, pending_comments.drain(..));
                     }
                     data.pert = Some(block);
                 }
-                KvnLine::BlockStart("OD") => {
+                KvnLine::BlockStart { tag: "OD", .. } => {
                     let mut block = OcmOdParameters::from_kvn_tokens(tokens)?;
                     if !pending_comments.is_empty() {
                         block.comment.splice(0..0, pending_comments.drain(..));
                     }
                     data.od = Some(block);
                 }
-                KvnLine::BlockStart("USER") => {
+                KvnLine::BlockStart { tag: "USER", .. } => {
                     tokens.next(); // Consume USER_START
                     let mut ud = UserDefined::default();
                     if !pending_comments.is_empty() {
@@ -1061,26 +1081,31 @@ impl OcmData {
                     }
                     for token in tokens.by_ref() {
                         match token? {
-                            KvnLine::BlockEnd("USER") => break,
-                            KvnLine::Comment(c) => ud.comment.push(c.to_string()),
+                            KvnLine::BlockEnd { tag: "USER", .. } => break,
+                            KvnLine::Comment { content: c, .. } => ud.comment.push(c.to_string()),
                             KvnLine::Pair { key, val, .. } => {
                                 ud.user_defined.push(UserDefinedParameter {
                                     parameter: key.to_string(),
                                     value: val.to_string(),
                                 })
                             }
-                            KvnLine::Empty => continue,
-                            _ => return Err(CcsdsNdmError::KvnParse("Unexpected in USER".into())),
+                            KvnLine::Empty { .. } => continue,
+                            t => {
+                                return Err(CcsdsNdmError::KvnParse {
+                                    line: t.line_number(),
+                                    message: "Unexpected in USER".to_string(),
+                                })
+                            }
                         }
                     }
                     data.user = Some(ud);
                 }
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                KvnLine::Comment { content: _, .. } => {
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         pending_comments.push(c.to_string());
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
                 _ => break,
@@ -1379,9 +1404,9 @@ impl OcmTrajState {
 
         for token in tokens.by_ref() {
             match token? {
-                KvnLine::BlockEnd("TRAJ") => break,
-                KvnLine::Comment(c) => traj.comment.push(c.to_string()),
-                KvnLine::Empty => continue,
+                KvnLine::BlockEnd { tag: "TRAJ", .. } => break,
+                KvnLine::Comment { content: c, .. } => traj.comment.push(c.to_string()),
+                KvnLine::Empty { .. } => continue,
                 KvnLine::Pair { key, val, .. } => match key {
                     "TRAJ_ID" => traj.traj_id = Some(val.into()),
                     "TRAJ_PREV_ID" => traj.traj_prev_id = Some(val.into()),
@@ -1413,7 +1438,7 @@ impl OcmTrajState {
                     "TRAJ_UNITS" => traj.traj_units = Some(val.into()),
                     _ => {}
                 },
-                KvnLine::Raw(line) => {
+                KvnLine::Raw { content: line, .. } => {
                     let mut parts = line.split_whitespace();
                     if let Some(epoch) = parts.next() {
                         let values: Result<Vec<f64>> = parts
@@ -2097,10 +2122,10 @@ impl OcmPhysicalDescription {
         let mut phys = OcmPhysicalDescription::default();
         for token in tokens.by_ref() {
             match token? {
-                KvnLine::BlockEnd("PHYS") => break,
-                KvnLine::Comment(c) => phys.comment.push(c.to_string()),
-                KvnLine::Empty => continue,
-                KvnLine::Pair { key, val, unit } => match key {
+                KvnLine::BlockEnd { tag: "PHYS", .. } => break,
+                KvnLine::Comment { content: c, .. } => phys.comment.push(c.to_string()),
+                KvnLine::Empty { .. } => continue,
+                KvnLine::Pair { key, val, unit, .. } => match key {
                     "MANUFACTURER" => phys.manufacturer = Some(val.into()),
                     "BUS_MODEL" => phys.bus_model = Some(val.into()),
                     "DOCKED_WITH" => phys.docked_with = Some(val.into()),
@@ -2432,10 +2457,15 @@ impl OcmCovarianceMatrix {
         let mut builder = OcmCovarianceMatrixBuilder::default();
         for token in tokens.by_ref() {
             match token? {
-                KvnLine::BlockEnd("COV") => break,
-                KvnLine::Comment(c) => builder.comment.push(c.to_string()),
-                KvnLine::Empty => continue,
-                KvnLine::Pair { key, val, unit } => match key {
+                KvnLine::BlockEnd { tag: "COV", .. } => break,
+                KvnLine::Comment { content: c, .. } => builder.comment.push(c.to_string()),
+                KvnLine::Empty { .. } => continue,
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => match key {
                     "COV_ID" => builder.cov_id = Some(val.into()),
                     "COV_PREV_ID" => builder.cov_prev_id = Some(val.into()),
                     "COV_NEXT_ID" => builder.cov_next_id = Some(val.into()),
@@ -2446,14 +2476,18 @@ impl OcmCovarianceMatrix {
                         builder.cov_frame_epoch = Some(FromKvnValue::from_kvn_value(val)?)
                     }
                     "COV_SCALE_MIN" => {
-                        builder.cov_scale_min = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid COV_SCALE_MIN: {}", e))
-                        })?)
+                        builder.cov_scale_min =
+                            Some(val.parse().map_err(|e| CcsdsNdmError::KvnParse {
+                                line: line_number,
+                                message: format!("Invalid COV_SCALE_MIN: {}", e),
+                            })?)
                     }
                     "COV_SCALE_MAX" => {
-                        builder.cov_scale_max = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid COV_SCALE_MAX: {}", e))
-                        })?)
+                        builder.cov_scale_max =
+                            Some(val.parse().map_err(|e| CcsdsNdmError::KvnParse {
+                                line: line_number,
+                                message: format!("Invalid COV_SCALE_MAX: {}", e),
+                            })?)
                     }
                     "COV_CONFIDENCE" => {
                         builder.cov_confidence = Some(Percentage::from_kvn(val, unit)?)
@@ -2465,13 +2499,18 @@ impl OcmCovarianceMatrix {
                     "COV_UNITS" => builder.cov_units = Some(val.into()),
                     _ => {}
                 },
-                KvnLine::Raw(line) => {
+                KvnLine::Raw {
+                    content: line,
+                    line_number,
+                } => {
                     let mut parts = line.split_whitespace();
                     if let Some(epoch) = parts.next() {
                         let values: Result<Vec<f64>> = parts
                             .map(|s| {
-                                s.parse::<f64>()
-                                    .map_err(|e| CcsdsNdmError::KvnParse(e.to_string()))
+                                s.parse::<f64>().map_err(|e| CcsdsNdmError::KvnParse {
+                                    line: line_number,
+                                    message: e.to_string(),
+                                })
                             })
                             .collect();
                         builder.cov_lines.push(CovLine {
@@ -2948,10 +2987,15 @@ impl OcmManeuverParameters {
         let mut builder = OcmManeuverParametersBuilder::default();
         for token in tokens.by_ref() {
             match token? {
-                KvnLine::BlockEnd("MAN") => break,
-                KvnLine::Comment(c) => builder.comment.push(c.to_string()),
-                KvnLine::Empty => continue,
-                KvnLine::Pair { key, val, unit } => match key {
+                KvnLine::BlockEnd { tag: "MAN", .. } => break,
+                KvnLine::Comment { content: c, .. } => builder.comment.push(c.to_string()),
+                KvnLine::Empty { .. } => continue,
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => match key {
                     "MAN_ID" => builder.man_id = Some(val.into()),
                     "MAN_PREV_ID" => builder.man_prev_id = Some(val.into()),
                     "MAN_NEXT_ID" => builder.man_next_id = Some(val.into()),
@@ -2977,14 +3021,18 @@ impl OcmManeuverParameters {
                         builder.dc_win_close = Some(FromKvnValue::from_kvn_value(val)?)
                     }
                     "DC_MIN_CYCLES" => {
-                        builder.dc_min_cycles = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid DC_MIN_CYCLES: {}", e))
-                        })?)
+                        builder.dc_min_cycles =
+                            Some(val.parse().map_err(|e| CcsdsNdmError::KvnParse {
+                                line: line_number,
+                                message: format!("Invalid DC_MIN_CYCLES: {}", e),
+                            })?)
                     }
                     "DC_MAX_CYCLES" => {
-                        builder.dc_max_cycles = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid DC_MAX_CYCLES: {}", e))
-                        })?)
+                        builder.dc_max_cycles =
+                            Some(val.parse().map_err(|e| CcsdsNdmError::KvnParse {
+                                line: line_number,
+                                message: format!("Invalid DC_MAX_CYCLES: {}", e),
+                            })?)
                     }
                     "DC_EXEC_START" => {
                         builder.dc_exec_start = Some(FromKvnValue::from_kvn_value(val)?)
@@ -3014,7 +3062,7 @@ impl OcmManeuverParameters {
                     "MAN_UNITS" => builder.man_units = Some(val.into()),
                     _ => {}
                 },
-                KvnLine::Raw(line) => {
+                KvnLine::Raw { content: line, .. } => {
                     let mut parts = line.split_whitespace();
                     if let Some(epoch) = parts.next() {
                         builder.man_lines.push(ManLine {
@@ -3385,10 +3433,15 @@ impl OcmPerturbations {
         let mut pert = OcmPerturbations::default();
         for token in tokens.by_ref() {
             match token? {
-                KvnLine::BlockEnd("PERT") => break,
-                KvnLine::Comment(c) => pert.comment.push(c.to_string()),
-                KvnLine::Empty => continue,
-                KvnLine::Pair { key, val, unit } => match key {
+                KvnLine::BlockEnd { tag: "PERT", .. } => break,
+                KvnLine::Comment { content: c, .. } => pert.comment.push(c.to_string()),
+                KvnLine::Empty { .. } => continue,
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => match key {
                     "ATMOSPHERIC_MODEL" => pert.atmospheric_model = Some(val.into()),
                     "GRAVITY_MODEL" => pert.gravity_model = Some(val.into()),
                     "EQUATORIAL_RADIUS" => {
@@ -3400,18 +3453,22 @@ impl OcmPerturbations {
                         pert.central_body_rotation = Some(AngleRate::from_kvn(val, unit)?)
                     }
                     "OBLATE_FLATTENING" => {
-                        pert.oblate_flattening = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid OBLATE_FLATTENING: {}", e))
-                        })?)
+                        pert.oblate_flattening =
+                            Some(val.parse().map_err(|e| CcsdsNdmError::KvnParse {
+                                line: line_number,
+                                message: format!("Invalid OBLATE_FLATTENING: {}", e),
+                            })?)
                     }
                     "OCEAN_TIDES_MODEL" => pert.ocean_tides_model = Some(val.into()),
                     "SOLID_TIDES_MODEL" => pert.solid_tides_model = Some(val.into()),
                     "REDUCTION_THEORY" => pert.reduction_theory = Some(val.into()),
                     "ALBEDO_MODEL" => pert.albedo_model = Some(val.into()),
                     "ALBEDO_GRID_SIZE" => {
-                        pert.albedo_grid_size = Some(val.parse().map_err(|e| {
-                            CcsdsNdmError::KvnParse(format!("Invalid ALBEDO_GRID_SIZE: {}", e))
-                        })?)
+                        pert.albedo_grid_size =
+                            Some(val.parse().map_err(|e| CcsdsNdmError::KvnParse {
+                                line: line_number,
+                                message: format!("Invalid ALBEDO_GRID_SIZE: {}", e),
+                            })?)
                     }
                     "SHADOW_MODEL" => pert.shadow_model = Some(val.into()),
                     "SHADOW_BODIES" => pert.shadow_bodies = Some(val.into()),
@@ -3875,10 +3932,10 @@ impl OcmOdParameters {
 
         for token in tokens.by_ref() {
             match token? {
-                KvnLine::BlockEnd("OD") => break,
-                KvnLine::Comment(c) => builder.comment.push(c.to_string()),
-                KvnLine::Empty => continue,
-                KvnLine::Pair { key, val, unit } => match key {
+                KvnLine::BlockEnd { tag: "OD", .. } => break,
+                KvnLine::Comment { content: c, .. } => builder.comment.push(c.to_string()),
+                KvnLine::Empty { .. } => continue,
+                KvnLine::Pair { key, val, unit, .. } => match key {
                     "OD_ID" => builder.od_id = Some(val.into()),
                     "OD_PREV_ID" => builder.od_prev_id = Some(val.into()),
                     "OD_METHOD" => builder.od_method = Some(val.into()),
@@ -5004,7 +5061,9 @@ ORIGINATOR = TEST
 TRAJ_START
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Expected META_START")));
+        assert!(
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Expected META_START"))
+        );
 
         // Metadata unexpected key
         let kvn = r#"CCSDS_OCM_VERS = 3.0
@@ -5018,7 +5077,7 @@ META_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Unexpected OCM Metadata key"))
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Unexpected OCM Metadata key"))
         );
     }
 
@@ -5127,7 +5186,9 @@ META_START
 USER_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Unexpected in USER")));
+        assert!(
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Unexpected in USER"))
+        );
     }
 
     #[test]
@@ -5396,7 +5457,7 @@ ORIGINATOR = TEST
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         // This should hit the "Unexpected EOF" branch
-        assert!(matches!(err, CcsdsNdmError::UnexpectedEof(_)));
+        assert!(matches!(err, CcsdsNdmError::UnexpectedEof { .. }));
     }
 
     #[test]
@@ -6568,7 +6629,7 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(ref msg) if msg.contains("COV_SCALE_MIN")),
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("COV_SCALE_MIN")),
             "Expected COV_SCALE_MIN error, got: {:?}",
             err
         );
@@ -6615,7 +6676,7 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(ref msg) if msg.contains("COV_SCALE_MAX")),
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("COV_SCALE_MAX")),
             "Expected COV_SCALE_MAX error, got: {:?}",
             err
         );
@@ -6703,7 +6764,7 @@ TRAJ_STOP
         let err = Ocm::from_kvn(kvn).unwrap_err();
         // OcmSegment checks first and gives "Expected META_START, found BlockStart(\"TRAJ\")"
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(ref msg) if msg.contains("META_START")),
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("META_START")),
             "Expected META_START error, got: {:?}",
             err
         );
@@ -6823,7 +6884,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(ref msg) if msg.contains("DC_MIN_CYCLES")),
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("DC_MIN_CYCLES")),
             "Expected DC_MIN_CYCLES error, got: {:?}",
             err
         );
@@ -6853,7 +6914,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(ref msg) if msg.contains("DC_MAX_CYCLES")),
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("DC_MAX_CYCLES")),
             "Expected DC_MAX_CYCLES error, got: {:?}",
             err
         );
@@ -6907,7 +6968,7 @@ PERT_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(ref msg) if msg.contains("OBLATE_FLATTENING")),
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("OBLATE_FLATTENING")),
             "Expected OBLATE_FLATTENING error, got: {:?}",
             err
         );
@@ -6935,7 +6996,7 @@ PERT_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(ref msg) if msg.contains("ALBEDO_GRID_SIZE")),
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("ALBEDO_GRID_SIZE")),
             "Expected ALBEDO_GRID_SIZE error, got: {:?}",
             err
         );

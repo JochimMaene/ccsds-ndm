@@ -234,9 +234,9 @@ fn detect_and_parse_xml(s: &str) -> Result<MessageType> {
                 continue;
             }
             Ok(Event::Eof) => {
-                return Err(CcsdsNdmError::UnexpectedEof(
-                    "XML parsing ended prematurely without finding root tag".into(),
-                ));
+                return Err(CcsdsNdmError::UnexpectedEof {
+                    context: "XML parsing ended prematurely without finding root tag".into(),
+                });
             }
             Err(e) => return Err(CcsdsNdmError::XmlParse(e)),
             _ => continue, // Ignore other events like text/PI before root
@@ -286,5 +286,7 @@ fn detect_and_parse_kvn(s: &str) -> Result<MessageType> {
         )));
     }
 
-    Err(CcsdsNdmError::UnexpectedEof("Empty KVN file".into()))
+    Err(CcsdsNdmError::UnexpectedEof {
+        context: "Empty KVN file".into(),
+    })
 }

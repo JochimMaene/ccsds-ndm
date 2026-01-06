@@ -40,7 +40,7 @@ impl ToKvn for NdmHeader {
 
 //         for token in tokens {
 //             match token? {
-//                 KvnLine::Comment(c) => comment.push(c.to_string()),
+//                 KvnLine::Comment { content: c, .. } => comment.push(c.to_string()),
 //                 KvnLine::Pair { key, val, .. } => match key {
 //                     "CREATION_DATE" => {
 //                         creation_date = Some(Epoch::from_str(val)?);
@@ -53,7 +53,7 @@ impl ToKvn for NdmHeader {
 //                         )));
 //                     }
 //                 },
-//                 KvnLine::Empty => continue,
+//                 KvnLine::Empty { .. } => continue,
 //                 _ => {
 //                     return Err(CcsdsNdmError::KvnParse(
 //                         "Unexpected token in header".to_string(),
@@ -183,12 +183,12 @@ impl FromKvnTokens for OdmHeader {
                 .as_ref()
                 .expect("Peeked value should be Ok");
             match token {
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
-                        comment.push(c.to_string());
+                KvnLine::Comment { .. } => {
+                    if let Some(Ok(KvnLine::Comment { content, .. })) = tokens.next() {
+                        comment.push(content.to_string());
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
                 KvnLine::Pair {
@@ -217,11 +217,10 @@ impl FromKvnTokens for OdmHeader {
         Ok(OdmHeader {
             comment,
             classification,
-            creation_date: creation_date.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CREATION_DATE is required".to_string())
-            })?,
+            creation_date: creation_date
+                .ok_or_else(|| CcsdsNdmError::MissingField("CREATION_DATE".to_string()))?,
             originator: originator
-                .ok_or_else(|| CcsdsNdmError::MissingField("ORIGINATOR is required".to_string()))?,
+                .ok_or_else(|| CcsdsNdmError::MissingField("ORIGINATOR".to_string()))?,
             message_id,
         })
     }
@@ -482,14 +481,20 @@ impl FromKvnTokens for StateVectorAcc {
     {
         // State vectors are single lines in OEM (Raw), so we consume the next one
         if let Some(token) = tokens.next() {
-            match token? {
-                KvnLine::Raw(line) => crate::common::parse_state_vector_raw(line),
-                KvnLine::Empty => Err(CcsdsNdmError::KvnParse(
-                    "Unexpected empty line expecting state vector".into(),
-                )),
-                _ => Err(CcsdsNdmError::KvnParse(
-                    "StateVector in KVN must be a raw line format".to_string(),
-                )),
+            let token = token?;
+            let line_num = token.line_number();
+            match token {
+                KvnLine::Raw { content, .. } => {
+                    crate::common::parse_state_vector_raw(content, line_num)
+                }
+                KvnLine::Empty { line_number, .. } => Err(CcsdsNdmError::KvnParse {
+                    line: line_number,
+                    message: "Unexpected empty line expecting state vector".into(),
+                }),
+                _ => Err(CcsdsNdmError::KvnParse {
+                    line: line_num,
+                    message: "StateVector in KVN must be a raw line format".to_string(),
+                }),
             }
         } else {
             Err(CcsdsNdmError::MissingField(
@@ -504,7 +509,7 @@ impl FromKvnTokens for StateVectorAcc {
 /// Expected tokens:
 /// 7 tokens: EPOCH X Y Z X_DOT Y_DOT Z_DOT
 /// 10 tokens: EPOCH X Y Z X_DOT Y_DOT Z_DOT X_DDOT Y_DDOT Z_DDOT
-pub fn parse_state_vector_raw(line: &str) -> Result<StateVectorAcc> {
+pub fn parse_state_vector_raw(line: &str, line_number: usize) -> Result<StateVectorAcc> {
     let mut tokens = line.split_whitespace();
 
     // Parse epoch first (most likely to fail, fail fast)
@@ -548,9 +553,10 @@ pub fn parse_state_vector_raw(line: &str) -> Result<StateVectorAcc> {
 
         // Validate no extra tokens
         if tokens.next().is_some() {
-            return Err(CcsdsNdmError::KvnParse(
-                "State vector has extra tokens. Expected 7 or 10 tokens.".to_string(),
-            ));
+            return Err(CcsdsNdmError::KvnParse {
+                line: line_number,
+                message: "State vector has extra tokens. Expected 7 or 10 tokens.".to_string(),
+            });
         }
 
         (
@@ -748,14 +754,14 @@ impl FromKvnTokens for StateVector {
                 .as_ref()
                 .expect("Peeked value should be Ok")
             {
-                KvnLine::Comment(c) => {
-                    comment.push(c.to_string());
+                KvnLine::Comment { content, .. } => {
+                    comment.push(content.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, unit } => {
+                KvnLine::Pair { key, val, unit, .. } => {
                     let key_str = *key;
                     // Only consume keys that belong to the state vector
                     match key_str {
@@ -803,17 +809,13 @@ impl FromKvnTokens for StateVector {
 
         Ok(StateVector {
             comment,
-            epoch: epoch
-                .ok_or_else(|| CcsdsNdmError::MissingField("EPOCH is required".to_string()))?,
-            x: x.ok_or_else(|| CcsdsNdmError::MissingField("X is required".to_string()))?,
-            y: y.ok_or_else(|| CcsdsNdmError::MissingField("Y is required".to_string()))?,
-            z: z.ok_or_else(|| CcsdsNdmError::MissingField("Z is required".to_string()))?,
-            x_dot: x_dot
-                .ok_or_else(|| CcsdsNdmError::MissingField("X_DOT is required".to_string()))?,
-            y_dot: y_dot
-                .ok_or_else(|| CcsdsNdmError::MissingField("Y_DOT is required".to_string()))?,
-            z_dot: z_dot
-                .ok_or_else(|| CcsdsNdmError::MissingField("Z_DOT is required".to_string()))?,
+            epoch: epoch.ok_or_else(|| CcsdsNdmError::MissingField("EPOCH".to_string()))?,
+            x: x.ok_or_else(|| CcsdsNdmError::MissingField("X".to_string()))?,
+            y: y.ok_or_else(|| CcsdsNdmError::MissingField("Y".to_string()))?,
+            z: z.ok_or_else(|| CcsdsNdmError::MissingField("Z".to_string()))?,
+            x_dot: x_dot.ok_or_else(|| CcsdsNdmError::MissingField("X_DOT".to_string()))?,
+            y_dot: y_dot.ok_or_else(|| CcsdsNdmError::MissingField("Y_DOT".to_string()))?,
+            z_dot: z_dot.ok_or_else(|| CcsdsNdmError::MissingField("Z_DOT".to_string()))?,
         })
     }
 }
@@ -1139,15 +1141,15 @@ impl FromKvnTokens for OpmCovarianceMatrix {
                 .as_ref()
                 .expect("Peeked value should be Ok")
             {
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
-                        comment.push(c.to_string());
+                KvnLine::Comment { .. } => {
+                    if let Some(Ok(KvnLine::Comment { content, .. })) = tokens.next() {
+                        comment.push(content.to_string());
                     }
                 }
-                KvnLine::Pair { key, val, unit } => {
+                KvnLine::Pair { key, val, unit, .. } => {
                     let k = *key;
                     let u = unit.as_deref();
                     let consumed = match k {

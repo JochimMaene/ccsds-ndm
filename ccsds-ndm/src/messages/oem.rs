@@ -65,7 +65,7 @@ impl Ndm for Oem {
                     }
                     unreachable!();
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { content: _, .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next(); // skip
                 }
                 Some(_) => {
@@ -127,10 +127,10 @@ impl OemBody {
         let mut segment = Vec::new();
         while let Some(token) = tokens.peek() {
             match token {
-                Ok(KvnLine::BlockStart("META")) => {
+                Ok(KvnLine::BlockStart { tag: "META", .. }) => {
                     segment.push(OemSegment::from_kvn_tokens(tokens)?);
                 }
-                Ok(KvnLine::Empty) | Ok(KvnLine::Comment(_)) => {
+                Ok(KvnLine::Empty { .. }) | Ok(KvnLine::Comment { content: _, .. }) => {
                     tokens.next();
                 }
                 Ok(_) => break,
@@ -176,10 +176,19 @@ impl OemSegment {
     {
         // Expect META_START
         match tokens.next() {
-            Some(Ok(KvnLine::BlockStart("META"))) => {}
+            Some(Ok(KvnLine::BlockStart { tag: "META", .. })) => {}
             Some(Err(e)) => return Err(e),
-            Some(Ok(_)) => return Err(CcsdsNdmError::KvnParse("Expected META_START".into())),
-            None => return Err(CcsdsNdmError::UnexpectedEof("Expected META_START".into())),
+            Some(Ok(t)) => {
+                return Err(CcsdsNdmError::KvnParse {
+                    line: t.line_number(),
+                    message: "Expected META_START".to_string(),
+                })
+            }
+            None => {
+                return Err(CcsdsNdmError::UnexpectedEof {
+                    context: "Expected META_START".into(),
+                })
+            }
         }
 
         let metadata = OemMetadata::from_kvn_tokens(tokens)?;
@@ -357,15 +366,20 @@ impl OemMetadata {
         let mut builder = OemMetadataBuilder::default();
         for token in tokens.by_ref() {
             match token? {
-                KvnLine::BlockEnd("META") => break,
-                KvnLine::Comment(c) => builder.comment.push(c.to_string()),
-                KvnLine::Pair { key, val, .. } => builder.match_pair(key, val)?,
-                KvnLine::Empty => continue,
+                KvnLine::BlockEnd { tag: "META", .. } => break,
+                KvnLine::Comment { content: c, .. } => builder.comment.push(c.to_string()),
+                KvnLine::Pair {
+                    key,
+                    val,
+                    line_number,
+                    ..
+                } => builder.match_pair(key, val, line_number)?,
+                KvnLine::Empty { .. } => continue,
                 t => {
-                    return Err(CcsdsNdmError::KvnParse(format!(
-                        "Unexpected token in META: {:?}",
-                        t
-                    )))
+                    return Err(CcsdsNdmError::KvnParse {
+                        line: t.line_number(),
+                        message: format!("Unexpected token in META: {:?}", t),
+                    })
                 }
             }
         }
@@ -391,7 +405,7 @@ struct OemMetadataBuilder {
 }
 
 impl OemMetadataBuilder {
-    fn match_pair(&mut self, key: &str, val: &str) -> Result<()> {
+    fn match_pair(&mut self, key: &str, val: &str, line: usize) -> Result<()> {
         match key {
             "OBJECT_NAME" => self.object_name = Some(val.into()),
             "OBJECT_ID" => self.object_id = Some(val.into()),
@@ -420,10 +434,10 @@ impl OemMetadataBuilder {
                     );
             }
             _ => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Unknown META key: {}",
-                    key
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line,
+                    message: format!("Unknown META key: {}", key),
+                })
             }
         }
         Ok(())
@@ -524,6 +538,7 @@ impl ToKvn for OemData {
 }
 
 impl OemData {
+    #[allow(unused_variables, unused_assignments)]
     fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
     where
         I: Iterator<Item = Result<KvnLine<'a>>>,
@@ -531,6 +546,7 @@ impl OemData {
         let mut comment = Vec::new();
         let mut state_vector = Vec::new();
         let mut covariance_matrix = Vec::new();
+        let mut last_line: usize = 0;
 
         // 1. Parse Top-Level Comments
         while let Some(peek_res) = tokens.peek() {
@@ -541,12 +557,17 @@ impl OemData {
                 unreachable!("peek_res.is_err() was true but next() didn't return Err");
             }
             match peek_res.as_ref().expect("checked is_err above") {
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                KvnLine::Comment {
+                    content: _,
+                    line_number,
+                } => {
+                    last_line = *line_number;
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { line_number } => {
+                    last_line = *line_number;
                     tokens.next();
                 }
                 _ => break,
@@ -562,17 +583,23 @@ impl OemData {
                 unreachable!("peek_res.is_err() was true but next() didn't return Err");
             }
             match peek_res.as_ref().expect("checked is_err above") {
-                KvnLine::BlockStart("META") | KvnLine::BlockStart("COVARIANCE") => break,
-                KvnLine::Raw(_) => {
+                KvnLine::BlockStart { tag: "META", .. }
+                | KvnLine::BlockStart {
+                    tag: "COVARIANCE", ..
+                } => break,
+                KvnLine::Raw { line_number, .. } => {
+                    last_line = *line_number;
                     let sv = StateVectorAcc::from_kvn_tokens(tokens)?;
                     state_vector.push(sv);
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { line_number } => {
+                    last_line = *line_number;
                     tokens.next();
                 }
-                KvnLine::Comment(_) => {
+                KvnLine::Comment { line_number, .. } => {
+                    last_line = *line_number;
                     // Comments interspersed in data are technically allowed by spec logic but not struct
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
                     }
                 }
@@ -595,26 +622,34 @@ impl OemData {
                 unreachable!("peek_res.is_err() was true but next() didn't return Err");
             }
             match peek_res.as_ref().expect("checked is_err above") {
-                KvnLine::BlockStart("COVARIANCE") => {
+                KvnLine::BlockStart {
+                    tag: "COVARIANCE",
+                    line_number,
+                } => {
+                    last_line = *line_number;
                     tokens.next(); // Consume COVARIANCE_START
                     loop {
                         match tokens.peek() {
-                            Some(Ok(KvnLine::BlockEnd("COVARIANCE"))) => {
+                            Some(Ok(KvnLine::BlockEnd {
+                                tag: "COVARIANCE", ..
+                            })) => {
                                 tokens.next(); // Consume COVARIANCE_STOP
                                 break;
                             }
-                            Some(Ok(KvnLine::Empty)) => {
+                            Some(Ok(KvnLine::Empty { line_number })) => {
+                                last_line = *line_number;
                                 tokens.next();
                             }
-                            Some(Ok(_)) => {
+                            Some(Ok(t)) => {
+                                last_line = t.line_number();
                                 let cov =
                                     OemCovarianceMatrix::parse_single_covariance_matrix(tokens)?;
                                 covariance_matrix.push(cov);
                             }
                             None => {
-                                return Err(CcsdsNdmError::UnexpectedEof(
-                                    "within COVARIANCE block".into(),
-                                ))
+                                return Err(CcsdsNdmError::UnexpectedEof {
+                                    context: "within COVARIANCE block".into(),
+                                })
                             }
                             Some(Err(_)) => {
                                 if let Some(Err(e)) = tokens.next() {
@@ -625,11 +660,13 @@ impl OemData {
                         }
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { line_number } => {
+                    last_line = *line_number;
                     tokens.next();
                 }
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                KvnLine::Comment { line_number, .. } => {
+                    last_line = *line_number;
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
                     }
                 }
@@ -899,6 +936,7 @@ impl ToKvn for OemCovarianceMatrix {
 }
 
 impl OemCovarianceMatrix {
+    #[allow(unused_variables, unused_assignments)]
     fn parse_single_covariance_matrix<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
     where
         I: Iterator<Item = Result<KvnLine<'a>>>,
@@ -907,16 +945,19 @@ impl OemCovarianceMatrix {
         let epoch;
         let mut cov_ref_frame = None;
         let mut floats = Vec::new();
+        let mut last_line: usize = 0;
 
         // 1. Parse comments and blank lines before EPOCH
         while let Some(peeked) = tokens.peek() {
             match peeked {
-                Ok(KvnLine::Comment(_)) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+                Ok(KvnLine::Comment { line_number, .. }) => {
+                    last_line = *line_number;
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
                     }
                 }
-                Ok(KvnLine::Empty) => {
+                Ok(KvnLine::Empty { line_number }) => {
+                    last_line = *line_number;
                     tokens.next();
                 }
                 _ => break,
@@ -926,20 +967,25 @@ impl OemCovarianceMatrix {
         // 2. Parse EPOCH
         match tokens.next() {
             Some(Ok(KvnLine::Pair {
-                key: "EPOCH", val, ..
+                key: "EPOCH",
+                val,
+                line_number,
+                ..
             })) => {
+                last_line = line_number;
                 epoch = Some(FromKvnValue::from_kvn_value(val)?);
             }
             Some(Err(e)) => return Err(e),
-            Some(Ok(_)) => {
-                return Err(CcsdsNdmError::KvnParse(
-                    "Expected EPOCH for covariance matrix".into(),
-                ))
+            Some(Ok(t)) => {
+                return Err(CcsdsNdmError::KvnParse {
+                    line: t.line_number(),
+                    message: "Expected EPOCH for covariance matrix".to_string(),
+                })
             }
             None => {
-                return Err(CcsdsNdmError::UnexpectedEof(
-                    "Expected EPOCH for covariance matrix".into(),
-                ))
+                return Err(CcsdsNdmError::UnexpectedEof {
+                    context: "Expected EPOCH for covariance matrix".into(),
+                })
             }
         }
 
@@ -947,9 +993,11 @@ impl OemCovarianceMatrix {
         if let Some(Ok(KvnLine::Pair {
             key: "COV_REF_FRAME",
             val,
+            line_number,
             ..
         })) = tokens.peek()
         {
+            last_line = *line_number;
             cov_ref_frame = Some(val.to_string());
             tokens.next();
         }
@@ -960,17 +1008,22 @@ impl OemCovarianceMatrix {
 
         while row_idx < 6 {
             match tokens.peek() {
-                Some(Ok(KvnLine::Raw(_))) => {
-                    if let Some(Ok(KvnLine::Raw(line))) = tokens.next() {
+                Some(Ok(KvnLine::Raw { line_number, .. })) => {
+                    let raw_line_number = *line_number;
+                    if let Some(Ok(KvnLine::Raw { content: line, .. })) = tokens.next() {
+                        last_line = raw_line_number;
                         let parts: Vec<&str> = line.split_whitespace().collect();
 
                         if parts.len() != expected_counts[row_idx] {
-                            return Err(CcsdsNdmError::KvnParse(format!(
-                                "Covariance row {} must have {} elements, found {}",
-                                row_idx + 1,
-                                expected_counts[row_idx],
-                                parts.len()
-                            )));
+                            return Err(CcsdsNdmError::KvnParse {
+                                line: raw_line_number,
+                                message: format!(
+                                    "Covariance row {} must have {} elements, found {}",
+                                    row_idx + 1,
+                                    expected_counts[row_idx],
+                                    parts.len()
+                                ),
+                            });
                         }
 
                         for part in parts {
@@ -979,27 +1032,31 @@ impl OemCovarianceMatrix {
                         row_idx += 1;
                     }
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { line_number, .. })) => {
+                    last_line = *line_number;
+                    tokens.next();
+                }
+                Some(Ok(KvnLine::Empty { line_number })) => {
+                    last_line = *line_number;
                     tokens.next();
                 }
                 Some(Err(_)) => return Err(tokens.next().unwrap().unwrap_err()),
-                Some(Ok(_)) => {
-                    return Err(CcsdsNdmError::KvnParse(format!(
-                        "Expected covariance data row {}",
-                        row_idx + 1,
-                    )))
+                Some(Ok(t)) => {
+                    return Err(CcsdsNdmError::KvnParse {
+                        line: t.line_number(),
+                        message: format!("Expected covariance data row {}", row_idx + 1),
+                    })
                 }
                 None => {
-                    return Err(CcsdsNdmError::UnexpectedEof(format!(
-                        "Expected covariance data row {}",
-                        row_idx + 1,
-                    )))
+                    return Err(CcsdsNdmError::UnexpectedEof {
+                        context: format!("Expected covariance data row {}", row_idx + 1),
+                    })
                 }
             }
         }
 
         if floats.len() != 21 {
-            return Err(CcsdsNdmError::KvnParse(format!(
+            return Err(CcsdsNdmError::Validation(format!(
                 "Covariance matrix requires 21 values, found {}",
                 floats.len()
             )));
@@ -1263,7 +1320,7 @@ COMMENT Another data comment
     "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
         let ok = match &err {
-            CcsdsNdmError::KvnParse(msg)
+            CcsdsNdmError::KvnParse { message: msg, .. }
                 if msg.contains("Unexpected token in META")
                     || msg.contains("Expected raw float data line for covariance matrix") =>
             {
@@ -1509,7 +1566,7 @@ OBJECT_NAME = SAT1
         let err = Oem::from_kvn(kvn).unwrap_err();
         assert!(
             matches!(err, CcsdsNdmError::MissingField(_))
-                | matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Expected META_START"))
+                | matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Expected META_START"))
         );
     }
 
@@ -1561,7 +1618,9 @@ COVARIANCE_START
 COVARIANCE_STOP
 "#;
         let err1 = Oem::from_kvn(kvn_missing_epoch).unwrap_err();
-        assert!(matches!(err1, CcsdsNdmError::KvnParse(msg) if msg.contains("Expected EPOCH")));
+        assert!(
+            matches!(err1, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Expected EPOCH"))
+        );
 
         let kvn_wrong_count = r#"CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -1588,7 +1647,7 @@ COVARIANCE_STOP
 "#;
         let err2 = Oem::from_kvn(kvn_wrong_count).unwrap_err();
         assert!(
-            matches!(err2, CcsdsNdmError::KvnParse(msg) if msg.contains("Covariance row 6 must have 6 elements, found 5"))
+            matches!(err2, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Covariance row 6 must have 6 elements, found 5"))
         );
     }
 
@@ -1610,7 +1669,9 @@ META_STOP
 bad-epoch 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::Epoch(_)) | matches!(err, CcsdsNdmError::KvnParse(_)));
+        assert!(
+            matches!(err, CcsdsNdmError::Epoch(_)) | matches!(err, CcsdsNdmError::KvnParse { .. })
+        );
     }
 
     // =========================================================================
@@ -2076,7 +2137,9 @@ COVARIANCE_START
 COVARIANCE_STOP
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Expected EPOCH")));
+        assert!(
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Expected EPOCH"))
+        );
     }
 
     #[test]
@@ -2107,7 +2170,7 @@ COVARIANCE_STOP
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Covariance row 6 must have 6 elements, found 5"))
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Covariance row 6 must have 6 elements, found 5"))
         );
     }
 
@@ -2600,7 +2663,9 @@ OBJECT_NAME = SAT1
 UNKNOWN_KEY = VAL
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Unknown META key")));
+        assert!(
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Unknown META key"))
+        );
     }
 
     #[test]
@@ -2652,7 +2717,7 @@ EPOCH = 2023-01-01T00:00:00
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::UnexpectedEof(msg) if msg.contains("within COVARIANCE block"))
+            matches!(err, CcsdsNdmError::UnexpectedEof { context, .. } if context.contains("within COVARIANCE block"))
         );
     }
 
@@ -2700,7 +2765,7 @@ KEY = VAL
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse(msg) if msg.contains("Expected covariance data row"))
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Expected covariance data row"))
         );
     }
 

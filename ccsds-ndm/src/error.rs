@@ -23,13 +23,9 @@ pub enum CcsdsNdmError {
     #[error("XML parsing error: {0}")]
     XmlParse(#[from] quick_xml::Error),
 
-    /// Errors occurring during KVN parsing.
-    #[error("KVN parsing error: {0}")]
-    KvnParse(String),
-
     /// Errors occurring during KVN parsing at a specific line.
     #[error("KVN parsing error at line {line}: {message}")]
-    KvnParseWithLine { line: usize, message: String },
+    KvnParse { line: usize, message: String },
 
     /// Errors related to CCSDS Epochs.
     #[error("Epoch error: {0}")]
@@ -76,8 +72,8 @@ pub enum CcsdsNdmError {
     MissingField(String),
 
     /// Error when an unexpected end of input is reached.
-    #[error("Unexpected end of input: {0}")]
-    UnexpectedEof(String),
+    #[error("Unexpected end of input: {context}")]
+    UnexpectedEof { context: String },
 }
 
 pub type Result<T> = std::result::Result<T, CcsdsNdmError>;
