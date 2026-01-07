@@ -46,17 +46,20 @@ impl Ndm for Cdm {
             match tokens.peek() {
                 Some(Ok(KvnLine::Pair {
                     key: "CCSDS_CDM_VERS",
+                    val,
                     ..
                 })) => {
-                    if let Some(Ok(KvnLine::Pair { val, .. })) = tokens.next() {
-                        break val.to_string();
-                    }
-                    unreachable!();
+                    let v = val.to_string();
+                    tokens.next();
+                    break v;
                 }
-                Some(Ok(KvnLine::Comment { content: _, .. })) | Some(Ok(KvnLine::Empty { .. })) => {
+                Some(Ok(KvnLine::Comment { .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next(); // skip
                 }
-                Some(_) => {
+                Some(Err(_)) => {
+                    return Err(tokens.next().unwrap().unwrap_err());
+                }
+                Some(Ok(_)) => {
                     return Err(CcsdsNdmError::MissingField(
                         "CCSDS_CDM_VERS must be the first keyword".into(),
                     ))
@@ -138,16 +141,11 @@ impl FromKvnTokens for CdmHeader {
         let mut originator = None;
         let mut message_for = None;
         let mut message_id = None;
+        let mut last_line = 0;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                if let Some(Err(e)) = tokens.next() {
-                    return Err(e);
-                }
-                unreachable!("peeked.is_err() was true but next() didn't return Err");
-            }
-
-            match peeked.as_ref().expect("checked is_err above") {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
                 KvnLine::Comment { content: _, .. } => {
                     if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
@@ -157,16 +155,25 @@ impl FromKvnTokens for CdmHeader {
                     tokens.next();
                 }
                 KvnLine::Pair {
-                    key: "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_FOR" | "MESSAGE_ID",
+                    key: k @ ("CREATION_DATE" | "ORIGINATOR" | "MESSAGE_FOR" | "MESSAGE_ID"),
+                    val,
+                    line_number,
                     ..
                 } => {
-                    if let Some(Ok(KvnLine::Pair { key, val, .. })) = tokens.next() {
-                        match key {
-                            "CREATION_DATE" => creation_date = Some(Epoch::new(val)?),
-                            "ORIGINATOR" => originator = Some(val.to_string()),
-                            "MESSAGE_FOR" => message_for = Some(val.to_string()),
-                            "MESSAGE_ID" => message_id = Some(val.to_string()),
-                            _ => unreachable!(),
+                    let line_num = *line_number;
+                    let key = *k;
+                    let val = val.to_string();
+                    tokens.next();
+                    match key {
+                        "CREATION_DATE" => creation_date = Some(Epoch::new(&val)?),
+                        "ORIGINATOR" => originator = Some(val),
+                        "MESSAGE_FOR" => message_for = Some(val),
+                        "MESSAGE_ID" => message_id = Some(val),
+                        _ => {
+                            return Err(CcsdsNdmError::KvnParse {
+                                line: line_num,
+                                message: format!("Unexpected header key: {}", key),
+                            })
                         }
                     }
                 }
@@ -175,15 +182,22 @@ impl FromKvnTokens for CdmHeader {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         Ok(CdmHeader {
             comment,
-            creation_date: creation_date
-                .ok_or_else(|| CcsdsNdmError::MissingField("CREATION_DATE is required".into()))?,
-            originator: originator
-                .ok_or_else(|| CcsdsNdmError::MissingField("ORIGINATOR is required".into()))?,
+            creation_date: creation_date.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CREATION_DATE is required".into()).at_line(last_line)
+            })?,
+            originator: originator.ok_or_else(|| {
+                CcsdsNdmError::MissingField("ORIGINATOR is required".into()).at_line(last_line)
+            })?,
             message_for,
-            message_id: message_id
-                .ok_or_else(|| CcsdsNdmError::MissingField("MESSAGE_ID is required".into()))?,
+            message_id: message_id.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MESSAGE_ID is required".into()).at_line(last_line)
+            })?,
         })
     }
 }
@@ -220,42 +234,38 @@ impl CdmBody {
         // 2. Segments (Expect exactly 2)
         let mut segments = Vec::new();
         let mut pending_comments = Vec::new();
+        let mut last_line = 0;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                if let Some(Err(e)) = tokens.next() {
-                    return Err(e);
-                }
-                unreachable!("peeked.is_err() was true but next() didn't return Err");
-            }
-            match peeked.as_ref().expect("checked is_err above") {
-                KvnLine::Pair { key: "OBJECT", .. } => {
-                    let mut segment = CdmSegment::from_kvn_tokens(tokens)?;
-                    if !pending_comments.is_empty() {
-                        segment
-                            .metadata
-                            .comment
-                            .splice(0..0, pending_comments.drain(..));
-                    }
-                    segments.push(segment);
-                }
-                KvnLine::Comment { content: _, .. } => {
-                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
-                        pending_comments.push(c.to_string());
-                    }
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
+                KvnLine::Comment { content: c, .. } => {
+                    pending_comments.push(c.to_string());
+                    tokens.next();
                 }
                 KvnLine::Empty { .. } => {
                     tokens.next();
                 }
+                KvnLine::Pair { key: "OBJECT", .. } => {
+                    let mut segment = CdmSegment::from_kvn_tokens(tokens)?;
+                    segment.metadata.comment.splice(0..0, pending_comments);
+                    pending_comments = Vec::new();
+                    segments.push(segment);
+                }
                 _ => break,
             }
+        }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
         }
 
         if segments.len() != 2 {
             return Err(CcsdsNdmError::Validation(format!(
                 "CDM body must contain exactly 2 segments, found {}",
                 segments.len()
-            )));
+            ))
+            .at_line(last_line));
         }
 
         Ok(CdmBody {
@@ -407,16 +417,11 @@ impl RelativeMetadataData {
         let mut exit_time = None;
         let mut coll_prob = None;
         let mut coll_method = None;
+        let mut last_line = 0;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                if let Some(Err(e)) = tokens.next() {
-                    return Err(e);
-                }
-                unreachable!("peeked.is_err() was true but next() didn't return Err");
-            }
-
-            match peeked.as_ref().expect("checked is_err above") {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
                 KvnLine::BlockStart { tag: "META", .. } => break,
                 KvnLine::Comment { content: _, .. } => {
                     if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
@@ -488,7 +493,7 @@ impl RelativeMetadataData {
                             return Err(CcsdsNdmError::KvnParse {
                                 line: *line_number,
                                 message: format!("Unexpected field in Relative Metadata: {}", key),
-                            })
+                            });
                         }
                     }
                     tokens.next();
@@ -497,21 +502,31 @@ impl RelativeMetadataData {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         let relative_state_vector =
             if rel_pos_r.is_some() || rel_pos_t.is_some() || rel_pos_n.is_some() {
                 Some(RelativeStateVector {
-                    relative_position_r: rel_pos_r
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_POSITION_R".into()))?,
-                    relative_position_t: rel_pos_t
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_POSITION_T".into()))?,
-                    relative_position_n: rel_pos_n
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_POSITION_N".into()))?,
-                    relative_velocity_r: rel_vel_r
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_VELOCITY_R".into()))?,
-                    relative_velocity_t: rel_vel_t
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_VELOCITY_T".into()))?,
-                    relative_velocity_n: rel_vel_n
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_VELOCITY_N".into()))?,
+                    relative_position_r: rel_pos_r.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_POSITION_R".into()).at_line(last_line)
+                    })?,
+                    relative_position_t: rel_pos_t.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_POSITION_T".into()).at_line(last_line)
+                    })?,
+                    relative_position_n: rel_pos_n.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_POSITION_N".into()).at_line(last_line)
+                    })?,
+                    relative_velocity_r: rel_vel_r.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_VELOCITY_R".into()).at_line(last_line)
+                    })?,
+                    relative_velocity_t: rel_vel_t.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_VELOCITY_T".into()).at_line(last_line)
+                    })?,
+                    relative_velocity_n: rel_vel_n.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_VELOCITY_N".into()).at_line(last_line)
+                    })?,
                 })
             } else {
                 None
@@ -519,9 +534,10 @@ impl RelativeMetadataData {
 
         Ok(RelativeMetadataData {
             comment,
-            tca: tca.ok_or(CcsdsNdmError::MissingField("TCA".into()))?,
-            miss_distance: miss_distance
-                .ok_or(CcsdsNdmError::MissingField("MISS_DISTANCE".into()))?,
+            tca: tca.ok_or_else(|| CcsdsNdmError::MissingField("TCA".into()).at_line(last_line))?,
+            miss_distance: miss_distance.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MISS_DISTANCE".into()).at_line(last_line)
+            })?,
             relative_speed,
             relative_state_vector,
             start_screen_period: start_screen,
@@ -593,11 +609,7 @@ impl CdmSegment {
                 })
             }
             Some(Err(_)) => {
-                // Advance and return the owned error
-                if let Some(Err(err)) = tokens.next() {
-                    return Err(err);
-                }
-                unreachable!();
+                return Err(tokens.next().unwrap().unwrap_err());
             }
             None => {
                 return Err(CcsdsNdmError::UnexpectedEof {
@@ -814,14 +826,8 @@ impl CdmMetadata {
             )
         }
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                if let Some(Err(e)) = tokens.next() {
-                    return Err(e);
-                }
-                unreachable!("peeked.is_err() was true but next() didn't return Err");
-            }
-            match peeked.as_ref().expect("checked is_err above") {
+        while let Some(Ok(token)) = tokens.peek() {
+            match token {
                 KvnLine::BlockEnd { tag: "META", .. } => {
                     tokens.next();
                     break;
@@ -854,6 +860,10 @@ impl CdmMetadata {
                 }
             }
         }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
         builder.build()
     }
 }
@@ -882,10 +892,12 @@ struct CdmMetadataBuilder {
     solar_rad_pressure: Option<YesNo>,
     earth_tides: Option<YesNo>,
     intrack_thrust: Option<YesNo>,
+    last_line: usize,
 }
 
 impl CdmMetadataBuilder {
     fn match_pair(&mut self, key: &str, val: &str, line: usize) -> Result<()> {
+        self.last_line = line;
         match key {
             "OBJECT" => {
                 self.object = Some(match val.to_uppercase().as_str() {
@@ -998,39 +1010,40 @@ impl CdmMetadataBuilder {
     fn build(self) -> Result<CdmMetadata> {
         Ok(CdmMetadata {
             comment: self.comment,
-            object: self
-                .object
-                .ok_or(CcsdsNdmError::MissingField("OBJECT".into()))?,
-            object_designator: self
-                .object_designator
-                .ok_or(CcsdsNdmError::MissingField("OBJECT_DESIGNATOR".into()))?,
-            catalog_name: self
-                .catalog_name
-                .ok_or(CcsdsNdmError::MissingField("CATALOG_NAME".into()))?,
-            object_name: self
-                .object_name
-                .ok_or(CcsdsNdmError::MissingField("OBJECT_NAME".into()))?,
-            international_designator: self.international_designator.ok_or(
-                CcsdsNdmError::MissingField("INTERNATIONAL_DESIGNATOR".into()),
-            )?,
+            object: self.object.ok_or_else(|| {
+                CcsdsNdmError::MissingField("OBJECT".into()).at_line(self.last_line)
+            })?,
+            object_designator: self.object_designator.ok_or_else(|| {
+                CcsdsNdmError::MissingField("OBJECT_DESIGNATOR".into()).at_line(self.last_line)
+            })?,
+            catalog_name: self.catalog_name.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CATALOG_NAME".into()).at_line(self.last_line)
+            })?,
+            object_name: self.object_name.ok_or_else(|| {
+                CcsdsNdmError::MissingField("OBJECT_NAME".into()).at_line(self.last_line)
+            })?,
+            international_designator: self.international_designator.ok_or_else(|| {
+                CcsdsNdmError::MissingField("INTERNATIONAL_DESIGNATOR".into())
+                    .at_line(self.last_line)
+            })?,
             object_type: self.object_type,
             operator_contact_position: self.operator_contact_position,
             operator_organization: self.operator_organization,
             operator_phone: self.operator_phone,
             operator_email: self.operator_email,
-            ephemeris_name: self
-                .ephemeris_name
-                .ok_or(CcsdsNdmError::MissingField("EPHEMERIS_NAME".into()))?,
-            covariance_method: self
-                .covariance_method
-                .ok_or(CcsdsNdmError::MissingField("COVARIANCE_METHOD".into()))?,
-            maneuverable: self
-                .maneuverable
-                .ok_or(CcsdsNdmError::MissingField("MANEUVERABLE".into()))?,
+            ephemeris_name: self.ephemeris_name.ok_or_else(|| {
+                CcsdsNdmError::MissingField("EPHEMERIS_NAME".into()).at_line(self.last_line)
+            })?,
+            covariance_method: self.covariance_method.ok_or_else(|| {
+                CcsdsNdmError::MissingField("COVARIANCE_METHOD".into()).at_line(self.last_line)
+            })?,
+            maneuverable: self.maneuverable.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MANEUVERABLE".into()).at_line(self.last_line)
+            })?,
             orbit_center: self.orbit_center,
-            ref_frame: self
-                .ref_frame
-                .ok_or(CcsdsNdmError::MissingField("REF_FRAME".into()))?,
+            ref_frame: self.ref_frame.ok_or_else(|| {
+                CcsdsNdmError::MissingField("REF_FRAME".into()).at_line(self.last_line)
+            })?,
             gravity_model: self.gravity_model,
             atmospheric_model: self.atmospheric_model,
             n_body_perturbations: self.n_body_perturbations,
@@ -1160,18 +1173,14 @@ impl CdmData {
         let mut x_dot = None;
         let mut y_dot = None;
         let mut z_dot = None;
+        let mut last_line = 0;
 
         // Using a Builder pattern locally for Covariance because strict requirements exist
         let mut cov = CdmCovarianceMatrixBuilder::default();
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                if let Some(Err(e)) = tokens.next() {
-                    return Err(e);
-                }
-                unreachable!("peeked.is_err() was true but next() didn't return Err");
-            }
-            match peeked.as_ref().expect("checked is_err above") {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
                 KvnLine::BlockStart { tag: "META", .. } => break,
                 KvnLine::Comment { content: _, .. } => {
                     if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
@@ -1281,13 +1290,20 @@ impl CdmData {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         let state_vector = CdmStateVector {
-            x: x.ok_or(CcsdsNdmError::MissingField("X".into()))?,
-            y: y.ok_or(CcsdsNdmError::MissingField("Y".into()))?,
-            z: z.ok_or(CcsdsNdmError::MissingField("Z".into()))?,
-            x_dot: x_dot.ok_or(CcsdsNdmError::MissingField("X_DOT".into()))?,
-            y_dot: y_dot.ok_or(CcsdsNdmError::MissingField("Y_DOT".into()))?,
-            z_dot: z_dot.ok_or(CcsdsNdmError::MissingField("Z_DOT".into()))?,
+            x: x.ok_or_else(|| CcsdsNdmError::MissingField("X".into()).at_line(last_line))?,
+            y: y.ok_or_else(|| CcsdsNdmError::MissingField("Y".into()).at_line(last_line))?,
+            z: z.ok_or_else(|| CcsdsNdmError::MissingField("Z".into()).at_line(last_line))?,
+            x_dot: x_dot
+                .ok_or_else(|| CcsdsNdmError::MissingField("X_DOT".into()).at_line(last_line))?,
+            y_dot: y_dot
+                .ok_or_else(|| CcsdsNdmError::MissingField("Y_DOT".into()).at_line(last_line))?,
+            z_dot: z_dot
+                .ok_or_else(|| CcsdsNdmError::MissingField("Z_DOT".into()).at_line(last_line))?,
         };
 
         let od_parameters = if od_params.time_lastob_start.is_some() || od_params.obs_used.is_some()
@@ -2095,6 +2111,13 @@ MESSAGE_ID = MSG-001
 "#;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::MissingField(msg) = *source {
+                    assert!(msg.contains("CREATION_DATE"))
+                } else {
+                    panic!("unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::MissingField(msg) => assert!(msg.contains("CREATION_DATE")),
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -2152,6 +2175,13 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 "#;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::Validation(msg) = *source {
+                    assert!(msg.contains("exactly 2 segments"))
+                } else {
+                    panic!("unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::Validation(msg) => assert!(msg.contains("exactly 2 segments")),
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -2248,6 +2278,13 @@ CNDOT_NDOT = 1 [m**2/s**2]
 "#;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::MissingField(msg) = *source {
+                    assert!(msg.contains("RELATIVE_VELOCITY_N"))
+                } else {
+                    panic!("unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::MissingField(msg) => assert!(msg.contains("RELATIVE_VELOCITY_N")),
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -3248,10 +3285,10 @@ META_START
     #[test]
     fn unexpected_end_of_input() {
         let kvn = r#"
-CCSDS_CDM_VERS = 1.0
+    CCSDS_CDM_VERS = 1.0
 CREATION_DATE = 2025-01-01T00:00:00
 ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
+MESSAGE_ID = MSG-ONE
 
 TCA = 2025-01-02T12:00:00
 MISS_DISTANCE = 100.0 [m]
@@ -3259,6 +3296,13 @@ MISS_DISTANCE = 100.0 [m]
         // This should give validation error because no segments found
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::Validation(msg) = *source {
+                    assert!(msg.contains("exactly 2 segments"))
+                } else {
+                    panic!("unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::Validation(msg) => assert!(msg.contains("exactly 2 segments")),
             _ => panic!("unexpected error: {:?}", err),
         }

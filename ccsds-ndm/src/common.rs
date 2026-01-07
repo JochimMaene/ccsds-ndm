@@ -168,20 +168,7 @@ impl FromKvnTokens for OdmHeader {
         let mut originator = None;
         let mut message_id = None;
 
-        while tokens.peek().is_some() {
-            // If the next token is an error, return it immediately
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-
-            let token = tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok");
+        while let Some(Ok(token)) = tokens.peek() {
             match token {
                 KvnLine::Comment { .. } => {
                     if let Some(Ok(KvnLine::Comment { content, .. })) = tokens.next() {
@@ -192,24 +179,30 @@ impl FromKvnTokens for OdmHeader {
                     tokens.next();
                 }
                 KvnLine::Pair {
-                    key: "CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID",
+                    key: k @ ("CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID"),
+                    val,
                     line_number,
                     ..
                 } => {
                     let line_num = *line_number;
-                    // Valid header key, consume and parse
-                    if let Some(Ok(KvnLine::Pair { key, val, .. })) = tokens.next() {
-                        match key {
-                            "CLASSIFICATION" => classification = Some(val.to_string()),
-                            "CREATION_DATE" => {
-                                creation_date = Some(
-                                    Epoch::from_str(val)
-                                        .map_err(|e| CcsdsNdmError::from(e).at_line(line_num))?,
-                                )
-                            }
-                            "ORIGINATOR" => originator = Some(val.to_string()),
-                            "MESSAGE_ID" => message_id = Some(val.to_string()),
-                            _ => unreachable!(),
+                    let val = val.to_string();
+                    let key = *k;
+                    tokens.next();
+                    match key {
+                        "CLASSIFICATION" => classification = Some(val),
+                        "CREATION_DATE" => {
+                            creation_date = Some(
+                                Epoch::from_str(&val)
+                                    .map_err(|e| CcsdsNdmError::from(e).at_line(line_num))?,
+                            )
+                        }
+                        "ORIGINATOR" => originator = Some(val),
+                        "MESSAGE_ID" => message_id = Some(val),
+                        _ => {
+                            return Err(CcsdsNdmError::KvnParse {
+                                line: line_num,
+                                message: format!("Unexpected header key: {}", key),
+                            })
                         }
                     }
                 }
@@ -219,6 +212,10 @@ impl FromKvnTokens for OdmHeader {
                 // Any other token (BlockStart, BlockEnd, Raw) signals end of header
                 _ => break,
             }
+        }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
         }
 
         Ok(OdmHeader {
@@ -523,8 +520,8 @@ pub fn parse_state_vector_raw(line: &str, line_number: usize) -> Result<StateVec
     let epoch_str = tokens
         .next()
         .ok_or_else(|| CcsdsNdmError::MissingField("EPOCH".to_string()).at_line(line_number))?;
-    let epoch = Epoch::from_str(epoch_str)
-        .map_err(|e| CcsdsNdmError::from(e).at_line(line_number))?;
+    let epoch =
+        Epoch::from_str(epoch_str).map_err(|e| CcsdsNdmError::from(e).at_line(line_number))?;
 
     // Helper to parse next f64
     let mut next_f64 = |field: &'static str| -> Result<f64> {
@@ -750,20 +747,11 @@ impl FromKvnTokens for StateVector {
         let mut x_dot: Option<Velocity> = None;
         let mut y_dot: Option<Velocity> = None;
         let mut z_dot: Option<Velocity> = None;
+        let mut last_line = 0;
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
                 KvnLine::Comment { content, .. } => {
                     comment.push(content.to_string());
                     tokens.next();
@@ -833,15 +821,27 @@ impl FromKvnTokens for StateVector {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         Ok(StateVector {
             comment,
-            epoch: epoch.ok_or_else(|| CcsdsNdmError::MissingField("EPOCH".to_string()))?,
-            x: x.ok_or_else(|| CcsdsNdmError::MissingField("X".to_string()))?,
-            y: y.ok_or_else(|| CcsdsNdmError::MissingField("Y".to_string()))?,
-            z: z.ok_or_else(|| CcsdsNdmError::MissingField("Z".to_string()))?,
-            x_dot: x_dot.ok_or_else(|| CcsdsNdmError::MissingField("X_DOT".to_string()))?,
-            y_dot: y_dot.ok_or_else(|| CcsdsNdmError::MissingField("Y_DOT".to_string()))?,
-            z_dot: z_dot.ok_or_else(|| CcsdsNdmError::MissingField("Z_DOT".to_string()))?,
+            epoch: epoch.ok_or_else(|| {
+                CcsdsNdmError::MissingField("EPOCH".to_string()).at_line(last_line)
+            })?,
+            x: x.ok_or_else(|| CcsdsNdmError::MissingField("X".to_string()).at_line(last_line))?,
+            y: y.ok_or_else(|| CcsdsNdmError::MissingField("Y".to_string()).at_line(last_line))?,
+            z: z.ok_or_else(|| CcsdsNdmError::MissingField("Z".to_string()).at_line(last_line))?,
+            x_dot: x_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("X_DOT".to_string()).at_line(last_line)
+            })?,
+            y_dot: y_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("Y_DOT".to_string()).at_line(last_line)
+            })?,
+            z_dot: z_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("Z_DOT".to_string()).at_line(last_line)
+            })?,
         })
     }
 }
@@ -1153,20 +1153,11 @@ impl FromKvnTokens for OpmCovarianceMatrix {
         req!(cz_dot_x_dot: VelocityCovariance);
         req!(cz_dot_y_dot: VelocityCovariance);
         req!(cz_dot_z_dot: VelocityCovariance);
+        let mut last_line = 0;
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
                 KvnLine::Empty { .. } => {
                     tokens.next();
                 }
@@ -1349,45 +1340,76 @@ impl FromKvnTokens for OpmCovarianceMatrix {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         Ok(OpmCovarianceMatrix {
             comment,
             cov_ref_frame,
-            cx_x: cx_x.ok_or_else(|| CcsdsNdmError::MissingField("CX_X is required".into()))?,
-            cy_x: cy_x.ok_or_else(|| CcsdsNdmError::MissingField("CY_X is required".into()))?,
-            cy_y: cy_y.ok_or_else(|| CcsdsNdmError::MissingField("CY_Y is required".into()))?,
-            cz_x: cz_x.ok_or_else(|| CcsdsNdmError::MissingField("CZ_X is required".into()))?,
-            cz_y: cz_y.ok_or_else(|| CcsdsNdmError::MissingField("CZ_Y is required".into()))?,
-            cz_z: cz_z.ok_or_else(|| CcsdsNdmError::MissingField("CZ_Z is required".into()))?,
-            cx_dot_x: cx_dot_x
-                .ok_or_else(|| CcsdsNdmError::MissingField("CX_DOT_X is required".into()))?,
-            cx_dot_y: cx_dot_y
-                .ok_or_else(|| CcsdsNdmError::MissingField("CX_DOT_Y is required".into()))?,
-            cx_dot_z: cx_dot_z
-                .ok_or_else(|| CcsdsNdmError::MissingField("CX_DOT_Z is required".into()))?,
-            cx_dot_x_dot: cx_dot_x_dot
-                .ok_or_else(|| CcsdsNdmError::MissingField("CX_DOT_X_DOT is required".into()))?,
-            cy_dot_x: cy_dot_x
-                .ok_or_else(|| CcsdsNdmError::MissingField("CY_DOT_X is required".into()))?,
-            cy_dot_y: cy_dot_y
-                .ok_or_else(|| CcsdsNdmError::MissingField("CY_DOT_Y is required".into()))?,
-            cy_dot_z: cy_dot_z
-                .ok_or_else(|| CcsdsNdmError::MissingField("CY_DOT_Z is required".into()))?,
-            cy_dot_x_dot: cy_dot_x_dot
-                .ok_or_else(|| CcsdsNdmError::MissingField("CY_DOT_X_DOT is required".into()))?,
-            cy_dot_y_dot: cy_dot_y_dot
-                .ok_or_else(|| CcsdsNdmError::MissingField("CY_DOT_Y_DOT is required".into()))?,
-            cz_dot_x: cz_dot_x
-                .ok_or_else(|| CcsdsNdmError::MissingField("CZ_DOT_X is required".into()))?,
-            cz_dot_y: cz_dot_y
-                .ok_or_else(|| CcsdsNdmError::MissingField("CZ_DOT_Y is required".into()))?,
-            cz_dot_z: cz_dot_z
-                .ok_or_else(|| CcsdsNdmError::MissingField("CZ_DOT_Z is required".into()))?,
-            cz_dot_x_dot: cz_dot_x_dot
-                .ok_or_else(|| CcsdsNdmError::MissingField("CZ_DOT_X_DOT is required".into()))?,
-            cz_dot_y_dot: cz_dot_y_dot
-                .ok_or_else(|| CcsdsNdmError::MissingField("CZ_DOT_Y_DOT is required".into()))?,
-            cz_dot_z_dot: cz_dot_z_dot
-                .ok_or_else(|| CcsdsNdmError::MissingField("CZ_DOT_Z_DOT is required".into()))?,
+            cx_x: cx_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CX_X is required".into()).at_line(last_line)
+            })?,
+            cy_x: cy_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_X is required".into()).at_line(last_line)
+            })?,
+            cy_y: cy_y.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_Y is required".into()).at_line(last_line)
+            })?,
+            cz_x: cz_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_X is required".into()).at_line(last_line)
+            })?,
+            cz_y: cz_y.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_Y is required".into()).at_line(last_line)
+            })?,
+            cz_z: cz_z.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_Z is required".into()).at_line(last_line)
+            })?,
+            cx_dot_x: cx_dot_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CX_DOT_X is required".into()).at_line(last_line)
+            })?,
+            cx_dot_y: cx_dot_y.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CX_DOT_Y is required".into()).at_line(last_line)
+            })?,
+            cx_dot_z: cx_dot_z.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CX_DOT_Z is required".into()).at_line(last_line)
+            })?,
+            cx_dot_x_dot: cx_dot_x_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CX_DOT_X_DOT is required".into()).at_line(last_line)
+            })?,
+            cy_dot_x: cy_dot_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_DOT_X is required".into()).at_line(last_line)
+            })?,
+            cy_dot_y: cy_dot_y.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_DOT_Y is required".into()).at_line(last_line)
+            })?,
+            cy_dot_z: cy_dot_z.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_DOT_Z is required".into()).at_line(last_line)
+            })?,
+            cy_dot_x_dot: cy_dot_x_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_DOT_X_DOT is required".into()).at_line(last_line)
+            })?,
+            cy_dot_y_dot: cy_dot_y_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_DOT_Y_DOT is required".into()).at_line(last_line)
+            })?,
+            cz_dot_x: cz_dot_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_X is required".into()).at_line(last_line)
+            })?,
+            cz_dot_y: cz_dot_y.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_Y is required".into()).at_line(last_line)
+            })?,
+            cz_dot_z: cz_dot_z.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_Z is required".into()).at_line(last_line)
+            })?,
+            cz_dot_x_dot: cz_dot_x_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_X_DOT is required".into()).at_line(last_line)
+            })?,
+            cz_dot_y_dot: cz_dot_y_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_Y_DOT is required".into()).at_line(last_line)
+            })?,
+            cz_dot_z_dot: cz_dot_z_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_Z_DOT is required".into()).at_line(last_line)
+            })?,
         })
     }
 }

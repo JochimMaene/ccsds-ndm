@@ -51,17 +51,20 @@ impl Ndm for Ocm {
             match tokens.peek() {
                 Some(Ok(KvnLine::Pair {
                     key: "CCSDS_OCM_VERS",
+                    val,
                     ..
                 })) => {
-                    if let Some(Ok(KvnLine::Pair { val, .. })) = tokens.next() {
-                        break val.to_string();
-                    }
-                    unreachable!();
+                    let v = val.to_string();
+                    tokens.next();
+                    break v;
                 }
-                Some(Ok(KvnLine::Comment { content: _, .. })) | Some(Ok(KvnLine::Empty { .. })) => {
+                Some(Ok(KvnLine::Comment { .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next();
                 }
-                Some(_) => {
+                Some(Err(_)) => {
+                    return Err(tokens.next().unwrap().unwrap_err());
+                }
+                Some(Ok(_)) => {
                     return Err(CcsdsNdmError::MissingField(
                         "CCSDS_OCM_VERS must be the first keyword".into(),
                     ))
@@ -157,10 +160,7 @@ impl OcmSegment {
                 })
             }
             Some(Err(_)) => {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err())
+                return Err(tokens.next().unwrap().unwrap_err());
             }
             None => {
                 return Err(CcsdsNdmError::UnexpectedEof {
@@ -765,19 +765,8 @@ impl OcmMetadata {
         let mut interp_method_eop: Option<String> = None;
         let mut celestial_source: Option<String> = None;
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
+        while let Some(Ok(token)) = tokens.peek() {
+            match token {
                 KvnLine::BlockEnd { tag: "META", .. } => {
                     tokens.next();
                     break;
@@ -878,18 +867,18 @@ impl OcmMetadata {
         let et = epoch_tzero.ok_or(CcsdsNdmError::MissingField("EPOCH_TZERO".into()))?;
 
         // Apply defaults per XSD/Blue Book where applicable
-        let sclk_offset_at_epoch = sclk_offset_at_epoch.or_else(|| {
-            Some(
-                TimeOffset::from_kvn("0.0", None)
-                    .expect("default SCLK_OFFSET_AT_EPOCH '0.0' is valid"),
-            )
-        });
-        let sclk_sec_per_si_sec = sclk_sec_per_si_sec.or_else(|| {
-            Some(
-                Duration::from_kvn("1.0", None)
-                    .expect("default SCLK_SEC_PER_SI_SEC '1.0' is valid"),
-            )
-        });
+        let sclk_offset_at_epoch = sclk_offset_at_epoch.or(Some(TimeOffset {
+            value: 0.0,
+            units: None,
+        }));
+        let sclk_sec_per_si_sec = sclk_sec_per_si_sec.or(Some(Duration {
+            value: 1.0,
+            units: None,
+        }));
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
 
         Ok(OcmMetadata {
             comment,
@@ -1018,19 +1007,8 @@ impl OcmData {
         let mut data = OcmData::default();
         let mut pending_comments = Vec::new();
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
+        while let Some(Ok(token)) = tokens.peek() {
+            match token {
                 KvnLine::BlockStart { tag: "TRAJ", .. } => {
                     let mut block = OcmTrajState::from_kvn_tokens(tokens)?;
                     if !pending_comments.is_empty() {
@@ -1111,6 +1089,11 @@ impl OcmData {
                 _ => break,
             }
         }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         Ok(data)
     }
 }

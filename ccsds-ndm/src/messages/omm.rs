@@ -167,17 +167,20 @@ impl Ndm for Omm {
             match tokens.peek() {
                 Some(Ok(KvnLine::Pair {
                     key: "CCSDS_OMM_VERS",
+                    val,
                     ..
                 })) => {
-                    if let Some(Ok(KvnLine::Pair { val, .. })) = tokens.next() {
-                        break val.to_string();
-                    }
-                    unreachable!();
+                    let v = val.to_string();
+                    tokens.next();
+                    break v;
                 }
-                Some(Ok(KvnLine::Comment { content: _, .. })) | Some(Ok(KvnLine::Empty { .. })) => {
+                Some(Ok(KvnLine::Comment { .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next(); // skip
                 }
-                Some(_) => {
+                Some(Err(_)) => {
+                    return Err(tokens.next().unwrap().unwrap_err());
+                }
+                Some(Ok(_)) => {
                     return Err(CcsdsNdmError::MissingField(
                         "CCSDS_OMM_VERS must be the first keyword".into(),
                     ))
@@ -364,19 +367,8 @@ impl OmmMetadata {
     {
         let mut builder = OmmMetadataBuilder::default();
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
+        while let Some(Ok(token)) = tokens.peek() {
+            match token {
                 KvnLine::Comment { content: c, .. } => {
                     builder.comment.push(c.to_string());
                     tokens.next();
@@ -392,7 +384,7 @@ impl OmmMetadata {
                 } => {
                     // Stop when we hit a Data keyword (e.g. EPOCH)
                     // The standard usually puts EPOCH first in data.
-                    if key == &"EPOCH" {
+                    if *key == "EPOCH" {
                         break;
                     }
                     builder.match_pair(key, val, *line_number)?;
@@ -401,6 +393,11 @@ impl OmmMetadata {
                 _ => break,
             }
         }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         builder.build()
     }
 }
@@ -415,10 +412,12 @@ struct OmmMetadataBuilder {
     ref_frame_epoch: Option<Epoch>,
     time_system: Option<String>,
     mean_element_theory: Option<String>,
+    last_line: usize,
 }
 
 impl OmmMetadataBuilder {
     fn match_pair(&mut self, key: &str, val: &str, line: usize) -> Result<()> {
+        self.last_line = line;
         match key {
             "OBJECT_NAME" => self.object_name = Some(val.to_string()),
             "OBJECT_ID" => self.object_id = Some(val.to_string()),
@@ -445,25 +444,25 @@ impl OmmMetadataBuilder {
     fn build(self) -> Result<OmmMetadata> {
         Ok(OmmMetadata {
             comment: self.comment,
-            object_name: self
-                .object_name
-                .ok_or(CcsdsNdmError::MissingField("OBJECT_NAME".into()))?,
-            object_id: self
-                .object_id
-                .ok_or(CcsdsNdmError::MissingField("OBJECT_ID".into()))?,
-            center_name: self
-                .center_name
-                .ok_or(CcsdsNdmError::MissingField("CENTER_NAME".into()))?,
-            ref_frame: self
-                .ref_frame
-                .ok_or(CcsdsNdmError::MissingField("REF_FRAME".into()))?,
+            object_name: self.object_name.ok_or_else(|| {
+                CcsdsNdmError::MissingField("OBJECT_NAME".into()).at_line(self.last_line)
+            })?,
+            object_id: self.object_id.ok_or_else(|| {
+                CcsdsNdmError::MissingField("OBJECT_ID".into()).at_line(self.last_line)
+            })?,
+            center_name: self.center_name.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CENTER_NAME".into()).at_line(self.last_line)
+            })?,
+            ref_frame: self.ref_frame.ok_or_else(|| {
+                CcsdsNdmError::MissingField("REF_FRAME".into()).at_line(self.last_line)
+            })?,
             ref_frame_epoch: self.ref_frame_epoch,
-            time_system: self
-                .time_system
-                .ok_or(CcsdsNdmError::MissingField("TIME_SYSTEM".into()))?,
-            mean_element_theory: self
-                .mean_element_theory
-                .ok_or(CcsdsNdmError::MissingField("MEAN_ELEMENT_THEORY".into()))?,
+            time_system: self.time_system.ok_or_else(|| {
+                CcsdsNdmError::MissingField("TIME_SYSTEM".into()).at_line(self.last_line)
+            })?,
+            mean_element_theory: self.mean_element_theory.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MEAN_ELEMENT_THEORY".into()).at_line(self.last_line)
+            })?,
         })
     }
 }
@@ -573,19 +572,8 @@ impl OmmData {
         let mut ud_builder = UserDefinedBuilder::default();
         let mut pending_comments = Vec::new();
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
+        while let Some(Ok(token)) = tokens.peek() {
+            match token {
                 KvnLine::Comment { content: c, .. } => {
                     if !me_builder.has_started() {
                         comment.push(c.to_string());
@@ -652,6 +640,10 @@ impl OmmData {
                 }
                 _ => break,
             }
+        }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
         }
 
         Ok(OmmData {
@@ -786,6 +778,7 @@ struct MeanElementsBuilder {
     arg_of_pericenter: Option<Angle>,
     mean_anomaly: Option<Angle>,
     gm: Option<Gm>,
+    last_line: usize,
 }
 
 impl MeanElementsBuilder {
@@ -794,6 +787,7 @@ impl MeanElementsBuilder {
     }
 
     fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
+        self.last_line = line;
         match key {
             "EPOCH" => {
                 self.epoch = Some(
@@ -806,7 +800,8 @@ impl MeanElementsBuilder {
                     Some(Distance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
             }
             "MEAN_MOTION" => {
-                self.mean_motion = Some(MeanMotion::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+                self.mean_motion =
+                    Some(MeanMotion::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
             }
             "ECCENTRICITY" => {
                 self.eccentricity = Some(
@@ -815,20 +810,22 @@ impl MeanElementsBuilder {
                 )
             }
             "INCLINATION" => {
-                self.inclination = Some(Inclination::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+                self.inclination =
+                    Some(Inclination::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
             }
             "RA_OF_ASC_NODE" => {
                 self.ra_of_asc_node = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
             }
             "ARG_OF_PERICENTER" => {
-                self.arg_of_pericenter = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+                self.arg_of_pericenter =
+                    Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
             }
             "MEAN_ANOMALY" => {
                 self.mean_anomaly = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
             }
             "GM" => {
-                let uv = UnitValue::<f64, GmUnits>::from_kvn(val, unit)
-                    .map_err(|e| e.at_line(line))?;
+                let uv =
+                    UnitValue::<f64, GmUnits>::from_kvn(val, unit).map_err(|e| e.at_line(line))?;
                 self.gm = Some(Gm::new(uv.value, uv.units).map_err(|e| e.at_line(line))?);
             }
             _ => return Ok(false),
@@ -840,47 +837,50 @@ impl MeanElementsBuilder {
         if self.semi_major_axis.is_some() && self.mean_motion.is_some() {
             return Err(CcsdsNdmError::Validation(
                 "Cannot have both SEMI_MAJOR_AXIS and MEAN_MOTION".to_string(),
-            ));
+            )
+            .at_line(self.last_line));
         }
         if self.semi_major_axis.is_none() && self.mean_motion.is_none() {
             return Err(CcsdsNdmError::MissingField(
                 "Either SEMI_MAJOR_AXIS or MEAN_MOTION must be present".into(),
-            ));
+            )
+            .at_line(self.last_line));
         }
 
-        let eccentricity = self
-            .eccentricity
-            .ok_or(CcsdsNdmError::MissingField("ECCENTRICITY".into()))?;
+        let eccentricity = self.eccentricity.ok_or_else(|| {
+            CcsdsNdmError::MissingField("ECCENTRICITY".into()).at_line(self.last_line)
+        })?;
         if eccentricity < 0.0 {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "ECCENTRICITY".to_string(),
                 value: eccentricity.to_string(),
                 expected: ">= 0".to_string(),
-            });
+            }
+            .at_line(self.last_line));
         }
 
-        let inclination = self
-            .inclination
-            .ok_or(CcsdsNdmError::MissingField("INCLINATION".into()))?;
+        let inclination = self.inclination.ok_or_else(|| {
+            CcsdsNdmError::MissingField("INCLINATION".into()).at_line(self.last_line)
+        })?;
 
         Ok(MeanElements {
             comment: self.comment,
-            epoch: self
-                .epoch
-                .ok_or(CcsdsNdmError::MissingField("EPOCH".into()))?,
+            epoch: self.epoch.ok_or_else(|| {
+                CcsdsNdmError::MissingField("EPOCH".into()).at_line(self.last_line)
+            })?,
             semi_major_axis: self.semi_major_axis,
             mean_motion: self.mean_motion,
             eccentricity,
             inclination,
-            ra_of_asc_node: self
-                .ra_of_asc_node
-                .ok_or(CcsdsNdmError::MissingField("RA_OF_ASC_NODE".into()))?,
-            arg_of_pericenter: self
-                .arg_of_pericenter
-                .ok_or(CcsdsNdmError::MissingField("ARG_OF_PERICENTER".into()))?,
-            mean_anomaly: self
-                .mean_anomaly
-                .ok_or(CcsdsNdmError::MissingField("MEAN_ANOMALY".into()))?,
+            ra_of_asc_node: self.ra_of_asc_node.ok_or_else(|| {
+                CcsdsNdmError::MissingField("RA_OF_ASC_NODE".into()).at_line(self.last_line)
+            })?,
+            arg_of_pericenter: self.arg_of_pericenter.ok_or_else(|| {
+                CcsdsNdmError::MissingField("ARG_OF_PERICENTER".into()).at_line(self.last_line)
+            })?,
+            mean_anomaly: self.mean_anomaly.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MEAN_ANOMALY".into()).at_line(self.last_line)
+            })?,
             gm: self.gm,
         })
     }
@@ -1113,10 +1113,12 @@ struct TleParametersBuilder {
     mean_motion_dot: Option<MeanMotionDot>,
     mean_motion_ddot: Option<MeanMotionDDot>,
     agom: Option<M2kg>,
+    last_line: usize,
 }
 
 impl TleParametersBuilder {
     fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
+        self.last_line = line;
         match key {
             "EPHEMERIS_TYPE" => {
                 self.ephemeris_type = Some(
@@ -1182,39 +1184,45 @@ impl TleParametersBuilder {
                     name: "ELEMENT_SET_NO".to_string(),
                     value: esn.to_string(),
                     expected: "[0, 9999]".to_string(),
-                });
+                }
+                .at_line(self.last_line));
             }
         }
 
         // Check Choice: BSTAR vs BTERM
         if self.bstar.is_some() && self.bterm.is_some() {
-            return Err(CcsdsNdmError::Validation(
-                "Cannot have both BSTAR and BTERM".to_string(),
-            ));
+            return Err(
+                CcsdsNdmError::Validation("Cannot have both BSTAR and BTERM".to_string())
+                    .at_line(self.last_line),
+            );
         }
         if self.bstar.is_none() && self.bterm.is_none() {
             return Err(CcsdsNdmError::MissingField(
                 "Either BSTAR or BTERM must be present in TLE Parameters".into(),
-            ));
+            )
+            .at_line(self.last_line));
         }
 
         // MEAN_MOTION_DOT is mandatory in tleParametersType
         if self.mean_motion_dot.is_none() {
             return Err(CcsdsNdmError::MissingField(
                 "MEAN_MOTION_DOT is required in TLE Parameters".into(),
-            ));
+            )
+            .at_line(self.last_line));
         }
 
         // Check Choice: MEAN_MOTION_DDOT vs AGOM
         if self.mean_motion_ddot.is_some() && self.agom.is_some() {
             return Err(CcsdsNdmError::Validation(
                 "Cannot have both MEAN_MOTION_DDOT and AGOM".to_string(),
-            ));
+            )
+            .at_line(self.last_line));
         }
         if self.mean_motion_ddot.is_none() && self.agom.is_none() {
             return Err(CcsdsNdmError::MissingField(
                 "Either MEAN_MOTION_DDOT or AGOM must be present in TLE Parameters".into(),
-            ));
+            )
+            .at_line(self.last_line));
         }
 
         Ok(Some(TleParameters {
