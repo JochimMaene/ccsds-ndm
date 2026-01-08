@@ -435,39 +435,30 @@ impl OemMetadataBuilder {
             "REF_FRAME" => self.ref_frame = Some(val.into()),
             "REF_FRAME_EPOCH" => {
                 self.ref_frame_epoch = Some(
-                    FromKvnValue::from_kvn_value(val)
-                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?,
                 )
             }
             "TIME_SYSTEM" => self.time_system = Some(val.into()),
             "START_TIME" => {
-                self.start_time = Some(
-                    FromKvnValue::from_kvn_value(val)
-                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
-                )
+                self.start_time =
+                    Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
             "USEABLE_START_TIME" => {
-                self.useable_start_time = Some(
-                    FromKvnValue::from_kvn_value(val)
-                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
-                )
+                self.useable_start_time =
+                    Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
             "USEABLE_STOP_TIME" => {
-                self.useable_stop_time = Some(
-                    FromKvnValue::from_kvn_value(val)
-                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
-                )
+                self.useable_stop_time =
+                    Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
             "STOP_TIME" => {
-                self.stop_time = Some(
-                    FromKvnValue::from_kvn_value(val)
-                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
-                )
+                self.stop_time =
+                    Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
             "INTERPOLATION" => self.interpolation = Some(val.into()),
             "INTERPOLATION_DEGREE" => {
-                let parsed_u32: u32 = FromKvnValue::from_kvn_value(val)
-                    .map_err(|e| CcsdsNdmError::from(e).at_line(line))?;
+                let parsed_u32: u32 =
+                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?;
                 self.interpolation_degree = Some(NonZeroU32::new(parsed_u32).ok_or_else(|| {
                     CcsdsNdmError::OutOfRange {
                         name: "INTERPOLATION_DEGREE".to_string(),
@@ -1013,8 +1004,7 @@ impl OemCovarianceMatrix {
                 let line_num = line_number;
                 last_line = line_num;
                 epoch = Some(
-                    FromKvnValue::from_kvn_value(val)
-                        .map_err(|e| CcsdsNdmError::from(e).at_line(line_num))?,
+                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line_num))?,
                 );
             }
             Some(Err(e)) => return Err(e),

@@ -425,8 +425,7 @@ impl OmmMetadataBuilder {
             "REF_FRAME" => self.ref_frame = Some(val.to_string()),
             "REF_FRAME_EPOCH" => {
                 self.ref_frame_epoch = Some(
-                    FromKvnValue::from_kvn_value(val)
-                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?,
                 )
             }
             "TIME_SYSTEM" => self.time_system = Some(val.to_string()),
@@ -791,8 +790,7 @@ impl MeanElementsBuilder {
         match key {
             "EPOCH" => {
                 self.epoch = Some(
-                    FromKvnValue::from_kvn_value(val)
-                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?,
                 )
             }
             "SEMI_MAJOR_AXIS" => {
