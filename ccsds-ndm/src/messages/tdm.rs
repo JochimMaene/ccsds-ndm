@@ -47,17 +47,20 @@ impl Ndm for Tdm {
             match tokens.peek() {
                 Some(Ok(KvnLine::Pair {
                     key: "CCSDS_TDM_VERS",
+                    val,
                     ..
                 })) => {
-                    if let Some(Ok(KvnLine::Pair { val, .. })) = tokens.next() {
-                        break val.to_string();
-                    }
-                    unreachable!();
+                    let v = val.to_string();
+                    tokens.next();
+                    break v;
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next();
                 }
-                Some(_) => {
+                Some(Err(_)) => {
+                    return Err(tokens.next().unwrap().unwrap_err());
+                }
+                Some(Ok(_)) => {
                     return Err(CcsdsNdmError::MissingField(
                         "CCSDS_TDM_VERS must be the first keyword".into(),
                     ))
@@ -134,25 +137,16 @@ impl FromKvnTokens for TdmHeader {
         let mut creation_date = None;
         let mut originator = None;
         let mut message_id = None;
+        let mut last_line = 0;
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
-                KvnLine::Comment(c) => {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
+                KvnLine::Comment { content: c, .. } => {
                     comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
                 KvnLine::Pair { key, val, .. } => {
@@ -170,11 +164,18 @@ impl FromKvnTokens for TdmHeader {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         Ok(TdmHeader {
             comment,
-            creation_date: creation_date
-                .ok_or(CcsdsNdmError::MissingField("CREATION_DATE".into()))?,
-            originator: originator.ok_or(CcsdsNdmError::MissingField("ORIGINATOR".into()))?,
+            creation_date: creation_date.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CREATION_DATE".into()).at_line(last_line)
+            })?,
+            originator: originator.ok_or_else(|| {
+                CcsdsNdmError::MissingField("ORIGINATOR".into()).at_line(last_line)
+            })?,
             message_id,
         })
     }
@@ -205,31 +206,31 @@ impl TdmBody {
         I: Iterator<Item = Result<KvnLine<'a>>>,
     {
         let mut segments = Vec::new();
-        while tokens.peek().is_some() {
+        let mut last_line = 0;
+        loop {
             let mut pending_comments = Vec::new();
             let mut has_content = false;
-            while let Some(peeked) = tokens.peek() {
-                match peeked {
-                    Ok(KvnLine::Empty) => {
+            while let Some(Ok(token)) = tokens.peek() {
+                last_line = token.line_number();
+                match token {
+                    KvnLine::Empty { .. } => {
                         tokens.next();
                     }
-                    Ok(KvnLine::Comment(_)) => {
-                        if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
-                            pending_comments.push(c.to_string());
-                        }
+                    KvnLine::Comment { content: c, .. } => {
+                        pending_comments.push(c.to_string());
+                        tokens.next();
                     }
-                    Ok(_) => {
+                    _ => {
                         has_content = true;
                         break;
                     }
-                    Err(_) => {
-                        return Err(tokens
-                            .next()
-                            .expect("Peeked error should exist")
-                            .unwrap_err());
-                    }
                 }
             }
+
+            if let Some(Err(_)) = tokens.peek() {
+                return Err(tokens.next().unwrap().unwrap_err());
+            }
+
             if !has_content {
                 break;
             }
@@ -246,7 +247,8 @@ impl TdmBody {
         if segments.is_empty() {
             return Err(CcsdsNdmError::MissingField(
                 "TDM body must contain at least one segment".into(),
-            ));
+            )
+            .at_line(last_line));
         }
 
         Ok(TdmBody { segments })
@@ -274,18 +276,18 @@ impl TdmSegment {
         I: Iterator<Item = Result<KvnLine<'a>>>,
     {
         match tokens.next() {
-            Some(Ok(KvnLine::BlockStart("META"))) => {}
+            Some(Ok(KvnLine::BlockStart { tag: "META", .. })) => {}
             Some(Ok(t)) => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Expected META_START, found {:?}",
-                    t
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line: t.line_number(),
+                    message: format!("Expected META_START, found {:?}", t),
+                })
             }
             Some(Err(e)) => return Err(e),
             None => {
-                return Err(CcsdsNdmError::KvnParse(
-                    "Unexpected EOF before TDM segment".into(),
-                ))
+                return Err(CcsdsNdmError::UnexpectedEof {
+                    context: "before TDM segment".into(),
+                })
             }
         }
 
@@ -822,32 +824,29 @@ impl TdmMetadata {
         I: Iterator<Item = Result<KvnLine<'a>>>,
     {
         let mut meta = TdmMetadata::default();
+        let mut last_line = 0;
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
-                KvnLine::BlockEnd("META") => {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
+                KvnLine::BlockEnd { tag: "META", .. } => {
                     tokens.next();
                     break;
                 }
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     meta.comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, .. } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    line_number,
+                    ..
+                } => {
+                    let line = *line_number;
                     let key = *key;
                     let val = *val;
                     match key {
@@ -919,10 +918,10 @@ impl TdmMetadata {
                         }
                         "CORRECTIONS_APPLIED" => meta.corrections_applied = Some(val.to_string()),
                         _ => {
-                            return Err(CcsdsNdmError::KvnParse(format!(
-                                "Unexpected TDM Metadata key: {}",
-                                key
-                            )))
+                            return Err(CcsdsNdmError::KvnParse {
+                                line,
+                                message: format!("Unexpected TDM Metadata key: {}", key),
+                            })
                         }
                     }
                     tokens.next();
@@ -931,11 +930,15 @@ impl TdmMetadata {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         if meta.time_system.is_empty() {
-            return Err(CcsdsNdmError::MissingField("TIME_SYSTEM".into()));
+            return Err(CcsdsNdmError::MissingField("TIME_SYSTEM".into()).at_line(last_line));
         }
         if meta.participant_1.is_empty() {
-            return Err(CcsdsNdmError::MissingField("PARTICIPANT_1".into()));
+            return Err(CcsdsNdmError::MissingField("PARTICIPANT_1".into()).at_line(last_line));
         }
 
         Ok(meta)
@@ -977,66 +980,77 @@ impl TdmData {
         I: Iterator<Item = Result<KvnLine<'a>>>,
     {
         match tokens.next() {
-            Some(Ok(KvnLine::BlockStart("DATA"))) => {}
+            Some(Ok(KvnLine::BlockStart { tag: "DATA", .. })) => {}
             Some(Ok(t)) => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Expected DATA_START, found {:?}",
-                    t
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line: t.line_number(),
+                    message: format!("Expected DATA_START, found {:?}", t),
+                })
             }
             Some(Err(e)) => return Err(e),
             None => {
-                return Err(CcsdsNdmError::KvnParse(
-                    "Unexpected EOF before TDM data".into(),
-                ))
+                return Err(CcsdsNdmError::UnexpectedEof {
+                    context: "before TDM data".into(),
+                })
             }
         }
 
         let mut comment = Vec::new();
         let mut observations = Vec::new();
+        let mut last_line = 0;
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
-                KvnLine::BlockEnd("DATA") => {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
+                KvnLine::BlockEnd { tag: "DATA", .. } => {
                     tokens.next();
                     break;
                 }
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, .. } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    line_number,
+                    ..
+                } => {
                     let parts: Vec<&str> = val.split_whitespace().collect();
                     if parts.len() < 2 {
-                        return Err(CcsdsNdmError::KvnParse(format!(
-                            "Data line value must contain 'EPOCH MEASUREMENT', found '{}'",
-                            val
-                        )));
+                        return Err(CcsdsNdmError::KvnParse {
+                            line: *line_number,
+                            message: format!(
+                                "Data line value must contain 'EPOCH MEASUREMENT', found '{}'",
+                                val
+                            ),
+                        });
                     }
                     let epoch_str = parts[0];
                     let measure_str = parts[1..].join(" ");
                     let epoch = Epoch::from_kvn_value(epoch_str)?;
-                    let data = TdmObservationData::from_key_val(key, &measure_str)?;
+                    let data = TdmObservationData::from_key_val(key, &measure_str, *line_number)?;
                     observations.push(TdmObservation { epoch, data });
                     tokens.next();
                 }
                 _ => break,
             }
         }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
+        if observations.is_empty() {
+            return Err(CcsdsNdmError::MissingField(
+                "TDM data section must contain at least one observation".into(),
+            )
+            .at_line(last_line));
+        }
+
         Ok(TdmData {
             comment,
             observations,
@@ -1555,10 +1569,12 @@ impl TdmObservationData {
         }
     }
 
-    pub fn from_key_val(key: &str, val: &str) -> Result<Self> {
+    pub fn from_key_val(key: &str, val: &str, line: usize) -> Result<Self> {
         let pf = |s: &str| {
-            s.parse::<f64>()
-                .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid float: {}", e)))
+            s.parse::<f64>().map_err(|e| CcsdsNdmError::KvnParse {
+                line,
+                message: format!("Invalid float: {}", e),
+            })
         };
         match key {
             "ANGLE_1" => Ok(Self::Angle1(pf(val)?)),
@@ -1608,10 +1624,10 @@ impl TdmObservationData {
             "TROPO_DRY" => Ok(Self::TropoDry(pf(val)?)),
             "TROPO_WET" => Ok(Self::TropoWet(pf(val)?)),
             "VLBI_DELAY" => Ok(Self::VlbiDelay(pf(val)?)),
-            _ => Err(CcsdsNdmError::KvnParse(format!(
-                "Unknown TDM data keyword: {}",
-                key
-            ))),
+            _ => Err(CcsdsNdmError::KvnParse {
+                line,
+                message: format!("Unknown TDM data keyword: {}", key),
+            }),
         }
     }
 }
@@ -3101,7 +3117,7 @@ DATA_STOP
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(msg) => {
+            CcsdsNdmError::KvnParse { message: msg, .. } => {
                 assert!(msg.contains("Unknown TDM data keyword"));
             }
             _ => panic!("Expected KvnParse error, got: {:?}", err),
@@ -3124,7 +3140,7 @@ DATA_STOP
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(msg) => {
+            CcsdsNdmError::KvnParse { message: msg, .. } => {
                 assert!(msg.contains("Unexpected TDM Metadata key"));
             }
             _ => panic!("Expected KvnParse error, got: {:?}", err),

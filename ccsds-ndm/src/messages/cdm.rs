@@ -46,17 +46,20 @@ impl Ndm for Cdm {
             match tokens.peek() {
                 Some(Ok(KvnLine::Pair {
                     key: "CCSDS_CDM_VERS",
+                    val,
                     ..
                 })) => {
-                    if let Some(Ok(KvnLine::Pair { val, .. })) = tokens.next() {
-                        break val.to_string();
-                    }
-                    unreachable!();
+                    let v = val.to_string();
+                    tokens.next();
+                    break v;
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next(); // skip
                 }
-                Some(_) => {
+                Some(Err(_)) => {
+                    return Err(tokens.next().unwrap().unwrap_err());
+                }
+                Some(Ok(_)) => {
                     return Err(CcsdsNdmError::MissingField(
                         "CCSDS_CDM_VERS must be the first keyword".into(),
                     ))
@@ -138,35 +141,39 @@ impl FromKvnTokens for CdmHeader {
         let mut originator = None;
         let mut message_for = None;
         let mut message_id = None;
+        let mut last_line = 0;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                if let Some(Err(e)) = tokens.next() {
-                    return Err(e);
-                }
-                unreachable!("peeked.is_err() was true but next() didn't return Err");
-            }
-
-            match peeked.as_ref().expect("checked is_err above") {
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
+                KvnLine::Comment { content: _, .. } => {
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
                 KvnLine::Pair {
-                    key: "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_FOR" | "MESSAGE_ID",
+                    key: k @ ("CREATION_DATE" | "ORIGINATOR" | "MESSAGE_FOR" | "MESSAGE_ID"),
+                    val,
+                    line_number,
                     ..
                 } => {
-                    if let Some(Ok(KvnLine::Pair { key, val, .. })) = tokens.next() {
-                        match key {
-                            "CREATION_DATE" => creation_date = Some(Epoch::new(val)?),
-                            "ORIGINATOR" => originator = Some(val.to_string()),
-                            "MESSAGE_FOR" => message_for = Some(val.to_string()),
-                            "MESSAGE_ID" => message_id = Some(val.to_string()),
-                            _ => unreachable!(),
+                    let line_num = *line_number;
+                    let key = *k;
+                    let val = val.to_string();
+                    tokens.next();
+                    match key {
+                        "CREATION_DATE" => creation_date = Some(Epoch::new(&val)?),
+                        "ORIGINATOR" => originator = Some(val),
+                        "MESSAGE_FOR" => message_for = Some(val),
+                        "MESSAGE_ID" => message_id = Some(val),
+                        _ => {
+                            return Err(CcsdsNdmError::KvnParse {
+                                line: line_num,
+                                message: format!("Unexpected header key: {}", key),
+                            })
                         }
                     }
                 }
@@ -175,15 +182,22 @@ impl FromKvnTokens for CdmHeader {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         Ok(CdmHeader {
             comment,
-            creation_date: creation_date
-                .ok_or_else(|| CcsdsNdmError::MissingField("CREATION_DATE is required".into()))?,
-            originator: originator
-                .ok_or_else(|| CcsdsNdmError::MissingField("ORIGINATOR is required".into()))?,
+            creation_date: creation_date.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CREATION_DATE is required".into()).at_line(last_line)
+            })?,
+            originator: originator.ok_or_else(|| {
+                CcsdsNdmError::MissingField("ORIGINATOR is required".into()).at_line(last_line)
+            })?,
             message_for,
-            message_id: message_id
-                .ok_or_else(|| CcsdsNdmError::MissingField("MESSAGE_ID is required".into()))?,
+            message_id: message_id.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MESSAGE_ID is required".into()).at_line(last_line)
+            })?,
         })
     }
 }
@@ -220,42 +234,38 @@ impl CdmBody {
         // 2. Segments (Expect exactly 2)
         let mut segments = Vec::new();
         let mut pending_comments = Vec::new();
+        let mut last_line = 0;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                if let Some(Err(e)) = tokens.next() {
-                    return Err(e);
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
+                KvnLine::Comment { content: c, .. } => {
+                    pending_comments.push(c.to_string());
+                    tokens.next();
                 }
-                unreachable!("peeked.is_err() was true but next() didn't return Err");
-            }
-            match peeked.as_ref().expect("checked is_err above") {
+                KvnLine::Empty { .. } => {
+                    tokens.next();
+                }
                 KvnLine::Pair { key: "OBJECT", .. } => {
                     let mut segment = CdmSegment::from_kvn_tokens(tokens)?;
-                    if !pending_comments.is_empty() {
-                        segment
-                            .metadata
-                            .comment
-                            .splice(0..0, pending_comments.drain(..));
-                    }
+                    segment.metadata.comment.splice(0..0, pending_comments);
+                    pending_comments = Vec::new();
                     segments.push(segment);
-                }
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
-                        pending_comments.push(c.to_string());
-                    }
-                }
-                KvnLine::Empty => {
-                    tokens.next();
                 }
                 _ => break,
             }
+        }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
         }
 
         if segments.len() != 2 {
             return Err(CcsdsNdmError::Validation(format!(
                 "CDM body must contain exactly 2 segments, found {}",
                 segments.len()
-            )));
+            ))
+            .at_line(last_line));
         }
 
         Ok(CdmBody {
@@ -407,26 +417,26 @@ impl RelativeMetadataData {
         let mut exit_time = None;
         let mut coll_prob = None;
         let mut coll_method = None;
+        let mut last_line = 0;
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                if let Some(Err(e)) = tokens.next() {
-                    return Err(e);
-                }
-                unreachable!("peeked.is_err() was true but next() didn't return Err");
-            }
-
-            match peeked.as_ref().expect("checked is_err above") {
-                KvnLine::BlockStart("META") => break,
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
+                KvnLine::BlockStart { tag: "META", .. } => break,
+                KvnLine::Comment { content: _, .. } => {
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, unit } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => {
                     if *key == "OBJECT" {
                         // Start of segment metadata in CDM 1.0 style (no META block)
                         break;
@@ -448,10 +458,11 @@ impl RelativeMetadataData {
                                 "RTN" => ScreenVolumeFrameType::Rtn,
                                 "TVN" => ScreenVolumeFrameType::Tvn,
                                 _ => {
-                                    return Err(CcsdsNdmError::Validation(format!(
-                                        "Invalid SCREEN_VOLUME_FRAME: {}",
-                                        val
-                                    )))
+                                    return Err(CcsdsNdmError::InvalidCcsdsValue {
+                                        key: "SCREEN_VOLUME_FRAME".to_string(),
+                                        value: val.to_string(),
+                                        expected: "RTN or TVN".to_string(),
+                                    })
                                 }
                             })
                         }
@@ -460,10 +471,11 @@ impl RelativeMetadataData {
                                 "ELLIPSOID" => ScreenVolumeShapeType::Ellipsoid,
                                 "BOX" => ScreenVolumeShapeType::Box,
                                 _ => {
-                                    return Err(CcsdsNdmError::Validation(format!(
-                                        "Invalid SCREEN_VOLUME_SHAPE: {}",
-                                        val
-                                    )))
+                                    return Err(CcsdsNdmError::InvalidCcsdsValue {
+                                        key: "SCREEN_VOLUME_SHAPE".to_string(),
+                                        value: val.to_string(),
+                                        expected: "ELLIPSOID or BOX".to_string(),
+                                    })
                                 }
                             })
                         }
@@ -473,18 +485,15 @@ impl RelativeMetadataData {
                         "SCREEN_ENTRY_TIME" => entry_time = Some(Epoch::new(val)?),
                         "SCREEN_EXIT_TIME" => exit_time = Some(Epoch::new(val)?),
                         "COLLISION_PROBABILITY" => {
-                            coll_prob = Some(Probability::new(val.parse().map_err(
-                                |e: std::num::ParseFloatError| {
-                                    CcsdsNdmError::KvnParse(e.to_string())
-                                },
-                            )?)?);
+                            coll_prob =
+                                Some(Probability::new(val.parse().map_err(CcsdsNdmError::from)?)?);
                         }
                         "COLLISION_PROBABILITY_METHOD" => coll_method = Some(val.to_string()),
                         _ => {
-                            return Err(CcsdsNdmError::KvnParse(format!(
-                                "Unexpected field in Relative Metadata: {}",
-                                key
-                            )))
+                            return Err(CcsdsNdmError::KvnParse {
+                                line: *line_number,
+                                message: format!("Unexpected field in Relative Metadata: {}", key),
+                            });
                         }
                     }
                     tokens.next();
@@ -493,21 +502,31 @@ impl RelativeMetadataData {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         let relative_state_vector =
             if rel_pos_r.is_some() || rel_pos_t.is_some() || rel_pos_n.is_some() {
                 Some(RelativeStateVector {
-                    relative_position_r: rel_pos_r
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_POSITION_R".into()))?,
-                    relative_position_t: rel_pos_t
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_POSITION_T".into()))?,
-                    relative_position_n: rel_pos_n
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_POSITION_N".into()))?,
-                    relative_velocity_r: rel_vel_r
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_VELOCITY_R".into()))?,
-                    relative_velocity_t: rel_vel_t
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_VELOCITY_T".into()))?,
-                    relative_velocity_n: rel_vel_n
-                        .ok_or(CcsdsNdmError::MissingField("RELATIVE_VELOCITY_N".into()))?,
+                    relative_position_r: rel_pos_r.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_POSITION_R".into()).at_line(last_line)
+                    })?,
+                    relative_position_t: rel_pos_t.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_POSITION_T".into()).at_line(last_line)
+                    })?,
+                    relative_position_n: rel_pos_n.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_POSITION_N".into()).at_line(last_line)
+                    })?,
+                    relative_velocity_r: rel_vel_r.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_VELOCITY_R".into()).at_line(last_line)
+                    })?,
+                    relative_velocity_t: rel_vel_t.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_VELOCITY_T".into()).at_line(last_line)
+                    })?,
+                    relative_velocity_n: rel_vel_n.ok_or_else(|| {
+                        CcsdsNdmError::MissingField("RELATIVE_VELOCITY_N".into()).at_line(last_line)
+                    })?,
                 })
             } else {
                 None
@@ -515,9 +534,10 @@ impl RelativeMetadataData {
 
         Ok(RelativeMetadataData {
             comment,
-            tca: tca.ok_or(CcsdsNdmError::MissingField("TCA".into()))?,
-            miss_distance: miss_distance
-                .ok_or(CcsdsNdmError::MissingField("MISS_DISTANCE".into()))?,
+            tca: tca.ok_or_else(|| CcsdsNdmError::MissingField("TCA".into()).at_line(last_line))?,
+            miss_distance: miss_distance.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MISS_DISTANCE".into()).at_line(last_line)
+            })?,
             relative_speed,
             relative_state_vector,
             start_screen_period: start_screen,
@@ -583,19 +603,19 @@ impl CdmSegment {
         let metadata = match tokens.peek() {
             Some(Ok(KvnLine::Pair { key: "OBJECT", .. })) => CdmMetadata::from_kvn_tokens(tokens)?,
             Some(Ok(other)) => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Expected segment start, found {:?}",
-                    other
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line: other.line_number(),
+                    message: format!("Expected segment start, found {:?}", other),
+                })
             }
             Some(Err(_)) => {
-                // Advance and return the owned error
-                if let Some(Err(err)) = tokens.next() {
-                    return Err(err);
-                }
-                unreachable!();
+                return Err(tokens.next().unwrap().unwrap_err());
             }
-            None => return Err(CcsdsNdmError::KvnParse("Unexpected end of input".into())),
+            None => {
+                return Err(CcsdsNdmError::UnexpectedEof {
+                    context: "Expected CDM segment start".to_string(),
+                })
+            }
         };
         let data = CdmData::from_kvn_tokens(tokens)?;
 
@@ -806,40 +826,43 @@ impl CdmMetadata {
             )
         }
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                if let Some(Err(e)) = tokens.next() {
-                    return Err(e);
-                }
-                unreachable!("peeked.is_err() was true but next() didn't return Err");
-            }
-            match peeked.as_ref().expect("checked is_err above") {
-                KvnLine::BlockEnd("META") => {
+        while let Some(Ok(token)) = tokens.peek() {
+            match token {
+                KvnLine::BlockEnd { tag: "META", .. } => {
                     tokens.next();
                     break;
                 }
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     builder.comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, .. } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    line_number,
+                    ..
+                } => {
                     if is_data_key(key) {
                         // Start of data section; do not consume, let data parser handle
                         break;
                     }
-                    builder.match_pair(key, val)?;
+                    builder.match_pair(key, val, *line_number)?;
                     tokens.next();
                 }
                 t => {
-                    return Err(CcsdsNdmError::KvnParse(format!(
-                        "Unexpected token in metadata: {:?}",
-                        t
-                    )))
+                    return Err(CcsdsNdmError::KvnParse {
+                        line: t.line_number(),
+                        message: format!("Unexpected token in metadata: {:?}", t),
+                    })
                 }
             }
+        }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
         }
         builder.build()
     }
@@ -869,20 +892,23 @@ struct CdmMetadataBuilder {
     solar_rad_pressure: Option<YesNo>,
     earth_tides: Option<YesNo>,
     intrack_thrust: Option<YesNo>,
+    last_line: usize,
 }
 
 impl CdmMetadataBuilder {
-    fn match_pair(&mut self, key: &str, val: &str) -> Result<()> {
+    fn match_pair(&mut self, key: &str, val: &str, line: usize) -> Result<()> {
+        self.last_line = line;
         match key {
             "OBJECT" => {
                 self.object = Some(match val.to_uppercase().as_str() {
                     "OBJECT1" => CdmObjectType::Object1,
                     "OBJECT2" => CdmObjectType::Object2,
                     _ => {
-                        return Err(CcsdsNdmError::Validation(format!(
-                            "Invalid OBJECT: {}",
-                            val
-                        )))
+                        return Err(CcsdsNdmError::InvalidCcsdsValue {
+                            key: "OBJECT".to_string(),
+                            value: val.to_string(),
+                            expected: "OBJECT1 or OBJECT2".to_string(),
+                        })
                     }
                 })
             }
@@ -910,10 +936,11 @@ impl CdmMetadataBuilder {
                     "CALCULATED" => CovarianceMethodType::Calculated,
                     "DEFAULT" => CovarianceMethodType::Default,
                     _ => {
-                        return Err(CcsdsNdmError::Validation(format!(
-                            "Invalid COV_METHOD: {}",
-                            val
-                        )))
+                        return Err(CcsdsNdmError::InvalidCcsdsValue {
+                            key: "COV_METHOD".to_string(),
+                            value: val.to_string(),
+                            expected: "CALCULATED or DEFAULT".to_string(),
+                        })
                     }
                 })
             }
@@ -923,10 +950,11 @@ impl CdmMetadataBuilder {
                     "NO" => ManeuverableType::No,
                     "N/A" => ManeuverableType::NA,
                     _ => {
-                        return Err(CcsdsNdmError::Validation(format!(
-                            "Invalid MANEUVERABLE: {}",
-                            val
-                        )))
+                        return Err(CcsdsNdmError::InvalidCcsdsValue {
+                            key: "MANEUVERABLE".to_string(),
+                            value: val.to_string(),
+                            expected: "YES, NO, or N/A".to_string(),
+                        })
                     }
                 })
             }
@@ -937,10 +965,11 @@ impl CdmMetadataBuilder {
                     "GCRF" => ReferenceFrameType::Gcrf,
                     "ITRF" => ReferenceFrameType::Itrf,
                     _ => {
-                        return Err(CcsdsNdmError::Validation(format!(
-                            "Invalid REF_FRAME: {}",
-                            val
-                        )))
+                        return Err(CcsdsNdmError::InvalidCcsdsValue {
+                            key: "REF_FRAME".to_string(),
+                            value: val.to_string(),
+                            expected: "EME2000, GCRF, or ITRF".to_string(),
+                        })
                     }
                 })
             }
@@ -969,10 +998,10 @@ impl CdmMetadataBuilder {
                 })
             }
             _ => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Unknown META key: {}",
-                    key
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line,
+                    message: format!("Unknown META key: {}", key),
+                })
             }
         }
         Ok(())
@@ -981,39 +1010,40 @@ impl CdmMetadataBuilder {
     fn build(self) -> Result<CdmMetadata> {
         Ok(CdmMetadata {
             comment: self.comment,
-            object: self
-                .object
-                .ok_or(CcsdsNdmError::MissingField("OBJECT".into()))?,
-            object_designator: self
-                .object_designator
-                .ok_or(CcsdsNdmError::MissingField("OBJECT_DESIGNATOR".into()))?,
-            catalog_name: self
-                .catalog_name
-                .ok_or(CcsdsNdmError::MissingField("CATALOG_NAME".into()))?,
-            object_name: self
-                .object_name
-                .ok_or(CcsdsNdmError::MissingField("OBJECT_NAME".into()))?,
-            international_designator: self.international_designator.ok_or(
-                CcsdsNdmError::MissingField("INTERNATIONAL_DESIGNATOR".into()),
-            )?,
+            object: self.object.ok_or_else(|| {
+                CcsdsNdmError::MissingField("OBJECT".into()).at_line(self.last_line)
+            })?,
+            object_designator: self.object_designator.ok_or_else(|| {
+                CcsdsNdmError::MissingField("OBJECT_DESIGNATOR".into()).at_line(self.last_line)
+            })?,
+            catalog_name: self.catalog_name.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CATALOG_NAME".into()).at_line(self.last_line)
+            })?,
+            object_name: self.object_name.ok_or_else(|| {
+                CcsdsNdmError::MissingField("OBJECT_NAME".into()).at_line(self.last_line)
+            })?,
+            international_designator: self.international_designator.ok_or_else(|| {
+                CcsdsNdmError::MissingField("INTERNATIONAL_DESIGNATOR".into())
+                    .at_line(self.last_line)
+            })?,
             object_type: self.object_type,
             operator_contact_position: self.operator_contact_position,
             operator_organization: self.operator_organization,
             operator_phone: self.operator_phone,
             operator_email: self.operator_email,
-            ephemeris_name: self
-                .ephemeris_name
-                .ok_or(CcsdsNdmError::MissingField("EPHEMERIS_NAME".into()))?,
-            covariance_method: self
-                .covariance_method
-                .ok_or(CcsdsNdmError::MissingField("COVARIANCE_METHOD".into()))?,
-            maneuverable: self
-                .maneuverable
-                .ok_or(CcsdsNdmError::MissingField("MANEUVERABLE".into()))?,
+            ephemeris_name: self.ephemeris_name.ok_or_else(|| {
+                CcsdsNdmError::MissingField("EPHEMERIS_NAME".into()).at_line(self.last_line)
+            })?,
+            covariance_method: self.covariance_method.ok_or_else(|| {
+                CcsdsNdmError::MissingField("COVARIANCE_METHOD".into()).at_line(self.last_line)
+            })?,
+            maneuverable: self.maneuverable.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MANEUVERABLE".into()).at_line(self.last_line)
+            })?,
             orbit_center: self.orbit_center,
-            ref_frame: self
-                .ref_frame
-                .ok_or(CcsdsNdmError::MissingField("REF_FRAME".into()))?,
+            ref_frame: self.ref_frame.ok_or_else(|| {
+                CcsdsNdmError::MissingField("REF_FRAME".into()).at_line(self.last_line)
+            })?,
             gravity_model: self.gravity_model,
             atmospheric_model: self.atmospheric_model,
             n_body_perturbations: self.n_body_perturbations,
@@ -1143,28 +1173,29 @@ impl CdmData {
         let mut x_dot = None;
         let mut y_dot = None;
         let mut z_dot = None;
+        let mut last_line = 0;
 
         // Using a Builder pattern locally for Covariance because strict requirements exist
         let mut cov = CdmCovarianceMatrixBuilder::default();
 
-        while let Some(peeked) = tokens.peek() {
-            if peeked.is_err() {
-                if let Some(Err(e)) = tokens.next() {
-                    return Err(e);
-                }
-                unreachable!("peeked.is_err() was true but next() didn't return Err");
-            }
-            match peeked.as_ref().expect("checked is_err above") {
-                KvnLine::BlockStart("META") => break,
-                KvnLine::Comment(_) => {
-                    if let Some(Ok(KvnLine::Comment(c))) = tokens.next() {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
+                KvnLine::BlockStart { tag: "META", .. } => break,
+                KvnLine::Comment { content: _, .. } => {
+                    if let Some(Ok(KvnLine::Comment { content: c, .. })) = tokens.next() {
                         comment.push(c.to_string());
                     }
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, unit } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => {
                     // In CDM 1.0 style, a new segment starts when encountering OBJECT.
                     // Data section must stop here and let the next segment parse metadata.
                     if *key == "OBJECT" {
@@ -1246,10 +1277,10 @@ impl CdmData {
                         // Covariance - delegate to builder
                         _ => {
                             if !cov.try_match_pair(key, val, *unit)? {
-                                return Err(CcsdsNdmError::KvnParse(format!(
-                                    "Unexpected field in Segment Data: {}",
-                                    key
-                                )));
+                                return Err(CcsdsNdmError::KvnParse {
+                                    line: *line_number,
+                                    message: format!("Unexpected field in Segment Data: {}", key),
+                                });
                             }
                         }
                     }
@@ -1259,13 +1290,20 @@ impl CdmData {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         let state_vector = CdmStateVector {
-            x: x.ok_or(CcsdsNdmError::MissingField("X".into()))?,
-            y: y.ok_or(CcsdsNdmError::MissingField("Y".into()))?,
-            z: z.ok_or(CcsdsNdmError::MissingField("Z".into()))?,
-            x_dot: x_dot.ok_or(CcsdsNdmError::MissingField("X_DOT".into()))?,
-            y_dot: y_dot.ok_or(CcsdsNdmError::MissingField("Y_DOT".into()))?,
-            z_dot: z_dot.ok_or(CcsdsNdmError::MissingField("Z_DOT".into()))?,
+            x: x.ok_or_else(|| CcsdsNdmError::MissingField("X".into()).at_line(last_line))?,
+            y: y.ok_or_else(|| CcsdsNdmError::MissingField("Y".into()).at_line(last_line))?,
+            z: z.ok_or_else(|| CcsdsNdmError::MissingField("Z".into()).at_line(last_line))?,
+            x_dot: x_dot
+                .ok_or_else(|| CcsdsNdmError::MissingField("X_DOT".into()).at_line(last_line))?,
+            y_dot: y_dot
+                .ok_or_else(|| CcsdsNdmError::MissingField("Y_DOT".into()).at_line(last_line))?,
+            z_dot: z_dot
+                .ok_or_else(|| CcsdsNdmError::MissingField("Z_DOT".into()).at_line(last_line))?,
         };
 
         let od_parameters = if od_params.time_lastob_start.is_some() || od_params.obs_used.is_some()
@@ -2073,6 +2111,13 @@ MESSAGE_ID = MSG-001
 "#;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::MissingField(msg) = *source {
+                    assert!(msg.contains("CREATION_DATE"))
+                } else {
+                    panic!("unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::MissingField(msg) => assert!(msg.contains("CREATION_DATE")),
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -2130,6 +2175,13 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 "#;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::Validation(msg) = *source {
+                    assert!(msg.contains("exactly 2 segments"))
+                } else {
+                    panic!("unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::Validation(msg) => assert!(msg.contains("exactly 2 segments")),
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -2226,6 +2278,13 @@ CNDOT_NDOT = 1 [m**2/s**2]
 "#;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::MissingField(msg) = *source {
+                    assert!(msg.contains("RELATIVE_VELOCITY_N"))
+                } else {
+                    panic!("unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::MissingField(msg) => assert!(msg.contains("RELATIVE_VELOCITY_N")),
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -2250,7 +2309,7 @@ CNDOT_NDOT = 1 [m**2/s**2]
         kvn = kvn.replace("SCREEN_VOLUME_FRAME = RTN", "SCREEN_VOLUME_FRAME = BAD");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("SCREEN_VOLUME_FRAME")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "SCREEN_VOLUME_FRAME"),
             _ => panic!("unexpected error: {:?}", err),
         }
 
@@ -2259,7 +2318,7 @@ CNDOT_NDOT = 1 [m**2/s**2]
         kvn2 = kvn2.replace("SCREEN_VOLUME_SHAPE = BOX", "SCREEN_VOLUME_SHAPE = BALL");
         let err2 = Cdm::from_kvn(&kvn2).unwrap_err();
         match err2 {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("SCREEN_VOLUME_SHAPE")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "SCREEN_VOLUME_SHAPE"),
             _ => panic!("unexpected error: {:?}", err2),
         }
     }
@@ -2472,7 +2531,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(_) => {}
+            CcsdsNdmError::ParseFloat(_) => {}
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2487,7 +2546,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(msg) => {
+            CcsdsNdmError::KvnParse { message: msg, .. } => {
                 assert!(msg.contains("Unexpected field in Relative Metadata"))
             }
             _ => panic!("unexpected error: {:?}", err),
@@ -2627,7 +2686,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("OBJECT = OBJECT1", "OBJECT = OBJECT3");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("Invalid OBJECT")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "OBJECT"),
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2641,7 +2700,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("Invalid COV_METHOD")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "COV_METHOD"),
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2663,7 +2722,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("MANEUVERABLE = YES", "MANEUVERABLE = MAYBE");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("Invalid MANEUVERABLE")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "MANEUVERABLE"),
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2695,7 +2754,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = INVALID");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(msg) => assert!(msg.contains("Invalid REF_FRAME")),
+            CcsdsNdmError::InvalidCcsdsValue { key, .. } => assert_eq!(key, "REF_FRAME"),
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2709,7 +2768,9 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(msg) => assert!(msg.contains("Unknown META key")),
+            CcsdsNdmError::KvnParse { message: msg, .. } => {
+                assert!(msg.contains("Unknown META key"))
+            }
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2904,7 +2965,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(msg) => {
+            CcsdsNdmError::KvnParse { message: msg, .. } => {
                 assert!(msg.contains("Unexpected field in Segment Data"))
             }
             _ => panic!("unexpected error: {:?}", err),
@@ -3224,10 +3285,10 @@ META_START
     #[test]
     fn unexpected_end_of_input() {
         let kvn = r#"
-CCSDS_CDM_VERS = 1.0
+    CCSDS_CDM_VERS = 1.0
 CREATION_DATE = 2025-01-01T00:00:00
 ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
+MESSAGE_ID = MSG-ONE
 
 TCA = 2025-01-02T12:00:00
 MISS_DISTANCE = 100.0 [m]
@@ -3235,6 +3296,13 @@ MISS_DISTANCE = 100.0 [m]
         // This should give validation error because no segments found
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::Validation(msg) = *source {
+                    assert!(msg.contains("exactly 2 segments"))
+                } else {
+                    panic!("unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::Validation(msg) => assert!(msg.contains("exactly 2 segments")),
             _ => panic!("unexpected error: {:?}", err),
         }

@@ -53,17 +53,20 @@ impl Ndm for Rdm {
             match tokens.peek() {
                 Some(Ok(KvnLine::Pair {
                     key: "CCSDS_RDM_VERS",
+                    val,
                     ..
                 })) => {
-                    if let Some(Ok(KvnLine::Pair { val, .. })) = tokens.next() {
-                        break val.to_string();
-                    }
-                    unreachable!();
+                    let v = val.to_string();
+                    tokens.next();
+                    break v;
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next();
                 }
-                Some(_) => {
+                Some(Err(_)) => {
+                    return Err(tokens.next().unwrap().unwrap_err());
+                }
+                Some(Ok(_)) => {
                     return Err(CcsdsNdmError::MissingField(
                         "CCSDS_RDM_VERS must be the first keyword".into(),
                     ))
@@ -135,25 +138,16 @@ impl FromKvnTokens for RdmHeader {
         let mut creation_date = None;
         let mut originator = None;
         let mut message_id = None;
+        let mut last_line = 0;
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
-                KvnLine::Comment(c) => {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
+                KvnLine::Comment { content: c, .. } => {
                     comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
                 KvnLine::Pair { key, val, .. } => {
@@ -169,12 +163,21 @@ impl FromKvnTokens for RdmHeader {
             }
         }
 
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         Ok(RdmHeader {
             comment,
-            creation_date: creation_date
-                .ok_or(CcsdsNdmError::MissingField("CREATION_DATE".into()))?,
-            originator: originator.ok_or(CcsdsNdmError::MissingField("ORIGINATOR".into()))?,
-            message_id: message_id.ok_or(CcsdsNdmError::MissingField("MESSAGE_ID".into()))?,
+            creation_date: creation_date.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CREATION_DATE".into()).at_line(last_line)
+            })?,
+            originator: originator.ok_or_else(|| {
+                CcsdsNdmError::MissingField("ORIGINATOR".into()).at_line(last_line)
+            })?,
+            message_id: message_id.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MESSAGE_ID".into()).at_line(last_line)
+            })?,
         })
     }
 }
@@ -507,33 +510,28 @@ impl RdmMetadata {
         let mut previous_message_epoch: Option<Epoch> = None;
         let mut next_message_epoch: Option<Epoch> = None;
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
+        while let Some(Ok(token)) = tokens.peek() {
+            match token {
                 // No META_STOP expectation
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, .. } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    line_number,
+                    ..
+                } => {
                     // If we hit a Data keyword, stop.
                     if is_rdm_data_keyword(key) {
                         break;
                     }
 
+                    let line = *line_number;
                     let key = *key;
                     let val = *val;
                     match key {
@@ -579,16 +577,20 @@ impl RdmMetadata {
                             next_message_epoch = Some(Epoch::from_kvn_value(val)?)
                         }
                         _ => {
-                            return Err(CcsdsNdmError::KvnParse(format!(
-                                "Unexpected RDM Metadata key: {}",
-                                key
-                            )))
+                            return Err(CcsdsNdmError::KvnParse {
+                                line,
+                                message: format!("Unexpected RDM Metadata key: {}", key),
+                            })
                         }
                     }
                     tokens.next();
                 }
                 _ => break,
             }
+        }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
         }
 
         // Validate all mandatory fields per XSD (no defaults allowed)
@@ -1038,25 +1040,14 @@ impl RdmData {
         let mut od_parameters: Option<OdParameters> = None;
         let mut user_defined_parameters: Vec<(String, String)> = Vec::new();
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
+        while let Some(Ok(token)) = tokens.peek() {
+            match token {
                 // No DATA_STOP expected
-                KvnLine::Comment(c) => {
+                KvnLine::Comment { content: c, .. } => {
                     comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
                 KvnLine::Pair { key, val, .. } => {
@@ -1356,6 +1347,10 @@ impl RdmData {
             if od != OdParameters::default() {
                 od_parameters = Some(od);
             }
+        }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
         }
 
         Ok(RdmData {
@@ -2195,6 +2190,13 @@ REENTRY_ALTITUDE = 80 [km]
     "#;
         let err = Rdm::from_kvn(kvn_missing_creation).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::MissingField(f) = *source {
+                    assert_eq!(f, "CREATION_DATE")
+                } else {
+                    panic!("Unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::MissingField(f) => assert_eq!(f, "CREATION_DATE"),
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -2218,6 +2220,13 @@ REENTRY_ALTITUDE = 80 [km]
     "#;
         let err = Rdm::from_kvn(kvn_missing_originator).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::MissingField(f) = *source {
+                    assert_eq!(f, "ORIGINATOR")
+                } else {
+                    panic!("Unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::MissingField(f) => assert_eq!(f, "ORIGINATOR"),
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -2237,6 +2246,13 @@ REENTRY_ALTITUDE = 80 [km]
     "#;
         let err = Rdm::from_kvn(kvn_missing_msgid).unwrap_err();
         match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                if let CcsdsNdmError::MissingField(f) = *source {
+                    assert_eq!(f, "MESSAGE_ID")
+                } else {
+                    panic!("Unexpected inner error: {:?}", source)
+                }
+            }
             CcsdsNdmError::MissingField(f) => assert_eq!(f, "MESSAGE_ID"),
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -2988,7 +3004,7 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse(msg) => {
+            CcsdsNdmError::KvnParse { message: msg, .. } => {
                 assert!(msg.contains("Unexpected RDM Metadata key"));
             }
             _ => panic!("Expected KvnParse error, got: {:?}", err),

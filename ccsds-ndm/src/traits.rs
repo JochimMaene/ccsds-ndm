@@ -74,11 +74,10 @@ pub trait FromKvnValue: Sized {
 impl<T> FromKvnValue for T
 where
     T: std::str::FromStr,
-    T::Err: std::error::Error + Send + Sync + 'static,
+    T::Err: Into<crate::error::CcsdsNdmError>,
 {
     fn from_kvn_value(s: &str) -> Result<Self> {
-        s.parse::<T>()
-            .map_err(|e| crate::error::CcsdsNdmError::KvnParse(e.to_string()))
+        s.parse::<T>().map_err(Into::into)
     }
 }
 

@@ -122,7 +122,7 @@ impl<V, U> UnitValue<V, U> {
 impl<V, U> FromKvn for UnitValue<V, U>
 where
     V: FromStr,
-    V::Err: std::error::Error + 'static,
+    CcsdsNdmError: From<V::Err>,
     U: FromStr<Err = CcsdsNdmError>,
 {
     /// Parses a `UnitValue` from a value string and an optional unit string.
@@ -130,9 +130,7 @@ where
     /// The value is parsed using its `FromStr` implementation. If a unit string
     /// is provided, it is parsed using the unit type's `FromStr` implementation.
     fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let value = value
-            .parse::<V>()
-            .map_err(|e| CcsdsNdmError::KvnParse(e.to_string()))?;
+        let value = value.parse::<V>()?;
 
         let units = match unit {
             Some(u_str) => Some(u_str.parse::<U>()?),
@@ -178,7 +176,7 @@ macro_rules! define_unit_type {
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
                 match s {
                     $($str_rep => Ok(Self::$variant)),+,
-                    _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!("Unknown unit: {}", s)))
+                    _ => Err(crate::error::CcsdsNdmError::UnknownUnit(s.to_string()))
                 }
             }
         }
@@ -222,9 +220,7 @@ macro_rules! define_required_type {
         }
         impl FromKvn for $name {
             fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-                let v: f64 = value.parse().map_err(|e: std::num::ParseFloatError| {
-                    CcsdsNdmError::KvnParse(e.to_string())
-                })?;
+                let v: f64 = value.parse().map_err(CcsdsNdmError::from)?;
                 Ok(Self::new(v))
             }
         }
@@ -245,7 +241,7 @@ macro_rules! define_unit_enum {
         impl std::str::FromStr for $unit_enum {
             type Err = crate::error::CcsdsNdmError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-                match s { $($str_rep => Ok(Self::$variant)),+, _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!("Unknown unit: {}", s))) }
+                match s { $($str_rep => Ok(Self::$variant)),+, _ => Err(crate::error::CcsdsNdmError::UnknownUnit(s.to_string())) }
             }
         }
     };
@@ -300,10 +296,11 @@ impl Angle {
     /// XSD angleRange: -360.0 <= value < 360.0
     pub fn new(value: f64, units: Option<AngleUnits>) -> Result<Self> {
         if !(-360.0..360.0).contains(&value) {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Angle out of range [-360,360): {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Angle".to_string(),
+                value: value.to_string(),
+                expected: "[-360, 360)".to_string(),
+            });
         }
         Ok(Self { value, units })
     }
@@ -344,10 +341,11 @@ impl DayInterval {
     /// dayIntervalTypeUO: nonNegativeDouble
     pub fn new(value: f64, units: Option<DayIntervalUnits>) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::Validation(format!(
-                "DayInterval must be >= 0: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "DayInterval".to_string(),
+                value: value.to_string(),
+                expected: ">= 0".to_string(),
+            });
         }
         Ok(Self { value, units })
     }
@@ -380,10 +378,11 @@ impl DayIntervalRequired {
     /// dayIntervalTypeUR: positiveDouble (>0, units required)
     pub fn new(value: f64) -> Result<Self> {
         if value <= 0.0 {
-            return Err(CcsdsNdmError::Validation(format!(
-                "DayIntervalRequired must be > 0: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "DayIntervalRequired".to_string(),
+                value: value.to_string(),
+                expected: "> 0".to_string(),
+            });
         }
         Ok(Self {
             value,
@@ -399,9 +398,7 @@ impl DayIntervalRequired {
 }
 impl FromKvn for DayIntervalRequired {
     fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value
-            .parse()
-            .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
+        let v: f64 = value.parse().map_err(CcsdsNdmError::from)?;
         Self::new(v)
     }
 }
@@ -425,10 +422,11 @@ impl Frequency {
     /// frequencyType: positiveDouble (>0)
     pub fn new(value: f64, units: Option<FrequencyUnits>) -> Result<Self> {
         if value <= 0.0 {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Frequency must be > 0: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Frequency".to_string(),
+                value: value.to_string(),
+                expected: "> 0".to_string(),
+            });
         }
         Ok(Self { value, units })
     }
@@ -468,10 +466,11 @@ impl Gm {
     /// gmType: positiveDouble (>0)
     pub fn new(value: f64, units: Option<GmUnits>) -> Result<Self> {
         if value <= 0.0 {
-            return Err(CcsdsNdmError::Validation(format!(
-                "GM must be > 0: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "GM".to_string(),
+                value: value.to_string(),
+                expected: "> 0".to_string(),
+            });
         }
         Ok(Self { value, units })
     }
@@ -509,10 +508,11 @@ impl AltitudeRequired {
     /// altRange: -430.5 ..= 8848
     pub fn new(value: f64) -> Result<Self> {
         if !(-430.5..=8848.0).contains(&value) {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Altitude out of range [-430.5,8848]: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Altitude".to_string(),
+                value: value.to_string(),
+                expected: "[-430.5, 8848]".to_string(),
+            });
         }
         Ok(Self {
             value,
@@ -528,9 +528,7 @@ impl AltitudeRequired {
 }
 impl FromKvn for AltitudeRequired {
     fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value
-            .parse()
-            .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
+        let v: f64 = value.parse()?;
         Self::new(v)
     }
 }
@@ -557,10 +555,11 @@ impl WkgRequired {
     /// wkgType: nonNegativeDouble, units required
     pub fn new(value: f64) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::Validation(format!(
-                "W/kg must be >= 0: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "W/kg".to_string(),
+                value: value.to_string(),
+                expected: ">= 0".to_string(),
+            });
         }
         Ok(Self {
             value,
@@ -576,9 +575,7 @@ impl WkgRequired {
 }
 impl FromKvn for WkgRequired {
     fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value
-            .parse()
-            .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
+        let v: f64 = value.parse()?;
         Self::new(v)
     }
 }
@@ -598,10 +595,11 @@ impl Mass {
     /// XSD massType: nonNegativeDouble
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Mass must be >= 0: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Mass".to_string(),
+                value: value.to_string(),
+                expected: ">= 0".to_string(),
+            });
         }
         Ok(Self { value, units })
     }
@@ -639,10 +637,11 @@ impl Area {
     /// XSD areaType: nonNegativeDouble
     pub fn new(value: f64, units: Option<AreaUnits>) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Area must be >= 0: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Area".to_string(),
+                value: value.to_string(),
+                expected: ">= 0".to_string(),
+            });
         }
         Ok(Self { value, units })
     }
@@ -710,10 +709,11 @@ impl BallisticCoeffRequired {
     /// ballisticCoeffType: nonNegativeDouble, units required
     pub fn new(value: f64) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Ballistic Coeff must be >= 0: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Ballistic Coeff".to_string(),
+                value: value.to_string(),
+                expected: ">= 0".to_string(),
+            });
         }
         Ok(Self {
             value,
@@ -739,10 +739,11 @@ pub struct Percentage {
 impl Percentage {
     pub fn new(value: f64, units: Option<PercentageUnits>) -> Result<Self> {
         if !(0.0..=100.0).contains(&value) {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Percentage out of range: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Percentage".to_string(),
+                value: value.to_string(),
+                expected: "[0, 100]".to_string(),
+            });
         }
         Ok(Self { value, units })
     }
@@ -775,10 +776,11 @@ pub struct PercentageRequired {
 impl PercentageRequired {
     pub fn new(value: f64) -> Result<Self> {
         if !(0.0..=100.0).contains(&value) {
-            return Err(CcsdsNdmError::Validation(format!(
-                "PercentageRequired out of range: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "PercentageRequired".to_string(),
+                value: value.to_string(),
+                expected: "[0, 100]".to_string(),
+            });
         }
         Ok(Self {
             value,
@@ -793,9 +795,7 @@ impl std::fmt::Display for PercentageRequired {
 }
 impl FromKvn for PercentageRequired {
     fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value
-            .parse()
-            .map_err(|e: std::num::ParseFloatError| CcsdsNdmError::KvnParse(e.to_string()))?;
+        let v: f64 = value.parse()?;
         Self::new(v)
     }
 }
@@ -808,10 +808,11 @@ pub struct Probability {
 impl Probability {
     pub fn new(value: f64) -> Result<Self> {
         if !(0.0..=1.0).contains(&value) {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Probability out of range: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Probability".to_string(),
+                value: value.to_string(),
+                expected: "[0, 1]".to_string(),
+            });
         }
         Ok(Self { value })
     }
@@ -833,9 +834,11 @@ pub struct DeltaMass {
 impl DeltaMass {
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value >= 0.0 {
-            return Err(CcsdsNdmError::Validation(
-                "DeltaMass must be negative".into(),
-            ));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "DeltaMass".to_string(),
+                value: value.to_string(),
+                expected: "< 0".to_string(),
+            });
         }
         Ok(Self { value, units })
     }
@@ -851,7 +854,11 @@ pub struct DeltaMassZ {
 impl DeltaMassZ {
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value > 0.0 {
-            return Err(CcsdsNdmError::Validation("DeltaMassZ must be <= 0".into()));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "DeltaMassZ".to_string(),
+                value: value.to_string(),
+                expected: "<= 0".to_string(),
+            });
         }
         Ok(Self { value, units })
     }
@@ -876,10 +883,11 @@ pub struct LatitudeRequired {
 impl LatitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
         if !(-90.0..=90.0).contains(&value) {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Latitude out of range [-90,90]: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Latitude".to_string(),
+                value: value.to_string(),
+                expected: "[-90, 90]".to_string(),
+            });
         }
         Ok(Self {
             value,
@@ -903,10 +911,11 @@ pub struct LongitudeRequired {
 impl LongitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
         if !(-180.0..=180.0).contains(&value) {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Longitude out of range [-180,180]: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Longitude".to_string(),
+                value: value.to_string(),
+                expected: "[-180, 180]".to_string(),
+            });
         }
         Ok(Self {
             value,
@@ -998,10 +1007,11 @@ impl std::str::FromStr for ObjectDescription {
             "unknown" => Ok(Self::UnknownLower),
             "OTHER" => Ok(Self::Other),
             "other" => Ok(Self::OtherLower),
-            _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown OBJECT_TYPE: {}",
-                s
-            ))),
+            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
+                key: "OBJECT_TYPE".to_string(),
+                value: s.to_string(),
+                expected: "PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, or OTHER".to_string(),
+            }),
         }
     }
 }
@@ -1104,10 +1114,11 @@ impl std::str::FromStr for YesNo {
         match s {
             "YES" | "yes" => Ok(YesNo::Yes),
             "NO" | "no" => Ok(YesNo::No),
-            _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown YES/NO value: {}",
-                s
-            ))),
+            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
+                key: "YES/NO".to_string(),
+                value: s.to_string(),
+                expected: "YES or NO".to_string(),
+            }),
         }
     }
 }
@@ -1135,10 +1146,11 @@ impl std::str::FromStr for TrajBasis {
             "TELEMETRY" => Ok(Self::Telemetry),
             "SIMULATED" => Ok(Self::Simulated),
             "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown TRAJ_BASIS: {}",
-                s
-            ))),
+            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
+                key: "TRAJ_BASIS".to_string(),
+                value: s.to_string(),
+                expected: "PREDICTED, DETERMINED, TELEMETRY, SIMULATED, or OTHER".to_string(),
+            }),
         }
     }
 }
@@ -1157,10 +1169,11 @@ impl std::str::FromStr for RevNumBasis {
         match s {
             "0" => Ok(Self::Zero),
             "1" => Ok(Self::One),
-            _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown ORB_REVNUM_BASIS: {}",
-                s
-            ))),
+            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
+                key: "ORB_REVNUM_BASIS".to_string(),
+                value: s.to_string(),
+                expected: "0 or 1".to_string(),
+            }),
         }
     }
 }
@@ -1188,10 +1201,11 @@ impl std::str::FromStr for CovBasis {
             "EMPIRICAL" => Ok(Self::Empirical),
             "SIMULATED" => Ok(Self::Simulated),
             "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown COV_BASIS: {}",
-                s
-            ))),
+            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
+                key: "COV_BASIS".to_string(),
+                value: s.to_string(),
+                expected: "PREDICTED, DETERMINED, EMPIRICAL, SIMULATED, or OTHER".to_string(),
+            }),
         }
     }
 }
@@ -1225,10 +1239,13 @@ impl std::str::FromStr for ManBasis {
             "DETERMINED" => Ok(Self::Determined),
             "SIMULATED" => Ok(Self::Simulated),
             "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown MAN_BASIS: {}",
-                s
-            ))),
+            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
+                key: "MAN_BASIS".to_string(),
+                value: s.to_string(),
+                expected:
+                    "CANDIDATE, PLANNED, ANTICIPATED, TELEMETRY, DETERMINED, SIMULATED, or OTHER"
+                        .to_string(),
+            }),
         }
     }
 }
@@ -1252,10 +1269,11 @@ impl std::str::FromStr for ManDc {
             "CONTINUOUS" => Ok(Self::Continuous),
             "TIME" => Ok(Self::Time),
             "TIME_AND_ANGLE" => Ok(Self::TimeAndAngle),
-            _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown DC_TYPE: {}",
-                s
-            ))),
+            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
+                key: "DC_TYPE".to_string(),
+                value: s.to_string(),
+                expected: "CONTINUOUS, TIME, or TIME_AND_ANGLE".to_string(),
+            }),
         }
     }
 }
@@ -1284,10 +1302,11 @@ impl std::str::FromStr for CovOrder {
             "FULL" => Ok(Self::Full),
             "LTMWCC" => Ok(Self::LtmWcc),
             "UTMWCC" => Ok(Self::UtmWcc),
-            _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown COV_ORDERING: {}",
-                s
-            ))),
+            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
+                key: "COV_ORDERING".to_string(),
+                value: s.to_string(),
+                expected: "LTM, UTM, FULL, LTMWCC, or UTMWCC".to_string(),
+            }),
         }
     }
 }
@@ -1324,10 +1343,11 @@ impl std::str::FromStr for ControlledType {
             "YES" | "yes" => Ok(ControlledType::Yes),
             "NO" | "no" => Ok(ControlledType::No),
             "UNKNOWN" | "unknown" => Ok(ControlledType::Unknown),
-            _ => Err(crate::error::CcsdsNdmError::UnsupportedFormat(format!(
-                "Unknown CONTROLLED_TYPE value: {}",
-                s
-            ))),
+            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
+                key: "CONTROLLED_TYPE".to_string(),
+                value: s.to_string(),
+                expected: "YES, NO, or UNKNOWN".to_string(),
+            }),
         }
     }
 }
@@ -1345,10 +1365,11 @@ pub struct Duration {
 impl Duration {
     pub fn new(value: f64, units: Option<TimeUnits>) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Duration must be >= 0: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Duration".to_string(),
+                value: value.to_string(),
+                expected: ">= 0".to_string(),
+            });
         }
         Ok(Self { value, units })
     }
@@ -1408,10 +1429,11 @@ pub struct Inclination {
 impl Inclination {
     pub fn new(value: f64, units: Option<AngleUnits>) -> Result<Self> {
         if !(0.0..=180.0).contains(&value) {
-            return Err(CcsdsNdmError::Validation(format!(
-                "Inclination out of range: {}",
-                value
-            )));
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "Inclination".to_string(),
+                value: value.to_string(),
+                expected: "[0, 180]".to_string(),
+            });
         }
         Ok(Self {
             angle: Angle { value, units },
@@ -1821,21 +1843,15 @@ impl FromKvnValue for Vec3Double {
     fn from_kvn_value(val: &str) -> Result<Self> {
         let parts: Vec<&str> = val.split_whitespace().collect();
         if parts.len() != 3 {
-            return Err(CcsdsNdmError::KvnParse(format!(
+            return Err(CcsdsNdmError::InvalidFormat(format!(
                 "Vec3Double requires 3 values, got {}: {}",
                 parts.len(),
                 val
             )));
         }
-        let x = parts[0]
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid Vec3Double x: {}", e)))?;
-        let y = parts[1]
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid Vec3Double y: {}", e)))?;
-        let z = parts[2]
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::KvnParse(format!("Invalid Vec3Double z: {}", e)))?;
+        let x = parts[0].parse::<f64>()?;
+        let y = parts[1].parse::<f64>()?;
+        let z = parts[2].parse::<f64>()?;
         Ok(Self { x, y, z })
     }
 }

@@ -55,17 +55,20 @@ impl Ndm for Opm {
             match tokens.peek() {
                 Some(Ok(KvnLine::Pair {
                     key: "CCSDS_OPM_VERS",
+                    val,
                     ..
                 })) => {
-                    if let Some(Ok(KvnLine::Pair { val, .. })) = tokens.next() {
-                        break val.to_string();
-                    }
-                    unreachable!();
+                    let v = val.to_string();
+                    tokens.next();
+                    break v;
                 }
-                Some(Ok(KvnLine::Comment(_))) | Some(Ok(KvnLine::Empty)) => {
+                Some(Ok(KvnLine::Comment { .. })) | Some(Ok(KvnLine::Empty { .. })) => {
                     tokens.next(); // skip
                 }
-                Some(_) => {
+                Some(Err(_)) => {
+                    return Err(tokens.next().unwrap().unwrap_err());
+                }
+                Some(Ok(_)) => {
                     return Err(CcsdsNdmError::MissingField(
                         "CCSDS_OPM_VERS must be the first keyword".into(),
                     ))
@@ -248,36 +251,36 @@ impl OpmMetadata {
         let mut builder = OpmMetadataBuilder::default();
 
         // OPM Metadata ends when we hit a Data keyword (e.g., EPOCH, X, Y...)
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
-                KvnLine::Comment(c) => {
+        while let Some(Ok(token)) = tokens.peek() {
+            match token {
+                KvnLine::Comment { content: c, .. } => {
                     builder.comment.push(c.to_string());
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, .. } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    line_number,
+                    ..
+                } => {
                     if is_opm_data_keyword(key) {
                         break;
                     }
-                    builder.match_pair(key, val)?;
+                    let line = *line_number;
+                    builder.match_pair(key, val, line)?;
                     tokens.next();
                 }
                 _ => break,
             }
         }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
+        }
+
         builder.build()
     }
 }
@@ -321,22 +324,27 @@ struct OpmMetadataBuilder {
     ref_frame: Option<String>,
     ref_frame_epoch: Option<Epoch>,
     time_system: Option<String>,
+    last_line: usize,
 }
 
 impl OpmMetadataBuilder {
-    fn match_pair(&mut self, key: &str, val: &str) -> Result<()> {
+    fn match_pair(&mut self, key: &str, val: &str, line: usize) -> Result<()> {
+        self.last_line = line;
         match key {
             "OBJECT_NAME" => self.object_name = Some(val.to_string()),
             "OBJECT_ID" => self.object_id = Some(val.to_string()),
             "CENTER_NAME" => self.center_name = Some(val.to_string()),
             "REF_FRAME" => self.ref_frame = Some(val.to_string()),
-            "REF_FRAME_EPOCH" => self.ref_frame_epoch = Some(FromKvnValue::from_kvn_value(val)?),
+            "REF_FRAME_EPOCH" => {
+                self.ref_frame_epoch =
+                    Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
+            }
             "TIME_SYSTEM" => self.time_system = Some(val.to_string()),
             _ => {
-                return Err(CcsdsNdmError::KvnParse(format!(
-                    "Unexpected OPM Metadata key: {}",
-                    key
-                )))
+                return Err(CcsdsNdmError::KvnParse {
+                    line,
+                    message: format!("Unexpected OPM Metadata key: {}", key),
+                })
             }
         }
         Ok(())
@@ -345,22 +353,22 @@ impl OpmMetadataBuilder {
     fn build(self) -> Result<OpmMetadata> {
         Ok(OpmMetadata {
             comment: self.comment,
-            object_name: self
-                .object_name
-                .ok_or(CcsdsNdmError::MissingField("OBJECT_NAME".into()))?,
-            object_id: self
-                .object_id
-                .ok_or(CcsdsNdmError::MissingField("OBJECT_ID".into()))?,
-            center_name: self
-                .center_name
-                .ok_or(CcsdsNdmError::MissingField("CENTER_NAME".into()))?,
-            ref_frame: self
-                .ref_frame
-                .ok_or(CcsdsNdmError::MissingField("REF_FRAME".into()))?,
+            object_name: self.object_name.ok_or_else(|| {
+                CcsdsNdmError::MissingField("OBJECT_NAME".into()).at_line(self.last_line)
+            })?,
+            object_id: self.object_id.ok_or_else(|| {
+                CcsdsNdmError::MissingField("OBJECT_ID".into()).at_line(self.last_line)
+            })?,
+            center_name: self.center_name.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CENTER_NAME".into()).at_line(self.last_line)
+            })?,
+            ref_frame: self.ref_frame.ok_or_else(|| {
+                CcsdsNdmError::MissingField("REF_FRAME".into()).at_line(self.last_line)
+            })?,
             ref_frame_epoch: self.ref_frame_epoch,
-            time_system: self
-                .time_system
-                .ok_or(CcsdsNdmError::MissingField("TIME_SYSTEM".into()))?,
+            time_system: self.time_system.ok_or_else(|| {
+                CcsdsNdmError::MissingField("TIME_SYSTEM".into()).at_line(self.last_line)
+            })?,
         })
     }
 }
@@ -487,21 +495,12 @@ impl OpmData {
         let mut current_maneuver = ManeuverParametersBuilder::default();
         let mut ud_builder = UserDefinedBuilder::default();
         let mut pending_comments = Vec::new();
+        let mut last_line = 0;
 
-        while tokens.peek().is_some() {
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens
-                    .next()
-                    .expect("Peeked error should exist")
-                    .unwrap_err());
-            }
-            match tokens
-                .peek()
-                .expect("Peeked value should exist")
-                .as_ref()
-                .expect("Peeked value should be Ok")
-            {
-                KvnLine::Comment(c) => {
+        while let Some(Ok(token)) = tokens.peek() {
+            last_line = token.line_number();
+            match token {
+                KvnLine::Comment { content: c, .. } => {
                     if !sv_builder.has_started() {
                         comment.push(c.to_string());
                     } else {
@@ -509,36 +508,43 @@ impl OpmData {
                     }
                     tokens.next();
                 }
-                KvnLine::Empty => {
+                KvnLine::Empty { .. } => {
                     tokens.next();
                 }
-                KvnLine::Pair { key, val, unit } => {
+                KvnLine::Pair {
+                    key,
+                    val,
+                    unit,
+                    line_number,
+                } => {
                     let key = *key;
+                    let line = *line_number;
+                    last_line = line;
                     // Route the key to the correct builder
 
                     // State Vector
-                    if sv_builder.try_match(key, val)? {
+                    if sv_builder.try_match(key, val, line)? {
                         sv_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Keplerian Elements
-                    if ke_builder.try_match(key, val, *unit)? {
+                    if ke_builder.try_match(key, val, *unit, line)? {
                         ke_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Spacecraft Parameters
-                    if sp_builder.try_match(key, val, *unit)? {
+                    if sp_builder.try_match(key, val, *unit, line)? {
                         sp_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
                     }
 
                     // Covariance
-                    if cov_builder.try_match(key, val, *unit)? {
+                    if cov_builder.try_match(key, val, *unit, line)? {
                         cov_builder.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
@@ -549,7 +555,7 @@ impl OpmData {
                         maneuvers.push(current_maneuver.build()?);
                         current_maneuver = ManeuverParametersBuilder::default();
                     }
-                    if current_maneuver.try_match(key, val, *unit)? {
+                    if current_maneuver.try_match(key, val, *unit, line)? {
                         current_maneuver.comment.append(&mut pending_comments);
                         tokens.next();
                         continue;
@@ -557,6 +563,7 @@ impl OpmData {
 
                     // User Defined
                     if key.starts_with("USER_DEFINED_") {
+                        ud_builder.last_line = line;
                         ud_builder.comment.append(&mut pending_comments);
                         ud_builder.params.push(UserDefinedParameter {
                             parameter: key.to_string(),
@@ -566,13 +573,17 @@ impl OpmData {
                         continue;
                     }
 
-                    return Err(CcsdsNdmError::KvnParse(format!(
-                        "Unexpected OPM Data field: {}",
-                        key
-                    )));
+                    return Err(CcsdsNdmError::KvnParse {
+                        line,
+                        message: format!("Unexpected OPM Data keyword: {}", key),
+                    });
                 }
                 _ => break,
             }
+        }
+
+        if let Some(Err(_)) = tokens.peek() {
+            tokens.next().unwrap()?;
         }
 
         if current_maneuver.has_data() {
@@ -591,7 +602,8 @@ impl OpmData {
             if !mass_present {
                 return Err(CcsdsNdmError::MissingField(
                     "MASS is required in Spacecraft Parameters when Maneuvers are present".into(),
-                ));
+                )
+                .at_line(last_line));
             }
         }
 
@@ -621,6 +633,7 @@ struct StateVectorBuilder {
     x_dot: Option<Velocity>,
     y_dot: Option<Velocity>,
     z_dot: Option<Velocity>,
+    last_line: usize,
 }
 
 impl StateVectorBuilder {
@@ -628,15 +641,27 @@ impl StateVectorBuilder {
         self.epoch.is_some()
     }
 
-    fn try_match(&mut self, key: &str, val: &str) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, line: usize) -> Result<bool> {
+        self.last_line = line;
         match key {
-            "EPOCH" => self.epoch = Some(FromKvnValue::from_kvn_value(val)?),
-            "X" => self.x = Some(Position::from_kvn(val, Some("km"))?),
-            "Y" => self.y = Some(Position::from_kvn(val, Some("km"))?),
-            "Z" => self.z = Some(Position::from_kvn(val, Some("km"))?),
-            "X_DOT" => self.x_dot = Some(Velocity::from_kvn(val, Some("km/s"))?),
-            "Y_DOT" => self.y_dot = Some(Velocity::from_kvn(val, Some("km/s"))?),
-            "Z_DOT" => self.z_dot = Some(Velocity::from_kvn(val, Some("km/s"))?),
+            "EPOCH" => {
+                self.epoch = Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
+            }
+            "X" => self.x = Some(Position::from_kvn(val, Some("km")).map_err(|e| e.at_line(line))?),
+            "Y" => self.y = Some(Position::from_kvn(val, Some("km")).map_err(|e| e.at_line(line))?),
+            "Z" => self.z = Some(Position::from_kvn(val, Some("km")).map_err(|e| e.at_line(line))?),
+            "X_DOT" => {
+                self.x_dot =
+                    Some(Velocity::from_kvn(val, Some("km/s")).map_err(|e| e.at_line(line))?)
+            }
+            "Y_DOT" => {
+                self.y_dot =
+                    Some(Velocity::from_kvn(val, Some("km/s")).map_err(|e| e.at_line(line))?)
+            }
+            "Z_DOT" => {
+                self.z_dot =
+                    Some(Velocity::from_kvn(val, Some("km/s")).map_err(|e| e.at_line(line))?)
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -645,21 +670,27 @@ impl StateVectorBuilder {
     fn build(self) -> Result<StateVector> {
         Ok(StateVector {
             comment: self.comment,
-            epoch: self
-                .epoch
-                .ok_or(CcsdsNdmError::MissingField("EPOCH".into()))?,
-            x: self.x.ok_or(CcsdsNdmError::MissingField("X".into()))?,
-            y: self.y.ok_or(CcsdsNdmError::MissingField("Y".into()))?,
-            z: self.z.ok_or(CcsdsNdmError::MissingField("Z".into()))?,
-            x_dot: self
-                .x_dot
-                .ok_or(CcsdsNdmError::MissingField("X_DOT".into()))?,
-            y_dot: self
-                .y_dot
-                .ok_or(CcsdsNdmError::MissingField("Y_DOT".into()))?,
-            z_dot: self
-                .z_dot
-                .ok_or(CcsdsNdmError::MissingField("Z_DOT".into()))?,
+            epoch: self.epoch.ok_or_else(|| {
+                CcsdsNdmError::MissingField("EPOCH".into()).at_line(self.last_line)
+            })?,
+            x: self
+                .x
+                .ok_or_else(|| CcsdsNdmError::MissingField("X".into()).at_line(self.last_line))?,
+            y: self
+                .y
+                .ok_or_else(|| CcsdsNdmError::MissingField("Y".into()).at_line(self.last_line))?,
+            z: self
+                .z
+                .ok_or_else(|| CcsdsNdmError::MissingField("Z".into()).at_line(self.last_line))?,
+            x_dot: self.x_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("X_DOT".into()).at_line(self.last_line)
+            })?,
+            y_dot: self.y_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("Y_DOT".into()).at_line(self.last_line)
+            })?,
+            z_dot: self.z_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("Z_DOT".into()).at_line(self.last_line)
+            })?,
         })
     }
 }
@@ -771,21 +802,44 @@ struct KeplerianElementsBuilder {
     true_anomaly: Option<Angle>,
     mean_anomaly: Option<Angle>,
     gm: Option<Gm>,
+    last_line: usize,
 }
 
 impl KeplerianElementsBuilder {
-    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
+        self.last_line = line;
         match key {
-            "SEMI_MAJOR_AXIS" => self.semi_major_axis = Some(Distance::from_kvn(val, unit)?),
-            "ECCENTRICITY" => self.eccentricity = Some(val.parse()?),
-            "INCLINATION" => self.inclination = Some(Inclination::from_kvn(val, unit)?),
-            "RA_OF_ASC_NODE" => self.ra_of_asc_node = Some(Angle::from_kvn(val, unit)?),
-            "ARG_OF_PERICENTER" => self.arg_of_pericenter = Some(Angle::from_kvn(val, unit)?),
-            "TRUE_ANOMALY" => self.true_anomaly = Some(Angle::from_kvn(val, unit)?),
-            "MEAN_ANOMALY" => self.mean_anomaly = Some(Angle::from_kvn(val, unit)?),
+            "SEMI_MAJOR_AXIS" => {
+                self.semi_major_axis =
+                    Some(Distance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "ECCENTRICITY" => {
+                self.eccentricity = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "INCLINATION" => {
+                self.inclination =
+                    Some(Inclination::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "RA_OF_ASC_NODE" => {
+                self.ra_of_asc_node = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "ARG_OF_PERICENTER" => {
+                self.arg_of_pericenter =
+                    Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "TRUE_ANOMALY" => {
+                self.true_anomaly = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "MEAN_ANOMALY" => {
+                self.mean_anomaly = Some(Angle::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
             "GM" => {
-                let uv = UnitValue::<f64, GmUnits>::from_kvn(val, unit)?;
-                self.gm = Some(Gm::new(uv.value, uv.units)?);
+                let uv =
+                    UnitValue::<f64, GmUnits>::from_kvn(val, unit).map_err(|e| e.at_line(line))?;
+                self.gm = Some(Gm::new(uv.value, uv.units).map_err(|e| e.at_line(line))?);
             }
             _ => return Ok(false),
         }
@@ -807,33 +861,45 @@ impl KeplerianElementsBuilder {
         }
 
         // If ANY are present, ALL mandatory ones must be present
-        let semi_major_axis = self
-            .semi_major_axis
-            .ok_or(CcsdsNdmError::MissingField("SEMI_MAJOR_AXIS".into()))?;
-        let eccentricity = self
-            .eccentricity
-            .ok_or(CcsdsNdmError::MissingField("ECCENTRICITY".into()))?;
-        let inclination = self
-            .inclination
-            .ok_or(CcsdsNdmError::MissingField("INCLINATION".into()))?;
-        let ra_of_asc_node = self
-            .ra_of_asc_node
-            .ok_or(CcsdsNdmError::MissingField("RA_OF_ASC_NODE".into()))?;
-        let arg_of_pericenter = self
-            .arg_of_pericenter
-            .ok_or(CcsdsNdmError::MissingField("ARG_OF_PERICENTER".into()))?;
-        let gm = self.gm.ok_or(CcsdsNdmError::MissingField("GM".into()))?;
+        let semi_major_axis = self.semi_major_axis.ok_or_else(|| {
+            CcsdsNdmError::MissingField("SEMI_MAJOR_AXIS".into()).at_line(self.last_line)
+        })?;
+        let eccentricity = self.eccentricity.ok_or_else(|| {
+            CcsdsNdmError::MissingField("ECCENTRICITY".into()).at_line(self.last_line)
+        })?;
+        if eccentricity < 0.0 {
+            return Err(CcsdsNdmError::OutOfRange {
+                name: "ECCENTRICITY".to_string(),
+                value: eccentricity.to_string(),
+                expected: ">= 0".to_string(),
+            }
+            .at_line(self.last_line));
+        }
+        let inclination = self.inclination.ok_or_else(|| {
+            CcsdsNdmError::MissingField("INCLINATION".into()).at_line(self.last_line)
+        })?;
+        let ra_of_asc_node = self.ra_of_asc_node.ok_or_else(|| {
+            CcsdsNdmError::MissingField("RA_OF_ASC_NODE".into()).at_line(self.last_line)
+        })?;
+        let arg_of_pericenter = self.arg_of_pericenter.ok_or_else(|| {
+            CcsdsNdmError::MissingField("ARG_OF_PERICENTER".into()).at_line(self.last_line)
+        })?;
+        let gm = self
+            .gm
+            .ok_or_else(|| CcsdsNdmError::MissingField("GM".into()).at_line(self.last_line))?;
 
         if self.true_anomaly.is_some() && self.mean_anomaly.is_some() {
-            return Err(CcsdsNdmError::KvnParse(
+            return Err(CcsdsNdmError::Validation(
                 "Cannot have both TRUE_ANOMALY and MEAN_ANOMALY".into(),
-            ));
+            )
+            .at_line(self.last_line));
         }
 
         if self.true_anomaly.is_none() && self.mean_anomaly.is_none() {
-            return Err(CcsdsNdmError::MissingField(
-                "TRUE_ANOMALY or MEAN_ANOMALY".into(),
-            ));
+            return Err(
+                CcsdsNdmError::MissingField("TRUE_ANOMALY or MEAN_ANOMALY".into())
+                    .at_line(self.last_line),
+            );
         }
 
         Ok(Some(KeplerianElements {
@@ -858,16 +924,32 @@ struct SpacecraftParametersBuilder {
     solar_rad_coeff: Option<f64>,
     drag_area: Option<Area>,
     drag_coeff: Option<f64>,
+    last_line: usize,
 }
 
 impl SpacecraftParametersBuilder {
-    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
+        self.last_line = line;
         match key {
-            "MASS" => self.mass = Some(Mass::from_kvn(val, unit)?),
-            "SOLAR_RAD_AREA" => self.solar_rad_area = Some(Area::from_kvn(val, unit)?),
-            "SOLAR_RAD_COEFF" => self.solar_rad_coeff = Some(val.parse()?),
-            "DRAG_AREA" => self.drag_area = Some(Area::from_kvn(val, unit)?),
-            "DRAG_COEFF" => self.drag_coeff = Some(val.parse()?),
+            "MASS" => self.mass = Some(Mass::from_kvn(val, unit).map_err(|e| e.at_line(line))?),
+            "SOLAR_RAD_AREA" => {
+                self.solar_rad_area = Some(Area::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "SOLAR_RAD_COEFF" => {
+                self.solar_rad_coeff = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
+            "DRAG_AREA" => {
+                self.drag_area = Some(Area::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "DRAG_COEFF" => {
+                self.drag_coeff = Some(
+                    val.parse()
+                        .map_err(|e| CcsdsNdmError::from(e).at_line(line))?,
+                )
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -919,33 +1001,113 @@ pub struct OpmCovarianceMatrixBuilder {
     pub cz_dot_x_dot: Option<VelocityCovariance>,
     pub cz_dot_y_dot: Option<VelocityCovariance>,
     pub cz_dot_z_dot: Option<VelocityCovariance>,
+    pub last_line: usize,
 }
 
 impl OpmCovarianceMatrixBuilder {
-    pub fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    pub fn try_match(
+        &mut self,
+        key: &str,
+        val: &str,
+        unit: Option<&str>,
+        line: usize,
+    ) -> Result<bool> {
+        self.last_line = line;
         match key {
             "COV_REF_FRAME" => self.cov_ref_frame = Some(val.to_string()),
-            "CX_X" => self.cx_x = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CY_X" => self.cy_x = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CY_Y" => self.cy_y = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CZ_X" => self.cz_x = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CZ_Y" => self.cz_y = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CZ_Z" => self.cz_z = Some(PositionCovariance::from_kvn(val, unit)?),
-            "CX_DOT_X" => self.cx_dot_x = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CX_DOT_Y" => self.cx_dot_y = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CX_DOT_Z" => self.cx_dot_z = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CX_DOT_X_DOT" => self.cx_dot_x_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
-            "CY_DOT_X" => self.cy_dot_x = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CY_DOT_Y" => self.cy_dot_y = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CY_DOT_Z" => self.cy_dot_z = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CY_DOT_X_DOT" => self.cy_dot_x_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
-            "CY_DOT_Y_DOT" => self.cy_dot_y_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_X" => self.cz_dot_x = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_Y" => self.cz_dot_y = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_Z" => self.cz_dot_z = Some(PositionVelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_X_DOT" => self.cz_dot_x_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_Y_DOT" => self.cz_dot_y_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
-            "CZ_DOT_Z_DOT" => self.cz_dot_z_dot = Some(VelocityCovariance::from_kvn(val, unit)?),
+            "CX_X" => {
+                self.cx_x =
+                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_X" => {
+                self.cy_x =
+                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_Y" => {
+                self.cy_y =
+                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_X" => {
+                self.cz_x =
+                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_Y" => {
+                self.cz_y =
+                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_Z" => {
+                self.cz_z =
+                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CX_DOT_X" => {
+                self.cx_dot_x = Some(
+                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
+                )
+            }
+            "CX_DOT_Y" => {
+                self.cx_dot_y = Some(
+                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
+                )
+            }
+            "CX_DOT_Z" => {
+                self.cx_dot_z = Some(
+                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
+                )
+            }
+            "CX_DOT_X_DOT" => {
+                self.cx_dot_x_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_DOT_X" => {
+                self.cy_dot_x = Some(
+                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
+                )
+            }
+            "CY_DOT_Y" => {
+                self.cy_dot_y = Some(
+                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
+                )
+            }
+            "CY_DOT_Z" => {
+                self.cy_dot_z = Some(
+                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
+                )
+            }
+            "CY_DOT_X_DOT" => {
+                self.cy_dot_x_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CY_DOT_Y_DOT" => {
+                self.cy_dot_y_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_DOT_X" => {
+                self.cz_dot_x = Some(
+                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
+                )
+            }
+            "CZ_DOT_Y" => {
+                self.cz_dot_y = Some(
+                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
+                )
+            }
+            "CZ_DOT_Z" => {
+                self.cz_dot_z = Some(
+                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
+                )
+            }
+            "CZ_DOT_X_DOT" => {
+                self.cz_dot_x_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_DOT_Y_DOT" => {
+                self.cz_dot_y_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "CZ_DOT_Z_DOT" => {
+                self.cz_dot_z_dot =
+                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -961,69 +1123,69 @@ impl OpmCovarianceMatrixBuilder {
         Ok(Some(OpmCovarianceMatrix {
             comment: self.comment,
             cov_ref_frame: self.cov_ref_frame,
-            cx_x: self
-                .cx_x
-                .ok_or(CcsdsNdmError::MissingField("CX_X".into()))?,
-            cy_x: self
-                .cy_x
-                .ok_or(CcsdsNdmError::MissingField("CY_X".into()))?,
-            cy_y: self
-                .cy_y
-                .ok_or(CcsdsNdmError::MissingField("CY_Y".into()))?,
-            cz_x: self
-                .cz_x
-                .ok_or(CcsdsNdmError::MissingField("CZ_X".into()))?,
-            cz_y: self
-                .cz_y
-                .ok_or(CcsdsNdmError::MissingField("CZ_Y".into()))?,
-            cz_z: self
-                .cz_z
-                .ok_or(CcsdsNdmError::MissingField("CZ_Z".into()))?,
-            cx_dot_x: self
-                .cx_dot_x
-                .ok_or(CcsdsNdmError::MissingField("CX_DOT_X".into()))?,
-            cx_dot_y: self
-                .cx_dot_y
-                .ok_or(CcsdsNdmError::MissingField("CX_DOT_Y".into()))?,
-            cx_dot_z: self
-                .cx_dot_z
-                .ok_or(CcsdsNdmError::MissingField("CX_DOT_Z".into()))?,
-            cx_dot_x_dot: self
-                .cx_dot_x_dot
-                .ok_or(CcsdsNdmError::MissingField("CX_DOT_X_DOT".into()))?,
-            cy_dot_x: self
-                .cy_dot_x
-                .ok_or(CcsdsNdmError::MissingField("CY_DOT_X".into()))?,
-            cy_dot_y: self
-                .cy_dot_y
-                .ok_or(CcsdsNdmError::MissingField("CY_DOT_Y".into()))?,
-            cy_dot_z: self
-                .cy_dot_z
-                .ok_or(CcsdsNdmError::MissingField("CY_DOT_Z".into()))?,
-            cy_dot_x_dot: self
-                .cy_dot_x_dot
-                .ok_or(CcsdsNdmError::MissingField("CY_DOT_X_DOT".into()))?,
-            cy_dot_y_dot: self
-                .cy_dot_y_dot
-                .ok_or(CcsdsNdmError::MissingField("CY_DOT_Y_DOT".into()))?,
-            cz_dot_x: self
-                .cz_dot_x
-                .ok_or(CcsdsNdmError::MissingField("CZ_DOT_X".into()))?,
-            cz_dot_y: self
-                .cz_dot_y
-                .ok_or(CcsdsNdmError::MissingField("CZ_DOT_Y".into()))?,
-            cz_dot_z: self
-                .cz_dot_z
-                .ok_or(CcsdsNdmError::MissingField("CZ_DOT_Z".into()))?,
-            cz_dot_x_dot: self
-                .cz_dot_x_dot
-                .ok_or(CcsdsNdmError::MissingField("CZ_DOT_X_DOT".into()))?,
-            cz_dot_y_dot: self
-                .cz_dot_y_dot
-                .ok_or(CcsdsNdmError::MissingField("CZ_DOT_Y_DOT".into()))?,
-            cz_dot_z_dot: self
-                .cz_dot_z_dot
-                .ok_or(CcsdsNdmError::MissingField("CZ_DOT_Z_DOT".into()))?,
+            cx_x: self.cx_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CX_X".into()).at_line(self.last_line)
+            })?,
+            cy_x: self.cy_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_X".into()).at_line(self.last_line)
+            })?,
+            cy_y: self.cy_y.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_Y".into()).at_line(self.last_line)
+            })?,
+            cz_x: self.cz_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_X".into()).at_line(self.last_line)
+            })?,
+            cz_y: self.cz_y.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_Y".into()).at_line(self.last_line)
+            })?,
+            cz_z: self.cz_z.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_Z".into()).at_line(self.last_line)
+            })?,
+            cx_dot_x: self.cx_dot_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CX_DOT_X".into()).at_line(self.last_line)
+            })?,
+            cx_dot_y: self.cx_dot_y.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CX_DOT_Y".into()).at_line(self.last_line)
+            })?,
+            cx_dot_z: self.cx_dot_z.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CX_DOT_Z".into()).at_line(self.last_line)
+            })?,
+            cx_dot_x_dot: self.cx_dot_x_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CX_DOT_X_DOT".into()).at_line(self.last_line)
+            })?,
+            cy_dot_x: self.cy_dot_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_DOT_X".into()).at_line(self.last_line)
+            })?,
+            cy_dot_y: self.cy_dot_y.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_DOT_Y".into()).at_line(self.last_line)
+            })?,
+            cy_dot_z: self.cy_dot_z.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_DOT_Z".into()).at_line(self.last_line)
+            })?,
+            cy_dot_x_dot: self.cy_dot_x_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_DOT_X_DOT".into()).at_line(self.last_line)
+            })?,
+            cy_dot_y_dot: self.cy_dot_y_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CY_DOT_Y_DOT".into()).at_line(self.last_line)
+            })?,
+            cz_dot_x: self.cz_dot_x.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_X".into()).at_line(self.last_line)
+            })?,
+            cz_dot_y: self.cz_dot_y.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_Y".into()).at_line(self.last_line)
+            })?,
+            cz_dot_z: self.cz_dot_z.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_Z".into()).at_line(self.last_line)
+            })?,
+            cz_dot_x_dot: self.cz_dot_x_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_X_DOT".into()).at_line(self.last_line)
+            })?,
+            cz_dot_y_dot: self.cz_dot_y_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_Y_DOT".into()).at_line(self.last_line)
+            })?,
+            cz_dot_z_dot: self.cz_dot_z_dot.ok_or_else(|| {
+                CcsdsNdmError::MissingField("CZ_DOT_Z_DOT".into()).at_line(self.last_line)
+            })?,
         }))
     }
 }
@@ -1107,6 +1269,7 @@ struct ManeuverParametersBuilder {
     man_dv_1: Option<Velocity>,
     man_dv_2: Option<Velocity>,
     man_dv_3: Option<Velocity>,
+    last_line: usize,
 }
 
 impl ManeuverParametersBuilder {
@@ -1116,21 +1279,34 @@ impl ManeuverParametersBuilder {
             || self.man_delta_mass.is_some()
     }
 
-    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
+    fn try_match(&mut self, key: &str, val: &str, unit: Option<&str>, line: usize) -> Result<bool> {
+        self.last_line = line;
         match key {
             "MAN_EPOCH_IGNITION" => {
-                self.man_epoch_ignition = Some(FromKvnValue::from_kvn_value(val)?)
+                self.man_epoch_ignition =
+                    Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
-            "MAN_DURATION" => self.man_duration = Some(Duration::from_kvn(val, unit)?),
+            "MAN_DURATION" => {
+                self.man_duration =
+                    Some(Duration::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
             "MAN_DELTA_MASS" => {
-                let uv = UnitValue::<f64, MassUnits>::from_kvn(val, unit)?;
+                let uv = UnitValue::<f64, MassUnits>::from_kvn(val, unit)
+                    .map_err(|e| e.at_line(line))?;
                 // DeltaMassZ validation handled by ::new() (value <= 0)
-                self.man_delta_mass = Some(DeltaMassZ::new(uv.value, uv.units)?);
+                self.man_delta_mass =
+                    Some(DeltaMassZ::new(uv.value, uv.units).map_err(|e| e.at_line(line))?);
             }
             "MAN_REF_FRAME" => self.man_ref_frame = Some(val.to_string()),
-            "MAN_DV_1" => self.man_dv_1 = Some(Velocity::from_kvn(val, unit)?),
-            "MAN_DV_2" => self.man_dv_2 = Some(Velocity::from_kvn(val, unit)?),
-            "MAN_DV_3" => self.man_dv_3 = Some(Velocity::from_kvn(val, unit)?),
+            "MAN_DV_1" => {
+                self.man_dv_1 = Some(Velocity::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "MAN_DV_2" => {
+                self.man_dv_2 = Some(Velocity::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
+            "MAN_DV_3" => {
+                self.man_dv_3 = Some(Velocity::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
+            }
             _ => return Ok(false),
         }
         Ok(true)
@@ -1139,27 +1315,27 @@ impl ManeuverParametersBuilder {
     fn build(self) -> Result<ManeuverParameters> {
         Ok(ManeuverParameters {
             comment: self.comment,
-            man_epoch_ignition: self
-                .man_epoch_ignition
-                .ok_or(CcsdsNdmError::MissingField("MAN_EPOCH_IGNITION".into()))?,
-            man_duration: self
-                .man_duration
-                .ok_or(CcsdsNdmError::MissingField("MAN_DURATION".into()))?,
-            man_delta_mass: self
-                .man_delta_mass
-                .ok_or(CcsdsNdmError::MissingField("MAN_DELTA_MASS".into()))?,
-            man_ref_frame: self
-                .man_ref_frame
-                .ok_or(CcsdsNdmError::MissingField("MAN_REF_FRAME".into()))?,
-            man_dv_1: self
-                .man_dv_1
-                .ok_or(CcsdsNdmError::MissingField("MAN_DV_1".into()))?,
-            man_dv_2: self
-                .man_dv_2
-                .ok_or(CcsdsNdmError::MissingField("MAN_DV_2".into()))?,
-            man_dv_3: self
-                .man_dv_3
-                .ok_or(CcsdsNdmError::MissingField("MAN_DV_3".into()))?,
+            man_epoch_ignition: self.man_epoch_ignition.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MAN_EPOCH_IGNITION".into()).at_line(self.last_line)
+            })?,
+            man_duration: self.man_duration.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MAN_DURATION".into()).at_line(self.last_line)
+            })?,
+            man_delta_mass: self.man_delta_mass.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MAN_DELTA_MASS".into()).at_line(self.last_line)
+            })?,
+            man_ref_frame: self.man_ref_frame.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MAN_REF_FRAME".into()).at_line(self.last_line)
+            })?,
+            man_dv_1: self.man_dv_1.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MAN_DV_1".into()).at_line(self.last_line)
+            })?,
+            man_dv_2: self.man_dv_2.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MAN_DV_2".into()).at_line(self.last_line)
+            })?,
+            man_dv_3: self.man_dv_3.ok_or_else(|| {
+                CcsdsNdmError::MissingField("MAN_DV_3".into()).at_line(self.last_line)
+            })?,
         })
     }
 }
@@ -1172,6 +1348,7 @@ fn is_maneuver_start_key(key: &str) -> bool {
 struct UserDefinedBuilder {
     comment: Vec<String>,
     params: Vec<UserDefinedParameter>,
+    last_line: usize,
 }
 
 impl UserDefinedBuilder {
@@ -1315,7 +1492,13 @@ Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::MissingField(k) if k == "OBJECT_NAME"));
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::MissingField(k) if k == "OBJECT_NAME"));
+            }
+            CcsdsNdmError::MissingField(k) => assert_eq!(k, "OBJECT_NAME"),
+            _ => panic!("unexpected error: {:?}", err),
+        }
     }
 
     #[test]
@@ -1337,7 +1520,13 @@ Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::MissingField(k) if k == "OBJECT_ID"));
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::MissingField(k) if k == "OBJECT_ID"));
+            }
+            CcsdsNdmError::MissingField(k) => assert_eq!(k, "OBJECT_ID"),
+            _ => panic!("unexpected error: {:?}", err),
+        }
     }
 
     #[test]
@@ -1359,7 +1548,13 @@ Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::MissingField(k) if k == "CENTER_NAME"));
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::MissingField(k) if k == "CENTER_NAME"));
+            }
+            CcsdsNdmError::MissingField(k) => assert_eq!(k, "CENTER_NAME"),
+            _ => panic!("unexpected error: {:?}", err),
+        }
     }
 
     #[test]
@@ -1381,7 +1576,13 @@ Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::MissingField(k) if k == "REF_FRAME"));
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::MissingField(k) if k == "REF_FRAME"));
+            }
+            CcsdsNdmError::MissingField(k) => assert_eq!(k, "REF_FRAME"),
+            _ => panic!("unexpected error: {:?}", err),
+        }
     }
 
     #[test]
@@ -1403,7 +1604,13 @@ Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::MissingField(k) if k == "TIME_SYSTEM"));
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::MissingField(k) if k == "TIME_SYSTEM"));
+            }
+            CcsdsNdmError::MissingField(k) => assert_eq!(k, "TIME_SYSTEM"),
+            _ => panic!("unexpected error: {:?}", err),
+        }
     }
 
     #[test]
@@ -1501,7 +1708,13 @@ Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::MissingField(k) if k == "EPOCH"));
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::MissingField(k) if k == "EPOCH"));
+            }
+            CcsdsNdmError::MissingField(k) => assert_eq!(k, "EPOCH"),
+            _ => panic!("unexpected error: {:?}", err),
+        }
     }
 
     #[test]
@@ -1523,7 +1736,13 @@ Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::MissingField(k) if k == "Z"));
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::MissingField(k) if k == "Z"));
+            }
+            CcsdsNdmError::MissingField(k) => assert_eq!(k, "Z"),
+            _ => panic!("unexpected error: {:?}", err),
+        }
     }
 
     #[test]
@@ -1545,7 +1764,13 @@ X_DOT = 1.0 [km/s]
 Y_DOT = 2.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::MissingField(k) if k == "Z_DOT"));
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::MissingField(k) if k == "Z_DOT"));
+            }
+            CcsdsNdmError::MissingField(k) => assert_eq!(k, "Z_DOT"),
+            _ => panic!("unexpected error: {:?}", err),
+        }
     }
 
     // =========================================================================
@@ -2139,7 +2364,24 @@ MAN_DV_2 = 0.0 [km/s]
 MAN_DV_3 = 0.0 [km/s]
 "#;
         let err = Opm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::Validation(_)));
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(
+                    matches!(*source, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "DeltaMassZ" && expected == "<= 0")
+                );
+            }
+            CcsdsNdmError::OutOfRange {
+                ref name,
+                ref expected,
+                ..
+            } => {
+                assert!(name == "DeltaMassZ" && expected == "<= 0");
+            }
+            _ => panic!(
+                "Expected OutOfRange or LineContext(OutOfRange), got {:?}",
+                err
+            ),
+        }
     }
 
     #[test]
