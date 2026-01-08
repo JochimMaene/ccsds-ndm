@@ -424,9 +424,8 @@ impl OmmMetadataBuilder {
             "CENTER_NAME" => self.center_name = Some(val.to_string()),
             "REF_FRAME" => self.ref_frame = Some(val.to_string()),
             "REF_FRAME_EPOCH" => {
-                self.ref_frame_epoch = Some(
-                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?,
-                )
+                self.ref_frame_epoch =
+                    Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
             "TIME_SYSTEM" => self.time_system = Some(val.to_string()),
             "MEAN_ELEMENT_THEORY" => self.mean_element_theory = Some(val.to_string()),
@@ -789,9 +788,7 @@ impl MeanElementsBuilder {
         self.last_line = line;
         match key {
             "EPOCH" => {
-                self.epoch = Some(
-                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?,
-                )
+                self.epoch = Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
             "SEMI_MAJOR_AXIS" => {
                 self.semi_major_axis =

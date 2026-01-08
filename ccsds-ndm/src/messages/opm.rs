@@ -336,9 +336,8 @@ impl OpmMetadataBuilder {
             "CENTER_NAME" => self.center_name = Some(val.to_string()),
             "REF_FRAME" => self.ref_frame = Some(val.to_string()),
             "REF_FRAME_EPOCH" => {
-                self.ref_frame_epoch = Some(
-                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?,
-                )
+                self.ref_frame_epoch =
+                    Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
             "TIME_SYSTEM" => self.time_system = Some(val.to_string()),
             _ => {
@@ -646,9 +645,7 @@ impl StateVectorBuilder {
         self.last_line = line;
         match key {
             "EPOCH" => {
-                self.epoch = Some(
-                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?,
-                )
+                self.epoch = Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
             "X" => self.x = Some(Position::from_kvn(val, Some("km")).map_err(|e| e.at_line(line))?),
             "Y" => self.y = Some(Position::from_kvn(val, Some("km")).map_err(|e| e.at_line(line))?),
@@ -1286,9 +1283,8 @@ impl ManeuverParametersBuilder {
         self.last_line = line;
         match key {
             "MAN_EPOCH_IGNITION" => {
-                self.man_epoch_ignition = Some(
-                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?,
-                )
+                self.man_epoch_ignition =
+                    Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
             "MAN_DURATION" => {
                 self.man_duration =

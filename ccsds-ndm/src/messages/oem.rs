@@ -434,9 +434,8 @@ impl OemMetadataBuilder {
             "CENTER_NAME" => self.center_name = Some(val.into()),
             "REF_FRAME" => self.ref_frame = Some(val.into()),
             "REF_FRAME_EPOCH" => {
-                self.ref_frame_epoch = Some(
-                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?,
-                )
+                self.ref_frame_epoch =
+                    Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line))?)
             }
             "TIME_SYSTEM" => self.time_system = Some(val.into()),
             "START_TIME" => {
@@ -1003,9 +1002,7 @@ impl OemCovarianceMatrix {
             })) => {
                 let line_num = line_number;
                 last_line = line_num;
-                epoch = Some(
-                    FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line_num))?,
-                );
+                epoch = Some(FromKvnValue::from_kvn_value(val).map_err(|e| e.at_line(line_num))?);
             }
             Some(Err(e)) => return Err(e),
             Some(Ok(t)) => {
