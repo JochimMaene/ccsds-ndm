@@ -2,10 +2,12 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector, UserDefined};
-use crate::error::Result;
+use crate::common::{
+    OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector, UserDefined,
+};
 #[cfg(test)]
 use crate::error::CcsdsNdmError;
+use crate::error::Result;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
@@ -77,8 +79,6 @@ impl ToKvn for OpmBody {
     }
 }
 
-
-
 /// A single segment of the OPM.
 ///
 /// Contains metadata and data sections.
@@ -94,8 +94,6 @@ impl ToKvn for OpmSegment {
         self.data.write_kvn(writer);
     }
 }
-
-
 
 //----------------------------------------------------------------------
 // Metadata
@@ -181,7 +179,6 @@ impl ToKvn for OpmMetadata {
         writer.write_pair("TIME_SYSTEM", &self.time_system);
     }
 }
-
 
 //----------------------------------------------------------------------
 // Data
@@ -291,13 +288,9 @@ impl ToKvn for OpmData {
     }
 }
 
-
-
 //----------------------------------------------------------------------
 // Sub-structures and Builders
 //----------------------------------------------------------------------
-
-
 
 /// Osculating Keplerian Elements.
 ///
@@ -395,12 +388,6 @@ impl ToKvn for KeplerianElements {
     }
 }
 
-
-
-
-
-
-
 /// Maneuver Parameters.
 ///
 /// References:
@@ -469,12 +456,6 @@ impl ToKvn for ManeuverParameters {
         writer.write_measure("MAN_DV_3", &self.man_dv_3);
     }
 }
-
-
-
-
-
-
 
 //----------------------------------------------------------------------
 // Tests

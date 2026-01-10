@@ -41,7 +41,7 @@ pub struct Deserializer<'de> {
 }
 
 impl<'de> Deserializer<'de> {
-    pub fn from_str(input: &'de str) -> Self {
+    pub fn new(input: &'de str) -> Self {
         Deserializer {
             tokenizer: KvnTokenizer::new(input).peekable(),
             context_stack: vec![KvnContext::Root],
@@ -67,7 +67,7 @@ impl<'de> Deserializer<'de> {
     }
 
     fn next(&mut self) -> Result<Option<KvnLine<'de>>> {
-        while let Some(res) = self.tokenizer.next() {
+        for res in self.tokenizer.by_ref() {
             match res {
                 Ok(KvnLine::Empty { .. }) | Ok(KvnLine::Comment { .. }) => continue,
                 Ok(line) => return Ok(Some(line)),
@@ -82,12 +82,12 @@ pub fn from_str<'a, T>(s: &'a str) -> Result<T>
 where
     T: Deserialize<'a>,
 {
-    let mut deserializer = Deserializer::from_str(s);
+    let mut deserializer = Deserializer::new(s);
     let t = T::deserialize(&mut deserializer)?;
     Ok(t)
 }
 
-impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = CcsdsNdmError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value>
@@ -209,10 +209,26 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.context_stack.pop();
                 Ok(val)
             }
-            "UnitValue" | "Angle" | "DayInterval" | "Frequency" | "Gm" | "AltitudeRequired"
-            | "BallisticCoeffRequired" | "Percentage" | "PercentageRequired" | "Mass" | "Area"
-            | "PositionRequired" | "VelocityRequired" | "DayIntervalRequired" | "WkgRequired"
-            | "Ms2Required" | "SensorNoise" | "DeltaMassZRaw" | "Duration" | "RelTime" => {
+            "UnitValue"
+            | "Angle"
+            | "DayInterval"
+            | "Frequency"
+            | "Gm"
+            | "AltitudeRequired"
+            | "BallisticCoeffRequired"
+            | "Percentage"
+            | "PercentageRequired"
+            | "Mass"
+            | "Area"
+            | "PositionRequired"
+            | "VelocityRequired"
+            | "DayIntervalRequired"
+            | "WkgRequired"
+            | "Ms2Required"
+            | "SensorNoise"
+            | "DeltaMassZRaw"
+            | "Duration"
+            | "RelTime" => {
                 self.context_stack.push(KvnContext::UnitValue);
                 let val = visitor.visit_map(KvnMapAccess::new(self))?;
                 self.context_stack.pop();
@@ -455,7 +471,6 @@ enum ImpliedField {
     UserDefinedParameters,
     Done,
     // UnitValue implied fields
-    UnitValueValue,
     UnitValueUnits,
 }
 
@@ -486,7 +501,8 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                             self.de.version_key = Some(key);
                             self.de.version_val = Some(val);
                             self.current_implied_field = Some(ImpliedField::Version);
-                            let de: de::value::StrDeserializer<CcsdsNdmError> = "@version".into_deserializer();
+                            let de: de::value::StrDeserializer<CcsdsNdmError> =
+                                "@version".into_deserializer();
                             return seed.deserialize(de).map(Some);
                         }
                     }
@@ -499,7 +515,8 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                 }
                 Some(ImpliedField::Id) => {
                     self.current_implied_field = Some(ImpliedField::Header);
-                    let de: de::value::StrDeserializer<CcsdsNdmError> = "header".into_deserializer();
+                    let de: de::value::StrDeserializer<CcsdsNdmError> =
+                        "header".into_deserializer();
                     seed.deserialize(de).map(Some)
                 }
                 Some(ImpliedField::Header) => {
@@ -521,7 +538,8 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
             KvnContext::Body => {
                 if self.current_implied_field.is_none() {
                     self.current_implied_field = Some(ImpliedField::Done);
-                    let de: de::value::StrDeserializer<CcsdsNdmError> = "segment".into_deserializer();
+                    let de: de::value::StrDeserializer<CcsdsNdmError> =
+                        "segment".into_deserializer();
                     return seed.deserialize(de).map(Some);
                 }
                 Ok(None)
@@ -529,7 +547,8 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
             KvnContext::Segment => match self.current_implied_field {
                 None => {
                     self.current_implied_field = Some(ImpliedField::Data);
-                    let de: de::value::StrDeserializer<CcsdsNdmError> = "metadata".into_deserializer();
+                    let de: de::value::StrDeserializer<CcsdsNdmError> =
+                        "metadata".into_deserializer();
                     seed.deserialize(de).map(Some)
                 }
                 Some(ImpliedField::Data) => {
@@ -588,7 +607,8 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                             ImpliedField::UserDefinedParameters => "userDefined",
                             _ => unreachable!(),
                         };
-                        let de: de::value::StrDeserializer<CcsdsNdmError> = field_name.into_deserializer();
+                        let de: de::value::StrDeserializer<CcsdsNdmError> =
+                            field_name.into_deserializer();
                         return seed.deserialize(de).map(Some);
                     }
                 }
@@ -670,13 +690,13 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
             }
             KvnContext::UserDefined => {
                 if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
-                    if key.starts_with("USER_DEFINED_") {
-                        if !self.seen_keys.contains(&"userDefinedParameter") {
-                            self.seen_keys.push("userDefinedParameter");
-                            let de: de::value::StrDeserializer<CcsdsNdmError> =
-                                "userDefinedParameter".into_deserializer();
-                            return seed.deserialize(de).map(Some);
-                        }
+                    if key.starts_with("USER_DEFINED_")
+                        && !self.seen_keys.contains(&"userDefinedParameter")
+                    {
+                        self.seen_keys.push("userDefinedParameter");
+                        let de: de::value::StrDeserializer<CcsdsNdmError> =
+                            "userDefinedParameter".into_deserializer();
+                        return seed.deserialize(de).map(Some);
                     }
                 }
                 Ok(None)
@@ -703,13 +723,15 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
             KvnContext::UnitValue => match self.current_implied_field {
                 None => {
                     self.current_implied_field = Some(ImpliedField::UnitValueUnits);
-                    let de: de::value::StrDeserializer<CcsdsNdmError> = "$value".into_deserializer();
+                    let de: de::value::StrDeserializer<CcsdsNdmError> =
+                        "$value".into_deserializer();
                     seed.deserialize(de).map(Some)
                 }
                 Some(ImpliedField::UnitValueUnits) => {
                     if let Some(KvnLine::Pair { unit: Some(_), .. }) = &self.de.current_pair {
                         self.current_implied_field = Some(ImpliedField::Done);
-                        let de: de::value::StrDeserializer<CcsdsNdmError> = "@units".into_deserializer();
+                        let de: de::value::StrDeserializer<CcsdsNdmError> =
+                            "@units".into_deserializer();
                         seed.deserialize(de).map(Some)
                     } else {
                         self.de.next()?; // Consume it here if no units
@@ -770,7 +792,9 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                     if self.seen_keys.last() == Some(&"value") {
                         self.de.next()?; // Consume the pair after we've returned both fields
                     }
-                    self.de.context_stack.push(KvnContext::SyntheticValue(synth));
+                    self.de
+                        .context_stack
+                        .push(KvnContext::SyntheticValue(synth));
                     let res = seed.deserialize(&mut *self.de);
                     self.de.context_stack.pop();
                     res
@@ -779,7 +803,7 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                 }
             }
             KvnContext::UnitValue => match self.current_implied_field {
-                Some(ImpliedField::UnitValueUnits) | Some(ImpliedField::UnitValueValue) => {
+                Some(ImpliedField::UnitValueUnits) => {
                     if let Some(KvnLine::Pair { val, .. }) = &self.de.current_pair {
                         self.de.context_stack.push(KvnContext::SyntheticValue(val));
                         let res = seed.deserialize(&mut *self.de);
@@ -808,15 +832,12 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
             },
             _ => {
                 if let Some(KvnContext::UnitValue) = self.de.context_stack.last() {
-                    match self.current_implied_field {
-                        Some(ImpliedField::UnitValueUnits) => {
-                             if let Some(KvnLine::Pair { unit: None, .. }) = &self.de.current_pair {
-                                 let res = seed.deserialize(&mut *self.de);
-                                 self.de.next()?;
-                                 return res;
-                             }
+                    if let Some(ImpliedField::UnitValueUnits) = self.current_implied_field {
+                        if let Some(KvnLine::Pair { unit: None, .. }) = &self.de.current_pair {
+                            let res = seed.deserialize(&mut *self.de);
+                            self.de.next()?;
+                            return res;
                         }
-                        _ => {}
                     }
                 }
                 seed.deserialize(&mut *self.de)

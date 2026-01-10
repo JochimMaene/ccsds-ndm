@@ -204,8 +204,6 @@ impl ToKvn for OmmBody {
     }
 }
 
-
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OmmSegment {
     pub metadata: OmmMetadata,
@@ -225,8 +223,6 @@ impl ToKvn for OmmSegment {
         self.data.write_kvn(writer);
     }
 }
-
-
 
 //----------------------------------------------------------------------
 // Metadata
@@ -324,8 +320,6 @@ impl ToKvn for OmmMetadata {
         writer.write_pair("MEAN_ELEMENT_THEORY", &self.mean_element_theory);
     }
 }
-
-
 
 //----------------------------------------------------------------------
 // Data
@@ -433,8 +427,6 @@ impl ToKvn for OmmData {
         }
     }
 }
-
-
 
 //----------------------------------------------------------------------
 // Mean Elements
@@ -550,10 +542,7 @@ impl MeanElements {
             self.inclination.angle.value,
             self.inclination.angle.units.clone(),
         )?;
-        Angle::new(
-            self.ra_of_asc_node.value,
-            self.ra_of_asc_node.units.clone(),
-        )?;
+        Angle::new(self.ra_of_asc_node.value, self.ra_of_asc_node.units.clone())?;
         Angle::new(
             self.arg_of_pericenter.value,
             self.arg_of_pericenter.units.clone(),
@@ -584,13 +573,9 @@ impl ToKvn for MeanElements {
     }
 }
 
-
-
 //----------------------------------------------------------------------
 // Spacecraft Parameters
 //----------------------------------------------------------------------
-
-
 
 //----------------------------------------------------------------------
 // TLE Parameters
@@ -773,13 +758,9 @@ impl ToKvn for TleParameters {
     }
 }
 
-
-
 //----------------------------------------------------------------------
 // User Defined
 //----------------------------------------------------------------------
-
-
 
 //----------------------------------------------------------------------
 // Tests
