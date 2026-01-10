@@ -107,4 +107,24 @@ impl CcsdsNdmError {
     }
 }
 
+impl serde::de::Error for CcsdsNdmError {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
+        CcsdsNdmError::Validation(msg.to_string())
+    }
+
+    fn missing_field(field: &'static str) -> Self {
+        CcsdsNdmError::MissingField(field.to_string())
+    }
+
+    fn duplicate_field(field: &'static str) -> Self {
+        CcsdsNdmError::Validation(format!("duplicate field `{}`", field))
+    }
+}
+
+impl serde::ser::Error for CcsdsNdmError {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
+        CcsdsNdmError::Validation(msg.to_string())
+    }
+}
+
 pub type Result<T> = std::result::Result<T, CcsdsNdmError>;

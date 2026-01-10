@@ -1123,7 +1123,7 @@ impl TleParameters {
 #[pyclass]
 #[derive(Clone)]
 pub struct UserDefined {
-    pub inner: ccsds_ndm::types::UserDefined,
+    pub inner: ccsds_ndm::common::UserDefined,
 }
 
 #[pymethods]
@@ -1133,13 +1133,13 @@ impl UserDefined {
     fn new(parameters: std::collections::HashMap<String, String>) -> Self {
         let user_defined = parameters
             .into_iter()
-            .map(|(k, v)| ccsds_ndm::types::UserDefinedParameter {
+            .map(|(k, v)| ccsds_ndm::common::UserDefinedParameter {
                 parameter: k,
                 value: v,
             })
             .collect();
         Self {
-            inner: ccsds_ndm::types::UserDefined {
+            inner: ccsds_ndm::common::UserDefined {
                 comment: vec![],
                 user_defined,
             },
@@ -1179,7 +1179,7 @@ impl UserDefined {
     fn set_user_defined(&mut self, value: std::collections::HashMap<String, String>) {
         self.inner.user_defined = value
             .into_iter()
-            .map(|(k, v)| ccsds_ndm::types::UserDefinedParameter {
+            .map(|(k, v)| ccsds_ndm::common::UserDefinedParameter {
                 parameter: k,
                 value: v,
             })

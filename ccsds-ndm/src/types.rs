@@ -845,11 +845,25 @@ impl DeltaMass {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(try_from = "DeltaMassZRaw")]
 pub struct DeltaMassZ {
-    #[serde(rename = "$value")]
     pub value: f64,
-    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<MassUnits>,
+}
+
+#[derive(Deserialize)]
+struct DeltaMassZRaw {
+    #[serde(rename = "$value")]
+    value: f64,
+    #[serde(rename = "@units")]
+    units: Option<MassUnits>,
+}
+
+impl TryFrom<DeltaMassZRaw> for DeltaMassZ {
+    type Error = CcsdsNdmError;
+    fn try_from(raw: DeltaMassZRaw) -> Result<Self> {
+        Self::new(raw.value, raw.units)
+    }
 }
 impl DeltaMassZ {
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {

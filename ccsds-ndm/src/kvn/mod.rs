@@ -4,3 +4,6 @@
 
 pub mod de;
 pub mod ser;
+pub mod serde_de;
+
+pub use serde_de::from_str;

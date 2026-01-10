@@ -1531,3 +1531,36 @@ pub struct RdmSpacecraftParameters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thrust_acceleration: Option<Ms2Required>,
 }
+
+//----------------------------------------------------------------------
+// User Defined
+//----------------------------------------------------------------------
+
+/// User-Defined Parameters.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+pub struct UserDefined {
+    /// Comments.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comment: Vec<String>,
+    /// User-defined parameters.
+    #[serde(rename = "userDefinedParameter")]
+    pub user_defined: Vec<UserDefinedParameter>,
+}
+
+/// A single user-defined parameter.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct UserDefinedParameter {
+    /// Parameter name (must start with USER_DEFINED_).
+    pub parameter: String,
+    /// Parameter value.
+    pub value: String,
+}
+
+impl ToKvn for UserDefined {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        for param in &self.user_defined {
+            writer.write_pair(&param.parameter, &param.value);
+        }
+    }
+}
