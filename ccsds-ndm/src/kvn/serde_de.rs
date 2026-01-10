@@ -718,7 +718,8 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                                 ImpliedField::UserDefinedParameters
                             } else {
                                 // Transition to synthetic COMMENT if needed
-                                if !self.returned_comments && !self.de.accumulated_comments.is_empty()
+                                if !self.returned_comments
+                                    && !self.de.accumulated_comments.is_empty()
                                 {
                                     self.returned_comments = true;
                                     self.seen_keys.push("COMMENT");
@@ -745,17 +746,22 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                         }
                     };
 
-                    if Some(mapped) != self.current_implied_field && !self.seen_keys.contains(&match mapped {
-                        ImpliedField::StateVector | ImpliedField::OemStateVectors => "stateVector",
-                        ImpliedField::KeplerianElements => "keplerianElements",
-                        ImpliedField::MeanElements => "meanElements",
-                        ImpliedField::TleParameters => "tleParameters",
-                        ImpliedField::SpacecraftParameters => "spacecraftParameters",
-                        ImpliedField::CovarianceMatrix | ImpliedField::OemCovarianceMatrices => "covarianceMatrix",
-                        ImpliedField::ManeuverParameters => "maneuverParameters",
-                        ImpliedField::UserDefinedParameters => "userDefined",
-                        _ => "",
-                    }) {
+                    if Some(mapped) != self.current_implied_field
+                        && !self.seen_keys.contains(&match mapped {
+                            ImpliedField::StateVector | ImpliedField::OemStateVectors => {
+                                "stateVector"
+                            }
+                            ImpliedField::KeplerianElements => "keplerianElements",
+                            ImpliedField::MeanElements => "meanElements",
+                            ImpliedField::TleParameters => "tleParameters",
+                            ImpliedField::SpacecraftParameters => "spacecraftParameters",
+                            ImpliedField::CovarianceMatrix
+                            | ImpliedField::OemCovarianceMatrices => "covarianceMatrix",
+                            ImpliedField::ManeuverParameters => "maneuverParameters",
+                            ImpliedField::UserDefinedParameters => "userDefined",
+                            _ => "",
+                        })
+                    {
                         self.current_implied_field = Some(mapped);
                         let field_name = match mapped {
                             ImpliedField::StateVector => "stateVector",
@@ -918,8 +924,7 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                             return Ok(None);
                         }
                         self.seen_keys.push(key);
-                        let de: de::value::StrDeserializer<CcsdsNdmError> =
-                            key.into_deserializer();
+                        let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
                         return seed.deserialize(de).map(Some);
                     }
                 }
@@ -1036,7 +1041,9 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                             return res;
                         }
                         Some(ImpliedField::OemCovarianceMatrices) => {
-                            self.de.context_stack.push(KvnContext::OemCovarianceMatrices);
+                            self.de
+                                .context_stack
+                                .push(KvnContext::OemCovarianceMatrices);
                             let res = seed.deserialize(&mut *self.de);
                             self.de.context_stack.pop();
                             return res;
