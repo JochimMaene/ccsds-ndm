@@ -27,6 +27,9 @@ enum KvnContext<'de> {
     UserDefined,
     UserDefinedParameter,
     UnitValue, // Handling $value and @units
+    Comments,
+    OemStateVectors,
+    OemCovarianceMatrices,
     SyntheticValue(&'de str),
 }
 
@@ -38,6 +41,8 @@ pub struct Deserializer<'de> {
     version_val: Option<&'de str>,
     // Current pair being processed (for UnitValue expansion)
     pub(crate) current_pair: Option<KvnLine<'de>>,
+    pub(crate) remaining_raw_values: Vec<&'de str>,
+    pub(crate) accumulated_comments: Vec<&'de str>,
 }
 
 impl<'de> Deserializer<'de> {
@@ -48,13 +53,15 @@ impl<'de> Deserializer<'de> {
             version_key: None,
             version_val: None,
             current_pair: None,
+            remaining_raw_values: Vec::new(),
+            accumulated_comments: Vec::new(),
         }
     }
 
     fn peek(&mut self) -> Result<Option<KvnLine<'de>>> {
         loop {
             match self.tokenizer.peek() {
-                Some(Ok(KvnLine::Empty { .. })) | Some(Ok(KvnLine::Comment { .. })) => {
+                Some(Ok(KvnLine::Empty { .. })) => {
                     self.tokenizer.next();
                 }
                 Some(Ok(line)) => return Ok(Some(line.clone())),
@@ -67,14 +74,28 @@ impl<'de> Deserializer<'de> {
     }
 
     fn next(&mut self) -> Result<Option<KvnLine<'de>>> {
+        self.current_pair = None;
         for res in self.tokenizer.by_ref() {
             match res {
-                Ok(KvnLine::Empty { .. }) | Ok(KvnLine::Comment { .. }) => continue,
+                Ok(KvnLine::Empty { .. }) => continue,
                 Ok(line) => return Ok(Some(line)),
                 Err(e) => return Err(e),
             }
         }
         Ok(None)
+    }
+
+    fn peek_no_comment(&mut self) -> Result<Option<KvnLine<'de>>> {
+        loop {
+            match self.peek()? {
+                Some(KvnLine::Comment { content, .. }) => {
+                    self.accumulated_comments.push(content);
+                    self.next()?;
+                }
+                Some(line) => return Ok(Some(line)),
+                None => return Ok(None),
+            }
+        }
     }
 }
 
@@ -119,37 +140,37 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         match name {
-            "Opm" | "opm" | "Omm" | "omm" => {
+            "Opm" | "opm" | "Omm" | "omm" | "Oem" | "oem" => {
                 self.context_stack.push(KvnContext::Root);
                 let val = visitor.visit_map(KvnMapAccess::new(self))?;
                 self.context_stack.pop();
                 Ok(val)
             }
-            "OdmHeader" | "Header" | "TdmHeader" | "OmmHeader" => {
+            "OdmHeader" | "Header" | "TdmHeader" | "OmmHeader" | "OemHeader" => {
                 self.context_stack.push(KvnContext::Header);
                 let val = visitor.visit_map(KvnMapAccess::new(self))?;
                 self.context_stack.pop();
                 Ok(val)
             }
-            "OpmBody" | "OmmBody" | "Body" => {
+            "OpmBody" | "OmmBody" | "OemBody" | "Body" => {
                 self.context_stack.push(KvnContext::Body);
                 let val = visitor.visit_map(KvnMapAccess::new(self))?;
                 self.context_stack.pop();
                 Ok(val)
             }
-            "OpmSegment" | "OmmSegment" | "Segment" => {
+            "OpmSegment" | "OmmSegment" | "OemSegment" | "Segment" => {
                 self.context_stack.push(KvnContext::Segment);
                 let val = visitor.visit_map(KvnMapAccess::new(self))?;
                 self.context_stack.pop();
                 Ok(val)
             }
-            "OpmMetadata" | "OmmMetadata" | "Metadata" => {
+            "OpmMetadata" | "OmmMetadata" | "OemMetadata" | "Metadata" => {
                 self.context_stack.push(KvnContext::Metadata);
                 let val = visitor.visit_map(KvnMapAccess::new(self))?;
                 self.context_stack.pop();
                 Ok(val)
             }
-            "OpmData" | "OmmData" | "Data" => {
+            "OpmData" | "OmmData" | "OemData" | "Data" => {
                 self.context_stack.push(KvnContext::Data);
                 let val = visitor.visit_map(KvnMapAccess::new(self))?;
                 self.context_stack.pop();
@@ -185,11 +206,29 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 self.context_stack.pop();
                 Ok(val)
             }
-            "OpmCovarianceMatrix" | "OmmCovarianceMatrix" | "OdmCovarianceMatrix" => {
+            "OpmCovarianceMatrix"
+            | "OmmCovarianceMatrix"
+            | "OemCovarianceMatrix"
+            | "OdmCovarianceMatrix" => {
                 self.context_stack.push(KvnContext::CovarianceMatrix);
                 let val = visitor.visit_map(KvnMapAccess::new(self))?;
                 self.context_stack.pop();
                 Ok(val)
+            }
+            "StateVectorAcc" => {
+                // For OEM raw state vectors
+                if let Some(KvnLine::Raw { content, .. }) = self.peek_no_comment()? {
+                    self.next()?;
+                    let val = visitor.visit_map(KvnRawMapAccess::new(
+                        self,
+                        content,
+                        RawType::StateVector,
+                    ))?;
+                    return Ok(val);
+                }
+                Err(<CcsdsNdmError as de::Error>::custom(
+                    "Expected Raw line for StateVectorAcc",
+                ))
             }
             "ManeuverParameters" => {
                 self.context_stack.push(KvnContext::ManeuverParameters);
@@ -425,6 +464,16 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        let context = self.context_stack.last();
+        if let Some(KvnContext::Comments) = context {
+            return visitor.visit_seq(KvnSeqAccess::new_comments(self));
+        }
+        if let Some(KvnContext::OemStateVectors) = context {
+            return visitor.visit_seq(KvnSeqAccess::new_mode(self, SeqMode::OemStateVectors));
+        }
+        if let Some(KvnContext::OemCovarianceMatrices) = context {
+            return visitor.visit_seq(KvnSeqAccess::new_mode(self, SeqMode::OemCovarianceMatrices));
+        }
         visitor.visit_seq(KvnSeqAccess::new(self))
     }
 
@@ -451,6 +500,7 @@ struct KvnMapAccess<'a, 'de> {
     de: &'a mut Deserializer<'de>,
     current_implied_field: Option<ImpliedField>,
     seen_keys: Vec<&'de str>,
+    returned_comments: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -469,6 +519,9 @@ enum ImpliedField {
     CovarianceMatrix,
     ManeuverParameters,
     UserDefinedParameters,
+    // OEM specific
+    OemStateVectors,
+    OemCovarianceMatrices,
     Done,
     // UnitValue implied fields
     UnitValueUnits,
@@ -480,6 +533,7 @@ impl<'a, 'de> KvnMapAccess<'a, 'de> {
             de,
             current_implied_field: None,
             seen_keys: Vec::new(),
+            returned_comments: false,
         }
     }
 }
@@ -493,10 +547,12 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
     {
         let context = *self.de.context_stack.last().unwrap();
 
+        let token = self.de.peek_no_comment()?;
+
         match context {
             KvnContext::Root => match self.current_implied_field {
                 None => {
-                    if let Some(KvnLine::Pair { key, val, .. }) = self.de.peek()? {
+                    if let Some(KvnLine::Pair { key, val, .. }) = token {
                         if key.ends_with("_VERS") {
                             self.de.version_key = Some(key);
                             self.de.version_val = Some(val);
@@ -504,7 +560,18 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                             let de: de::value::StrDeserializer<CcsdsNdmError> =
                                 "@version".into_deserializer();
                             return seed.deserialize(de).map(Some);
+                        } else {
+                            return Err(CcsdsNdmError::MissingField(
+                                "CCSDS_xxx_VERS must be the first non-comment keyword".to_string(),
+                            ));
                         }
+                    }
+                    if !self.returned_comments && !self.de.accumulated_comments.is_empty() {
+                        self.returned_comments = true;
+                        self.seen_keys.push("COMMENT");
+                        let de: de::value::StrDeserializer<CcsdsNdmError> =
+                            "COMMENT".into_deserializer();
+                        return seed.deserialize(de).map(Some);
                     }
                     Ok(None)
                 }
@@ -527,11 +594,19 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                 _ => Ok(None),
             },
             KvnContext::Header => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
-                    if is_header_key(key) {
+                if let Some(KvnLine::Pair { key, .. }) = token {
+                    if is_header_key(key) && !self.seen_keys.contains(&key) {
+                        self.seen_keys.push(key);
                         let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
                         return seed.deserialize(de).map(Some);
                     }
+                }
+                if !self.returned_comments && !self.de.accumulated_comments.is_empty() {
+                    self.returned_comments = true;
+                    self.seen_keys.push("COMMENT");
+                    let de: de::value::StrDeserializer<CcsdsNdmError> =
+                        "COMMENT".into_deserializer();
+                    return seed.deserialize(de).map(Some);
                 }
                 Ok(None)
             }
@@ -546,6 +621,9 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
             }
             KvnContext::Segment => match self.current_implied_field {
                 None => {
+                    if let Some(KvnLine::BlockStart { tag: "META", .. }) = token {
+                        self.de.next()?;
+                    }
                     self.current_implied_field = Some(ImpliedField::Data);
                     let de: de::value::StrDeserializer<CcsdsNdmError> =
                         "metadata".into_deserializer();
@@ -559,42 +637,125 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                 _ => Ok(None),
             },
             KvnContext::Metadata => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
-                    if !is_data_transition(key) {
-                        let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
-                        return seed.deserialize(de).map(Some);
+                if let Some(token) = token {
+                    match token {
+                        KvnLine::Pair { key, .. } => {
+                            if !is_data_transition(key) && !self.seen_keys.contains(&key) {
+                                self.seen_keys.push(key);
+                                let de: de::value::StrDeserializer<CcsdsNdmError> =
+                                    key.into_deserializer();
+                                return seed.deserialize(de).map(Some);
+                            }
+                        }
+                        KvnLine::BlockEnd { tag: "META", .. } => {
+                            if !self.returned_comments && !self.de.accumulated_comments.is_empty() {
+                                self.returned_comments = true;
+                                self.seen_keys.push("COMMENT");
+                                let de: de::value::StrDeserializer<CcsdsNdmError> =
+                                    "COMMENT".into_deserializer();
+                                return seed.deserialize(de).map(Some);
+                            }
+                            self.de.next()?;
+                            return Ok(None);
+                        }
+                        _ => {
+                            // If it's a data transition but we are in OEM/OCM, it means META_STOP was missing
+                            let is_oem = self
+                                .de
+                                .version_key
+                                .map(|k| k.contains("OEM"))
+                                .unwrap_or(false);
+                            let is_ocm = self
+                                .de
+                                .version_key
+                                .map(|k| k.contains("OCM"))
+                                .unwrap_or(false);
+                            if (is_oem || is_ocm) && is_data_transition_token(&token) {
+                                return Err(CcsdsNdmError::MissingField("META_STOP".into()));
+                            }
+                        }
                     }
+                }
+                if !self.returned_comments && !self.de.accumulated_comments.is_empty() {
+                    self.returned_comments = true;
+                    self.seen_keys.push("COMMENT");
+                    let de: de::value::StrDeserializer<CcsdsNdmError> =
+                        "COMMENT".into_deserializer();
+                    return seed.deserialize(de).map(Some);
                 }
                 Ok(None)
             }
             KvnContext::Data => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
+                if let Some(token) = token {
                     let is_omm = self
                         .de
                         .version_key
                         .map(|k| k.contains("OMM"))
                         .unwrap_or(false);
-                    let mapped = if is_state_vector_key(key) && !is_omm {
-                        ImpliedField::StateVector
-                    } else if is_keplerian_key(key) && !is_omm {
-                        ImpliedField::KeplerianElements
-                    } else if is_mean_elements_key(key) && is_omm {
-                        ImpliedField::MeanElements
-                    } else if is_tle_key(key) && is_omm {
-                        ImpliedField::TleParameters
-                    } else if is_spacecraft_key(key) {
-                        ImpliedField::SpacecraftParameters
-                    } else if is_covariance_key(key) {
-                        ImpliedField::CovarianceMatrix
-                    } else if key.starts_with("MAN_") {
-                        ImpliedField::ManeuverParameters
-                    } else if key.starts_with("USER_DEFINED_") {
-                        ImpliedField::UserDefinedParameters
-                    } else {
-                        return Ok(None);
+                    let is_oem = self
+                        .de
+                        .version_key
+                        .map(|k| k.contains("OEM"))
+                        .unwrap_or(false);
+
+                    let mapped = match token {
+                        KvnLine::Pair { key, .. } => {
+                            if is_state_vector_key(key) && !is_omm && !is_oem {
+                                ImpliedField::StateVector
+                            } else if is_keplerian_key(key) && !is_omm && !is_oem {
+                                ImpliedField::KeplerianElements
+                            } else if is_mean_elements_key(key) && is_omm {
+                                ImpliedField::MeanElements
+                            } else if is_tle_key(key) && is_omm {
+                                ImpliedField::TleParameters
+                            } else if is_spacecraft_key(key) {
+                                ImpliedField::SpacecraftParameters
+                            } else if is_covariance_key(key) {
+                                ImpliedField::CovarianceMatrix
+                            } else if key.starts_with("MAN_") {
+                                ImpliedField::ManeuverParameters
+                            } else if key.starts_with("USER_DEFINED_") {
+                                ImpliedField::UserDefinedParameters
+                            } else {
+                                // Transition to synthetic COMMENT if needed
+                                if !self.returned_comments && !self.de.accumulated_comments.is_empty()
+                                {
+                                    self.returned_comments = true;
+                                    self.seen_keys.push("COMMENT");
+                                    let de: de::value::StrDeserializer<CcsdsNdmError> =
+                                        "COMMENT".into_deserializer();
+                                    return seed.deserialize(de).map(Some);
+                                }
+                                return Ok(None);
+                            }
+                        }
+                        KvnLine::Raw { .. } if is_oem => ImpliedField::OemStateVectors,
+                        KvnLine::BlockStart {
+                            tag: "COVARIANCE", ..
+                        } if is_oem => ImpliedField::OemCovarianceMatrices,
+                        _ => {
+                            if !self.returned_comments && !self.de.accumulated_comments.is_empty() {
+                                self.returned_comments = true;
+                                self.seen_keys.push("COMMENT");
+                                let de: de::value::StrDeserializer<CcsdsNdmError> =
+                                    "COMMENT".into_deserializer();
+                                return seed.deserialize(de).map(Some);
+                            }
+                            return Ok(None);
+                        }
                     };
 
-                    if Some(mapped) != self.current_implied_field {
+                    if Some(mapped) != self.current_implied_field && !self.seen_keys.contains(&match mapped {
+                        ImpliedField::StateVector | ImpliedField::OemStateVectors => "stateVector",
+                        ImpliedField::KeplerianElements => "keplerianElements",
+                        ImpliedField::MeanElements => "meanElements",
+                        ImpliedField::TleParameters => "tleParameters",
+                        ImpliedField::SpacecraftParameters => "spacecraftParameters",
+                        ImpliedField::CovarianceMatrix | ImpliedField::OemCovarianceMatrices => "covarianceMatrix",
+                        ImpliedField::ManeuverParameters => "maneuverParameters",
+                        ImpliedField::UserDefinedParameters => "userDefined",
+                        _ => "",
+                    }) {
                         self.current_implied_field = Some(mapped);
                         let field_name = match mapped {
                             ImpliedField::StateVector => "stateVector",
@@ -605,17 +766,27 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                             ImpliedField::CovarianceMatrix => "covarianceMatrix",
                             ImpliedField::ManeuverParameters => "maneuverParameters",
                             ImpliedField::UserDefinedParameters => "userDefined",
+                            ImpliedField::OemStateVectors => "stateVector",
+                            ImpliedField::OemCovarianceMatrices => "covarianceMatrix",
                             _ => unreachable!(),
                         };
+                        self.seen_keys.push(field_name);
                         let de: de::value::StrDeserializer<CcsdsNdmError> =
                             field_name.into_deserializer();
                         return seed.deserialize(de).map(Some);
                     }
                 }
+                if !self.returned_comments && !self.de.accumulated_comments.is_empty() {
+                    self.returned_comments = true;
+                    self.seen_keys.push("COMMENT");
+                    let de: de::value::StrDeserializer<CcsdsNdmError> =
+                        "COMMENT".into_deserializer();
+                    return seed.deserialize(de).map(Some);
+                }
                 Ok(None)
             }
             KvnContext::StateVector => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
+                if let Some(KvnLine::Pair { key, .. }) = token {
                     if is_state_vector_key(key) && !self.seen_keys.contains(&key) {
                         self.seen_keys.push(key);
                         let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
@@ -625,7 +796,7 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                 Ok(None)
             }
             KvnContext::KeplerianElements => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
+                if let Some(KvnLine::Pair { key, .. }) = token {
                     if is_keplerian_key(key) && !self.seen_keys.contains(&key) {
                         self.seen_keys.push(key);
                         let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
@@ -635,7 +806,7 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                 Ok(None)
             }
             KvnContext::SpacecraftParameters => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
+                if let Some(KvnLine::Pair { key, .. }) = token {
                     if is_spacecraft_key(key) && !self.seen_keys.contains(&key) {
                         self.seen_keys.push(key);
                         let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
@@ -645,7 +816,7 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                 Ok(None)
             }
             KvnContext::MeanElements => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
+                if let Some(KvnLine::Pair { key, .. }) = token {
                     if is_mean_elements_key(key) && !self.seen_keys.contains(&key) {
                         self.seen_keys.push(key);
                         let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
@@ -655,7 +826,7 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                 Ok(None)
             }
             KvnContext::TleParameters => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
+                if let Some(KvnLine::Pair { key, .. }) = token {
                     if is_tle_key(key) && !self.seen_keys.contains(&key) {
                         self.seen_keys.push(key);
                         let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
@@ -665,31 +836,97 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                 Ok(None)
             }
             KvnContext::CovarianceMatrix => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
-                    if is_covariance_key(key) && !self.seen_keys.contains(&key) {
-                        self.seen_keys.push(key);
-                        let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
-                        return seed.deserialize(de).map(Some);
+                let cov_fields = [
+                    "CX_X",
+                    "CY_X",
+                    "CY_Y",
+                    "CZ_X",
+                    "CZ_Y",
+                    "CZ_Z",
+                    "CX_DOT_X",
+                    "CX_DOT_Y",
+                    "CX_DOT_Z",
+                    "CX_DOT_X_DOT",
+                    "CY_DOT_X",
+                    "CY_DOT_Y",
+                    "CY_DOT_Z",
+                    "CY_DOT_X_DOT",
+                    "CY_DOT_Y_DOT",
+                    "CZ_DOT_X",
+                    "CZ_DOT_Y",
+                    "CZ_DOT_Z",
+                    "CZ_DOT_X_DOT",
+                    "CZ_DOT_Y_DOT",
+                    "CZ_DOT_Z_DOT",
+                ];
+
+                if !self.de.remaining_raw_values.is_empty() {
+                    for field in cov_fields {
+                        if !self.seen_keys.contains(&field) {
+                            self.seen_keys.push(field);
+                            let de: de::value::StrDeserializer<CcsdsNdmError> =
+                                field.into_deserializer();
+                            return seed.deserialize(de).map(Some);
+                        }
                     }
+                }
+
+                if let Some(token) = token {
+                    match token {
+                        KvnLine::Pair { key, .. } => {
+                            if is_covariance_key(key) && !self.seen_keys.contains(&key) {
+                                self.seen_keys.push(key);
+                                let de: de::value::StrDeserializer<CcsdsNdmError> =
+                                    key.into_deserializer();
+                                return seed.deserialize(de).map(Some);
+                            }
+                        }
+                        KvnLine::BlockEnd {
+                            tag: "COVARIANCE", ..
+                        } => {
+                            // Don't consume here, let KvnSeqAccess or parent handle it if needed
+                            // But return None to finish the struct
+                            return Ok(None);
+                        }
+                        KvnLine::Raw { .. } => {
+                            for field in cov_fields {
+                                if !self.seen_keys.contains(&field) {
+                                    self.seen_keys.push(field);
+                                    let de: de::value::StrDeserializer<CcsdsNdmError> =
+                                        field.into_deserializer();
+                                    return seed.deserialize(de).map(Some);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                if !self.returned_comments && !self.de.accumulated_comments.is_empty() {
+                    self.returned_comments = true;
+                    self.seen_keys.push("COMMENT");
+                    let de: de::value::StrDeserializer<CcsdsNdmError> =
+                        "COMMENT".into_deserializer();
+                    return seed.deserialize(de).map(Some);
                 }
                 Ok(None)
             }
             KvnContext::ManeuverParameters => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
+                if let Some(KvnLine::Pair { key, .. }) = self.de.peek_no_comment()? {
                     // Stop if we hit a key already seen (signaling start of next maneuver block)
                     if key.starts_with("MAN_") {
                         if self.seen_keys.contains(&key) {
                             return Ok(None);
                         }
                         self.seen_keys.push(key);
-                        let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
+                        let de: de::value::StrDeserializer<CcsdsNdmError> =
+                            key.into_deserializer();
                         return seed.deserialize(de).map(Some);
                     }
                 }
                 Ok(None)
             }
             KvnContext::UserDefined => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
+                if let Some(KvnLine::Pair { key, .. }) = self.de.peek_no_comment()? {
                     if key.starts_with("USER_DEFINED_")
                         && !self.seen_keys.contains(&"userDefinedParameter")
                     {
@@ -702,7 +939,7 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                 Ok(None)
             }
             KvnContext::UserDefinedParameter => {
-                if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
+                if let Some(KvnLine::Pair { key, .. }) = self.de.peek_no_comment()? {
                     if key.starts_with("USER_DEFINED_") {
                         if !self.seen_keys.contains(&"parameter") {
                             self.seen_keys.push("parameter");
@@ -734,7 +971,11 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                             "@units".into_deserializer();
                         seed.deserialize(de).map(Some)
                     } else {
-                        self.de.next()?; // Consume it here if no units
+                        // Only consume from tokenizer if it was actually a Pair that we are done with.
+                        // If it was a SyntheticValue (e.g. from Raw line), it's already "consumed" from the values list.
+                        if let Some(KvnLine::Pair { .. }) = &self.de.current_pair {
+                            self.de.next()?;
+                        }
                         Ok(None)
                     }
                 }
@@ -777,13 +1018,73 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
             | KvnContext::CovarianceMatrix
             | KvnContext::ManeuverParameters
             | KvnContext::UserDefined => {
-                if let Some(line) = self.de.peek()? {
-                    self.de.current_pair = Some(line);
+                // 1. Synthetic COMMENT
+                if self.seen_keys.last() == Some(&"COMMENT") {
+                    self.de.context_stack.push(KvnContext::Comments);
+                    let res = seed.deserialize(&mut *self.de);
+                    self.de.context_stack.pop();
+                    return res;
+                }
+
+                // 2. OEM Data sequences
+                if let Some(KvnContext::Data) = self.de.context_stack.last() {
+                    match self.current_implied_field {
+                        Some(ImpliedField::OemStateVectors) => {
+                            self.de.context_stack.push(KvnContext::OemStateVectors);
+                            let res = seed.deserialize(&mut *self.de);
+                            self.de.context_stack.pop();
+                            return res;
+                        }
+                        Some(ImpliedField::OemCovarianceMatrices) => {
+                            self.de.context_stack.push(KvnContext::OemCovarianceMatrices);
+                            let res = seed.deserialize(&mut *self.de);
+                            self.de.context_stack.pop();
+                            return res;
+                        }
+                        _ => {}
+                    }
+                }
+
+                if let Some(KvnContext::CovarianceMatrix) = self.de.context_stack.last() {
+                    if !self.de.remaining_raw_values.is_empty() {
+                        let val = self.de.remaining_raw_values.remove(0);
+                        self.de.context_stack.push(KvnContext::SyntheticValue(val));
+                        let res = seed.deserialize(&mut *self.de);
+                        self.de.context_stack.pop();
+                        return res;
+                    }
+
+                    if let Some(token) = self.de.peek_no_comment()? {
+                        match token {
+                            KvnLine::Pair { .. } => {
+                                self.de.current_pair = Some(token);
+                                return seed.deserialize(&mut *self.de);
+                            }
+                            KvnLine::Raw { content, .. } => {
+                                self.de.remaining_raw_values = content.split_whitespace().collect();
+                                self.de.next()?; // Consume the Raw line
+                                let val = self.de.remaining_raw_values.remove(0);
+                                self.de.context_stack.push(KvnContext::SyntheticValue(val));
+                                let res = seed.deserialize(&mut *self.de);
+                                self.de.context_stack.pop();
+                                return res;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                // 4. Default: Pairs
+                if let Some(token) = self.de.peek_no_comment()? {
+                    if let KvnLine::Pair { .. } = token {
+                        self.de.current_pair = Some(token);
+                        return seed.deserialize(&mut *self.de);
+                    }
                 }
                 seed.deserialize(&mut *self.de)
             }
             KvnContext::UserDefinedParameter => {
-                if let Some(KvnLine::Pair { key, val, .. }) = self.de.peek()? {
+                if let Some(KvnLine::Pair { key, val, .. }) = self.de.peek_no_comment()? {
                     let synth = if self.seen_keys.last() == Some(&"parameter") {
                         key
                     } else {
@@ -797,10 +1098,9 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                         .push(KvnContext::SyntheticValue(synth));
                     let res = seed.deserialize(&mut *self.de);
                     self.de.context_stack.pop();
-                    res
-                } else {
-                    seed.deserialize(&mut *self.de)
+                    return res;
                 }
+                seed.deserialize(&mut *self.de)
             }
             KvnContext::UnitValue => match self.current_implied_field {
                 Some(ImpliedField::UnitValueUnits) => {
@@ -810,9 +1110,26 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
                         self.de.context_stack.pop();
                         res
                     } else {
-                        Err(<CcsdsNdmError as de::Error>::custom(
-                            "UnitValue context without current pair",
-                        ))
+                        // Check if there's a SyntheticValue underneath us (e.g. from KvnRawMapAccess)
+                        let mut synth_val = None;
+                        if self.de.context_stack.len() >= 2 {
+                            if let KvnContext::SyntheticValue(v) =
+                                self.de.context_stack[self.de.context_stack.len() - 2]
+                            {
+                                synth_val = Some(v);
+                            }
+                        }
+
+                        if let Some(v) = synth_val {
+                            self.de.context_stack.push(KvnContext::SyntheticValue(v));
+                            let res = seed.deserialize(&mut *self.de);
+                            self.de.context_stack.pop();
+                            res
+                        } else {
+                            Err(<CcsdsNdmError as de::Error>::custom(
+                                "UnitValue context without current pair or synthetic value",
+                            ))
+                        }
                     }
                 }
                 Some(ImpliedField::Done) => {
@@ -846,6 +1163,15 @@ impl<'de, 'a> MapAccess<'de> for KvnMapAccess<'a, 'de> {
     }
 }
 
+fn is_data_transition_token(token: &KvnLine) -> bool {
+    match token {
+        KvnLine::Pair { key, .. } => is_data_transition(key),
+        KvnLine::BlockStart { tag, .. } => *tag == "COVARIANCE" || *tag == "USER",
+        KvnLine::Raw { .. } => true,
+        _ => false,
+    }
+}
+
 fn is_header_key(key: &str) -> bool {
     matches!(
         key,
@@ -862,6 +1188,8 @@ fn is_data_transition(key: &str) -> bool {
         || is_covariance_key(key)
         || key.starts_with("MAN_")
         || key.starts_with("USER_DEFINED_")
+        || key == "META_START"
+        || key == "COVARIANCE_START"
 }
 
 fn is_state_vector_key(key: &str) -> bool {
@@ -921,7 +1249,8 @@ fn is_spacecraft_key(key: &str) -> bool {
 }
 
 fn is_covariance_key(key: &str) -> bool {
-    key.starts_with("CX_")
+    key == "EPOCH"
+        || key.starts_with("CX_")
         || key.starts_with("CY_")
         || key.starts_with("CZ_")
         || key == "COV_REF_FRAME"
@@ -981,11 +1310,33 @@ impl<'de, 'a> de::VariantAccess<'de> for KvnEnumAccess<'a, 'de> {
 
 struct KvnSeqAccess<'a, 'de> {
     de: &'a mut Deserializer<'de>,
+    mode: SeqMode,
+}
+
+enum SeqMode {
+    General,
+    Comments,
+    OemStateVectors,
+    OemCovarianceMatrices,
 }
 
 impl<'a, 'de> KvnSeqAccess<'a, 'de> {
     fn new(de: &'a mut Deserializer<'de>) -> Self {
-        KvnSeqAccess { de }
+        KvnSeqAccess {
+            de,
+            mode: SeqMode::General,
+        }
+    }
+
+    fn new_comments(de: &'a mut Deserializer<'de>) -> Self {
+        KvnSeqAccess {
+            de,
+            mode: SeqMode::Comments,
+        }
+    }
+
+    fn new_mode(de: &'a mut Deserializer<'de>, mode: SeqMode) -> Self {
+        KvnSeqAccess { de, mode }
     }
 }
 
@@ -996,11 +1347,133 @@ impl<'de, 'a> de::SeqAccess<'de> for KvnSeqAccess<'a, 'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
-        if let Some(KvnLine::Pair { key, .. }) = self.de.peek()? {
-            if key.starts_with("MAN_") || key.starts_with("USER_DEFINED_") {
-                return seed.deserialize(&mut *self.de).map(Some);
+        match self.mode {
+            SeqMode::Comments => {
+                if self.de.accumulated_comments.is_empty() {
+                    return Ok(None);
+                }
+                let val = self.de.accumulated_comments.remove(0);
+                self.de.context_stack.push(KvnContext::SyntheticValue(val));
+                let res = seed.deserialize(&mut *self.de).map(Some);
+                self.de.context_stack.pop();
+                res
+            }
+            SeqMode::OemStateVectors => {
+                if let Some(KvnLine::Raw { .. }) = self.de.peek_no_comment()? {
+                    return seed.deserialize(&mut *self.de).map(Some);
+                }
+                Ok(None)
+            }
+            SeqMode::OemCovarianceMatrices => {
+                if let Some(KvnLine::BlockStart {
+                    tag: "COVARIANCE", ..
+                }) = self.de.peek_no_comment()?
+                {
+                    self.de.next()?; // Consume COVARIANCE_START
+                }
+                if let Some(KvnLine::BlockEnd {
+                    tag: "COVARIANCE", ..
+                }) = self.de.peek_no_comment()?
+                {
+                    self.de.next()?; // Consume COVARIANCE_STOP
+                    return Ok(None);
+                }
+                if let Some(_token) = self.de.peek_no_comment()? {
+                    return seed.deserialize(&mut *self.de).map(Some);
+                }
+                Ok(None)
+            }
+            SeqMode::General => {
+                if let Some(token) = self.de.peek_no_comment()? {
+                    match token {
+                        KvnLine::BlockStart { tag: "META", .. } => {
+                            return seed.deserialize(&mut *self.de).map(Some);
+                        }
+                        KvnLine::Raw { .. } => {
+                            return seed.deserialize(&mut *self.de).map(Some);
+                        }
+                        KvnLine::BlockStart {
+                            tag: "COVARIANCE", ..
+                        } => {
+                            return seed.deserialize(&mut *self.de).map(Some);
+                        }
+                        KvnLine::Pair { key, .. } => {
+                            if key.starts_with("MAN_") || key.starts_with("USER_DEFINED_") {
+                                return seed.deserialize(&mut *self.de).map(Some);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(None)
             }
         }
-        Ok(None)
+    }
+}
+
+struct KvnRawMapAccess<'a, 'de> {
+    de: &'a mut Deserializer<'de>,
+    values: Vec<&'de str>,
+    raw_type: RawType,
+    index: usize,
+}
+
+#[derive(Clone, Copy)]
+enum RawType {
+    StateVector,
+}
+
+impl<'a, 'de> KvnRawMapAccess<'a, 'de> {
+    fn new(de: &'a mut Deserializer<'de>, content: &'de str, raw_type: RawType) -> Self {
+        KvnRawMapAccess {
+            de,
+            values: content.split_whitespace().collect(),
+            raw_type,
+            index: 0,
+        }
+    }
+}
+
+impl<'de, 'a> MapAccess<'de> for KvnRawMapAccess<'a, 'de> {
+    type Error = CcsdsNdmError;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        if self.index >= self.values.len() {
+            return Ok(None);
+        }
+
+        let key = match self.raw_type {
+            RawType::StateVector => match self.index {
+                0 => "EPOCH",
+                1 => "X",
+                2 => "Y",
+                3 => "Z",
+                4 => "X_DOT",
+                5 => "Y_DOT",
+                6 => "Z_DOT",
+                7 => "X_DDOT",
+                8 => "Y_DDOT",
+                9 => "Z_DDOT",
+                _ => return Ok(None),
+            },
+        };
+
+        let de: de::value::StrDeserializer<CcsdsNdmError> = key.into_deserializer();
+        seed.deserialize(de).map(Some)
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        let val = self.values[self.index];
+        self.index += 1;
+        self.de.context_stack.push(KvnContext::SyntheticValue(val));
+        let res = seed.deserialize(&mut *self.de);
+        self.de.context_stack.pop();
+        res
     }
 }
