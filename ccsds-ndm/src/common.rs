@@ -102,7 +102,7 @@ impl ToKvn for AdmHeader {
 }
 
 /// Represents the `odmHeader` complex type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdmHeader {
     /// Comments (see 7.8 for formatting rules).

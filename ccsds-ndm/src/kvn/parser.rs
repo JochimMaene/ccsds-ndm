@@ -256,6 +256,17 @@ pub fn parse_u32(value: &str) -> crate::error::Result<u32> {
         })
 }
 
+/// Parses a u64 value from a string slice.
+pub fn parse_u64(value: &str) -> crate::error::Result<u64> {
+    value
+        .trim()
+        .parse::<u64>()
+        .map_err(|e| CcsdsNdmError::KvnParse {
+            line: 0,
+            message: format!("Invalid unsigned 64-bit integer '{}': {}", value, e),
+        })
+}
+
 //----------------------------------------------------------------------
 // High-level Parsing Traits
 //----------------------------------------------------------------------
@@ -451,9 +462,23 @@ pub fn expect_block_start<'a>(
 ) -> impl FnMut(&mut &'a str) -> ModalResult<()> {
     move |input: &mut &'a str| {
         let _ = ws.parse_next(input);
-        let tag = block_start.parse_next(input)?;
+        let tag = block_start.parse_next(input).map_err(|e| {
+            e.add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description(
+                    format!("{}_START", expected_tag).leak(),
+                )),
+            )
+        })?;
         if tag != expected_tag {
-            return Err(ErrMode::Backtrack(ContextError::new()));
+            return Err(ErrMode::Backtrack(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description(
+                    format!("{}_START", expected_tag).leak(),
+                )),
+            )));
         }
         let _ = opt_line_ending.parse_next(input);
         Ok(())
@@ -466,9 +491,23 @@ pub fn expect_block_end<'a>(
 ) -> impl FnMut(&mut &'a str) -> ModalResult<()> {
     move |input: &mut &'a str| {
         let _ = ws.parse_next(input);
-        let tag = block_end.parse_next(input)?;
+        let tag = block_end.parse_next(input).map_err(|e| {
+            e.add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description(
+                    format!("{}_STOP", expected_tag).leak(),
+                )),
+            )
+        })?;
         if tag != expected_tag {
-            return Err(ErrMode::Backtrack(ContextError::new()));
+            return Err(ErrMode::Backtrack(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description(
+                    format!("{}_STOP", expected_tag).leak(),
+                )),
+            )));
         }
         let _ = opt_line_ending.parse_next(input);
         Ok(())

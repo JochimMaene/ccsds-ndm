@@ -613,6 +613,7 @@ impl ToKvn for RdmData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::CcsdsNdmError;
 
     // ==========================================
     // XSD Compliance Tests for RDM

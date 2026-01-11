@@ -17,7 +17,7 @@ use thiserror::Error;
 ///
 /// This struct wraps a `String` and provides validation during deserialization
 /// to ensure it conforms to the CCSDS epoch format.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(try_from = "String")]
 pub struct Epoch(String);
 
