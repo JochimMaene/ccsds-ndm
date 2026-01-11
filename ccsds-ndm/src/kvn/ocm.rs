@@ -11,7 +11,8 @@ use crate::messages::ocm::*;
 use crate::traits::FromKvnValue;
 use crate::types::*;
 use std::str::FromStr;
-use winnow::ascii::till_line_ending;
+use winnow::ascii::{space1, till_line_ending};
+use winnow::combinator::repeat;
 use winnow::error::{AddContext, ContextError, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 use winnow::ModalResult;
@@ -370,20 +371,13 @@ fn is_traj_key(key: &str) -> bool {
 }
 
 pub fn ocm_traj_line(input: &mut &str) -> ModalResult<TrajLine> {
-    let line = raw_line.parse_next(input)?;
+    let epoch = till_space.parse_next(input)?;
+    let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
-    let mut parts = line.split_whitespace();
-    let epoch = parts
-        .next()
-        .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-        .to_string();
-    let values: Vec<f64> = parts
-        .map(|v| {
-            v.parse::<f64>()
-                .map_err(|_| ErrMode::Cut(ContextError::new()))
-        })
-        .collect::<Result<Vec<f64>, _>>()?;
-    Ok(TrajLine { epoch, values })
+    Ok(TrajLine {
+        epoch: epoch.to_string(),
+        values,
+    })
 }
 
 pub fn ocm_traj_state(input: &mut &str) -> ModalResult<OcmTrajState> {
@@ -971,20 +965,13 @@ fn is_ocm_cov_key(key: &str) -> bool {
 }
 
 pub fn ocm_cov_line(input: &mut &str) -> ModalResult<CovLine> {
-    let line = raw_line.parse_next(input)?;
+    let epoch = till_space.parse_next(input)?;
+    let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
-    let mut parts = line.split_whitespace();
-    let epoch = parts
-        .next()
-        .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-        .to_string();
-    let values: Vec<f64> = parts
-        .map(|v| {
-            v.parse::<f64>()
-                .map_err(|_| ErrMode::Cut(ContextError::new()))
-        })
-        .collect::<Result<Vec<f64>, _>>()?;
-    Ok(CovLine { epoch, values })
+    Ok(CovLine {
+        epoch: epoch.to_string(),
+        values,
+    })
 }
 
 pub fn ocm_cov(input: &mut &str) -> ModalResult<OcmCovarianceMatrix> {
@@ -1158,15 +1145,14 @@ fn is_ocm_man_key(key: &str) -> bool {
 }
 
 pub fn ocm_man_line(input: &mut &str) -> ModalResult<ManLine> {
-    let line = raw_line.parse_next(input)?;
+    let epoch = till_space.parse_next(input)?;
+    let values =
+        repeat(1.., (space1, till_space_or_eol).map(|(_, v)| v.to_string())).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
-    let mut parts = line.split_whitespace();
-    let epoch = parts
-        .next()
-        .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-        .to_string();
-    let values: Vec<String> = parts.map(|s| s.to_string()).collect();
-    Ok(ManLine { epoch, values })
+    Ok(ManLine {
+        epoch: epoch.to_string(),
+        values,
+    })
 }
 
 pub fn ocm_man(input: &mut &str) -> ModalResult<OcmManeuverParameters> {
@@ -2002,60 +1988,70 @@ pub fn ocm_data(input: &mut &str) -> ModalResult<OcmData> {
             break;
         }
 
-        if at_block_start("TRAJ", input) {
-            let mut block = ocm_traj_state.parse_next(input)?;
-            block.comment.splice(0..0, pending_comments.drain(..));
-            data.traj.push(block);
-        } else if at_block_start("PHYS", input) {
-            let mut block = ocm_phys.parse_next(input)?;
-            block.comment.splice(0..0, pending_comments.drain(..));
-            data.phys = Some(block);
-        } else if at_block_start("COV", input) {
-            let mut block = ocm_cov.parse_next(input)?;
-            block.comment.splice(0..0, pending_comments.drain(..));
-            data.cov.push(block);
-        } else if at_block_start("MAN", input) {
-            let mut block = ocm_man.parse_next(input)?;
-            block.comment.splice(0..0, pending_comments.drain(..));
-            data.man.push(block);
-        } else if at_block_start("PERT", input) {
-            let mut block = ocm_pert.parse_next(input)?;
-            block.comment.splice(0..0, pending_comments.drain(..));
-            data.pert = Some(block);
-        } else if at_block_start("OD", input) {
-            let mut block = ocm_od.parse_next(input)?;
-            block.comment.splice(0..0, pending_comments.drain(..));
-            data.od = Some(block);
-        } else if at_block_start("USER", input) {
-            let mut block = ocm_user.parse_next(input)?;
-            block.comment.splice(0..0, pending_comments.drain(..));
-            data.user = Some(block);
-        } else {
-            // Check if it's an unexpected key that isn't a block start
-            // If we are here, we are not at a block start, and comments have been consumed.
-            // If there is anything else than empty, it's an error.
-
-            // However, collect_comments skips whitespace.
-            // If input is not empty, it means we have something unknown.
-            if !input.is_empty() {
-                let checkpoint = input.checkpoint();
-                let next = peek_key(input)?;
-                input.reset(&checkpoint);
-
-                if let Some(k) = next {
-                    return Err(ErrMode::Cut(ContextError::new().add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description(
-                            format!("Unexpected key: {}", k).leak(),
-                        )),
-                    )));
-                } else {
-                    // Could be garbage, break and let trailing checker handle it or fail
-                    break;
-                }
+        let first_char = input.as_bytes().first();
+        match first_char {
+            Some(b'T') if at_block_start("TRAJ", input) => {
+                let mut block = ocm_traj_state.parse_next(input)?;
+                block.comment.splice(0..0, pending_comments.drain(..));
+                data.traj.push(block);
             }
-            break;
+            Some(b'P') if at_block_start("PHYS", input) => {
+                let mut block = ocm_phys.parse_next(input)?;
+                block.comment.splice(0..0, pending_comments.drain(..));
+                data.phys = Some(block);
+            }
+            Some(b'C') if at_block_start("COV", input) => {
+                let mut block = ocm_cov.parse_next(input)?;
+                block.comment.splice(0..0, pending_comments.drain(..));
+                data.cov.push(block);
+            }
+            Some(b'M') if at_block_start("MAN", input) => {
+                let mut block = ocm_man.parse_next(input)?;
+                block.comment.splice(0..0, pending_comments.drain(..));
+                data.man.push(block);
+            }
+            Some(b'P') if at_block_start("PERT", input) => {
+                let mut block = ocm_pert.parse_next(input)?;
+                block.comment.splice(0..0, pending_comments.drain(..));
+                data.pert = Some(block);
+            }
+            Some(b'O') if at_block_start("OD", input) => {
+                let mut block = ocm_od.parse_next(input)?;
+                block.comment.splice(0..0, pending_comments.drain(..));
+                data.od = Some(block);
+            }
+            Some(b'U') if at_block_start("USER", input) => {
+                let mut block = ocm_user.parse_next(input)?;
+                block.comment.splice(0..0, pending_comments.drain(..));
+                data.user = Some(block);
+            }
+            _ => {
+                // Check if it's an unexpected key that isn't a block start
+                // If we are here, we are not at a block start, and comments have been consumed.
+                // If there is anything else than empty, it's an error.
+
+                // However, collect_comments skips whitespace.
+                // If input is not empty, it means we have something unknown.
+                if !input.is_empty() {
+                    let checkpoint = input.checkpoint();
+                    let next = peek_key(input)?;
+                    input.reset(&checkpoint);
+
+                    if let Some(k) = next {
+                        return Err(ErrMode::Cut(ContextError::new().add_context(
+                            input,
+                            &input.checkpoint(),
+                            StrContext::Expected(StrContextValue::Description(
+                                format!("Unexpected key: {}", k).leak(),
+                            )),
+                        )));
+                    } else {
+                        // Could be garbage, break and let trailing checker handle it or fail
+                        break;
+                    }
+                }
+                break;
+            }
         }
     }
 

@@ -22,12 +22,31 @@ use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateV
 use crate::error::CcsdsNdmError;
 use crate::types::{UserDefined, UserDefinedParameter, *};
 use std::str::FromStr;
-use winnow::ascii::{line_ending, space0, till_line_ending};
+use winnow::ascii::{float, line_ending, space0, till_line_ending};
 use winnow::combinator::{alt, opt, peek, repeat};
 use winnow::error::{AddContext, ContextError, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
-use winnow::token::take_while;
+use winnow::token::{take_till, take_while};
 use winnow::ModalResult;
+
+//----------------------------------------------------------------------
+// Low-level fast parsers
+//----------------------------------------------------------------------
+
+/// Parses a float directly from the input.
+pub fn parse_f64_winnow(input: &mut &str) -> ModalResult<f64> {
+    float.parse_next(input)
+}
+
+/// Parses up to the next space or line ending.
+pub fn till_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    take_till(1.., (' ', '\t', '\r', '\n')).parse_next(input)
+}
+
+/// Parses up to the next space or line ending, or end of input.
+pub fn till_space_or_eol<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    take_till(1.., (' ', '\t', '\r', '\n')).parse_next(input)
+}
 
 //----------------------------------------------------------------------
 // Error Handling
@@ -337,7 +356,13 @@ pub fn expect_key<'a>(
 ) -> impl FnMut(&mut &'a str) -> ModalResult<(&'a str, Option<&'a str>)> {
     move |input: &mut &'a str| {
         ws.parse_next(input)?;
-        let key = keyword.parse_next(input)?;
+        let key = keyword.parse_next(input).map_err(|e| {
+            e.add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Label("Expected KVN keyword"),
+            )
+        })?;
         if key != expected_key {
             return Err(ErrMode::Backtrack(ContextError::new().add_context(
                 input,
@@ -466,22 +491,37 @@ pub fn peek_key<'a>(input: &mut &'a str) -> ModalResult<Option<&'a str>> {
     }
 }
 
-/// Checks if we're at a specific block start.
+/// Checks if we're at a specific block start without full string scan.
 pub fn at_block_start(tag: &str, input: &mut &str) -> bool {
-    let checkpoint = input.checkpoint();
-    let _ = ws.parse_next(input);
-    let result = block_start.parse_next(input);
-    input.reset(&checkpoint);
-    matches!(result, Ok(t) if t == tag)
+    let mut s = *input;
+    // Skip only spaces/tabs
+    while s.starts_with(' ') || s.starts_with('\t') {
+        s = &s[1..];
+    }
+    if let Some(rest) = s.strip_prefix(tag) {
+        if let Some(suffix) = rest.strip_prefix("_START") {
+            return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
+        }
+    }
+    false
 }
 
-/// Checks if we're at a specific block end.
+/// Checks if we're at a specific block end without full string scan.
 pub fn at_block_end(tag: &str, input: &mut &str) -> bool {
-    let checkpoint = input.checkpoint();
-    let _ = ws.parse_next(input);
-    let result = block_end.parse_next(input);
-    input.reset(&checkpoint);
-    matches!(result, Ok(t) if t == tag)
+    let mut s = *input;
+    // Skip only spaces/tabs
+    while s.starts_with(' ') || s.starts_with('\t') {
+        s = &s[1..];
+    }
+    if let Some(rest) = s.strip_prefix(tag) {
+        if let Some(suffix) = rest.strip_prefix("_STOP") {
+            return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
+        }
+        if let Some(suffix) = rest.strip_prefix("_END") {
+            return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
+        }
+    }
+    false
 }
 
 /// Expects a specific block start and consumes it.

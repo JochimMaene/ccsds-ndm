@@ -46,7 +46,9 @@ use crate::messages::oem::{Oem, OemBody, OemCovarianceMatrix, OemData, OemMetada
 use crate::types::*;
 use std::num::NonZeroU32;
 use std::str::FromStr;
-use winnow::error::{ContextError, ErrMode};
+use winnow::ascii::space1;
+use winnow::combinator::opt;
+use winnow::error::{AddContext, ContextError, ErrMode, StrContext};
 use winnow::prelude::*;
 use winnow::ModalResult;
 
@@ -263,89 +265,111 @@ pub fn oem_metadata(input: &mut &str) -> ModalResult<OemMetadata> {
 /// Parses a raw state vector line.
 /// Format: EPOCH X Y Z X_DOT Y_DOT Z_DOT [X_DDOT Y_DDOT Z_DDOT]
 fn parse_state_vector_line(input: &mut &str) -> ModalResult<StateVectorAcc> {
-    let line = raw_line.parse_next(input)?;
-    opt_line_ending.parse_next(input)?;
+    let epoch_str = till_space.parse_next(input).map_err(|e| {
+        e.add_context(
+            input,
+            &input.checkpoint(),
+            StrContext::Label("Expected epoch in state vector line"),
+        )
+    })?;
+    let epoch = Epoch::from_str(epoch_str).map_err(|_| {
+        ErrMode::Cut(ContextError::new().add_context(
+            input,
+            &input.checkpoint(),
+            StrContext::Label("Invalid epoch format in state vector line"),
+        ))
+    })?;
 
-    let mut tokens = line.split_whitespace();
+    let x_val = (space1, parse_f64_winnow)
+        .map(|(_, v)| v)
+        .parse_next(input)
+        .map_err(|e| {
+            e.add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Label("Expected X component"),
+            )
+        })?;
+    let y_val = (space1, parse_f64_winnow)
+        .map(|(_, v)| v)
+        .parse_next(input)
+        .map_err(|e| {
+            e.add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Label("Expected Y component"),
+            )
+        })?;
+    let z_val = (space1, parse_f64_winnow)
+        .map(|(_, v)| v)
+        .parse_next(input)
+        .map_err(|e| {
+            e.add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Label("Expected Z component"),
+            )
+        })?;
 
-    // Parse epoch
-    let epoch_str = tokens
-        .next()
-        .ok_or_else(|| ErrMode::Cut(ContextError::new()))?;
-    let epoch = Epoch::from_str(epoch_str).map_err(|_| ErrMode::Cut(ContextError::new()))?;
+    let x_dot_val = (space1, parse_f64_winnow)
+        .map(|(_, v)| v)
+        .parse_next(input)
+        .map_err(|e| {
+            e.add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Label("Expected X_DOT component"),
+            )
+        })?;
+    let y_dot_val = (space1, parse_f64_winnow)
+        .map(|(_, v)| v)
+        .parse_next(input)
+        .map_err(|e| {
+            e.add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Label("Expected Y_DOT component"),
+            )
+        })?;
+    let z_dot_val = (space1, parse_f64_winnow)
+        .map(|(_, v)| v)
+        .parse_next(input)
+        .map_err(|e| {
+            e.add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Label("Expected Z_DOT component"),
+            )
+        })?;
 
-    // Parse position components
-    let x_val: f64 = tokens
-        .next()
-        .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-        .parse()
-        .map_err(|_| ErrMode::Cut(ContextError::new()))?;
-    let y_val: f64 = tokens
-        .next()
-        .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-        .parse()
-        .map_err(|_| ErrMode::Cut(ContextError::new()))?;
-    let z_val: f64 = tokens
-        .next()
-        .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-        .parse()
-        .map_err(|_| ErrMode::Cut(ContextError::new()))?;
+    let accs = opt((
+        (space1, parse_f64_winnow).map(|(_, v)| v),
+        (space1, parse_f64_winnow).map(|(_, v)| v),
+        (space1, parse_f64_winnow).map(|(_, v)| v),
+    ))
+    .parse_next(input)?;
 
-    // Parse velocity components
-    let x_dot_val: f64 = tokens
-        .next()
-        .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-        .parse()
-        .map_err(|_| ErrMode::Cut(ContextError::new()))?;
-    let y_dot_val: f64 = tokens
-        .next()
-        .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-        .parse()
-        .map_err(|_| ErrMode::Cut(ContextError::new()))?;
-    let z_dot_val: f64 = tokens
-        .next()
-        .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-        .parse()
-        .map_err(|_| ErrMode::Cut(ContextError::new()))?;
-
-    // Parse optional acceleration components
-    let (x_ddot, y_ddot, z_ddot) = if let Some(x_ddot_str) = tokens.next() {
-        let x_acc: f64 = x_ddot_str
-            .parse()
-            .map_err(|_| ErrMode::Cut(ContextError::new()))?;
-        let y_acc: f64 = tokens
-            .next()
-            .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-            .parse()
-            .map_err(|_| ErrMode::Cut(ContextError::new()))?;
-        let z_acc: f64 = tokens
-            .next()
-            .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
-            .parse()
-            .map_err(|_| ErrMode::Cut(ContextError::new()))?;
-
-        // Check no extra tokens
-        if tokens.next().is_some() {
-            return Err(ErrMode::Cut(ContextError::new()));
-        }
-
+    let (x_ddot, y_ddot, z_ddot) = if let Some((ax, ay, az)) = accs {
         (
             Some(Acc {
-                value: x_acc,
+                value: ax,
                 units: Some(AccUnits::KmPerS2),
             }),
             Some(Acc {
-                value: y_acc,
+                value: ay,
                 units: Some(AccUnits::KmPerS2),
             }),
             Some(Acc {
-                value: z_acc,
+                value: az,
                 units: Some(AccUnits::KmPerS2),
             }),
         )
     } else {
         (None, None, None)
     };
+
+    let _ = ws.parse_next(input)?;
+    opt_line_ending.parse_next(input)?;
 
     Ok(StateVectorAcc {
         epoch,
@@ -530,19 +554,6 @@ fn parse_covariance_block(input: &mut &str) -> ModalResult<Vec<OemCovarianceMatr
 // OEM Data Parser
 //----------------------------------------------------------------------
 
-/// Checks if we're at a raw data line (starts with a date-like pattern).
-fn is_raw_data_line(input: &str) -> bool {
-    let trimmed = input.trim_start();
-    // Get just the first line
-    let first_line = trimmed.lines().next().unwrap_or("");
-    // Raw data lines start with a digit (epoch timestamp) and have no '='
-    first_line
-        .chars()
-        .next()
-        .is_some_and(|c| c.is_ascii_digit())
-        && !first_line.contains('=')
-}
-
 /// Parses the OEM data section (state vectors and optional covariance matrices).
 pub fn oem_data(input: &mut &str) -> ModalResult<OemData> {
     let mut comment = Vec::new();
@@ -551,33 +562,41 @@ pub fn oem_data(input: &mut &str) -> ModalResult<OemData> {
 
     // Parse comments and state vectors
     loop {
-        // Collect comments
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
-
-        // Check if we're at META_START (next segment) or COVARIANCE_START
-        if at_block_start("META", input) || at_block_start("COVARIANCE", input) {
+        // Skip leading whitespace on lines (spaces/tabs only)
+        let _ = ws.parse_next(input)?;
+        if input.is_empty() {
             break;
         }
 
-        // Check if this is a raw data line
-        if is_raw_data_line(input) {
-            let sv = parse_state_vector_line.parse_next(input)?;
-            state_vector.push(sv);
-        } else if input.trim().is_empty() {
-            // End of input
-            break;
-        } else {
-            // Check for key-value line (e.g., COMMENT that wasn't caught)
-            let next_key = peek_key(input)?;
-            if next_key.is_some() {
-                // Unexpected key-value in data section - probably belongs to next section
-                break;
+        // Peek first char to decide what to do - prioritize digits for performance
+        let first_char = input.as_bytes()[0];
+        match first_char {
+            b'0'..=b'9' => {
+                state_vector.push(parse_state_vector_line.parse_next(input)?);
             }
-            // Empty or whitespace - skip
-            if let Some(pos) = input.find('\n') {
-                *input = &input[pos + 1..];
-            } else {
+            b'M' if at_block_start("META", input) => break,
+            b'C' => {
+                if at_block_start("COVARIANCE", input) {
+                    break;
+                }
+                if input.starts_with("COMMENT") {
+                    let c = comment_line.parse_next(input)?;
+                    comment.push(c.trim().to_string());
+                    let _ = opt_line_ending.parse_next(input);
+                } else {
+                    // Unknown key starting with C?
+                    break;
+                }
+            }
+            b'\r' | b'\n' => {
+                let _ = opt_line_ending.parse_next(input);
+            }
+            _ => {
+                // Check if it's an empty line (just spaces)
+                if empty_line.parse_next(input).is_ok() {
+                    let _ = opt_line_ending.parse_next(input);
+                    continue;
+                }
                 break;
             }
         }
