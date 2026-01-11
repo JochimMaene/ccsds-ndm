@@ -929,7 +929,7 @@ pub fn cdm_segment(input: &mut &str) -> ModalResult<CdmSegment> {
     // However, if it's CDM 2.0, we might see META_START.
     // existing parser:
     // match tokens.peek() {
-    //    Some(Ok(KvnLine::Pair { key: "OBJECT", .. })) => ...
+    //    Some(Ok(...)) => ...
 
     // winnow approach:
     // Check if we have META_START

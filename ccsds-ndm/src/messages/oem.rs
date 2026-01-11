@@ -2416,9 +2416,14 @@ STOP_TIME = 2023-01-02T00:00:00
 META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
-        // This should break OemData state vector loop and then break OemData covariance loop
-        // Then it will break OemBody loop because KEY = VAL is not a META_START.
-        let oem = Oem::from_kvn(kvn).unwrap();
-        assert_eq!(oem.body.segment.len(), 1);
+        // The winnow-based parser is stricter and will error on unexpected keys
+        // like KEY = VAL in the middle of data lines.
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        match err {
+            CcsdsNdmError::KvnParse { message, .. } => {
+                assert!(message.contains("Unexpected key: KEY"));
+            }
+            _ => panic!("Expected KvnParse error, got: {:?}", err),
+        }
     }
 }

@@ -6,7 +6,6 @@
 //!
 //! This module implements KVN parsing for OCM using winnow parser combinators.
 
-use crate::kvn::opm::odm_header;
 use crate::kvn::parser::*;
 use crate::messages::ocm::*;
 use crate::traits::FromKvnValue;

@@ -604,16 +604,16 @@ pub fn omm_data(input: &mut &str) -> ModalResult<OmmData> {
     let (me_comment, mean_elements) = mean_elements.parse_next(input)?;
 
     // Spacecraft parameters
-    let spacecraft_parameters = crate::kvn::opm::spacecraft_parameters.parse_next(input)?;
+    let spacecraft_parameters = spacecraft_parameters.parse_next(input)?;
 
     // TLE parameters
     let tle_parameters = tle_parameters.parse_next(input)?;
 
     // Covariance matrix
-    let covariance_matrix = crate::kvn::opm::covariance_matrix.parse_next(input)?;
+    let covariance_matrix = covariance_matrix.parse_next(input)?;
 
     // User defined
-    let user_defined_parameters = crate::kvn::opm::user_defined_parameters.parse_next(input)?;
+    let user_defined_parameters = user_defined_parameters.parse_next(input)?;
 
     Ok(OmmData {
         comment: me_comment,
@@ -631,7 +631,7 @@ pub fn omm_data(input: &mut &str) -> ModalResult<OmmData> {
 
 pub fn parse_omm(input: &mut &str) -> ModalResult<Omm> {
     let version = omm_version.parse_next(input)?;
-    let header = crate::kvn::opm::odm_header.parse_next(input)?;
+    let header = odm_header.parse_next(input)?;
     let metadata = omm_metadata.parse_next(input)?;
     let data = omm_data.parse_next(input)?;
 

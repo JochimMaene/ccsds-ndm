@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
-use crate::error::{CcsdsNdmError, Result};
+use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
@@ -387,223 +387,8 @@ impl ToKvn for KeplerianElements {
 }
 
 //----------------------------------------------------------------------
-// Covariance Matrix Builder (used by OPM and OMM)
+// Maneuver Parameters
 //----------------------------------------------------------------------
-
-// OpmCovarianceMatrix is defined in common.rs but we need a builder here
-#[derive(Default)]
-pub struct OpmCovarianceMatrixBuilder {
-    pub comment: Vec<String>,
-    pub cov_ref_frame: Option<String>,
-    pub cx_x: Option<PositionCovariance>,
-    pub cy_x: Option<PositionCovariance>,
-    pub cy_y: Option<PositionCovariance>,
-    pub cz_x: Option<PositionCovariance>,
-    pub cz_y: Option<PositionCovariance>,
-    pub cz_z: Option<PositionCovariance>,
-    pub cx_dot_x: Option<PositionVelocityCovariance>,
-    pub cx_dot_y: Option<PositionVelocityCovariance>,
-    pub cx_dot_z: Option<PositionVelocityCovariance>,
-    pub cx_dot_x_dot: Option<VelocityCovariance>,
-    pub cy_dot_x: Option<PositionVelocityCovariance>,
-    pub cy_dot_y: Option<PositionVelocityCovariance>,
-    pub cy_dot_z: Option<PositionVelocityCovariance>,
-    pub cy_dot_x_dot: Option<VelocityCovariance>,
-    pub cy_dot_y_dot: Option<VelocityCovariance>,
-    pub cz_dot_x: Option<PositionVelocityCovariance>,
-    pub cz_dot_y: Option<PositionVelocityCovariance>,
-    pub cz_dot_z: Option<PositionVelocityCovariance>,
-    pub cz_dot_x_dot: Option<VelocityCovariance>,
-    pub cz_dot_y_dot: Option<VelocityCovariance>,
-    pub cz_dot_z_dot: Option<VelocityCovariance>,
-    pub last_line: usize,
-}
-
-impl OpmCovarianceMatrixBuilder {
-    pub fn try_match(
-        &mut self,
-        key: &str,
-        val: &str,
-        unit: Option<&str>,
-        line: usize,
-    ) -> Result<bool> {
-        self.last_line = line;
-        match key {
-            "COV_REF_FRAME" => self.cov_ref_frame = Some(val.to_string()),
-            "CX_X" => {
-                self.cx_x =
-                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CY_X" => {
-                self.cy_x =
-                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CY_Y" => {
-                self.cy_y =
-                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CZ_X" => {
-                self.cz_x =
-                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CZ_Y" => {
-                self.cz_y =
-                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CZ_Z" => {
-                self.cz_z =
-                    Some(PositionCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CX_DOT_X" => {
-                self.cx_dot_x = Some(
-                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
-                )
-            }
-            "CX_DOT_Y" => {
-                self.cx_dot_y = Some(
-                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
-                )
-            }
-            "CX_DOT_Z" => {
-                self.cx_dot_z = Some(
-                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
-                )
-            }
-            "CX_DOT_X_DOT" => {
-                self.cx_dot_x_dot =
-                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CY_DOT_X" => {
-                self.cy_dot_x = Some(
-                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
-                )
-            }
-            "CY_DOT_Y" => {
-                self.cy_dot_y = Some(
-                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
-                )
-            }
-            "CY_DOT_Z" => {
-                self.cy_dot_z = Some(
-                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
-                )
-            }
-            "CY_DOT_X_DOT" => {
-                self.cy_dot_x_dot =
-                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CY_DOT_Y_DOT" => {
-                self.cy_dot_y_dot =
-                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CZ_DOT_X" => {
-                self.cz_dot_x = Some(
-                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
-                )
-            }
-            "CZ_DOT_Y" => {
-                self.cz_dot_y = Some(
-                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
-                )
-            }
-            "CZ_DOT_Z" => {
-                self.cz_dot_z = Some(
-                    PositionVelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?,
-                )
-            }
-            "CZ_DOT_X_DOT" => {
-                self.cz_dot_x_dot =
-                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CZ_DOT_Y_DOT" => {
-                self.cz_dot_y_dot =
-                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            "CZ_DOT_Z_DOT" => {
-                self.cz_dot_z_dot =
-                    Some(VelocityCovariance::from_kvn(val, unit).map_err(|e| e.at_line(line))?)
-            }
-            _ => return Ok(false),
-        }
-        Ok(true)
-    }
-
-    pub fn build(self) -> Result<Option<OpmCovarianceMatrix>> {
-        // If no covariance fields provided, return None
-        if self.cx_x.is_none() && self.cov_ref_frame.is_none() {
-            return Ok(None);
-        }
-
-        // If ANY are provided, ALL 21 elements are required
-        Ok(Some(OpmCovarianceMatrix {
-            comment: self.comment,
-            cov_ref_frame: self.cov_ref_frame,
-            cx_x: self.cx_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CX_X".into()).at_line(self.last_line)
-            })?,
-            cy_x: self.cy_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_X".into()).at_line(self.last_line)
-            })?,
-            cy_y: self.cy_y.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_Y".into()).at_line(self.last_line)
-            })?,
-            cz_x: self.cz_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_X".into()).at_line(self.last_line)
-            })?,
-            cz_y: self.cz_y.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_Y".into()).at_line(self.last_line)
-            })?,
-            cz_z: self.cz_z.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_Z".into()).at_line(self.last_line)
-            })?,
-            cx_dot_x: self.cx_dot_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CX_DOT_X".into()).at_line(self.last_line)
-            })?,
-            cx_dot_y: self.cx_dot_y.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CX_DOT_Y".into()).at_line(self.last_line)
-            })?,
-            cx_dot_z: self.cx_dot_z.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CX_DOT_Z".into()).at_line(self.last_line)
-            })?,
-            cx_dot_x_dot: self.cx_dot_x_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CX_DOT_X_DOT".into()).at_line(self.last_line)
-            })?,
-            cy_dot_x: self.cy_dot_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_DOT_X".into()).at_line(self.last_line)
-            })?,
-            cy_dot_y: self.cy_dot_y.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_DOT_Y".into()).at_line(self.last_line)
-            })?,
-            cy_dot_z: self.cy_dot_z.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_DOT_Z".into()).at_line(self.last_line)
-            })?,
-            cy_dot_x_dot: self.cy_dot_x_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_DOT_X_DOT".into()).at_line(self.last_line)
-            })?,
-            cy_dot_y_dot: self.cy_dot_y_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_DOT_Y_DOT".into()).at_line(self.last_line)
-            })?,
-            cz_dot_x: self.cz_dot_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_X".into()).at_line(self.last_line)
-            })?,
-            cz_dot_y: self.cz_dot_y.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_Y".into()).at_line(self.last_line)
-            })?,
-            cz_dot_z: self.cz_dot_z.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_Z".into()).at_line(self.last_line)
-            })?,
-            cz_dot_x_dot: self.cz_dot_x_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_X_DOT".into()).at_line(self.last_line)
-            })?,
-            cz_dot_y_dot: self.cz_dot_y_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_Y_DOT".into()).at_line(self.last_line)
-            })?,
-            cz_dot_z_dot: self.cz_dot_z_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_Z_DOT".into()).at_line(self.last_line)
-            })?,
-        }))
-    }
-}
 
 /// Maneuver Parameters.
 ///
@@ -1677,7 +1462,7 @@ MAN_DV_3 = 0.0 [km/s]
         assert!(!opm.body.segment.metadata.center_name.is_empty());
 
         // Verify state vector present
-        assert!(opm.body.segment.data.state_vector.epoch.to_string().len() > 0);
+        assert!(!opm.body.segment.data.state_vector.epoch.to_string().is_empty());
     }
 
     #[test]
