@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::OdParameters;
-use crate::error::{CcsdsNdmError, Result};
+use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
@@ -834,208 +834,6 @@ pub struct CdmCovarianceMatrix {
     pub cthr_thr: Option<M2s4>,
 }
 
-#[derive(Default)]
-pub struct CdmCovarianceMatrixBuilder {
-    pub comment: Vec<String>,
-    pub cr_r: Option<M2>,
-    pub ct_r: Option<M2>,
-    pub ct_t: Option<M2>,
-    pub cn_r: Option<M2>,
-    pub cn_t: Option<M2>,
-    pub cn_n: Option<M2>,
-    pub crdot_r: Option<M2s>,
-    pub crdot_t: Option<M2s>,
-    pub crdot_n: Option<M2s>,
-    pub crdot_rdot: Option<M2s2>,
-    pub ctdot_r: Option<M2s>,
-    pub ctdot_t: Option<M2s>,
-    pub ctdot_n: Option<M2s>,
-    pub ctdot_rdot: Option<M2s2>,
-    pub ctdot_tdot: Option<M2s2>,
-    pub cndot_r: Option<M2s>,
-    pub cndot_t: Option<M2s>,
-    pub cndot_n: Option<M2s>,
-    pub cndot_rdot: Option<M2s2>,
-    pub cndot_tdot: Option<M2s2>,
-    pub cndot_ndot: Option<M2s2>,
-
-    pub cdrg_r: Option<M3kg>,
-    pub cdrg_t: Option<M3kg>,
-    pub cdrg_n: Option<M3kg>,
-    pub cdrg_rdot: Option<M3kgs>,
-    pub cdrg_tdot: Option<M3kgs>,
-    pub cdrg_ndot: Option<M3kgs>,
-    pub cdrg_drg: Option<M4kg2>,
-    pub csrp_r: Option<M3kg>,
-    pub csrp_t: Option<M3kg>,
-    pub csrp_n: Option<M3kg>,
-    pub csrp_rdot: Option<M3kgs>,
-    pub csrp_tdot: Option<M3kgs>,
-    pub csrp_ndot: Option<M3kgs>,
-    pub csrp_drg: Option<M4kg2>,
-    pub csrp_srp: Option<M4kg2>,
-    pub cthr_r: Option<M2s2>,
-    pub cthr_t: Option<M2s2>,
-    pub cthr_n: Option<M2s2>,
-    pub cthr_rdot: Option<M2s3>,
-    pub cthr_tdot: Option<M2s3>,
-    pub cthr_ndot: Option<M2s3>,
-    pub cthr_drg: Option<M3kgs2>,
-    pub cthr_srp: Option<M3kgs2>,
-    pub cthr_thr: Option<M2s4>,
-}
-
-impl CdmCovarianceMatrixBuilder {
-    pub fn try_match_pair(&mut self, key: &str, val: &str, unit: Option<&str>) -> Result<bool> {
-        match key {
-            "CR_R" => self.cr_r = Some(M2::from_kvn(val, unit)?),
-            "CT_R" => self.ct_r = Some(M2::from_kvn(val, unit)?),
-            "CT_T" => self.ct_t = Some(M2::from_kvn(val, unit)?),
-            "CN_R" => self.cn_r = Some(M2::from_kvn(val, unit)?),
-            "CN_T" => self.cn_t = Some(M2::from_kvn(val, unit)?),
-            "CN_N" => self.cn_n = Some(M2::from_kvn(val, unit)?),
-            "CRDOT_R" => self.crdot_r = Some(M2s::from_kvn(val, unit)?),
-            "CRDOT_T" => self.crdot_t = Some(M2s::from_kvn(val, unit)?),
-            "CRDOT_N" => self.crdot_n = Some(M2s::from_kvn(val, unit)?),
-            "CRDOT_RDOT" => self.crdot_rdot = Some(M2s2::from_kvn(val, unit)?),
-            "CTDOT_R" => self.ctdot_r = Some(M2s::from_kvn(val, unit)?),
-            "CTDOT_T" => self.ctdot_t = Some(M2s::from_kvn(val, unit)?),
-            "CTDOT_N" => self.ctdot_n = Some(M2s::from_kvn(val, unit)?),
-            "CTDOT_RDOT" => self.ctdot_rdot = Some(M2s2::from_kvn(val, unit)?),
-            "CTDOT_TDOT" => self.ctdot_tdot = Some(M2s2::from_kvn(val, unit)?),
-            "CNDOT_R" => self.cndot_r = Some(M2s::from_kvn(val, unit)?),
-            "CNDOT_T" => self.cndot_t = Some(M2s::from_kvn(val, unit)?),
-            "CNDOT_N" => self.cndot_n = Some(M2s::from_kvn(val, unit)?),
-            "CNDOT_RDOT" => self.cndot_rdot = Some(M2s2::from_kvn(val, unit)?),
-            "CNDOT_TDOT" => self.cndot_tdot = Some(M2s2::from_kvn(val, unit)?),
-            "CNDOT_NDOT" => self.cndot_ndot = Some(M2s2::from_kvn(val, unit)?),
-
-            "CDRG_R" => self.cdrg_r = Some(M3kg::from_kvn(val, unit)?),
-            "CDRG_T" => self.cdrg_t = Some(M3kg::from_kvn(val, unit)?),
-            "CDRG_N" => self.cdrg_n = Some(M3kg::from_kvn(val, unit)?),
-            "CDRG_RDOT" => self.cdrg_rdot = Some(M3kgs::from_kvn(val, unit)?),
-            "CDRG_TDOT" => self.cdrg_tdot = Some(M3kgs::from_kvn(val, unit)?),
-            "CDRG_NDOT" => self.cdrg_ndot = Some(M3kgs::from_kvn(val, unit)?),
-            "CDRG_DRG" => self.cdrg_drg = Some(M4kg2::from_kvn(val, unit)?),
-
-            "CSRP_R" => self.csrp_r = Some(M3kg::from_kvn(val, unit)?),
-            "CSRP_T" => self.csrp_t = Some(M3kg::from_kvn(val, unit)?),
-            "CSRP_N" => self.csrp_n = Some(M3kg::from_kvn(val, unit)?),
-            "CSRP_RDOT" => self.csrp_rdot = Some(M3kgs::from_kvn(val, unit)?),
-            "CSRP_TDOT" => self.csrp_tdot = Some(M3kgs::from_kvn(val, unit)?),
-            "CSRP_NDOT" => self.csrp_ndot = Some(M3kgs::from_kvn(val, unit)?),
-            "CSRP_DRG" => self.csrp_drg = Some(M4kg2::from_kvn(val, unit)?),
-            "CSRP_SRP" => self.csrp_srp = Some(M4kg2::from_kvn(val, unit)?),
-
-            "CTHR_R" => self.cthr_r = Some(M2s2::from_kvn(val, unit)?),
-            "CTHR_T" => self.cthr_t = Some(M2s2::from_kvn(val, unit)?),
-            "CTHR_N" => self.cthr_n = Some(M2s2::from_kvn(val, unit)?),
-            "CTHR_RDOT" => self.cthr_rdot = Some(M2s3::from_kvn(val, unit)?),
-            "CTHR_TDOT" => self.cthr_tdot = Some(M2s3::from_kvn(val, unit)?),
-            "CTHR_NDOT" => self.cthr_ndot = Some(M2s3::from_kvn(val, unit)?),
-            "CTHR_DRG" => self.cthr_drg = Some(M3kgs2::from_kvn(val, unit)?),
-            "CTHR_SRP" => self.cthr_srp = Some(M3kgs2::from_kvn(val, unit)?),
-            "CTHR_THR" => self.cthr_thr = Some(M2s4::from_kvn(val, unit)?),
-            _ => return Ok(false),
-        }
-        Ok(true)
-    }
-
-    pub fn build(self) -> Result<CdmCovarianceMatrix> {
-        Ok(CdmCovarianceMatrix {
-            comment: self.comment,
-            cr_r: self
-                .cr_r
-                .ok_or(CcsdsNdmError::MissingField("CR_R".into()))?,
-            ct_r: self
-                .ct_r
-                .ok_or(CcsdsNdmError::MissingField("CT_R".into()))?,
-            ct_t: self
-                .ct_t
-                .ok_or(CcsdsNdmError::MissingField("CT_T".into()))?,
-            cn_r: self
-                .cn_r
-                .ok_or(CcsdsNdmError::MissingField("CN_R".into()))?,
-            cn_t: self
-                .cn_t
-                .ok_or(CcsdsNdmError::MissingField("CN_T".into()))?,
-            cn_n: self
-                .cn_n
-                .ok_or(CcsdsNdmError::MissingField("CN_N".into()))?,
-            crdot_r: self
-                .crdot_r
-                .ok_or(CcsdsNdmError::MissingField("CRDOT_R".into()))?,
-            crdot_t: self
-                .crdot_t
-                .ok_or(CcsdsNdmError::MissingField("CRDOT_T".into()))?,
-            crdot_n: self
-                .crdot_n
-                .ok_or(CcsdsNdmError::MissingField("CRDOT_N".into()))?,
-            crdot_rdot: self
-                .crdot_rdot
-                .ok_or(CcsdsNdmError::MissingField("CRDOT_RDOT".into()))?,
-            ctdot_r: self
-                .ctdot_r
-                .ok_or(CcsdsNdmError::MissingField("CTDOT_R".into()))?,
-            ctdot_t: self
-                .ctdot_t
-                .ok_or(CcsdsNdmError::MissingField("CTDOT_T".into()))?,
-            ctdot_n: self
-                .ctdot_n
-                .ok_or(CcsdsNdmError::MissingField("CTDOT_N".into()))?,
-            ctdot_rdot: self
-                .ctdot_rdot
-                .ok_or(CcsdsNdmError::MissingField("CTDOT_RDOT".into()))?,
-            ctdot_tdot: self
-                .ctdot_tdot
-                .ok_or(CcsdsNdmError::MissingField("CTDOT_TDOT".into()))?,
-            cndot_r: self
-                .cndot_r
-                .ok_or(CcsdsNdmError::MissingField("CNDOT_R".into()))?,
-            cndot_t: self
-                .cndot_t
-                .ok_or(CcsdsNdmError::MissingField("CNDOT_T".into()))?,
-            cndot_n: self
-                .cndot_n
-                .ok_or(CcsdsNdmError::MissingField("CNDOT_N".into()))?,
-            cndot_rdot: self
-                .cndot_rdot
-                .ok_or(CcsdsNdmError::MissingField("CNDOT_RDOT".into()))?,
-            cndot_tdot: self
-                .cndot_tdot
-                .ok_or(CcsdsNdmError::MissingField("CNDOT_TDOT".into()))?,
-            cndot_ndot: self
-                .cndot_ndot
-                .ok_or(CcsdsNdmError::MissingField("CNDOT_NDOT".into()))?,
-
-            cdrg_r: self.cdrg_r,
-            cdrg_t: self.cdrg_t,
-            cdrg_n: self.cdrg_n,
-            cdrg_rdot: self.cdrg_rdot,
-            cdrg_tdot: self.cdrg_tdot,
-            cdrg_ndot: self.cdrg_ndot,
-            cdrg_drg: self.cdrg_drg,
-            csrp_r: self.csrp_r,
-            csrp_t: self.csrp_t,
-            csrp_n: self.csrp_n,
-            csrp_rdot: self.csrp_rdot,
-            csrp_tdot: self.csrp_tdot,
-            csrp_ndot: self.csrp_ndot,
-            csrp_drg: self.csrp_drg,
-            csrp_srp: self.csrp_srp,
-            cthr_r: self.cthr_r,
-            cthr_t: self.cthr_t,
-            cthr_n: self.cthr_n,
-            cthr_rdot: self.cthr_rdot,
-            cthr_tdot: self.cthr_tdot,
-            cthr_ndot: self.cthr_ndot,
-            cthr_drg: self.cthr_drg,
-            cthr_srp: self.cthr_srp,
-            cthr_thr: self.cthr_thr,
-        })
-    }
-}
-
 impl ToKvn for CdmCovarianceMatrix {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -1147,6 +945,7 @@ impl ToKvn for CdmCovarianceMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::CcsdsNdmError;
 
     fn sample_cdm_kvn() -> String {
         let kvn = r#"

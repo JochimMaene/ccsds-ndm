@@ -645,6 +645,232 @@ pub fn cdm_metadata(input: &mut &str) -> ModalResult<CdmMetadata> {
 }
 
 //----------------------------------------------------------------------
+// CDM Covariance Matrix Parser
+//----------------------------------------------------------------------
+
+fn is_cdm_covariance_key(key: &str) -> bool {
+    matches!(
+        key,
+        "CR_R"
+            | "CT_R"
+            | "CT_T"
+            | "CN_R"
+            | "CN_T"
+            | "CN_N"
+            | "CRDOT_R"
+            | "CRDOT_T"
+            | "CRDOT_N"
+            | "CRDOT_RDOT"
+            | "CTDOT_R"
+            | "CTDOT_T"
+            | "CTDOT_N"
+            | "CTDOT_RDOT"
+            | "CTDOT_TDOT"
+            | "CNDOT_R"
+            | "CNDOT_T"
+            | "CNDOT_N"
+            | "CNDOT_RDOT"
+            | "CNDOT_TDOT"
+            | "CNDOT_NDOT"
+            | "CDRG_R"
+            | "CDRG_T"
+            | "CDRG_N"
+            | "CDRG_RDOT"
+            | "CDRG_TDOT"
+            | "CDRG_NDOT"
+            | "CDRG_DRG"
+            | "CSRP_R"
+            | "CSRP_T"
+            | "CSRP_N"
+            | "CSRP_RDOT"
+            | "CSRP_TDOT"
+            | "CSRP_NDOT"
+            | "CSRP_DRG"
+            | "CSRP_SRP"
+            | "CTHR_R"
+            | "CTHR_T"
+            | "CTHR_N"
+            | "CTHR_RDOT"
+            | "CTHR_TDOT"
+            | "CTHR_NDOT"
+            | "CTHR_DRG"
+            | "CTHR_SRP"
+            | "CTHR_THR"
+    )
+}
+
+pub fn cdm_covariance_matrix(input: &mut &str) -> ModalResult<crate::messages::cdm::CdmCovarianceMatrix> {
+    let mut comment = Vec::new();
+    let mut cr_r = None;
+    let mut ct_r = None;
+    let mut ct_t = None;
+    let mut cn_r = None;
+    let mut cn_t = None;
+    let mut cn_n = None;
+    let mut crdot_r = None;
+    let mut crdot_t = None;
+    let mut crdot_n = None;
+    let mut crdot_rdot = None;
+    let mut ctdot_r = None;
+    let mut ctdot_t = None;
+    let mut ctdot_n = None;
+    let mut ctdot_rdot = None;
+    let mut ctdot_tdot = None;
+    let mut cndot_r = None;
+    let mut cndot_t = None;
+    let mut cndot_n = None;
+    let mut cndot_rdot = None;
+    let mut cndot_tdot = None;
+    let mut cndot_ndot = None;
+
+    let mut cdrg_r = None;
+    let mut cdrg_t = None;
+    let mut cdrg_n = None;
+    let mut cdrg_rdot = None;
+    let mut cdrg_tdot = None;
+    let mut cdrg_ndot = None;
+    let mut cdrg_drg = None;
+
+    let mut csrp_r = None;
+    let mut csrp_t = None;
+    let mut csrp_n = None;
+    let mut csrp_rdot = None;
+    let mut csrp_tdot = None;
+    let mut csrp_ndot = None;
+    let mut csrp_drg = None;
+    let mut csrp_srp = None;
+
+    let mut cthr_r = None;
+    let mut cthr_t = None;
+    let mut cthr_n = None;
+    let mut cthr_rdot = None;
+    let mut cthr_tdot = None;
+    let mut cthr_ndot = None;
+    let mut cthr_drg = None;
+    let mut cthr_srp = None;
+    let mut cthr_thr = None;
+
+    loop {
+        let checkpoint = input.checkpoint();
+        let comments = collect_comments.parse_next(input)?;
+
+        let next_key = peek_key(input)?;
+        match next_key {
+            Some(key) if is_cdm_covariance_key(key) => {
+                comment.extend(comments);
+                let (k, v, u) = key_value_line.parse_next(input)?;
+                opt_line_ending.parse_next(input)?;
+
+                match k {
+                    "CR_R" => cr_r = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CT_R" => ct_r = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CT_T" => ct_t = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CN_R" => cn_r = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CN_T" => cn_t = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CN_N" => cn_n = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CRDOT_R" => crdot_r = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CRDOT_T" => crdot_t = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CRDOT_N" => crdot_n = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CRDOT_RDOT" => crdot_rdot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTDOT_R" => ctdot_r = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTDOT_T" => ctdot_t = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTDOT_N" => ctdot_n = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTDOT_RDOT" => ctdot_rdot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTDOT_TDOT" => ctdot_tdot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CNDOT_R" => cndot_r = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CNDOT_T" => cndot_t = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CNDOT_N" => cndot_n = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CNDOT_RDOT" => cndot_rdot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CNDOT_TDOT" => cndot_tdot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CNDOT_NDOT" => cndot_ndot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+
+                    "CDRG_R" => cdrg_r = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CDRG_T" => cdrg_t = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CDRG_N" => cdrg_n = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CDRG_RDOT" => cdrg_rdot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CDRG_TDOT" => cdrg_tdot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CDRG_NDOT" => cdrg_ndot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CDRG_DRG" => cdrg_drg = Some(M4kg2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+
+                    "CSRP_R" => csrp_r = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CSRP_T" => csrp_t = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CSRP_N" => csrp_n = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CSRP_RDOT" => csrp_rdot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CSRP_TDOT" => csrp_tdot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CSRP_NDOT" => csrp_ndot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CSRP_DRG" => csrp_drg = Some(M4kg2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CSRP_SRP" => csrp_srp = Some(M4kg2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+
+                    "CTHR_R" => cthr_r = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTHR_T" => cthr_t = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTHR_N" => cthr_n = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTHR_RDOT" => cthr_rdot = Some(M2s3::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTHR_TDOT" => cthr_tdot = Some(M2s3::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTHR_NDOT" => cthr_ndot = Some(M2s3::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTHR_DRG" => cthr_drg = Some(M3kgs2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTHR_SRP" => cthr_srp = Some(M3kgs2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTHR_THR" => cthr_thr = Some(M2s4::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    _ => unreachable!(),
+                }
+            }
+            _ => {
+                input.reset(&checkpoint);
+                break;
+            }
+        }
+    }
+
+    Ok(crate::messages::cdm::CdmCovarianceMatrix {
+        comment,
+        cr_r: cr_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CR_R")))))?,
+        ct_r: ct_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CT_R")))))?,
+        ct_t: ct_t.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CT_T")))))?,
+        cn_r: cn_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CN_R")))))?,
+        cn_t: cn_t.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CN_T")))))?,
+        cn_n: cn_n.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CN_N")))))?,
+        crdot_r: crdot_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CRDOT_R")))))?,
+        crdot_t: crdot_t.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CRDOT_T")))))?,
+        crdot_n: crdot_n.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CRDOT_N")))))?,
+        crdot_rdot: crdot_rdot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CRDOT_RDOT")))))?,
+        ctdot_r: ctdot_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CTDOT_R")))))?,
+        ctdot_t: ctdot_t.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CTDOT_T")))))?,
+        ctdot_n: ctdot_n.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CTDOT_N")))))?,
+        ctdot_rdot: ctdot_rdot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CTDOT_RDOT")))))?,
+        ctdot_tdot: ctdot_tdot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CTDOT_TDOT")))))?,
+        cndot_r: cndot_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_R")))))?,
+        cndot_t: cndot_t.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_T")))))?,
+        cndot_n: cndot_n.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_N")))))?,
+        cndot_rdot: cndot_rdot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_RDOT")))))?,
+        cndot_tdot: cndot_tdot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_TDOT")))))?,
+        cndot_ndot: cndot_ndot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_NDOT")))))?,
+        cdrg_r,
+        cdrg_t,
+        cdrg_n,
+        cdrg_rdot,
+        cdrg_tdot,
+        cdrg_ndot,
+        cdrg_drg,
+        csrp_r,
+        csrp_t,
+        csrp_n,
+        csrp_rdot,
+        csrp_tdot,
+        csrp_ndot,
+        csrp_drg,
+        csrp_srp,
+        cthr_r,
+        cthr_t,
+        cthr_n,
+        cthr_rdot,
+        cthr_tdot,
+        cthr_ndot,
+        cthr_drg,
+        cthr_srp,
+        cthr_thr,
+    })
+}
+
+//----------------------------------------------------------------------
 // CDM Data Parser
 //----------------------------------------------------------------------
 
@@ -663,8 +889,7 @@ pub fn cdm_data(input: &mut &str) -> ModalResult<CdmData> {
     let mut has_od_params = false;
     let mut has_add_params = false;
 
-    // Covariance builder
-    let mut cov = crate::messages::cdm::CdmCovarianceMatrixBuilder::default();
+    let mut covariance_matrix_val = None;
 
     loop {
         // If we hit META block for NEXT segment, stop
@@ -673,17 +898,19 @@ pub fn cdm_data(input: &mut &str) -> ModalResult<CdmData> {
         }
 
         let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
 
         let next_key = peek_key(input)?;
 
         match next_key {
-            Some("OBJECT") => break, // Start of next segment
+            Some("OBJECT") => {
+                comment.extend(comments);
+                break; // Start of next segment
+            }
             Some(key) => {
-                // If it's not a data key and not something we expect, break
-                // But we need to check if it matches OD/Add params or Cov
-                if !is_cdm_data_key(key) {
-                    // break; // Actually, all keys should be data keys here if we are in data section
+                comment.extend(comments);
+                if is_cdm_covariance_key(key) {
+                    covariance_matrix_val = Some(cdm_covariance_matrix.parse_next(input)?);
+                    continue;
                 }
 
                 let (k, v, u) = key_value_line.parse_next(input)?;
@@ -838,22 +1065,19 @@ pub fn cdm_data(input: &mut &str) -> ModalResult<CdmData> {
                         });
                     }
 
-                    // Covariance (delegate)
                     _ => {
-                        if !cov
-                            .try_match_pair(k, v, u)
-                            .map_err(|_| ErrMode::Cut(ContextError::new()))?
-                        {
-                            return Err(ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label("Unknown Data key"),
-                            )));
-                        }
+                        return Err(ErrMode::Cut(ContextError::new().add_context(
+                            input,
+                            &input.checkpoint(),
+                            StrContext::Label("Unknown Data key"),
+                        )));
                     }
                 }
             }
-            None => break,
+            _ => {
+                comment.extend(comments);
+                break;
+            }
         }
     }
 
@@ -909,11 +1133,11 @@ pub fn cdm_data(input: &mut &str) -> ModalResult<CdmData> {
                 ))
             })?,
         },
-        covariance_matrix: cov.build().map_err(|e| {
+        covariance_matrix: covariance_matrix_val.ok_or_else(|| {
             ErrMode::Cut(ContextError::new().add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Label(e.to_string().leak()),
+                StrContext::Expected(StrContextValue::Description("Covariance Matrix keys")),
             ))
         })?,
     })
@@ -927,9 +1151,9 @@ pub fn cdm_segment(input: &mut &str) -> ModalResult<CdmSegment> {
     // 1. Metadata
     // Metadata can start with optional META_START (for CDM 2.0) or just keys (for CDM 1.0)
     // However, if it's CDM 2.0, we might see META_START.
-    // existing parser:
-    // match tokens.peek() {
-    //    Some(Ok(...)) => ...
+
+    // Collect comments before segment
+    let pre_comments = collect_comments.parse_next(input)?;
 
     // winnow approach:
     // Check if we have META_START
@@ -937,7 +1161,8 @@ pub fn cdm_segment(input: &mut &str) -> ModalResult<CdmSegment> {
         expect_block_start("META").parse_next(input)?;
     }
 
-    let metadata = cdm_metadata.parse_next(input)?;
+    let mut metadata = cdm_metadata.parse_next(input)?;
+    metadata.comment.splice(0..0, pre_comments);
 
     // 2. Data
     let data = cdm_data.parse_next(input)?;
