@@ -8325,8 +8325,6 @@ class OpmSegment:
 
 class Rdm:
     """
-    Re-entry Data Message (RDM).
-
     A message format for use in exchanging spacecraft re-entry information.
 
     Parameters
@@ -8388,8 +8386,6 @@ class Rdm:
     @property
     def header(self) -> RdmHeader:
         """
-        Re-entry Data Message (RDM).
-
         A message format for use in exchanging spacecraft re-entry information.
         """
         ...

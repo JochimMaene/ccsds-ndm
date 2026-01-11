@@ -636,8 +636,15 @@ pub fn ocm_phys(input: &mut &str) -> ModalResult<OcmPhysicalDescription> {
                         );
                     }
                     "DRAG_COEFF_NOM" => {
-                        phys.drag_coeff_nom =
-                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("DRAG_COEFF_NOM")))))?);
+                        phys.drag_coeff_nom = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description(
+                                    "DRAG_COEFF_NOM",
+                                )),
+                            ))
+                        })?);
                     }
                     "DRAG_UNCERTAINTY" => {
                         phys.drag_uncertainty = Some(
@@ -1221,8 +1228,7 @@ pub fn ocm_man(input: &mut &str) -> ModalResult<OcmManeuverParameters> {
                     "MAN_NEXT_ID" => man_next_id = Some(v.to_string()),
                     "MAN_BASIS" => {
                         man_basis = Some(
-                            ManBasis::from_str(v)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            ManBasis::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "MAN_BASIS_ID" => man_basis_id = Some(v.to_string()),
