@@ -5,6 +5,7 @@
 pub mod cdm;
 pub mod de;
 pub mod oem;
+pub mod omm;
 pub mod opm;
 pub mod parser;
 pub mod ser;
