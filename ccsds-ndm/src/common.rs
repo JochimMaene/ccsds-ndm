@@ -1437,7 +1437,7 @@ pub struct AtmosphericReentryParameters {
 }
 
 /// Ground impact parameters (groundImpactParametersType, RDM).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct GroundImpactParameters {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

@@ -3,14 +3,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::error::{CcsdsNdmError, Result};
-use crate::kvn::de::{KvnLine, KvnTokenizer};
+use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{FromKvnTokens, FromKvnValue, Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn};
 use crate::types::{Epoch, Percentage};
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::iter::Peekable;
 
 //----------------------------------------------------------------------
 // Root TDM Structure
@@ -40,47 +39,7 @@ impl Ndm for Tdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let mut tokens = KvnTokenizer::new(kvn).peekable();
-
-        // 1. Version Check
-        let version = loop {
-            match tokens.peek() {
-                Some(Ok(KvnLine::Pair {
-                    key: "CCSDS_TDM_VERS",
-                    val,
-                    ..
-                })) => {
-                    let v = val.to_string();
-                    tokens.next();
-                    break v;
-                }
-                Some(Ok(KvnLine::Comment { .. })) | Some(Ok(KvnLine::Empty { .. })) => {
-                    tokens.next();
-                }
-                Some(Err(_)) => {
-                    return Err(tokens.next().unwrap().unwrap_err());
-                }
-                Some(Ok(_)) => {
-                    return Err(CcsdsNdmError::MissingField(
-                        "CCSDS_TDM_VERS must be the first keyword".into(),
-                    ))
-                }
-                None => return Err(CcsdsNdmError::MissingField("Empty file".into())),
-            }
-        };
-
-        // 2. Header
-        let header = TdmHeader::from_kvn_tokens(&mut tokens)?;
-
-        // 3. Body
-        let body = TdmBody::from_kvn_tokens(&mut tokens)?;
-
-        Ok(Tdm {
-            header,
-            body,
-            id: Some("CCSDS_TDM_VERS".to_string()),
-            version,
-        })
+        Self::from_kvn_str(kvn)
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -128,59 +87,6 @@ impl ToKvn for TdmHeader {
     }
 }
 
-impl FromKvnTokens for TdmHeader {
-    fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
-    where
-        I: Iterator<Item = Result<KvnLine<'a>>>,
-    {
-        let mut comment = Vec::new();
-        let mut creation_date = None;
-        let mut originator = None;
-        let mut message_id = None;
-        let mut last_line = 0;
-
-        while let Some(Ok(token)) = tokens.peek() {
-            last_line = token.line_number();
-            match token {
-                KvnLine::Comment { content: c, .. } => {
-                    comment.push(c.to_string());
-                    tokens.next();
-                }
-                KvnLine::Empty { .. } => {
-                    tokens.next();
-                }
-                KvnLine::Pair { key, val, .. } => {
-                    match *key {
-                        "CREATION_DATE" => {
-                            creation_date = Some(Epoch::from_kvn_value(val)?);
-                        }
-                        "ORIGINATOR" => originator = Some(val.to_string()),
-                        "MESSAGE_ID" => message_id = Some(val.to_string()),
-                        _ => break,
-                    }
-                    tokens.next();
-                }
-                _ => break,
-            }
-        }
-
-        if let Some(Err(_)) = tokens.peek() {
-            tokens.next().unwrap()?;
-        }
-
-        Ok(TdmHeader {
-            comment,
-            creation_date: creation_date.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CREATION_DATE".into()).at_line(last_line)
-            })?,
-            originator: originator.ok_or_else(|| {
-                CcsdsNdmError::MissingField("ORIGINATOR".into()).at_line(last_line)
-            })?,
-            message_id,
-        })
-    }
-}
-
 //----------------------------------------------------------------------
 // Body & Segment
 //----------------------------------------------------------------------
@@ -200,61 +106,6 @@ impl ToKvn for TdmBody {
     }
 }
 
-impl TdmBody {
-    fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
-    where
-        I: Iterator<Item = Result<KvnLine<'a>>>,
-    {
-        let mut segments = Vec::new();
-        let mut last_line = 0;
-        loop {
-            let mut pending_comments = Vec::new();
-            let mut has_content = false;
-            while let Some(Ok(token)) = tokens.peek() {
-                last_line = token.line_number();
-                match token {
-                    KvnLine::Empty { .. } => {
-                        tokens.next();
-                    }
-                    KvnLine::Comment { content: c, .. } => {
-                        pending_comments.push(c.to_string());
-                        tokens.next();
-                    }
-                    _ => {
-                        has_content = true;
-                        break;
-                    }
-                }
-            }
-
-            if let Some(Err(_)) = tokens.peek() {
-                return Err(tokens.next().unwrap().unwrap_err());
-            }
-
-            if !has_content {
-                break;
-            }
-            let mut segment = TdmSegment::from_kvn_tokens(tokens)?;
-            if !pending_comments.is_empty() {
-                segment
-                    .metadata
-                    .comment
-                    .splice(0..0, pending_comments.drain(..));
-            }
-            segments.push(segment);
-        }
-
-        if segments.is_empty() {
-            return Err(CcsdsNdmError::MissingField(
-                "TDM body must contain at least one segment".into(),
-            )
-            .at_line(last_line));
-        }
-
-        Ok(TdmBody { segments })
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TdmSegment {
     /// Metadata section for this TDM segment.
@@ -267,34 +118,6 @@ impl ToKvn for TdmSegment {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         self.metadata.write_kvn(writer);
         self.data.write_kvn(writer);
-    }
-}
-
-impl TdmSegment {
-    fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
-    where
-        I: Iterator<Item = Result<KvnLine<'a>>>,
-    {
-        match tokens.next() {
-            Some(Ok(KvnLine::BlockStart { tag: "META", .. })) => {}
-            Some(Ok(t)) => {
-                return Err(CcsdsNdmError::KvnParse {
-                    line: t.line_number(),
-                    message: format!("Expected META_START, found {:?}", t),
-                })
-            }
-            Some(Err(e)) => return Err(e),
-            None => {
-                return Err(CcsdsNdmError::UnexpectedEof {
-                    context: "before TDM segment".into(),
-                })
-            }
-        }
-
-        let metadata = TdmMetadata::from_kvn_tokens(tokens)?;
-        let data = TdmData::from_kvn_tokens(tokens)?;
-
-        Ok(TdmSegment { metadata, data })
     }
 }
 
@@ -818,133 +641,6 @@ impl ToKvn for TdmMetadata {
     }
 }
 
-impl TdmMetadata {
-    fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
-    where
-        I: Iterator<Item = Result<KvnLine<'a>>>,
-    {
-        let mut meta = TdmMetadata::default();
-        let mut last_line = 0;
-
-        while let Some(Ok(token)) = tokens.peek() {
-            last_line = token.line_number();
-            match token {
-                KvnLine::BlockEnd { tag: "META", .. } => {
-                    tokens.next();
-                    break;
-                }
-                KvnLine::Comment { content: c, .. } => {
-                    meta.comment.push(c.to_string());
-                    tokens.next();
-                }
-                KvnLine::Empty { .. } => {
-                    tokens.next();
-                }
-                KvnLine::Pair {
-                    key,
-                    val,
-                    line_number,
-                    ..
-                } => {
-                    let line = *line_number;
-                    let key = *key;
-                    let val = *val;
-                    match key {
-                        "TRACK_ID" => meta.track_id = Some(val.to_string()),
-                        "DATA_TYPES" => meta.data_types = Some(val.to_string()),
-                        "TIME_SYSTEM" => meta.time_system = val.to_string(),
-                        "START_TIME" => meta.start_time = Some(Epoch::from_kvn_value(val)?),
-                        "STOP_TIME" => meta.stop_time = Some(Epoch::from_kvn_value(val)?),
-                        "PARTICIPANT_1" => meta.participant_1 = val.to_string(),
-                        "PARTICIPANT_2" => meta.participant_2 = Some(val.to_string()),
-                        "PARTICIPANT_3" => meta.participant_3 = Some(val.to_string()),
-                        "PARTICIPANT_4" => meta.participant_4 = Some(val.to_string()),
-                        "PARTICIPANT_5" => meta.participant_5 = Some(val.to_string()),
-                        "MODE" => meta.mode = Some(val.to_string()),
-                        "PATH" => meta.path = Some(val.to_string()),
-                        "PATH_1" => meta.path_1 = Some(val.to_string()),
-                        "PATH_2" => meta.path_2 = Some(val.to_string()),
-                        "EPHEMERIS_NAME_1" => meta.ephemeris_name_1 = Some(val.to_string()),
-                        "EPHEMERIS_NAME_2" => meta.ephemeris_name_2 = Some(val.to_string()),
-                        "EPHEMERIS_NAME_3" => meta.ephemeris_name_3 = Some(val.to_string()),
-                        "EPHEMERIS_NAME_4" => meta.ephemeris_name_4 = Some(val.to_string()),
-                        "EPHEMERIS_NAME_5" => meta.ephemeris_name_5 = Some(val.to_string()),
-                        "TRANSMIT_BAND" => meta.transmit_band = Some(val.to_string()),
-                        "RECEIVE_BAND" => meta.receive_band = Some(val.to_string()),
-                        "TURNAROUND_NUMERATOR" => meta.turnaround_numerator = Some(val.parse()?),
-                        "TURNAROUND_DENOMINATOR" => {
-                            meta.turnaround_denominator = Some(val.parse()?)
-                        }
-                        "TIMETAG_REF" => meta.timetag_ref = Some(val.to_string()),
-                        "INTEGRATION_INTERVAL" => meta.integration_interval = Some(val.parse()?),
-                        "INTEGRATION_REF" => meta.integration_ref = Some(val.to_string()),
-                        "FREQ_OFFSET" => meta.freq_offset = Some(val.parse()?),
-                        "RANGE_MODE" => meta.range_mode = Some(val.to_string()),
-                        "RANGE_MODULUS" => meta.range_modulus = Some(val.parse()?),
-                        "RANGE_UNITS" => meta.range_units = Some(val.to_string()),
-                        "ANGLE_TYPE" => meta.angle_type = Some(val.to_string()),
-                        "REFERENCE_FRAME" => meta.reference_frame = Some(val.to_string()),
-                        "INTERPOLATION" => meta.interpolation = Some(val.to_string()),
-                        "INTERPOLATION_DEGREE" => meta.interpolation_degree = Some(val.parse()?),
-                        "DOPPLER_COUNT_BIAS" => meta.doppler_count_bias = Some(val.parse()?),
-                        "DOPPLER_COUNT_SCALE" => meta.doppler_count_scale = Some(val.parse()?),
-                        "DOPPLER_COUNT_ROLLOVER" => {
-                            meta.doppler_count_rollover = Some(val.to_string())
-                        }
-                        "TRANSMIT_DELAY_1" => meta.transmit_delay_1 = Some(val.parse()?),
-                        "TRANSMIT_DELAY_2" => meta.transmit_delay_2 = Some(val.parse()?),
-                        "TRANSMIT_DELAY_3" => meta.transmit_delay_3 = Some(val.parse()?),
-                        "TRANSMIT_DELAY_4" => meta.transmit_delay_4 = Some(val.parse()?),
-                        "TRANSMIT_DELAY_5" => meta.transmit_delay_5 = Some(val.parse()?),
-                        "RECEIVE_DELAY_1" => meta.receive_delay_1 = Some(val.parse()?),
-                        "RECEIVE_DELAY_2" => meta.receive_delay_2 = Some(val.parse()?),
-                        "RECEIVE_DELAY_3" => meta.receive_delay_3 = Some(val.parse()?),
-                        "RECEIVE_DELAY_4" => meta.receive_delay_4 = Some(val.parse()?),
-                        "RECEIVE_DELAY_5" => meta.receive_delay_5 = Some(val.parse()?),
-                        "DATA_QUALITY" => meta.data_quality = Some(val.to_string()),
-                        "CORRECTION_ANGLE_1" => meta.correction_angle_1 = Some(val.parse()?),
-                        "CORRECTION_ANGLE_2" => meta.correction_angle_2 = Some(val.parse()?),
-                        "CORRECTION_DOPPLER" => meta.correction_doppler = Some(val.parse()?),
-                        "CORRECTION_MAG" => meta.correction_mag = Some(val.parse()?),
-                        "CORRECTION_RANGE" => meta.correction_range = Some(val.parse()?),
-                        "CORRECTION_RCS" => meta.correction_rcs = Some(val.parse()?),
-                        "CORRECTION_RECEIVE" => meta.correction_receive = Some(val.parse()?),
-                        "CORRECTION_TRANSMIT" => meta.correction_transmit = Some(val.parse()?),
-                        "CORRECTION_ABERRATION_YEARLY" => {
-                            meta.correction_aberration_yearly = Some(val.parse()?)
-                        }
-                        "CORRECTION_ABERRATION_DIURNAL" => {
-                            meta.correction_aberration_diurnal = Some(val.parse()?)
-                        }
-                        "CORRECTIONS_APPLIED" => meta.corrections_applied = Some(val.to_string()),
-                        _ => {
-                            return Err(CcsdsNdmError::KvnParse {
-                                line,
-                                message: format!("Unexpected TDM Metadata key: {}", key),
-                            })
-                        }
-                    }
-                    tokens.next();
-                }
-                _ => break,
-            }
-        }
-
-        if let Some(Err(_)) = tokens.peek() {
-            tokens.next().unwrap()?;
-        }
-
-        if meta.time_system.is_empty() {
-            return Err(CcsdsNdmError::MissingField("TIME_SYSTEM".into()).at_line(last_line));
-        }
-        if meta.participant_1.is_empty() {
-            return Err(CcsdsNdmError::MissingField("PARTICIPANT_1".into()).at_line(last_line));
-        }
-
-        Ok(meta)
-    }
-}
-
 //----------------------------------------------------------------------
 // Data
 //----------------------------------------------------------------------
@@ -971,90 +667,6 @@ impl ToKvn for TdmData {
             writer.write_pair(key, line);
         }
         writer.write_section("DATA_STOP");
-    }
-}
-
-impl TdmData {
-    fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
-    where
-        I: Iterator<Item = Result<KvnLine<'a>>>,
-    {
-        match tokens.next() {
-            Some(Ok(KvnLine::BlockStart { tag: "DATA", .. })) => {}
-            Some(Ok(t)) => {
-                return Err(CcsdsNdmError::KvnParse {
-                    line: t.line_number(),
-                    message: format!("Expected DATA_START, found {:?}", t),
-                })
-            }
-            Some(Err(e)) => return Err(e),
-            None => {
-                return Err(CcsdsNdmError::UnexpectedEof {
-                    context: "before TDM data".into(),
-                })
-            }
-        }
-
-        let mut comment = Vec::new();
-        let mut observations = Vec::new();
-        let mut last_line = 0;
-
-        while let Some(Ok(token)) = tokens.peek() {
-            last_line = token.line_number();
-            match token {
-                KvnLine::BlockEnd { tag: "DATA", .. } => {
-                    tokens.next();
-                    break;
-                }
-                KvnLine::Comment { content: c, .. } => {
-                    comment.push(c.to_string());
-                    tokens.next();
-                }
-                KvnLine::Empty { .. } => {
-                    tokens.next();
-                }
-                KvnLine::Pair {
-                    key,
-                    val,
-                    line_number,
-                    ..
-                } => {
-                    let parts: Vec<&str> = val.split_whitespace().collect();
-                    if parts.len() < 2 {
-                        return Err(CcsdsNdmError::KvnParse {
-                            line: *line_number,
-                            message: format!(
-                                "Data line value must contain 'EPOCH MEASUREMENT', found '{}'",
-                                val
-                            ),
-                        });
-                    }
-                    let epoch_str = parts[0];
-                    let measure_str = parts[1..].join(" ");
-                    let epoch = Epoch::from_kvn_value(epoch_str)?;
-                    let data = TdmObservationData::from_key_val(key, &measure_str, *line_number)?;
-                    observations.push(TdmObservation { epoch, data });
-                    tokens.next();
-                }
-                _ => break,
-            }
-        }
-
-        if let Some(Err(_)) = tokens.peek() {
-            tokens.next().unwrap()?;
-        }
-
-        if observations.is_empty() {
-            return Err(CcsdsNdmError::MissingField(
-                "TDM data section must contain at least one observation".into(),
-            )
-            .at_line(last_line));
-        }
-
-        Ok(TdmData {
-            comment,
-            observations,
-        })
     }
 }
 
@@ -2686,7 +2298,8 @@ DATA_STOP
     fn test_tdm_empty_file_error() {
         let err = Tdm::from_kvn("").unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(f) => assert_eq!(f, "Empty file"),
+            CcsdsNdmError::UnexpectedEof { .. } => {}
+            CcsdsNdmError::KvnParse { .. } => {}
             _ => panic!("Expected Empty file error, got: {:?}", err),
         }
     }
@@ -2699,8 +2312,8 @@ CCSDS_TDM_VERS = 2.0
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(f) => {
-                assert!(f.contains("CCSDS_TDM_VERS must be the first keyword"));
+            CcsdsNdmError::KvnParse { message, .. } => {
+                assert!(message.contains("expected CCSDS_TDM_VERS"));
             }
             _ => panic!("Expected version-not-first error, got: {:?}", err),
         }

@@ -8,4 +8,6 @@ pub mod oem;
 pub mod omm;
 pub mod opm;
 pub mod parser;
+pub mod rdm;
 pub mod ser;
+pub mod tdm;
