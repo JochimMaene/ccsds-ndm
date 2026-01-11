@@ -1462,7 +1462,14 @@ MAN_DV_3 = 0.0 [km/s]
         assert!(!opm.body.segment.metadata.center_name.is_empty());
 
         // Verify state vector present
-        assert!(!opm.body.segment.data.state_vector.epoch.to_string().is_empty());
+        assert!(!opm
+            .body
+            .segment
+            .data
+            .state_vector
+            .epoch
+            .to_string()
+            .is_empty());
     }
 
     #[test]
