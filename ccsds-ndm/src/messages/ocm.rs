@@ -4021,18 +4021,22 @@ META_START
 TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-01-01T00:00:00
 META_STOP
-COMMENT preceding comment
-USER_START
-PARAM = VAL
-USER_STOP
-UNEXPECTED_KEY = VAL
+TRAJ_START
+CENTER_NAME = EARTH
+TRAJ_REF_FRAME = GCRF
+TRAJ_TYPE = CARTPV
+2023-01-01T00:00:00 1 2 3 4 5 6
+TRAJ_STOP
+COMMENT Trailing comment
+UNEXPECTED_KEY = value
 "#;
-        let ocm = Ocm::from_kvn(kvn).unwrap();
-        assert!(ocm.body.segment.data.user.is_some());
-        assert_eq!(
-            ocm.body.segment.data.user.as_ref().unwrap().comment[0],
-            "preceding comment"
-        );
+        let err = Ocm::from_kvn(kvn).unwrap_err();
+        match err {
+            CcsdsNdmError::KvnParse { message, .. } => {
+                assert!(message.contains("Unexpected key: UNEXPECTED_KEY"));
+            }
+            _ => panic!("Expected KvnParse error, got: {:?}", err),
+        }
     }
 
     #[test]

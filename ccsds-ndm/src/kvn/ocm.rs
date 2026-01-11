@@ -265,12 +265,16 @@ pub fn ocm_metadata(input: &mut &str) -> ModalResult<OcmMetadata> {
                     _ => unreachable!(),
                 }
             }
-            Some(key) if !key.ends_with("_STOP") => {
-                // Ignore unknown metadata key
-                let _ = till_line_ending.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
+            Some(_key) => {
+                return Err(ErrMode::Cut(ContextError::new().add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description(
+                        "Unexpected OCM Metadata key",
+                    )),
+                )));
             }
-            _ => break,
+            None => break,
         }
     }
 
@@ -2028,6 +2032,30 @@ pub fn ocm_data(input: &mut &str) -> ModalResult<OcmData> {
             block.comment.splice(0..0, pending_comments.drain(..));
             data.user = Some(block);
         } else {
+            // Check if it's an unexpected key that isn't a block start
+            // If we are here, we are not at a block start, and comments have been consumed.
+            // If there is anything else than empty, it's an error.
+
+            // However, collect_comments skips whitespace.
+            // If input is not empty, it means we have something unknown.
+            if !input.is_empty() {
+                let checkpoint = input.checkpoint();
+                let next = peek_key(input)?;
+                input.reset(&checkpoint);
+
+                if let Some(k) = next {
+                    return Err(ErrMode::Cut(ContextError::new().add_context(
+                        input,
+                        &input.checkpoint(),
+                        StrContext::Expected(StrContextValue::Description(
+                            format!("Unexpected key: {}", k).leak(),
+                        )),
+                    )));
+                } else {
+                    // Could be garbage, break and let trailing checker handle it or fail
+                    break;
+                }
+            }
             break;
         }
     }
