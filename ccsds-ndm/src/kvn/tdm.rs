@@ -209,153 +209,125 @@ pub fn tdm_metadata<'a>(input: &mut &'a str) -> ModalResult<TdmMetadata> {
                     "TRANSMIT_BAND" => meta.transmit_band = Some(v.to_string()),
                     "RECEIVE_BAND" => meta.receive_band = Some(v.to_string()),
                     "TURNAROUND_NUMERATOR" => {
-                        meta.turnaround_numerator = Some(
-                            parse_i32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.turnaround_numerator =
+                            Some(parse_i32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "TURNAROUND_DENOMINATOR" => {
-                        meta.turnaround_denominator = Some(
-                            parse_i32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.turnaround_denominator =
+                            Some(parse_i32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "TIMETAG_REF" => meta.timetag_ref = Some(v.to_string()),
                     "INTEGRATION_INTERVAL" => {
-                        meta.integration_interval = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.integration_interval =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "INTEGRATION_REF" => meta.integration_ref = Some(v.to_string()),
                     "FREQ_OFFSET" => {
-                        meta.freq_offset = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.freq_offset =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "RANGE_MODE" => meta.range_mode = Some(v.to_string()),
                     "RANGE_MODULUS" => {
-                        meta.range_modulus = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.range_modulus =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "RANGE_UNITS" => meta.range_units = Some(v.to_string()),
                     "ANGLE_TYPE" => meta.angle_type = Some(v.to_string()),
                     "REFERENCE_FRAME" => meta.reference_frame = Some(v.to_string()),
                     "INTERPOLATION" => meta.interpolation = Some(v.to_string()),
                     "INTERPOLATION_DEGREE" => {
-                        meta.interpolation_degree = Some(
-                            parse_u32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.interpolation_degree =
+                            Some(parse_u32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "DOPPLER_COUNT_BIAS" => {
-                        meta.doppler_count_bias = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.doppler_count_bias =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "DOPPLER_COUNT_SCALE" => {
-                        meta.doppler_count_scale = Some(
-                            parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.doppler_count_scale =
+                            Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "DOPPLER_COUNT_ROLLOVER" => meta.doppler_count_rollover = Some(v.to_string()),
                     "TRANSMIT_DELAY_1" => {
-                        meta.transmit_delay_1 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.transmit_delay_1 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "TRANSMIT_DELAY_2" => {
-                        meta.transmit_delay_2 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.transmit_delay_2 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "TRANSMIT_DELAY_3" => {
-                        meta.transmit_delay_3 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.transmit_delay_3 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "TRANSMIT_DELAY_4" => {
-                        meta.transmit_delay_4 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.transmit_delay_4 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "TRANSMIT_DELAY_5" => {
-                        meta.transmit_delay_5 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.transmit_delay_5 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "RECEIVE_DELAY_1" => {
-                        meta.receive_delay_1 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.receive_delay_1 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "RECEIVE_DELAY_2" => {
-                        meta.receive_delay_2 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.receive_delay_2 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "RECEIVE_DELAY_3" => {
-                        meta.receive_delay_3 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.receive_delay_3 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "RECEIVE_DELAY_4" => {
-                        meta.receive_delay_4 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.receive_delay_4 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "RECEIVE_DELAY_5" => {
-                        meta.receive_delay_5 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.receive_delay_5 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "DATA_QUALITY" => meta.data_quality = Some(v.to_string()),
                     "CORRECTION_ANGLE_1" => {
-                        meta.correction_angle_1 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.correction_angle_1 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "CORRECTION_ANGLE_2" => {
-                        meta.correction_angle_2 = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.correction_angle_2 =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "CORRECTION_DOPPLER" => {
-                        meta.correction_doppler = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.correction_doppler =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "CORRECTION_MAG" => {
-                        meta.correction_mag = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.correction_mag =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "CORRECTION_RANGE" => {
-                        meta.correction_range = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.correction_range =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "CORRECTION_RCS" => {
-                        meta.correction_rcs = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.correction_rcs =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "CORRECTION_RECEIVE" => {
-                        meta.correction_receive = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.correction_receive =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "CORRECTION_TRANSMIT" => {
-                        meta.correction_transmit = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.correction_transmit =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "CORRECTION_ABERRATION_YEARLY" => {
-                        meta.correction_aberration_yearly = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.correction_aberration_yearly =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "CORRECTION_ABERRATION_DIURNAL" => {
-                        meta.correction_aberration_diurnal = Some(
-                            parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        meta.correction_aberration_diurnal =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                     }
                     "CORRECTIONS_APPLIED" => meta.corrections_applied = Some(v.to_string()),
                     "EPHEMERIS_NAME_1" => meta.ephemeris_name_1 = Some(v.to_string()),

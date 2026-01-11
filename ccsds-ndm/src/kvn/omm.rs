@@ -7,7 +7,10 @@
 //! This module implements KVN parsing for OMM using winnow parser combinators.
 
 use crate::kvn::parser::*;
-use crate::messages::omm::{MeanElements, Omm, OmmBody, OmmData, OmmMetadata, OmmSegment, TleParameters, BStar, MeanMotion, MeanMotionDot, MeanMotionDDot};
+use crate::messages::omm::{
+    BStar, MeanElements, MeanMotion, MeanMotionDDot, MeanMotionDot, Omm, OmmBody, OmmData,
+    OmmMetadata, OmmSegment, TleParameters,
+};
 use crate::types::*;
 use std::str::FromStr;
 use winnow::error::{AddContext, ContextError, ErrMode, StrContext, StrContextValue};
@@ -202,7 +205,10 @@ pub fn mean_elements<'a>(input: &mut &'a str) -> ModalResult<(Vec<String>, MeanE
         let next_key = peek_key(input)?;
 
         match next_key {
-            Some(_k @ ("EPOCH" | "SEMI_MAJOR_AXIS" | "MEAN_MOTION" | "ECCENTRICITY" | "INCLINATION" | "RA_OF_ASC_NODE" | "ARG_OF_PERICENTER" | "MEAN_ANOMALY" | "GM")) => {
+            Some(
+                _k @ ("EPOCH" | "SEMI_MAJOR_AXIS" | "MEAN_MOTION" | "ECCENTRICITY" | "INCLINATION"
+                | "RA_OF_ASC_NODE" | "ARG_OF_PERICENTER" | "MEAN_ANOMALY" | "GM"),
+            ) => {
                 let (key, val, unit) = key_value_line.parse_next(input)?;
                 opt_line_ending.parse_next(input)?;
 
@@ -423,70 +429,89 @@ pub fn tle_parameters<'a>(input: &mut &'a str) -> ModalResult<Option<TleParamete
                 opt_line_ending.parse_next(input)?;
 
                 match key {
-                    "EPHEMERIS_TYPE" => ephemeris_type = Some(parse_i32(val).map_err(|e| {
-                        ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label(e.to_string().leak()),
-                        ))
-                    })?),
+                    "EPHEMERIS_TYPE" => {
+                        ephemeris_type = Some(parse_i32(val).map_err(|e| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Label(e.to_string().leak()),
+                            ))
+                        })?)
+                    }
                     "CLASSIFICATION_TYPE" => classification_type = Some(val.to_string()),
-                    "NORAD_CAT_ID" => norad_cat_id = Some(parse_u32(val).map_err(|e| {
-                        ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label(e.to_string().leak()),
-                        ))
-                    })?),
-                    "ELEMENT_SET_NO" => element_set_no = Some(parse_u32(val).map_err(|e| {
-                        ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label(e.to_string().leak()),
-                        ))
-                    })?),
-                    "REV_AT_EPOCH" => rev_at_epoch = Some(parse_u32(val).map_err(|e| {
-                        ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label(e.to_string().leak()),
-                        ))
-                    })?),
-                    "BSTAR" => bstar = Some(BStar::from_kvn(val, unit).map_err(|e| {
-                        ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label(e.to_string().leak()),
-                        ))
-                    })?),
-                    "BTERM" => bterm = Some(M2kg::from_kvn(val, unit).map_err(|e| {
-                        ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label(e.to_string().leak()),
-                        ))
-                    })?),
-                    "MEAN_MOTION_DOT" => mean_motion_dot = Some(MeanMotionDot::from_kvn(val, unit).map_err(|e| {
-                        ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label(e.to_string().leak()),
-                        ))
-                    })?),
-                    "MEAN_MOTION_DDOT" => mean_motion_ddot = Some(MeanMotionDDot::from_kvn(val, unit).map_err(|e| {
-                        ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label(e.to_string().leak()),
-                        ))
-                    })?),
-                    "AGOM" => agom = Some(M2kg::from_kvn(val, unit).map_err(|e| {
-                        ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label(e.to_string().leak()),
-                        ))
-                    })?),
+                    "NORAD_CAT_ID" => {
+                        norad_cat_id = Some(parse_u32(val).map_err(|e| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Label(e.to_string().leak()),
+                            ))
+                        })?)
+                    }
+                    "ELEMENT_SET_NO" => {
+                        element_set_no = Some(parse_u32(val).map_err(|e| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Label(e.to_string().leak()),
+                            ))
+                        })?)
+                    }
+                    "REV_AT_EPOCH" => {
+                        rev_at_epoch = Some(parse_u32(val).map_err(|e| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Label(e.to_string().leak()),
+                            ))
+                        })?)
+                    }
+                    "BSTAR" => {
+                        bstar = Some(BStar::from_kvn(val, unit).map_err(|e| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Label(e.to_string().leak()),
+                            ))
+                        })?)
+                    }
+                    "BTERM" => {
+                        bterm = Some(M2kg::from_kvn(val, unit).map_err(|e| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Label(e.to_string().leak()),
+                            ))
+                        })?)
+                    }
+                    "MEAN_MOTION_DOT" => {
+                        mean_motion_dot = Some(MeanMotionDot::from_kvn(val, unit).map_err(|e| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Label(e.to_string().leak()),
+                            ))
+                        })?)
+                    }
+                    "MEAN_MOTION_DDOT" => {
+                        mean_motion_ddot =
+                            Some(MeanMotionDDot::from_kvn(val, unit).map_err(|e| {
+                                ErrMode::Cut(ContextError::new().add_context(
+                                    input,
+                                    &input.checkpoint(),
+                                    StrContext::Label(e.to_string().leak()),
+                                ))
+                            })?)
+                    }
+                    "AGOM" => {
+                        agom = Some(M2kg::from_kvn(val, unit).map_err(|e| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Label(e.to_string().leak()),
+                            ))
+                        })?)
+                    }
                     _ => unreachable!(),
                 }
             }
@@ -494,7 +519,17 @@ pub fn tle_parameters<'a>(input: &mut &'a str) -> ModalResult<Option<TleParamete
         }
     }
 
-    if ephemeris_type.is_none() && classification_type.is_none() && norad_cat_id.is_none() && element_set_no.is_none() && rev_at_epoch.is_none() && bstar.is_none() && bterm.is_none() && mean_motion_dot.is_none() && mean_motion_ddot.is_none() && agom.is_none() {
+    if ephemeris_type.is_none()
+        && classification_type.is_none()
+        && norad_cat_id.is_none()
+        && element_set_no.is_none()
+        && rev_at_epoch.is_none()
+        && bstar.is_none()
+        && bterm.is_none()
+        && mean_motion_dot.is_none()
+        && mean_motion_ddot.is_none()
+        && agom.is_none()
+    {
         return Ok(None);
     }
 
@@ -567,16 +602,16 @@ pub fn tle_parameters<'a>(input: &mut &'a str) -> ModalResult<Option<TleParamete
 
 pub fn omm_data<'a>(input: &mut &'a str) -> ModalResult<OmmData> {
     let (me_comment, mean_elements) = mean_elements.parse_next(input)?;
-    
+
     // Spacecraft parameters
     let spacecraft_parameters = crate::kvn::opm::spacecraft_parameters.parse_next(input)?;
-    
+
     // TLE parameters
     let tle_parameters = tle_parameters.parse_next(input)?;
-    
+
     // Covariance matrix
     let covariance_matrix = crate::kvn::opm::covariance_matrix.parse_next(input)?;
-    
+
     // User defined
     let user_defined_parameters = crate::kvn::opm::user_defined_parameters.parse_next(input)?;
 
@@ -648,7 +683,11 @@ BSTAR = 0.0001 [1/ER]
     #[test]
     fn test_parse_minimal_omm() {
         let result = Omm::from_kvn_str(MINIMAL_OMM);
-        assert!(result.is_ok(), "Failed to parse minimal OMM: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to parse minimal OMM: {:?}",
+            result.err()
+        );
 
         let omm = result.unwrap();
         assert_eq!(omm.version, "3.0");

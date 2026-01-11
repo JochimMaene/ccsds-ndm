@@ -290,7 +290,9 @@ pub fn rdm_metadata<'a>(input: &mut &'a str) -> ModalResult<RdmMetadata> {
                                 .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
-                    "REENTRY_UNCERTAINTY_METHOD" => reentry_uncertainty_method = Some(v.to_string()),
+                    "REENTRY_UNCERTAINTY_METHOD" => {
+                        reentry_uncertainty_method = Some(v.to_string())
+                    }
                     "REENTRY_DISINTEGRATION" => reentry_disintegration = Some(v.to_string()),
                     "IMPACT_UNCERTAINTY_METHOD" => impact_uncertainty_method = Some(v.to_string()),
                     "PREVIOUS_MESSAGE_ID" => previous_message_id = Some(v.to_string()),
@@ -407,14 +409,14 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
     let mut have_ground = false;
 
     let mut state_vector = None;
-    
+
     let mut covariance_matrix = None;
     let mut spacecraft_parameters = RdmSpacecraftParameters::default();
     let mut have_sp = false;
-    
+
     let mut od_parameters = OdParameters::default();
     let mut have_od = false;
-    
+
     let mut user_defined_parameters = Vec::new();
 
     loop {
@@ -478,36 +480,46 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                     // Ground Impact
                     "PROBABILITY_OF_IMPACT" => {
                         ground.probability_of_impact = Some(
-                            Probability::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Probability::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
                     "PROBABILITY_OF_BURN_UP" => {
                         ground.probability_of_burn_up = Some(
-                            Probability::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Probability::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
                     "PROBABILITY_OF_BREAK_UP" => {
                         ground.probability_of_break_up = Some(
-                            Probability::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Probability::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
                     "PROBABILITY_OF_LAND_IMPACT" => {
                         ground.probability_of_land_impact = Some(
-                            Probability::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Probability::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
                     "PROBABILITY_OF_CASUALTY" => {
                         ground.probability_of_casualty = Some(
-                            Probability::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Probability::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
@@ -535,15 +547,19 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                     }
                     "NOMINAL_IMPACT_LON" => {
                         ground.nominal_impact_lon = Some(
-                            LongitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            LongitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
                     "NOMINAL_IMPACT_LAT" => {
                         ground.nominal_impact_lat = Some(
-                            LatitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            LatitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
@@ -563,29 +579,37 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                     }
                     "IMPACT_1_START_LON" => {
                         ground.impact_1_start_lon = Some(
-                            LongitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            LongitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
                     "IMPACT_1_START_LAT" => {
                         ground.impact_1_start_lat = Some(
-                            LatitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            LatitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
                     "IMPACT_1_STOP_LON" => {
                         ground.impact_1_stop_lon = Some(
-                            LongitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            LongitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
                     "IMPACT_1_STOP_LAT" => {
                         ground.impact_1_stop_lat = Some(
-                            LatitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            LatitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                         have_ground = true;
                     }
@@ -598,51 +622,103 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                     }
                     // ... and so on for IMPACT_2 and IMPACT_3 ...
                     "IMPACT_2_CONFIDENCE" => {
-                        ground.impact_2_confidence = Some(PercentageRequired::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_2_confidence = Some(
+                            PercentageRequired::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_2_START_LON" => {
-                        ground.impact_2_start_lon = Some(LongitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_2_start_lon = Some(
+                            LongitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_2_START_LAT" => {
-                        ground.impact_2_start_lat = Some(LatitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_2_start_lat = Some(
+                            LatitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_2_STOP_LON" => {
-                        ground.impact_2_stop_lon = Some(LongitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_2_stop_lon = Some(
+                            LongitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_2_STOP_LAT" => {
-                        ground.impact_2_stop_lat = Some(LatitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_2_stop_lat = Some(
+                            LatitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_2_CROSS_TRACK" => {
-                        ground.impact_2_cross_track = Some(Distance::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_2_cross_track = Some(
+                            Distance::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_3_CONFIDENCE" => {
-                        ground.impact_3_confidence = Some(PercentageRequired::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_3_confidence = Some(
+                            PercentageRequired::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_3_START_LON" => {
-                        ground.impact_3_start_lon = Some(LongitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_3_start_lon = Some(
+                            LongitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_3_START_LAT" => {
-                        ground.impact_3_start_lat = Some(LatitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_3_start_lat = Some(
+                            LatitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_3_STOP_LON" => {
-                        ground.impact_3_stop_lon = Some(LongitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_3_stop_lon = Some(
+                            LongitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_3_STOP_LAT" => {
-                        ground.impact_3_stop_lat = Some(LatitudeRequired::new(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_3_stop_lat = Some(
+                            LatitudeRequired::new(
+                                parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            )
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
                     "IMPACT_3_CROSS_TRACK" => {
-                        ground.impact_3_cross_track = Some(Distance::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        ground.impact_3_cross_track = Some(
+                            Distance::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_ground = true;
                     }
 
@@ -653,13 +729,13 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                         // I'll re-implement state vector parsing here or reuse.
                         // RDM's StateVector is crate::common::StateVector.
                         // In OPM it's crate::common::StateVector too.
-                        
+
                         // We need to parse all 7 lines.
                         // Actually, I'll reuse crate::kvn::opm::state_vector by re-feeding the EPOCH line.
-                        
-                        // But wait, winnow doesn't easily "back up". 
+
+                        // But wait, winnow doesn't easily "back up".
                         // I'll just parse manually here.
-                        
+
                         let mut sv_epoch = None;
                         let mut sv_x = None;
                         let mut sv_y = None;
@@ -667,28 +743,68 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                         let mut sv_x_dot = None;
                         let mut sv_y_dot = None;
                         let mut sv_z_dot = None;
-                        
+
                         // Current line is k, v, u.
                         let mut cur_k = k;
                         let mut cur_v = v;
                         let mut cur_u = u;
-                        
+
                         loop {
                             match cur_k {
-                                "EPOCH" => sv_epoch = Some(Epoch::from_str(cur_v).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                                "X" => sv_x = Some(Position::from_kvn(cur_v, cur_u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                                "Y" => sv_y = Some(Position::from_kvn(cur_v, cur_u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                                "Z" => sv_z = Some(Position::from_kvn(cur_v, cur_u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                                "X_DOT" => sv_x_dot = Some(Velocity::from_kvn(cur_v, cur_u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                                "Y_DOT" => sv_y_dot = Some(Velocity::from_kvn(cur_v, cur_u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                                "Z_DOT" => sv_z_dot = Some(Velocity::from_kvn(cur_v, cur_u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                                "EPOCH" => {
+                                    sv_epoch = Some(
+                                        Epoch::from_str(cur_v)
+                                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                    )
+                                }
+                                "X" => {
+                                    sv_x = Some(
+                                        Position::from_kvn(cur_v, cur_u)
+                                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                    )
+                                }
+                                "Y" => {
+                                    sv_y = Some(
+                                        Position::from_kvn(cur_v, cur_u)
+                                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                    )
+                                }
+                                "Z" => {
+                                    sv_z = Some(
+                                        Position::from_kvn(cur_v, cur_u)
+                                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                    )
+                                }
+                                "X_DOT" => {
+                                    sv_x_dot = Some(
+                                        Velocity::from_kvn(cur_v, cur_u)
+                                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                    )
+                                }
+                                "Y_DOT" => {
+                                    sv_y_dot = Some(
+                                        Velocity::from_kvn(cur_v, cur_u)
+                                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                    )
+                                }
+                                "Z_DOT" => {
+                                    sv_z_dot = Some(
+                                        Velocity::from_kvn(cur_v, cur_u)
+                                            .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                    )
+                                }
                                 _ => break,
                             }
-                            
+
                             // Peek next
                             let nk = peek_key(input)?;
                             match nk {
-                                Some(nk) if matches!(nk, "EPOCH" | "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT") => {
+                                Some(nk)
+                                    if matches!(
+                                        nk,
+                                        "EPOCH" | "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT"
+                                    ) =>
+                                {
                                     let (nk, nv, nu) = key_value_line.parse_next(input)?;
                                     opt_line_ending.parse_next(input)?;
                                     cur_k = nk;
@@ -698,7 +814,7 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                                 _ => break,
                             }
                         }
-                        
+
                         state_vector = Some(StateVector {
                             comment: Vec::new(),
                             epoch: sv_epoch.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
@@ -718,24 +834,33 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                         // I need to provide it the input.
                         // But I already consumed one line.
                         // Same issue as state vector.
-                        
-                        // I'll just reuse the OpmCovarianceMatrixBuilder from common if it was public, 
+
+                        // I'll just reuse the OpmCovarianceMatrixBuilder from common if it was public,
                         // but it's in messages/opm.rs and it IS public.
-                        
-                        let mut cov_builder = crate::messages::opm::OpmCovarianceMatrixBuilder::default();
-                        
+
+                        let mut cov_builder =
+                            crate::messages::opm::OpmCovarianceMatrixBuilder::default();
+
                         let mut cur_k = k;
                         let mut cur_v = v;
                         let mut cur_u = u;
-                        
+
                         loop {
-                            if !cov_builder.try_match(cur_k, cur_v, cur_u, 0).map_err(|_| ErrMode::Cut(ContextError::new()))? {
+                            if !cov_builder
+                                .try_match(cur_k, cur_v, cur_u, 0)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?
+                            {
                                 break;
                             }
-                            
+
                             let nk = peek_key(input)?;
                             match nk {
-                                Some(nk) if nk.starts_with("CX_") || nk.starts_with("CY_") || nk.starts_with("CZ_") || nk == "COV_REF_FRAME" => {
+                                Some(nk)
+                                    if nk.starts_with("CX_")
+                                        || nk.starts_with("CY_")
+                                        || nk.starts_with("CZ_")
+                                        || nk == "COV_REF_FRAME" =>
+                                {
                                     let (nk, nv, nu) = key_value_line.parse_next(input)?;
                                     opt_line_ending.parse_next(input)?;
                                     cur_k = nk;
@@ -745,17 +870,23 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                                 _ => break,
                             }
                         }
-                        
-                        covariance_matrix = cov_builder.build().map_err(|_| ErrMode::Cut(ContextError::new()))?;
+
+                        covariance_matrix = cov_builder
+                            .build()
+                            .map_err(|_| ErrMode::Cut(ContextError::new()))?;
                     }
 
                     // Spacecraft Parameters
                     "WET_MASS" => {
-                        spacecraft_parameters.wet_mass = Some(Mass::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        spacecraft_parameters.wet_mass = Some(
+                            Mass::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_sp = true;
                     }
                     "DRY_MASS" => {
-                        spacecraft_parameters.dry_mass = Some(Mass::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        spacecraft_parameters.dry_mass = Some(
+                            Mass::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_sp = true;
                     }
                     "HAZARDOUS_SUBSTANCES" => {
@@ -763,23 +894,31 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                         have_sp = true;
                     }
                     "SOLAR_RAD_AREA" => {
-                        spacecraft_parameters.solar_rad_area = Some(Area::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        spacecraft_parameters.solar_rad_area = Some(
+                            Area::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_sp = true;
                     }
                     "SOLAR_RAD_COEFF" => {
-                        spacecraft_parameters.solar_rad_coeff = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        spacecraft_parameters.solar_rad_coeff =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                         have_sp = true;
                     }
                     "DRAG_AREA" => {
-                        spacecraft_parameters.drag_area = Some(Area::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        spacecraft_parameters.drag_area = Some(
+                            Area::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_sp = true;
                     }
                     "DRAG_COEFF" => {
-                        spacecraft_parameters.drag_coeff = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        spacecraft_parameters.drag_coeff =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                         have_sp = true;
                     }
                     "RCS" => {
-                        spacecraft_parameters.rcs = Some(Area::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        spacecraft_parameters.rcs = Some(
+                            Area::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_sp = true;
                     }
                     "BALLISTIC_COEFF" => {
@@ -800,50 +939,68 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
 
                     // OD Parameters
                     "TIME_LASTOB_START" => {
-                        od_parameters.time_lastob_start = Some(Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_parameters.time_lastob_start = Some(
+                            Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_od = true;
                     }
                     "TIME_LASTOB_END" => {
-                        od_parameters.time_lastob_end = Some(Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_parameters.time_lastob_end = Some(
+                            Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_od = true;
                     }
                     "RECOMMENDED_OD_SPAN" => {
-                        od_parameters.recommended_od_span = Some(DayInterval::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_parameters.recommended_od_span = Some(
+                            DayInterval::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_od = true;
                     }
                     "ACTUAL_OD_SPAN" => {
-                        od_parameters.actual_od_span = Some(DayInterval::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_parameters.actual_od_span = Some(
+                            DayInterval::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_od = true;
                     }
                     "OBS_AVAILABLE" => {
-                        od_parameters.obs_available = Some(parse_u32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_parameters.obs_available =
+                            Some(parse_u32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                         have_od = true;
                     }
                     "OBS_USED" => {
-                        od_parameters.obs_used = Some(parse_u32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_parameters.obs_used =
+                            Some(parse_u32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                         have_od = true;
                     }
                     "TRACKS_AVAILABLE" => {
-                        od_parameters.tracks_available = Some(parse_u32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_parameters.tracks_available =
+                            Some(parse_u32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                         have_od = true;
                     }
                     "TRACKS_USED" => {
-                        od_parameters.tracks_used = Some(parse_u32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_parameters.tracks_used =
+                            Some(parse_u32(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                         have_od = true;
                     }
                     "RESIDUALS_ACCEPTED" => {
-                        od_parameters.residuals_accepted = Some(Percentage::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_parameters.residuals_accepted = Some(
+                            Percentage::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                         have_od = true;
                     }
                     "WEIGHTED_RMS" => {
-                        od_parameters.weighted_rms = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_parameters.weighted_rms =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
                         have_od = true;
                     }
 
                     _ if k.starts_with("USER_DEFINED_") => {
                         user_defined_parameters.push((k.to_string(), v.to_string()));
                     }
-                    
+
                     _ => {
                         return Err(ErrMode::Cut(ContextError::new().add_context(
                             input,
@@ -875,7 +1032,11 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
         ground_impact_parameters: if have_ground { Some(ground) } else { None },
         state_vector,
         covariance_matrix,
-        spacecraft_parameters: if have_sp { Some(spacecraft_parameters) } else { None },
+        spacecraft_parameters: if have_sp {
+            Some(spacecraft_parameters)
+        } else {
+            None
+        },
         od_parameters: if have_od { Some(od_parameters) } else { None },
         user_defined_parameters,
     })

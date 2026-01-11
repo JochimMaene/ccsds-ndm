@@ -269,7 +269,9 @@ pub fn ocm_metadata<'a>(input: &mut &'a str) -> ModalResult<OcmMetadata> {
                 return Err(ErrMode::Cut(ContextError::new().add_context(
                     input,
                     &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("Unexpected OCM Metadata key")),
+                    StrContext::Expected(StrContextValue::Description(
+                        "Unexpected OCM Metadata key",
+                    )),
                 )));
             }
             _ => break,
@@ -317,8 +319,14 @@ pub fn ocm_metadata<'a>(input: &mut &'a str) -> ModalResult<OcmMetadata> {
         ops_status,
         orbit_category,
         ocm_data_elements,
-        sclk_offset_at_epoch: sclk_offset_at_epoch.or(Some(TimeOffset { value: 0.0, units: None })),
-        sclk_sec_per_si_sec: sclk_sec_per_si_sec.or(Some(Duration { value: 1.0, units: None })),
+        sclk_offset_at_epoch: sclk_offset_at_epoch.or(Some(TimeOffset {
+            value: 0.0,
+            units: None,
+        })),
+        sclk_sec_per_si_sec: sclk_sec_per_si_sec.or(Some(Duration {
+            value: 1.0,
+            units: None,
+        })),
         previous_message_epoch,
         next_message_epoch,
         start_time,
@@ -371,7 +379,10 @@ pub fn ocm_traj_line<'a>(input: &mut &'a str) -> ModalResult<TrajLine> {
         .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
         .to_string();
     let values: Vec<f64> = parts
-        .map(|v| v.parse::<f64>().map_err(|_| ErrMode::Cut(ContextError::new())))
+        .map(|v| {
+            v.parse::<f64>()
+                .map_err(|_| ErrMode::Cut(ContextError::new()))
+        })
         .collect::<Result<Vec<f64>, _>>()?;
     Ok(TrajLine { epoch, values })
 }
@@ -425,23 +436,22 @@ pub fn ocm_traj_state<'a>(input: &mut &'a str) -> ModalResult<OcmTrajState> {
                     "TRAJ_NEXT_ID" => traj_next_id = Some(v.to_string()),
                     "TRAJ_BASIS" => {
                         traj_basis = Some(
-                            TrajBasis::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            TrajBasis::from_str(v)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "TRAJ_BASIS_ID" => traj_basis_id = Some(v.to_string()),
                     "INTERPOLATION" => interpolation = Some(v.to_string()),
                     "INTERPOLATION_DEGREE" => {
-                        interpolation_degree = Some(
-                            parse_u32(v).map_err(|_| {
-                                ErrMode::Cut(ContextError::new().add_context(
-                                    input,
-                                    &input.checkpoint(),
-                                    StrContext::Expected(StrContextValue::Description(
-                                        "INTERPOLATION_DEGREE",
-                                    )),
-                                ))
-                            })?,
-                        );
+                        interpolation_degree = Some(parse_u32(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description(
+                                    "INTERPOLATION_DEGREE",
+                                )),
+                            ))
+                        })?);
                     }
                     "PROPAGATOR" => propagator = Some(v.to_string()),
                     "CENTER_NAME" => center_name = Some(v.to_string()),
@@ -630,12 +640,20 @@ pub fn ocm_phys<'a>(input: &mut &'a str) -> ModalResult<OcmPhysicalDescription> 
                         );
                     }
                     "DRAG_COEFF_NOM" => {
-                        phys.drag_coeff_nom =
-                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("DRAG_COEFF_NOM")))))?);
+                        phys.drag_coeff_nom = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description(
+                                    "DRAG_COEFF_NOM",
+                                )),
+                            ))
+                        })?);
                     }
                     "DRAG_UNCERTAINTY" => {
                         phys.drag_uncertainty = Some(
-                            Percentage::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Percentage::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "INITIAL_WET_MASS" => {
@@ -659,23 +677,58 @@ pub fn ocm_phys<'a>(input: &mut &'a str) -> ModalResult<OcmPhysicalDescription> 
                             Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
-                    "OEB_Q1" => phys.oeb_q1 = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("OEB_Q1")))))?),
-                    "OEB_Q2" => phys.oeb_q2 = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("OEB_Q2")))))?),
-                    "OEB_Q3" => phys.oeb_q3 = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("OEB_Q3")))))?),
-                    "OEB_QC" => phys.oeb_qc = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("OEB_QC")))))?),
+                    "OEB_Q1" => {
+                        phys.oeb_q1 = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("OEB_Q1")),
+                            ))
+                        })?)
+                    }
+                    "OEB_Q2" => {
+                        phys.oeb_q2 = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("OEB_Q2")),
+                            ))
+                        })?)
+                    }
+                    "OEB_Q3" => {
+                        phys.oeb_q3 = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("OEB_Q3")),
+                            ))
+                        })?)
+                    }
+                    "OEB_QC" => {
+                        phys.oeb_qc = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("OEB_QC")),
+                            ))
+                        })?)
+                    }
                     "OEB_MAX" => {
                         phys.oeb_max = Some(
-                            Length::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Length::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "OEB_INT" => {
                         phys.oeb_int = Some(
-                            Length::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Length::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "OEB_MIN" => {
                         phys.oeb_min = Some(
-                            Length::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Length::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "AREA_ALONG_OEB_MAX" => {
@@ -729,18 +782,62 @@ pub fn ocm_phys<'a>(input: &mut &'a str) -> ModalResult<OcmPhysicalDescription> 
                         );
                     }
                     "SOLAR_RAD_COEFF" => {
-                        phys.solar_rad_coeff =
-                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("SOLAR_RAD_COEFF")))))?);
+                        phys.solar_rad_coeff = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description(
+                                    "SOLAR_RAD_COEFF",
+                                )),
+                            ))
+                        })?);
                     }
                     "SOLAR_RAD_UNCERTAINTY" => {
                         phys.solar_rad_uncertainty = Some(
-                            Percentage::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Percentage::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
-                    "VM_ABSOLUTE" => phys.vm_absolute = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("VM_ABSOLUTE")))))?),
-                    "VM_APPARENT_MIN" => phys.vm_apparent_min = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("VM_APPARENT_MIN")))))?),
-                    "VM_APPARENT" => phys.vm_apparent = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("VM_APPARENT")))))?),
-                    "VM_APPARENT_MAX" => phys.vm_apparent_max = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("VM_APPARENT_MAX")))))?),
+                    "VM_ABSOLUTE" => {
+                        phys.vm_absolute = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("VM_ABSOLUTE")),
+                            ))
+                        })?)
+                    }
+                    "VM_APPARENT_MIN" => {
+                        phys.vm_apparent_min = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description(
+                                    "VM_APPARENT_MIN",
+                                )),
+                            ))
+                        })?)
+                    }
+                    "VM_APPARENT" => {
+                        phys.vm_apparent = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("VM_APPARENT")),
+                            ))
+                        })?)
+                    }
+                    "VM_APPARENT_MAX" => {
+                        phys.vm_apparent_max = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description(
+                                    "VM_APPARENT_MAX",
+                                )),
+                            ))
+                        })?)
+                    }
                     "REFLECTANCE" => {
                         let val = parse_f64(v).map_err(|_| {
                             ErrMode::Cut(ContextError::new().add_context(
@@ -776,30 +873,64 @@ pub fn ocm_phys<'a>(input: &mut &'a str) -> ModalResult<OcmPhysicalDescription> 
                     }
                     "AVG_MANEUVER_FREQ" => {
                         phys.avg_maneuver_freq = Some(
-                            ManeuverFreq::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            ManeuverFreq::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "MAX_THRUST" => {
                         phys.max_thrust = Some(
-                            Thrust::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Thrust::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "DV_BOL" => {
                         phys.dv_bol = Some(
-                            Velocity::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Velocity::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "DV_REMAINING" => {
                         phys.dv_remaining = Some(
-                            Velocity::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Velocity::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
-                    "IXX" => phys.ixx = Some(Moment::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "IYY" => phys.iyy = Some(Moment::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "IZZ" => phys.izz = Some(Moment::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "IXY" => phys.ixy = Some(Moment::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "IXZ" => phys.ixz = Some(Moment::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "IYZ" => phys.iyz = Some(Moment::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "IXX" => {
+                        phys.ixx = Some(
+                            Moment::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "IYY" => {
+                        phys.iyy = Some(
+                            Moment::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "IZZ" => {
+                        phys.izz = Some(
+                            Moment::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "IXY" => {
+                        phys.ixy = Some(
+                            Moment::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "IXZ" => {
+                        phys.ixz = Some(
+                            Moment::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "IYZ" => {
+                        phys.iyz = Some(
+                            Moment::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
                     _ => unreachable!(),
                 }
             }
@@ -849,7 +980,10 @@ pub fn ocm_cov_line<'a>(input: &mut &'a str) -> ModalResult<CovLine> {
         .ok_or_else(|| ErrMode::Cut(ContextError::new()))?
         .to_string();
     let values: Vec<f64> = parts
-        .map(|v| v.parse::<f64>().map_err(|_| ErrMode::Cut(ContextError::new())))
+        .map(|v| {
+            v.parse::<f64>()
+                .map_err(|_| ErrMode::Cut(ContextError::new()))
+        })
         .collect::<Result<Vec<f64>, _>>()?;
     Ok(CovLine { epoch, values })
 }
@@ -917,12 +1051,22 @@ pub fn ocm_cov<'a>(input: &mut &'a str) -> ModalResult<OcmCovarianceMatrix> {
                         );
                     }
                     "COV_SCALE_MIN" => {
-                        cov_scale_min =
-                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("COV_SCALE_MIN")))))?);
+                        cov_scale_min = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("COV_SCALE_MIN")),
+                            ))
+                        })?);
                     }
                     "COV_SCALE_MAX" => {
-                        cov_scale_max =
-                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("COV_SCALE_MAX")))))?);
+                        cov_scale_max = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("COV_SCALE_MAX")),
+                            ))
+                        })?);
                     }
                     "COV_CONFIDENCE" => {
                         cov_confidence = Some(
@@ -1128,12 +1272,22 @@ pub fn ocm_man<'a>(input: &mut &'a str) -> ModalResult<OcmManeuverParameters> {
                         );
                     }
                     "DC_MIN_CYCLES" => {
-                        dc_min_cycles =
-                            Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("DC_MIN_CYCLES")))))?);
+                        dc_min_cycles = Some(parse_u64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("DC_MIN_CYCLES")),
+                            ))
+                        })?);
                     }
                     "DC_MAX_CYCLES" => {
-                        dc_max_cycles =
-                            Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("DC_MAX_CYCLES")))))?);
+                        dc_max_cycles = Some(parse_u64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("DC_MAX_CYCLES")),
+                            ))
+                        })?);
                     }
                     "DC_EXEC_START" => {
                         dc_exec_start = Some(
@@ -1208,12 +1362,24 @@ pub fn ocm_man<'a>(input: &mut &'a str) -> ModalResult<OcmManeuverParameters> {
 
     Ok(OcmManeuverParameters {
         comment,
-        man_id: man_id.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("MAN_ID")))))?,
+        man_id: man_id.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("MAN_ID")),
+            ))
+        })?,
         man_prev_id,
         man_next_id,
         man_basis,
         man_basis_id,
-        man_device_id: man_device_id.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("MAN_DEVICE_ID")))))?,
+        man_device_id: man_device_id.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("MAN_DEVICE_ID")),
+            ))
+        })?,
         man_prev_epoch,
         man_next_epoch,
         man_purpose,
@@ -1236,7 +1402,13 @@ pub fn ocm_man<'a>(input: &mut &'a str) -> ModalResult<OcmManeuverParameters> {
         dc_body_trigger,
         dc_pa_start_angle,
         dc_pa_stop_angle,
-        man_composition: man_composition.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("MAN_COMPOSITION")))))?,
+        man_composition: man_composition.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("MAN_COMPOSITION")),
+            ))
+        })?,
         man_units,
         man_lines,
     })
@@ -1310,7 +1482,8 @@ pub fn ocm_pert<'a>(input: &mut &'a str) -> ModalResult<OcmPerturbations> {
                     "GRAVITY_MODEL" => pert.gravity_model = Some(v.to_string()),
                     "EQUATORIAL_RADIUS" => {
                         pert.equatorial_radius = Some(
-                            Position::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Position::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "GM" => {
@@ -1326,16 +1499,30 @@ pub fn ocm_pert<'a>(input: &mut &'a str) -> ModalResult<OcmPerturbations> {
                         );
                     }
                     "OBLATE_FLATTENING" => {
-                        pert.oblate_flattening =
-                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("OBLATE_FLATTENING")))))?);
+                        pert.oblate_flattening = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description(
+                                    "OBLATE_FLATTENING",
+                                )),
+                            ))
+                        })?);
                     }
                     "OCEAN_TIDES_MODEL" => pert.ocean_tides_model = Some(v.to_string()),
                     "SOLID_TIDES_MODEL" => pert.solid_tides_model = Some(v.to_string()),
                     "REDUCTION_THEORY" => pert.reduction_theory = Some(v.to_string()),
                     "ALBEDO_MODEL" => pert.albedo_model = Some(v.to_string()),
                     "ALBEDO_GRID_SIZE" => {
-                        pert.albedo_grid_size =
-                            Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("ALBEDO_GRID_SIZE")))))?);
+                        pert.albedo_grid_size = Some(parse_u64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description(
+                                    "ALBEDO_GRID_SIZE",
+                                )),
+                            ))
+                        })?);
                     }
                     "SHADOW_MODEL" => pert.shadow_model = Some(v.to_string()),
                     "SHADOW_BODIES" => pert.shadow_bodies = Some(v.to_string()),
@@ -1349,17 +1536,20 @@ pub fn ocm_pert<'a>(input: &mut &'a str) -> ModalResult<OcmPerturbations> {
                     "SW_INTERP_METHOD" => pert.sw_interp_method = Some(v.to_string()),
                     "FIXED_GEOMAG_KP" => {
                         pert.fixed_geomag_kp = Some(
-                            Geomag::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Geomag::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "FIXED_GEOMAG_AP" => {
                         pert.fixed_geomag_ap = Some(
-                            Geomag::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Geomag::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "FIXED_GEOMAG_DST" => {
                         pert.fixed_geomag_dst = Some(
-                            Geomag::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Geomag::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "FIXED_F10P7" => {
@@ -1522,95 +1712,166 @@ pub fn ocm_od<'a>(input: &mut &'a str) -> ModalResult<OcmOdParameters> {
                     "OD_PREV_ID" => od_prev_id = Some(v.to_string()),
                     "OD_METHOD" => od_method = Some(v.to_string()),
                     "OD_EPOCH" => {
-                        od_epoch = Some(Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        od_epoch = Some(
+                            Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                     }
                     "DAYS_SINCE_FIRST_OBS" => {
                         days_since_first_obs = Some(
-                            DayInterval::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            DayInterval::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "DAYS_SINCE_LAST_OBS" => {
                         days_since_last_obs = Some(
-                            DayInterval::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            DayInterval::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "RECOMMENDED_OD_SPAN" => {
                         recommended_od_span = Some(
-                            DayInterval::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            DayInterval::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "ACTUAL_OD_SPAN" => {
                         actual_od_span = Some(
-                            DayInterval::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            DayInterval::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "OBS_AVAILABLE" => {
-                        obs_available = Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("OBS_AVAILABLE")))))?);
+                        obs_available = Some(parse_u64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("OBS_AVAILABLE")),
+                            ))
+                        })?);
                     }
                     "OBS_USED" => {
-                        obs_used = Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("OBS_USED")))))?);
+                        obs_used = Some(parse_u64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("OBS_USED")),
+                            ))
+                        })?);
                     }
                     "TRACKS_AVAILABLE" => {
-                        tracks_available = Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("TRACKS_AVAILABLE")))))?);
+                        tracks_available = Some(parse_u64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description(
+                                    "TRACKS_AVAILABLE",
+                                )),
+                            ))
+                        })?);
                     }
                     "TRACKS_USED" => {
-                        tracks_used = Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("TRACKS_USED")))))?);
+                        tracks_used = Some(parse_u64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("TRACKS_USED")),
+                            ))
+                        })?);
                     }
                     "MAXIMUM_OBS_GAP" => {
                         maximum_obs_gap = Some(
-                            DayInterval::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            DayInterval::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "OD_EPOCH_EIGMAJ" => {
                         od_epoch_eigmaj = Some(
-                            Length::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Length::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "OD_EPOCH_EIGINT" => {
                         od_epoch_eigint = Some(
-                            Length::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Length::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "OD_EPOCH_EIGMIN" => {
                         od_epoch_eigmin = Some(
-                            Length::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Length::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "OD_MAX_PRED_EIGMAJ" => {
                         od_max_pred_eigmaj = Some(
-                            Length::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Length::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "OD_MIN_PRED_EIGMIN" => {
                         od_min_pred_eigmin = Some(
-                            Length::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Length::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "OD_CONFIDENCE" => {
                         od_confidence = Some(
-                            Percentage::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Percentage::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "GDOP" => {
-                        gdop = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("GDOP")))))?);
+                        gdop = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("GDOP")),
+                            ))
+                        })?);
                     }
                     "SOLVE_N" => {
-                        solve_n = Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("SOLVE_N")))))?);
+                        solve_n = Some(parse_u64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("SOLVE_N")),
+                            ))
+                        })?);
                     }
                     "SOLVE_STATES" => solve_states = Some(v.to_string()),
                     "CONSIDER_N" => {
-                        consider_n = Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CONSIDER_N")))))?);
+                        consider_n = Some(parse_u64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("CONSIDER_N")),
+                            ))
+                        })?);
                     }
                     "CONSIDER_PARAMS" => consider_params = Some(v.to_string()),
                     "SEDR" => {
-                        sedr = Some(Wkg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                        sedr = Some(
+                            Wkg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        );
                     }
                     "SENSORS_N" => {
-                        sensors_n = Some(parse_u64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("SENSORS_N")))))?);
+                        sensors_n = Some(parse_u64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("SENSORS_N")),
+                            ))
+                        })?);
                     }
                     "SENSORS" => sensors = Some(v.to_string()),
                     "WEIGHTED_RMS" => {
-                        weighted_rms = Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("WEIGHTED_RMS")))))?);
+                        weighted_rms = Some(parse_f64(v).map_err(|_| {
+                            ErrMode::Cut(ContextError::new().add_context(
+                                input,
+                                &input.checkpoint(),
+                                StrContext::Expected(StrContextValue::Description("WEIGHTED_RMS")),
+                            ))
+                        })?);
                     }
                     "DATA_TYPES" => data_types = Some(v.to_string()),
                     _ => unreachable!(),
@@ -1627,10 +1888,28 @@ pub fn ocm_od<'a>(input: &mut &'a str) -> ModalResult<OcmOdParameters> {
 
     Ok(OcmOdParameters {
         comment,
-        od_id: od_id.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("OD_ID")))))?,
+        od_id: od_id.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("OD_ID")),
+            ))
+        })?,
         od_prev_id,
-        od_method: od_method.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("OD_METHOD")))))?,
-        od_epoch: od_epoch.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("OD_EPOCH")))))?,
+        od_method: od_method.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("OD_METHOD")),
+            ))
+        })?,
+        od_epoch: od_epoch.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("OD_EPOCH")),
+            ))
+        })?,
         days_since_first_obs,
         days_since_last_obs,
         recommended_od_span,

@@ -2009,8 +2009,6 @@ pub struct OcmManeuverParameters {
     pub man_lines: Vec<ManLine>,
 }
 
-
-
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct ManLine {
     pub epoch: String,
@@ -2735,8 +2733,6 @@ pub struct OcmOdParameters {
     pub data_types: Option<String>,
 }
 
-
-
 impl ToKvn for OcmOdParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("OD_START");
@@ -3403,7 +3399,9 @@ MAN_STOP
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "MAN_DEVICE_ID"),
-            CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("MAN_DEVICE_ID")),
+            CcsdsNdmError::KvnParse { ref message, .. } => {
+                assert!(message.contains("MAN_DEVICE_ID"))
+            }
             _ => panic!("Unexpected error: {:?}", err),
         }
     }
@@ -3429,7 +3427,9 @@ MAN_STOP
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "MAN_COMPOSITION"),
-            CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("MAN_COMPOSITION")),
+            CcsdsNdmError::KvnParse { ref message, .. } => {
+                assert!(message.contains("MAN_COMPOSITION"))
+            }
             _ => panic!("Unexpected error: {:?}", err),
         }
     }
@@ -4836,21 +4836,27 @@ PHYS_STOP
         let err2 = Ocm::from_kvn(&kvn2).unwrap_err();
         assert!(matches!(
             err2,
-            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_) | CcsdsNdmError::KvnParse { .. }
+            CcsdsNdmError::ParseInt(_)
+                | CcsdsNdmError::ParseFloat(_)
+                | CcsdsNdmError::KvnParse { .. }
         ));
 
         let kvn3 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT");
         let err3 = Ocm::from_kvn(&kvn3).unwrap_err();
         assert!(matches!(
             err3,
-            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_) | CcsdsNdmError::KvnParse { .. }
+            CcsdsNdmError::ParseInt(_)
+                | CcsdsNdmError::ParseFloat(_)
+                | CcsdsNdmError::KvnParse { .. }
         ));
 
         let kvn4 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT_MAX");
         let err4 = Ocm::from_kvn(&kvn4).unwrap_err();
         assert!(matches!(
             err4,
-            CcsdsNdmError::ParseInt(_) | CcsdsNdmError::ParseFloat(_) | CcsdsNdmError::KvnParse { .. }
+            CcsdsNdmError::ParseInt(_)
+                | CcsdsNdmError::ParseFloat(_)
+                | CcsdsNdmError::KvnParse { .. }
         ));
     }
 
