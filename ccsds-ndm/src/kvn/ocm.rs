@@ -21,7 +21,7 @@ use winnow::ModalResult;
 // OCM Version Parser
 //----------------------------------------------------------------------
 
-pub fn ocm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
+pub fn ocm_version(input: &mut &str) -> ModalResult<String> {
     let _ = collect_comments.parse_next(input)?;
     let (value, _) = expect_key("CCSDS_OCM_VERS").parse_next(input)?;
     Ok(value.to_string())
@@ -84,7 +84,7 @@ fn is_ocm_metadata_key(key: &str) -> bool {
     )
 }
 
-pub fn ocm_metadata<'a>(input: &mut &'a str) -> ModalResult<OcmMetadata> {
+pub fn ocm_metadata(input: &mut &str) -> ModalResult<OcmMetadata> {
     expect_block_start("META").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -265,14 +265,10 @@ pub fn ocm_metadata<'a>(input: &mut &'a str) -> ModalResult<OcmMetadata> {
                     _ => unreachable!(),
                 }
             }
-            Some(_key) => {
-                return Err(ErrMode::Cut(ContextError::new().add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description(
-                        "Unexpected OCM Metadata key",
-                    )),
-                )));
+            Some(key) if !key.ends_with("_STOP") => {
+                // Ignore unknown metadata key
+                let _ = till_line_ending.parse_next(input)?;
+                opt_line_ending.parse_next(input)?;
             }
             _ => break,
         }
@@ -370,7 +366,7 @@ fn is_traj_key(key: &str) -> bool {
     )
 }
 
-pub fn ocm_traj_line<'a>(input: &mut &'a str) -> ModalResult<TrajLine> {
+pub fn ocm_traj_line(input: &mut &str) -> ModalResult<TrajLine> {
     let line = raw_line.parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     let mut parts = line.split_whitespace();
@@ -387,7 +383,7 @@ pub fn ocm_traj_line<'a>(input: &mut &'a str) -> ModalResult<TrajLine> {
     Ok(TrajLine { epoch, values })
 }
 
-pub fn ocm_traj_state<'a>(input: &mut &'a str) -> ModalResult<OcmTrajState> {
+pub fn ocm_traj_state(input: &mut &str) -> ModalResult<OcmTrajState> {
     expect_block_start("TRAJ").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -495,7 +491,7 @@ pub fn ocm_traj_state<'a>(input: &mut &'a str) -> ModalResult<OcmTrajState> {
             Some(key) if !key.ends_with("_STOP") && !key.ends_with("_START") => {
                 // Unknown key-value pair, ignore
                 let _ = till_line_ending.parse_next(input)?;
-                let _ = opt_line_ending.parse_next(input)?;
+                opt_line_ending.parse_next(input)?;
             }
             _ => {
                 // Likely a raw line
@@ -606,7 +602,7 @@ fn is_phys_key(key: &str) -> bool {
     )
 }
 
-pub fn ocm_phys<'a>(input: &mut &'a str) -> ModalResult<OcmPhysicalDescription> {
+pub fn ocm_phys(input: &mut &str) -> ModalResult<OcmPhysicalDescription> {
     expect_block_start("PHYS").parse_next(input)?;
 
     let mut phys = OcmPhysicalDescription::default();
@@ -640,15 +636,8 @@ pub fn ocm_phys<'a>(input: &mut &'a str) -> ModalResult<OcmPhysicalDescription> 
                         );
                     }
                     "DRAG_COEFF_NOM" => {
-                        phys.drag_coeff_nom = Some(parse_f64(v).map_err(|_| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Expected(StrContextValue::Description(
-                                    "DRAG_COEFF_NOM",
-                                )),
-                            ))
-                        })?);
+                        phys.drag_coeff_nom =
+                            Some(parse_f64(v).map_err(|_| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("DRAG_COEFF_NOM")))))?);
                     }
                     "DRAG_UNCERTAINTY" => {
                         phys.drag_uncertainty = Some(
@@ -937,7 +926,7 @@ pub fn ocm_phys<'a>(input: &mut &'a str) -> ModalResult<OcmPhysicalDescription> 
             Some(key) if !key.ends_with("_STOP") && !key.ends_with("_START") => {
                 // Ignore unknown physical description key
                 let _ = till_line_ending.parse_next(input)?;
-                let _ = opt_line_ending.parse_next(input)?;
+                opt_line_ending.parse_next(input)?;
             }
             _ => break,
         }
@@ -971,7 +960,7 @@ fn is_ocm_cov_key(key: &str) -> bool {
         || key.starts_with("CZ_")
 }
 
-pub fn ocm_cov_line<'a>(input: &mut &'a str) -> ModalResult<CovLine> {
+pub fn ocm_cov_line(input: &mut &str) -> ModalResult<CovLine> {
     let line = raw_line.parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     let mut parts = line.split_whitespace();
@@ -988,7 +977,7 @@ pub fn ocm_cov_line<'a>(input: &mut &'a str) -> ModalResult<CovLine> {
     Ok(CovLine { epoch, values })
 }
 
-pub fn ocm_cov<'a>(input: &mut &'a str) -> ModalResult<OcmCovarianceMatrix> {
+pub fn ocm_cov(input: &mut &str) -> ModalResult<OcmCovarianceMatrix> {
     expect_block_start("COV").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -1080,7 +1069,7 @@ pub fn ocm_cov<'a>(input: &mut &'a str) -> ModalResult<OcmCovarianceMatrix> {
             Some(key) if !key.ends_with("_STOP") && !key.ends_with("_START") => {
                 // Ignore unknown key-value pair unless it's a block tag
                 let _ = till_line_ending.parse_next(input)?;
-                let _ = opt_line_ending.parse_next(input)?;
+                opt_line_ending.parse_next(input)?;
             }
             _ => {
                 if let Ok(line) = ocm_cov_line.parse_next(input) {
@@ -1158,7 +1147,7 @@ fn is_ocm_man_key(key: &str) -> bool {
     )
 }
 
-pub fn ocm_man_line<'a>(input: &mut &'a str) -> ModalResult<ManLine> {
+pub fn ocm_man_line(input: &mut &str) -> ModalResult<ManLine> {
     let line = raw_line.parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     let mut parts = line.split_whitespace();
@@ -1170,7 +1159,7 @@ pub fn ocm_man_line<'a>(input: &mut &'a str) -> ModalResult<ManLine> {
     Ok(ManLine { epoch, values })
 }
 
-pub fn ocm_man<'a>(input: &mut &'a str) -> ModalResult<OcmManeuverParameters> {
+pub fn ocm_man(input: &mut &str) -> ModalResult<OcmManeuverParameters> {
     expect_block_start("MAN").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -1232,7 +1221,8 @@ pub fn ocm_man<'a>(input: &mut &'a str) -> ModalResult<OcmManeuverParameters> {
                     "MAN_NEXT_ID" => man_next_id = Some(v.to_string()),
                     "MAN_BASIS" => {
                         man_basis = Some(
-                            ManBasis::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            ManBasis::from_str(v)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     "MAN_BASIS_ID" => man_basis_id = Some(v.to_string()),
@@ -1347,7 +1337,7 @@ pub fn ocm_man<'a>(input: &mut &'a str) -> ModalResult<OcmManeuverParameters> {
             Some(key) if !key.ends_with("_STOP") && !key.ends_with("_START") => {
                 // Ignore unknown key-value pair unless it's a block tag
                 let _ = till_line_ending.parse_next(input)?;
-                let _ = opt_line_ending.parse_next(input)?;
+                opt_line_ending.parse_next(input)?;
             }
             _ => {
                 if let Ok(line) = ocm_man_line.parse_next(input) {
@@ -1453,7 +1443,7 @@ fn is_pert_key(key: &str) -> bool {
     )
 }
 
-pub fn ocm_pert<'a>(input: &mut &'a str) -> ModalResult<OcmPerturbations> {
+pub fn ocm_pert(input: &mut &str) -> ModalResult<OcmPerturbations> {
     expect_block_start("PERT").parse_next(input)?;
 
     let mut pert = OcmPerturbations::default();
@@ -1606,7 +1596,7 @@ pub fn ocm_pert<'a>(input: &mut &'a str) -> ModalResult<OcmPerturbations> {
             Some(key) if !key.ends_with("_STOP") && !key.ends_with("_START") => {
                 // Ignore unknown perturbation key
                 let _ = till_line_ending.parse_next(input)?;
-                let _ = opt_line_ending.parse_next(input)?;
+                opt_line_ending.parse_next(input)?;
             }
             _ => break,
         }
@@ -1654,7 +1644,7 @@ fn is_ocm_od_key(key: &str) -> bool {
     )
 }
 
-pub fn ocm_od<'a>(input: &mut &'a str) -> ModalResult<OcmOdParameters> {
+pub fn ocm_od(input: &mut &str) -> ModalResult<OcmOdParameters> {
     expect_block_start("OD").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -1880,7 +1870,7 @@ pub fn ocm_od<'a>(input: &mut &'a str) -> ModalResult<OcmOdParameters> {
             Some(key) if !key.ends_with("_STOP") && !key.ends_with("_START") => {
                 // Ignore unknown OD key
                 let _ = till_line_ending.parse_next(input)?;
-                let _ = opt_line_ending.parse_next(input)?;
+                opt_line_ending.parse_next(input)?;
             }
             _ => break,
         }
@@ -1942,7 +1932,7 @@ pub fn ocm_od<'a>(input: &mut &'a str) -> ModalResult<OcmOdParameters> {
 // OCM User Parser
 //----------------------------------------------------------------------
 
-pub fn ocm_user<'a>(input: &mut &'a str) -> ModalResult<UserDefined> {
+pub fn ocm_user(input: &mut &str) -> ModalResult<UserDefined> {
     expect_block_start("USER").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -1991,7 +1981,7 @@ pub fn ocm_user<'a>(input: &mut &'a str) -> ModalResult<UserDefined> {
 // OCM Data Parser
 //----------------------------------------------------------------------
 
-pub fn ocm_data<'a>(input: &mut &'a str) -> ModalResult<OcmData> {
+pub fn ocm_data(input: &mut &str) -> ModalResult<OcmData> {
     let mut data = OcmData::default();
     let mut pending_comments = Vec::new();
 
@@ -2043,7 +2033,7 @@ pub fn ocm_data<'a>(input: &mut &'a str) -> ModalResult<OcmData> {
 // Complete OCM Parser
 //----------------------------------------------------------------------
 
-pub fn parse_ocm<'a>(input: &mut &'a str) -> ModalResult<Ocm> {
+pub fn parse_ocm(input: &mut &str) -> ModalResult<Ocm> {
     let version = ocm_version.parse_next(input)?;
     let header = odm_header.parse_next(input)?;
     let metadata = ocm_metadata.parse_next(input)?;

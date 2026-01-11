@@ -118,7 +118,7 @@ fn is_header_key(key: &str) -> bool {
 //----------------------------------------------------------------------
 
 /// Parses the OPM version line: `CCSDS_OPM_VERS = 3.0`
-pub fn opm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
+pub fn opm_version(input: &mut &str) -> ModalResult<String> {
     // Skip any leading comments/empty lines
     let _ = collect_comments.parse_next(input)?;
 
@@ -131,7 +131,7 @@ pub fn opm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
 //----------------------------------------------------------------------
 
 /// Parses the ODM header section.
-pub fn odm_header<'a>(input: &mut &'a str) -> ModalResult<OdmHeader> {
+pub fn odm_header(input: &mut &str) -> ModalResult<OdmHeader> {
     let mut comment = Vec::new();
     let mut classification = None;
     let mut creation_date = None;
@@ -185,7 +185,7 @@ pub fn odm_header<'a>(input: &mut &'a str) -> ModalResult<OdmHeader> {
 //----------------------------------------------------------------------
 
 /// Parses the OPM metadata section.
-pub fn opm_metadata<'a>(input: &mut &'a str) -> ModalResult<OpmMetadata> {
+pub fn opm_metadata(input: &mut &str) -> ModalResult<OpmMetadata> {
     let mut comment = Vec::new();
     let mut object_name = None;
     let mut object_id = None;
@@ -247,7 +247,7 @@ pub fn opm_metadata<'a>(input: &mut &'a str) -> ModalResult<OpmMetadata> {
 //----------------------------------------------------------------------
 
 /// Parses the state vector section.
-pub fn state_vector<'a>(input: &mut &'a str) -> ModalResult<(Vec<String>, StateVector)> {
+pub fn state_vector(input: &mut &str) -> ModalResult<(Vec<String>, StateVector)> {
     let mut comment = Vec::new();
     let mut epoch = None;
     let mut x = None;
@@ -354,7 +354,7 @@ fn is_keplerian_key(key: &str) -> bool {
 }
 
 /// Parses the optional Keplerian elements section.
-pub fn keplerian_elements<'a>(input: &mut &'a str) -> ModalResult<Option<KeplerianElements>> {
+pub fn keplerian_elements(input: &mut &str) -> ModalResult<Option<KeplerianElements>> {
     let mut comment = Vec::new();
     let mut semi_major_axis = None;
     let mut eccentricity = None;
@@ -481,7 +481,7 @@ fn is_spacecraft_key(key: &str) -> bool {
 }
 
 /// Parses the optional spacecraft parameters section.
-pub fn spacecraft_parameters<'a>(input: &mut &'a str) -> ModalResult<Option<SpacecraftParameters>> {
+pub fn spacecraft_parameters(input: &mut &str) -> ModalResult<Option<SpacecraftParameters>> {
     let mut comment = Vec::new();
     let mut mass = None;
     let mut solar_rad_area = None;
@@ -576,7 +576,7 @@ fn is_covariance_key(key: &str) -> bool {
 }
 
 /// Parses the optional covariance matrix section.
-pub fn covariance_matrix<'a>(input: &mut &'a str) -> ModalResult<Option<OpmCovarianceMatrix>> {
+pub fn covariance_matrix(input: &mut &str) -> ModalResult<Option<OpmCovarianceMatrix>> {
     let mut comment = Vec::new();
     let mut cov_ref_frame = None;
     let mut cx_x = None;
@@ -812,7 +812,7 @@ fn is_maneuver_key(key: &str) -> bool {
 }
 
 /// Parses a single maneuver parameter block.
-pub fn maneuver_parameters<'a>(input: &mut &'a str) -> ModalResult<Option<ManeuverParameters>> {
+pub fn maneuver_parameters(input: &mut &str) -> ModalResult<Option<ManeuverParameters>> {
     let mut comment = Vec::new();
     let mut man_epoch_ignition = None;
     let mut man_duration = None;
@@ -920,7 +920,7 @@ pub fn maneuver_parameters<'a>(input: &mut &'a str) -> ModalResult<Option<Maneuv
 }
 
 /// Parses all maneuver parameter blocks.
-pub fn all_maneuvers<'a>(input: &mut &'a str) -> ModalResult<Vec<ManeuverParameters>> {
+pub fn all_maneuvers(input: &mut &str) -> ModalResult<Vec<ManeuverParameters>> {
     let mut maneuvers = Vec::new();
 
     loop {
@@ -939,7 +939,7 @@ pub fn all_maneuvers<'a>(input: &mut &'a str) -> ModalResult<Vec<ManeuverParamet
 //----------------------------------------------------------------------
 
 /// Parses user-defined parameters.
-pub fn user_defined_parameters<'a>(input: &mut &'a str) -> ModalResult<Option<UserDefined>> {
+pub fn user_defined_parameters(input: &mut &str) -> ModalResult<Option<UserDefined>> {
     let mut comment = Vec::new();
     let mut params = Vec::new();
 
@@ -978,7 +978,7 @@ pub fn user_defined_parameters<'a>(input: &mut &'a str) -> ModalResult<Option<Us
 //----------------------------------------------------------------------
 
 /// Parses the complete OPM data section.
-pub fn opm_data<'a>(input: &mut &'a str) -> ModalResult<OpmData> {
+pub fn opm_data(input: &mut &str) -> ModalResult<OpmData> {
     // Parse state vector (required)
     let (sv_comment, state_vector) = state_vector.parse_next(input)?;
 
@@ -1005,7 +1005,7 @@ pub fn opm_data<'a>(input: &mut &'a str) -> ModalResult<OpmData> {
 //----------------------------------------------------------------------
 
 /// Parses a complete OPM message.
-pub fn parse_opm<'a>(input: &mut &'a str) -> ModalResult<Opm> {
+pub fn parse_opm(input: &mut &str) -> ModalResult<Opm> {
     // 1. Version
     let version = opm_version.parse_next(input)?;
 

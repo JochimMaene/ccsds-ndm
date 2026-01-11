@@ -123,7 +123,7 @@ fn is_rdm_header_key(key: &str) -> bool {
 // RDM Version Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
+pub fn rdm_version(input: &mut &str) -> ModalResult<String> {
     let _ = collect_comments.parse_next(input)?;
     let (value, _) = expect_key("CCSDS_RDM_VERS").parse_next(input)?;
     Ok(value.to_string())
@@ -133,7 +133,7 @@ pub fn rdm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
 // RDM Header Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_header<'a>(input: &mut &'a str) -> ModalResult<RdmHeader> {
+pub fn rdm_header(input: &mut &str) -> ModalResult<RdmHeader> {
     let mut comment = Vec::new();
     let mut creation_date = None;
     let mut originator = None;
@@ -195,7 +195,7 @@ pub fn rdm_header<'a>(input: &mut &'a str) -> ModalResult<RdmHeader> {
 // RDM Metadata Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_metadata<'a>(input: &mut &'a str) -> ModalResult<RdmMetadata> {
+pub fn rdm_metadata(input: &mut &str) -> ModalResult<RdmMetadata> {
     let mut comment = Vec::new();
     let mut object_name = None;
     let mut international_designator = None;
@@ -393,7 +393,7 @@ pub fn rdm_metadata<'a>(input: &mut &'a str) -> ModalResult<RdmMetadata> {
 // RDM Data Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
+pub fn rdm_data(input: &mut &str) -> ModalResult<RdmData> {
     let mut comment = Vec::new();
 
     let mut orbit_lifetime = None;
@@ -799,12 +799,7 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
                             // Peek next
                             let nk = peek_key(input)?;
                             match nk {
-                                Some(nk)
-                                    if matches!(
-                                        nk,
-                                        "EPOCH" | "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT"
-                                    ) =>
-                                {
+                                Some("EPOCH" | "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT") => {
                                     let (nk, nv, nu) = key_value_line.parse_next(input)?;
                                     opt_line_ending.parse_next(input)?;
                                     cur_k = nk;
@@ -1046,7 +1041,7 @@ pub fn rdm_data<'a>(input: &mut &'a str) -> ModalResult<RdmData> {
 // RDM Segment Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_segment<'a>(input: &mut &'a str) -> ModalResult<RdmSegment> {
+pub fn rdm_segment(input: &mut &str) -> ModalResult<RdmSegment> {
     let metadata = rdm_metadata.parse_next(input)?;
     let data = rdm_data.parse_next(input)?;
 
@@ -1057,7 +1052,7 @@ pub fn rdm_segment<'a>(input: &mut &'a str) -> ModalResult<RdmSegment> {
 // RDM Body Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_body<'a>(input: &mut &'a str) -> ModalResult<RdmBody> {
+pub fn rdm_body(input: &mut &str) -> ModalResult<RdmBody> {
     let segment = rdm_segment.parse_next(input)?;
     Ok(RdmBody {
         segment: Box::new(segment),
@@ -1068,7 +1063,7 @@ pub fn rdm_body<'a>(input: &mut &'a str) -> ModalResult<RdmBody> {
 // Complete RDM Parser
 //----------------------------------------------------------------------
 
-pub fn parse_rdm<'a>(input: &mut &'a str) -> ModalResult<Rdm> {
+pub fn parse_rdm(input: &mut &str) -> ModalResult<Rdm> {
     let version = rdm_version.parse_next(input)?;
     let header = rdm_header.parse_next(input)?;
     let body = rdm_body.parse_next(input)?;

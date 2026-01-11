@@ -77,7 +77,7 @@ fn is_omm_data_key(key: &str) -> bool {
 // OMM Version Parser
 //----------------------------------------------------------------------
 
-pub fn omm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
+pub fn omm_version(input: &mut &str) -> ModalResult<String> {
     let _ = collect_comments.parse_next(input)?;
     let (value, _) = expect_key("CCSDS_OMM_VERS").parse_next(input)?;
     Ok(value.to_string())
@@ -87,7 +87,7 @@ pub fn omm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
 // OMM Metadata Parser
 //----------------------------------------------------------------------
 
-pub fn omm_metadata<'a>(input: &mut &'a str) -> ModalResult<OmmMetadata> {
+pub fn omm_metadata(input: &mut &str) -> ModalResult<OmmMetadata> {
     let mut comment = Vec::new();
     let mut object_name = None;
     let mut object_id = None;
@@ -186,7 +186,7 @@ pub fn omm_metadata<'a>(input: &mut &'a str) -> ModalResult<OmmMetadata> {
 // Mean Elements Parser
 //----------------------------------------------------------------------
 
-pub fn mean_elements<'a>(input: &mut &'a str) -> ModalResult<(Vec<String>, MeanElements)> {
+pub fn mean_elements(input: &mut &str) -> ModalResult<(Vec<String>, MeanElements)> {
     let mut comment = Vec::new();
     let mut epoch = None;
     let mut semi_major_axis = None;
@@ -404,7 +404,7 @@ fn is_tle_key(key: &str) -> bool {
     )
 }
 
-pub fn tle_parameters<'a>(input: &mut &'a str) -> ModalResult<Option<TleParameters>> {
+pub fn tle_parameters(input: &mut &str) -> ModalResult<Option<TleParameters>> {
     let mut comment = Vec::new();
     let mut ephemeris_type = None;
     let mut classification_type = None;
@@ -600,7 +600,7 @@ pub fn tle_parameters<'a>(input: &mut &'a str) -> ModalResult<Option<TleParamete
 // OMM Data Parser
 //----------------------------------------------------------------------
 
-pub fn omm_data<'a>(input: &mut &'a str) -> ModalResult<OmmData> {
+pub fn omm_data(input: &mut &str) -> ModalResult<OmmData> {
     let (me_comment, mean_elements) = mean_elements.parse_next(input)?;
 
     // Spacecraft parameters
@@ -629,7 +629,7 @@ pub fn omm_data<'a>(input: &mut &'a str) -> ModalResult<OmmData> {
 // Complete OMM Parser
 //----------------------------------------------------------------------
 
-pub fn parse_omm<'a>(input: &mut &'a str) -> ModalResult<Omm> {
+pub fn parse_omm(input: &mut &str) -> ModalResult<Omm> {
     let version = omm_version.parse_next(input)?;
     let header = crate::kvn::opm::odm_header.parse_next(input)?;
     let metadata = omm_metadata.parse_next(input)?;

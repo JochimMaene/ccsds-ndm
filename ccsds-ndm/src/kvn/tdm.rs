@@ -93,7 +93,7 @@ fn is_tdm_header_key(key: &str) -> bool {
 // TDM Version Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
+pub fn tdm_version(input: &mut &str) -> ModalResult<String> {
     let _ = collect_comments.parse_next(input)?;
     let (value, _) = expect_key("CCSDS_TDM_VERS").parse_next(input)?;
     Ok(value.to_string())
@@ -103,7 +103,7 @@ pub fn tdm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
 // TDM Header Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_header<'a>(input: &mut &'a str) -> ModalResult<TdmHeader> {
+pub fn tdm_header(input: &mut &str) -> ModalResult<TdmHeader> {
     let mut comment = Vec::new();
     let mut creation_date = None;
     let mut originator = None;
@@ -159,7 +159,7 @@ pub fn tdm_header<'a>(input: &mut &'a str) -> ModalResult<TdmHeader> {
 // TDM Metadata Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_metadata<'a>(input: &mut &'a str) -> ModalResult<TdmMetadata> {
+pub fn tdm_metadata(input: &mut &str) -> ModalResult<TdmMetadata> {
     expect_block_start("META").parse_next(input)?;
 
     let mut meta = TdmMetadata::default();
@@ -371,7 +371,7 @@ pub fn tdm_metadata<'a>(input: &mut &'a str) -> ModalResult<TdmMetadata> {
 // TDM Observation Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_observation<'a>(input: &mut &'a str) -> ModalResult<TdmObservation> {
+pub fn tdm_observation(input: &mut &str) -> ModalResult<TdmObservation> {
     let (key, val, _unit) = key_value_line.parse_next(input)?;
     opt_line_ending.parse_next(input)?;
 
@@ -410,7 +410,7 @@ pub fn tdm_observation<'a>(input: &mut &'a str) -> ModalResult<TdmObservation> {
 // TDM Data Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_data<'a>(input: &mut &'a str) -> ModalResult<TdmData> {
+pub fn tdm_data(input: &mut &str) -> ModalResult<TdmData> {
     expect_block_start("DATA").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -450,7 +450,7 @@ pub fn tdm_data<'a>(input: &mut &'a str) -> ModalResult<TdmData> {
 // TDM Segment Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_segment<'a>(input: &mut &'a str) -> ModalResult<TdmSegment> {
+pub fn tdm_segment(input: &mut &str) -> ModalResult<TdmSegment> {
     let metadata = tdm_metadata.parse_next(input)?;
     let data = tdm_data.parse_next(input)?;
 
@@ -461,7 +461,7 @@ pub fn tdm_segment<'a>(input: &mut &'a str) -> ModalResult<TdmSegment> {
 // TDM Body Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_body<'a>(input: &mut &'a str) -> ModalResult<TdmBody> {
+pub fn tdm_body(input: &mut &str) -> ModalResult<TdmBody> {
     let mut segments = Vec::new();
 
     loop {
@@ -489,7 +489,7 @@ pub fn tdm_body<'a>(input: &mut &'a str) -> ModalResult<TdmBody> {
 // Complete TDM Parser
 //----------------------------------------------------------------------
 
-pub fn parse_tdm<'a>(input: &mut &'a str) -> ModalResult<Tdm> {
+pub fn parse_tdm(input: &mut &str) -> ModalResult<Tdm> {
     let version = tdm_version.parse_next(input)?;
     let header = tdm_header.parse_next(input)?;
     let body = tdm_body.parse_next(input)?;

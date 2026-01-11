@@ -108,7 +108,7 @@ fn is_header_key(key: &str) -> bool {
 // CDM Version Parser
 //----------------------------------------------------------------------
 
-pub fn cdm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
+pub fn cdm_version(input: &mut &str) -> ModalResult<String> {
     let _ = collect_comments.parse_next(input)?;
     let (value, _) = expect_key("CCSDS_CDM_VERS").parse_next(input)?;
     Ok(value.to_string())
@@ -118,7 +118,7 @@ pub fn cdm_version<'a>(input: &mut &'a str) -> ModalResult<String> {
 // CDM Header Parser
 //----------------------------------------------------------------------
 
-pub fn cdm_header<'a>(input: &mut &'a str) -> ModalResult<CdmHeader> {
+pub fn cdm_header(input: &mut &str) -> ModalResult<CdmHeader> {
     let mut comment = Vec::new();
     let mut creation_date = None;
     let mut originator = None;
@@ -183,7 +183,7 @@ pub fn cdm_header<'a>(input: &mut &'a str) -> ModalResult<CdmHeader> {
 // Relative Metadata Parser
 //----------------------------------------------------------------------
 
-pub fn relative_metadata_data<'a>(input: &mut &'a str) -> ModalResult<RelativeMetadataData> {
+pub fn relative_metadata_data(input: &mut &str) -> ModalResult<RelativeMetadataData> {
     let mut comment = Vec::new();
     let mut tca = None;
     let mut miss_distance = None;
@@ -435,7 +435,7 @@ pub fn relative_metadata_data<'a>(input: &mut &'a str) -> ModalResult<RelativeMe
 // CDM Metadata Parser
 //----------------------------------------------------------------------
 
-pub fn cdm_metadata<'a>(input: &mut &'a str) -> ModalResult<CdmMetadata> {
+pub fn cdm_metadata(input: &mut &str) -> ModalResult<CdmMetadata> {
     let mut comment = Vec::new();
     let mut object = None;
     let mut object_designator = None;
@@ -461,7 +461,7 @@ pub fn cdm_metadata<'a>(input: &mut &'a str) -> ModalResult<CdmMetadata> {
 
     loop {
         if at_block_end("META", input) {
-            let _ = expect_block_end("META").parse_next(input)?;
+            expect_block_end("META").parse_next(input)?;
             break;
         }
 
@@ -648,7 +648,7 @@ pub fn cdm_metadata<'a>(input: &mut &'a str) -> ModalResult<CdmMetadata> {
 // CDM Data Parser
 //----------------------------------------------------------------------
 
-pub fn cdm_data<'a>(input: &mut &'a str) -> ModalResult<CdmData> {
+pub fn cdm_data(input: &mut &str) -> ModalResult<CdmData> {
     let mut comment = Vec::new();
     let mut od_params = OdParameters::default();
     let mut add_params = AdditionalParameters::default();
@@ -923,7 +923,7 @@ pub fn cdm_data<'a>(input: &mut &'a str) -> ModalResult<CdmData> {
 // CDM Segment Parser
 //----------------------------------------------------------------------
 
-pub fn cdm_segment<'a>(input: &mut &'a str) -> ModalResult<CdmSegment> {
+pub fn cdm_segment(input: &mut &str) -> ModalResult<CdmSegment> {
     // 1. Metadata
     // Metadata can start with optional META_START (for CDM 2.0) or just keys (for CDM 1.0)
     // However, if it's CDM 2.0, we might see META_START.
@@ -949,13 +949,14 @@ pub fn cdm_segment<'a>(input: &mut &'a str) -> ModalResult<CdmSegment> {
 // CDM Body Parser
 //----------------------------------------------------------------------
 
-pub fn cdm_body<'a>(input: &mut &'a str) -> ModalResult<CdmBody> {
+pub fn cdm_body(input: &mut &str) -> ModalResult<CdmBody> {
     let relative_metadata_data = relative_metadata_data.parse_next(input)?;
 
-    let mut segments = Vec::new();
     // Expecting 2 segments
-    segments.push(cdm_segment.parse_next(input)?);
-    segments.push(cdm_segment.parse_next(input)?);
+    let segments = vec![
+        cdm_segment.parse_next(input)?,
+        cdm_segment.parse_next(input)?,
+    ];
 
     Ok(CdmBody {
         relative_metadata_data,
@@ -967,7 +968,7 @@ pub fn cdm_body<'a>(input: &mut &'a str) -> ModalResult<CdmBody> {
 // Complete CDM Parser
 //----------------------------------------------------------------------
 
-pub fn parse_cdm<'a>(input: &mut &'a str) -> ModalResult<Cdm> {
+pub fn parse_cdm(input: &mut &str) -> ModalResult<Cdm> {
     let version = cdm_version.parse_next(input)?;
     let header = cdm_header.parse_next(input)?;
     let body = cdm_body.parse_next(input)?;

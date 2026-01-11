@@ -84,7 +84,7 @@ fn is_metadata_key(key: &str) -> bool {
 //----------------------------------------------------------------------
 
 /// Parses the OEM version line: `CCSDS_OEM_VERS = 3.0`
-pub fn oem_version<'a>(input: &mut &'a str) -> ModalResult<String> {
+pub fn oem_version(input: &mut &str) -> ModalResult<String> {
     // Skip any leading comments/empty lines
     let _ = collect_comments.parse_next(input)?;
 
@@ -97,7 +97,7 @@ pub fn oem_version<'a>(input: &mut &'a str) -> ModalResult<String> {
 //----------------------------------------------------------------------
 
 /// Parses the ODM header section.
-pub fn odm_header<'a>(input: &mut &'a str) -> ModalResult<OdmHeader> {
+pub fn odm_header(input: &mut &str) -> ModalResult<OdmHeader> {
     let mut comment = Vec::new();
     let mut classification = None;
     let mut creation_date = None;
@@ -151,7 +151,7 @@ pub fn odm_header<'a>(input: &mut &'a str) -> ModalResult<OdmHeader> {
 //----------------------------------------------------------------------
 
 /// Parses the OEM metadata section (between META_START and META_STOP).
-pub fn oem_metadata<'a>(input: &mut &'a str) -> ModalResult<OemMetadata> {
+pub fn oem_metadata(input: &mut &str) -> ModalResult<OemMetadata> {
     let mut comment = Vec::new();
     let mut object_name = None;
     let mut object_id = None;
@@ -262,7 +262,7 @@ pub fn oem_metadata<'a>(input: &mut &'a str) -> ModalResult<OemMetadata> {
 
 /// Parses a raw state vector line.
 /// Format: EPOCH X Y Z X_DOT Y_DOT Z_DOT [X_DDOT Y_DDOT Z_DDOT]
-fn parse_state_vector_line<'a>(input: &mut &'a str) -> ModalResult<StateVectorAcc> {
+fn parse_state_vector_line(input: &mut &str) -> ModalResult<StateVectorAcc> {
     let line = raw_line.parse_next(input)?;
     opt_line_ending.parse_next(input)?;
 
@@ -384,7 +384,7 @@ fn parse_state_vector_line<'a>(input: &mut &'a str) -> ModalResult<StateVectorAc
 //----------------------------------------------------------------------
 
 /// Parses a single covariance matrix (within COVARIANCE_START/STOP block).
-fn parse_covariance_matrix<'a>(input: &mut &'a str) -> ModalResult<OemCovarianceMatrix> {
+fn parse_covariance_matrix(input: &mut &str) -> ModalResult<OemCovarianceMatrix> {
     let mut comment = Vec::new();
     let mut cov_ref_frame = None;
 
@@ -496,7 +496,7 @@ fn parse_covariance_matrix<'a>(input: &mut &'a str) -> ModalResult<OemCovariance
 }
 
 /// Parses all covariance matrices within a COVARIANCE block.
-fn parse_covariance_block<'a>(input: &mut &'a str) -> ModalResult<Vec<OemCovarianceMatrix>> {
+fn parse_covariance_block(input: &mut &str) -> ModalResult<Vec<OemCovarianceMatrix>> {
     let mut matrices = Vec::new();
 
     // We're inside the COVARIANCE block, parse matrices until COVARIANCE_STOP
@@ -544,7 +544,7 @@ fn is_raw_data_line(input: &str) -> bool {
 }
 
 /// Parses the OEM data section (state vectors and optional covariance matrices).
-pub fn oem_data<'a>(input: &mut &'a str) -> ModalResult<OemData> {
+pub fn oem_data(input: &mut &str) -> ModalResult<OemData> {
     let mut comment = Vec::new();
     let mut state_vector = Vec::new();
     let mut covariance_matrix = Vec::new();
@@ -616,7 +616,7 @@ pub fn oem_data<'a>(input: &mut &'a str) -> ModalResult<OemData> {
 //----------------------------------------------------------------------
 
 /// Parses a single OEM segment (META_START ... META_STOP + data).
-pub fn oem_segment<'a>(input: &mut &'a str) -> ModalResult<OemSegment> {
+pub fn oem_segment(input: &mut &str) -> ModalResult<OemSegment> {
     // Expect META_START
     expect_block_start("META").parse_next(input)?;
 
@@ -637,7 +637,7 @@ pub fn oem_segment<'a>(input: &mut &'a str) -> ModalResult<OemSegment> {
 //----------------------------------------------------------------------
 
 /// Parses the OEM body (one or more segments).
-pub fn oem_body<'a>(input: &mut &'a str) -> ModalResult<OemBody> {
+pub fn oem_body(input: &mut &str) -> ModalResult<OemBody> {
     let mut segments = Vec::new();
 
     // Skip any leading comments/empty lines
@@ -673,7 +673,7 @@ pub fn oem_body<'a>(input: &mut &'a str) -> ModalResult<OemBody> {
 //----------------------------------------------------------------------
 
 /// Parses a complete OEM message.
-pub fn parse_oem<'a>(input: &mut &'a str) -> ModalResult<Oem> {
+pub fn parse_oem(input: &mut &str) -> ModalResult<Oem> {
     // 1. Version
     let version = oem_version.parse_next(input)?;
 
