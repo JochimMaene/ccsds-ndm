@@ -217,10 +217,10 @@ pub fn oem_metadata<'a>(input: &mut &'a str) -> ModalResult<OemMetadata> {
                     }
                     "INTERPOLATION" => interpolation = Some(v.to_string()),
                     "INTERPOLATION_DEGREE" => {
-                        let val: u32 =
-                            v.parse().map_err(|_| ErrMode::Cut(ContextError::new()))?;
+                        let val: u32 = v.parse().map_err(|_| ErrMode::Cut(ContextError::new()))?;
                         interpolation_degree = Some(
-                            NonZeroU32::new(val).ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+                            NonZeroU32::new(val)
+                                .ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
                         );
                     }
                     _ => {}
@@ -424,7 +424,9 @@ fn parse_covariance_matrix<'a>(input: &mut &'a str) -> ModalResult<OemCovariance
         }
 
         for part in parts {
-            let val: f64 = part.parse().map_err(|_| ErrMode::Cut(ContextError::new()))?;
+            let val: f64 = part
+                .parse()
+                .map_err(|_| ErrMode::Cut(ContextError::new()))?;
             floats.push(val);
         }
 
@@ -448,18 +450,45 @@ fn parse_covariance_matrix<'a>(input: &mut &'a str) -> ModalResult<OemCovariance
         cz_x: PositionCovariance::new(floats[3], Some(PositionCovarianceUnits::Km2)),
         cz_y: PositionCovariance::new(floats[4], Some(PositionCovarianceUnits::Km2)),
         cz_z: PositionCovariance::new(floats[5], Some(PositionCovarianceUnits::Km2)),
-        cx_dot_x: PositionVelocityCovariance::new(floats[6], Some(PositionVelocityCovarianceUnits::Km2PerS)),
-        cx_dot_y: PositionVelocityCovariance::new(floats[7], Some(PositionVelocityCovarianceUnits::Km2PerS)),
-        cx_dot_z: PositionVelocityCovariance::new(floats[8], Some(PositionVelocityCovarianceUnits::Km2PerS)),
+        cx_dot_x: PositionVelocityCovariance::new(
+            floats[6],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cx_dot_y: PositionVelocityCovariance::new(
+            floats[7],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cx_dot_z: PositionVelocityCovariance::new(
+            floats[8],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
         cx_dot_x_dot: VelocityCovariance::new(floats[9], Some(VelocityCovarianceUnits::Km2PerS2)),
-        cy_dot_x: PositionVelocityCovariance::new(floats[10], Some(PositionVelocityCovarianceUnits::Km2PerS)),
-        cy_dot_y: PositionVelocityCovariance::new(floats[11], Some(PositionVelocityCovarianceUnits::Km2PerS)),
-        cy_dot_z: PositionVelocityCovariance::new(floats[12], Some(PositionVelocityCovarianceUnits::Km2PerS)),
+        cy_dot_x: PositionVelocityCovariance::new(
+            floats[10],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cy_dot_y: PositionVelocityCovariance::new(
+            floats[11],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cy_dot_z: PositionVelocityCovariance::new(
+            floats[12],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
         cy_dot_x_dot: VelocityCovariance::new(floats[13], Some(VelocityCovarianceUnits::Km2PerS2)),
         cy_dot_y_dot: VelocityCovariance::new(floats[14], Some(VelocityCovarianceUnits::Km2PerS2)),
-        cz_dot_x: PositionVelocityCovariance::new(floats[15], Some(PositionVelocityCovarianceUnits::Km2PerS)),
-        cz_dot_y: PositionVelocityCovariance::new(floats[16], Some(PositionVelocityCovarianceUnits::Km2PerS)),
-        cz_dot_z: PositionVelocityCovariance::new(floats[17], Some(PositionVelocityCovarianceUnits::Km2PerS)),
+        cz_dot_x: PositionVelocityCovariance::new(
+            floats[15],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cz_dot_y: PositionVelocityCovariance::new(
+            floats[16],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cz_dot_z: PositionVelocityCovariance::new(
+            floats[17],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
         cz_dot_x_dot: VelocityCovariance::new(floats[18], Some(VelocityCovarianceUnits::Km2PerS2)),
         cz_dot_y_dot: VelocityCovariance::new(floats[19], Some(VelocityCovarianceUnits::Km2PerS2)),
         cz_dot_z_dot: VelocityCovariance::new(floats[20], Some(VelocityCovarianceUnits::Km2PerS2)),
@@ -507,7 +536,10 @@ fn is_raw_data_line(input: &str) -> bool {
     // Get just the first line
     let first_line = trimmed.lines().next().unwrap_or("");
     // Raw data lines start with a digit (epoch timestamp) and have no '='
-    first_line.chars().next().is_some_and(|c| c.is_ascii_digit())
+    first_line
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_digit())
         && !first_line.contains('=')
 }
 
@@ -765,7 +797,10 @@ META_STOP
         );
 
         let oem = result.unwrap();
-        assert_eq!(oem.body.segment[0].metadata.object_name, "MARS GLOBAL SURVEYOR");
+        assert_eq!(
+            oem.body.segment[0].metadata.object_name,
+            "MARS GLOBAL SURVEYOR"
+        );
         assert!(!oem.body.segment[0].data.comment.is_empty());
     }
 

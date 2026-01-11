@@ -1097,8 +1097,10 @@ COVARIANCE_STOP
         let err1 = Oem::from_kvn(kvn_missing_epoch).unwrap_err();
         // winnow parser may return generic KvnParse error without specific message
         assert!(
-            matches!(&err1, CcsdsNdmError::KvnParse { .. })
-        , "unexpected error: {:?}", err1);
+            matches!(&err1, CcsdsNdmError::KvnParse { .. }),
+            "unexpected error: {:?}",
+            err1
+        );
 
         let kvn_wrong_count = r#"CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -1126,8 +1128,10 @@ COVARIANCE_STOP
         let err2 = Oem::from_kvn(kvn_wrong_count).unwrap_err();
         // winnow parser may return generic KvnParse error without specific message
         assert!(
-            matches!(&err2, CcsdsNdmError::KvnParse { .. })
-        , "unexpected error: {:?}", err2);
+            matches!(&err2, CcsdsNdmError::KvnParse { .. }),
+            "unexpected error: {:?}",
+            err2
+        );
     }
 
     #[test]
@@ -1963,7 +1967,11 @@ META_STOP
         let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "INTERPOLATION_DEGREE" && expected == ">= 1"))
             || matches!(err, CcsdsNdmError::OutOfRange { ref name, ref expected, .. } if name == "INTERPOLATION_DEGREE" && expected == ">= 1")
             || matches!(err, CcsdsNdmError::KvnParse { .. });
-        assert!(ok, "Expected OutOfRange, LineContext(OutOfRange), or KvnParse, got {:?}", err);
+        assert!(
+            ok,
+            "Expected OutOfRange, LineContext(OutOfRange), or KvnParse, got {:?}",
+            err
+        );
     }
 
     #[test]
@@ -2246,7 +2254,11 @@ NOT_A_FLOAT
         let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::ParseFloat(_)))
             || matches!(err, CcsdsNdmError::ParseFloat(_))
             || matches!(err, CcsdsNdmError::KvnParse { .. });
-        assert!(ok, "Expected ParseFloat, LineContext(ParseFloat), or KvnParse, got {:?}", err);
+        assert!(
+            ok,
+            "Expected ParseFloat, LineContext(ParseFloat), or KvnParse, got {:?}",
+            err
+        );
     }
 
     #[test]
