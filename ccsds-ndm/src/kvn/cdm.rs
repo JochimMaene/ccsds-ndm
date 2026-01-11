@@ -699,7 +699,9 @@ fn is_cdm_covariance_key(key: &str) -> bool {
     )
 }
 
-pub fn cdm_covariance_matrix(input: &mut &str) -> ModalResult<crate::messages::cdm::CdmCovarianceMatrix> {
+pub fn cdm_covariance_matrix(
+    input: &mut &str,
+) -> ModalResult<crate::messages::cdm::CdmCovarianceMatrix> {
     let mut comment = Vec::new();
     let mut cr_r = None;
     let mut ct_r = None;
@@ -762,54 +764,236 @@ pub fn cdm_covariance_matrix(input: &mut &str) -> ModalResult<crate::messages::c
                 opt_line_ending.parse_next(input)?;
 
                 match k {
-                    "CR_R" => cr_r = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CT_R" => ct_r = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CT_T" => ct_t = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CN_R" => cn_r = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CN_T" => cn_t = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CN_N" => cn_n = Some(M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CRDOT_R" => crdot_r = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CRDOT_T" => crdot_t = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CRDOT_N" => crdot_n = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CRDOT_RDOT" => crdot_rdot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTDOT_R" => ctdot_r = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTDOT_T" => ctdot_t = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTDOT_N" => ctdot_n = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTDOT_RDOT" => ctdot_rdot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTDOT_TDOT" => ctdot_tdot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CNDOT_R" => cndot_r = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CNDOT_T" => cndot_t = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CNDOT_N" => cndot_n = Some(M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CNDOT_RDOT" => cndot_rdot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CNDOT_TDOT" => cndot_tdot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CNDOT_NDOT" => cndot_ndot = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CR_R" => {
+                        cr_r = Some(
+                            M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CT_R" => {
+                        ct_r = Some(
+                            M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CT_T" => {
+                        ct_t = Some(
+                            M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CN_R" => {
+                        cn_r = Some(
+                            M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CN_T" => {
+                        cn_t = Some(
+                            M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CN_N" => {
+                        cn_n = Some(
+                            M2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CRDOT_R" => {
+                        crdot_r = Some(
+                            M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CRDOT_T" => {
+                        crdot_t = Some(
+                            M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CRDOT_N" => {
+                        crdot_n = Some(
+                            M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CRDOT_RDOT" => {
+                        crdot_rdot = Some(
+                            M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTDOT_R" => {
+                        ctdot_r = Some(
+                            M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTDOT_T" => {
+                        ctdot_t = Some(
+                            M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTDOT_N" => {
+                        ctdot_n = Some(
+                            M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTDOT_RDOT" => {
+                        ctdot_rdot = Some(
+                            M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTDOT_TDOT" => {
+                        ctdot_tdot = Some(
+                            M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CNDOT_R" => {
+                        cndot_r = Some(
+                            M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CNDOT_T" => {
+                        cndot_t = Some(
+                            M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CNDOT_N" => {
+                        cndot_n = Some(
+                            M2s::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CNDOT_RDOT" => {
+                        cndot_rdot = Some(
+                            M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CNDOT_TDOT" => {
+                        cndot_tdot = Some(
+                            M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CNDOT_NDOT" => {
+                        cndot_ndot = Some(
+                            M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
 
-                    "CDRG_R" => cdrg_r = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CDRG_T" => cdrg_t = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CDRG_N" => cdrg_n = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CDRG_RDOT" => cdrg_rdot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CDRG_TDOT" => cdrg_tdot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CDRG_NDOT" => cdrg_ndot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CDRG_DRG" => cdrg_drg = Some(M4kg2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CDRG_R" => {
+                        cdrg_r = Some(
+                            M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CDRG_T" => {
+                        cdrg_t = Some(
+                            M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CDRG_N" => {
+                        cdrg_n = Some(
+                            M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CDRG_RDOT" => {
+                        cdrg_rdot = Some(
+                            M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CDRG_TDOT" => {
+                        cdrg_tdot = Some(
+                            M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CDRG_NDOT" => {
+                        cdrg_ndot = Some(
+                            M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CDRG_DRG" => {
+                        cdrg_drg = Some(
+                            M4kg2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
 
-                    "CSRP_R" => csrp_r = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CSRP_T" => csrp_t = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CSRP_N" => csrp_n = Some(M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CSRP_RDOT" => csrp_rdot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CSRP_TDOT" => csrp_tdot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CSRP_NDOT" => csrp_ndot = Some(M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CSRP_DRG" => csrp_drg = Some(M4kg2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CSRP_SRP" => csrp_srp = Some(M4kg2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CSRP_R" => {
+                        csrp_r = Some(
+                            M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CSRP_T" => {
+                        csrp_t = Some(
+                            M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CSRP_N" => {
+                        csrp_n = Some(
+                            M3kg::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CSRP_RDOT" => {
+                        csrp_rdot = Some(
+                            M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CSRP_TDOT" => {
+                        csrp_tdot = Some(
+                            M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CSRP_NDOT" => {
+                        csrp_ndot = Some(
+                            M3kgs::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CSRP_DRG" => {
+                        csrp_drg = Some(
+                            M4kg2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CSRP_SRP" => {
+                        csrp_srp = Some(
+                            M4kg2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
 
-                    "CTHR_R" => cthr_r = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTHR_T" => cthr_t = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTHR_N" => cthr_n = Some(M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTHR_RDOT" => cthr_rdot = Some(M2s3::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTHR_TDOT" => cthr_tdot = Some(M2s3::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTHR_NDOT" => cthr_ndot = Some(M2s3::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTHR_DRG" => cthr_drg = Some(M3kgs2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTHR_SRP" => cthr_srp = Some(M3kgs2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
-                    "CTHR_THR" => cthr_thr = Some(M2s4::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?),
+                    "CTHR_R" => {
+                        cthr_r = Some(
+                            M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTHR_T" => {
+                        cthr_t = Some(
+                            M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTHR_N" => {
+                        cthr_n = Some(
+                            M2s2::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTHR_RDOT" => {
+                        cthr_rdot = Some(
+                            M2s3::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTHR_TDOT" => {
+                        cthr_tdot = Some(
+                            M2s3::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTHR_NDOT" => {
+                        cthr_ndot = Some(
+                            M2s3::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTHR_DRG" => {
+                        cthr_drg = Some(
+                            M3kgs2::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTHR_SRP" => {
+                        cthr_srp = Some(
+                            M3kgs2::from_kvn(v, u)
+                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
+                    "CTHR_THR" => {
+                        cthr_thr = Some(
+                            M2s4::from_kvn(v, u).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                        )
+                    }
                     _ => unreachable!(),
                 }
             }
@@ -822,27 +1006,153 @@ pub fn cdm_covariance_matrix(input: &mut &str) -> ModalResult<crate::messages::c
 
     Ok(crate::messages::cdm::CdmCovarianceMatrix {
         comment,
-        cr_r: cr_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CR_R")))))?,
-        ct_r: ct_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CT_R")))))?,
-        ct_t: ct_t.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CT_T")))))?,
-        cn_r: cn_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CN_R")))))?,
-        cn_t: cn_t.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CN_T")))))?,
-        cn_n: cn_n.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CN_N")))))?,
-        crdot_r: crdot_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CRDOT_R")))))?,
-        crdot_t: crdot_t.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CRDOT_T")))))?,
-        crdot_n: crdot_n.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CRDOT_N")))))?,
-        crdot_rdot: crdot_rdot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CRDOT_RDOT")))))?,
-        ctdot_r: ctdot_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CTDOT_R")))))?,
-        ctdot_t: ctdot_t.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CTDOT_T")))))?,
-        ctdot_n: ctdot_n.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CTDOT_N")))))?,
-        ctdot_rdot: ctdot_rdot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CTDOT_RDOT")))))?,
-        ctdot_tdot: ctdot_tdot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CTDOT_TDOT")))))?,
-        cndot_r: cndot_r.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_R")))))?,
-        cndot_t: cndot_t.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_T")))))?,
-        cndot_n: cndot_n.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_N")))))?,
-        cndot_rdot: cndot_rdot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_RDOT")))))?,
-        cndot_tdot: cndot_tdot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_TDOT")))))?,
-        cndot_ndot: cndot_ndot.ok_or_else(|| ErrMode::Cut(ContextError::new().add_context(input, &input.checkpoint(), StrContext::Expected(StrContextValue::Description("CNDOT_NDOT")))))?,
+        cr_r: cr_r.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CR_R")),
+            ))
+        })?,
+        ct_r: ct_r.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CT_R")),
+            ))
+        })?,
+        ct_t: ct_t.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CT_T")),
+            ))
+        })?,
+        cn_r: cn_r.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CN_R")),
+            ))
+        })?,
+        cn_t: cn_t.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CN_T")),
+            ))
+        })?,
+        cn_n: cn_n.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CN_N")),
+            ))
+        })?,
+        crdot_r: crdot_r.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CRDOT_R")),
+            ))
+        })?,
+        crdot_t: crdot_t.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CRDOT_T")),
+            ))
+        })?,
+        crdot_n: crdot_n.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CRDOT_N")),
+            ))
+        })?,
+        crdot_rdot: crdot_rdot.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CRDOT_RDOT")),
+            ))
+        })?,
+        ctdot_r: ctdot_r.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CTDOT_R")),
+            ))
+        })?,
+        ctdot_t: ctdot_t.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CTDOT_T")),
+            ))
+        })?,
+        ctdot_n: ctdot_n.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CTDOT_N")),
+            ))
+        })?,
+        ctdot_rdot: ctdot_rdot.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CTDOT_RDOT")),
+            ))
+        })?,
+        ctdot_tdot: ctdot_tdot.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CTDOT_TDOT")),
+            ))
+        })?,
+        cndot_r: cndot_r.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CNDOT_R")),
+            ))
+        })?,
+        cndot_t: cndot_t.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CNDOT_T")),
+            ))
+        })?,
+        cndot_n: cndot_n.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CNDOT_N")),
+            ))
+        })?,
+        cndot_rdot: cndot_rdot.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CNDOT_RDOT")),
+            ))
+        })?,
+        cndot_tdot: cndot_tdot.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CNDOT_TDOT")),
+            ))
+        })?,
+        cndot_ndot: cndot_ndot.ok_or_else(|| {
+            ErrMode::Cut(ContextError::new().add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CNDOT_NDOT")),
+            ))
+        })?,
         cdrg_r,
         cdrg_t,
         cdrg_n,
