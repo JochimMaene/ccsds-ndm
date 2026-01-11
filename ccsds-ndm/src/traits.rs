@@ -8,9 +8,7 @@
 //! NDM messages in both KVN and XML formats.
 
 use crate::error::Result;
-use crate::kvn::de::KvnLine;
 use crate::kvn::ser::KvnWriter;
-use std::iter::Peekable;
 
 /// Core trait for NDM message types.
 ///
@@ -91,13 +89,4 @@ pub trait ToKvn {
     ///
     /// * `writer` - The KVN writer to output to
     fn write_kvn(&self, writer: &mut KvnWriter);
-}
-
-/// Trait for types that can be parsed from KVN token streams.
-pub trait FromKvnTokens: Sized {
-    /// Parse from a peekable sequence of KVN tokens.
-    /// allows the parser to inspect the next token without consuming it.
-    fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
-    where
-        I: Iterator<Item = Result<KvnLine<'a>>>;
 }

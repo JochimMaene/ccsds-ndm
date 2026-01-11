@@ -282,19 +282,44 @@ pub trait ParseKvn: Sized {
     /// Convenience method to parse from a string.
     fn from_kvn_str(s: &str) -> crate::error::Result<Self> {
         let mut input = s;
-        Self::parse_kvn(&mut input).map_err(|e| match e {
-            ErrMode::Backtrack(ctx) | ErrMode::Cut(ctx) => {
-                let consumed = s.len() - input.len();
-                let line_num = s[..consumed].lines().count().max(1);
-                CcsdsNdmError::KvnParse {
-                    line: line_num,
-                    message: format!("{}", ctx),
+        let result = Self::parse_kvn(&mut input);
+
+        match result {
+            Ok(val) => {
+                // Check if we can skip remaining whitespace/comments
+                // We don't care about the result, just want to advance input if possible
+                let _ = skip_empty_and_comments(&mut input);
+
+                if !input.is_empty() {
+                    let line_num = s[..s.len() - input.len()].lines().count().max(1);
+                    // Determine if it's an unexpected key or just garbage
+                    let msg = if let Ok(Some(k)) = peek_key(&mut input) {
+                        format!("Unexpected key: {}", k)
+                    } else {
+                        "Unexpected trailing data".to_string()
+                    };
+
+                    return Err(CcsdsNdmError::KvnParse {
+                        line: line_num,
+                        message: msg,
+                    });
                 }
+                Ok(val)
             }
-            ErrMode::Incomplete(_) => CcsdsNdmError::UnexpectedEof {
-                context: "Incomplete KVN input".into(),
-            },
-        })
+            Err(e) => Err(match e {
+                ErrMode::Backtrack(ctx) | ErrMode::Cut(ctx) => {
+                    let consumed = s.len() - input.len();
+                    let line_num = s[..consumed].lines().count().max(1);
+                    CcsdsNdmError::KvnParse {
+                        line: line_num,
+                        message: format!("{}", ctx),
+                    }
+                }
+                ErrMode::Incomplete(_) => CcsdsNdmError::UnexpectedEof {
+                    context: "Incomplete KVN input".into(),
+                },
+            }),
+        }
     }
 }
 
