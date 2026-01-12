@@ -43,7 +43,7 @@ use crate::messages::opm::{
 };
 use crate::types::*;
 use std::str::FromStr;
-use winnow::error::{ContextError, ErrMode};
+use winnow::error::{AddContext, ContextError, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 use winnow::ModalResult;
 
@@ -116,6 +116,13 @@ pub fn opm_version(input: &mut &str) -> ModalResult<String> {
     let _ = collect_comments.parse_next(input)?;
 
     let (value, _) = expect_key("CCSDS_OPM_VERS").parse_next(input)?;
+    if value != "3.0" && value != "2.0" {
+        return Err(ErrMode::Cut(ContextError::new().add_context(
+            input,
+            &input.checkpoint(),
+            StrContext::Expected(StrContextValue::Description("3.0 or 2.0")),
+        )));
+    }
     Ok(value.to_string())
 }
 
@@ -156,13 +163,12 @@ pub fn opm_metadata(input: &mut &str) -> ModalResult<OpmMetadata> {
                     "CENTER_NAME" => center_name = Some(v.to_string()),
                     "REF_FRAME" => ref_frame = Some(v.to_string()),
                     "REF_FRAME_EPOCH" => {
-                        ref_frame_epoch = Some(
-                            Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        ref_frame_epoch =
+                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
                     }
                     "TIME_SYSTEM" => time_system = Some(v.to_string()),
                     _ => {
-                        return Err(ErrMode::Cut(ContextError::new()));
+                        return Err(cut_err(input, "Unexpected key or invalid format"));
                     }
                 }
             }
@@ -172,12 +178,12 @@ pub fn opm_metadata(input: &mut &str) -> ModalResult<OpmMetadata> {
 
     Ok(OpmMetadata {
         comment,
-        object_name: object_name.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        object_id: object_id.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        center_name: center_name.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        ref_frame: ref_frame.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+        object_name: object_name.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        object_id: object_id.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        center_name: center_name.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        ref_frame: ref_frame.ok_or_else(|| cut_err(input, "Missing required value"))?,
         ref_frame_epoch,
-        time_system: time_system.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+        time_system: time_system.ok_or_else(|| cut_err(input, "Missing required value"))?,
     })
 }
 
@@ -245,49 +251,49 @@ pub fn keplerian_elements(input: &mut &str) -> ModalResult<Option<KeplerianEleme
                     "SEMI_MAJOR_AXIS" => {
                         semi_major_axis = Some(
                             Distance::from_kvn(val, unit.or(Some("km")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "ECCENTRICITY" => {
                         eccentricity =
-                            Some(parse_f64(val).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                            Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
                     }
                     "INCLINATION" => {
                         let angle = Angle::from_kvn(val, unit)
-                            .map_err(|_| ErrMode::Cut(ContextError::new()))?;
+                            .map_err(|_| cut_err(input, "Invalid value"))?;
                         inclination = Some(
                             Inclination::new(angle.value, angle.units)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "RA_OF_ASC_NODE" => {
                         ra_of_asc_node = Some(
                             Angle::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "ARG_OF_PERICENTER" => {
                         arg_of_pericenter = Some(
                             Angle::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "TRUE_ANOMALY" => {
                         true_anomaly = Some(
                             Angle::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "MEAN_ANOMALY" => {
                         mean_anomaly = Some(
                             Angle::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "GM" => {
                         gm = Some(
                             Gm::from_kvn(val, unit.or(Some("km**3/s**2")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     _ => {}
@@ -301,15 +307,17 @@ pub fn keplerian_elements(input: &mut &str) -> ModalResult<Option<KeplerianEleme
     if semi_major_axis.is_some() || eccentricity.is_some() {
         Ok(Some(KeplerianElements {
             comment,
-            semi_major_axis: semi_major_axis.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            eccentricity: eccentricity.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            inclination: inclination.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            ra_of_asc_node: ra_of_asc_node.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+            semi_major_axis: semi_major_axis
+                .ok_or_else(|| cut_err(input, "Missing required value"))?,
+            eccentricity: eccentricity.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            inclination: inclination.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            ra_of_asc_node: ra_of_asc_node
+                .ok_or_else(|| cut_err(input, "Missing required value"))?,
             arg_of_pericenter: arg_of_pericenter
-                .ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+                .ok_or_else(|| cut_err(input, "Missing required value"))?,
             true_anomaly,
             mean_anomaly,
-            gm: gm.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+            gm: gm.ok_or_else(|| cut_err(input, "Missing required value"))?,
         }))
     } else {
         Ok(None)
@@ -366,28 +374,28 @@ pub fn spacecraft_parameters(input: &mut &str) -> ModalResult<Option<SpacecraftP
                     "MASS" => {
                         mass = Some(
                             Mass::from_kvn(val, unit.or(Some("kg")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "SOLAR_RAD_AREA" => {
                         solar_rad_area = Some(
                             Area::from_kvn(val, unit.or(Some("m**2")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "SOLAR_RAD_COEFF" => {
                         solar_rad_coeff =
-                            Some(parse_f64(val).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                            Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
                     }
                     "DRAG_AREA" => {
                         drag_area = Some(
                             Area::from_kvn(val, unit.or(Some("m**2")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "DRAG_COEFF" => {
                         drag_coeff =
-                            Some(parse_f64(val).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                            Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
                     }
                     _ => {}
                 }
@@ -472,22 +480,21 @@ pub fn maneuver_parameters(input: &mut &str) -> ModalResult<Option<ManeuverParam
                 match key {
                     "MAN_EPOCH_IGNITION" => {
                         man_epoch_ignition = Some(
-                            Epoch::from_str(val).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Epoch::from_str(val).map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "MAN_DURATION" => {
                         man_duration = Some(
                             Duration::from_kvn(val, unit.or(Some("s")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "MAN_DELTA_MASS" => {
-                        let value =
-                            parse_f64(val).map_err(|_| ErrMode::Cut(ContextError::new()))?;
+                        let value = parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?;
                         let units = unit.and_then(|u| u.parse::<MassUnits>().ok());
                         man_delta_mass = Some(
                             DeltaMassZ::new(value, units)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "MAN_REF_FRAME" => {
@@ -496,19 +503,19 @@ pub fn maneuver_parameters(input: &mut &str) -> ModalResult<Option<ManeuverParam
                     "MAN_DV_1" => {
                         man_dv_1 = Some(
                             Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "MAN_DV_2" => {
                         man_dv_2 = Some(
                             Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "MAN_DV_3" => {
                         man_dv_3 = Some(
                             Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     _ => {}
@@ -523,13 +530,14 @@ pub fn maneuver_parameters(input: &mut &str) -> ModalResult<Option<ManeuverParam
         Ok(Some(ManeuverParameters {
             comment,
             man_epoch_ignition: man_epoch_ignition
-                .ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            man_duration: man_duration.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            man_delta_mass: man_delta_mass.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            man_ref_frame: man_ref_frame.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            man_dv_1: man_dv_1.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            man_dv_2: man_dv_2.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            man_dv_3: man_dv_3.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+                .ok_or_else(|| cut_err(input, "Missing required value"))?,
+            man_duration: man_duration.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            man_delta_mass: man_delta_mass
+                .ok_or_else(|| cut_err(input, "Missing required value"))?,
+            man_ref_frame: man_ref_frame.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            man_dv_1: man_dv_1.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            man_dv_2: man_dv_2.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            man_dv_3: man_dv_3.ok_or_else(|| cut_err(input, "Missing required value"))?,
         }))
     } else {
         Ok(None)
@@ -788,5 +796,162 @@ DRAG_COEFF = 2.5
             .expect("Should have spacecraft params");
         assert_eq!(sc.mass.as_ref().unwrap().value, 3000.0);
         assert_eq!(*sc.drag_coeff.as_ref().unwrap(), 2.5);
+    }
+
+    #[test]
+    fn test_opm_errors() {
+        // Version error
+        assert!(opm_version
+            .parse_next(&mut "CCSDS_OPM_VERS = BAD\n")
+            .is_err());
+
+        // Metadata errors
+        let mut kvn_meta_err = "OBJECT_NAME = SAT\nUNKNOWN_KEY = VAL\n";
+        assert!(opm_metadata.parse_next(&mut kvn_meta_err).is_err());
+
+        let mut kvn_epoch_err = "REF_FRAME_EPOCH = INVALID\n";
+        assert!(opm_metadata.parse_next(&mut kvn_epoch_err).is_err());
+
+        // Keplerian errors
+        let mut kvn_kep_err = "SEMI_MAJOR_AXIS = 7000.0\n"; // Missing others
+        assert!(keplerian_elements.parse_next(&mut kvn_kep_err).is_err());
+
+        let mut input = "SEMI_MAJOR_AXIS = BAD\n";
+        assert!(keplerian_elements.parse_next(&mut input).is_err());
+
+        let mut input = "ECCENTRICITY = BAD\n";
+        assert!(keplerian_elements.parse_next(&mut input).is_err());
+
+        let mut input = "INCLINATION = BAD\n";
+        assert!(keplerian_elements.parse_next(&mut input).is_err());
+
+        let mut input = "INCLINATION = 190.0\n"; // Out of range
+        assert!(keplerian_elements.parse_next(&mut input).is_err());
+
+        let mut input = "RA_OF_ASC_NODE = BAD\n";
+        assert!(keplerian_elements.parse_next(&mut input).is_err());
+
+        let mut input = "ARG_OF_PERICENTER = BAD\n";
+        assert!(keplerian_elements.parse_next(&mut input).is_err());
+
+        let mut input = "TRUE_ANOMALY = BAD\n";
+        assert!(keplerian_elements.parse_next(&mut input).is_err());
+
+        let mut input = "MEAN_ANOMALY = BAD\n";
+        assert!(keplerian_elements.parse_next(&mut input).is_err());
+
+        let mut input = "GM = BAD\n";
+        assert!(keplerian_elements.parse_next(&mut input).is_err());
+
+        // Spacecraft errors
+        let mut input = "MASS = BAD\n";
+        assert!(spacecraft_parameters.parse_next(&mut input).is_err());
+        let mut input = "SOLAR_RAD_AREA = BAD\n";
+        assert!(spacecraft_parameters.parse_next(&mut input).is_err());
+        let mut input = "SOLAR_RAD_COEFF = BAD\n";
+        assert!(spacecraft_parameters.parse_next(&mut input).is_err());
+        let mut input = "DRAG_AREA = BAD\n";
+        assert!(spacecraft_parameters.parse_next(&mut input).is_err());
+        let mut input = "DRAG_COEFF = BAD\n";
+        assert!(spacecraft_parameters.parse_next(&mut input).is_err());
+
+        // Maneuver errors
+        let mut input = "MAN_EPOCH_IGNITION = BAD\n";
+        assert!(maneuver_parameters.parse_next(&mut input).is_err());
+        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DURATION = BAD\n";
+        assert!(maneuver_parameters.parse_next(&mut input).is_err());
+        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DELTA_MASS = BAD\n";
+        assert!(maneuver_parameters.parse_next(&mut input).is_err());
+        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DV_1 = BAD\n";
+        assert!(maneuver_parameters.parse_next(&mut input).is_err());
+        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DV_2 = BAD\n";
+        assert!(maneuver_parameters.parse_next(&mut input).is_err());
+        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DV_3 = BAD\n";
+        assert!(maneuver_parameters.parse_next(&mut input).is_err());
+
+        // Incomplete maneuver
+        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\n";
+        assert!(maneuver_parameters.parse_next(&mut input).is_err());
+
+        // Trailing data error
+        let kvn_trailing = format!("{}EXTRA = DATA\n", MINIMAL_OPM);
+        assert!(Opm::from_kvn_str(&kvn_trailing).is_err());
+    }
+
+    #[test]
+    fn test_opm_optional_comments() {
+        let mut input = "COMMENT kep comment\nSEMI_MAJOR_AXIS = 7000.0\nECCENTRICITY = 0.0\nINCLINATION = 0.0\nRA_OF_ASC_NODE = 0.0\nARG_OF_PERICENTER = 0.0\nTRUE_ANOMALY = 0.0\nGM = 398600.44\n";
+        let kep = keplerian_elements.parse_next(&mut input).unwrap().unwrap();
+        assert_eq!(kep.comment, vec!["kep comment"]);
+
+        let mut input = "COMMENT sc comment\nMASS = 1000.0\n";
+        let sc = spacecraft_parameters
+            .parse_next(&mut input)
+            .unwrap()
+            .unwrap();
+        assert_eq!(sc.comment, vec!["sc comment"]);
+
+        let mut input = "COMMENT man comment\nMAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DURATION = 0.0\nMAN_DELTA_MASS = 0.0\nMAN_REF_FRAME = TNW\nMAN_DV_1 = 0.0\nMAN_DV_2 = 0.0\nMAN_DV_3 = 0.0\n";
+        let man = maneuver_parameters.parse_next(&mut input).unwrap().unwrap();
+        assert_eq!(man.comment, vec!["man comment"]);
+    }
+
+    #[test]
+    fn test_opm_optional_empty() {
+        let mut input = "COMMENT only comment\nNOT_A_KEY = VAL\n";
+        assert!(keplerian_elements.parse_next(&mut input).unwrap().is_none());
+
+        let mut input = "COMMENT only comment\nNOT_A_KEY = VAL\n";
+        assert!(spacecraft_parameters
+            .parse_next(&mut input)
+            .unwrap()
+            .is_none());
+
+        let mut input = "COMMENT only comment\nNOT_A_KEY = VAL\n";
+        assert!(maneuver_parameters
+            .parse_next(&mut input)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn test_opm_user_defined() {
+        let mut input = "COMMENT user comment\nUSER_DEFINED_FOO = BAR\nUSER_DEFINED_BAZ = QUX\n";
+        let ud = user_defined_parameters
+            .parse_next(&mut input)
+            .unwrap()
+            .unwrap();
+        assert_eq!(ud.comment, vec!["user comment"]);
+        assert_eq!(ud.user_defined.len(), 2);
+        assert_eq!(ud.user_defined[0].parameter, "USER_DEFINED_FOO");
+    }
+
+    #[test]
+    fn test_opm_data_loop() {
+        // Test multiple maneuvers
+        let mut input = r#"EPOCH = 2023-01-01T00:00:00
+X = 1000
+Y = 2000
+Z = 3000
+X_DOT = 1
+Y_DOT = 2
+Z_DOT = 3
+MAN_EPOCH_IGNITION = 2023-01-01T01:00:00
+MAN_DURATION = 10
+MAN_DELTA_MASS = -1
+MAN_REF_FRAME = RSW
+MAN_DV_1 = 0.1
+MAN_DV_2 = 0.2
+MAN_DV_3 = 0.3
+MAN_EPOCH_IGNITION = 2023-01-01T02:00:00
+MAN_DURATION = 20
+MAN_DELTA_MASS = -2
+MAN_REF_FRAME = RSW
+MAN_DV_1 = 0.4
+MAN_DV_2 = 0.5
+MAN_DV_3 = 0.6
+"#;
+        let data = opm_data.parse_next(&mut input).unwrap();
+        assert_eq!(data.maneuver_parameters.len(), 2);
     }
 }

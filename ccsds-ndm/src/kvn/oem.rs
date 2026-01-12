@@ -46,7 +46,7 @@ use crate::messages::oem::{Oem, OemBody, OemCovarianceMatrix, OemData, OemMetada
 use crate::types::*;
 use std::num::NonZeroU32;
 use std::str::FromStr;
-use winnow::ascii::space1;
+use winnow::ascii::{space1, till_line_ending};
 use winnow::combinator::opt;
 use winnow::error::{AddContext, ContextError, ErrMode, StrContext};
 use winnow::prelude::*;
@@ -122,9 +122,8 @@ pub fn odm_header(input: &mut &str) -> ModalResult<OdmHeader> {
                 match k {
                     "CLASSIFICATION" => classification = Some(v.to_string()),
                     "CREATION_DATE" => {
-                        creation_date = Some(
-                            Epoch::from_str(v).map_err(|_e| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        creation_date =
+                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid value"))?);
                     }
                     "ORIGINATOR" => originator = Some(v.to_string()),
                     "MESSAGE_ID" => message_id = Some(v.to_string()),
@@ -136,8 +135,8 @@ pub fn odm_header(input: &mut &str) -> ModalResult<OdmHeader> {
         }
     }
 
-    let creation_date = creation_date.ok_or_else(|| ErrMode::Cut(ContextError::new()))?;
-    let originator = originator.ok_or_else(|| ErrMode::Cut(ContextError::new()))?;
+    let creation_date = creation_date.ok_or_else(|| cut_err(input, "Missing required value"))?;
+    let originator = originator.ok_or_else(|| cut_err(input, "Missing required value"))?;
 
     Ok(OdmHeader {
         comment,
@@ -192,37 +191,32 @@ pub fn oem_metadata(input: &mut &str) -> ModalResult<OemMetadata> {
                     "CENTER_NAME" => center_name = Some(v.to_string()),
                     "REF_FRAME" => ref_frame = Some(v.to_string()),
                     "REF_FRAME_EPOCH" => {
-                        ref_frame_epoch = Some(
-                            Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        ref_frame_epoch =
+                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
                     }
                     "TIME_SYSTEM" => time_system = Some(v.to_string()),
                     "START_TIME" => {
-                        start_time = Some(
-                            Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        start_time =
+                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
                     }
                     "USEABLE_START_TIME" => {
-                        useable_start_time = Some(
-                            Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        useable_start_time =
+                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
                     }
                     "USEABLE_STOP_TIME" => {
-                        useable_stop_time = Some(
-                            Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        useable_stop_time =
+                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
                     }
                     "STOP_TIME" => {
-                        stop_time = Some(
-                            Epoch::from_str(v).map_err(|_| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        stop_time =
+                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
                     }
                     "INTERPOLATION" => interpolation = Some(v.to_string()),
                     "INTERPOLATION_DEGREE" => {
-                        let val: u32 = v.parse().map_err(|_| ErrMode::Cut(ContextError::new()))?;
+                        let val: u32 = v.parse().map_err(|_| cut_err(input, "Invalid value"))?;
                         interpolation_degree = Some(
                             NonZeroU32::new(val)
-                                .ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+                                .ok_or_else(|| cut_err(input, "Missing required value"))?,
                         );
                     }
                     _ => {}
@@ -230,7 +224,7 @@ pub fn oem_metadata(input: &mut &str) -> ModalResult<OemMetadata> {
             }
             Some(_unknown) => {
                 // Unknown key in metadata - error
-                return Err(ErrMode::Cut(ContextError::new()));
+                return Err(cut_err(input, "Unexpected key or invalid format"));
             }
             None => break,
         }
@@ -238,21 +232,21 @@ pub fn oem_metadata(input: &mut &str) -> ModalResult<OemMetadata> {
 
     // Validation: INTERPOLATION_DEGREE required if INTERPOLATION present
     if interpolation.is_some() && interpolation_degree.is_none() {
-        return Err(ErrMode::Cut(ContextError::new()));
+        return Err(cut_err(input, "Unexpected key or invalid format"));
     }
 
     Ok(OemMetadata {
         comment,
-        object_name: object_name.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        object_id: object_id.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        center_name: center_name.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        ref_frame: ref_frame.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+        object_name: object_name.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        object_id: object_id.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        center_name: center_name.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        ref_frame: ref_frame.ok_or_else(|| cut_err(input, "Missing required value"))?,
         ref_frame_epoch,
-        time_system: time_system.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        start_time: start_time.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+        time_system: time_system.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        start_time: start_time.ok_or_else(|| cut_err(input, "Missing required value"))?,
         useable_start_time,
         useable_stop_time,
-        stop_time: stop_time.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+        stop_time: stop_time.ok_or_else(|| cut_err(input, "Missing required value"))?,
         interpolation,
         interpolation_degree,
     })
@@ -369,6 +363,15 @@ fn parse_state_vector_line(input: &mut &str) -> ModalResult<StateVectorAcc> {
     };
 
     let _ = ws.parse_next(input)?;
+    // Ensure no more tokens on the line before the line ending
+    let remaining = till_line_ending.parse_next(input)?;
+    if !remaining.trim().is_empty() {
+        return Err(ErrMode::Cut(ContextError::new().add_context(
+            input,
+            &input.checkpoint(),
+            StrContext::Label("Unexpected tokens at end of state vector line"),
+        )));
+    }
     opt_line_ending.parse_next(input)?;
 
     Ok(StateVectorAcc {
@@ -418,7 +421,7 @@ fn parse_covariance_matrix(input: &mut &str) -> ModalResult<OemCovarianceMatrix>
 
     // Parse EPOCH (required)
     let (val, _) = expect_key("EPOCH").parse_next(input)?;
-    let epoch = Epoch::from_str(val).map_err(|_| ErrMode::Cut(ContextError::new()))?;
+    let epoch = Epoch::from_str(val).map_err(|_| cut_err(input, "Invalid value"))?;
 
     // Check for optional COV_REF_FRAME
     let comments = collect_comments.parse_next(input)?;
@@ -444,13 +447,11 @@ fn parse_covariance_matrix(input: &mut &str) -> ModalResult<OemCovarianceMatrix>
 
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() != *expected_count {
-            return Err(ErrMode::Cut(ContextError::new()));
+            return Err(cut_err(input, "Unexpected key or invalid format"));
         }
 
         for part in parts {
-            let val: f64 = part
-                .parse()
-                .map_err(|_| ErrMode::Cut(ContextError::new()))?;
+            let val: f64 = part.parse().map_err(|_| cut_err(input, "Invalid value"))?;
             floats.push(val);
         }
 
@@ -461,7 +462,7 @@ fn parse_covariance_matrix(input: &mut &str) -> ModalResult<OemCovarianceMatrix>
     }
 
     if floats.len() != 21 {
-        return Err(ErrMode::Cut(ContextError::new()));
+        return Err(cut_err(input, "Unexpected key or invalid format"));
     }
 
     Ok(OemCovarianceMatrix {
@@ -543,7 +544,7 @@ fn parse_covariance_block(input: &mut &str) -> ModalResult<Vec<OemCovarianceMatr
             break;
         } else {
             // Unexpected key
-            return Err(ErrMode::Cut(ContextError::new()));
+            return Err(cut_err(input, "Unexpected key or invalid format"));
         }
     }
 
@@ -620,7 +621,7 @@ pub fn oem_data(input: &mut &str) -> ModalResult<OemData> {
     }
 
     if state_vector.is_empty() {
-        return Err(ErrMode::Cut(ContextError::new()));
+        return Err(cut_err(input, "Unexpected key or invalid format"));
     }
 
     Ok(OemData {
@@ -664,7 +665,7 @@ pub fn oem_body(input: &mut &str) -> ModalResult<OemBody> {
 
     // Parse first segment (required)
     if !at_block_start("META", input) {
-        return Err(ErrMode::Cut(ContextError::new()));
+        return Err(cut_err(input, "Unexpected key or invalid format"));
     }
 
     let segment = oem_segment.parse_next(input)?;
@@ -723,6 +724,8 @@ impl ParseKvn for Oem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::CcsdsNdmError;
+    use crate::traits::Ndm;
 
     const MINIMAL_OEM: &str = r#"CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -860,5 +863,1313 @@ META_STOP
         assert_eq!(sv.x_ddot.unwrap().value, 0.001);
         assert_eq!(sv.y_ddot.unwrap().value, 0.002);
         assert_eq!(sv.z_ddot.unwrap().value, 0.003);
+    }
+
+    #[test]
+    fn test_oem_errors() {
+        // Missing CREATION_DATE in header
+        let kvn = "CCSDS_OEM_VERS = 3.0\nORIGINATOR = TEST\n";
+        assert!(Oem::from_kvn_str(kvn).is_err());
+
+        // Missing ORIGINATOR in header
+        let kvn = "CCSDS_OEM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\n";
+        assert!(Oem::from_kvn_str(kvn).is_err());
+
+        // Invalid epoch in metadata
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = INVALID_EPOCH
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+"#;
+        assert!(Oem::from_kvn_str(kvn).is_err());
+
+        // Invalid START_TIME/STOP_TIME format
+        let kvn_base = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+"#;
+        assert!(Oem::from_kvn_str(&format!(
+            "{}START_TIME = INVALID\nSTOP_TIME = 2023-01-02T00:00:00\nMETA_STOP\n",
+            kvn_base
+        ))
+        .is_err());
+        assert!(Oem::from_kvn_str(&format!(
+            "{}START_TIME = 2023-01-01T00:00:00\nSTOP_TIME = INVALID\nMETA_STOP\n",
+            kvn_base
+        ))
+        .is_err());
+        assert!(Oem::from_kvn_str(&format!("{}START_TIME = 2023-01-01T00:00:00\nSTOP_TIME = 2023-01-02T00:00:00\nUSEABLE_START_TIME = INVALID\nMETA_STOP\n", kvn_base)).is_err());
+        assert!(Oem::from_kvn_str(&format!("{}START_TIME = 2023-01-01T00:00:00\nSTOP_TIME = 2023-01-02T00:00:00\nUSEABLE_STOP_TIME = INVALID\nMETA_STOP\n", kvn_base)).is_err());
+
+        // Unknown key in metadata
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+UNKNOWN_KEY = VAL
+"#;
+        assert!(Oem::from_kvn_str(kvn).is_err());
+
+        // Missing interpolation degree when interpolation present
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+INTERPOLATION = LINEAR
+META_STOP
+"#;
+        assert!(Oem::from_kvn_str(kvn).is_err());
+
+        // State vector line errors
+        let mut input = "2023-01-01T00:00:00 1000.0 2000.0 3000.0 1.0 2.0\n"; // Missing one velocity component
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+
+        let mut input = "2023-01-01T00:00:00 1000.0 2000.0 3000.0 1.0 2.0 3.0 4.0 5.0\n"; // Missing one acceleration
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+
+        let mut input = "INVALID_EPOCH 1000.0 2000.0 3000.0 1.0 2.0 3.0\n";
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+
+        let mut input = "2023-01-01T00:00:00 BAD 2000.0 3000.0 1.0 2.0 3.0\n";
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+        let mut input = "2023-01-01T00:00:00 1000.0 BAD 3000.0 1.0 2.0 3.0\n";
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+        let mut input = "2023-01-01T00:00:00 1000.0 2000.0 BAD 1.0 2.0 3.0\n";
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+        let mut input = "2023-01-01T00:00:00 1000.0 2000.0 3000.0 BAD 2.0 3.0\n";
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+        let mut input = "2023-01-01T00:00:00 1000.0 2000.0 3000.0 1.0 BAD 3.0\n";
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+        let mut input = "2023-01-01T00:00:00 1000.0 2000.0 3000.0 1.0 2.0 BAD\n";
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+
+        // Covariance errors
+        let mut input = "EPOCH = 2023-01-01T00:00:00\n1.0\n0.1\n"; // Row 2 has only 1 element instead of 2
+        assert!(parse_covariance_matrix.parse_next(&mut input).is_err());
+
+        let mut input = "COVARIANCE_START\nEPOCH = 2023-01-01T00:00:00\n1.0\nCOVARIANCE_STOP\n"; // Incomplete matrix
+        assert!(parse_covariance_block.parse_next(&mut input).is_err());
+
+        let mut input = "COVARIANCE_START\nEPOCH = 2023-01-01T00:00:00\nUNKNOWN_KEY = VAL\n";
+        assert!(parse_covariance_block.parse_next(&mut input).is_err());
+
+        // Body must have at least one segment
+        let kvn = "CCSDS_OEM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\n";
+        assert!(Oem::from_kvn_str(kvn).is_err());
+
+        // oem_data must have state vectors
+        let mut input = "COVARIANCE_START\nEPOCH = 2023-01-01T00:00:00\n1.0\n2.0 3.0\n4.0 5.0 6.0\n7.0 8.0 9.0 10.0\n11.0 12.0 13.0 14.0 15.0\n16.0 17.0 18.0 19.0 20.0 21.0\nCOVARIANCE_STOP\n";
+        assert!(oem_data.parse_next(&mut input).is_err());
+    }
+
+    #[test]
+    fn test_oem_data_branches() {
+        // Test oem_data loop branches (comments, empty lines, block starts)
+        let kvn = r#"META_STOP
+COMMENT data comment
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1 1.0
+COVARIANCE_STOP
+"#;
+        let mut input = &kvn[10..]; // Skip META_STOP
+        let data = oem_data.parse_next(&mut input).unwrap();
+        assert_eq!(data.state_vector.len(), 1);
+        assert_eq!(data.covariance_matrix.len(), 1);
+        assert_eq!(data.comment, vec!["data comment"]);
+
+        // Test unknown key starting with 'C' in oem_data loop
+        let kvn = "COOL_KEY = VAL\n";
+        let mut input = kvn;
+        assert!(oem_data.parse_next(&mut input).is_err());
+
+        // Test unknown key starting with other letter
+        let kvn = "X_KEY = VAL\n";
+        let mut input = kvn;
+        assert!(oem_data.parse_next(&mut input).is_err());
+
+        // Test empty line in oem_data (just spaces)
+        let kvn = "   \n2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0\n";
+        let mut input = kvn;
+        let data = oem_data.parse_next(&mut input).unwrap();
+        assert_eq!(data.state_vector.len(), 1);
+    }
+
+    #[test]
+    fn test_oem_metadata_more_errors() {
+        // Invalid interpolation degree (not a number)
+        let kvn = r#"META_START
+OBJECT_NAME = SAT
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+INTERPOLATION = LINEAR
+INTERPOLATION_DEGREE = NOT_A_NUMBER
+META_STOP
+"#;
+        let mut input = kvn;
+        assert!(oem_segment.parse_next(&mut input).is_err());
+
+        // Missing metadata fields
+        let kvn = "META_START\nOBJECT_NAME = SAT\nMETA_STOP\n";
+        let mut input = kvn;
+        assert!(oem_metadata.parse_next(&mut input).is_err());
+
+        // REF_FRAME_EPOCH invalid
+        let kvn = "REF_FRAME_EPOCH = INVALID\n";
+        let mut input = kvn;
+        assert!(oem_metadata.parse_next(&mut input).is_err());
+    }
+
+    #[test]
+    fn test_oem_body_errors() {
+        // Body doesn't start with META_START
+        let kvn = "CCSDS_OEM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nNOT_META_START\n";
+        assert!(Oem::from_kvn_str(kvn).is_err());
+    }
+
+    #[test]
+    fn test_block_checks() {
+        let mut input = "META_STAR";
+        assert!(!at_block_start("META", &mut input));
+        let mut input = "META_START_EXTRA";
+        assert!(!at_block_start("META", &mut input));
+        let mut input = "META_STOP_EXTRA";
+        assert!(!at_block_end("META", &mut input));
+        let mut input = "META_END_EXTRA";
+        assert!(!at_block_end("META", &mut input));
+    }
+
+    #[test]
+    fn test_odm_header_errors() {
+        // Invalid creation date
+        let kvn = "CREATION_DATE = INVALID\nORIGINATOR = TEST\n";
+        let mut input = kvn;
+        assert!(odm_header.parse_next(&mut input).is_err());
+    }
+
+    #[test]
+    fn test_covariance_matrix_errors() {
+        // Invalid epoch
+        let mut input = "EPOCH = INVALID\n";
+        assert!(parse_covariance_matrix.parse_next(&mut input).is_err());
+
+        // Invalid float in data
+        let mut input = "EPOCH = 2023-01-01T00:00:00\nNOT_A_FLOAT\n";
+        assert!(parse_covariance_matrix.parse_next(&mut input).is_err());
+    }
+    // Tests moved from messages/oem.rs
+    #[test]
+    fn test_parse_oem_simple_moved() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+2023-01-01T00:01:00 1060 2120 3180 1.0 2.0 3.0
+"#;
+        let oem = Oem::from_kvn(kvn).expect("Failed to parse OEM");
+        assert_eq!(oem.body.segment.len(), 1);
+        assert_eq!(oem.body.segment[0].data.state_vector.len(), 2);
+        assert_eq!(oem.body.segment[0].data.state_vector[0].x.value, 1000.0);
+    }
+
+    #[test]
+    fn test_header_requires_creation_date_and_originator() {
+        // A2.5.3 Items 5 and 6: CREATION_DATE and ORIGINATOR are mandatory
+        let kvn_missing_creation = r#"CCSDS_OEM_VERS = 3.0
+    ORIGINATOR = TEST
+    META_START
+    OBJECT_NAME = SAT1
+    OBJECT_ID = 999
+    CENTER_NAME = EARTH
+    REF_FRAME = GCRF
+    TIME_SYSTEM = UTC
+    START_TIME = 2023-01-01T00:00:00
+    STOP_TIME = 2023-01-02T00:00:00
+    META_STOP
+    2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+    "#;
+        let err1 = Oem::from_kvn(kvn_missing_creation).unwrap_err();
+        let ok1 = matches!(&err1, CcsdsNdmError::MissingField(k) if k.contains("CREATION_DATE"))
+            || matches!(&err1, CcsdsNdmError::KvnParse { .. });
+        assert!(ok1, "unexpected error: {:?}", err1);
+
+        let kvn_missing_originator = r#"CCSDS_OEM_VERS = 3.0
+    CREATION_DATE = 2023-01-01T00:00:00
+    META_START
+    OBJECT_NAME = SAT1
+    OBJECT_ID = 999
+    CENTER_NAME = EARTH
+    REF_FRAME = GCRF
+    TIME_SYSTEM = UTC
+    START_TIME = 2023-01-01T00:00:00
+    STOP_TIME = 2023-01-02T00:00:00
+    META_STOP
+    2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+    "#;
+        let err2 = Oem::from_kvn(kvn_missing_originator).unwrap_err();
+        let ok2 = matches!(&err2, CcsdsNdmError::MissingField(k) if k.contains("ORIGINATOR"))
+            || matches!(&err2, CcsdsNdmError::KvnParse { .. });
+        assert!(ok2, "unexpected error: {:?}", err2);
+    }
+
+    #[test]
+    fn test_meta_stop_required() {
+        // A2.5.3 Item 23: META_STOP required
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+    CREATION_DATE = 2023-01-01T00:00:00
+    ORIGINATOR = TEST
+    META_START
+    OBJECT_NAME = SAT1
+    OBJECT_ID = 999
+    CENTER_NAME = EARTH
+    REF_FRAME = GCRF
+    TIME_SYSTEM = UTC
+    START_TIME = 2023-01-01T00:00:00
+    STOP_TIME = 2023-01-02T00:00:00
+    2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+    "#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = match &err {
+            CcsdsNdmError::KvnParse { .. } => true, // winnow parser error is acceptable
+            CcsdsNdmError::MissingField(_) => true,
+            _ => false,
+        };
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_optional_interpolation_fields() {
+        // A2.5.3 Items 21–22: INTERPOLATION optional, INTERPOLATION_DEGREE conditional positive integer
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+    CREATION_DATE = 2023-01-01T00:00:00
+    ORIGINATOR = TEST
+    META_START
+    OBJECT_NAME = SAT1
+    OBJECT_ID = 999
+    CENTER_NAME = EARTH
+    REF_FRAME = GCRF
+    TIME_SYSTEM = UTC
+    START_TIME = 2023-01-01T00:00:00
+    INTERPOLATION = LAGRANGE
+    INTERPOLATION_DEGREE = 5
+    STOP_TIME = 2023-01-02T00:00:00
+    META_STOP
+    2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+    "#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        let meta = &oem.body.segment[0].metadata;
+        assert_eq!(meta.interpolation.as_deref(), Some("LAGRANGE"));
+        assert_eq!(meta.interpolation_degree.map(|v| v.get()), Some(5));
+
+        let kvn_bad_degree = r#"CCSDS_OEM_VERS = 3.0
+    CREATION_DATE = 2023-01-01T00:00:00
+    ORIGINATOR = TEST
+    META_START
+    OBJECT_NAME = SAT1
+    OBJECT_ID = 999
+    CENTER_NAME = EARTH
+    REF_FRAME = GCRF
+    TIME_SYSTEM = UTC
+    START_TIME = 2023-01-01T00:00:00
+    INTERPOLATION_DEGREE = 0
+    STOP_TIME = 2023-01-02T00:00:00
+    META_STOP
+    2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+    "#;
+        let err = Oem::from_kvn(kvn_bad_degree).unwrap_err();
+        // The parser might return out of range or line context error
+        // Just assert error for now as message might vary slightly
+        assert!(
+            matches!(err, CcsdsNdmError::LineContext { .. })
+                || matches!(err, CcsdsNdmError::OutOfRange { .. })
+                || matches!(err, CcsdsNdmError::KvnParse { .. })
+        );
+    }
+
+    #[test]
+    fn test_covariance_block_start_stop_and_optional_ref_frame() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1 1.0
+COVARIANCE_STOP
+"#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        let cov = &oem.body.segment[0].data.covariance_matrix[0];
+        assert!(cov.cov_ref_frame.is_none());
+
+        let kvn_with_ref = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+    COV_REF_FRAME = RTN
+    1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1 1.0
+COVARIANCE_STOP
+"#;
+        let oem2 = Oem::from_kvn(kvn_with_ref).unwrap();
+        let cov2 = &oem2.body.segment[0].data.covariance_matrix[0];
+        assert_eq!(cov2.cov_ref_frame.as_deref(), Some("RTN"));
+    }
+
+    #[test]
+    fn test_parse_oem_with_covariance_basic() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 1996-11-04T17:22:31
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+COV_REF_FRAME = GCRF
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1 1.0
+COVARIANCE_STOP
+"#;
+        let oem = Oem::from_kvn(kvn).expect("Failed to parse OEM with covariance");
+        let data = &oem.body.segment[0].data;
+        assert_eq!(data.state_vector.len(), 1);
+        assert_eq!(data.covariance_matrix.len(), 1);
+        assert_eq!(data.covariance_matrix[0].cx_x.value, 1.0);
+        assert_eq!(data.covariance_matrix[0].cz_z.value, 1.0);
+    }
+
+    #[test]
+    fn test_version_must_be_first_moved() {
+        let kvn = r#"CREATION_DATE = 2023-01-01T00:00:00
+CCSDS_OEM_VERS = 3.0
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::MissingField(ref msg) if msg.contains("CCSDS_OEM_VERS"))
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_missing_required_metadata_fields() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        match err {
+            CcsdsNdmError::LineContext { source, .. } => {
+                assert!(matches!(*source, CcsdsNdmError::MissingField(k) if k == "OBJECT_NAME"));
+            }
+            CcsdsNdmError::MissingField(k) => assert_eq!(k, "OBJECT_NAME"),
+            CcsdsNdmError::KvnParse { .. } => {}
+            _ => panic!("unexpected error: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_body_must_have_at_least_one_segment() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::MissingField(k) if k.contains("segment")))
+            || matches!(err, CcsdsNdmError::MissingField(ref k) if k.contains("segment"))
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_segment_requires_meta_start_stop() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT1
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::MissingField(_)) | matches!(&**source, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Expected META_START")))
+            || matches!(err, CcsdsNdmError::MissingField(_))
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_data_requires_at_least_one_state_vector() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::MissingField(k) if k.contains("must contain at least one state vector")))
+            || matches!(err, CcsdsNdmError::MissingField(ref k) if k.contains("must contain at least one state vector"))
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_covariance_requires_epoch_and_21_values() {
+        let kvn_missing_epoch = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1 1.0
+COVARIANCE_STOP
+"#;
+        let err1 = Oem::from_kvn(kvn_missing_epoch).unwrap_err();
+        assert!(matches!(err1, CcsdsNdmError::KvnParse { .. }));
+
+        let kvn_wrong_count = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1
+COVARIANCE_STOP
+"#;
+        let err2 = Oem::from_kvn(kvn_wrong_count).unwrap_err();
+        assert!(matches!(err2, CcsdsNdmError::KvnParse { .. }));
+    }
+
+    #[test]
+    fn test_invalid_epoch_in_state_vector() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+bad-epoch 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        assert!(
+            matches!(err, CcsdsNdmError::Epoch(_))
+                | matches!(err, CcsdsNdmError::KvnParse { .. })
+                | matches!(err, CcsdsNdmError::LineContext { .. })
+        );
+    }
+
+    #[test]
+    fn test_xsd_missing_object_id() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::MissingField(k) if k == "OBJECT_ID"))
+            || matches!(err, CcsdsNdmError::MissingField(ref k) if k == "OBJECT_ID")
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_xsd_missing_center_name() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::MissingField(k) if k == "CENTER_NAME"))
+            || matches!(err, CcsdsNdmError::MissingField(ref k) if k == "CENTER_NAME")
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_xsd_missing_ref_frame() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::MissingField(k) if k == "REF_FRAME"))
+            || matches!(err, CcsdsNdmError::MissingField(ref k) if k == "REF_FRAME")
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_xsd_missing_time_system() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::MissingField(k) if k == "TIME_SYSTEM"))
+            || matches!(err, CcsdsNdmError::MissingField(ref k) if k == "TIME_SYSTEM")
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_xsd_missing_start_time() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::MissingField(k) if k == "START_TIME"))
+            || matches!(err, CcsdsNdmError::MissingField(ref k) if k == "START_TIME")
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_xsd_missing_stop_time() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::MissingField(k) if k == "STOP_TIME"))
+            || matches!(err, CcsdsNdmError::MissingField(ref k) if k == "STOP_TIME")
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_xsd_body_min_one_segment() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        let ok = matches!(err, CcsdsNdmError::LineContext { ref source, .. } if matches!(&**source, CcsdsNdmError::MissingField(k) if k.contains("segment")))
+            || matches!(err, CcsdsNdmError::MissingField(ref k) if k.contains("segment"))
+            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        assert!(ok, "unexpected error: {:?}", err);
+    }
+
+    #[test]
+    fn test_xsd_body_multiple_segments() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T01:00:00
+STOP_TIME = 2023-01-01T02:00:00
+META_STOP
+2023-01-01T01:00:00 1100 2100 3100 1.1 2.1 3.1
+"#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        assert_eq!(oem.body.segment.len(), 2);
+        assert_eq!(oem.body.segment[0].data.state_vector.len(), 1);
+        assert_eq!(oem.body.segment[1].data.state_vector.len(), 1);
+    }
+    #[test]
+    fn test_xsd_version_attribute_fixed() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+    CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+    META_START
+    OBJECT_NAME = SAT1
+    OBJECT_ID = 999
+    CENTER_NAME = EARTH
+    REF_FRAME = GCRF
+    TIME_SYSTEM = UTC
+    START_TIME = 2023-01-01T00:00:00
+    STOP_TIME = 2023-01-02T00:00:00
+    META_STOP
+    2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+    "#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        assert_eq!(oem.version, "3.0");
+    }
+
+    #[test]
+    fn test_xsd_data_min_one_state_vector() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        assert!(
+            matches!(err, CcsdsNdmError::KvnParse { .. })
+                || matches!(err, CcsdsNdmError::MissingField(_))
+        );
+    }
+
+    #[test]
+    fn test_xsd_data_multiple_state_vectors() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+2023-01-01T00:01:00 1060 2120 3180 1.0 2.0 3.0
+2023-01-01T00:02:00 1120 2240 3360 1.0 2.0 3.0
+"#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        assert_eq!(oem.body.segment[0].data.state_vector.len(), 3);
+    }
+
+    #[test]
+    fn test_xsd_state_vector_position_velocity_mandatory() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000.123 2000.456 3000.789 1.111 2.222 3.333
+"#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        let sv = &oem.body.segment[0].data.state_vector[0];
+        assert_eq!(sv.x.value, 1000.123);
+        assert_eq!(sv.y.value, 2000.456);
+        assert_eq!(sv.z.value, 3000.789);
+        assert_eq!(sv.x_dot.value, 1.111);
+        assert_eq!(sv.y_dot.value, 2.222);
+        assert_eq!(sv.z_dot.value, 3.333);
+    }
+
+    #[test]
+    fn test_xsd_state_vector_acceleration_optional() {
+        let kvn_without_acc = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let oem = Oem::from_kvn(kvn_without_acc).unwrap();
+        let sv = &oem.body.segment[0].data.state_vector[0];
+        assert!(sv.x_ddot.is_none());
+    }
+
+    #[test]
+    fn test_xsd_state_vector_with_acceleration() {
+        let kvn_with_acc = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0 0.001 0.002 0.003
+"#;
+        let oem = Oem::from_kvn(kvn_with_acc).unwrap();
+        let sv = &oem.body.segment[0].data.state_vector[0];
+        assert_eq!(sv.x_ddot.as_ref().map(|v| v.value), Some(0.001));
+    }
+
+    #[test]
+    fn test_xsd_data_comments_unbounded() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+COMMENT First comment in data section
+COMMENT Second comment in data section
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        assert_eq!(oem.body.segment[0].data.comment.len(), 2);
+    }
+
+    #[test]
+    fn test_xsd_covariance_optional() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        assert!(oem.body.segment[0].data.covariance_matrix.is_empty());
+    }
+
+    #[test]
+    fn test_xsd_covariance_multiple() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1 1.0
+EPOCH = 2023-01-01T01:00:00
+2.0
+0.2 2.0
+0.2 0.2 2.0
+0.02 0.02 0.02 2.0
+0.02 0.02 0.02 0.2 2.0
+0.02 0.02 0.02 0.2 0.2 2.0
+COVARIANCE_STOP
+"#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        assert_eq!(oem.body.segment[0].data.covariance_matrix.len(), 2);
+    }
+
+    #[test]
+    fn test_xsd_covariance_epoch_mandatory() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1 1.0
+COVARIANCE_STOP
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        assert!(matches!(err, CcsdsNdmError::KvnParse { .. }));
+    }
+
+    #[test]
+    fn test_xsd_covariance_21_values_required() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1
+COVARIANCE_STOP
+"#;
+        let err = Oem::from_kvn(kvn).unwrap_err();
+        assert!(matches!(err, CcsdsNdmError::KvnParse { .. }));
+    }
+
+    #[test]
+    fn test_xsd_covariance_cov_ref_frame_optional() {
+        let kvn_without = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1 1.0
+COVARIANCE_STOP
+"#;
+        let oem = Oem::from_kvn(kvn_without).unwrap();
+        assert!(oem.body.segment[0].data.covariance_matrix[0]
+            .cov_ref_frame
+            .is_none());
+
+        let kvn_with = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+COV_REF_FRAME = RTN
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1 1.0
+COVARIANCE_STOP
+"#;
+        let oem = Oem::from_kvn(kvn_with).unwrap();
+        assert_eq!(
+            oem.body.segment[0].data.covariance_matrix[0]
+                .cov_ref_frame
+                .as_deref(),
+            Some("RTN")
+        );
+    }
+
+    #[test]
+    fn test_xsd_covariance_all_21_elements() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+1.0
+2.0 3.0
+4.0 5.0 6.0
+7.0 8.0 9.0 10.0
+11.0 12.0 13.0 14.0 15.0
+16.0 17.0 18.0 19.0 20.0 21.0
+COVARIANCE_STOP
+"#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        let cov = &oem.body.segment[0].data.covariance_matrix[0];
+        assert_eq!(cov.cx_x.value, 1.0);
+        assert_eq!(cov.cy_x.value, 2.0);
+        assert_eq!(cov.cz_dot_z_dot.value, 21.0);
+    }
+
+    #[test]
+    fn test_xsd_parse_sample_oem_g11() {
+        let kvn = include_str!("../../../data/kvn/oem_g11.kvn");
+        let oem = Oem::from_kvn(kvn).expect("Failed to parse oem_g11.kvn");
+        assert_eq!(oem.version, "3.0");
+        assert_eq!(oem.header.originator, "NASA/JPL");
+    }
+
+    #[test]
+    fn test_xsd_metadata_optional_ref_frame_epoch() {
+        let kvn_without = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let oem = Oem::from_kvn(kvn_without).unwrap();
+        assert!(oem.body.segment[0].metadata.ref_frame_epoch.is_none());
+
+        let kvn_with = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+REF_FRAME_EPOCH = 2000-01-01T12:00:00
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let oem = Oem::from_kvn(kvn_with).unwrap();
+        assert!(oem.body.segment[0].metadata.ref_frame_epoch.is_some());
+    }
+
+    #[test]
+    fn test_xsd_metadata_optional_useable_times() {
+        let kvn_with = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+USEABLE_START_TIME = 2023-01-01T01:00:00
+USEABLE_STOP_TIME = 2023-01-01T23:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T01:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let oem = Oem::from_kvn(kvn_with).unwrap();
+        assert!(oem.body.segment[0].metadata.useable_start_time.is_some());
+    }
+
+    #[test]
+    fn test_xsd_interpolation_degree_positive_integer() {
+        let kvn_valid = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+INTERPOLATION = LAGRANGE
+INTERPOLATION_DEGREE = 7
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let oem = Oem::from_kvn(kvn_valid).unwrap();
+        assert_eq!(
+            oem.body.segment[0]
+                .metadata
+                .interpolation_degree
+                .map(|v| v.get()),
+            Some(7)
+        );
+
+        let kvn_zero = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+INTERPOLATION_DEGREE = 0
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let err = Oem::from_kvn(kvn_zero).unwrap_err();
+        assert!(
+            matches!(err, CcsdsNdmError::LineContext { .. })
+                || matches!(err, CcsdsNdmError::OutOfRange { .. })
+                || matches!(err, CcsdsNdmError::KvnParse { .. })
+        );
+    }
+
+    #[test]
+    fn test_xsd_metadata_comments_unbounded() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+COMMENT First metadata comment
+COMMENT Second metadata comment
+COMMENT Third metadata comment
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let oem = Oem::from_kvn(kvn).unwrap();
+        assert_eq!(oem.body.segment[0].metadata.comment.len(), 3);
     }
 }

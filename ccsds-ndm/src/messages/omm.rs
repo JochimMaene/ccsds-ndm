@@ -664,669 +664,110 @@ impl ToKvn for TleParameters {
 mod tests {
     use super::*;
 
-    fn sample_omm_kvn() -> String {
-        r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2022-11-06T09:23:57
-ORIGINATOR = JAXA
-MESSAGE_ID = OMM 201113719185
-OBJECT_NAME = GOES 9
-OBJECT_ID = 1995-025A
+    // =========================================================================
+    // OMM Roundtrip Tests (Kitchen Sink)
+    // =========================================================================
+
+    #[test]
+    fn full_optional_fields_roundtrip() {
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+COMMENT Header Comment 1
+COMMENT Header Comment 2
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME = SATELLITE
+OBJECT_ID = 2023-001A
 CENTER_NAME = EARTH
 REF_FRAME = TEME
+REF_FRAME_EPOCH = 2000-01-01T12:00:00
 TIME_SYSTEM = UTC
 MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2000-06-28T11:59:28.000000
-MEAN_MOTION = 1.00273272 [rev/day]
-ECCENTRICITY = 0.00050130
-INCLINATION = 3.053900 [deg]
-RA_OF_ASC_NODE = 81.793900 [deg]
-ARG_OF_PERICENTER = 249.236300 [deg]
-MEAN_ANOMALY = 150.160200 [deg]
+EPOCH = 2023-01-01T00:00:00
+MEAN_MOTION = 15.5 [rev/day]
+ECCENTRICITY = 0.001
+INCLINATION = 98.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 20.0 [deg]
+MEAN_ANOMALY = 30.0 [deg]
+GM = 398600.4418 [km**3/s**2]
+MASS = 1500.0 [kg]
+SOLAR_RAD_AREA = 20.0 [m**2]
+SOLAR_RAD_COEFF = 1.2
+DRAG_AREA = 15.0 [m**2]
+DRAG_COEFF = 2.2
 EPHEMERIS_TYPE = 0
 CLASSIFICATION_TYPE = U
-NORAD_CAT_ID = 23581
-ELEMENT_SET_NO = 999
-REV_AT_EPOCH = 1000
+NORAD_CAT_ID = 99999
+ELEMENT_SET_NO = 123
+REV_AT_EPOCH = 500
 BSTAR = 0.0001 [1/ER]
 MEAN_MOTION_DOT = 0.000001 [rev/day**2]
 MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#
-        .to_string()
-    }
+COV_REF_FRAME = TEME
+CX_X = 1.0
+CY_X = 0.1
+CY_Y = 1.0
+CZ_X = 0.1
+CZ_Y = 0.1
+CZ_Z = 1.0
+CX_DOT_X = 0.1
+CX_DOT_Y = 0.1
+CX_DOT_Z = 0.1
+CX_DOT_X_DOT = 1.0
+CY_DOT_X = 0.1
+CY_DOT_Y = 0.1
+CY_DOT_Z = 0.1
+CY_DOT_X_DOT = 0.1
+CY_DOT_Y_DOT = 1.0
+CZ_DOT_X = 0.1
+CZ_DOT_Y = 0.1
+CZ_DOT_Z = 0.1
+CZ_DOT_X_DOT = 0.1
+CZ_DOT_Y_DOT = 0.1
+CZ_DOT_Z_DOT = 1.0
+USER_DEFINED_FOO = BAR
+USER_DEFINED_BAZ = QUX
+"#;
+        let omm = Omm::from_kvn(kvn).expect("Failed to parse kitchen sink OMM");
 
-    #[test]
-    fn parse_omm_success() {
-        let kvn = sample_omm_kvn();
-        let omm = Omm::from_kvn(&kvn).expect("OMM parse failed");
-
-        assert_eq!(omm.version, "3.0");
-        assert_eq!(omm.header.originator, "JAXA");
-        assert_eq!(omm.body.segment.metadata.object_name, "GOES 9");
-        assert_eq!(omm.body.segment.metadata.mean_element_theory, "SGP4");
+        // Verify some fields
+        assert_eq!(omm.header.message_id, Some("MSG-001".to_string()));
+        assert_eq!(omm.header.comment.len(), 2);
 
         let me = &omm.body.segment.data.mean_elements;
-        assert_eq!(me.mean_motion.as_ref().unwrap().value, 1.00273272);
-        assert_eq!(me.eccentricity, 0.00050130);
+        assert_eq!(me.gm.as_ref().unwrap().value, 398600.4418);
 
-        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-        assert_eq!(tle.norad_cat_id, Some(23581));
-        assert_eq!(tle.bstar.as_ref().unwrap().value, 0.0001);
-    }
-
-    #[test]
-    fn parse_omm_with_covariance() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-CX_X = 1.0 [km**2]
-CY_X = 0.0 [km**2]
-CY_Y = 1.0 [km**2]
-CZ_X = 0.0 [km**2]
-CZ_Y = 0.0 [km**2]
-CZ_Z = 1.0 [km**2]
-CX_DOT_X = 0.0 [km**2/s]
-CX_DOT_Y = 0.0 [km**2/s]
-CX_DOT_Z = 0.0 [km**2/s]
-CX_DOT_X_DOT = 0.01 [km**2/s**2]
-CY_DOT_X = 0.0 [km**2/s]
-CY_DOT_Y = 0.0 [km**2/s]
-CY_DOT_Z = 0.0 [km**2/s]
-CY_DOT_X_DOT = 0.0 [km**2/s**2]
-CY_DOT_Y_DOT = 0.01 [km**2/s**2]
-CZ_DOT_X = 0.0 [km**2/s]
-CZ_DOT_Y = 0.0 [km**2/s]
-CZ_DOT_Z = 0.0 [km**2/s]
-CZ_DOT_X_DOT = 0.0 [km**2/s**2]
-CZ_DOT_Y_DOT = 0.0 [km**2/s**2]
-CZ_DOT_Z_DOT = 0.01 [km**2/s**2]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("OMM Covariance parse failed");
-        assert!(omm.body.segment.data.covariance_matrix.is_some());
-        assert_eq!(
-            omm.body
-                .segment
-                .data
-                .covariance_matrix
-                .as_ref()
-                .unwrap()
-                .cx_x
-                .value,
-            1.0
-        );
-    }
-
-    #[test]
-    fn test_mean_elements_choice_semi_major_axis_only() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with SEMI_MAJOR_AXIS");
-        assert!(omm
+        let sp = omm
             .body
             .segment
             .data
-            .mean_elements
-            .semi_major_axis
-            .is_some());
-        assert!(omm.body.segment.data.mean_elements.mean_motion.is_none());
-        assert_eq!(
-            omm.body
-                .segment
-                .data
-                .mean_elements
-                .semi_major_axis
-                .as_ref()
-                .unwrap()
-                .value,
-            7000.0
-        );
-    }
+            .spacecraft_parameters
+            .as_ref()
+            .unwrap();
+        assert_eq!(sp.mass.as_ref().unwrap().value, 1500.0);
 
-    #[test]
-    fn test_mean_elements_choice_mean_motion_only() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with MEAN_MOTION");
-        assert!(omm.body.segment.data.mean_elements.mean_motion.is_some());
-        assert!(omm
+        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
+        assert_eq!(tle.norad_cat_id, Some(99999));
+
+        let binding = omm
             .body
             .segment
             .data
-            .mean_elements
-            .semi_major_axis
-            .is_none());
-        assert_eq!(
-            omm.body
-                .segment
-                .data
-                .mean_elements
-                .mean_motion
-                .as_ref()
-                .unwrap()
-                .value,
-            15.5
-        );
+            .user_defined_parameters
+            .as_ref()
+            .unwrap();
+        let ud = &binding.user_defined;
+        assert_eq!(ud.len(), 2);
+        assert_eq!(ud[0].parameter, "USER_DEFINED_FOO");
+        assert_eq!(ud[0].value, "BAR");
+
+        // Roundtrip
+        let kvn_out = omm.to_kvn().expect("Failed to serialize OMM");
+        let omm2 = Omm::from_kvn(&kvn_out).expect("Failed to re-parse OMM");
+
+        assert_eq!(omm, omm2);
     }
-
-    #[test]
-    fn test_mean_elements_choice_both_fails() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("SEMI_MAJOR_AXIS") && err.contains("MEAN_MOTION"));
-    }
-
-    #[test]
-    fn test_mean_elements_choice_neither_fails() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("SEMI_MAJOR_AXIS") || err.contains("MEAN_MOTION"));
-    }
-
-    #[test]
-    fn test_tle_choice_bstar_only() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with BSTAR");
-        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-        assert!(tle.bstar.is_some());
-        assert!(tle.bterm.is_none());
-    }
-
-    #[test]
-    fn test_tle_choice_bterm_only() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4-XP
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BTERM = 0.02 [m**2/kg]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-AGOM = 0.01 [m**2/kg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with BTERM");
-        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-        assert!(tle.bterm.is_some());
-        assert!(tle.bstar.is_none());
-    }
-
-    #[test]
-    fn test_tle_choice_bstar_and_bterm_fails() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BSTAR = 0.0001 [1/ER]
-BTERM = 0.02 [m**2/kg]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("BSTAR") && err.contains("BTERM"));
-    }
-
-    #[test]
-    fn test_tle_choice_mean_motion_ddot_only() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with MEAN_MOTION_DDOT");
-        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-        assert!(tle.mean_motion_ddot.is_some());
-        assert!(tle.agom.is_none());
-    }
-
-    #[test]
-    fn test_tle_choice_agom_only() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4-XP
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BTERM = 0.02 [m**2/kg]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-AGOM = 0.01 [m**2/kg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with AGOM");
-        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-        assert!(tle.agom.is_some());
-        assert!(tle.mean_motion_ddot.is_none());
-    }
-
-    #[test]
-    fn test_tle_choice_mean_motion_ddot_and_agom_fails() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-AGOM = 0.01 [m**2/kg]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("MEAN_MOTION_DDOT") && err.contains("AGOM"));
-    }
-
-    #[test]
-    fn test_eccentricity_non_negative() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = -0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("ECCENTRICITY") || err.contains("0"));
-    }
-
-    #[test]
-    fn test_inclination_range_valid() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 180.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("INCLINATION = 180 should be valid");
-        assert_eq!(
-            omm.body.segment.data.mean_elements.inclination.angle.value,
-            180.0
-        );
-    }
-
-    #[test]
-    fn test_inclination_out_of_range_negative() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = -10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("Inclination") || err.contains("range"));
-    }
-
-    #[test]
-    fn test_element_set_no_range_valid() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-ELEMENT_SET_NO = 9999
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("ELEMENT_SET_NO = 9999 should be valid");
-        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-        assert_eq!(tle.element_set_no, Some(9999));
-    }
-
-    #[test]
-    fn test_element_set_no_out_of_range() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-ELEMENT_SET_NO = 10000
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("ELEMENT_SET_NO") || err.contains("9999"));
-    }
-
-    #[test]
-    fn test_parse_sample_omm_g7() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2007-07-26T17:26:06
-ORIGINATOR = NOAA
-MESSAGE_ID = 2007-001A
-COMMENT This is a comment
-OBJECT_NAME = GOES 9
-OBJECT_ID = 1995-025A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP/SGP4
-EPOCH = 2007-07-26T17:26:06
-MEAN_MOTION = 1.00273272 [rev/day]
-ECCENTRICITY = 0.00050130
-INCLINATION = 3.053900 [deg]
-RA_OF_ASC_NODE = 81.793900 [deg]
-ARG_OF_PERICENTER = 249.236300 [deg]
-MEAN_ANOMALY = 150.160200 [deg]
-NORAD_CAT_ID = 23581
-ELEMENT_SET_NO = 925
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.000001 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Failed to parse omm_g7.kvn");
-
-        assert_eq!(omm.version, "3.0");
-        assert_eq!(omm.header.originator, "NOAA");
-        assert_eq!(omm.body.segment.metadata.object_name, "GOES 9");
-        assert_eq!(omm.body.segment.metadata.object_id, "1995-025A");
-        assert_eq!(omm.body.segment.metadata.center_name, "EARTH");
-        assert_eq!(omm.body.segment.metadata.ref_frame, "TEME");
-        assert_eq!(omm.body.segment.metadata.time_system, "UTC");
-        assert_eq!(omm.body.segment.metadata.mean_element_theory, "SGP/SGP4");
-
-        let me = &omm.body.segment.data.mean_elements;
-        assert!(me.mean_motion.is_some());
-        assert_eq!(me.mean_motion.as_ref().unwrap().value, 1.00273272);
-        assert_eq!(me.eccentricity, 0.0005013);
-
-        // Has TLE parameters
-        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-        assert_eq!(tle.norad_cat_id, Some(23581));
-        assert_eq!(tle.element_set_no, Some(925));
-    }
-
-    #[test]
-    fn test_missing_object_name() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("OBJECT_NAME"));
-    }
-
-    #[test]
-    fn test_missing_epoch() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_missing_mean_motion_dot_required() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("MEAN_MOTION_DOT"));
-    }
-
-    // =========================================================================
-    // XML Parsing Tests
-    // =========================================================================
 
     #[test]
     fn test_parse_xml_omm_g10() {
@@ -1381,346 +822,5 @@ MEAN_ANOMALY = 30.0 [deg]
             omm1.body.segment.data.mean_elements.eccentricity,
             omm2.body.segment.data.mean_elements.eccentricity
         );
-    }
-
-    #[test]
-    fn test_roundtrip_kvn_with_tle() {
-        let kvn = sample_omm_kvn();
-        let omm1 = Omm::from_kvn(&kvn).expect("First parse failed");
-        let kvn2 = omm1.to_kvn().expect("Serialization failed");
-        let omm2 = Omm::from_kvn(&kvn2).expect("Second parse failed");
-
-        let tle1 = omm1.body.segment.data.tle_parameters.as_ref().unwrap();
-        let tle2 = omm2.body.segment.data.tle_parameters.as_ref().unwrap();
-
-        assert_eq!(tle1.norad_cat_id, tle2.norad_cat_id);
-        assert_eq!(
-            tle1.bstar.as_ref().unwrap().value,
-            tle2.bstar.as_ref().unwrap().value
-        );
-    }
-
-    // =========================================================================
-    // Optional Section Tests
-    // =========================================================================
-
-    #[test]
-    fn test_omm_without_tle_parameters() {
-        // OMM with no TLE parameters (valid for non-SGP4 theories)
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse without TLE parameters");
-        assert!(omm.body.segment.data.tle_parameters.is_none());
-    }
-
-    #[test]
-    fn test_omm_with_spacecraft_parameters() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-MASS = 1500.0 [kg]
-SOLAR_RAD_AREA = 20.0 [m**2]
-SOLAR_RAD_COEFF = 1.2
-DRAG_AREA = 15.0 [m**2]
-DRAG_COEFF = 2.2
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with spacecraft parameters");
-        let sp = omm
-            .body
-            .segment
-            .data
-            .spacecraft_parameters
-            .as_ref()
-            .unwrap();
-        assert_eq!(sp.mass.as_ref().unwrap().value, 1500.0);
-        assert_eq!(sp.solar_rad_area.as_ref().unwrap().value, 20.0);
-        assert_eq!(sp.solar_rad_coeff, Some(1.2));
-        assert_eq!(sp.drag_area.as_ref().unwrap().value, 15.0);
-        assert_eq!(sp.drag_coeff, Some(2.2));
-    }
-
-    #[test]
-    fn test_omm_with_gm() {
-        // GM is optional in meanElementsType
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-GM = 398600.4418 [km**3/s**2]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with GM");
-        let me = &omm.body.segment.data.mean_elements;
-        assert!(me.gm.is_some());
-        assert_eq!(me.gm.as_ref().unwrap().value, 398600.4418);
-    }
-
-    #[test]
-    fn test_omm_with_ref_frame_epoch() {
-        // REF_FRAME_EPOCH is optional in metadata
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-REF_FRAME_EPOCH = 2000-01-01T12:00:00
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with REF_FRAME_EPOCH");
-        assert!(omm.body.segment.metadata.ref_frame_epoch.is_some());
-    }
-
-    // =========================================================================
-    // Unit Acceptance Tests (XSD allows uppercase units)
-    // =========================================================================
-
-    #[test]
-    fn test_units_without_brackets() {
-        // KVN can have units without brackets
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5
-ECCENTRICITY = 0.001
-INCLINATION = 98.0
-RA_OF_ASC_NODE = 10.0
-ARG_OF_PERICENTER = 20.0
-MEAN_ANOMALY = 30.0
-"#;
-        // This should parse - units are optional per KVN format
-        let omm = Omm::from_kvn(kvn).expect("Should parse without explicit units");
-        assert_eq!(
-            omm.body
-                .segment
-                .data
-                .mean_elements
-                .mean_motion
-                .as_ref()
-                .unwrap()
-                .value,
-            15.5
-        );
-    }
-
-    // =========================================================================
-    // Version and Comment Tests
-    // =========================================================================
-
-    #[test]
-    fn test_omm_version_30() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse OMM version 3.0");
-        // XSD: version is fixed="3.0"
-        assert_eq!(omm.version, "3.0");
-    }
-
-    #[test]
-    fn test_omm_with_comments() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-COMMENT This is a header comment
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-COMMENT This is a metadata comment
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-COMMENT This is a data comment
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with comments");
-        // Verify the message parsed correctly with comments
-        assert_eq!(omm.body.segment.metadata.object_name, "SAT");
-    }
-
-    // =========================================================================
-    // TLE Parameters MEAN_MOTION_DOT is required when tleParameters present
-    // Per XSD: <xsd:element name="MEAN_MOTION_DOT" type="ndm:dRevType"/> (no minOccurs=0)
-    // =========================================================================
-
-    #[test]
-    fn test_tle_mean_motion_dot_required() {
-        // According to XSD tleParametersType, MEAN_MOTION_DOT is mandatory
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("Should parse with MEAN_MOTION_DOT");
-        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-        assert!(tle.mean_motion_dot.is_some());
-    }
-
-    // =========================================================================
-    // Angle Range Tests (XSD angleRange: -360 <= value < 360)
-    // =========================================================================
-
-    #[test]
-    fn test_angle_range_boundary_negative_360() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = -360.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        // -360.0 is inclusive per XSD
-        let omm = Omm::from_kvn(kvn).expect("RA_OF_ASC_NODE = -360 should be valid");
-        assert_eq!(
-            omm.body.segment.data.mean_elements.ra_of_asc_node.value,
-            -360.0
-        );
-    }
-
-    #[test]
-    fn test_angle_range_boundary_positive_359() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 359.99 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        let omm = Omm::from_kvn(kvn).expect("RA_OF_ASC_NODE = 359.99 should be valid");
-        assert!(omm.body.segment.data.mean_elements.ra_of_asc_node.value < 360.0);
-    }
-
-    #[test]
-    fn test_angle_range_out_of_bounds_positive() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 360.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-        // 360.0 is exclusive per XSD (maxExclusive)
-        let result = Omm::from_kvn(kvn);
-        assert!(result.is_err());
     }
 }

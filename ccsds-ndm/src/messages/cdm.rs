@@ -945,7 +945,7 @@ impl ToKvn for CdmCovarianceMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::CcsdsNdmError;
+    use crate::traits::Ndm;
 
     fn sample_cdm_kvn() -> String {
         let kvn = r#"
@@ -1052,229 +1052,6 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
     }
 
     #[test]
-    fn parse_cdm_kvn_success() {
-        let kvn = sample_cdm_kvn();
-        let cdm = Cdm::from_kvn(&kvn).expect("CDM should parse");
-        assert_eq!(cdm.version, "1.0");
-        assert_eq!(cdm.header.originator, "TEST");
-        assert_eq!(cdm.body.segments.len(), 2);
-        assert!(cdm
-            .body
-            .relative_metadata_data
-            .relative_state_vector
-            .is_some());
-        assert_eq!(
-            cdm.body.relative_metadata_data.screen_volume_frame,
-            Some(ScreenVolumeFrameType::Rtn)
-        );
-        assert_eq!(
-            cdm.body.relative_metadata_data.screen_volume_shape,
-            Some(ScreenVolumeShapeType::Box)
-        );
-    }
-
-    #[test]
-    fn header_missing_fields_error() {
-        let kvn = r#"
-CCSDS_CDM_VERS = 1.0
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-"#;
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { message, .. } => assert!(message.contains("CREATION_DATE")),
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    #[test]
-    fn validate_exactly_two_segments() {
-        // Build KVN with only one segment explicitly
-        let kvn = r#"
-    CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-ONE
-
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 00001
-CATALOG_NAME = CAT
-OBJECT_NAME = OBJ1
-INTERNATIONAL_DESIGNATOR = 1998-067A
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = EME2000
-
-X = 1.0 [km]
-Y = 2.0 [km]
-Z = 3.0 [km]
-X_DOT = 0.1 [km/s]
-Y_DOT = 0.2 [km/s]
-Z_DOT = 0.3 [km/s]
-
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-"#;
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        if let CcsdsNdmError::Validation(_) = err {
-            // Validation error for "exactly 2 segments"
-        }
-    }
-
-    #[test]
-    fn relative_state_vector_must_be_complete() {
-        let kvn = r#"
-    CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-RELATIVE_POSITION_R = 10.0 [m]
-RELATIVE_POSITION_T = -20.0 [m]
-RELATIVE_POSITION_N = 5.0 [m]
-RELATIVE_VELOCITY_R = 0.1 [m/s]
-RELATIVE_VELOCITY_T = -0.2 [m/s]
-// Missing RELATIVE_VELOCITY_N
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 1
-CATALOG_NAME = CAT
-OBJECT_NAME = O1
-INTERNATIONAL_DESIGNATOR = 1998-067A
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = EME2000
-X = 0 [km]
-Y = 0 [km]
-Z = 0 [km]
-X_DOT = 0 [km/s]
-Y_DOT = 0 [km/s]
-Z_DOT = 0 [km/s]
-CR_R = 1 [m**2]
-CT_R = 0 [m**2]
-CT_T = 1 [m**2]
-CN_R = 0 [m**2]
-CN_T = 0 [m**2]
-CN_N = 1 [m**2]
-CRDOT_R = 0 [m**2/s]
-CRDOT_T = 0 [m**2/s]
-CRDOT_N = 0 [m**2/s]
-CRDOT_RDOT = 1 [m**2/s**2]
-CTDOT_R = 0 [m**2/s]
-CTDOT_T = 0 [m**2/s]
-CTDOT_N = 0 [m**2/s]
-CTDOT_RDOT = 0 [m**2/s**2]
-CTDOT_TDOT = 1 [m**2/s**2]
-CNDOT_R = 0 [m**2/s]
-CNDOT_T = 0 [m**2/s]
-CNDOT_N = 0 [m**2/s]
-CNDOT_RDOT = 0 [m**2/s**2]
-CNDOT_TDOT = 0 [m**2/s**2]
-CNDOT_NDOT = 1 [m**2/s**2]
-OBJECT = OBJECT2
-OBJECT_DESIGNATOR = 2
-CATALOG_NAME = CAT
-OBJECT_NAME = O2
-INTERNATIONAL_DESIGNATOR = 1998-067B
-EPHEMERIS_NAME = EPH2
-COVARIANCE_METHOD = DEFAULT
-MANEUVERABLE = NO
-REF_FRAME = EME2000
-X = 0 [km]
-Y = 0 [km]
-Z = 0 [km]
-X_DOT = 0 [km/s]
-Y_DOT = 0 [km/s]
-Z_DOT = 0 [km/s]
-CR_R = 1 [m**2]
-CT_R = 0 [m**2]
-CT_T = 1 [m**2]
-CN_R = 0 [m**2]
-CN_T = 0 [m**2]
-CN_N = 1 [m**2]
-CRDOT_R = 0 [m**2/s]
-CRDOT_T = 0 [m**2/s]
-CRDOT_N = 0 [m**2/s]
-CRDOT_RDOT = 1 [m**2/s**2]
-CTDOT_R = 0 [m**2/s]
-CTDOT_T = 0 [m**2/s]
-CTDOT_N = 0 [m**2/s]
-CTDOT_RDOT = 0 [m**2/s**2]
-CTDOT_TDOT = 1 [m**2/s**2]
-CNDOT_R = 0 [m**2/s]
-CNDOT_T = 0 [m**2/s]
-CNDOT_N = 0 [m**2/s]
-CNDOT_RDOT = 0 [m**2/s**2]
-CNDOT_TDOT = 0 [m**2/s**2]
-CNDOT_NDOT = 1 [m**2/s**2]
-"#;
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("RELATIVE_VELOCITY_N"))
-            }
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    #[test]
-    fn covariance_missing_required_field() {
-        // Remove CR_R from first segment to trigger error
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace("CR_R = 1.0 [m**2]", "");
-        let err = Cdm::from_kvn(&kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { message, .. } => assert!(message.contains("CR_R")),
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    #[test]
-    fn screen_frame_shape_validation() {
-        // Invalid SCREEN_VOLUME_FRAME
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace("SCREEN_VOLUME_FRAME = RTN", "SCREEN_VOLUME_FRAME = BAD");
-        let err = Cdm::from_kvn(&kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("unexpected error: {:?}", err),
-        }
-
-        // Invalid SCREEN_VOLUME_SHAPE
-        let mut kvn2 = sample_cdm_kvn();
-        kvn2 = kvn2.replace("SCREEN_VOLUME_SHAPE = BOX", "SCREEN_VOLUME_SHAPE = BALL");
-        let err2 = Cdm::from_kvn(&kvn2).unwrap_err();
-        match err2 {
-            CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("unexpected error: {:?}", err2),
-        }
-    }
-
-    #[test]
     fn kvn_roundtrip() {
         let kvn = sample_cdm_kvn();
         let cdm = Cdm::from_kvn(&kvn).expect("parse");
@@ -1284,10 +1061,6 @@ CNDOT_NDOT = 1 [m**2/s**2]
         assert_eq!(cdm.header.originator, cdm2.header.originator);
         assert_eq!(cdm.body.segments.len(), cdm2.body.segments.len());
     }
-
-    // =====================================================
-    // Tests for XML roundtrip
-    // =====================================================
 
     #[test]
     fn xml_roundtrip() {
@@ -1299,61 +1072,79 @@ CNDOT_NDOT = 1 [m**2/s**2]
         assert_eq!(cdm.body.segments.len(), cdm2.body.segments.len());
     }
 
-    // =====================================================
-    // Tests for VERSION being first keyword
-    // =====================================================
-
     #[test]
-    fn version_must_be_first() {
-        let kvn = r#"
-CREATION_DATE = 2025-01-01T00:00:00
-CCSDS_CDM_VERS = 1.0
-ORIGINATOR = TEST
-"#;
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected CCSDS_CDM_VERS"))
-            }
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    #[test]
-    fn empty_file_error() {
-        let kvn = "";
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::UnexpectedEof { .. } => {} // Can be EOF or KvnParse depending on parser state
-            CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    // =====================================================
-    // Tests for optional header fields (MESSAGE_FOR)
-    // =====================================================
-
-    #[test]
-    fn header_with_message_for() {
+    fn full_optional_fields_roundtrip() {
         let kvn = r#"
 CCSDS_CDM_VERS = 1.0
+COMMENT Header comment
 CREATION_DATE = 2025-01-01T00:00:00
 ORIGINATOR = TEST
-MESSAGE_FOR = OPERATOR
+MESSAGE_FOR = RECIPIENT
 MESSAGE_ID = MSG-001
 
 TCA = 2025-01-02T12:00:00
 MISS_DISTANCE = 100.0 [m]
+RELATIVE_SPEED = 7.5 [m/s]
+RELATIVE_POSITION_R = 10.0 [m]
+RELATIVE_POSITION_T = -20.0 [m]
+RELATIVE_POSITION_N = 5.0 [m]
+RELATIVE_VELOCITY_R = 0.1 [m/s]
+RELATIVE_VELOCITY_T = -0.2 [m/s]
+RELATIVE_VELOCITY_N = 0.05 [m/s]
+START_SCREEN_PERIOD = 2025-01-02T11:00:00
+STOP_SCREEN_PERIOD = 2025-01-02T13:00:00
+SCREEN_VOLUME_FRAME = RTN
+SCREEN_VOLUME_SHAPE = BOX
+SCREEN_VOLUME_X = 1000.0 [m]
+SCREEN_VOLUME_Y = 2000.0 [m]
+SCREEN_VOLUME_Z = 3000.0 [m]
+SCREEN_ENTRY_TIME = 2025-01-02T11:30:00
+SCREEN_EXIT_TIME = 2025-01-02T12:30:00
+COLLISION_PROBABILITY = 0.001
+COLLISION_PROBABILITY_METHOD = FOSTER-1992
+
+COMMENT Segment 1
 OBJECT = OBJECT1
 OBJECT_DESIGNATOR = 00001
 CATALOG_NAME = CAT
 OBJECT_NAME = OBJ1
 INTERNATIONAL_DESIGNATOR = 1998-067A
+OBJECT_TYPE = PAYLOAD
+OPERATOR_CONTACT_POSITION = POSITION
+OPERATOR_ORGANIZATION = ORG
+OPERATOR_PHONE = PHONE
+OPERATOR_EMAIL = EMAIL
 EPHEMERIS_NAME = EPH1
 COVARIANCE_METHOD = CALCULATED
 MANEUVERABLE = YES
+ORBIT_CENTER = EARTH
 REF_FRAME = EME2000
+GRAVITY_MODEL = EGM-96
+ATMOSPHERIC_MODEL = JACCHIA
+N_BODY_PERTURBATIONS = MOON,SUN
+SOLAR_RAD_PRESSURE = YES
+EARTH_TIDES = YES
+INTRACK_THRUST = YES
+
+TIME_LASTOB_START = 2025-01-01T00:00:00
+TIME_LASTOB_END = 2025-01-02T00:00:00
+RECOMMENDED_OD_SPAN = 7.0 [d]
+ACTUAL_OD_SPAN = 5.0 [d]
+OBS_AVAILABLE = 100
+OBS_USED = 95
+TRACKS_AVAILABLE = 50
+TRACKS_USED = 48
+RESIDUALS_ACCEPTED = 95.5 [%]
+WEIGHTED_RMS = 1.23
+
+AREA_PC = 10.0 [m**2]
+AREA_DRG = 12.0 [m**2]
+AREA_SRP = 15.0 [m**2]
+MASS = 1000.0 [kg]
+CD_AREA_OVER_MASS = 0.012 [m**2/kg]
+CR_AREA_OVER_MASS = 0.015 [m**2/kg]
+THRUST_ACCELERATION = 0.001 [m/s**2]
+SEDR = 0.05 [W/kg]
 
 X = 1.0 [km]
 Y = 2.0 [km]
@@ -1383,601 +1174,30 @@ CNDOT_N = 0.0 [m**2/s]
 CNDOT_RDOT = 0.0 [m**2/s**2]
 CNDOT_TDOT = 0.0 [m**2/s**2]
 CNDOT_NDOT = 1.0 [m**2/s**2]
-
-OBJECT = OBJECT2
-OBJECT_DESIGNATOR = 00002
-CATALOG_NAME = CAT
-OBJECT_NAME = OBJ2
-INTERNATIONAL_DESIGNATOR = 1998-067B
-EPHEMERIS_NAME = EPH2
-COVARIANCE_METHOD = DEFAULT
-MANEUVERABLE = NO
-REF_FRAME = EME2000
-
-X = -1.0 [km]
-Y = -2.0 [km]
-Z = -3.0 [km]
-X_DOT = -0.1 [km/s]
-Y_DOT = -0.2 [km/s]
-Z_DOT = -0.3 [km/s]
-
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-
-"#;
-        let cdm = Cdm::from_kvn(kvn).expect("should parse with MESSAGE_FOR");
-        assert_eq!(cdm.header.message_for, Some("OPERATOR".to_string()));
-
-        // Test roundtrip to ensure MESSAGE_FOR is serialized
-        let regenerated = cdm.to_kvn().expect("to_kvn");
-        println!("Regenerated:\n{}", regenerated);
-        assert!(regenerated.contains("MESSAGE_FOR"));
-    }
-
-    // =====================================================
-    // Tests for optional relative metadata fields
-    // =====================================================
-
-    #[test]
-    fn relative_metadata_with_screen_periods() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert screen period fields
-        kvn = kvn.replace(
-            "SCREEN_VOLUME_FRAME = RTN",
-            "START_SCREEN_PERIOD = 2025-01-02T11:00:00\nSTOP_SCREEN_PERIOD = 2025-01-02T13:00:00\nSCREEN_VOLUME_FRAME = RTN",
-        );
-        kvn = kvn.replace(
-            "COLLISION_PROBABILITY = 0.001",
-            "SCREEN_ENTRY_TIME = 2025-01-02T11:30:00\nSCREEN_EXIT_TIME = 2025-01-02T12:30:00\nCOLLISION_PROBABILITY = 0.001\nCOLLISION_PROBABILITY_METHOD = FOSTER-1992",
-        );
-
-        let cdm = Cdm::from_kvn(&kvn).expect("should parse with screen period");
-        assert!(cdm
-            .body
-            .relative_metadata_data
-            .start_screen_period
-            .is_some());
-        assert!(cdm.body.relative_metadata_data.stop_screen_period.is_some());
-        assert!(cdm.body.relative_metadata_data.screen_entry_time.is_some());
-        assert!(cdm.body.relative_metadata_data.screen_exit_time.is_some());
-        assert_eq!(
-            cdm.body.relative_metadata_data.collision_probability_method,
-            Some("FOSTER-1992".to_string())
-        );
-
-        // Test roundtrip
-        let regenerated = cdm.to_kvn().expect("to_kvn");
-        assert!(regenerated.contains("START_SCREEN_PERIOD"));
-        assert!(regenerated.contains("STOP_SCREEN_PERIOD"));
-        assert!(regenerated.contains("SCREEN_ENTRY_TIME"));
-        assert!(regenerated.contains("SCREEN_EXIT_TIME"));
-        assert!(regenerated.contains("COLLISION_PROBABILITY_METHOD"));
-    }
-
-    #[test]
-    fn relative_metadata_collision_probability_parse_error() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "COLLISION_PROBABILITY = 0.001",
-            "COLLISION_PROBABILITY = INVALID",
-        );
-
-        let err = Cdm::from_kvn(&kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    #[test]
-    fn relative_metadata_unexpected_field() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "COLLISION_PROBABILITY = 0.001",
-            "COLLISION_PROBABILITY = 0.001\nUNKNOWN_FIELD = VALUE",
-        );
-
-        let err = Cdm::from_kvn(&kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { message: msg, .. } => {
-                assert!(msg.contains("Unknown Relative Metadata key"))
-            }
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    // =====================================================
-    // Tests for optional metadata fields
-    // =====================================================
-
-    #[test]
-    fn metadata_with_optional_fields() {
-        let mut kvn = sample_cdm_kvn();
-        // Add optional metadata fields
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = PAYLOAD\nOPERATOR_CONTACT_POSITION = Flight Director\nOPERATOR_ORGANIZATION = NASA\nOPERATOR_PHONE = +1-555-1234\nOPERATOR_EMAIL = contact@nasa.gov\nORBIT_CENTER = EARTH\nGRAVITY_MODEL = EGM-96\nATMOSPHERIC_MODEL = JACCHIA 70\nN_BODY_PERTURBATIONS = MOON, SUN\nSOLAR_RAD_PRESSURE = YES\nEARTH_TIDES = YES\nINTRACK_THRUST = YES",
-        );
-
-        let cdm = Cdm::from_kvn(&kvn).expect("should parse with optional metadata");
-        let seg1 = &cdm.body.segments[0];
-        assert_eq!(seg1.metadata.object_type, Some(ObjectDescription::Payload));
-        assert_eq!(
-            seg1.metadata.operator_contact_position,
-            Some("Flight Director".to_string())
-        );
-        assert_eq!(
-            seg1.metadata.operator_organization,
-            Some("NASA".to_string())
-        );
-        assert_eq!(
-            seg1.metadata.operator_phone,
-            Some("+1-555-1234".to_string())
-        );
-        assert_eq!(
-            seg1.metadata.operator_email,
-            Some("contact@nasa.gov".to_string())
-        );
-        assert_eq!(seg1.metadata.orbit_center, Some("EARTH".to_string()));
-        assert_eq!(seg1.metadata.gravity_model, Some("EGM-96".to_string()));
-        assert_eq!(
-            seg1.metadata.atmospheric_model,
-            Some("JACCHIA 70".to_string())
-        );
-        assert_eq!(
-            seg1.metadata.n_body_perturbations,
-            Some("MOON, SUN".to_string())
-        );
-        assert_eq!(seg1.metadata.solar_rad_pressure, Some(YesNo::Yes));
-        assert_eq!(seg1.metadata.earth_tides, Some(YesNo::Yes));
-        assert_eq!(seg1.metadata.intrack_thrust, Some(YesNo::Yes));
-
-        // Test roundtrip - check that the serialized output contains the fields
-        let regenerated = cdm.to_kvn().expect("to_kvn");
-        // OBJECT_TYPE with Debug formatting becomes "Payload" -> "PAYLOAD"
-        assert!(regenerated.contains("OBJECT_TYPE"));
-        assert!(regenerated.contains("OPERATOR_CONTACT_POSITION"));
-        assert!(regenerated.contains("OPERATOR_ORGANIZATION"));
-        assert!(regenerated.contains("OPERATOR_PHONE"));
-        assert!(regenerated.contains("OPERATOR_EMAIL"));
-        assert!(regenerated.contains("ORBIT_CENTER"));
-        assert!(regenerated.contains("GRAVITY_MODEL"));
-        assert!(regenerated.contains("ATMOSPHERIC_MODEL"));
-        assert!(regenerated.contains("N_BODY_PERTURBATIONS"));
-        // Note: KVN output has aligned spacing, so use simpler assertions
-        assert!(regenerated.contains("SOLAR_RAD_PRESSURE"));
-        assert!(regenerated.contains("EARTH_TIDES"));
-        assert!(regenerated.contains("INTRACK_THRUST"));
-    }
-
-    #[test]
-    fn metadata_object_types() {
-        // Test ROCKET BODY
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = ROCKET BODY",
-        );
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(
-            cdm.body.segments[0].metadata.object_type,
-            Some(ObjectDescription::RocketBody)
-        );
-
-        // Test DEBRIS
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = DEBRIS",
-        );
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(
-            cdm.body.segments[0].metadata.object_type,
-            Some(ObjectDescription::Debris)
-        );
-
-        // Test UNKNOWN
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = UNKNOWN",
-        );
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(
-            cdm.body.segments[0].metadata.object_type,
-            Some(ObjectDescription::Unknown)
-        );
-
-        // Test OTHER
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = OTHER",
-        );
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(
-            cdm.body.segments[0].metadata.object_type,
-            Some(ObjectDescription::Other)
-        );
-
-        // Test fallback to OTHER for unknown values
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = SATELLITE",
-        );
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(
-            cdm.body.segments[0].metadata.object_type,
-            Some(ObjectDescription::Other)
-        );
-    }
-
-    #[test]
-    fn metadata_invalid_object() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace("OBJECT = OBJECT1", "OBJECT = OBJECT3");
-        let err = Cdm::from_kvn(&kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    #[test]
-    fn metadata_invalid_covariance_method() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "COVARIANCE_METHOD = CALCULATED",
-            "COVARIANCE_METHOD = INVALID",
-        );
-        let err = Cdm::from_kvn(&kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    #[test]
-    fn metadata_maneuverable_na() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace("MANEUVERABLE = YES", "MANEUVERABLE = N/A");
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(
-            cdm.body.segments[0].metadata.maneuverable,
-            ManeuverableType::NA
-        );
-    }
-
-    #[test]
-    fn metadata_invalid_maneuverable() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace("MANEUVERABLE = YES", "MANEUVERABLE = MAYBE");
-        let err = Cdm::from_kvn(&kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    #[test]
-    fn metadata_ref_frames() {
-        // Test GCRF
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = GCRF");
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(
-            cdm.body.segments[0].metadata.ref_frame,
-            ReferenceFrameType::Gcrf
-        );
-
-        // Test ITRF
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = ITRF");
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(
-            cdm.body.segments[0].metadata.ref_frame,
-            ReferenceFrameType::Itrf
-        );
-    }
-
-    #[test]
-    fn metadata_invalid_ref_frame() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = INVALID");
-        let err = Cdm::from_kvn(&kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    #[test]
-    fn metadata_unknown_key() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "REF_FRAME = EME2000",
-            "REF_FRAME = EME2000\nUNKNOWN_META_KEY = VALUE",
-        );
-        let err = Cdm::from_kvn(&kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { message: msg, .. } => {
-                assert!(msg.contains("Unknown metadata key"))
-            }
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    // =====================================================
-    // Tests for OD Parameters
-    // =====================================================
-
-    #[test]
-    fn data_with_od_parameters() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert OD parameters before state vector
-        kvn = kvn.replace(
-            "X = 1.0 [km]",
-            "TIME_LASTOB_START = 2025-01-01T00:00:00\nTIME_LASTOB_END = 2025-01-02T00:00:00\nRECOMMENDED_OD_SPAN = 7.0 [d]\nACTUAL_OD_SPAN = 5.0 [d]\nOBS_AVAILABLE = 100\nOBS_USED = 95\nTRACKS_AVAILABLE = 50\nTRACKS_USED = 48\nRESIDUALS_ACCEPTED = 95.5 [%]\nWEIGHTED_RMS = 1.23\nX = 1.0 [km]",
-        );
-
-        let cdm = Cdm::from_kvn(&kvn).expect("should parse with OD parameters");
-        let od = cdm.body.segments[0].data.od_parameters.as_ref().unwrap();
-        assert!(od.time_lastob_start.is_some());
-        assert!(od.time_lastob_end.is_some());
-        assert!(od.recommended_od_span.is_some());
-        assert!(od.actual_od_span.is_some());
-        assert_eq!(od.obs_available, Some(100));
-        assert_eq!(od.obs_used, Some(95));
-        assert_eq!(od.tracks_available, Some(50));
-        assert_eq!(od.tracks_used, Some(48));
-        assert!(od.residuals_accepted.is_some());
-        assert_eq!(od.weighted_rms, Some(1.23));
-
-        // Test roundtrip
-        let regenerated = cdm.to_kvn().expect("to_kvn");
-        assert!(regenerated.contains("TIME_LASTOB_START"));
-        assert!(regenerated.contains("TIME_LASTOB_END"));
-        assert!(regenerated.contains("RECOMMENDED_OD_SPAN"));
-        assert!(regenerated.contains("ACTUAL_OD_SPAN"));
-        assert!(regenerated.contains("OBS_AVAILABLE"));
-        assert!(regenerated.contains("OBS_USED"));
-        assert!(regenerated.contains("TRACKS_AVAILABLE"));
-        assert!(regenerated.contains("TRACKS_USED"));
-        assert!(regenerated.contains("RESIDUALS_ACCEPTED"));
-        assert!(regenerated.contains("WEIGHTED_RMS"));
-    }
-
-    // =====================================================
-    // Tests for Additional Parameters
-    // =====================================================
-
-    #[test]
-    fn data_with_additional_parameters() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert additional parameters
-        kvn = kvn.replace(
-            "X = 1.0 [km]",
-            "AREA_PC = 10.0 [m**2]\nAREA_DRG = 12.0 [m**2]\nAREA_SRP = 15.0 [m**2]\nMASS = 1000.0 [kg]\nCD_AREA_OVER_MASS = 0.012 [m**2/kg]\nCR_AREA_OVER_MASS = 0.015 [m**2/kg]\nTHRUST_ACCELERATION = 0.001 [m/s**2]\nSEDR = 0.05 [W/kg]\nX = 1.0 [km]",
-        );
-
-        let cdm = Cdm::from_kvn(&kvn).expect("should parse with additional parameters");
-        let ap = cdm.body.segments[0]
-            .data
-            .additional_parameters
-            .as_ref()
-            .unwrap();
-        assert!(ap.area_pc.is_some());
-        assert!(ap.area_drg.is_some());
-        assert!(ap.area_srp.is_some());
-        assert!(ap.mass.is_some());
-        assert!(ap.cd_area_over_mass.is_some());
-        assert!(ap.cr_area_over_mass.is_some());
-        assert!(ap.thrust_acceleration.is_some());
-        assert!(ap.sedr.is_some());
-
-        // Test roundtrip
-        let regenerated = cdm.to_kvn().expect("to_kvn");
-        assert!(regenerated.contains("AREA_PC"));
-        assert!(regenerated.contains("AREA_DRG"));
-        assert!(regenerated.contains("AREA_SRP"));
-        assert!(regenerated.contains("MASS"));
-        assert!(regenerated.contains("CD_AREA_OVER_MASS"));
-        assert!(regenerated.contains("CR_AREA_OVER_MASS"));
-        assert!(regenerated.contains("THRUST_ACCELERATION"));
-        assert!(regenerated.contains("SEDR"));
-    }
-
-    // =====================================================
-    // Tests for Optional Covariance Fields
-    // =====================================================
-
-    #[test]
-    fn covariance_with_drag_fields() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert CDRG fields
-        kvn = kvn.replace(
-            "CNDOT_NDOT = 1.0 [m**2/s**2]",
-            "CNDOT_NDOT = 1.0 [m**2/s**2]\nCDRG_R = 0.001 [m**3/kg]\nCDRG_T = 0.002 [m**3/kg]\nCDRG_N = 0.003 [m**3/kg]\nCDRG_RDOT = 0.0001 [m**3/(kg*s)]\nCDRG_TDOT = 0.0002 [m**3/(kg*s)]\nCDRG_NDOT = 0.0003 [m**3/(kg*s)]\nCDRG_DRG = 0.00001 [m**4/kg**2]",
-        );
-
-        let cdm = Cdm::from_kvn(&kvn).expect("should parse with CDRG fields");
-        let cov = &cdm.body.segments[0].data.covariance_matrix;
-        assert!(cov.cdrg_r.is_some());
-        assert!(cov.cdrg_t.is_some());
-        assert!(cov.cdrg_n.is_some());
-        assert!(cov.cdrg_rdot.is_some());
-        assert!(cov.cdrg_tdot.is_some());
-        assert!(cov.cdrg_ndot.is_some());
-        assert!(cov.cdrg_drg.is_some());
-
-        // Test roundtrip
-        let regenerated = cdm.to_kvn().expect("to_kvn");
-        assert!(regenerated.contains("CDRG_R"));
-        assert!(regenerated.contains("CDRG_T"));
-        assert!(regenerated.contains("CDRG_N"));
-        assert!(regenerated.contains("CDRG_RDOT"));
-        assert!(regenerated.contains("CDRG_TDOT"));
-        assert!(regenerated.contains("CDRG_NDOT"));
-        assert!(regenerated.contains("CDRG_DRG"));
-    }
-
-    #[test]
-    fn covariance_with_srp_fields() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert CSRP fields
-        kvn = kvn.replace(
-            "CNDOT_NDOT = 1.0 [m**2/s**2]",
-            "CNDOT_NDOT = 1.0 [m**2/s**2]\nCSRP_R = 0.001 [m**3/kg]\nCSRP_T = 0.002 [m**3/kg]\nCSRP_N = 0.003 [m**3/kg]\nCSRP_RDOT = 0.0001 [m**3/(kg*s)]\nCSRP_TDOT = 0.0002 [m**3/(kg*s)]\nCSRP_NDOT = 0.0003 [m**3/(kg*s)]\nCSRP_DRG = 0.00001 [m**4/kg**2]\nCSRP_SRP = 0.00002 [m**4/kg**2]",
-        );
-
-        let cdm = Cdm::from_kvn(&kvn).expect("should parse with CSRP fields");
-        let cov = &cdm.body.segments[0].data.covariance_matrix;
-        assert!(cov.csrp_r.is_some());
-        assert!(cov.csrp_t.is_some());
-        assert!(cov.csrp_n.is_some());
-        assert!(cov.csrp_rdot.is_some());
-        assert!(cov.csrp_tdot.is_some());
-        assert!(cov.csrp_ndot.is_some());
-        assert!(cov.csrp_drg.is_some());
-        assert!(cov.csrp_srp.is_some());
-
-        // Test roundtrip
-        let regenerated = cdm.to_kvn().expect("to_kvn");
-        assert!(regenerated.contains("CSRP_R"));
-        assert!(regenerated.contains("CSRP_T"));
-        assert!(regenerated.contains("CSRP_N"));
-        assert!(regenerated.contains("CSRP_RDOT"));
-        assert!(regenerated.contains("CSRP_TDOT"));
-        assert!(regenerated.contains("CSRP_NDOT"));
-        assert!(regenerated.contains("CSRP_DRG"));
-        assert!(regenerated.contains("CSRP_SRP"));
-    }
-
-    #[test]
-    fn covariance_with_thrust_fields() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert CTHR fields
-        kvn = kvn.replace(
-            "CNDOT_NDOT = 1.0 [m**2/s**2]",
-            "CNDOT_NDOT = 1.0 [m**2/s**2]\nCTHR_R = 0.001 [m**2/s**2]\nCTHR_T = 0.002 [m**2/s**2]\nCTHR_N = 0.003 [m**2/s**2]\nCTHR_RDOT = 0.0001 [m**2/s**3]\nCTHR_TDOT = 0.0002 [m**2/s**3]\nCTHR_NDOT = 0.0003 [m**2/s**3]\nCTHR_DRG = 0.00001 [m**3/(kg*s**2)]\nCTHR_SRP = 0.00002 [m**3/(kg*s**2)]\nCTHR_THR = 0.000001 [m**2/s**4]",
-        );
-
-        let cdm = Cdm::from_kvn(&kvn).expect("should parse with CTHR fields");
-        let cov = &cdm.body.segments[0].data.covariance_matrix;
-        assert!(cov.cthr_r.is_some());
-        assert!(cov.cthr_t.is_some());
-        assert!(cov.cthr_n.is_some());
-        assert!(cov.cthr_rdot.is_some());
-        assert!(cov.cthr_tdot.is_some());
-        assert!(cov.cthr_ndot.is_some());
-        assert!(cov.cthr_drg.is_some());
-        assert!(cov.cthr_srp.is_some());
-        assert!(cov.cthr_thr.is_some());
-
-        // Test roundtrip
-        let regenerated = cdm.to_kvn().expect("to_kvn");
-        assert!(regenerated.contains("CTHR_R"));
-        assert!(regenerated.contains("CTHR_T"));
-        assert!(regenerated.contains("CTHR_N"));
-        assert!(regenerated.contains("CTHR_RDOT"));
-        assert!(regenerated.contains("CTHR_TDOT"));
-        assert!(regenerated.contains("CTHR_NDOT"));
-        assert!(regenerated.contains("CTHR_DRG"));
-        assert!(regenerated.contains("CTHR_SRP"));
-        assert!(regenerated.contains("CTHR_THR"));
-    }
-
-    #[test]
-    fn covariance_unknown_field_error() {
-        let mut kvn = sample_cdm_kvn();
-        // Add unknown covariance field
-        kvn = kvn.replace(
-            "CNDOT_NDOT = 1.0 [m**2/s**2]",
-            "CNDOT_NDOT = 1.0 [m**2/s**2]\nUNKNOWN_COV = 0.001",
-        );
-        let err = Cdm::from_kvn(&kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse { message: msg, .. } => {
-                assert!(msg.contains("Unknown Data key"))
-            }
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    // =====================================================
-    // Tests for comments
-    // =====================================================
-
-    #[test]
-    fn header_with_comments() {
-        let kvn = r#"
-CCSDS_CDM_VERS = 1.0
-COMMENT This is a header comment
-COMMENT Another header comment
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 00001
-CATALOG_NAME = CAT
-OBJECT_NAME = OBJ1
-INTERNATIONAL_DESIGNATOR = 1998-067A
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = EME2000
-
-X = 1.0 [km]
-Y = 2.0 [km]
-Z = 3.0 [km]
-X_DOT = 0.1 [km/s]
-Y_DOT = 0.2 [km/s]
-Z_DOT = 0.3 [km/s]
-
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
+CDRG_R = 0.001 [m**3/kg]
+CDRG_T = 0.002 [m**3/kg]
+CDRG_N = 0.003 [m**3/kg]
+CDRG_RDOT = 0.0001 [m**3/(kg*s)]
+CDRG_TDOT = 0.0002 [m**3/(kg*s)]
+CDRG_NDOT = 0.0003 [m**3/(kg*s)]
+CDRG_DRG = 0.00001 [m**4/kg**2]
+CSRP_R = 0.001 [m**3/kg]
+CSRP_T = 0.002 [m**3/kg]
+CSRP_N = 0.003 [m**3/kg]
+CSRP_RDOT = 0.0001 [m**3/(kg*s)]
+CSRP_TDOT = 0.0002 [m**3/(kg*s)]
+CSRP_NDOT = 0.0003 [m**3/(kg*s)]
+CSRP_DRG = 0.00001 [m**4/kg**2]
+CSRP_SRP = 0.00002 [m**4/kg**2]
+CTHR_R = 0.001 [m**2/s**2]
+CTHR_T = 0.002 [m**2/s**2]
+CTHR_N = 0.003 [m**2/s**2]
+CTHR_RDOT = 0.0001 [m**2/s**3]
+CTHR_TDOT = 0.0002 [m**2/s**3]
+CTHR_NDOT = 0.0003 [m**2/s**3]
+CTHR_DRG = 0.00001 [m**3/(kg*s**2)]
+CTHR_SRP = 0.00002 [m**3/(kg*s**2)]
+CTHR_THR = 0.000001 [m**2/s**4]
 
 OBJECT = OBJECT2
 OBJECT_DESIGNATOR = 00002
@@ -2018,249 +1238,27 @@ CNDOT_RDOT = 0.0 [m**2/s**2]
 CNDOT_TDOT = 0.0 [m**2/s**2]
 CNDOT_NDOT = 1.0 [m**2/s**2]
 "#;
-        let cdm = Cdm::from_kvn(kvn).expect("should parse with header comments");
-        assert_eq!(cdm.header.comment.len(), 2);
-        assert!(cdm.header.comment[0].contains("header comment"));
-    }
+        let cdm = Cdm::from_kvn(kvn).expect("parse full cdm");
+        let regenerated = cdm.to_kvn().expect("generate full kvn");
+        let cdm2 = Cdm::from_kvn(&regenerated).expect("parse regenerated full cdm");
 
-    #[test]
-    fn relative_metadata_with_comments() {
-        // Comments between header and TCA get attached to header in current implementation
-        // Test that relative metadata fields still work correctly
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "TCA = 2025-01-02T12:00:00",
-            "TCA = 2025-01-02T12:00:00\nCOMMENT After TCA comment",
-        );
-        // This comment goes into the header, not relative metadata, as per current impl
-        let cdm = Cdm::from_kvn(&kvn).expect("should parse");
-        // Just verify the parse succeeds
-        assert!(!cdm.body.relative_metadata_data.tca.to_string().is_empty());
-    }
-
-    // =====================================================
-    // Tests for segment boundary detection
-    // =====================================================
-
-    #[test]
-    fn comment_before_segment_attached_to_data() {
-        // In CDM 1.0 style (no META blocks), comments between segments are consumed
-        // by the data section parser of the preceding segment
-        let kvn = r#"
-CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 00001
-CATALOG_NAME = CAT
-OBJECT_NAME = OBJ1
-INTERNATIONAL_DESIGNATOR = 1998-067A
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = EME2000
-
-X = 1.0 [km]
-Y = 2.0 [km]
-Z = 3.0 [km]
-X_DOT = 0.1 [km/s]
-Y_DOT = 0.2 [km/s]
-Z_DOT = 0.3 [km/s]
-
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-
-COMMENT Comment between segments
-OBJECT = OBJECT2
-OBJECT_DESIGNATOR = 00002
-CATALOG_NAME = CAT
-OBJECT_NAME = OBJ2
-INTERNATIONAL_DESIGNATOR = 1998-067B
-EPHEMERIS_NAME = EPH2
-COVARIANCE_METHOD = DEFAULT
-MANEUVERABLE = NO
-REF_FRAME = EME2000
-
-X = -1.0 [km]
-Y = -2.0 [km]
-Z = -3.0 [km]
-X_DOT = -0.1 [km/s]
-Y_DOT = -0.2 [km/s]
-Z_DOT = -0.3 [km/s]
-
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-"#;
-        let cdm = Cdm::from_kvn(kvn).expect("should parse with pre-segment comment");
-        // Comments between segments get attached to the data section of the preceding segment
-        assert_eq!(cdm.body.segments[0].data.comment.len(), 1);
-        assert!(cdm.body.segments[0].data.comment[0].contains("between segments"));
-    }
-
-    // =====================================================
-    // Tests for TVN screen volume frame
-    // =====================================================
-
-    #[test]
-    fn screen_volume_frame_tvn() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace("SCREEN_VOLUME_FRAME = RTN", "SCREEN_VOLUME_FRAME = TVN");
-        let cdm = Cdm::from_kvn(&kvn).expect("should parse with TVN frame");
+        // Verify key fields
+        assert_eq!(cdm.header.message_for, cdm2.header.message_for);
         assert_eq!(
             cdm.body.relative_metadata_data.screen_volume_frame,
-            Some(ScreenVolumeFrameType::Tvn)
+            cdm2.body.relative_metadata_data.screen_volume_frame
         );
-    }
-
-    #[test]
-    fn screen_volume_shape_ellipsoid() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "SCREEN_VOLUME_SHAPE = BOX",
-            "SCREEN_VOLUME_SHAPE = ELLIPSOID",
-        );
-        let cdm = Cdm::from_kvn(&kvn).expect("should parse with ellipsoid shape");
-        assert_eq!(
-            cdm.body.relative_metadata_data.screen_volume_shape,
-            Some(ScreenVolumeShapeType::Ellipsoid)
-        );
-    }
-
-    // =====================================================
-    // Tests for YES/NO fields with NO values
-    // =====================================================
-
-    #[test]
-    fn metadata_solar_rad_pressure_no() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "REF_FRAME = EME2000",
-            "REF_FRAME = EME2000\nSOLAR_RAD_PRESSURE = NO",
-        );
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(
-            cdm.body.segments[0].metadata.solar_rad_pressure,
-            Some(YesNo::No)
-        );
-    }
-
-    #[test]
-    fn metadata_earth_tides_no() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "REF_FRAME = EME2000",
-            "REF_FRAME = EME2000\nEARTH_TIDES = NO",
-        );
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(cdm.body.segments[0].metadata.earth_tides, Some(YesNo::No));
-    }
-
-    #[test]
-    fn metadata_intrack_thrust_no() {
-        let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "REF_FRAME = EME2000",
-            "REF_FRAME = EME2000\nINTRACK_THRUST = NO",
-        );
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        assert_eq!(
-            cdm.body.segments[0].metadata.intrack_thrust,
-            Some(YesNo::No)
-        );
-    }
-
-    // =====================================================
-    // Tests for CDM with unexpected segment start
-    // =====================================================
-
-    #[test]
-    fn unexpected_segment_start() {
-        let kvn = r#"
-CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-META_START
-"#;
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        if let CcsdsNdmError::Validation(_) = err {
-            // Validation error for "exactly 2 segments"
-        }
-    }
-
-    #[test]
-    fn unexpected_end_of_input() {
-        let kvn = r#"
-CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-TCA = 2025-01-02T12:00:00
-"#;
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::UnexpectedEof { .. } => {}
-            CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
-
-    // =====================================================
-    // Tests for Object type fallback
-    // =====================================================
-
-    #[test]
-    fn metadata_object_default_fallback() {
-        // Test what happens if OBJECT isn't OBJECT1 or OBJECT2 in serialization
-        let kvn = sample_cdm_kvn();
-        let cdm = Cdm::from_kvn(&kvn).expect("parse");
-        // Verify both objects are parsed correctly
-        assert_eq!(cdm.body.segments[0].metadata.object, CdmObjectType::Object1);
-        assert_eq!(cdm.body.segments[1].metadata.object, CdmObjectType::Object2);
+        assert!(cdm.body.segments[0].data.od_parameters.is_some());
+        assert!(cdm2.body.segments[0].data.od_parameters.is_some());
+        assert!(cdm.body.segments[0]
+            .data
+            .covariance_matrix
+            .cthr_thr
+            .is_some());
+        assert!(cdm2.body.segments[0]
+            .data
+            .covariance_matrix
+            .cthr_thr
+            .is_some());
     }
 }

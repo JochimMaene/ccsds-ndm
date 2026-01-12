@@ -66,6 +66,15 @@ pub fn to_ccsds_error(
     }
 }
 
+/// Creates a winnow ErrMode::Cut with a static context label.
+pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<ContextError> {
+    ErrMode::Cut(ContextError::new().add_context(
+        input,
+        &input.checkpoint(),
+        StrContext::Label(label),
+    ))
+}
+
 //----------------------------------------------------------------------
 // Low-level Token Parsers
 //----------------------------------------------------------------------
@@ -250,43 +259,22 @@ pub fn parse_f64(value: &str) -> crate::error::Result<f64> {
     value
         .trim()
         .parse::<f64>()
-        .map_err(|e| CcsdsNdmError::KvnParse {
-            line: 0,
-            message: format!("Invalid float '{}': {}", value, e),
-        })
+        .map_err(CcsdsNdmError::ParseFloat)
 }
 
 /// Parses an i32 value from a string slice.
 pub fn parse_i32(value: &str) -> crate::error::Result<i32> {
-    value
-        .trim()
-        .parse::<i32>()
-        .map_err(|e| CcsdsNdmError::KvnParse {
-            line: 0,
-            message: format!("Invalid integer '{}': {}", value, e),
-        })
+    value.trim().parse::<i32>().map_err(CcsdsNdmError::ParseInt)
 }
 
 /// Parses a u32 value from a string slice.
 pub fn parse_u32(value: &str) -> crate::error::Result<u32> {
-    value
-        .trim()
-        .parse::<u32>()
-        .map_err(|e| CcsdsNdmError::KvnParse {
-            line: 0,
-            message: format!("Invalid unsigned integer '{}': {}", value, e),
-        })
+    value.trim().parse::<u32>().map_err(CcsdsNdmError::ParseInt)
 }
 
 /// Parses a u64 value from a string slice.
 pub fn parse_u64(value: &str) -> crate::error::Result<u64> {
-    value
-        .trim()
-        .parse::<u64>()
-        .map_err(|e| CcsdsNdmError::KvnParse {
-            line: 0,
-            message: format!("Invalid unsigned 64-bit integer '{}': {}", value, e),
-        })
+    value.trim().parse::<u64>().map_err(CcsdsNdmError::ParseInt)
 }
 
 //----------------------------------------------------------------------
@@ -613,9 +601,8 @@ pub fn odm_header(input: &mut &str) -> ModalResult<OdmHeader> {
                 match k {
                     "CLASSIFICATION" => classification = Some(v.to_string()),
                     "CREATION_DATE" => {
-                        creation_date = Some(
-                            Epoch::from_str(v).map_err(|_e| ErrMode::Cut(ContextError::new()))?,
-                        );
+                        creation_date =
+                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid value"))?);
                     }
                     "ORIGINATOR" => originator = Some(v.to_string()),
                     "MESSAGE_ID" => message_id = Some(v.to_string()),
@@ -627,8 +614,8 @@ pub fn odm_header(input: &mut &str) -> ModalResult<OdmHeader> {
         }
     }
 
-    let creation_date = creation_date.ok_or_else(|| ErrMode::Cut(ContextError::new()))?;
-    let originator = originator.ok_or_else(|| ErrMode::Cut(ContextError::new()))?;
+    let creation_date = creation_date.ok_or_else(|| cut_err(input, "Missing required value"))?;
+    let originator = originator.ok_or_else(|| cut_err(input, "Missing required value"))?;
 
     Ok(OdmHeader {
         comment,
@@ -683,43 +670,43 @@ pub fn state_vector(input: &mut &str) -> ModalResult<(Vec<String>, StateVector)>
                 match key {
                     "EPOCH" => {
                         epoch = Some(
-                            Epoch::from_str(val).map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                            Epoch::from_str(val).map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "X" => {
                         x = Some(
                             Position::from_kvn(val, unit.or(Some("km")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "Y" => {
                         y = Some(
                             Position::from_kvn(val, unit.or(Some("km")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "Z" => {
                         z = Some(
                             Position::from_kvn(val, unit.or(Some("km")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "X_DOT" => {
                         x_dot = Some(
                             Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "Y_DOT" => {
                         y_dot = Some(
                             Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "Z_DOT" => {
                         z_dot = Some(
                             Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     _ => {}
@@ -731,13 +718,13 @@ pub fn state_vector(input: &mut &str) -> ModalResult<(Vec<String>, StateVector)>
 
     let sv = StateVector {
         comment: Vec::new(), // comments are returned separately for proper placement
-        epoch: epoch.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        x: x.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        y: y.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        z: z.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        x_dot: x_dot.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        y_dot: y_dot.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-        z_dot: z_dot.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+        epoch: epoch.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        x: x.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        y: y.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        z: z.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        x_dot: x_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        y_dot: y_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        z_dot: z_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
     };
 
     Ok((comment, sv))
@@ -794,13 +781,14 @@ pub fn covariance_matrix(input: &mut &str) -> ModalResult<Option<OpmCovarianceMa
     }
 
     loop {
+        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
 
         let next_key = peek_key(input)?;
 
         match next_key {
             Some(k) if is_covariance_key(k) => {
+                comment.extend(comments);
                 let (key, val, unit) = key_value_line.parse_next(input)?;
                 opt_line_ending.parse_next(input)?;
 
@@ -809,133 +797,136 @@ pub fn covariance_matrix(input: &mut &str) -> ModalResult<Option<OpmCovarianceMa
                     "CX_X" => {
                         cx_x = Some(
                             PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CY_X" => {
                         cy_x = Some(
                             PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CY_Y" => {
                         cy_y = Some(
                             PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CZ_X" => {
                         cz_x = Some(
                             PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CZ_Y" => {
                         cz_y = Some(
                             PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CZ_Z" => {
                         cz_z = Some(
                             PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CX_DOT_X" => {
                         cx_dot_x = Some(
                             PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CX_DOT_Y" => {
                         cx_dot_y = Some(
                             PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CX_DOT_Z" => {
                         cx_dot_z = Some(
                             PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CX_DOT_X_DOT" => {
                         cx_dot_x_dot = Some(
                             VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CY_DOT_X" => {
                         cy_dot_x = Some(
                             PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CY_DOT_Y" => {
                         cy_dot_y = Some(
                             PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CY_DOT_Z" => {
                         cy_dot_z = Some(
                             PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CY_DOT_X_DOT" => {
                         cy_dot_x_dot = Some(
                             VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CY_DOT_Y_DOT" => {
                         cy_dot_y_dot = Some(
                             VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CZ_DOT_X" => {
                         cz_dot_x = Some(
                             PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CZ_DOT_Y" => {
                         cz_dot_y = Some(
                             PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CZ_DOT_Z" => {
                         cz_dot_z = Some(
                             PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CZ_DOT_X_DOT" => {
                         cz_dot_x_dot = Some(
                             VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CZ_DOT_Y_DOT" => {
                         cz_dot_y_dot = Some(
                             VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     "CZ_DOT_Z_DOT" => {
                         cz_dot_z_dot = Some(
                             VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
                     _ => {}
                 }
             }
-            _ => break,
+            _ => {
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
@@ -944,27 +935,27 @@ pub fn covariance_matrix(input: &mut &str) -> ModalResult<Option<OpmCovarianceMa
         Ok(Some(OpmCovarianceMatrix {
             comment,
             cov_ref_frame,
-            cx_x: cx_x.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cy_x: cy_x.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cy_y: cy_y.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cz_x: cz_x.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cz_y: cz_y.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cz_z: cz_z.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cx_dot_x: cx_dot_x.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cx_dot_y: cx_dot_y.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cx_dot_z: cx_dot_z.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cx_dot_x_dot: cx_dot_x_dot.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cy_dot_x: cy_dot_x.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cy_dot_y: cy_dot_y.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cy_dot_z: cy_dot_z.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cy_dot_x_dot: cy_dot_x_dot.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cy_dot_y_dot: cy_dot_y_dot.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cz_dot_x: cz_dot_x.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cz_dot_y: cz_dot_y.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cz_dot_z: cz_dot_z.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cz_dot_x_dot: cz_dot_x_dot.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cz_dot_y_dot: cz_dot_y_dot.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
-            cz_dot_z_dot: cz_dot_z_dot.ok_or_else(|| ErrMode::Cut(ContextError::new()))?,
+            cx_x: cx_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cy_x: cy_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cy_y: cy_y.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cz_x: cz_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cz_y: cz_y.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cz_z: cz_z.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cx_dot_x: cx_dot_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cx_dot_y: cx_dot_y.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cx_dot_z: cx_dot_z.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cx_dot_x_dot: cx_dot_x_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cy_dot_x: cy_dot_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cy_dot_y: cy_dot_y.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cy_dot_z: cy_dot_z.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cy_dot_x_dot: cy_dot_x_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cy_dot_y_dot: cy_dot_y_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cz_dot_x: cz_dot_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cz_dot_y: cz_dot_y.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cz_dot_z: cz_dot_z.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cz_dot_x_dot: cz_dot_x_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cz_dot_y_dot: cz_dot_y_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cz_dot_z_dot: cz_dot_z_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
         }))
     } else {
         Ok(None)
@@ -1005,13 +996,14 @@ pub fn spacecraft_parameters(input: &mut &str) -> ModalResult<Option<SpacecraftP
     }
 
     loop {
+        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
 
         let next_key = peek_key(input)?;
 
         match next_key {
             Some(k) if is_spacecraft_key(k) => {
+                comment.extend(comments);
                 let (key, val, unit) = key_value_line.parse_next(input)?;
                 opt_line_ending.parse_next(input)?;
 
@@ -1019,33 +1011,36 @@ pub fn spacecraft_parameters(input: &mut &str) -> ModalResult<Option<SpacecraftP
                     "MASS" => {
                         mass = Some(
                             Mass::from_kvn(val, unit.or(Some("kg")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "SOLAR_RAD_AREA" => {
                         solar_rad_area = Some(
                             Area::from_kvn(val, unit.or(Some("m**2")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "SOLAR_RAD_COEFF" => {
                         solar_rad_coeff =
-                            Some(parse_f64(val).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                            Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
                     }
                     "DRAG_AREA" => {
                         drag_area = Some(
                             Area::from_kvn(val, unit.or(Some("m**2")))
-                                .map_err(|_| ErrMode::Cut(ContextError::new()))?,
+                                .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
                     "DRAG_COEFF" => {
                         drag_coeff =
-                            Some(parse_f64(val).map_err(|_| ErrMode::Cut(ContextError::new()))?);
+                            Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
                     }
                     _ => {}
                 }
             }
-            _ => break,
+            _ => {
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
