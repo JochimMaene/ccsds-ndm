@@ -1937,7 +1937,7 @@ ORIGINATOR = TEST
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected CCSDS_CDM_VERS"))
+                assert!(message.to_lowercase().contains("expected ccsds_cdm_vers"))
             }
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -2100,8 +2100,15 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message: msg, .. } => {
-                assert!(msg.contains("Unknown Relative Metadata key"))
+            CcsdsNdmError::KvnParse {
+                message: msg,
+                contexts,
+                ..
+            } => {
+                assert!(
+                    msg.contains("Unknown Relative Metadata key")
+                        || contexts.contains(&"Unknown Relative Metadata key".to_string())
+                )
             }
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -2301,8 +2308,15 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message: msg, .. } => {
-                assert!(msg.contains("Unknown metadata key"))
+            CcsdsNdmError::KvnParse {
+                message: msg,
+                contexts,
+                ..
+            } => {
+                assert!(
+                    msg.contains("Unknown metadata key")
+                        || contexts.contains(&"Unknown metadata key".to_string())
+                )
             }
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -2420,8 +2434,15 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message: msg, .. } => {
-                assert!(msg.contains("Unknown Data key"))
+            CcsdsNdmError::KvnParse {
+                message: msg,
+                contexts,
+                ..
+            } => {
+                assert!(
+                    msg.contains("Unknown Data key")
+                        || contexts.contains(&"Unknown Data key".to_string())
+                )
             }
             _ => panic!("unexpected error: {:?}", err),
         }

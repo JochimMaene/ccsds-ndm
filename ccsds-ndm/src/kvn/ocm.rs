@@ -3083,7 +3083,7 @@ TRAJ_START
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.to_lowercase().contains("meta_start"))
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.to_lowercase().contains("expected meta"))
         );
 
         // Metadata unexpected key
@@ -4518,10 +4518,10 @@ TRAJ_TYPE = CARTPV
 TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        // OcmSegment checks first and gives "Expected META_START, found BlockStart(\"TRAJ\")"
+        // OcmSegment checks first and gives "expected META"
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.to_lowercase().contains("meta_start")),
-            "Expected META_START error, got: {:?}",
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.to_lowercase().contains("expected meta")),
+            "Expected 'expected meta' error, got: {:?}",
             err
         );
     }

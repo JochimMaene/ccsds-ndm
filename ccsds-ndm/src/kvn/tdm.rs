@@ -378,11 +378,11 @@ pub fn tdm_metadata(input: &mut &str) -> ModalResult<TdmMetadata> {
                     _ => unreachable!(),
                 }
             }
-            Some(key) => {
+            Some(_key) => {
                 return Err(ErrMode::Cut(ContextError::new().add_context(
                     input,
                     &input.checkpoint(),
-                    StrContext::Label(format!("Unexpected TDM Metadata key: {}", key).leak()),
+                    StrContext::Label("Unexpected TDM Metadata key"),
                 )));
             }
             None => break,
@@ -1497,7 +1497,7 @@ CCSDS_TDM_VERS = 2.0
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
             crate::error::CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected CCSDS_TDM_VERS"));
+                assert!(message.to_lowercase().contains("expected ccsds_tdm_vers"));
             }
             _ => panic!("Expected version-not-first error, got: {:?}", err),
         }
@@ -1518,8 +1518,17 @@ DATA_STOP
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::KvnParse { message: msg, .. } => {
-                assert!(msg.contains("Unknown TDM data keyword"));
+            crate::error::CcsdsNdmError::KvnParse {
+                message: msg,
+                contexts,
+                ..
+            } => {
+                assert!(
+                    msg.to_lowercase().contains("unknown tdm data keyword")
+                        || contexts
+                            .iter()
+                            .any(|c| c.to_lowercase().contains("unknown tdm data keyword"))
+                );
             }
             _ => panic!("Expected KvnParse error, got: {:?}", err),
         }
@@ -1541,8 +1550,17 @@ DATA_STOP
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::KvnParse { message: msg, .. } => {
-                assert!(msg.contains("Unexpected TDM Metadata key"));
+            crate::error::CcsdsNdmError::KvnParse {
+                message: msg,
+                contexts,
+                ..
+            } => {
+                assert!(
+                    msg.to_lowercase().contains("unexpected tdm metadata key")
+                        || contexts
+                            .iter()
+                            .any(|c| c.to_lowercase().contains("unexpected tdm metadata key"))
+                );
             }
             _ => panic!("Expected KvnParse error, got: {:?}", err),
         }

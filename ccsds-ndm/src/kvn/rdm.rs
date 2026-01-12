@@ -315,7 +315,7 @@ pub fn rdm_metadata(input: &mut &str) -> ModalResult<RdmMetadata> {
                         return Err(ErrMode::Cut(ContextError::new().add_context(
                             input,
                             &input.checkpoint(),
-                            StrContext::Label(format!("Unexpected RDM Metadata key: {}", k).leak()),
+                            StrContext::Label("Unexpected RDM Metadata key"),
                         )));
                     }
                 }
@@ -959,7 +959,7 @@ pub fn rdm_data(input: &mut &str) -> ModalResult<RdmData> {
                         return Err(ErrMode::Cut(ContextError::new().add_context(
                             input,
                             &input.checkpoint(),
-                            StrContext::Label(format!("Unexpected RDM Data key: {}", k).leak()),
+                            StrContext::Label("Unexpected RDM Data key"),
                         )));
                     }
                 }
@@ -1820,7 +1820,7 @@ REENTRY_ALTITUDE = 80 [km]
         let err = Rdm::from_kvn(kvn_missing_creation).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected CREATION_DATE"))
+                assert!(message.to_lowercase().contains("expected creation_date"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1840,7 +1840,7 @@ REENTRY_ALTITUDE = 80 [km]
         let err = Rdm::from_kvn(kvn_missing_originator).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected ORIGINATOR"))
+                assert!(message.to_lowercase().contains("expected originator"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1860,7 +1860,7 @@ REENTRY_ALTITUDE = 80 [km]
         let err = Rdm::from_kvn(kvn_missing_msgid).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected MESSAGE_ID"))
+                assert!(message.to_lowercase().contains("expected message_id"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1883,7 +1883,7 @@ REENTRY_ALTITUDE = 80 [km]
         let err = Rdm::from_kvn(kvn_missing_object_name).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected OBJECT_NAME"))
+                assert!(message.to_lowercase().contains("expected object_name"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1903,7 +1903,9 @@ REENTRY_ALTITUDE = 80 [km]
         let err = Rdm::from_kvn(kvn_missing_intl).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected INTERNATIONAL_DESIGNATOR"))
+                assert!(message
+                    .to_lowercase()
+                    .contains("expected international_designator"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1923,7 +1925,7 @@ REENTRY_ALTITUDE = 80 [km]
         let err = Rdm::from_kvn(kvn_missing_center).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected CENTER_NAME"))
+                assert!(message.to_lowercase().contains("expected center_name"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1943,7 +1945,7 @@ REENTRY_ALTITUDE = 80 [km]
         let err = Rdm::from_kvn(kvn_missing_timesys).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected TIME_SYSTEM"))
+                assert!(message.to_lowercase().contains("expected time_system"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1963,7 +1965,9 @@ REENTRY_ALTITUDE = 80 [km]
         let err = Rdm::from_kvn(kvn_missing_controlled).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected CONTROLLED_REENTRY"))
+                assert!(message
+                    .to_lowercase()
+                    .contains("expected controlled_reentry"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1983,7 +1987,7 @@ REENTRY_ALTITUDE = 80 [km]
         let err = Rdm::from_kvn(kvn_missing_epoch).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected EPOCH_TZERO"))
+                assert!(message.to_lowercase().contains("expected epoch_tzero"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -2046,7 +2050,7 @@ CCSDS_RDM_VERS = 1.0
         let err = Rdm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("expected CCSDS_RDM_VERS"));
+                assert!(message.to_lowercase().contains("expected ccsds_rdm_vers"));
             }
             _ => panic!("Expected version-not-first error, got: {:?}", err),
         }

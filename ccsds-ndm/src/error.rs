@@ -5,6 +5,46 @@
 use crate::types::EpochError;
 use thiserror::Error;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParseDiagnostic {
+    pub line: usize,
+    pub column: usize,
+    pub message: String,
+    pub contexts: Vec<String>,
+    pub snippet: String,
+}
+
+impl ParseDiagnostic {
+    /// Creates a new diagnostic from an input string and byte offset.
+    pub fn new(input: &str, offset: usize, message: impl Into<String>) -> Self {
+        let offset = offset.min(input.len());
+        let prefix = &input[..offset];
+        let line = prefix.lines().count().max(1);
+
+        let line_start = prefix.rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let suffix = &input[offset..];
+        let line_end = suffix.find('\n').map(|i| i + offset).unwrap_or(input.len());
+
+        let line_text = &input[line_start..line_end];
+        let column = prefix[line_start..].chars().count();
+        let snippet = format!("{}\n{}^", line_text, " ".repeat(column));
+
+        Self {
+            line,
+            column: column + 1,
+            message: message.into(),
+            contexts: Vec::new(),
+            snippet,
+        }
+    }
+
+    /// Adds contexts to the diagnostic.
+    pub fn with_contexts(mut self, contexts: Vec<String>) -> Self {
+        self.contexts = contexts;
+        self
+    }
+}
+
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum CcsdsNdmError {
@@ -24,9 +64,59 @@ pub enum CcsdsNdmError {
     #[error("XML parsing error: {0}")]
     XmlParse(#[from] quick_xml::Error),
 
-    /// Errors occurring during KVN parsing at a specific line.
-    #[error("KVN parsing error at line {line}: {message}")]
-    KvnParse { line: usize, message: String },
+    /// Errors occurring during KVN parsing.
+    #[error("KVN parsing error at line {line}, column {column}: {message}\nContext: {}\n{snippet}", .contexts.join(" > "))]
+    KvnParse {
+        line: usize,
+        column: usize,
+        message: String,
+        contexts: Vec<String>,
+        snippet: String,
+    },
+
+    /// A required field was missing in the message.
+    #[error("Missing required field: {field} in block {block}")]
+    MissingRequiredField { block: String, field: String },
+
+    /// Legacy variant for missing fields.
+    #[error("Missing required KVN field: {0}")]
+    MissingField(String),
+
+    /// Legacy variant for missing segments.
+    #[error("Missing required segment: {0}")]
+    MissingSegment(String),
+
+    /// Two or more fields are in conflict (e.g., SEMI_MAJOR_AXIS and MEAN_MOTION).
+    #[error("Conflicting fields: {fields:?}")]
+    Conflict { fields: Vec<String> },
+
+    /// Legacy variant for conflicting fields.
+    #[error("Conflicting fields: {0}")]
+    ConflictingFields(String),
+
+    /// A value was provided that does not match the CCSDS specification for that field.
+    #[error("Invalid value for {field}: '{value}' (expected {expected})")]
+    InvalidValue {
+        field: String,
+        value: String,
+        expected: String,
+    },
+
+    /// Legacy variant for invalid CCSDS values.
+    #[error("Invalid value for '{key}': '{value}' (expected {expected})")]
+    InvalidCcsdsValue {
+        key: String,
+        value: String,
+        expected: String,
+    },
+
+    /// Contextual error wrapping another error with a description.
+    #[error("{context}: {source}")]
+    Context {
+        context: String,
+        #[source]
+        source: Box<CcsdsNdmError>,
+    },
 
     /// Contextual error wrapping another error with a line number.
     #[error("Error at line {line}: {source}")]
@@ -40,7 +130,11 @@ pub enum CcsdsNdmError {
     #[error("Epoch error: {0}")]
     Epoch(#[from] EpochError),
 
-    /// Validation errors when data does not meet CCSDS requirements.
+    /// General validation errors for cases not covered by specific variants.
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+
+    /// Legacy variant for validation errors.
     #[error("Validation error: {0}")]
     Validation(String),
 
@@ -48,14 +142,6 @@ pub enum CcsdsNdmError {
     #[error("Value for '{name}' is out of range: {value} (expected {expected})")]
     OutOfRange {
         name: String,
-        value: String,
-        expected: String,
-    },
-
-    /// Error when a value is invalid for a specific field.
-    #[error("Invalid value for '{key}': '{value}' (expected {expected})")]
-    InvalidCcsdsValue {
-        key: String,
         value: String,
         expected: String,
     },
@@ -80,18 +166,6 @@ pub enum CcsdsNdmError {
     #[error("Parse int error: {0}")]
     ParseInt(#[from] std::num::ParseIntError),
 
-    /// Error when a required field is missing in KVN.
-    #[error("Missing required KVN field: {0}")]
-    MissingField(String),
-
-    /// Error when a required segment is missing.
-    #[error("Missing required segment: {0}")]
-    MissingSegment(String),
-
-    /// Error when fields are conflicting.
-    #[error("Conflicting fields: {0}")]
-    ConflictingFields(String),
-
     /// Error when an unexpected end of input is reached.
     #[error("Unexpected end of input: {context}")]
     UnexpectedEof { context: String },
@@ -104,6 +178,31 @@ impl CcsdsNdmError {
             line,
             source: Box::new(self),
         }
+    }
+
+    /// Wraps the error with a descriptive context.
+    pub fn context<S: Into<String>>(self, context: S) -> Self {
+        CcsdsNdmError::Context {
+            context: context.into(),
+            source: Box::new(self),
+        }
+    }
+
+    /// Populates location information for KvnParse variants.
+    pub fn with_location(mut self, input: &str, offset: usize) -> Self {
+        if let CcsdsNdmError::KvnParse {
+            ref mut line,
+            ref mut column,
+            ref mut snippet,
+            ..
+        } = self
+        {
+            let diag = ParseDiagnostic::new(input, offset, "");
+            *line = diag.line;
+            *column = diag.column;
+            *snippet = diag.snippet;
+        }
+        self
     }
 }
 

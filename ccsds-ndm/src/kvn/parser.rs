@@ -55,15 +55,38 @@ pub fn till_space_or_eol<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 /// Converts a winnow error to our library's error type.
 pub fn to_ccsds_error(
     input: &str,
-    err: winnow::error::ParseError<&str, ContextError>,
+    current_input: &str,
+    err: ErrMode<ContextError>,
 ) -> CcsdsNdmError {
-    let consumed = err.offset();
-    let line_num = input[..consumed].lines().count().max(1);
+    let offset = input.len() - current_input.len();
+    let inner = match err {
+        ErrMode::Backtrack(c) | ErrMode::Cut(c) => c,
+        ErrMode::Incomplete(_) => {
+            return CcsdsNdmError::UnexpectedEof {
+                context: "Incomplete KVN input".into(),
+            }
+        }
+    };
+
+    let mut contexts = Vec::new();
+    let mut message = "Parse error".to_string();
+
+    for ctx in inner.context() {
+        match ctx {
+            StrContext::Label(l) => contexts.push(l.to_string()),
+            StrContext::Expected(e) => message = format!("Expected {}", e),
+            _ => {}
+        }
+    }
 
     CcsdsNdmError::KvnParse {
-        line: line_num,
-        message: format!("{}", err.inner()),
+        line: 0, // placeholders, will be filled by with_location
+        column: 0,
+        message,
+        contexts,
+        snippet: String::new(),
     }
+    .with_location(input, offset)
 }
 
 /// Creates a winnow ErrMode::Cut with a static context label.
@@ -296,13 +319,10 @@ pub trait ParseKvn: Sized {
 
         match result {
             Ok(val) => {
-                // Check if we can skip remaining whitespace/comments
-                // We don't care about the result, just want to advance input if possible
                 let _ = skip_empty_and_comments(&mut input);
 
                 if !input.is_empty() {
-                    let line_num = s[..s.len() - input.len()].lines().count().max(1);
-                    // Determine if it's an unexpected key or just garbage
+                    let offset = s.len() - input.len();
                     let msg = if let Ok(Some(k)) = peek_key(&mut input) {
                         format!("Unexpected key: {}", k)
                     } else {
@@ -310,25 +330,17 @@ pub trait ParseKvn: Sized {
                     };
 
                     return Err(CcsdsNdmError::KvnParse {
-                        line: line_num,
+                        line: 0,
+                        column: 0,
                         message: msg,
-                    });
+                        contexts: Vec::new(),
+                        snippet: String::new(),
+                    }
+                    .with_location(s, offset));
                 }
                 Ok(val)
             }
-            Err(e) => Err(match e {
-                ErrMode::Backtrack(ctx) | ErrMode::Cut(ctx) => {
-                    let consumed = s.len() - input.len();
-                    let line_num = s[..consumed].lines().count().max(1);
-                    CcsdsNdmError::KvnParse {
-                        line: line_num,
-                        message: format!("{}", ctx),
-                    }
-                }
-                ErrMode::Incomplete(_) => CcsdsNdmError::UnexpectedEof {
-                    context: "Incomplete KVN input".into(),
-                },
-            }),
+            Err(e) => Err(to_ccsds_error(s, input, e)),
         }
     }
 }
@@ -522,18 +534,14 @@ pub fn expect_block_start<'a>(
             e.add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description(
-                    format!("{}_START", expected_tag).leak(),
-                )),
+                StrContext::Label("Expected block start"),
             )
         })?;
         if tag != expected_tag {
             return Err(ErrMode::Backtrack(ContextError::new().add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description(
-                    format!("{}_START", expected_tag).leak(),
-                )),
+                StrContext::Expected(StrContextValue::Description(expected_tag)),
             )));
         }
         opt_line_ending.parse_next(input)?;
@@ -551,18 +559,14 @@ pub fn expect_block_end<'a>(
             e.add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description(
-                    format!("{}_STOP", expected_tag).leak(),
-                )),
+                StrContext::Label("Expected block end"),
             )
         })?;
         if tag != expected_tag {
             return Err(ErrMode::Backtrack(ContextError::new().add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description(
-                    format!("{}_STOP", expected_tag).leak(),
-                )),
+                StrContext::Expected(StrContextValue::Description(expected_tag)),
             )));
         }
         opt_line_ending.parse_next(input)?;

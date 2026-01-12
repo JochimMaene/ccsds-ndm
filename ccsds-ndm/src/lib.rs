@@ -280,10 +280,20 @@ fn detect_and_parse_kvn(s: &str) -> Result<MessageType> {
             return crate::traits::Ndm::from_kvn(s).map(MessageType::Ocm);
         }
 
-        return Err(CcsdsNdmError::UnsupportedMessage(format!(
-            "Could not determine NDM type from KVN header line: '{}'",
-            trimmed_line
-        )));
+        let offset =
+            s.len() - s.trim_start().len() + (line.as_ptr() as usize - s.as_ptr() as usize);
+        let diag = crate::error::ParseDiagnostic::new(
+            s,
+            offset,
+            format!("Unsupported or invalid KVN header: '{}'", trimmed_line),
+        );
+        return Err(CcsdsNdmError::KvnParse {
+            line: diag.line,
+            column: diag.column,
+            message: diag.message,
+            contexts: Vec::new(),
+            snippet: diag.snippet,
+        });
     }
 
     Err(CcsdsNdmError::UnexpectedEof {
