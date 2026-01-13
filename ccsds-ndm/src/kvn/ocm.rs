@@ -3135,7 +3135,7 @@ META_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, ref contexts, .. } if 
+            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, ref contexts, .. } if
                 msg.contains("Unexpected OCM Metadata key") || contexts.contains(&"Unexpected OCM Metadata key".to_string()))
         );
     }

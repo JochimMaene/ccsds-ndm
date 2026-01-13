@@ -441,12 +441,6 @@ where
     }
 }
 
-/// Peeks at the next key without consuming input.
-/// Returns None if the next token is not a key-value pair.
-pub fn peek_key<'a>(input: &mut &'a str) -> KvnResult<Option<&'a str>> {
-    peek(opt(preceded(ws, keyword))).parse_next(input)
-}
-
 /// Checks if we're at a specific block start without full string scan.
 pub fn at_block_start(tag: &str, input: &mut &str) -> bool {
     peek((
@@ -503,13 +497,6 @@ pub fn expect_block_end<'a>(
     }
 }
 
-fn is_header_key(key: &str) -> bool {
-    matches!(
-        key,
-        "CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID"
-    )
-}
-
 /// Parses the ODM header section.
 pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
     let mut comment = Vec::new();
@@ -519,19 +506,22 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
     let mut message_id = None;
 
     loop {
-        // Collect any comments
+        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
 
-        // Check what's next
-        let next_key = peek_key(input)?;
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
+            }
+        };
 
-        match next_key {
-            Some(key) if is_header_key(key) => {
-                let (k, v, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
+        match key {
+            "CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID" => {
+                comment.extend(comments);
+                let (v, _) = kv_rest.parse_next(input)?;
+                match key {
                     "CLASSIFICATION" => classification = Some(v.to_string()),
                     "CREATION_DATE" => {
                         creation_date =
@@ -539,16 +529,18 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
                     }
                     "ORIGINATOR" => originator = Some(v.to_string()),
                     "MESSAGE_ID" => message_id = Some(v.to_string()),
-                    _ => {}
+                    _ => unreachable!(),
                 }
             }
-            // Any other key signals end of header
-            _ => break,
+            _ => {
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
-    let creation_date = creation_date.ok_or_else(|| cut_err(input, "Missing required value"))?;
-    let originator = originator.ok_or_else(|| cut_err(input, "Missing required value"))?;
+    let creation_date = creation_date.ok_or_else(|| cut_err(input, "Missing CREATION_DATE"))?;
+    let originator = originator.ok_or_else(|| cut_err(input, "Missing ORIGINATOR"))?;
 
     Ok(OdmHeader {
         comment,
@@ -575,31 +567,21 @@ pub fn state_vector(input: &mut &str) -> KvnResult<(Vec<String>, StateVector)> {
     let mut z_dot = None;
 
     loop {
-        // Collect comments before state vector started
-        if epoch.is_none() {
-            let checkpoint = input.checkpoint();
-            let comments = collect_comments.parse_next(input)?;
-            if !comments.is_empty() {
-                let next_key = peek_key(input)?;
-                if !matches!(
-                    next_key,
-                    Some("EPOCH" | "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT")
-                ) {
-                    // No state vector follows, backtrack comments
-                    input.reset(&checkpoint);
-                    break;
-                }
-                comment.extend(comments);
+        let checkpoint = input.checkpoint();
+        let comments = collect_comments.parse_next(input)?;
+
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
             }
-        }
+        };
 
-        let next_key = peek_key(input)?;
-
-        match next_key {
-            Some(_k @ ("EPOCH" | "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT")) => {
-                let (key, val, unit) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
+        match key {
+            "EPOCH" | "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT" => {
+                comment.extend(comments);
+                let (val, unit) = kv_rest.parse_next(input)?;
                 match key {
                     "EPOCH" => {
                         epoch = Some(
@@ -642,32 +624,28 @@ pub fn state_vector(input: &mut &str) -> KvnResult<(Vec<String>, StateVector)> {
                                 .map_err(|_| cut_err(input, "Invalid value"))?,
                         );
                     }
-                    _ => {}
+                    _ => unreachable!(),
                 }
             }
-            _ => break,
+            _ => {
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
     let sv = StateVector {
         comment: Vec::new(), // comments are returned separately for proper placement
-        epoch: epoch.ok_or_else(|| cut_err(input, "Missing required value"))?,
-        x: x.ok_or_else(|| cut_err(input, "Missing required value"))?,
-        y: y.ok_or_else(|| cut_err(input, "Missing required value"))?,
-        z: z.ok_or_else(|| cut_err(input, "Missing required value"))?,
-        x_dot: x_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
-        y_dot: y_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
-        z_dot: z_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        epoch: epoch.ok_or_else(|| cut_err(input, "Missing EPOCH"))?,
+        x: x.ok_or_else(|| cut_err(input, "Missing X"))?,
+        y: y.ok_or_else(|| cut_err(input, "Missing Y"))?,
+        z: z.ok_or_else(|| cut_err(input, "Missing Z"))?,
+        x_dot: x_dot.ok_or_else(|| cut_err(input, "Missing X_DOT"))?,
+        y_dot: y_dot.ok_or_else(|| cut_err(input, "Missing Y_DOT"))?,
+        z_dot: z_dot.ok_or_else(|| cut_err(input, "Missing Z_DOT"))?,
     };
 
     Ok((comment, sv))
-}
-
-fn is_covariance_key(key: &str) -> bool {
-    key.starts_with("CX_")
-        || key.starts_with("CY_")
-        || key.starts_with("CZ_")
-        || key == "COV_REF_FRAME"
 }
 
 /// Parses the optional covariance matrix section.
@@ -696,35 +674,25 @@ pub fn covariance_matrix(input: &mut &str) -> KvnResult<Option<OpmCovarianceMatr
     let mut cz_dot_y_dot = None;
     let mut cz_dot_z_dot = None;
 
-    // Check if we have covariance keys
-    let next_key = peek_key(input)?;
-    if !matches!(next_key, Some(k) if is_covariance_key(k)) {
-        let checkpoint = input.checkpoint();
-        let comments = collect_comments.parse_next(input)?;
-        if !comments.is_empty() {
-            let next_key = peek_key(input)?;
-            if !matches!(next_key, Some(k) if is_covariance_key(k)) {
-                input.reset(&checkpoint);
-                return Ok(None);
-            }
-            comment.extend(comments);
-        } else {
-            return Ok(None);
-        }
-    }
-
     loop {
         let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
-        let next_key = peek_key(input)?;
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
+            }
+        };
 
-        match next_key {
-            Some(k) if is_covariance_key(k) => {
+        match key {
+            "COV_REF_FRAME" | "CX_X" | "CY_X" | "CY_Y" | "CZ_X" | "CZ_Y" | "CZ_Z" | "CX_DOT_X"
+            | "CX_DOT_Y" | "CX_DOT_Z" | "CX_DOT_X_DOT" | "CY_DOT_X" | "CY_DOT_Y" | "CY_DOT_Z"
+            | "CY_DOT_X_DOT" | "CY_DOT_Y_DOT" | "CZ_DOT_X" | "CZ_DOT_Y" | "CZ_DOT_Z"
+            | "CZ_DOT_X_DOT" | "CZ_DOT_Y_DOT" | "CZ_DOT_Z_DOT" => {
                 comment.extend(comments);
-                let (key, val, unit) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
+                let (val, unit) = kv_rest.parse_next(input)?;
                 match key {
                     "COV_REF_FRAME" => cov_ref_frame = Some(val.to_string()),
                     "CX_X" => {
@@ -853,7 +821,7 @@ pub fn covariance_matrix(input: &mut &str) -> KvnResult<Option<OpmCovarianceMatr
                                 .map_err(|_| cut_err(input, "Invalid value"))?,
                         )
                     }
-                    _ => {}
+                    _ => unreachable!(),
                 }
             }
             _ => {
@@ -868,38 +836,31 @@ pub fn covariance_matrix(input: &mut &str) -> KvnResult<Option<OpmCovarianceMatr
         Ok(Some(OpmCovarianceMatrix {
             comment,
             cov_ref_frame,
-            cx_x: cx_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cy_x: cy_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cy_y: cy_y.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cz_x: cz_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cz_y: cz_y.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cz_z: cz_z.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cx_dot_x: cx_dot_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cx_dot_y: cx_dot_y.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cx_dot_z: cx_dot_z.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cx_dot_x_dot: cx_dot_x_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cy_dot_x: cy_dot_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cy_dot_y: cy_dot_y.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cy_dot_z: cy_dot_z.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cy_dot_x_dot: cy_dot_x_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cy_dot_y_dot: cy_dot_y_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cz_dot_x: cz_dot_x.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cz_dot_y: cz_dot_y.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cz_dot_z: cz_dot_z.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cz_dot_x_dot: cz_dot_x_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cz_dot_y_dot: cz_dot_y_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            cz_dot_z_dot: cz_dot_z_dot.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            cx_x: cx_x.ok_or_else(|| cut_err(input, "Missing CX_X"))?,
+            cy_x: cy_x.ok_or_else(|| cut_err(input, "Missing CY_X"))?,
+            cy_y: cy_y.ok_or_else(|| cut_err(input, "Missing CY_Y"))?,
+            cz_x: cz_x.ok_or_else(|| cut_err(input, "Missing CZ_X"))?,
+            cz_y: cz_y.ok_or_else(|| cut_err(input, "Missing CZ_Y"))?,
+            cz_z: cz_z.ok_or_else(|| cut_err(input, "Missing CZ_Z"))?,
+            cx_dot_x: cx_dot_x.ok_or_else(|| cut_err(input, "Missing CX_DOT_X"))?,
+            cx_dot_y: cx_dot_y.ok_or_else(|| cut_err(input, "Missing CX_DOT_Y"))?,
+            cx_dot_z: cx_dot_z.ok_or_else(|| cut_err(input, "Missing CX_DOT_Z"))?,
+            cx_dot_x_dot: cx_dot_x_dot.ok_or_else(|| cut_err(input, "Missing CX_DOT_X_DOT"))?,
+            cy_dot_x: cy_dot_x.ok_or_else(|| cut_err(input, "Missing CY_DOT_X"))?,
+            cy_dot_y: cy_dot_y.ok_or_else(|| cut_err(input, "Missing CY_DOT_Y"))?,
+            cy_dot_z: cy_dot_z.ok_or_else(|| cut_err(input, "Missing CY_DOT_Z"))?,
+            cy_dot_x_dot: cy_dot_x_dot.ok_or_else(|| cut_err(input, "Missing CY_DOT_X_DOT"))?,
+            cy_dot_y_dot: cy_dot_y_dot.ok_or_else(|| cut_err(input, "Missing CY_DOT_Y_DOT"))?,
+            cz_dot_x: cz_dot_x.ok_or_else(|| cut_err(input, "Missing CZ_DOT_X"))?,
+            cz_dot_y: cz_dot_y.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Y"))?,
+            cz_dot_z: cz_dot_z.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Z"))?,
+            cz_dot_x_dot: cz_dot_x_dot.ok_or_else(|| cut_err(input, "Missing CZ_DOT_X_DOT"))?,
+            cz_dot_y_dot: cz_dot_y_dot.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Y_DOT"))?,
+            cz_dot_z_dot: cz_dot_z_dot.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Z_DOT"))?,
         }))
     } else {
         Ok(None)
     }
-}
-
-fn is_spacecraft_key(key: &str) -> bool {
-    matches!(
-        key,
-        "MASS" | "SOLAR_RAD_AREA" | "SOLAR_RAD_COEFF" | "DRAG_AREA" | "DRAG_COEFF"
-    )
 }
 
 /// Parses the optional spacecraft parameters section.
@@ -911,35 +872,22 @@ pub fn spacecraft_parameters(input: &mut &str) -> KvnResult<Option<SpacecraftPar
     let mut drag_area = None;
     let mut drag_coeff = None;
 
-    // Check if we have any spacecraft keys
-    let next_key = peek_key(input)?;
-    if !matches!(next_key, Some(k) if is_spacecraft_key(k)) {
-        let checkpoint = input.checkpoint();
-        let comments = collect_comments.parse_next(input)?;
-        if !comments.is_empty() {
-            let next_key = peek_key(input)?;
-            if !matches!(next_key, Some(k) if is_spacecraft_key(k)) {
-                input.reset(&checkpoint);
-                return Ok(None);
-            }
-            comment.extend(comments);
-        } else {
-            return Ok(None);
-        }
-    }
-
     loop {
         let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
-        let next_key = peek_key(input)?;
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
+            }
+        };
 
-        match next_key {
-            Some(k) if is_spacecraft_key(k) => {
+        match key {
+            "MASS" | "SOLAR_RAD_AREA" | "SOLAR_RAD_COEFF" | "DRAG_AREA" | "DRAG_COEFF" => {
                 comment.extend(comments);
-                let (key, val, unit) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
+                let (val, unit) = kv_rest.parse_next(input)?;
                 match key {
                     "MASS" => {
                         mass = Some(
@@ -967,7 +915,7 @@ pub fn spacecraft_parameters(input: &mut &str) -> KvnResult<Option<SpacecraftPar
                         drag_coeff =
                             Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
                     }
-                    _ => {}
+                    _ => unreachable!(),
                 }
             }
             _ => {
@@ -1001,23 +949,24 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
         let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
-        let next_key = peek_key(input)?;
-
-        match next_key {
-            Some(k) if k.starts_with("USER_DEFINED_") => {
-                comment.extend(comments);
-                let (key, val, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                params.push(UserDefinedParameter {
-                    parameter: key.to_string(),
-                    value: val.to_string(),
-                });
-            }
-            _ => {
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => {
                 input.reset(&checkpoint);
                 break;
             }
+        };
+
+        if key.starts_with("USER_DEFINED_") {
+            comment.extend(comments);
+            let (val, _) = kv_rest.parse_next(input)?;
+            params.push(UserDefinedParameter {
+                parameter: key.to_string(),
+                value: val.to_string(),
+            });
+        } else {
+            input.reset(&checkpoint);
+            break;
         }
     }
 

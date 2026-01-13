@@ -40,7 +40,7 @@
 //!             └── CovarianceMatrix* (optional, within COVARIANCE_START/STOP)
 //! ```
 
-use crate::common::{OdmHeader, StateVectorAcc};
+use crate::common::StateVectorAcc;
 use crate::kvn::parser::*;
 use crate::messages::oem::{Oem, OemBody, OemCovarianceMatrix, OemData, OemMetadata, OemSegment};
 use crate::types::*;
@@ -50,17 +50,6 @@ use winnow::ascii::{float, space1, till_line_ending};
 use winnow::combinator::{opt, preceded};
 use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
-
-//----------------------------------------------------------------------
-// Helper: Check if key belongs to OEM Header section
-//----------------------------------------------------------------------
-
-fn is_header_key(key: &str) -> bool {
-    matches!(
-        key,
-        "CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID"
-    )
-}
 
 //----------------------------------------------------------------------
 // OEM Version Parser
@@ -74,59 +63,6 @@ pub fn oem_version(input: &mut &str) -> KvnResult<String> {
 
     let (value, _) = expect_key("CCSDS_OEM_VERS").parse_next(input)?;
     Ok(value.to_string())
-}
-
-//----------------------------------------------------------------------
-// ODM Header Parser (shared with OPM)
-//----------------------------------------------------------------------
-
-/// Parses the ODM header section.
-pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
-    let mut comment = Vec::new();
-    let mut classification = None;
-    let mut creation_date = None;
-    let mut originator = None;
-    let mut message_id = None;
-
-    loop {
-        // Collect any comments
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
-
-        // Check what's next
-        let next_key = peek_key(input)?;
-
-        match next_key {
-            Some(key) if is_header_key(key) => {
-                let (k, v, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
-                    "CLASSIFICATION" => classification = Some(v.to_string()),
-                    "CREATION_DATE" => {
-                        creation_date =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "ORIGINATOR" => originator = Some(v.to_string()),
-                    "MESSAGE_ID" => message_id = Some(v.to_string()),
-                    _ => {}
-                }
-            }
-            // META_START or any other key signals end of header
-            _ => break,
-        }
-    }
-
-    let creation_date = creation_date.ok_or_else(|| cut_err(input, "Missing required value"))?;
-    let originator = originator.ok_or_else(|| cut_err(input, "Missing required value"))?;
-
-    Ok(OdmHeader {
-        comment,
-        classification,
-        creation_date,
-        originator,
-        message_id,
-    })
 }
 
 //----------------------------------------------------------------------
@@ -407,134 +343,106 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
 /// Parses a single covariance matrix (within COVARIANCE_START/STOP block).
 fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
-    let mut comment = Vec::new();
+    let mut comment = collect_comments.parse_next(input)?;
+
+    let checkpoint = input.checkpoint();
+    let key = key_token
+        .parse_next(input)
+        .map_err(|_| cut_err(input, "Expected EPOCH in covariance matrix"))?;
+
+    if key != "EPOCH" {
+        input.reset(&checkpoint);
+        return Err(cut_err(input, "Expected EPOCH in covariance matrix"));
+    }
+
+    let (val, _) = kv_rest.parse_next(input)?;
+    let epoch = Epoch::from_str(val).map_err(|_| cut_err(input, "Invalid value"))?;
+
+    // Once we have the epoch, the rest of the covariance matrix follows
+    // Check for optional COV_REF_FRAME
     let mut cov_ref_frame = None;
+    comment.extend(collect_comments.parse_next(input)?);
+    let checkpoint_inner = input.checkpoint();
+    if let Ok("COV_REF_FRAME") = key_token.parse_next(input) {
+        let (val, _) = kv_rest.parse_next(input)?;
+        cov_ref_frame = Some(val.to_string());
+    } else {
+        input.reset(&checkpoint_inner);
+    }
 
-    loop {
+    // Parse 6 lines of raw covariance data (1, 2, 3, 4, 5, 6 elements per line)
+    let expected_counts = [1, 2, 3, 4, 5, 6];
+    let mut floats = Vec::with_capacity(21);
+
+    for expected_count in expected_counts {
         comment.extend(collect_comments.parse_next(input)?);
+        let line = raw_line.parse_next(input)?;
+        opt_line_ending.parse_next(input)?;
 
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() != expected_count {
+            return Err(cut_err(input, "Unexpected key or invalid format"));
+        }
 
-        match key {
-            "EPOCH" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                let epoch = Epoch::from_str(val).map_err(|_| cut_err(input, "Invalid value"))?;
-
-                // Once we have the epoch, the rest of the covariance matrix follows
-                // Check for optional COV_REF_FRAME
-                comment.extend(collect_comments.parse_next(input)?);
-                let checkpoint_inner = input.checkpoint();
-                if let Ok("COV_REF_FRAME") = key_token.parse_next(input) {
-                    let (val, _) = kv_rest.parse_next(input)?;
-                    cov_ref_frame = Some(val.to_string());
-                } else {
-                    input.reset(&checkpoint_inner);
-                }
-
-                // Parse 6 lines of raw covariance data (1, 2, 3, 4, 5, 6 elements per line)
-                let expected_counts = [1, 2, 3, 4, 5, 6];
-                let mut floats = Vec::with_capacity(21);
-
-                for expected_count in expected_counts {
-                    comment.extend(collect_comments.parse_next(input)?);
-                    let line = raw_line.parse_next(input)?;
-                    opt_line_ending.parse_next(input)?;
-
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    if parts.len() != expected_count {
-                        return Err(cut_err(input, "Unexpected key or invalid format"));
-                    }
-
-                    for part in parts {
-                        let val: f64 = part.parse().map_err(|_| cut_err(input, "Invalid value"))?;
-                        floats.push(val);
-                    }
-                }
-
-                return Ok(OemCovarianceMatrix {
-                    comment,
-                    epoch,
-                    cov_ref_frame,
-                    cx_x: PositionCovariance::new(floats[0], Some(PositionCovarianceUnits::Km2)),
-                    cy_x: PositionCovariance::new(floats[1], Some(PositionCovarianceUnits::Km2)),
-                    cy_y: PositionCovariance::new(floats[2], Some(PositionCovarianceUnits::Km2)),
-                    cz_x: PositionCovariance::new(floats[3], Some(PositionCovarianceUnits::Km2)),
-                    cz_y: PositionCovariance::new(floats[4], Some(PositionCovarianceUnits::Km2)),
-                    cz_z: PositionCovariance::new(floats[5], Some(PositionCovarianceUnits::Km2)),
-                    cx_dot_x: PositionVelocityCovariance::new(
-                        floats[6],
-                        Some(PositionVelocityCovarianceUnits::Km2PerS),
-                    ),
-                    cx_dot_y: PositionVelocityCovariance::new(
-                        floats[7],
-                        Some(PositionVelocityCovarianceUnits::Km2PerS),
-                    ),
-                    cx_dot_z: PositionVelocityCovariance::new(
-                        floats[8],
-                        Some(PositionVelocityCovarianceUnits::Km2PerS),
-                    ),
-                    cx_dot_x_dot: VelocityCovariance::new(
-                        floats[9],
-                        Some(VelocityCovarianceUnits::Km2PerS2),
-                    ),
-                    cy_dot_x: PositionVelocityCovariance::new(
-                        floats[10],
-                        Some(PositionVelocityCovarianceUnits::Km2PerS),
-                    ),
-                    cy_dot_y: PositionVelocityCovariance::new(
-                        floats[11],
-                        Some(PositionVelocityCovarianceUnits::Km2PerS),
-                    ),
-                    cy_dot_z: PositionVelocityCovariance::new(
-                        floats[12],
-                        Some(PositionVelocityCovarianceUnits::Km2PerS),
-                    ),
-                    cy_dot_x_dot: VelocityCovariance::new(
-                        floats[13],
-                        Some(VelocityCovarianceUnits::Km2PerS2),
-                    ),
-                    cy_dot_y_dot: VelocityCovariance::new(
-                        floats[14],
-                        Some(VelocityCovarianceUnits::Km2PerS2),
-                    ),
-                    cz_dot_x: PositionVelocityCovariance::new(
-                        floats[15],
-                        Some(PositionVelocityCovarianceUnits::Km2PerS),
-                    ),
-                    cz_dot_y: PositionVelocityCovariance::new(
-                        floats[16],
-                        Some(PositionVelocityCovarianceUnits::Km2PerS),
-                    ),
-                    cz_dot_z: PositionVelocityCovariance::new(
-                        floats[17],
-                        Some(PositionVelocityCovarianceUnits::Km2PerS),
-                    ),
-                    cz_dot_x_dot: VelocityCovariance::new(
-                        floats[18],
-                        Some(VelocityCovarianceUnits::Km2PerS2),
-                    ),
-                    cz_dot_y_dot: VelocityCovariance::new(
-                        floats[19],
-                        Some(VelocityCovarianceUnits::Km2PerS2),
-                    ),
-                    cz_dot_z_dot: VelocityCovariance::new(
-                        floats[20],
-                        Some(VelocityCovarianceUnits::Km2PerS2),
-                    ),
-                });
-            }
-            _ => {
-                input.reset(&checkpoint);
-                break;
-            }
+        for part in parts {
+            let val: f64 = part.parse().map_err(|_| cut_err(input, "Invalid value"))?;
+            floats.push(val);
         }
     }
 
-    Err(cut_err(input, "Expected EPOCH in covariance matrix"))
+    Ok(OemCovarianceMatrix {
+        comment,
+        epoch,
+        cov_ref_frame,
+        cx_x: PositionCovariance::new(floats[0], Some(PositionCovarianceUnits::Km2)),
+        cy_x: PositionCovariance::new(floats[1], Some(PositionCovarianceUnits::Km2)),
+        cy_y: PositionCovariance::new(floats[2], Some(PositionCovarianceUnits::Km2)),
+        cz_x: PositionCovariance::new(floats[3], Some(PositionCovarianceUnits::Km2)),
+        cz_y: PositionCovariance::new(floats[4], Some(PositionCovarianceUnits::Km2)),
+        cz_z: PositionCovariance::new(floats[5], Some(PositionCovarianceUnits::Km2)),
+        cx_dot_x: PositionVelocityCovariance::new(
+            floats[6],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cx_dot_y: PositionVelocityCovariance::new(
+            floats[7],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cx_dot_z: PositionVelocityCovariance::new(
+            floats[8],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cx_dot_x_dot: VelocityCovariance::new(floats[9], Some(VelocityCovarianceUnits::Km2PerS2)),
+        cy_dot_x: PositionVelocityCovariance::new(
+            floats[10],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cy_dot_y: PositionVelocityCovariance::new(
+            floats[11],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cy_dot_z: PositionVelocityCovariance::new(
+            floats[12],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cy_dot_x_dot: VelocityCovariance::new(floats[13], Some(VelocityCovarianceUnits::Km2PerS2)),
+        cy_dot_y_dot: VelocityCovariance::new(floats[14], Some(VelocityCovarianceUnits::Km2PerS2)),
+        cz_dot_x: PositionVelocityCovariance::new(
+            floats[15],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cz_dot_y: PositionVelocityCovariance::new(
+            floats[16],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cz_dot_z: PositionVelocityCovariance::new(
+            floats[17],
+            Some(PositionVelocityCovarianceUnits::Km2PerS),
+        ),
+        cz_dot_x_dot: VelocityCovariance::new(floats[18], Some(VelocityCovarianceUnits::Km2PerS2)),
+        cz_dot_y_dot: VelocityCovariance::new(floats[19], Some(VelocityCovarianceUnits::Km2PerS2)),
+        cz_dot_z_dot: VelocityCovariance::new(floats[20], Some(VelocityCovarianceUnits::Km2PerS2)),
+    })
 }
 
 /// Parses all covariance matrices within a COVARIANCE block.
