@@ -13,71 +13,15 @@ use crate::messages::omm::{
 };
 use crate::types::*;
 use std::str::FromStr;
-use winnow::error::{AddContext, ContextError, ErrMode, StrContext, StrContextValue};
+use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
-use winnow::ModalResult;
-
-//----------------------------------------------------------------------
-// Helper: Check if key belongs to OMM Data section
-//----------------------------------------------------------------------
-
-fn is_omm_data_key(key: &str) -> bool {
-    matches!(
-        key,
-        "EPOCH"
-            | "SEMI_MAJOR_AXIS"
-            | "MEAN_MOTION"
-            | "ECCENTRICITY"
-            | "INCLINATION"
-            | "RA_OF_ASC_NODE"
-            | "ARG_OF_PERICENTER"
-            | "MEAN_ANOMALY"
-            | "GM"
-            | "MASS"
-            | "SOLAR_RAD_AREA"
-            | "SOLAR_RAD_COEFF"
-            | "DRAG_AREA"
-            | "DRAG_COEFF"
-            | "EPHEMERIS_TYPE"
-            | "CLASSIFICATION_TYPE"
-            | "NORAD_CAT_ID"
-            | "ELEMENT_SET_NO"
-            | "REV_AT_EPOCH"
-            | "BSTAR"
-            | "BTERM"
-            | "MEAN_MOTION_DOT"
-            | "MEAN_MOTION_DDOT"
-            | "AGOM"
-            | "COV_REF_FRAME"
-            | "CX_X"
-            | "CY_X"
-            | "CY_Y"
-            | "CZ_X"
-            | "CZ_Y"
-            | "CZ_Z"
-            | "CX_DOT_X"
-            | "CX_DOT_Y"
-            | "CX_DOT_Z"
-            | "CX_DOT_X_DOT"
-            | "CY_DOT_X"
-            | "CY_DOT_Y"
-            | "CY_DOT_Z"
-            | "CY_DOT_X_DOT"
-            | "CY_DOT_Y_DOT"
-            | "CZ_DOT_X"
-            | "CZ_DOT_Y"
-            | "CZ_DOT_Z"
-            | "CZ_DOT_X_DOT"
-            | "CZ_DOT_Y_DOT"
-            | "CZ_DOT_Z_DOT"
-    ) || key.starts_with("USER_DEFINED_")
-}
 
 //----------------------------------------------------------------------
 // OMM Version Parser
 //----------------------------------------------------------------------
 
-pub fn omm_version(input: &mut &str) -> ModalResult<String> {
+pub fn omm_version(input: &mut &str) -> KvnResult<String> {
+    ws.parse_next(input)?;
     let _ = collect_comments.parse_next(input)?;
     let (value, _) = expect_key("CCSDS_OMM_VERS").parse_next(input)?;
     Ok(value.to_string())
@@ -87,7 +31,7 @@ pub fn omm_version(input: &mut &str) -> ModalResult<String> {
 // OMM Metadata Parser
 //----------------------------------------------------------------------
 
-pub fn omm_metadata(input: &mut &str) -> ModalResult<OmmMetadata> {
+pub fn omm_metadata(input: &mut &str) -> KvnResult<OmmMetadata> {
     let mut comment = Vec::new();
     let mut object_name = None;
     let mut object_id = None;
@@ -98,66 +42,77 @@ pub fn omm_metadata(input: &mut &str) -> ModalResult<OmmMetadata> {
     let mut mean_element_theory = None;
 
     loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        match next_key {
-            Some(key) if is_omm_data_key(key) => break,
-            Some(_key) => {
-                let (k, v, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
-                    "OBJECT_NAME" => object_name = Some(v.to_string()),
-                    "OBJECT_ID" => object_id = Some(v.to_string()),
-                    "CENTER_NAME" => center_name = Some(v.to_string()),
-                    "REF_FRAME" => ref_frame = Some(v.to_string()),
-                    "REF_FRAME_EPOCH" => {
-                        ref_frame_epoch =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "TIME_SYSTEM" => time_system = Some(v.to_string()),
-                    "MEAN_ELEMENT_THEORY" => mean_element_theory = Some(v.to_string()),
-                    _ => {
-                        return Err(ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label("Unknown OMM Metadata key"),
-                        )));
-                    }
-                }
+        match key {
+            "OBJECT_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_name = Some(v.to_string());
             }
-            None => break,
+            "OBJECT_ID" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_id = Some(v.to_string());
+            }
+            "CENTER_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                center_name = Some(v.to_string());
+            }
+            "REF_FRAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ref_frame = Some(v.to_string());
+            }
+            "REF_FRAME_EPOCH" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ref_frame_epoch =
+                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
+            }
+            "TIME_SYSTEM" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                time_system = Some(v.to_string());
+            }
+            "MEAN_ELEMENT_THEORY" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                mean_element_theory = Some(v.to_string());
+            }
+            _ => {
+                // If it's a data key or unknown, backtrack and end metadata section
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
     Ok(OmmMetadata {
         comment,
         object_name: object_name.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("OBJECT_NAME")),
             ))
         })?,
         object_id: object_id.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("OBJECT_ID")),
             ))
         })?,
         center_name: center_name.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CENTER_NAME")),
             ))
         })?,
         ref_frame: ref_frame.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("REF_FRAME")),
@@ -165,14 +120,14 @@ pub fn omm_metadata(input: &mut &str) -> ModalResult<OmmMetadata> {
         })?,
         ref_frame_epoch,
         time_system: time_system.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("TIME_SYSTEM")),
             ))
         })?,
         mean_element_theory: mean_element_theory.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("MEAN_ELEMENT_THEORY")),
@@ -185,7 +140,7 @@ pub fn omm_metadata(input: &mut &str) -> ModalResult<OmmMetadata> {
 // Mean Elements Parser
 //----------------------------------------------------------------------
 
-pub fn mean_elements(input: &mut &str) -> ModalResult<(Vec<String>, MeanElements)> {
+pub fn mean_elements(input: &mut &str) -> KvnResult<(Vec<String>, MeanElements)> {
     let mut comment = Vec::new();
     let mut epoch = None;
     let mut semi_major_axis = None;
@@ -198,212 +153,136 @@ pub fn mean_elements(input: &mut &str) -> ModalResult<(Vec<String>, MeanElements
     let mut gm = None;
 
     loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        match next_key {
-            Some(
-                _k @ ("EPOCH" | "SEMI_MAJOR_AXIS" | "MEAN_MOTION" | "ECCENTRICITY" | "INCLINATION"
-                | "RA_OF_ASC_NODE" | "ARG_OF_PERICENTER" | "MEAN_ANOMALY" | "GM"),
-            ) => {
-                let (key, val, unit) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match key {
-                    "EPOCH" => {
-                        epoch = Some(Epoch::from_str(val).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?);
-                    }
-                    "SEMI_MAJOR_AXIS" => {
-                        semi_major_axis = Some(Distance::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?);
-                    }
-                    "MEAN_MOTION" => {
-                        mean_motion = Some(MeanMotion::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?);
-                    }
-                    "ECCENTRICITY" => {
-                        eccentricity = Some(parse_f64(val).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?);
-                    }
-                    "INCLINATION" => {
-                        inclination = Some(Inclination::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?);
-                    }
-                    "RA_OF_ASC_NODE" => {
-                        ra_of_asc_node = Some(Angle::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?);
-                    }
-                    "ARG_OF_PERICENTER" => {
-                        arg_of_pericenter = Some(Angle::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?);
-                    }
-                    "MEAN_ANOMALY" => {
-                        mean_anomaly = Some(Angle::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?);
-                    }
-                    "GM" => {
-                        let uv = UnitValue::<f64, GmUnits>::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?;
-                        gm = Some(Gm::new(uv.value, uv.units).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?);
-                    }
-                    _ => unreachable!(),
-                }
+        match key {
+            "EPOCH" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                epoch = Some(Epoch::from_str(val).map_err(|_| cut_err(input, "Invalid EPOCH"))?);
             }
-            _ => break,
+            "SEMI_MAJOR_AXIS" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                semi_major_axis = Some(
+                    Distance::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid SEMI_MAJOR_AXIS"))?,
+                );
+            }
+            "MEAN_MOTION" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                mean_motion = Some(
+                    MeanMotion::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid MEAN_MOTION"))?,
+                );
+            }
+            "ECCENTRICITY" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                eccentricity =
+                    Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid ECCENTRICITY"))?);
+            }
+            "INCLINATION" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                inclination = Some(
+                    Inclination::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid INCLINATION"))?,
+                );
+            }
+            "RA_OF_ASC_NODE" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                ra_of_asc_node = Some(
+                    Angle::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid RA_OF_ASC_NODE"))?,
+                );
+            }
+            "ARG_OF_PERICENTER" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                arg_of_pericenter = Some(
+                    Angle::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid ARG_OF_PERICENTER"))?,
+                );
+            }
+            "MEAN_ANOMALY" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                mean_anomaly = Some(
+                    Angle::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid MEAN_ANOMALY"))?,
+                );
+            }
+            "GM" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                gm = Some(Gm::from_kvn(val, unit).map_err(|_| cut_err(input, "Invalid GM"))?);
+            }
+            _ => {
+                // If it's a TLE key or unknown, backtrack and end mean elements section
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
-    if semi_major_axis.is_some() && mean_motion.is_some() {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Label("Cannot have both SEMI_MAJOR_AXIS and MEAN_MOTION"),
-        )));
-    }
-    if semi_major_axis.is_none() && mean_motion.is_none() {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Label("Either SEMI_MAJOR_AXIS or MEAN_MOTION must be present"),
-        )));
-    }
-
-    let ecc = eccentricity.ok_or_else(|| {
-        ErrMode::Cut(ContextError::new().add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Expected(StrContextValue::Description("ECCENTRICITY")),
-        ))
-    })?;
-    if ecc < 0.0 {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Label("ECCENTRICITY must be >= 0"),
-        )));
-    }
-
-    let me = MeanElements {
-        comment: Vec::new(),
-        epoch: epoch.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("EPOCH")),
-            ))
-        })?,
-        semi_major_axis,
-        mean_motion,
-        eccentricity: ecc,
-        inclination: inclination.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("INCLINATION")),
-            ))
-        })?,
-        ra_of_asc_node: ra_of_asc_node.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("RA_OF_ASC_NODE")),
-            ))
-        })?,
-        arg_of_pericenter: arg_of_pericenter.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("ARG_OF_PERICENTER")),
-            ))
-        })?,
-        mean_anomaly: mean_anomaly.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MEAN_ANOMALY")),
-            ))
-        })?,
-        gm,
-    };
-
-    Ok((comment, me))
+    Ok((
+        comment,
+        MeanElements {
+            comment: Vec::new(), // comment is returned as part of the tuple for OmmData
+            epoch: epoch.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("EPOCH")),
+                ))
+            })?,
+            semi_major_axis,
+            mean_motion,
+            eccentricity: eccentricity.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("ECCENTRICITY")),
+                ))
+            })?,
+            inclination: inclination.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("INCLINATION")),
+                ))
+            })?,
+            ra_of_asc_node: ra_of_asc_node.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("RA_OF_ASC_NODE")),
+                ))
+            })?,
+            arg_of_pericenter: arg_of_pericenter.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("ARG_OF_PERICENTER")),
+                ))
+            })?,
+            mean_anomaly: mean_anomaly.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("MEAN_ANOMALY")),
+                ))
+            })?,
+            gm,
+        },
+    ))
 }
 
 //----------------------------------------------------------------------
 // TLE Parameters Parser
 //----------------------------------------------------------------------
 
-fn is_tle_key(key: &str) -> bool {
-    matches!(
-        key,
-        "EPHEMERIS_TYPE"
-            | "CLASSIFICATION_TYPE"
-            | "NORAD_CAT_ID"
-            | "ELEMENT_SET_NO"
-            | "REV_AT_EPOCH"
-            | "BSTAR"
-            | "BTERM"
-            | "MEAN_MOTION_DOT"
-            | "MEAN_MOTION_DDOT"
-            | "AGOM"
-    )
-}
-
-pub fn tle_parameters(input: &mut &str) -> ModalResult<Option<TleParameters>> {
+pub fn tle_parameters(input: &mut &str) -> KvnResult<Option<TleParameters>> {
     let mut comment = Vec::new();
     let mut ephemeris_type = None;
     let mut classification_type = None;
@@ -417,104 +296,72 @@ pub fn tle_parameters(input: &mut &str) -> ModalResult<Option<TleParameters>> {
     let mut agom = None;
 
     loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        match next_key {
-            Some(k) if is_tle_key(k) => {
-                let (key, val, unit) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match key {
-                    "EPHEMERIS_TYPE" => {
-                        ephemeris_type = Some(parse_i32(val).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?)
-                    }
-                    "CLASSIFICATION_TYPE" => classification_type = Some(val.to_string()),
-                    "NORAD_CAT_ID" => {
-                        norad_cat_id = Some(parse_u32(val).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?)
-                    }
-                    "ELEMENT_SET_NO" => {
-                        element_set_no = Some(parse_u32(val).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?)
-                    }
-                    "REV_AT_EPOCH" => {
-                        rev_at_epoch = Some(parse_u32(val).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?)
-                    }
-                    "BSTAR" => {
-                        bstar = Some(BStar::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?)
-                    }
-                    "BTERM" => {
-                        bterm = Some(M2kg::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?)
-                    }
-                    "MEAN_MOTION_DOT" => {
-                        mean_motion_dot = Some(MeanMotionDot::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?)
-                    }
-                    "MEAN_MOTION_DDOT" => {
-                        mean_motion_ddot =
-                            Some(MeanMotionDDot::from_kvn(val, unit).map_err(|e| {
-                                ErrMode::Cut(ContextError::new().add_context(
-                                    input,
-                                    &input.checkpoint(),
-                                    StrContext::Label(e.to_string().leak()),
-                                ))
-                            })?)
-                    }
-                    "AGOM" => {
-                        agom = Some(M2kg::from_kvn(val, unit).map_err(|e| {
-                            ErrMode::Cut(ContextError::new().add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Label(e.to_string().leak()),
-                            ))
-                        })?)
-                    }
-                    _ => unreachable!(),
-                }
+        match key {
+            "EPHEMERIS_TYPE" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                ephemeris_type =
+                    Some(parse_i32(val).map_err(|_| cut_err(input, "Invalid EPHEMERIS_TYPE"))?);
             }
-            _ => break,
+            "CLASSIFICATION_TYPE" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                classification_type = Some(val.to_string());
+            }
+            "NORAD_CAT_ID" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                norad_cat_id =
+                    Some(parse_u32(val).map_err(|_| cut_err(input, "Invalid NORAD_CAT_ID"))?);
+            }
+            "ELEMENT_SET_NO" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                element_set_no =
+                    Some(parse_u32(val).map_err(|_| cut_err(input, "Invalid ELEMENT_SET_NO"))?);
+            }
+            "REV_AT_EPOCH" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                rev_at_epoch =
+                    Some(parse_u32(val).map_err(|_| cut_err(input, "Invalid REV_AT_EPOCH"))?);
+            }
+            "BSTAR" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                bstar =
+                    Some(BStar::from_kvn(val, unit).map_err(|_| cut_err(input, "Invalid BSTAR"))?);
+            }
+            "BTERM" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                bterm =
+                    Some(M2kg::from_kvn(val, unit).map_err(|_| cut_err(input, "Invalid BTERM"))?);
+            }
+            "MEAN_MOTION_DOT" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                mean_motion_dot = Some(
+                    MeanMotionDot::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid MEAN_MOTION_DOT"))?,
+                );
+            }
+            "MEAN_MOTION_DDOT" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                mean_motion_ddot = Some(
+                    MeanMotionDDot::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid MEAN_MOTION_DDOT"))?,
+                );
+            }
+            "AGOM" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                agom = Some(M2kg::from_kvn(val, unit).map_err(|_| cut_err(input, "Invalid AGOM"))?);
+            }
+            _ => {
+                // If it's a covariance key or unknown, backtrack and end TLE section
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
@@ -534,7 +381,7 @@ pub fn tle_parameters(input: &mut &str) -> ModalResult<Option<TleParameters>> {
 
     if let Some(esn) = element_set_no {
         if esn > 9999 {
-            return Err(ErrMode::Cut(ContextError::new().add_context(
+            return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Label("ELEMENT_SET_NO must be in range [0, 9999]"),
@@ -543,30 +390,30 @@ pub fn tle_parameters(input: &mut &str) -> ModalResult<Option<TleParameters>> {
     }
 
     if bstar.is_some() && bterm.is_some() {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
+        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
             StrContext::Label("Cannot have both BSTAR and BTERM"),
         )));
     }
     if bstar.is_none() && bterm.is_none() {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
+        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
             StrContext::Label("Either BSTAR or BTERM must be present in TLE Parameters"),
         )));
     }
 
-    if mean_motion_dot.is_none() {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
+    let mean_motion_dot = mean_motion_dot.ok_or_else(|| {
+        ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
             StrContext::Expected(StrContextValue::Description("MEAN_MOTION_DOT")),
-        )));
-    }
+        ))
+    })?;
 
     if mean_motion_ddot.is_some() && agom.is_some() {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
+        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
             StrContext::Label("Cannot have both MEAN_MOTION_DDOT and AGOM"),
@@ -582,7 +429,7 @@ pub fn tle_parameters(input: &mut &str) -> ModalResult<Option<TleParameters>> {
         rev_at_epoch,
         bstar,
         bterm,
-        mean_motion_dot,
+        mean_motion_dot: Some(mean_motion_dot),
         mean_motion_ddot,
         agom,
     }))
@@ -592,7 +439,7 @@ pub fn tle_parameters(input: &mut &str) -> ModalResult<Option<TleParameters>> {
 // OMM Data Parser
 //----------------------------------------------------------------------
 
-pub fn omm_data(input: &mut &str) -> ModalResult<OmmData> {
+pub fn omm_data(input: &mut &str) -> KvnResult<OmmData> {
     let (me_comment, mean_elements) = mean_elements.parse_next(input)?;
 
     // Spacecraft parameters
@@ -621,7 +468,7 @@ pub fn omm_data(input: &mut &str) -> ModalResult<OmmData> {
 // Complete OMM Parser
 //----------------------------------------------------------------------
 
-pub fn parse_omm(input: &mut &str) -> ModalResult<Omm> {
+pub fn parse_omm(input: &mut &str) -> KvnResult<Omm> {
     let version = omm_version.parse_next(input)?;
     let header = odm_header.parse_next(input)?;
     let metadata = omm_metadata.parse_next(input)?;
@@ -638,7 +485,7 @@ pub fn parse_omm(input: &mut &str) -> ModalResult<Omm> {
 }
 
 impl ParseKvn for Omm {
-    fn parse_kvn(input: &mut &str) -> ModalResult<Self> {
+    fn parse_kvn(input: &mut &str) -> KvnResult<Self> {
         parse_omm.parse_next(input)
     }
 }

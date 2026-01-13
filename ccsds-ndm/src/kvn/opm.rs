@@ -43,81 +43,22 @@ use crate::messages::opm::{
 };
 use crate::types::*;
 use std::str::FromStr;
-use winnow::error::{AddContext, ContextError, ErrMode, StrContext, StrContextValue};
+use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
-use winnow::ModalResult;
-
-//----------------------------------------------------------------------
-// Helper: Check if key belongs to OPM Data section
-//----------------------------------------------------------------------
-
-fn is_opm_data_key(key: &str) -> bool {
-    matches!(
-        key,
-        "EPOCH"
-            | "X"
-            | "Y"
-            | "Z"
-            | "X_DOT"
-            | "Y_DOT"
-            | "Z_DOT"
-            | "SEMI_MAJOR_AXIS"
-            | "ECCENTRICITY"
-            | "INCLINATION"
-            | "RA_OF_ASC_NODE"
-            | "ARG_OF_PERICENTER"
-            | "TRUE_ANOMALY"
-            | "MEAN_ANOMALY"
-            | "GM"
-            | "MASS"
-            | "SOLAR_RAD_AREA"
-            | "SOLAR_RAD_COEFF"
-            | "DRAG_AREA"
-            | "DRAG_COEFF"
-            | "COV_REF_FRAME"
-            | "CX_X"
-            | "CY_X"
-            | "CY_Y"
-            | "CZ_X"
-            | "CZ_Y"
-            | "CZ_Z"
-            | "CX_DOT_X"
-            | "CX_DOT_Y"
-            | "CX_DOT_Z"
-            | "CX_DOT_X_DOT"
-            | "CY_DOT_X"
-            | "CY_DOT_Y"
-            | "CY_DOT_Z"
-            | "CY_DOT_X_DOT"
-            | "CY_DOT_Y_DOT"
-            | "CZ_DOT_X"
-            | "CZ_DOT_Y"
-            | "CZ_DOT_Z"
-            | "CZ_DOT_X_DOT"
-            | "CZ_DOT_Y_DOT"
-            | "CZ_DOT_Z_DOT"
-            | "MAN_EPOCH_IGNITION"
-            | "MAN_DURATION"
-            | "MAN_DELTA_MASS"
-            | "MAN_REF_FRAME"
-            | "MAN_DV_1"
-            | "MAN_DV_2"
-            | "MAN_DV_3"
-    ) || key.starts_with("USER_DEFINED_")
-}
 
 //----------------------------------------------------------------------
 // OPM Version Parser
 //----------------------------------------------------------------------
 
 /// Parses the OPM version line: `CCSDS_OPM_VERS = 3.0`
-pub fn opm_version(input: &mut &str) -> ModalResult<String> {
+pub fn opm_version(input: &mut &str) -> KvnResult<String> {
+    ws.parse_next(input)?;
     // Skip any leading comments/empty lines
     let _ = collect_comments.parse_next(input)?;
 
     let (value, _) = expect_key("CCSDS_OPM_VERS").parse_next(input)?;
     if value != "3.0" && value != "2.0" {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
+        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
             StrContext::Expected(StrContextValue::Description("3.0 or 2.0")),
@@ -131,7 +72,7 @@ pub fn opm_version(input: &mut &str) -> ModalResult<String> {
 //----------------------------------------------------------------------
 
 /// Parses the OPM metadata section.
-pub fn opm_metadata(input: &mut &str) -> ModalResult<OpmMetadata> {
+pub fn opm_metadata(input: &mut &str) -> KvnResult<OpmMetadata> {
     let mut comment = Vec::new();
     let mut object_name = None;
     let mut object_id = None;
@@ -141,49 +82,86 @@ pub fn opm_metadata(input: &mut &str) -> ModalResult<OpmMetadata> {
     let mut time_system = None;
 
     loop {
-        // Collect any comments
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        // Check what's next
-        let next_key = peek_key(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        match next_key {
-            Some(key) if is_opm_data_key(key) => {
-                // We've reached the data section
+        match key {
+            "OBJECT_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_name = Some(v.to_string());
+            }
+            "OBJECT_ID" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_id = Some(v.to_string());
+            }
+            "CENTER_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                center_name = Some(v.to_string());
+            }
+            "REF_FRAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ref_frame = Some(v.to_string());
+            }
+            "REF_FRAME_EPOCH" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ref_frame_epoch =
+                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
+            }
+            "TIME_SYSTEM" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                time_system = Some(v.to_string());
+            }
+            _ => {
+                // If it's a data key or unknown, backtrack and end metadata section
+                input.reset(&checkpoint);
                 break;
             }
-            Some(_key) => {
-                let (k, v, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
-                    "OBJECT_NAME" => object_name = Some(v.to_string()),
-                    "OBJECT_ID" => object_id = Some(v.to_string()),
-                    "CENTER_NAME" => center_name = Some(v.to_string()),
-                    "REF_FRAME" => ref_frame = Some(v.to_string()),
-                    "REF_FRAME_EPOCH" => {
-                        ref_frame_epoch =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "TIME_SYSTEM" => time_system = Some(v.to_string()),
-                    _ => {
-                        return Err(cut_err(input, "Unexpected key or invalid format"));
-                    }
-                }
-            }
-            None => break,
         }
     }
 
     Ok(OpmMetadata {
         comment,
-        object_name: object_name.ok_or_else(|| cut_err(input, "Missing required value"))?,
-        object_id: object_id.ok_or_else(|| cut_err(input, "Missing required value"))?,
-        center_name: center_name.ok_or_else(|| cut_err(input, "Missing required value"))?,
-        ref_frame: ref_frame.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        object_name: object_name.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("OBJECT_NAME")),
+            ))
+        })?,
+        object_id: object_id.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("OBJECT_ID")),
+            ))
+        })?,
+        center_name: center_name.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CENTER_NAME")),
+            ))
+        })?,
+        ref_frame: ref_frame.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("REF_FRAME")),
+            ))
+        })?,
         ref_frame_epoch,
-        time_system: time_system.ok_or_else(|| cut_err(input, "Missing required value"))?,
+        time_system: time_system.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("TIME_SYSTEM")),
+            ))
+        })?,
     })
 }
 
@@ -191,23 +169,8 @@ pub fn opm_metadata(input: &mut &str) -> ModalResult<OpmMetadata> {
 // Keplerian Elements Parser
 //----------------------------------------------------------------------
 
-/// Checks if current key is a Keplerian element key.
-fn is_keplerian_key(key: &str) -> bool {
-    matches!(
-        key,
-        "SEMI_MAJOR_AXIS"
-            | "ECCENTRICITY"
-            | "INCLINATION"
-            | "RA_OF_ASC_NODE"
-            | "ARG_OF_PERICENTER"
-            | "TRUE_ANOMALY"
-            | "MEAN_ANOMALY"
-            | "GM"
-    )
-}
-
 /// Parses the optional Keplerian elements section.
-pub fn keplerian_elements(input: &mut &str) -> ModalResult<Option<KeplerianElements>> {
+pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElements>> {
     let mut comment = Vec::new();
     let mut semi_major_axis = None;
     let mut eccentricity = None;
@@ -218,125 +181,147 @@ pub fn keplerian_elements(input: &mut &str) -> ModalResult<Option<KeplerianEleme
     let mut mean_anomaly = None;
     let mut gm = None;
 
-    // Check if we have any Keplerian keys
-    let next_key = peek_key(input)?;
-    if !matches!(next_key, Some(k) if is_keplerian_key(k)) {
-        // Also check for comments before Keplerian section
-        let comments = collect_comments.parse_next(input)?;
-        if !comments.is_empty() {
-            let next_key = peek_key(input)?;
-            if !matches!(next_key, Some(k) if is_keplerian_key(k)) {
-                // No Keplerian section, but we consumed comments - this is fine
-                // The comments might belong to spacecraft params
-                return Ok(None);
-            }
-            comment.extend(comments);
-        } else {
-            return Ok(None);
-        }
-    }
-
     loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        match next_key {
-            Some(k) if is_keplerian_key(k) => {
-                let (key, val, unit) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match key {
-                    "SEMI_MAJOR_AXIS" => {
-                        semi_major_axis = Some(
-                            Distance::from_kvn(val, unit.or(Some("km")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "ECCENTRICITY" => {
-                        eccentricity =
-                            Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "INCLINATION" => {
-                        let angle = Angle::from_kvn(val, unit)
-                            .map_err(|_| cut_err(input, "Invalid value"))?;
-                        inclination = Some(
-                            Inclination::new(angle.value, angle.units)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "RA_OF_ASC_NODE" => {
-                        ra_of_asc_node = Some(
-                            Angle::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "ARG_OF_PERICENTER" => {
-                        arg_of_pericenter = Some(
-                            Angle::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "TRUE_ANOMALY" => {
-                        true_anomaly = Some(
-                            Angle::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "MEAN_ANOMALY" => {
-                        mean_anomaly = Some(
-                            Angle::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "GM" => {
-                        gm = Some(
-                            Gm::from_kvn(val, unit.or(Some("km**3/s**2")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    _ => {}
-                }
+        match key {
+            "SEMI_MAJOR_AXIS" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                semi_major_axis = Some(
+                    Distance::from_kvn(val, unit.or(Some("km")))
+                        .map_err(|_| cut_err(input, "Invalid SEMI_MAJOR_AXIS"))?,
+                );
             }
-            _ => break,
+            "ECCENTRICITY" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                eccentricity =
+                    Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid ECCENTRICITY"))?);
+            }
+            "INCLINATION" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                let angle = Angle::from_kvn(val, unit)
+                    .map_err(|_| cut_err(input, "Invalid INCLINATION"))?;
+                inclination = Some(
+                    Inclination::new(angle.value, angle.units)
+                        .map_err(|_| cut_err(input, "Invalid INCLINATION"))?,
+                );
+            }
+            "RA_OF_ASC_NODE" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                ra_of_asc_node = Some(
+                    Angle::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid RA_OF_ASC_NODE"))?,
+                );
+            }
+            "ARG_OF_PERICENTER" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                arg_of_pericenter = Some(
+                    Angle::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid ARG_OF_PERICENTER"))?,
+                );
+            }
+            "TRUE_ANOMALY" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                true_anomaly = Some(
+                    Angle::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid TRUE_ANOMALY"))?,
+                );
+            }
+            "MEAN_ANOMALY" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                mean_anomaly = Some(
+                    Angle::from_kvn(val, unit)
+                        .map_err(|_| cut_err(input, "Invalid MEAN_ANOMALY"))?,
+                );
+            }
+            "GM" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                gm = Some(
+                    Gm::from_kvn(val, unit.or(Some("km**3/s**2")))
+                        .map_err(|_| cut_err(input, "Invalid GM"))?,
+                );
+            }
+            _ => {
+                // Backtrack and end Keplerian section
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
-    // If we have any Keplerian data, build the struct
-    if semi_major_axis.is_some() || eccentricity.is_some() {
-        Ok(Some(KeplerianElements {
-            comment,
-            semi_major_axis: semi_major_axis
-                .ok_or_else(|| cut_err(input, "Missing required value"))?,
-            eccentricity: eccentricity.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            inclination: inclination.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            ra_of_asc_node: ra_of_asc_node
-                .ok_or_else(|| cut_err(input, "Missing required value"))?,
-            arg_of_pericenter: arg_of_pericenter
-                .ok_or_else(|| cut_err(input, "Missing required value"))?,
-            true_anomaly,
-            mean_anomaly,
-            gm: gm.ok_or_else(|| cut_err(input, "Missing required value"))?,
-        }))
-    } else {
-        Ok(None)
+    if semi_major_axis.is_none()
+        && eccentricity.is_none()
+        && inclination.is_none()
+        && ra_of_asc_node.is_none()
+        && arg_of_pericenter.is_none()
+        && true_anomaly.is_none()
+        && mean_anomaly.is_none()
+        && gm.is_none()
+    {
+        return Ok(None);
     }
+
+    Ok(Some(KeplerianElements {
+        comment,
+        semi_major_axis: semi_major_axis.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("SEMI_MAJOR_AXIS")),
+            ))
+        })?,
+        eccentricity: eccentricity.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("ECCENTRICITY")),
+            ))
+        })?,
+        inclination: inclination.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("INCLINATION")),
+            ))
+        })?,
+        ra_of_asc_node: ra_of_asc_node.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("RA_OF_ASC_NODE")),
+            ))
+        })?,
+        arg_of_pericenter: arg_of_pericenter.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("ARG_OF_PERICENTER")),
+            ))
+        })?,
+        true_anomaly,
+        mean_anomaly,
+        gm: gm.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("GM")),
+            ))
+        })?,
+    }))
 }
 
 //----------------------------------------------------------------------
 // Spacecraft Parameters Parser
 //----------------------------------------------------------------------
 
-fn is_spacecraft_key(key: &str) -> bool {
-    matches!(
-        key,
-        "MASS" | "SOLAR_RAD_AREA" | "SOLAR_RAD_COEFF" | "DRAG_AREA" | "DRAG_COEFF"
-    )
-}
-
 /// Parses the optional spacecraft parameters section.
-pub fn spacecraft_parameters(input: &mut &str) -> ModalResult<Option<SpacecraftParameters>> {
+pub fn spacecraft_parameters(input: &mut &str) -> KvnResult<Option<SpacecraftParameters>> {
     let mut comment = Vec::new();
     let mut mass = None;
     let mut solar_rad_area = None;
@@ -344,100 +329,75 @@ pub fn spacecraft_parameters(input: &mut &str) -> ModalResult<Option<SpacecraftP
     let mut drag_area = None;
     let mut drag_coeff = None;
 
-    // Check if we have any spacecraft keys
-    let next_key = peek_key(input)?;
-    if !matches!(next_key, Some(k) if is_spacecraft_key(k)) {
-        let comments = collect_comments.parse_next(input)?;
-        if !comments.is_empty() {
-            let next_key = peek_key(input)?;
-            if !matches!(next_key, Some(k) if is_spacecraft_key(k)) {
-                return Ok(None);
-            }
-            comment.extend(comments);
-        } else {
-            return Ok(None);
-        }
-    }
-
     loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        match next_key {
-            Some(k) if is_spacecraft_key(k) => {
-                let (key, val, unit) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match key {
-                    "MASS" => {
-                        mass = Some(
-                            Mass::from_kvn(val, unit.or(Some("kg")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "SOLAR_RAD_AREA" => {
-                        solar_rad_area = Some(
-                            Area::from_kvn(val, unit.or(Some("m**2")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "SOLAR_RAD_COEFF" => {
-                        solar_rad_coeff =
-                            Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "DRAG_AREA" => {
-                        drag_area = Some(
-                            Area::from_kvn(val, unit.or(Some("m**2")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "DRAG_COEFF" => {
-                        drag_coeff =
-                            Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    _ => {}
-                }
+        match key {
+            "MASS" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                mass = Some(
+                    Mass::from_kvn(val, unit.or(Some("kg")))
+                        .map_err(|_| cut_err(input, "Invalid MASS"))?,
+                );
             }
-            _ => break,
+            "SOLAR_RAD_AREA" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                solar_rad_area = Some(
+                    Area::from_kvn(val, unit.or(Some("m**2")))
+                        .map_err(|_| cut_err(input, "Invalid SOLAR_RAD_AREA"))?,
+                );
+            }
+            "SOLAR_RAD_COEFF" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                solar_rad_coeff =
+                    Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid SOLAR_RAD_COEFF"))?);
+            }
+            "DRAG_AREA" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                drag_area = Some(
+                    Area::from_kvn(val, unit.or(Some("m**2")))
+                        .map_err(|_| cut_err(input, "Invalid DRAG_AREA"))?,
+                );
+            }
+            "DRAG_COEFF" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                drag_coeff =
+                    Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid DRAG_COEFF"))?);
+            }
+            _ => {
+                // Backtrack and end spacecraft section
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
-    // If we have any spacecraft data, build the struct
-    if mass.is_some() || solar_rad_area.is_some() || drag_area.is_some() {
-        Ok(Some(SpacecraftParameters {
-            comment,
-            mass,
-            solar_rad_area,
-            solar_rad_coeff,
-            drag_area,
-            drag_coeff,
-        }))
-    } else {
-        Ok(None)
+    if mass.is_none() && solar_rad_area.is_none() && drag_area.is_none() {
+        return Ok(None);
     }
+
+    Ok(Some(SpacecraftParameters {
+        comment,
+        mass,
+        solar_rad_area,
+        solar_rad_coeff,
+        drag_area,
+        drag_coeff,
+    }))
 }
 
 //----------------------------------------------------------------------
 // Maneuver Parameters Parser
 //----------------------------------------------------------------------
 
-fn is_maneuver_key(key: &str) -> bool {
-    matches!(
-        key,
-        "MAN_EPOCH_IGNITION"
-            | "MAN_DURATION"
-            | "MAN_DELTA_MASS"
-            | "MAN_REF_FRAME"
-            | "MAN_DV_1"
-            | "MAN_DV_2"
-            | "MAN_DV_3"
-    )
-}
-
 /// Parses a single maneuver parameter block.
-pub fn maneuver_parameters(input: &mut &str) -> ModalResult<Option<ManeuverParameters>> {
+pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParameters>> {
     let mut comment = Vec::new();
     let mut man_epoch_ignition = None;
     let mut man_duration = None;
@@ -447,97 +407,123 @@ pub fn maneuver_parameters(input: &mut &str) -> ModalResult<Option<ManeuverParam
     let mut man_dv_2 = None;
     let mut man_dv_3 = None;
 
-    // Check if we have maneuver keys
-    let next_key = peek_key(input)?;
-    if !matches!(next_key, Some(k) if is_maneuver_key(k)) {
-        let comments = collect_comments.parse_next(input)?;
-        if !comments.is_empty() {
-            let next_key = peek_key(input)?;
-            if !matches!(next_key, Some(k) if is_maneuver_key(k)) {
-                return Ok(None);
-            }
-            comment.extend(comments);
-        } else {
-            return Ok(None);
-        }
-    }
-
     loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        match next_key {
-            Some("MAN_EPOCH_IGNITION") if man_epoch_ignition.is_some() => {
-                // New maneuver starting - return current one
+        match key {
+            "MAN_EPOCH_IGNITION" if man_epoch_ignition.is_some() => {
+                // Start of next maneuver block
+                input.reset(&checkpoint);
                 break;
             }
-            Some(k) if is_maneuver_key(k) => {
-                let (key, val, unit) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match key {
-                    "MAN_EPOCH_IGNITION" => {
-                        man_epoch_ignition = Some(
-                            Epoch::from_str(val).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "MAN_DURATION" => {
-                        man_duration = Some(
-                            Duration::from_kvn(val, unit.or(Some("s")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "MAN_DELTA_MASS" => {
-                        let value = parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?;
-                        let units = unit.and_then(|u| u.parse::<MassUnits>().ok());
-                        man_delta_mass = Some(
-                            DeltaMassZ::new(value, units)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "MAN_REF_FRAME" => {
-                        man_ref_frame = Some(val.to_string());
-                    }
-                    "MAN_DV_1" => {
-                        man_dv_1 = Some(
-                            Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "MAN_DV_2" => {
-                        man_dv_2 = Some(
-                            Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "MAN_DV_3" => {
-                        man_dv_3 = Some(
-                            Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    _ => {}
-                }
+            "MAN_EPOCH_IGNITION" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                man_epoch_ignition = Some(
+                    Epoch::from_str(val)
+                        .map_err(|_| cut_err(input, "Invalid MAN_EPOCH_IGNITION"))?,
+                );
             }
-            _ => break,
+            "MAN_DURATION" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                man_duration = Some(
+                    Duration::from_kvn(val, unit.or(Some("s")))
+                        .map_err(|_| cut_err(input, "Invalid MAN_DURATION"))?,
+                );
+            }
+            "MAN_DELTA_MASS" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                let value = parse_f64(val).map_err(|_| cut_err(input, "Invalid MAN_DELTA_MASS"))?;
+                let units = unit.and_then(|u| u.parse::<MassUnits>().ok());
+                man_delta_mass = Some(
+                    DeltaMassZ::new(value, units)
+                        .map_err(|_| cut_err(input, "Invalid MAN_DELTA_MASS"))?,
+                );
+            }
+            "MAN_REF_FRAME" => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                man_ref_frame = Some(val.to_string());
+            }
+            "MAN_DV_1" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                man_dv_1 = Some(
+                    Velocity::from_kvn(val, unit.or(Some("km/s")))
+                        .map_err(|_| cut_err(input, "Invalid MAN_DV_1"))?,
+                );
+            }
+            "MAN_DV_2" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                man_dv_2 = Some(
+                    Velocity::from_kvn(val, unit.or(Some("km/s")))
+                        .map_err(|_| cut_err(input, "Invalid MAN_DV_2"))?,
+                );
+            }
+            "MAN_DV_3" => {
+                let (val, unit) = kv_rest.parse_next(input)?;
+                man_dv_3 = Some(
+                    Velocity::from_kvn(val, unit.or(Some("km/s")))
+                        .map_err(|_| cut_err(input, "Invalid MAN_DV_3"))?,
+                );
+            }
+            _ => {
+                // Backtrack and end maneuver section
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
-    // If we have maneuver data, build the struct
-    if man_epoch_ignition.is_some() {
+    if let Some(ignition) = man_epoch_ignition {
         Ok(Some(ManeuverParameters {
             comment,
-            man_epoch_ignition: man_epoch_ignition
-                .ok_or_else(|| cut_err(input, "Missing required value"))?,
-            man_duration: man_duration.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            man_delta_mass: man_delta_mass
-                .ok_or_else(|| cut_err(input, "Missing required value"))?,
-            man_ref_frame: man_ref_frame.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            man_dv_1: man_dv_1.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            man_dv_2: man_dv_2.ok_or_else(|| cut_err(input, "Missing required value"))?,
-            man_dv_3: man_dv_3.ok_or_else(|| cut_err(input, "Missing required value"))?,
+            man_epoch_ignition: ignition,
+            man_duration: man_duration.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("MAN_DURATION")),
+                ))
+            })?,
+            man_delta_mass: man_delta_mass.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("MAN_DELTA_MASS")),
+                ))
+            })?,
+            man_ref_frame: man_ref_frame.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("MAN_REF_FRAME")),
+                ))
+            })?,
+            man_dv_1: man_dv_1.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("MAN_DV_1")),
+                ))
+            })?,
+            man_dv_2: man_dv_2.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("MAN_DV_2")),
+                ))
+            })?,
+            man_dv_3: man_dv_3.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("MAN_DV_3")),
+                ))
+            })?,
         }))
     } else {
         Ok(None)
@@ -545,14 +531,14 @@ pub fn maneuver_parameters(input: &mut &str) -> ModalResult<Option<ManeuverParam
 }
 
 /// Parses all maneuver parameter blocks.
-pub fn all_maneuvers(input: &mut &str) -> ModalResult<Vec<ManeuverParameters>> {
+pub fn all_maneuvers(input: &mut &str) -> KvnResult<Vec<ManeuverParameters>> {
     let mut maneuvers = Vec::new();
 
     loop {
         match maneuver_parameters.parse_next(input) {
             Ok(Some(man)) => maneuvers.push(man),
             Ok(None) => break,
-            Err(e) => return Err(e), // Propagate errors
+            Err(e) => return Err(e),
         }
     }
 
@@ -564,27 +550,32 @@ pub fn all_maneuvers(input: &mut &str) -> ModalResult<Vec<ManeuverParameters>> {
 //----------------------------------------------------------------------
 
 /// Parses user-defined parameters.
-pub fn user_defined_parameters(input: &mut &str) -> ModalResult<Option<UserDefined>> {
+pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined>> {
     let mut comment = Vec::new();
     let mut params = Vec::new();
 
     loop {
-        let comments = collect_comments.parse_next(input)?;
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        match next_key {
-            Some(k) if k.starts_with("USER_DEFINED_") => {
-                comment.extend(comments);
-                let (key, val, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
+        match key {
+            _ if key.starts_with("USER_DEFINED_") => {
+                let (val, _) = kv_rest.parse_next(input)?;
                 params.push(UserDefinedParameter {
                     parameter: key.to_string(),
                     value: val.to_string(),
                 });
             }
-            _ => break,
+            _ => {
+                // Backtrack and end user defined section
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
@@ -603,7 +594,7 @@ pub fn user_defined_parameters(input: &mut &str) -> ModalResult<Option<UserDefin
 //----------------------------------------------------------------------
 
 /// Parses the complete OPM data section.
-pub fn opm_data(input: &mut &str) -> ModalResult<OpmData> {
+pub fn opm_data(input: &mut &str) -> KvnResult<OpmData> {
     // Parse state vector (required)
     let (sv_comment, state_vector) = state_vector.parse_next(input)?;
 
@@ -630,7 +621,7 @@ pub fn opm_data(input: &mut &str) -> ModalResult<OpmData> {
 //----------------------------------------------------------------------
 
 /// Parses a complete OPM message.
-pub fn parse_opm(input: &mut &str) -> ModalResult<Opm> {
+pub fn parse_opm(input: &mut &str) -> KvnResult<Opm> {
     // 1. Version
     let version = opm_version.parse_next(input)?;
 
@@ -654,7 +645,7 @@ pub fn parse_opm(input: &mut &str) -> ModalResult<Opm> {
 }
 
 impl ParseKvn for Opm {
-    fn parse_kvn(input: &mut &str) -> ModalResult<Self> {
+    fn parse_kvn(input: &mut &str) -> KvnResult<Self> {
         parse_opm.parse_next(input)
     }
 }

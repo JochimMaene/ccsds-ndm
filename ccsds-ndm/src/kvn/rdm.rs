@@ -13,116 +13,15 @@ use crate::kvn::parser::*;
 use crate::messages::rdm::{Rdm, RdmBody, RdmData, RdmHeader, RdmMetadata, RdmSegment};
 use crate::types::*;
 use std::str::FromStr;
-use winnow::error::{AddContext, ContextError, ErrMode, StrContext, StrContextValue};
+use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
-use winnow::ModalResult;
-
-//----------------------------------------------------------------------
-// Helpers
-//----------------------------------------------------------------------
-
-fn is_rdm_data_keyword(key: &str) -> bool {
-    matches!(
-        key,
-        "ORBIT_LIFETIME"
-            | "REENTRY_ALTITUDE"
-            | "ORBIT_LIFETIME_WINDOW_START"
-            | "ORBIT_LIFETIME_WINDOW_END"
-            | "NOMINAL_REENTRY_EPOCH"
-            | "REENTRY_WINDOW_START"
-            | "REENTRY_WINDOW_END"
-            | "ORBIT_LIFETIME_CONFIDENCE_LEVEL"
-            | "PROBABILITY_OF_IMPACT"
-            | "PROBABILITY_OF_BURN_UP"
-            | "PROBABILITY_OF_BREAK_UP"
-            | "PROBABILITY_OF_LAND_IMPACT"
-            | "PROBABILITY_OF_CASUALTY"
-            | "NOMINAL_IMPACT_EPOCH"
-            | "IMPACT_WINDOW_START"
-            | "IMPACT_WINDOW_END"
-            | "IMPACT_REF_FRAME"
-            | "NOMINAL_IMPACT_LON"
-            | "NOMINAL_IMPACT_LAT"
-            | "NOMINAL_IMPACT_ALT"
-            | "IMPACT_1_CONFIDENCE"
-            | "IMPACT_1_START_LON"
-            | "IMPACT_1_START_LAT"
-            | "IMPACT_1_STOP_LON"
-            | "IMPACT_1_STOP_LAT"
-            | "IMPACT_1_CROSS_TRACK"
-            | "IMPACT_2_CONFIDENCE"
-            | "IMPACT_2_START_LON"
-            | "IMPACT_2_START_LAT"
-            | "IMPACT_2_STOP_LON"
-            | "IMPACT_2_STOP_LAT"
-            | "IMPACT_2_CROSS_TRACK"
-            | "IMPACT_3_CONFIDENCE"
-            | "IMPACT_3_START_LON"
-            | "IMPACT_3_START_LAT"
-            | "IMPACT_3_STOP_LON"
-            | "IMPACT_3_STOP_LAT"
-            | "IMPACT_3_CROSS_TRACK"
-            | "EPOCH"
-            | "X"
-            | "Y"
-            | "Z"
-            | "X_DOT"
-            | "Y_DOT"
-            | "Z_DOT"
-            | "COV_REF_FRAME"
-            | "CX_X"
-            | "CY_X"
-            | "CY_Y"
-            | "CZ_X"
-            | "CZ_Y"
-            | "CZ_Z"
-            | "CX_DOT_X"
-            | "CX_DOT_Y"
-            | "CX_DOT_Z"
-            | "CX_DOT_X_DOT"
-            | "CY_DOT_X"
-            | "CY_DOT_Y"
-            | "CY_DOT_Z"
-            | "CY_DOT_X_DOT"
-            | "CY_DOT_Y_DOT"
-            | "CZ_DOT_X"
-            | "CZ_DOT_Y"
-            | "CZ_DOT_Z"
-            | "CZ_DOT_X_DOT"
-            | "CZ_DOT_Y_DOT"
-            | "CZ_DOT_Z_DOT"
-            | "WET_MASS"
-            | "DRY_MASS"
-            | "HAZARDOUS_SUBSTANCES"
-            | "SOLAR_RAD_AREA"
-            | "SOLAR_RAD_COEFF"
-            | "DRAG_AREA"
-            | "DRAG_COEFF"
-            | "RCS"
-            | "BALLISTIC_COEFF"
-            | "THRUST_ACCELERATION"
-            | "TIME_LASTOB_START"
-            | "TIME_LASTOB_END"
-            | "RECOMMENDED_OD_SPAN"
-            | "ACTUAL_OD_SPAN"
-            | "OBS_AVAILABLE"
-            | "OBS_USED"
-            | "TRACKS_AVAILABLE"
-            | "TRACKS_USED"
-            | "RESIDUALS_ACCEPTED"
-            | "WEIGHTED_RMS"
-    ) || key.starts_with("USER_DEFINED_")
-}
-
-fn is_rdm_header_key(key: &str) -> bool {
-    matches!(key, "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID")
-}
 
 //----------------------------------------------------------------------
 // RDM Version Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_version(input: &mut &str) -> ModalResult<String> {
+pub fn rdm_version(input: &mut &str) -> KvnResult<String> {
+    ws.parse_next(input)?;
     let _ = collect_comments.parse_next(input)?;
     let (value, _) = expect_key("CCSDS_RDM_VERS").parse_next(input)?;
     Ok(value.to_string())
@@ -132,57 +31,61 @@ pub fn rdm_version(input: &mut &str) -> ModalResult<String> {
 // RDM Header Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_header(input: &mut &str) -> ModalResult<RdmHeader> {
+pub fn rdm_header(input: &mut &str) -> KvnResult<RdmHeader> {
     let mut comment = Vec::new();
     let mut creation_date = None;
     let mut originator = None;
     let mut message_id = None;
 
     loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        match next_key {
-            Some(key) if is_rdm_header_key(key) => {
-                let (k, v, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
-                    "CREATION_DATE" => {
-                        creation_date = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid CREATION_DATE"))?,
-                        );
-                    }
-                    "ORIGINATOR" => originator = Some(v.to_string()),
-                    "MESSAGE_ID" => message_id = Some(v.to_string()),
-                    _ => {}
-                }
+        match key {
+            "CREATION_DATE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                creation_date =
+                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid CREATION_DATE"))?);
             }
-            _ => break,
+            "ORIGINATOR" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                originator = Some(v.to_string());
+            }
+            "MESSAGE_ID" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                message_id = Some(v.to_string());
+            }
+            _ => {
+                // End of header
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
     Ok(RdmHeader {
         comment,
         creation_date: creation_date.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CREATION_DATE")),
             ))
         })?,
         originator: originator.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("ORIGINATOR")),
             ))
         })?,
         message_id: message_id.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("MESSAGE_ID")),
@@ -195,7 +98,7 @@ pub fn rdm_header(input: &mut &str) -> ModalResult<RdmHeader> {
 // RDM Metadata Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_metadata(input: &mut &str) -> ModalResult<RdmMetadata> {
+pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
     let mut comment = Vec::new();
     let mut object_name = None;
     let mut international_designator = None;
@@ -228,113 +131,168 @@ pub fn rdm_metadata(input: &mut &str) -> ModalResult<RdmMetadata> {
     let mut next_message_epoch = None;
 
     loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        match next_key {
-            Some(key) if is_rdm_data_keyword(key) => break,
-            Some(_key) => {
-                let (k, v, u) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
-                    "OBJECT_NAME" => object_name = Some(v.to_string()),
-                    "INTERNATIONAL_DESIGNATOR" => international_designator = Some(v.to_string()),
-                    "CATALOG_NAME" => catalog_name = Some(v.to_string()),
-                    "OBJECT_DESIGNATOR" => object_designator = Some(v.to_string()),
-                    "OBJECT_TYPE" => {
-                        object_type = Some(
-                            ObjectDescription::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid OBJECT_TYPE"))?,
-                        );
-                    }
-                    "OBJECT_OWNER" => object_owner = Some(v.to_string()),
-                    "OBJECT_OPERATOR" => object_operator = Some(v.to_string()),
-                    "CONTROLLED_REENTRY" => {
-                        controlled_reentry = Some(
-                            ControlledType::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid CONTROLLED_REENTRY"))?,
-                        );
-                    }
-                    "CENTER_NAME" => center_name = Some(v.to_string()),
-                    "TIME_SYSTEM" => time_system = Some(v.to_string()),
-                    "EPOCH_TZERO" => {
-                        epoch_tzero = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid EPOCH_TZERO"))?,
-                        );
-                    }
-                    "REF_FRAME" => ref_frame = Some(v.to_string()),
-                    "REF_FRAME_EPOCH" => {
-                        ref_frame_epoch = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid REF_FRAME_EPOCH"))?,
-                        );
-                    }
-                    "EPHEMERIS_NAME" => ephemeris_name = Some(v.to_string()),
-                    "GRAVITY_MODEL" => gravity_model = Some(v.to_string()),
-                    "ATMOSPHERIC_MODEL" => atmospheric_model = Some(v.to_string()),
-                    "SOLAR_FLUX_PREDICTION" => solar_flux_prediction = Some(v.to_string()),
-                    "N_BODY_PERTURBATIONS" => n_body_perturbations = Some(v.to_string()),
-                    "SOLAR_RAD_PRESSURE" => solar_rad_pressure = Some(v.to_string()),
-                    "EARTH_TIDES" => earth_tides = Some(v.to_string()),
-                    "INTRACK_THRUST" => {
-                        intrack_thrust = Some(
-                            YesNo::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid INTRACK_THRUST"))?,
-                        );
-                    }
-                    "DRAG_PARAMETERS_SOURCE" => drag_parameters_source = Some(v.to_string()),
-                    "DRAG_PARAMETERS_ALTITUDE" => {
-                        drag_parameters_altitude = Some(
-                            PositionRequired::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid DRAG_PARAMETERS_ALTITUDE"))?,
-                        );
-                    }
-                    "REENTRY_UNCERTAINTY_METHOD" => {
-                        reentry_uncertainty_method = Some(v.to_string())
-                    }
-                    "REENTRY_DISINTEGRATION" => reentry_disintegration = Some(v.to_string()),
-                    "IMPACT_UNCERTAINTY_METHOD" => impact_uncertainty_method = Some(v.to_string()),
-                    "PREVIOUS_MESSAGE_ID" => previous_message_id = Some(v.to_string()),
-                    "PREVIOUS_MESSAGE_EPOCH" => {
-                        previous_message_epoch = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid PREVIOUS_MESSAGE_EPOCH"))?,
-                        );
-                    }
-                    "NEXT_MESSAGE_EPOCH" => {
-                        next_message_epoch = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid NEXT_MESSAGE_EPOCH"))?,
-                        );
-                    }
-                    _ => {
-                        return Err(ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label("Unexpected RDM Metadata key"),
-                        )));
-                    }
-                }
+        match key {
+            "OBJECT_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_name = Some(v.to_string());
             }
-            None => break,
+            "INTERNATIONAL_DESIGNATOR" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                international_designator = Some(v.to_string());
+            }
+            "CATALOG_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                catalog_name = Some(v.to_string());
+            }
+            "OBJECT_DESIGNATOR" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_designator = Some(v.to_string());
+            }
+            "OBJECT_TYPE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_type = Some(
+                    ObjectDescription::from_str(v)
+                        .map_err(|_| cut_err(input, "Invalid OBJECT_TYPE"))?,
+                );
+            }
+            "OBJECT_OWNER" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_owner = Some(v.to_string());
+            }
+            "OBJECT_OPERATOR" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_operator = Some(v.to_string());
+            }
+            "CONTROLLED_REENTRY" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                controlled_reentry = Some(
+                    ControlledType::from_str(v)
+                        .map_err(|_| cut_err(input, "Invalid CONTROLLED_REENTRY"))?,
+                );
+            }
+            "CENTER_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                center_name = Some(v.to_string());
+            }
+            "TIME_SYSTEM" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                time_system = Some(v.to_string());
+            }
+            "EPOCH_TZERO" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                epoch_tzero =
+                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid EPOCH_TZERO"))?);
+            }
+            "REF_FRAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ref_frame = Some(v.to_string());
+            }
+            "REF_FRAME_EPOCH" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ref_frame_epoch = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid REF_FRAME_EPOCH"))?,
+                );
+            }
+            "EPHEMERIS_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ephemeris_name = Some(v.to_string());
+            }
+            "GRAVITY_MODEL" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                gravity_model = Some(v.to_string());
+            }
+            "ATMOSPHERIC_MODEL" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                atmospheric_model = Some(v.to_string());
+            }
+            "SOLAR_FLUX_PREDICTION" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                solar_flux_prediction = Some(v.to_string());
+            }
+            "N_BODY_PERTURBATIONS" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                n_body_perturbations = Some(v.to_string());
+            }
+            "SOLAR_RAD_PRESSURE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                solar_rad_pressure = Some(v.to_string());
+            }
+            "EARTH_TIDES" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                earth_tides = Some(v.to_string());
+            }
+            "INTRACK_THRUST" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                intrack_thrust =
+                    Some(YesNo::from_str(v).map_err(|_| cut_err(input, "Invalid INTRACK_THRUST"))?);
+            }
+            "DRAG_PARAMETERS_SOURCE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                drag_parameters_source = Some(v.to_string());
+            }
+            "DRAG_PARAMETERS_ALTITUDE" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                drag_parameters_altitude = Some(
+                    PositionRequired::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid DRAG_PARAMETERS_ALTITUDE"))?,
+                );
+            }
+            "REENTRY_UNCERTAINTY_METHOD" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                reentry_uncertainty_method = Some(v.to_string())
+            }
+            "REENTRY_DISINTEGRATION" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                reentry_disintegration = Some(v.to_string());
+            }
+            "IMPACT_UNCERTAINTY_METHOD" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                impact_uncertainty_method = Some(v.to_string());
+            }
+            "PREVIOUS_MESSAGE_ID" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                previous_message_id = Some(v.to_string());
+            }
+            "PREVIOUS_MESSAGE_EPOCH" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                previous_message_epoch = Some(
+                    Epoch::from_str(v)
+                        .map_err(|_| cut_err(input, "Invalid PREVIOUS_MESSAGE_EPOCH"))?,
+                );
+            }
+            "NEXT_MESSAGE_EPOCH" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                next_message_epoch = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid NEXT_MESSAGE_EPOCH"))?,
+                );
+            }
+            _ => {
+                // backtrack and end metadata section
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
     Ok(RdmMetadata {
         comment,
         object_name: object_name.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("OBJECT_NAME")),
             ))
         })?,
         international_designator: international_designator.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("INTERNATIONAL_DESIGNATOR")),
@@ -346,28 +304,28 @@ pub fn rdm_metadata(input: &mut &str) -> ModalResult<RdmMetadata> {
         object_owner,
         object_operator,
         controlled_reentry: controlled_reentry.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CONTROLLED_REENTRY")),
             ))
         })?,
         center_name: center_name.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CENTER_NAME")),
             ))
         })?,
         time_system: time_system.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("TIME_SYSTEM")),
             ))
         })?,
         epoch_tzero: epoch_tzero.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("EPOCH_TZERO")),
@@ -398,7 +356,7 @@ pub fn rdm_metadata(input: &mut &str) -> ModalResult<RdmMetadata> {
 // RDM Data Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_data(input: &mut &str) -> ModalResult<RdmData> {
+pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
     let mut comment = Vec::new();
 
     let mut orbit_lifetime = None;
@@ -425,546 +383,529 @@ pub fn rdm_data(input: &mut &str) -> ModalResult<RdmData> {
     let mut user_defined_parameters = Vec::new();
 
     loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
-        match next_key {
-            Some(key) if is_rdm_data_keyword(key) => {
-                match key {
-                    "EPOCH" | "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT" => {
-                        let (sv_comment, sv) =
-                            crate::kvn::parser::state_vector.parse_next(input)?;
-                        let mut sv = sv;
-                        sv.comment = sv_comment;
-                        state_vector_data = Some(sv);
-                        continue;
-                    }
-                    "COV_REF_FRAME" | "CX_X" | "CY_X" | "CY_Y" | "CZ_X" | "CZ_Y" | "CZ_Z"
-                    | "CX_DOT_X" | "CX_DOT_Y" | "CX_DOT_Z" | "CX_DOT_X_DOT" | "CY_DOT_X"
-                    | "CY_DOT_Y" | "CY_DOT_Z" | "CY_DOT_X_DOT" | "CY_DOT_Y_DOT" | "CZ_DOT_X"
-                    | "CZ_DOT_Y" | "CZ_DOT_Z" | "CZ_DOT_X_DOT" | "CZ_DOT_Y_DOT"
-                    | "CZ_DOT_Z_DOT" => {
-                        covariance_matrix_data =
-                            crate::kvn::parser::covariance_matrix.parse_next(input)?;
-                        continue;
-                    }
-                    _ => {}
-                }
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-                let (k, v, u) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
-                    // Atmospheric
-                    "ORBIT_LIFETIME" => {
-                        orbit_lifetime = Some(
-                            DayIntervalRequired::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid ORBIT_LIFETIME"))?,
-                        );
-                    }
-                    "REENTRY_ALTITUDE" => {
-                        reentry_altitude = Some(
-                            PositionRequired::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid REENTRY_ALTITUDE"))?,
-                        );
-                    }
-                    "ORBIT_LIFETIME_WINDOW_START" => {
-                        orbit_lifetime_window_start =
-                            Some(DayIntervalRequired::from_kvn(v, u).map_err(|_| {
-                                cut_err(input, "Invalid ORBIT_LIFETIME_WINDOW_START")
-                            })?);
-                    }
-                    "ORBIT_LIFETIME_WINDOW_END" => {
-                        orbit_lifetime_window_end =
-                            Some(DayIntervalRequired::from_kvn(v, u).map_err(|_| {
-                                cut_err(input, "Invalid ORBIT_LIFETIME_WINDOW_END")
-                            })?);
-                    }
-                    "NOMINAL_REENTRY_EPOCH" => {
-                        nominal_reentry_epoch = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid NOMINAL_REENTRY_EPOCH"))?,
-                        );
-                    }
-                    "REENTRY_WINDOW_START" => {
-                        reentry_window_start = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid REENTRY_WINDOW_START"))?,
-                        );
-                    }
-                    "REENTRY_WINDOW_END" => {
-                        reentry_window_end = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid REENTRY_WINDOW_END"))?,
-                        );
-                    }
-                    "ORBIT_LIFETIME_CONFIDENCE_LEVEL" => {
-                        orbit_lifetime_confidence_level =
-                            Some(PercentageRequired::from_kvn(v, u).map_err(|_| {
-                                cut_err(input, "Invalid ORBIT_LIFETIME_CONFIDENCE_LEVEL")
-                            })?);
-                    }
-
-                    // Ground Impact
-                    "PROBABILITY_OF_IMPACT" => {
-                        ground_params.probability_of_impact = Some(
-                            Probability::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_IMPACT"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Probability out of range for PROBABILITY_OF_IMPACT")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "PROBABILITY_OF_BURN_UP" => {
-                        ground_params.probability_of_burn_up =
-                            Some(
-                                Probability::new(parse_f64(v).map_err(|_| {
-                                    cut_err(input, "Invalid PROBABILITY_OF_BURN_UP")
-                                })?)
-                                .map_err(|_| {
-                                    cut_err(
-                                        input,
-                                        "Probability out of range for PROBABILITY_OF_BURN_UP",
-                                    )
-                                })?,
-                            );
-                        have_ground = true;
-                    }
-                    "PROBABILITY_OF_BREAK_UP" => {
-                        ground_params.probability_of_break_up =
-                            Some(
-                                Probability::new(parse_f64(v).map_err(|_| {
-                                    cut_err(input, "Invalid PROBABILITY_OF_BREAK_UP")
-                                })?)
-                                .map_err(|_| {
-                                    cut_err(
-                                        input,
-                                        "Probability out of range for PROBABILITY_OF_BREAK_UP",
-                                    )
-                                })?,
-                            );
-                        have_ground = true;
-                    }
-                    "PROBABILITY_OF_LAND_IMPACT" => {
-                        ground_params.probability_of_land_impact = Some(
-                            Probability::new(parse_f64(v).map_err(|_| {
-                                cut_err(input, "Invalid PROBABILITY_OF_LAND_IMPACT")
-                            })?)
-                            .map_err(|_| {
-                                cut_err(
-                                    input,
-                                    "Probability out of range for PROBABILITY_OF_LAND_IMPACT",
-                                )
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "PROBABILITY_OF_CASUALTY" => {
-                        ground_params.probability_of_casualty =
-                            Some(
-                                Probability::new(parse_f64(v).map_err(|_| {
-                                    cut_err(input, "Invalid PROBABILITY_OF_CASUALTY")
-                                })?)
-                                .map_err(|_| {
-                                    cut_err(
-                                        input,
-                                        "Probability out of range for PROBABILITY_OF_CASUALTY",
-                                    )
-                                })?,
-                            );
-                        have_ground = true;
-                    }
-                    "NOMINAL_IMPACT_EPOCH" => {
-                        ground_params.nominal_impact_epoch = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_EPOCH"))?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_WINDOW_START" => {
-                        ground_params.impact_window_start = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid IMPACT_WINDOW_START"))?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_WINDOW_END" => {
-                        ground_params.impact_window_end = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid IMPACT_WINDOW_END"))?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_REF_FRAME" => {
-                        ground_params.impact_ref_frame = Some(v.to_string());
-                        have_ground = true;
-                    }
-                    "NOMINAL_IMPACT_LON" => {
-                        ground_params.nominal_impact_lon = Some(
-                            LongitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_LON"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Longitude out of range for NOMINAL_IMPACT_LON")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "NOMINAL_IMPACT_LAT" => {
-                        ground_params.nominal_impact_lat = Some(
-                            LatitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_LAT"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Latitude out of range for NOMINAL_IMPACT_LAT")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "NOMINAL_IMPACT_ALT" => {
-                        ground_params.nominal_impact_alt = Some(
-                            AltitudeRequired::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_ALT"))?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_1_CONFIDENCE" => {
-                        ground_params.impact_1_confidence = Some(
-                            PercentageRequired::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid IMPACT_1_CONFIDENCE"))?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_1_START_LON" => {
-                        ground_params.impact_1_start_lon = Some(
-                            LongitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_1_START_LON"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Longitude out of range for IMPACT_1_START_LON")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_1_START_LAT" => {
-                        ground_params.impact_1_start_lat = Some(
-                            LatitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_1_START_LAT"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Latitude out of range for IMPACT_1_START_LAT")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_1_STOP_LON" => {
-                        ground_params.impact_1_stop_lon = Some(
-                            LongitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_1_STOP_LON"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Longitude out of range for IMPACT_1_STOP_LON")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_1_STOP_LAT" => {
-                        ground_params.impact_1_stop_lat = Some(
-                            LatitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_1_STOP_LAT"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Latitude out of range for IMPACT_1_STOP_LAT")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_1_CROSS_TRACK" => {
-                        ground_params.impact_1_cross_track = Some(
-                            Distance::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid IMPACT_1_CROSS_TRACK"))?,
-                        );
-                        have_ground = true;
-                    }
-                    // ... and so on for IMPACT_2 and IMPACT_3 ...
-                    "IMPACT_2_CONFIDENCE" => {
-                        ground_params.impact_2_confidence = Some(
-                            PercentageRequired::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid IMPACT_2_CONFIDENCE"))?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_2_START_LON" => {
-                        ground_params.impact_2_start_lon = Some(
-                            LongitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_2_START_LON"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Longitude out of range for IMPACT_2_START_LON")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_2_START_LAT" => {
-                        ground_params.impact_2_start_lat = Some(
-                            LatitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_2_START_LAT"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Latitude out of range for IMPACT_2_START_LAT")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_2_STOP_LON" => {
-                        ground_params.impact_2_stop_lon = Some(
-                            LongitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_2_STOP_LON"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Longitude out of range for IMPACT_2_STOP_LON")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_2_STOP_LAT" => {
-                        ground_params.impact_2_stop_lat = Some(
-                            LatitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_2_STOP_LAT"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Latitude out of range for IMPACT_2_STOP_LAT")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_2_CROSS_TRACK" => {
-                        ground_params.impact_2_cross_track = Some(
-                            Distance::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid IMPACT_2_CROSS_TRACK"))?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_3_CONFIDENCE" => {
-                        ground_params.impact_3_confidence = Some(
-                            PercentageRequired::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid IMPACT_3_CONFIDENCE"))?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_3_START_LON" => {
-                        ground_params.impact_3_start_lon = Some(
-                            LongitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_3_START_LON"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Longitude out of range for IMPACT_3_START_LON")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_3_START_LAT" => {
-                        ground_params.impact_3_start_lat = Some(
-                            LatitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_3_START_LAT"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Latitude out of range for IMPACT_3_START_LAT")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_3_STOP_LON" => {
-                        ground_params.impact_3_stop_lon = Some(
-                            LongitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_3_STOP_LON"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Longitude out of range for IMPACT_3_STOP_LON")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_3_STOP_LAT" => {
-                        ground_params.impact_3_stop_lat = Some(
-                            LatitudeRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid IMPACT_3_STOP_LAT"))?,
-                            )
-                            .map_err(|_| {
-                                cut_err(input, "Latitude out of range for IMPACT_3_STOP_LAT")
-                            })?,
-                        );
-                        have_ground = true;
-                    }
-                    "IMPACT_3_CROSS_TRACK" => {
-                        ground_params.impact_3_cross_track = Some(
-                            Distance::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid IMPACT_3_CROSS_TRACK"))?,
-                        );
-                        have_ground = true;
-                    }
-
-                    // Spacecraft Parameters
-                    "WET_MASS" => {
-                        spacecraft_params.wet_mass = Some(
-                            Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid WET_MASS"))?,
-                        );
-                        have_sp = true;
-                    }
-                    "DRY_MASS" => {
-                        spacecraft_params.dry_mass = Some(
-                            Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid DRY_MASS"))?,
-                        );
-                        have_sp = true;
-                    }
-                    "HAZARDOUS_SUBSTANCES" => {
-                        spacecraft_params.hazardous_substances = Some(v.to_string());
-                        have_sp = true;
-                    }
-                    "SOLAR_RAD_AREA" => {
-                        spacecraft_params.solar_rad_area = Some(
-                            Area::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid SOLAR_RAD_AREA"))?,
-                        );
-                        have_sp = true;
-                    }
-                    "SOLAR_RAD_COEFF" => {
-                        spacecraft_params.solar_rad_coeff = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid SOLAR_RAD_COEFF"))?,
-                        );
-                        have_sp = true;
-                    }
-                    "DRAG_AREA" => {
-                        spacecraft_params.drag_area = Some(
-                            Area::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid DRAG_AREA"))?,
-                        );
-                        have_sp = true;
-                    }
-                    "DRAG_COEFF" => {
-                        spacecraft_params.drag_coeff =
-                            Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid DRAG_COEFF"))?);
-                        have_sp = true;
-                    }
-                    "RCS" => {
-                        spacecraft_params.rcs =
-                            Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid RCS"))?);
-                        have_sp = true;
-                    }
-                    "BALLISTIC_COEFF" => {
-                        spacecraft_params.ballistic_coeff = Some(
-                            BallisticCoeffRequired::new(
-                                parse_f64(v)
-                                    .map_err(|_| cut_err(input, "Invalid BALLISTIC_COEFF"))?,
-                            )
-                            .map_err(|_| cut_err(input, "Ballistic coefficient out of range"))?,
-                        );
-                        have_sp = true;
-                    }
-                    "THRUST_ACCELERATION" => {
-                        spacecraft_params.thrust_acceleration =
-                            Some(Ms2Required::new(parse_f64(v).map_err(|_| {
-                                cut_err(input, "Invalid THRUST_ACCELERATION")
-                            })?));
-                        have_sp = true;
-                    }
-
-                    // OD Parameters
-                    "TIME_LASTOB_START" => {
-                        od_params.time_lastob_start = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid TIME_LASTOB_START"))?,
-                        );
-                        have_od = true;
-                    }
-                    "TIME_LASTOB_END" => {
-                        od_params.time_lastob_end = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid TIME_LASTOB_END"))?,
-                        );
-                        have_od = true;
-                    }
-                    "RECOMMENDED_OD_SPAN" => {
-                        od_params.recommended_od_span = Some(
-                            DayInterval::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid RECOMMENDED_OD_SPAN"))?,
-                        );
-                        have_od = true;
-                    }
-                    "ACTUAL_OD_SPAN" => {
-                        od_params.actual_od_span = Some(
-                            DayInterval::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid ACTUAL_OD_SPAN"))?,
-                        );
-                        have_od = true;
-                    }
-                    "OBS_AVAILABLE" => {
-                        od_params.obs_available = Some(
-                            parse_u32(v).map_err(|_| cut_err(input, "Invalid OBS_AVAILABLE"))?,
-                        );
-                        have_od = true;
-                    }
-                    "OBS_USED" => {
-                        od_params.obs_used =
-                            Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid OBS_USED"))?);
-                        have_od = true;
-                    }
-                    "TRACKS_AVAILABLE" => {
-                        od_params.tracks_available = Some(
-                            parse_u32(v).map_err(|_| cut_err(input, "Invalid TRACKS_AVAILABLE"))?,
-                        );
-                        have_od = true;
-                    }
-                    "TRACKS_USED" => {
-                        od_params.tracks_used =
-                            Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid TRACKS_USED"))?);
-                        have_od = true;
-                    }
-                    "RESIDUALS_ACCEPTED" => {
-                        od_params.residuals_accepted = Some(
-                            Percentage::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid RESIDUALS_ACCEPTED"))?,
-                        );
-                        have_od = true;
-                    }
-                    "WEIGHTED_RMS" => {
-                        od_params.weighted_rms =
-                            Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid WEIGHTED_RMS"))?);
-                        have_od = true;
-                    }
-
-                    _ if k.starts_with("USER_DEFINED_") => {
-                        user_defined_parameters.push((k.to_string(), v.to_string()));
-                    }
-
-                    _ => {
-                        return Err(ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label("Unexpected RDM Data key"),
-                        )));
-                    }
-                }
+        match key {
+            "EPOCH" => {
+                input.reset(&checkpoint);
+                let (sv_comment, sv) = crate::kvn::parser::state_vector.parse_next(input)?;
+                let mut sv = sv;
+                sv.comment = sv_comment;
+                state_vector_data = Some(sv);
             }
-            _ => break,
+            "COV_REF_FRAME" | "CX_X" | "CY_X" | "CY_Y" | "CZ_X" | "CZ_Y" | "CZ_Z" | "CX_DOT_X"
+            | "CX_DOT_Y" | "CX_DOT_Z" | "CX_DOT_X_DOT" | "CY_DOT_X" | "CY_DOT_Y" | "CY_DOT_Z"
+            | "CY_DOT_X_DOT" | "CY_DOT_Y_DOT" | "CZ_DOT_X" | "CZ_DOT_Y" | "CZ_DOT_Z"
+            | "CZ_DOT_X_DOT" | "CZ_DOT_Y_DOT" | "CZ_DOT_Z_DOT" => {
+                input.reset(&checkpoint);
+                covariance_matrix_data = crate::kvn::parser::covariance_matrix.parse_next(input)?;
+            }
+            "ORBIT_LIFETIME" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                orbit_lifetime = Some(
+                    DayIntervalRequired::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid ORBIT_LIFETIME"))?,
+                );
+            }
+            "REENTRY_ALTITUDE" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                reentry_altitude = Some(
+                    PositionRequired::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid REENTRY_ALTITUDE"))?,
+                );
+            }
+            "ORBIT_LIFETIME_WINDOW_START" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                orbit_lifetime_window_start = Some(
+                    DayIntervalRequired::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid ORBIT_LIFETIME_WINDOW_START"))?,
+                );
+            }
+            "ORBIT_LIFETIME_WINDOW_END" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                orbit_lifetime_window_end = Some(
+                    DayIntervalRequired::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid ORBIT_LIFETIME_WINDOW_END"))?,
+                );
+            }
+            "NOMINAL_REENTRY_EPOCH" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                nominal_reentry_epoch = Some(
+                    Epoch::from_str(v)
+                        .map_err(|_| cut_err(input, "Invalid NOMINAL_REENTRY_EPOCH"))?,
+                );
+            }
+            "REENTRY_WINDOW_START" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                reentry_window_start = Some(
+                    Epoch::from_str(v)
+                        .map_err(|_| cut_err(input, "Invalid REENTRY_WINDOW_START"))?,
+                );
+            }
+            "REENTRY_WINDOW_END" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                reentry_window_end = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid REENTRY_WINDOW_END"))?,
+                );
+            }
+            "ORBIT_LIFETIME_CONFIDENCE_LEVEL" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                orbit_lifetime_confidence_level = Some(
+                    PercentageRequired::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid ORBIT_LIFETIME_CONFIDENCE_LEVEL"))?,
+                );
+            }
+            "PROBABILITY_OF_IMPACT" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.probability_of_impact = Some(
+                    Probability::new(
+                        parse_f64(v)
+                            .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_IMPACT"))?,
+                    )
+                    .map_err(|_| {
+                        cut_err(input, "Probability out of range for PROBABILITY_OF_IMPACT")
+                    })?,
+                );
+                have_ground = true;
+            }
+            "PROBABILITY_OF_BURN_UP" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.probability_of_burn_up = Some(
+                    Probability::new(
+                        parse_f64(v)
+                            .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_BURN_UP"))?,
+                    )
+                    .map_err(|_| {
+                        cut_err(input, "Probability out of range for PROBABILITY_OF_BURN_UP")
+                    })?,
+                );
+                have_ground = true;
+            }
+            "PROBABILITY_OF_BREAK_UP" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.probability_of_break_up = Some(
+                    Probability::new(
+                        parse_f64(v)
+                            .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_BREAK_UP"))?,
+                    )
+                    .map_err(|_| {
+                        cut_err(
+                            input,
+                            "Probability out of range for PROBABILITY_OF_BREAK_UP",
+                        )
+                    })?,
+                );
+                have_ground = true;
+            }
+            "PROBABILITY_OF_LAND_IMPACT" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.probability_of_land_impact = Some(
+                    Probability::new(
+                        parse_f64(v)
+                            .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_LAND_IMPACT"))?,
+                    )
+                    .map_err(|_| {
+                        cut_err(
+                            input,
+                            "Probability out of range for PROBABILITY_OF_LAND_IMPACT",
+                        )
+                    })?,
+                );
+                have_ground = true;
+            }
+            "PROBABILITY_OF_CASUALTY" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.probability_of_casualty = Some(
+                    Probability::new(
+                        parse_f64(v)
+                            .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_CASUALTY"))?,
+                    )
+                    .map_err(|_| {
+                        cut_err(
+                            input,
+                            "Probability out of range for PROBABILITY_OF_CASUALTY",
+                        )
+                    })?,
+                );
+                have_ground = true;
+            }
+            "NOMINAL_IMPACT_EPOCH" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.nominal_impact_epoch = Some(
+                    Epoch::from_str(v)
+                        .map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_EPOCH"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_WINDOW_START" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_window_start = Some(
+                    Epoch::from_str(v)
+                        .map_err(|_| cut_err(input, "Invalid IMPACT_WINDOW_START"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_WINDOW_END" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_window_end = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid IMPACT_WINDOW_END"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_REF_FRAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_ref_frame = Some(v.to_string());
+                have_ground = true;
+            }
+            "NOMINAL_IMPACT_LON" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.nominal_impact_lon = Some(
+                    LongitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_LON"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Longitude out of range for NOMINAL_IMPACT_LON"))?,
+                );
+                have_ground = true;
+            }
+            "NOMINAL_IMPACT_LAT" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.nominal_impact_lat = Some(
+                    LatitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_LAT"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Latitude out of range for NOMINAL_IMPACT_LAT"))?,
+                );
+                have_ground = true;
+            }
+            "NOMINAL_IMPACT_ALT" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                ground_params.nominal_impact_alt = Some(
+                    AltitudeRequired::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_ALT"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_1_CONFIDENCE" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                ground_params.impact_1_confidence = Some(
+                    PercentageRequired::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid IMPACT_1_CONFIDENCE"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_1_START_LON" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_1_start_lon = Some(
+                    LongitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_1_START_LON"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_1_START_LON"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_1_START_LAT" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_1_start_lat = Some(
+                    LatitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_1_START_LAT"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_1_START_LAT"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_1_STOP_LON" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_1_stop_lon = Some(
+                    LongitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_1_STOP_LON"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_1_STOP_LON"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_1_STOP_LAT" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_1_stop_lat = Some(
+                    LatitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_1_STOP_LAT"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_1_STOP_LAT"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_1_CROSS_TRACK" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                ground_params.impact_1_cross_track = Some(
+                    Distance::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid IMPACT_1_CROSS_TRACK"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_2_CONFIDENCE" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                ground_params.impact_2_confidence = Some(
+                    PercentageRequired::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid IMPACT_2_CONFIDENCE"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_2_START_LON" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_2_start_lon = Some(
+                    LongitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_2_START_LON"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_2_START_LON"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_2_START_LAT" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_2_start_lat = Some(
+                    LatitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_2_START_LAT"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_2_START_LAT"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_2_STOP_LON" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_2_stop_lon = Some(
+                    LongitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_2_STOP_LON"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_2_STOP_LON"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_2_STOP_LAT" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_2_stop_lat = Some(
+                    LatitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_2_STOP_LAT"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_2_STOP_LAT"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_2_CROSS_TRACK" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                ground_params.impact_2_cross_track = Some(
+                    Distance::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid IMPACT_2_CROSS_TRACK"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_3_CONFIDENCE" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                ground_params.impact_3_confidence = Some(
+                    PercentageRequired::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid IMPACT_3_CONFIDENCE"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_3_START_LON" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_3_start_lon = Some(
+                    LongitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_3_START_LON"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_3_START_LON"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_3_START_LAT" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_3_start_lat = Some(
+                    LatitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_3_START_LAT"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_3_START_LAT"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_3_STOP_LON" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_3_stop_lon = Some(
+                    LongitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_3_STOP_LON"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_3_STOP_LON"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_3_STOP_LAT" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ground_params.impact_3_stop_lat = Some(
+                    LatitudeRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_3_STOP_LAT"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_3_STOP_LAT"))?,
+                );
+                have_ground = true;
+            }
+            "IMPACT_3_CROSS_TRACK" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                ground_params.impact_3_cross_track = Some(
+                    Distance::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid IMPACT_3_CROSS_TRACK"))?,
+                );
+                have_ground = true;
+            }
+
+            "WET_MASS" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                spacecraft_params.wet_mass =
+                    Some(Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid WET_MASS"))?);
+                have_sp = true;
+            }
+            "DRY_MASS" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                spacecraft_params.dry_mass =
+                    Some(Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid DRY_MASS"))?);
+                have_sp = true;
+            }
+            "HAZARDOUS_SUBSTANCES" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                spacecraft_params.hazardous_substances = Some(v.to_string());
+                have_sp = true;
+            }
+            "SOLAR_RAD_AREA" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                spacecraft_params.solar_rad_area = Some(
+                    Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid SOLAR_RAD_AREA"))?,
+                );
+                have_sp = true;
+            }
+            "SOLAR_RAD_COEFF" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                spacecraft_params.solar_rad_coeff =
+                    Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid SOLAR_RAD_COEFF"))?);
+                have_sp = true;
+            }
+            "DRAG_AREA" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                spacecraft_params.drag_area =
+                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid DRAG_AREA"))?);
+                have_sp = true;
+            }
+            "DRAG_COEFF" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                spacecraft_params.drag_coeff =
+                    Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid DRAG_COEFF"))?);
+                have_sp = true;
+            }
+            "RCS" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                spacecraft_params.rcs =
+                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid RCS"))?);
+                have_sp = true;
+            }
+            "BALLISTIC_COEFF" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                spacecraft_params.ballistic_coeff = Some(
+                    BallisticCoeffRequired::new(
+                        parse_f64(v).map_err(|_| cut_err(input, "Invalid BALLISTIC_COEFF"))?,
+                    )
+                    .map_err(|_| cut_err(input, "Ballistic coefficient out of range"))?,
+                );
+                have_sp = true;
+            }
+            "THRUST_ACCELERATION" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                spacecraft_params.thrust_acceleration =
+                    Some(Ms2Required::new(parse_f64(v).map_err(|_| {
+                        cut_err(input, "Invalid THRUST_ACCELERATION")
+                    })?));
+                have_sp = true;
+            }
+
+            "TIME_LASTOB_START" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.time_lastob_start = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid TIME_LASTOB_START"))?,
+                );
+                have_od = true;
+            }
+            "TIME_LASTOB_END" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.time_lastob_end = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid TIME_LASTOB_END"))?,
+                );
+                have_od = true;
+            }
+            "RECOMMENDED_OD_SPAN" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                od_params.recommended_od_span = Some(
+                    DayInterval::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid RECOMMENDED_OD_SPAN"))?,
+                );
+                have_od = true;
+            }
+            "ACTUAL_OD_SPAN" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                od_params.actual_od_span = Some(
+                    DayInterval::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid ACTUAL_OD_SPAN"))?,
+                );
+                have_od = true;
+            }
+            "OBS_AVAILABLE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.obs_available =
+                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid OBS_AVAILABLE"))?);
+                have_od = true;
+            }
+            "OBS_USED" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.obs_used =
+                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid OBS_USED"))?);
+                have_od = true;
+            }
+            "TRACKS_AVAILABLE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.tracks_available =
+                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid TRACKS_AVAILABLE"))?);
+                have_od = true;
+            }
+            "TRACKS_USED" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.tracks_used =
+                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid TRACKS_USED"))?);
+                have_od = true;
+            }
+            "RESIDUALS_ACCEPTED" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                od_params.residuals_accepted = Some(
+                    Percentage::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid RESIDUALS_ACCEPTED"))?,
+                );
+                have_od = true;
+            }
+            "WEIGHTED_RMS" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.weighted_rms =
+                    Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid WEIGHTED_RMS"))?);
+                have_od = true;
+            }
+
+            _ if key.starts_with("USER_DEFINED_") => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                user_defined_parameters.push((key.to_string(), v.to_string()));
+            }
+
+            _ => {
+                // backtrack and end data section
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
@@ -1005,7 +946,7 @@ pub fn rdm_data(input: &mut &str) -> ModalResult<RdmData> {
 // RDM Segment Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_segment(input: &mut &str) -> ModalResult<RdmSegment> {
+pub fn rdm_segment(input: &mut &str) -> KvnResult<RdmSegment> {
     let metadata = rdm_metadata.parse_next(input)?;
     let data = rdm_data.parse_next(input)?;
 
@@ -1016,7 +957,7 @@ pub fn rdm_segment(input: &mut &str) -> ModalResult<RdmSegment> {
 // RDM Body Parser
 //----------------------------------------------------------------------
 
-pub fn rdm_body(input: &mut &str) -> ModalResult<RdmBody> {
+pub fn rdm_body(input: &mut &str) -> KvnResult<RdmBody> {
     let segment = rdm_segment.parse_next(input)?;
     Ok(RdmBody {
         segment: Box::new(segment),
@@ -1027,7 +968,7 @@ pub fn rdm_body(input: &mut &str) -> ModalResult<RdmBody> {
 // Complete RDM Parser
 //----------------------------------------------------------------------
 
-pub fn parse_rdm(input: &mut &str) -> ModalResult<Rdm> {
+pub fn parse_rdm(input: &mut &str) -> KvnResult<Rdm> {
     let version = rdm_version.parse_next(input)?;
     let header = rdm_header.parse_next(input)?;
     let body = rdm_body.parse_next(input)?;
@@ -1041,7 +982,7 @@ pub fn parse_rdm(input: &mut &str) -> ModalResult<Rdm> {
 }
 
 impl ParseKvn for Rdm {
-    fn parse_kvn(input: &mut &str) -> ModalResult<Self> {
+    fn parse_kvn(input: &mut &str) -> KvnResult<Self> {
         parse_rdm.parse_next(input)
     }
 }

@@ -4,6 +4,8 @@
 
 use crate::types::EpochError;
 use thiserror::Error;
+use winnow::error::{AddContext, ParserError, StrContext};
+use winnow::stream::{Offset, Stream};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseDiagnostic {
@@ -169,6 +171,55 @@ pub enum CcsdsNdmError {
     /// Error when an unexpected end of input is reached.
     #[error("Unexpected end of input: {context}")]
     UnexpectedEof { context: String },
+}
+
+impl ParserError<&str> for CcsdsNdmError {
+    type Inner = ();
+    fn from_input(input: &&str) -> Self {
+        let diag = ParseDiagnostic::new(input, 0, "Parse error");
+        CcsdsNdmError::KvnParse {
+            line: diag.line,
+            column: diag.column,
+            message: diag.message,
+            contexts: Vec::new(),
+            snippet: diag.snippet,
+        }
+    }
+
+    fn into_inner(self) -> std::result::Result<Self::Inner, Self> {
+        Ok(())
+    }
+}
+
+impl AddContext<&str, StrContext> for CcsdsNdmError {
+    fn add_context(
+        mut self,
+        input: &&str,
+        token: &<&str as Stream>::Checkpoint,
+        context: StrContext,
+    ) -> Self {
+        if let CcsdsNdmError::KvnParse {
+            ref mut line,
+            ref mut column,
+            ref mut message,
+            ref mut contexts,
+            ref mut snippet,
+        } = self
+        {
+            let offset = input.offset_from(token);
+            let diag = ParseDiagnostic::new(input, offset, "");
+            *line = diag.line;
+            *column = diag.column;
+            *snippet = diag.snippet;
+
+            match context {
+                StrContext::Label(l) => contexts.push(l.to_string()),
+                StrContext::Expected(e) => *message = format!("Expected {}", e),
+                _ => {}
+            }
+        }
+        self
+    }
 }
 
 impl CcsdsNdmError {

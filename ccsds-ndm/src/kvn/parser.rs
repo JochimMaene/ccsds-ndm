@@ -19,32 +19,34 @@
 //! 2. **Message-level**: Compose line parsers to build complete message structures
 
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
-use crate::error::CcsdsNdmError;
+pub use crate::error::CcsdsNdmError;
 use crate::types::{UserDefined, UserDefinedParameter, *};
 use std::str::FromStr;
 use winnow::ascii::{float, line_ending, space0, till_line_ending};
-use winnow::combinator::{alt, opt, peek, repeat};
-use winnow::error::{AddContext, ContextError, ErrMode, StrContext, StrContextValue};
+use winnow::combinator::{alt, delimited, opt, peek, preceded, repeat, terminated};
+use winnow::error::{AddContext, ErrMode, ParserError, StrContext, StrContextValue};
 use winnow::prelude::*;
-use winnow::token::{take_till, take_while};
-use winnow::ModalResult;
+use winnow::token::{one_of, take_till, take_while};
+
+/// A result type for winnow parsers using the library's error type.
+pub type KvnResult<O, E = CcsdsNdmError> = Result<O, ErrMode<E>>;
 
 //----------------------------------------------------------------------
 // Low-level fast parsers
 //----------------------------------------------------------------------
 
 /// Parses a float directly from the input.
-pub fn parse_f64_winnow(input: &mut &str) -> ModalResult<f64> {
+pub fn parse_f64_winnow(input: &mut &str) -> KvnResult<f64> {
     float.parse_next(input)
 }
 
 /// Parses up to the next space or line ending.
-pub fn till_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub fn till_space<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     take_till(1.., (' ', '\t', '\r', '\n')).parse_next(input)
 }
 
 /// Parses up to the next space or line ending, or end of input.
-pub fn till_space_or_eol<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub fn till_space_or_eol<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     take_till(1.., (' ', '\t', '\r', '\n')).parse_next(input)
 }
 
@@ -54,44 +56,15 @@ pub fn till_space_or_eol<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 
 /// Converts a winnow error to our library's error type.
 pub fn to_ccsds_error(
-    input: &str,
-    current_input: &str,
-    err: ErrMode<ContextError>,
+    _input: &str,
+    err: winnow::error::ParseError<&str, CcsdsNdmError>,
 ) -> CcsdsNdmError {
-    let offset = input.len() - current_input.len();
-    let inner = match err {
-        ErrMode::Backtrack(c) | ErrMode::Cut(c) => c,
-        ErrMode::Incomplete(_) => {
-            return CcsdsNdmError::UnexpectedEof {
-                context: "Incomplete KVN input".into(),
-            }
-        }
-    };
-
-    let mut contexts = Vec::new();
-    let mut message = "Parse error".to_string();
-
-    for ctx in inner.context() {
-        match ctx {
-            StrContext::Label(l) => contexts.push(l.to_string()),
-            StrContext::Expected(e) => message = format!("Expected {}", e),
-            _ => {}
-        }
-    }
-
-    CcsdsNdmError::KvnParse {
-        line: 0, // placeholders, will be filled by with_location
-        column: 0,
-        message,
-        contexts,
-        snippet: String::new(),
-    }
-    .with_location(input, offset)
+    err.into_inner()
 }
 
 /// Creates a winnow ErrMode::Cut with a static context label.
-pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<ContextError> {
-    ErrMode::Cut(ContextError::new().add_context(
+pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<CcsdsNdmError> {
+    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
         input,
         &input.checkpoint(),
         StrContext::Label(label),
@@ -103,44 +76,49 @@ pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<ContextError> {
 //----------------------------------------------------------------------
 
 /// Parses optional whitespace (spaces and tabs only, not newlines).
-pub fn ws<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub fn ws<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     space0.parse_next(input)
 }
 
 /// Parses a KVN keyword (uppercase letters, digits, underscores).
 /// Keywords must start with a letter.
-pub fn keyword<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub fn keyword<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     (
-        take_while(1.., |c: char| c.is_ascii_uppercase()),
-        take_while(0.., |c: char| {
-            c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'
-        }),
+        one_of('A'..='Z'),
+        take_while(0.., ('A'..='Z', '0'..='9', '_')),
     )
         .take()
         .parse_next(input)
 }
 
 /// Parses the `= ` separator in a key-value pair.
-pub fn kv_sep(input: &mut &str) -> ModalResult<()> {
+pub fn kv_sep(input: &mut &str) -> KvnResult<()> {
     (ws, '=', ws).void().parse_next(input)
 }
 
 /// Parses the value part of a key-value pair.
 /// Handles values with or without units.
-pub fn kvn_value<'a>(input: &mut &'a str) -> ModalResult<(&'a str, Option<&'a str>)> {
-    let value_str = till_line_ending.parse_next(input)?;
-    let value_str = value_str.trim();
+pub fn kvn_value<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)> {
+    let val = take_till(0.., |c: char| c == '[' || c == '\r' || c == '\n')
+        .map(|s: &str| s.trim())
+        .parse_next(input)?;
 
-    // Check if the value ends with a unit specification
-    if value_str.ends_with(']') {
-        if let Some(open) = value_str.rfind('[') {
-            let val = value_str[..open].trim();
-            let unit = value_str[open + 1..value_str.len() - 1].trim();
-            return Ok((val, Some(unit)));
-        }
+    if val.is_empty() {
+        // If it starts with '[', it could be a unit OR the value itself could start with '['
+        // (like MAN_UNITS = [n/a, ...])
+        // In KVN, units are typically at the end.
+        // Let's take everything till the end of the line.
+        let rest = till_line_ending.parse_next(input)?;
+        let trimmed = rest.trim();
+        // If it's something like [km], and nothing else follows, we'll treat it as value for now
+        // if it was really intended as a unit with no value, that's weird but possible.
+        // Actually, let's just return the whole thing as value if it's bracketed and no value preceded.
+        Ok((trimmed, None))
+    } else {
+        let unit =
+            opt(delimited('[', take_till(0.., |c: char| c == ']'), ']')).parse_next(input)?;
+        Ok((val, unit))
     }
-
-    Ok((value_str, None))
 }
 
 //----------------------------------------------------------------------
@@ -169,22 +147,20 @@ pub enum KvnToken<'a> {
 }
 
 /// Parses a COMMENT line.
-pub fn comment_line<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
-    ("COMMENT", space0).parse_next(input)?;
-    till_line_ending.parse_next(input)
+pub fn comment_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+    preceded((ws, "COMMENT", space0), till_line_ending).parse_next(input)
 }
 
 /// Parses a key-value pair line.
-pub fn key_value_line<'a>(input: &mut &'a str) -> ModalResult<(&'a str, &'a str, Option<&'a str>)> {
-    let key = keyword.parse_next(input)?;
-    kv_sep.parse_next(input)?;
-    let (value, unit) = kvn_value.parse_next(input)?;
-    Ok((key, value, unit))
+pub fn key_value_line<'a>(input: &mut &'a str) -> KvnResult<(&'a str, &'a str, Option<&'a str>)> {
+    (preceded(ws, keyword), kv_sep, kvn_value)
+        .map(|(key, _, (value, unit))| (key, value, unit))
+        .parse_next(input)
 }
 
 /// Parses a block start marker (e.g., META_START).
-pub fn block_start<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
-    let content = till_line_ending.parse_next(input)?;
+pub fn block_start<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+    let content = preceded(ws, till_line_ending).parse_next(input)?;
     let content = content.trim();
 
     if let Some(prefix) = content.strip_suffix("_START") {
@@ -192,12 +168,12 @@ pub fn block_start<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
             return Ok(prefix);
         }
     }
-    Err(ErrMode::Backtrack(ContextError::new()))
+    Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)))
 }
 
 /// Parses a block end marker (e.g., META_STOP or COVARIANCE_END).
-pub fn block_end<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
-    let content = till_line_ending.parse_next(input)?;
+pub fn block_end<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+    let content = preceded(ws, till_line_ending).parse_next(input)?;
     let content = content.trim();
 
     if let Some(prefix) = content.strip_suffix("_STOP") {
@@ -209,13 +185,13 @@ pub fn block_end<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
             return Ok(prefix);
         }
     }
-    Err(ErrMode::Backtrack(ContextError::new()))
+    Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)))
 }
 
 /// Parses an empty line.
-pub fn empty_line(input: &mut &str) -> ModalResult<()> {
+pub fn empty_line(input: &mut &str) -> KvnResult<()> {
     (
-        space0,
+        ws,
         peek(alt((line_ending.void(), winnow::combinator::eof.void()))),
     )
         .void()
@@ -223,8 +199,8 @@ pub fn empty_line(input: &mut &str) -> ModalResult<()> {
 }
 
 /// Parses a raw data line (no equals sign, not a keyword).
-pub fn raw_line<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
-    let content = till_line_ending.parse_next(input)?;
+pub fn raw_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+    let content = preceded(ws, till_line_ending).parse_next(input)?;
     let trimmed = content.trim();
 
     // Raw lines should not be empty, comments, or contain '='
@@ -235,14 +211,14 @@ pub fn raw_line<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
         || trimmed.ends_with("_STOP")
         || trimmed.ends_with("_END")
     {
-        return Err(ErrMode::Backtrack(ContextError::new()));
+        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
     }
 
     Ok(trimmed)
 }
 
 /// Parses any KVN line into a token.
-pub fn kvn_token<'a>(input: &mut &'a str) -> ModalResult<KvnToken<'a>> {
+pub fn kvn_token<'a>(input: &mut &'a str) -> KvnResult<KvnToken<'a>> {
     // Skip leading whitespace on the line
     ws.parse_next(input)?;
 
@@ -261,16 +237,76 @@ pub fn kvn_token<'a>(input: &mut &'a str) -> ModalResult<KvnToken<'a>> {
     .parse_next(input)
 }
 
+/// Parses "KEY =" and returns the key.
+pub fn key_token<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+    terminated(preceded(ws, keyword), kv_sep).parse_next(input)
+}
+
+/// Parses the rest of a KVN line (value and optional unit).
+pub fn kv_rest<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)> {
+    terminated(kvn_value, opt_line_ending).parse_next(input)
+}
+
+/// Fast float parser for KVN values.
+pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
+    terminated(
+        (
+            float,
+            opt(preceded(
+                ws,
+                delimited('[', take_till(0.., |c: char| c == ']'), ']'),
+            )),
+        )
+            .map(|(f, _)| f),
+        opt_line_ending,
+    )
+    .parse_next(input)
+}
+
+/// Fast i32 parser for KVN values.
+pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
+    use winnow::ascii::dec_int;
+    terminated(
+        (
+            dec_int,
+            opt(preceded(
+                ws,
+                delimited('[', take_till(0.., |c: char| c == ']'), ']'),
+            )),
+        )
+            .map(|(i, _)| i),
+        opt_line_ending,
+    )
+    .parse_next(input)
+}
+
+/// Fast u32 parser for KVN values.
+pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
+    use winnow::ascii::dec_uint;
+    terminated(
+        (
+            dec_uint,
+            opt(preceded(
+                ws,
+                delimited('[', take_till(0.., |c: char| c == ']'), ']'),
+            )),
+        )
+            .map(|(u, _)| u),
+        opt_line_ending,
+    )
+    .parse_next(input)
+}
+
 /// Skips whitespace and empty lines.
-pub fn skip_empty_lines(input: &mut &str) -> ModalResult<()> {
+pub fn skip_empty_lines(input: &mut &str) -> KvnResult<()> {
     repeat(0.., (space0, line_ending))
         .map(|_: ()| ())
         .parse_next(input)
 }
 
-/// Parses an optional line ending.
-pub fn opt_line_ending(input: &mut &str) -> ModalResult<()> {
-    opt(line_ending).void().parse_next(input)
+/// Parses an optional line ending, consuming any trailing horizontal whitespace.
+pub fn opt_line_ending(input: &mut &str) -> KvnResult<()> {
+    (space0, opt(line_ending)).void().parse_next(input)
 }
 
 //----------------------------------------------------------------------
@@ -310,38 +346,13 @@ pub fn parse_u64(value: &str) -> crate::error::Result<u64> {
 /// implements this trait to define how it parses from KVN.
 pub trait ParseKvn: Sized {
     /// Parse the type from a KVN input stream.
-    fn parse_kvn(input: &mut &str) -> ModalResult<Self>;
+    fn parse_kvn(input: &mut &str) -> KvnResult<Self>;
 
     /// Convenience method to parse from a string.
     fn from_kvn_str(s: &str) -> crate::error::Result<Self> {
-        let mut input = s;
-        let result = Self::parse_kvn(&mut input);
-
-        match result {
-            Ok(val) => {
-                let _ = skip_empty_and_comments(&mut input);
-
-                if !input.is_empty() {
-                    let offset = s.len() - input.len();
-                    let msg = if let Ok(Some(k)) = peek_key(&mut input) {
-                        format!("Unexpected key: {}", k)
-                    } else {
-                        "Unexpected trailing data".to_string()
-                    };
-
-                    return Err(CcsdsNdmError::KvnParse {
-                        line: 0,
-                        column: 0,
-                        message: msg,
-                        contexts: Vec::new(),
-                        snippet: String::new(),
-                    }
-                    .with_location(s, offset));
-                }
-                Ok(val)
-            }
-            Err(e) => Err(to_ccsds_error(s, input, e)),
-        }
+        kvn_entry(Self::parse_kvn)
+            .parse(s)
+            .map_err(|e| to_ccsds_error(s, e))
     }
 }
 
@@ -353,27 +364,21 @@ pub trait ParseKvn: Sized {
 /// Returns the value and optional unit.
 pub fn expect_key<'a>(
     expected_key: &'static str,
-) -> impl FnMut(&mut &'a str) -> ModalResult<(&'a str, Option<&'a str>)> {
+) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)> {
     move |input: &mut &'a str| {
-        ws.parse_next(input)?;
-        let key = keyword.parse_next(input).map_err(|e| {
-            e.add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("Expected KVN keyword"),
-            )
-        })?;
-        if key != expected_key {
-            return Err(ErrMode::Backtrack(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description(expected_key)),
-            )));
-        }
-        kv_sep.parse_next(input)?;
-        let (value, unit) = kvn_value.parse_next(input)?;
-        opt_line_ending.parse_next(input)?;
-        Ok((value, unit))
+        (
+            ws,
+            keyword.context(StrContext::Label("KVN keyword")),
+            kv_sep,
+            kvn_value,
+            opt_line_ending,
+        )
+            .verify(|(_, key, _, _, _)| *key == expected_key)
+            .map(|(_, _, _, (val, unit), _)| (val, unit))
+            .context(StrContext::Expected(StrContextValue::Description(
+                expected_key,
+            )))
+            .parse_next(input)
     }
 }
 
@@ -381,7 +386,7 @@ pub fn expect_key<'a>(
 /// Returns (key, value, unit).
 pub fn key_matching<'a, F>(
     predicate: F,
-) -> impl FnMut(&mut &'a str) -> ModalResult<(&'a str, &'a str, Option<&'a str>)>
+) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, &'a str, Option<&'a str>)>
 where
     F: Fn(&str) -> bool + Copy,
 {
@@ -389,7 +394,7 @@ where
         ws.parse_next(input)?;
         let key = keyword.parse_next(input)?;
         if !predicate(key) {
-            return Err(ErrMode::Backtrack(ContextError::new()));
+            return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
         }
         kv_sep.parse_next(input)?;
         let (value, unit) = kvn_value.parse_next(input)?;
@@ -399,178 +404,102 @@ where
 }
 
 /// Skips comment lines and collects them into a Vec.
-pub fn collect_comments(input: &mut &str) -> ModalResult<Vec<String>> {
-    let mut comments = Vec::new();
-
-    loop {
-        let _ = ws.parse_next(input);
-
-        // Check if we're at end of input
-        if input.is_empty() {
-            break;
+pub fn collect_comments(input: &mut &str) -> KvnResult<Vec<String>> {
+    repeat(
+        0..,
+        alt((
+            preceded(ws, comment_line).map(|s| Some(s.trim().to_string())),
+            (ws, line_ending).map(|_| None),
+        )),
+    )
+    .fold(Vec::new, |mut acc: Vec<String>, item| {
+        if let Some(s) = item {
+            acc.push(s);
         }
-
-        // Try to parse a comment
-        let checkpoint = input.checkpoint();
-        if let Ok(content) = comment_line.parse_next(input) {
-            comments.push(content.trim().to_string());
-            opt_line_ending.parse_next(input)?;
-            continue;
-        }
-        input.reset(&checkpoint);
-
-        // Try to skip empty lines
-        let checkpoint = input.checkpoint();
-        if empty_line.parse_next(input).is_ok() {
-            let consumed = opt_line_ending.parse_next(input);
-            // If we didn't consume anything (e.g., at EOF), break
-            if consumed.is_err() || input.is_empty() {
-                break;
-            }
-            continue;
-        }
-        input.reset(&checkpoint);
-
-        break;
-    }
-
-    Ok(comments)
+        acc
+    })
+    .parse_next(input)
 }
 
 /// Skips empty lines and comments, discarding them.
-pub fn skip_empty_and_comments(input: &mut &str) -> ModalResult<()> {
-    loop {
-        let _ = ws.parse_next(input);
+pub fn skip_empty_and_comments(input: &mut &str) -> KvnResult<()> {
+    repeat(
+        0..,
+        alt(((ws, comment_line).void(), (ws, line_ending).void())),
+    )
+    .parse_next(input)
+}
 
-        // Check if we're at end of input
-        if input.is_empty() {
-            break;
-        }
-
-        // Skip empty lines
-        let checkpoint = input.checkpoint();
-        if empty_line.parse_next(input).is_ok() {
-            let consumed = opt_line_ending.parse_next(input);
-            if consumed.is_err() || input.is_empty() {
-                break;
-            }
-            continue;
-        }
-        input.reset(&checkpoint);
-
-        // Skip comments
-        let checkpoint = input.checkpoint();
-        if comment_line.parse_next(input).is_ok() {
-            opt_line_ending.parse_next(input)?;
-            continue;
-        }
-        input.reset(&checkpoint);
-
-        break;
+/// Entry point for message parsers that handles leading whitespace.
+pub fn kvn_entry<'a, O, P>(mut parser: P) -> impl FnMut(&mut &'a str) -> KvnResult<O>
+where
+    P: Parser<&'a str, O, ErrMode<CcsdsNdmError>>,
+{
+    move |input: &mut &'a str| {
+        ws.parse_next(input)?;
+        parser.parse_next(input)
     }
-    Ok(())
 }
 
 /// Peeks at the next key without consuming input.
 /// Returns None if the next token is not a key-value pair.
-pub fn peek_key<'a>(input: &mut &'a str) -> ModalResult<Option<&'a str>> {
-    let checkpoint = input.checkpoint();
-
-    // Skip whitespace
-    let _ = ws.parse_next(input);
-
-    // Try to get the key
-    let result = keyword.parse_next(input);
-
-    // Restore position
-    input.reset(&checkpoint);
-
-    match result {
-        Ok(key) => Ok(Some(key)),
-        Err(_) => Ok(None),
-    }
+pub fn peek_key<'a>(input: &mut &'a str) -> KvnResult<Option<&'a str>> {
+    peek(opt(preceded(ws, keyword))).parse_next(input)
 }
 
 /// Checks if we're at a specific block start without full string scan.
 pub fn at_block_start(tag: &str, input: &mut &str) -> bool {
-    let mut s = *input;
-    // Skip only spaces/tabs
-    while s.starts_with(' ') || s.starts_with('\t') {
-        s = &s[1..];
-    }
-    if let Some(rest) = s.strip_prefix(tag) {
-        if let Some(suffix) = rest.strip_prefix("_START") {
-            return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
-        }
-    }
-    false
+    peek((
+        ws,
+        tag,
+        "_START",
+        alt((line_ending, winnow::combinator::eof)),
+    ))
+    .parse_next(input)
+    .is_ok()
 }
 
 /// Checks if we're at a specific block end without full string scan.
 pub fn at_block_end(tag: &str, input: &mut &str) -> bool {
-    let mut s = *input;
-    // Skip only spaces/tabs
-    while s.starts_with(' ') || s.starts_with('\t') {
-        s = &s[1..];
-    }
-    if let Some(rest) = s.strip_prefix(tag) {
-        if let Some(suffix) = rest.strip_prefix("_STOP") {
-            return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
-        }
-        if let Some(suffix) = rest.strip_prefix("_END") {
-            return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
-        }
-    }
-    false
+    peek((
+        ws,
+        tag,
+        alt(("_STOP", "_END")),
+        alt((line_ending, winnow::combinator::eof)),
+    ))
+    .parse_next(input)
+    .is_ok()
 }
 
 /// Expects a specific block start and consumes it.
 pub fn expect_block_start<'a>(
     expected_tag: &'static str,
-) -> impl FnMut(&mut &'a str) -> ModalResult<()> {
+) -> impl FnMut(&mut &'a str) -> KvnResult<()> {
     move |input: &mut &'a str| {
-        let _ = ws.parse_next(input);
-        let tag = block_start.parse_next(input).map_err(|e| {
-            e.add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("Expected block start"),
-            )
-        })?;
-        if tag != expected_tag {
-            return Err(ErrMode::Backtrack(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description(expected_tag)),
-            )));
-        }
-        opt_line_ending.parse_next(input)?;
-        Ok(())
+        (ws, block_start, opt_line_ending)
+            .verify(|(_, tag, _)| *tag == expected_tag)
+            .void()
+            .context(StrContext::Label("Block start"))
+            .context(StrContext::Expected(StrContextValue::Description(
+                expected_tag,
+            )))
+            .parse_next(input)
     }
 }
 
 /// Expects a specific block end and consumes it.
 pub fn expect_block_end<'a>(
     expected_tag: &'static str,
-) -> impl FnMut(&mut &'a str) -> ModalResult<()> {
+) -> impl FnMut(&mut &'a str) -> KvnResult<()> {
     move |input: &mut &'a str| {
-        let _ = ws.parse_next(input)?;
-        let tag = block_end.parse_next(input).map_err(|e| {
-            e.add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("Expected block end"),
-            )
-        })?;
-        if tag != expected_tag {
-            return Err(ErrMode::Backtrack(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description(expected_tag)),
-            )));
-        }
-        opt_line_ending.parse_next(input)?;
-        Ok(())
+        (ws, block_end, opt_line_ending)
+            .verify(|(_, tag, _)| *tag == expected_tag)
+            .void()
+            .context(StrContext::Label("Block end"))
+            .context(StrContext::Expected(StrContextValue::Description(
+                expected_tag,
+            )))
+            .parse_next(input)
     }
 }
 
@@ -582,7 +511,7 @@ fn is_header_key(key: &str) -> bool {
 }
 
 /// Parses the ODM header section.
-pub fn odm_header(input: &mut &str) -> ModalResult<OdmHeader> {
+pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
     let mut comment = Vec::new();
     let mut classification = None;
     let mut creation_date = None;
@@ -635,7 +564,7 @@ pub fn odm_header(input: &mut &str) -> ModalResult<OdmHeader> {
 //----------------------------------------------------------------------
 
 /// Parses the state vector section.
-pub fn state_vector(input: &mut &str) -> ModalResult<(Vec<String>, StateVector)> {
+pub fn state_vector(input: &mut &str) -> KvnResult<(Vec<String>, StateVector)> {
     let mut comment = Vec::new();
     let mut epoch = None;
     let mut x = None;
@@ -742,7 +671,7 @@ fn is_covariance_key(key: &str) -> bool {
 }
 
 /// Parses the optional covariance matrix section.
-pub fn covariance_matrix(input: &mut &str) -> ModalResult<Option<OpmCovarianceMatrix>> {
+pub fn covariance_matrix(input: &mut &str) -> KvnResult<Option<OpmCovarianceMatrix>> {
     let mut comment = Vec::new();
     let mut cov_ref_frame = None;
     let mut cx_x = None;
@@ -974,7 +903,7 @@ fn is_spacecraft_key(key: &str) -> bool {
 }
 
 /// Parses the optional spacecraft parameters section.
-pub fn spacecraft_parameters(input: &mut &str) -> ModalResult<Option<SpacecraftParameters>> {
+pub fn spacecraft_parameters(input: &mut &str) -> KvnResult<Option<SpacecraftParameters>> {
     let mut comment = Vec::new();
     let mut mass = None;
     let mut solar_rad_area = None;
@@ -1064,7 +993,7 @@ pub fn spacecraft_parameters(input: &mut &str) -> ModalResult<Option<SpacecraftP
 }
 
 /// Parses user-defined parameters.
-pub fn user_defined_parameters(input: &mut &str) -> ModalResult<Option<UserDefined>> {
+pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined>> {
     let mut comment = Vec::new();
     let mut params = Vec::new();
 

@@ -14,12 +14,376 @@ use crate::messages::cdm::{
 };
 use crate::types::*;
 use std::str::FromStr;
-use winnow::error::{AddContext, ContextError, ErrMode, StrContext, StrContextValue};
+use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
-use winnow::ModalResult;
 
 //----------------------------------------------------------------------
-// Helper: Check if key belongs to CDM Data section
+// CDM Version Parser
+//----------------------------------------------------------------------
+
+pub fn cdm_version(input: &mut &str) -> KvnResult<String> {
+    ws.parse_next(input)?;
+    let _ = collect_comments.parse_next(input)?;
+    let (value, _) = expect_key("CCSDS_CDM_VERS").parse_next(input)?;
+    Ok(value.to_string())
+}
+
+//----------------------------------------------------------------------
+// CDM Header Parser
+//----------------------------------------------------------------------
+
+pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
+    let mut comment = Vec::new();
+    let mut creation_date = None;
+    let mut originator = None;
+    let mut message_for = None;
+    let mut message_id = None;
+
+    loop {
+        comment.extend(collect_comments.parse_next(input)?);
+
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
+
+        match key {
+            "CREATION_DATE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                creation_date =
+                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid CREATION_DATE"))?);
+            }
+            "ORIGINATOR" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                originator = Some(v.to_string());
+            }
+            "MESSAGE_FOR" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                message_for = Some(v.to_string());
+            }
+            "MESSAGE_ID" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                message_id = Some(v.to_string());
+            }
+            _ => {
+                // End of header
+                input.reset(&checkpoint);
+                break;
+            }
+        }
+    }
+
+    Ok(CdmHeader {
+        comment,
+        creation_date: creation_date.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("CREATION_DATE")),
+            ))
+        })?,
+        originator: originator.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("ORIGINATOR")),
+            ))
+        })?,
+        message_for,
+        message_id: message_id.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("MESSAGE_ID")),
+            ))
+        })?,
+    })
+}
+
+//----------------------------------------------------------------------
+// Relative Metadata Parser
+//----------------------------------------------------------------------
+
+pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataData> {
+    let mut comment = Vec::new();
+    let mut tca = None;
+    let mut miss_distance = None;
+    let mut relative_speed = None;
+    let mut rel_pos_r = None;
+    let mut rel_pos_t = None;
+    let mut rel_pos_n = None;
+    let mut rel_vel_r = None;
+    let mut rel_vel_t = None;
+    let mut rel_vel_n = None;
+    let mut start_screen_period = None;
+    let mut stop_screen_period = None;
+    let mut screen_volume_frame = None;
+    let mut screen_volume_shape = None;
+    let mut screen_volume_x = None;
+    let mut screen_volume_y = None;
+    let mut screen_volume_z = None;
+    let mut screen_entry_time = None;
+    let mut screen_exit_time = None;
+    let mut collision_probability = None;
+    let mut collision_probability_method = None;
+
+    loop {
+        comment.extend(collect_comments.parse_next(input)?);
+
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
+
+        match key {
+            "TCA" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                tca = Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid TCA"))?);
+            }
+            "MISS_DISTANCE" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                miss_distance = Some(
+                    Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid MISS_DISTANCE"))?,
+                );
+            }
+            "RELATIVE_SPEED" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                relative_speed =
+                    Some(Dv::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid RELATIVE_SPEED"))?);
+            }
+            "RELATIVE_POSITION_R" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                rel_pos_r = Some(
+                    Length::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid RELATIVE_POSITION_R"))?,
+                );
+            }
+            "RELATIVE_POSITION_T" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                rel_pos_t = Some(
+                    Length::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid RELATIVE_POSITION_T"))?,
+                );
+            }
+            "RELATIVE_POSITION_N" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                rel_pos_n = Some(
+                    Length::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid RELATIVE_POSITION_N"))?,
+                );
+            }
+            "RELATIVE_VELOCITY_R" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                rel_vel_r = Some(
+                    Dv::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid RELATIVE_VELOCITY_R"))?,
+                );
+            }
+            "RELATIVE_VELOCITY_T" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                rel_vel_t = Some(
+                    Dv::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid RELATIVE_VELOCITY_T"))?,
+                );
+            }
+            "RELATIVE_VELOCITY_N" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                rel_vel_n = Some(
+                    Dv::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid RELATIVE_VELOCITY_N"))?,
+                );
+            }
+            "START_SCREEN_PERIOD" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                start_screen_period = Some(
+                    Epoch::from_str(v)
+                        .map_err(|_| cut_err(input, "Invalid START_SCREEN_PERIOD"))?,
+                );
+            }
+            "STOP_SCREEN_PERIOD" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                stop_screen_period = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid STOP_SCREEN_PERIOD"))?,
+                );
+            }
+            "SCREEN_VOLUME_FRAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                screen_volume_frame = Some(match v.to_uppercase().as_str() {
+                    "RTN" => ScreenVolumeFrameType::Rtn,
+                    "TVN" => ScreenVolumeFrameType::Tvn,
+                    _ => {
+                        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                            input,
+                            &input.checkpoint(),
+                            StrContext::Expected(StrContextValue::Description("RTN or TVN")),
+                        )));
+                    }
+                });
+            }
+            "SCREEN_VOLUME_SHAPE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                screen_volume_shape = Some(match v.to_uppercase().as_str() {
+                    "ELLIPSOID" => ScreenVolumeShapeType::Ellipsoid,
+                    "BOX" => ScreenVolumeShapeType::Box,
+                    _ => {
+                        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                            input,
+                            &input.checkpoint(),
+                            StrContext::Expected(StrContextValue::Description("ELLIPSOID or BOX")),
+                        )));
+                    }
+                });
+            }
+            "SCREEN_VOLUME_X" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                screen_volume_x = Some(
+                    Length::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid SCREEN_VOLUME_X"))?,
+                );
+            }
+            "SCREEN_VOLUME_Y" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                screen_volume_y = Some(
+                    Length::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid SCREEN_VOLUME_Y"))?,
+                );
+            }
+            "SCREEN_VOLUME_Z" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                screen_volume_z = Some(
+                    Length::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid SCREEN_VOLUME_Z"))?,
+                );
+            }
+            "SCREEN_ENTRY_TIME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                screen_entry_time = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid SCREEN_ENTRY_TIME"))?,
+                );
+            }
+            "SCREEN_EXIT_TIME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                screen_exit_time = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid SCREEN_EXIT_TIME"))?,
+                );
+            }
+            "COLLISION_PROBABILITY" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                collision_probability = Some(
+                    Probability::new(parse_f64(v).map_err(|_| cut_err(input, "Invalid float"))?)
+                        .map_err(|_| cut_err(input, "Invalid COLLISION_PROBABILITY"))?,
+                );
+            }
+            "COLLISION_PROBABILITY_METHOD" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                collision_probability_method = Some(v.to_string());
+            }
+            "META_START" => {
+                input.reset(&checkpoint);
+                break;
+            }
+            "OBJECT" => {
+                input.reset(&checkpoint);
+                break;
+            }
+            _ => {
+                // Unknown key
+                input.reset(&checkpoint);
+                return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Label("Unknown Relative Metadata key"),
+                )));
+            }
+        }
+    }
+
+    let relative_state_vector = if rel_pos_r.is_some() || rel_pos_t.is_some() || rel_pos_n.is_some()
+    {
+        Some(RelativeStateVector {
+            relative_position_r: rel_pos_r.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("RELATIVE_POSITION_R")),
+                ))
+            })?,
+            relative_position_t: rel_pos_t.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("RELATIVE_POSITION_T")),
+                ))
+            })?,
+            relative_position_n: rel_pos_n.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("RELATIVE_POSITION_N")),
+                ))
+            })?,
+            relative_velocity_r: rel_vel_r.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("RELATIVE_VELOCITY_R")),
+                ))
+            })?,
+            relative_velocity_t: rel_vel_t.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("RELATIVE_VELOCITY_T")),
+                ))
+            })?,
+            relative_velocity_n: rel_vel_n.ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Expected(StrContextValue::Description("RELATIVE_VELOCITY_N")),
+                ))
+            })?,
+        })
+    } else {
+        None
+    };
+
+    Ok(RelativeMetadataData {
+        comment,
+        tca: tca.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("TCA")),
+            ))
+        })?,
+        miss_distance: miss_distance.ok_or_else(|| {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Expected(StrContextValue::Description("MISS_DISTANCE")),
+            ))
+        })?,
+        relative_speed,
+        relative_state_vector,
+        start_screen_period,
+        stop_screen_period,
+        screen_volume_frame,
+        screen_volume_shape,
+        screen_volume_x,
+        screen_volume_y,
+        screen_volume_z,
+        screen_entry_time,
+        screen_exit_time,
+        collision_probability,
+        collision_probability_method,
+    })
+}
+
+//----------------------------------------------------------------------
+// CDM Metadata Parser
 //----------------------------------------------------------------------
 
 fn is_cdm_data_key(key: &str) -> bool {
@@ -97,328 +461,14 @@ fn is_cdm_data_key(key: &str) -> bool {
     )
 }
 
-fn is_header_key(key: &str) -> bool {
-    matches!(
-        key,
-        "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_FOR" | "MESSAGE_ID"
-    )
-}
-
-//----------------------------------------------------------------------
-// CDM Version Parser
-//----------------------------------------------------------------------
-
-pub fn cdm_version(input: &mut &str) -> ModalResult<String> {
-    let _ = collect_comments.parse_next(input)?;
-    let (value, _) = expect_key("CCSDS_CDM_VERS").parse_next(input)?;
-    Ok(value.to_string())
-}
-
-//----------------------------------------------------------------------
-// CDM Header Parser
-//----------------------------------------------------------------------
-
-pub fn cdm_header(input: &mut &str) -> ModalResult<CdmHeader> {
-    let mut comment = Vec::new();
-    let mut creation_date = None;
-    let mut originator = None;
-    let mut message_for = None;
-    let mut message_id = None;
-
-    loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
-
-        let next_key = peek_key(input)?;
-
-        match next_key {
-            Some(key) if is_header_key(key) => {
-                let (k, v, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
-                    "CREATION_DATE" => {
-                        creation_date =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "ORIGINATOR" => originator = Some(v.to_string()),
-                    "MESSAGE_FOR" => message_for = Some(v.to_string()),
-                    "MESSAGE_ID" => message_id = Some(v.to_string()),
-                    _ => {}
-                }
-            }
-            _ => break,
-        }
-    }
-
-    Ok(CdmHeader {
-        comment,
-        creation_date: creation_date.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("CREATION_DATE")),
-            ))
-        })?,
-        originator: originator.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("ORIGINATOR")),
-            ))
-        })?,
-        message_for,
-        message_id: message_id.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MESSAGE_ID")),
-            ))
-        })?,
-    })
-}
-
-//----------------------------------------------------------------------
-// Relative Metadata Parser
-//----------------------------------------------------------------------
-
-pub fn relative_metadata_data(input: &mut &str) -> ModalResult<RelativeMetadataData> {
-    let mut comment = Vec::new();
-    let mut tca = None;
-    let mut miss_distance = None;
-    let mut relative_speed = None;
-    let mut rel_pos_r = None;
-    let mut rel_pos_t = None;
-    let mut rel_pos_n = None;
-    let mut rel_vel_r = None;
-    let mut rel_vel_t = None;
-    let mut rel_vel_n = None;
-    let mut start_screen_period = None;
-    let mut stop_screen_period = None;
-    let mut screen_volume_frame = None;
-    let mut screen_volume_shape = None;
-    let mut screen_volume_x = None;
-    let mut screen_volume_y = None;
-    let mut screen_volume_z = None;
-    let mut screen_entry_time = None;
-    let mut screen_exit_time = None;
-    let mut collision_probability = None;
-    let mut collision_probability_method = None;
-
-    loop {
-        // If we hit META_START, that belongs to a segment
-        if at_block_start("META", input) {
-            break;
-        }
-
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
-
-        let next_key = peek_key(input)?;
-
-        match next_key {
-            Some("OBJECT") => break, // Start of segment
-            Some(_key) => {
-                let (k, v, u) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
-                    "TCA" => {
-                        tca =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "MISS_DISTANCE" => {
-                        miss_distance = Some(
-                            Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "RELATIVE_SPEED" => {
-                        relative_speed =
-                            Some(Dv::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "RELATIVE_POSITION_R" => {
-                        rel_pos_r = Some(
-                            Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "RELATIVE_POSITION_T" => {
-                        rel_pos_t = Some(
-                            Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "RELATIVE_POSITION_N" => {
-                        rel_pos_n = Some(
-                            Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "RELATIVE_VELOCITY_R" => {
-                        rel_vel_r =
-                            Some(Dv::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "RELATIVE_VELOCITY_T" => {
-                        rel_vel_t =
-                            Some(Dv::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "RELATIVE_VELOCITY_N" => {
-                        rel_vel_n =
-                            Some(Dv::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "START_SCREEN_PERIOD" => {
-                        start_screen_period =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "STOP_SCREEN_PERIOD" => {
-                        stop_screen_period =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "SCREEN_VOLUME_FRAME" => {
-                        screen_volume_frame = Some(match v.to_uppercase().as_str() {
-                            "RTN" => ScreenVolumeFrameType::Rtn,
-                            "TVN" => ScreenVolumeFrameType::Tvn,
-                            _ => return Err(cut_err(input, "Unexpected key or invalid format")),
-                        });
-                    }
-                    "SCREEN_VOLUME_SHAPE" => {
-                        screen_volume_shape = Some(match v.to_uppercase().as_str() {
-                            "ELLIPSOID" => ScreenVolumeShapeType::Ellipsoid,
-                            "BOX" => ScreenVolumeShapeType::Box,
-                            _ => return Err(cut_err(input, "Unexpected key or invalid format")),
-                        });
-                    }
-                    "SCREEN_VOLUME_X" => {
-                        screen_volume_x = Some(
-                            Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "SCREEN_VOLUME_Y" => {
-                        screen_volume_y = Some(
-                            Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "SCREEN_VOLUME_Z" => {
-                        screen_volume_z = Some(
-                            Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "SCREEN_ENTRY_TIME" => {
-                        screen_entry_time =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "SCREEN_EXIT_TIME" => {
-                        screen_exit_time =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "COLLISION_PROBABILITY" => {
-                        collision_probability = Some(
-                            Probability::new(
-                                parse_f64(v).map_err(|_| cut_err(input, "Invalid float"))?,
-                            )
-                            .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "COLLISION_PROBABILITY_METHOD" => {
-                        collision_probability_method = Some(v.to_string());
-                    }
-                    _ => {
-                        return Err(ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label("Unknown Relative Metadata key"),
-                        )));
-                    }
-                }
-            }
-            None => break,
-        }
-    }
-
-    let relative_state_vector = if rel_pos_r.is_some() || rel_pos_t.is_some() || rel_pos_n.is_some()
-    {
-        Some(RelativeStateVector {
-            relative_position_r: rel_pos_r.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_POSITION_R")),
-                ))
-            })?,
-            relative_position_t: rel_pos_t.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_POSITION_T")),
-                ))
-            })?,
-            relative_position_n: rel_pos_n.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_POSITION_N")),
-                ))
-            })?,
-            relative_velocity_r: rel_vel_r.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_VELOCITY_R")),
-                ))
-            })?,
-            relative_velocity_t: rel_vel_t.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_VELOCITY_T")),
-                ))
-            })?,
-            relative_velocity_n: rel_vel_n.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_VELOCITY_N")),
-                ))
-            })?,
-        })
+pub fn cdm_metadata(input: &mut &str) -> KvnResult<CdmMetadata> {
+    let has_meta_block = if at_block_start("META", input) {
+        expect_block_start("META").parse_next(input)?;
+        true
     } else {
-        None
+        false
     };
 
-    Ok(RelativeMetadataData {
-        comment,
-        tca: tca.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("TCA")),
-            ))
-        })?,
-        miss_distance: miss_distance.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MISS_DISTANCE")),
-            ))
-        })?,
-        relative_speed,
-        relative_state_vector,
-        start_screen_period,
-        stop_screen_period,
-        screen_volume_frame,
-        screen_volume_shape,
-        screen_volume_x,
-        screen_volume_y,
-        screen_volume_z,
-        screen_entry_time,
-        screen_exit_time,
-        collision_probability,
-        collision_probability_method,
-    })
-}
-
-//----------------------------------------------------------------------
-// CDM Metadata Parser
-//----------------------------------------------------------------------
-
-pub fn cdm_metadata(input: &mut &str) -> ModalResult<CdmMetadata> {
     let mut comment = Vec::new();
     let mut object = None;
     let mut object_designator = None;
@@ -443,142 +493,192 @@ pub fn cdm_metadata(input: &mut &str) -> ModalResult<CdmMetadata> {
     let mut intrack_thrust = None;
 
     loop {
-        if at_block_end("META", input) {
+        if has_meta_block && at_block_end("META", input) {
             expect_block_end("META").parse_next(input)?;
             break;
         }
 
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        if has_meta_block && at_block_end("META", input) {
+            continue;
+        }
 
-        match next_key {
-            Some(key) if is_cdm_data_key(key) => break,
-            Some(_key) => {
-                let (k, v, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-                match k {
-                    "OBJECT" => {
-                        object = Some(match v.to_uppercase().as_str() {
-                            "OBJECT1" => CdmObjectType::Object1,
-                            "OBJECT2" => CdmObjectType::Object2,
-                            _ => return Err(cut_err(input, "Unexpected key or invalid format")),
-                        });
-                    }
-                    "OBJECT_DESIGNATOR" => object_designator = Some(v.to_string()),
-                    "CATALOG_NAME" => catalog_name = Some(v.to_string()),
-                    "OBJECT_NAME" => object_name = Some(v.to_string()),
-                    "INTERNATIONAL_DESIGNATOR" => international_designator = Some(v.to_string()),
-                    "OBJECT_TYPE" => {
-                        object_type = Some(match v.to_uppercase().as_str() {
-                            "PAYLOAD" => ObjectDescription::Payload,
-                            "ROCKET BODY" => ObjectDescription::RocketBody,
-                            "DEBRIS" => ObjectDescription::Debris,
-                            "UNKNOWN" => ObjectDescription::Unknown,
-                            "OTHER" => ObjectDescription::Other,
-                            _ => ObjectDescription::Other,
-                        });
-                    }
-                    "OPERATOR_CONTACT_POSITION" => operator_contact_position = Some(v.to_string()),
-                    "OPERATOR_ORGANIZATION" => operator_organization = Some(v.to_string()),
-                    "OPERATOR_PHONE" => operator_phone = Some(v.to_string()),
-                    "OPERATOR_EMAIL" => operator_email = Some(v.to_string()),
-                    "EPHEMERIS_NAME" => ephemeris_name = Some(v.to_string()),
-                    "COVARIANCE_METHOD" => {
-                        covariance_method = Some(match v.to_uppercase().as_str() {
-                            "CALCULATED" => CovarianceMethodType::Calculated,
-                            "DEFAULT" => CovarianceMethodType::Default,
-                            _ => return Err(cut_err(input, "Unexpected key or invalid format")),
-                        });
-                    }
-                    "MANEUVERABLE" => {
-                        maneuverable = Some(match v.to_uppercase().as_str() {
-                            "YES" => ManeuverableType::Yes,
-                            "NO" => ManeuverableType::No,
-                            "N/A" => ManeuverableType::NA,
-                            _ => return Err(cut_err(input, "Unexpected key or invalid format")),
-                        });
-                    }
-                    "ORBIT_CENTER" => orbit_center = Some(v.to_string()),
-                    "REF_FRAME" => {
-                        ref_frame = Some(match v.to_uppercase().as_str() {
-                            "EME2000" => ReferenceFrameType::Eme2000,
-                            "GCRF" => ReferenceFrameType::Gcrf,
-                            "ITRF" => ReferenceFrameType::Itrf,
-                            _ => return Err(cut_err(input, "Unexpected key or invalid format")),
-                        });
-                    }
-                    "GRAVITY_MODEL" => gravity_model = Some(v.to_string()),
-                    "ATMOSPHERIC_MODEL" => atmospheric_model = Some(v.to_string()),
-                    "N_BODY_PERTURBATIONS" => n_body_perturbations = Some(v.to_string()),
-                    "SOLAR_RAD_PRESSURE" => {
-                        solar_rad_pressure = Some(if v.eq_ignore_ascii_case("YES") {
-                            YesNo::Yes
-                        } else {
-                            YesNo::No
-                        });
-                    }
-                    "EARTH_TIDES" => {
-                        earth_tides = Some(if v.eq_ignore_ascii_case("YES") {
-                            YesNo::Yes
-                        } else {
-                            YesNo::No
-                        });
-                    }
-                    "INTRACK_THRUST" => {
-                        intrack_thrust = Some(if v.eq_ignore_ascii_case("YES") {
-                            YesNo::Yes
-                        } else {
-                            YesNo::No
-                        });
-                    }
-                    _ => {
-                        return Err(ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label("Unknown metadata key"),
-                        )));
-                    }
-                }
+        match key {
+            "OBJECT" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object = Some(match v.to_uppercase().as_str() {
+                    "OBJECT1" => CdmObjectType::Object1,
+                    "OBJECT2" => CdmObjectType::Object2,
+                    _ => return Err(cut_err(input, "Invalid OBJECT value")),
+                });
             }
-            None => break,
+            "OBJECT_DESIGNATOR" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_designator = Some(v.to_string());
+            }
+            "CATALOG_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                catalog_name = Some(v.to_string());
+            }
+            "OBJECT_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_name = Some(v.to_string());
+            }
+            "INTERNATIONAL_DESIGNATOR" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                international_designator = Some(v.to_string());
+            }
+            "OBJECT_TYPE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                object_type = Some(match v.to_uppercase().as_str() {
+                    "PAYLOAD" => ObjectDescription::Payload,
+                    "ROCKET BODY" => ObjectDescription::RocketBody,
+                    "DEBRIS" => ObjectDescription::Debris,
+                    "UNKNOWN" => ObjectDescription::Unknown,
+                    "OTHER" => ObjectDescription::Other,
+                    _ => ObjectDescription::Other,
+                });
+            }
+            "OPERATOR_CONTACT_POSITION" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                operator_contact_position = Some(v.to_string());
+            }
+            "OPERATOR_ORGANIZATION" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                operator_organization = Some(v.to_string());
+            }
+            "OPERATOR_PHONE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                operator_phone = Some(v.to_string());
+            }
+            "OPERATOR_EMAIL" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                operator_email = Some(v.to_string());
+            }
+            "EPHEMERIS_NAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ephemeris_name = Some(v.to_string());
+            }
+            "COVARIANCE_METHOD" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                covariance_method = Some(match v.to_uppercase().as_str() {
+                    "CALCULATED" => CovarianceMethodType::Calculated,
+                    "DEFAULT" => CovarianceMethodType::Default,
+                    _ => return Err(cut_err(input, "Invalid COVARIANCE_METHOD value")),
+                });
+            }
+            "MANEUVERABLE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                maneuverable = Some(match v.to_uppercase().as_str() {
+                    "YES" => ManeuverableType::Yes,
+                    "NO" => ManeuverableType::No,
+                    "N/A" => ManeuverableType::NA,
+                    _ => return Err(cut_err(input, "Invalid MANEUVERABLE value")),
+                });
+            }
+            "ORBIT_CENTER" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                orbit_center = Some(v.to_string());
+            }
+            "REF_FRAME" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                ref_frame = Some(match v.to_uppercase().as_str() {
+                    "EME2000" => ReferenceFrameType::Eme2000,
+                    "GCRF" => ReferenceFrameType::Gcrf,
+                    "ITRF" => ReferenceFrameType::Itrf,
+                    _ => return Err(cut_err(input, "Invalid REF_FRAME value")),
+                });
+            }
+            "GRAVITY_MODEL" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                gravity_model = Some(v.to_string());
+            }
+            "ATMOSPHERIC_MODEL" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                atmospheric_model = Some(v.to_string());
+            }
+            "N_BODY_PERTURBATIONS" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                n_body_perturbations = Some(v.to_string());
+            }
+            "SOLAR_RAD_PRESSURE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                solar_rad_pressure = Some(if v.eq_ignore_ascii_case("YES") {
+                    YesNo::Yes
+                } else {
+                    YesNo::No
+                });
+            }
+            "EARTH_TIDES" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                earth_tides = Some(if v.eq_ignore_ascii_case("YES") {
+                    YesNo::Yes
+                } else {
+                    YesNo::No
+                });
+            }
+            "INTRACK_THRUST" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                intrack_thrust = Some(if v.eq_ignore_ascii_case("YES") {
+                    YesNo::Yes
+                } else {
+                    YesNo::No
+                });
+            }
+            _ => {
+                // If it's a data key or unknown, backtrack and end metadata section
+                input.reset(&checkpoint);
+                if has_meta_block || !is_cdm_data_key(key) {
+                    return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                        input,
+                        &input.checkpoint(),
+                        StrContext::Label("Unknown metadata key"),
+                    )));
+                }
+                break;
+            }
         }
     }
 
     Ok(CdmMetadata {
         comment,
         object: object.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("OBJECT")),
             ))
         })?,
         object_designator: object_designator.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("OBJECT_DESIGNATOR")),
             ))
         })?,
         catalog_name: catalog_name.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CATALOG_NAME")),
             ))
         })?,
         object_name: object_name.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("OBJECT_NAME")),
             ))
         })?,
         international_designator: international_designator.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("INTERNATIONAL_DESIGNATOR")),
@@ -590,21 +690,21 @@ pub fn cdm_metadata(input: &mut &str) -> ModalResult<CdmMetadata> {
         operator_phone,
         operator_email,
         ephemeris_name: ephemeris_name.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("EPHEMERIS_NAME")),
             ))
         })?,
         covariance_method: covariance_method.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("COVARIANCE_METHOD")),
             ))
         })?,
         maneuverable: maneuverable.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("MANEUVERABLE")),
@@ -612,7 +712,7 @@ pub fn cdm_metadata(input: &mut &str) -> ModalResult<CdmMetadata> {
         })?,
         orbit_center,
         ref_frame: ref_frame.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("REF_FRAME")),
@@ -631,60 +731,13 @@ pub fn cdm_metadata(input: &mut &str) -> ModalResult<CdmMetadata> {
 // CDM Covariance Matrix Parser
 //----------------------------------------------------------------------
 
-fn is_cdm_covariance_key(key: &str) -> bool {
-    matches!(
-        key,
-        "CR_R"
-            | "CT_R"
-            | "CT_T"
-            | "CN_R"
-            | "CN_T"
-            | "CN_N"
-            | "CRDOT_R"
-            | "CRDOT_T"
-            | "CRDOT_N"
-            | "CRDOT_RDOT"
-            | "CTDOT_R"
-            | "CTDOT_T"
-            | "CTDOT_N"
-            | "CTDOT_RDOT"
-            | "CTDOT_TDOT"
-            | "CNDOT_R"
-            | "CNDOT_T"
-            | "CNDOT_N"
-            | "CNDOT_RDOT"
-            | "CNDOT_TDOT"
-            | "CNDOT_NDOT"
-            | "CDRG_R"
-            | "CDRG_T"
-            | "CDRG_N"
-            | "CDRG_RDOT"
-            | "CDRG_TDOT"
-            | "CDRG_NDOT"
-            | "CDRG_DRG"
-            | "CSRP_R"
-            | "CSRP_T"
-            | "CSRP_N"
-            | "CSRP_RDOT"
-            | "CSRP_TDOT"
-            | "CSRP_NDOT"
-            | "CSRP_DRG"
-            | "CSRP_SRP"
-            | "CTHR_R"
-            | "CTHR_T"
-            | "CTHR_N"
-            | "CTHR_RDOT"
-            | "CTHR_TDOT"
-            | "CTHR_NDOT"
-            | "CTHR_DRG"
-            | "CTHR_SRP"
-            | "CTHR_THR"
-    )
-}
+//----------------------------------------------------------------------
+// CDM Covariance Matrix Parser
+//----------------------------------------------------------------------
 
 pub fn cdm_covariance_matrix(
     input: &mut &str,
-) -> ModalResult<crate::messages::cdm::CdmCovarianceMatrix> {
+) -> KvnResult<crate::messages::cdm::CdmCovarianceMatrix> {
     let mut comment = Vec::new();
     let mut cr_r = None;
     let mut ct_r = None;
@@ -739,231 +792,283 @@ pub fn cdm_covariance_matrix(
         let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
-        let next_key = peek_key(input)?;
-        match next_key {
-            Some(key) if is_cdm_covariance_key(key) => {
-                comment.extend(comments);
-                let (k, v, u) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
-                    "CR_R" => {
-                        cr_r =
-                            Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CT_R" => {
-                        ct_r =
-                            Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CT_T" => {
-                        ct_t =
-                            Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CN_R" => {
-                        cn_r =
-                            Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CN_T" => {
-                        cn_t =
-                            Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CN_N" => {
-                        cn_n =
-                            Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CRDOT_R" => {
-                        crdot_r =
-                            Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CRDOT_T" => {
-                        crdot_t =
-                            Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CRDOT_N" => {
-                        crdot_n =
-                            Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CRDOT_RDOT" => {
-                        crdot_rdot = Some(
-                            M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CTDOT_R" => {
-                        ctdot_r =
-                            Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CTDOT_T" => {
-                        ctdot_t =
-                            Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CTDOT_N" => {
-                        ctdot_n =
-                            Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CTDOT_RDOT" => {
-                        ctdot_rdot = Some(
-                            M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CTDOT_TDOT" => {
-                        ctdot_tdot = Some(
-                            M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CNDOT_R" => {
-                        cndot_r =
-                            Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CNDOT_T" => {
-                        cndot_t =
-                            Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CNDOT_N" => {
-                        cndot_n =
-                            Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-                    }
-                    "CNDOT_RDOT" => {
-                        cndot_rdot = Some(
-                            M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CNDOT_TDOT" => {
-                        cndot_tdot = Some(
-                            M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CNDOT_NDOT" => {
-                        cndot_ndot = Some(
-                            M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-
-                    "CDRG_R" => {
-                        cdrg_r = Some(
-                            M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CDRG_T" => {
-                        cdrg_t = Some(
-                            M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CDRG_N" => {
-                        cdrg_n = Some(
-                            M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CDRG_RDOT" => {
-                        cdrg_rdot = Some(
-                            M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CDRG_TDOT" => {
-                        cdrg_tdot = Some(
-                            M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CDRG_NDOT" => {
-                        cdrg_ndot = Some(
-                            M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CDRG_DRG" => {
-                        cdrg_drg = Some(
-                            M4kg2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-
-                    "CSRP_R" => {
-                        csrp_r = Some(
-                            M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CSRP_T" => {
-                        csrp_t = Some(
-                            M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CSRP_N" => {
-                        csrp_n = Some(
-                            M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CSRP_RDOT" => {
-                        csrp_rdot = Some(
-                            M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CSRP_TDOT" => {
-                        csrp_tdot = Some(
-                            M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CSRP_NDOT" => {
-                        csrp_ndot = Some(
-                            M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CSRP_DRG" => {
-                        csrp_drg = Some(
-                            M4kg2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CSRP_SRP" => {
-                        csrp_srp = Some(
-                            M4kg2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-
-                    "CTHR_R" => {
-                        cthr_r = Some(
-                            M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CTHR_T" => {
-                        cthr_t = Some(
-                            M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CTHR_N" => {
-                        cthr_n = Some(
-                            M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CTHR_RDOT" => {
-                        cthr_rdot = Some(
-                            M2s3::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CTHR_TDOT" => {
-                        cthr_tdot = Some(
-                            M2s3::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CTHR_NDOT" => {
-                        cthr_ndot = Some(
-                            M2s3::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CTHR_DRG" => {
-                        cthr_drg = Some(
-                            M3kgs2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CTHR_SRP" => {
-                        cthr_srp = Some(
-                            M3kgs2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CTHR_THR" => {
-                        cthr_thr = Some(
-                            M2s4::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    _ => unreachable!(),
+        let key_res = key_token.parse_next(input);
+        match key_res {
+            Ok(key) => match key {
+                "CR_R" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cr_r = Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
                 }
-            }
-            _ => {
+                "CT_R" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    ct_r = Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CT_T" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    ct_t = Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CN_R" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cn_r = Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CN_T" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cn_t = Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CN_N" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cn_n = Some(M2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CRDOT_R" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    crdot_r =
+                        Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CRDOT_T" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    crdot_t =
+                        Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CRDOT_N" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    crdot_n =
+                        Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CRDOT_RDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    crdot_rdot =
+                        Some(M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTDOT_R" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    ctdot_r =
+                        Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTDOT_T" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    ctdot_t =
+                        Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTDOT_N" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    ctdot_n =
+                        Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTDOT_RDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    ctdot_rdot =
+                        Some(M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTDOT_TDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    ctdot_tdot =
+                        Some(M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CNDOT_R" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cndot_r =
+                        Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CNDOT_T" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cndot_t =
+                        Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CNDOT_N" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cndot_n =
+                        Some(M2s::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CNDOT_RDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cndot_rdot =
+                        Some(M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CNDOT_TDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cndot_tdot =
+                        Some(M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CNDOT_NDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cndot_ndot =
+                        Some(M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+
+                "CDRG_R" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cdrg_r =
+                        Some(M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CDRG_T" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cdrg_t =
+                        Some(M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CDRG_N" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cdrg_n =
+                        Some(M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CDRG_RDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cdrg_rdot =
+                        Some(M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CDRG_TDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cdrg_tdot =
+                        Some(M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CDRG_NDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cdrg_ndot =
+                        Some(M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CDRG_DRG" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cdrg_drg =
+                        Some(M4kg2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+
+                "CSRP_R" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    csrp_r =
+                        Some(M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CSRP_T" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    csrp_t =
+                        Some(M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CSRP_N" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    csrp_n =
+                        Some(M3kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CSRP_RDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    csrp_rdot =
+                        Some(M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CSRP_TDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    csrp_tdot =
+                        Some(M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CSRP_NDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    csrp_ndot =
+                        Some(M3kgs::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CSRP_DRG" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    csrp_drg =
+                        Some(M4kg2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CSRP_SRP" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    csrp_srp =
+                        Some(M4kg2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+
+                "CTHR_R" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cthr_r =
+                        Some(M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTHR_T" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cthr_t =
+                        Some(M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTHR_N" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cthr_n =
+                        Some(M2s2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTHR_RDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cthr_rdot =
+                        Some(M2s3::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTHR_TDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cthr_tdot =
+                        Some(M2s3::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTHR_NDOT" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cthr_ndot =
+                        Some(M2s3::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTHR_DRG" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cthr_drg =
+                        Some(M3kgs2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTHR_SRP" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cthr_srp =
+                        Some(M3kgs2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+                "CTHR_THR" => {
+                    comment.extend(comments);
+                    let (v, u) = kv_rest.parse_next(input)?;
+                    cthr_thr =
+                        Some(M2s4::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
+                }
+
+                _ => {
+                    input.reset(&checkpoint);
+                    break;
+                }
+            },
+            Err(_) => {
                 input.reset(&checkpoint);
                 break;
             }
@@ -973,147 +1078,147 @@ pub fn cdm_covariance_matrix(
     Ok(crate::messages::cdm::CdmCovarianceMatrix {
         comment,
         cr_r: cr_r.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CR_R")),
             ))
         })?,
         ct_r: ct_r.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CT_R")),
             ))
         })?,
         ct_t: ct_t.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CT_T")),
             ))
         })?,
         cn_r: cn_r.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CN_R")),
             ))
         })?,
         cn_t: cn_t.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CN_T")),
             ))
         })?,
         cn_n: cn_n.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CN_N")),
             ))
         })?,
         crdot_r: crdot_r.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CRDOT_R")),
             ))
         })?,
         crdot_t: crdot_t.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CRDOT_T")),
             ))
         })?,
         crdot_n: crdot_n.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CRDOT_N")),
             ))
         })?,
         crdot_rdot: crdot_rdot.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CRDOT_RDOT")),
             ))
         })?,
         ctdot_r: ctdot_r.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CTDOT_R")),
             ))
         })?,
         ctdot_t: ctdot_t.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CTDOT_T")),
             ))
         })?,
         ctdot_n: ctdot_n.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CTDOT_N")),
             ))
         })?,
         ctdot_rdot: ctdot_rdot.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CTDOT_RDOT")),
             ))
         })?,
         ctdot_tdot: ctdot_tdot.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CTDOT_TDOT")),
             ))
         })?,
         cndot_r: cndot_r.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CNDOT_R")),
             ))
         })?,
         cndot_t: cndot_t.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CNDOT_T")),
             ))
         })?,
         cndot_n: cndot_n.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CNDOT_N")),
             ))
         })?,
         cndot_rdot: cndot_rdot.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CNDOT_RDOT")),
             ))
         })?,
         cndot_tdot: cndot_tdot.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CNDOT_TDOT")),
             ))
         })?,
         cndot_ndot: cndot_ndot.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CNDOT_NDOT")),
@@ -1150,7 +1255,7 @@ pub fn cdm_covariance_matrix(
 // CDM Data Parser
 //----------------------------------------------------------------------
 
-pub fn cdm_data(input: &mut &str) -> ModalResult<CdmData> {
+pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
     let mut comment = Vec::new();
     let mut od_params = OdParameters::default();
     let mut add_params = AdditionalParameters::default();
@@ -1168,187 +1273,212 @@ pub fn cdm_data(input: &mut &str) -> ModalResult<CdmData> {
     let mut covariance_matrix_val = None;
 
     loop {
-        // If we hit META block for NEXT segment, stop
-        if at_block_start("META", input) {
-            break;
-        }
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let comments = collect_comments.parse_next(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-        let next_key = peek_key(input)?;
-
-        match next_key {
-            Some("OBJECT") => {
-                comment.extend(comments);
-                break; // Start of next segment
+        match key {
+            "TIME_LASTOB_START" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.time_lastob_start = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid TIME_LASTOB_START"))?,
+                );
+                has_od_params = true;
             }
-            Some(key) => {
-                comment.extend(comments);
-                if is_cdm_covariance_key(key) {
-                    covariance_matrix_val = Some(cdm_covariance_matrix.parse_next(input)?);
-                    continue;
-                }
-
-                let (k, v, u) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-
-                match k {
-                    // OD Parameters
-                    "TIME_LASTOB_START" => {
-                        od_params.time_lastob_start =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                        has_od_params = true;
-                    }
-                    "TIME_LASTOB_END" => {
-                        od_params.time_lastob_end =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                        has_od_params = true;
-                    }
-                    "RECOMMENDED_OD_SPAN" => {
-                        od_params.recommended_od_span = Some(
-                            DayInterval::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                        has_od_params = true;
-                    }
-                    "ACTUAL_OD_SPAN" => {
-                        od_params.actual_od_span = Some(
-                            DayInterval::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                        has_od_params = true;
-                    }
-                    "OBS_AVAILABLE" => {
-                        od_params.obs_available =
-                            Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid value"))?);
-                        has_od_params = true;
-                    }
-                    "OBS_USED" => {
-                        od_params.obs_used =
-                            Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid value"))?);
-                        has_od_params = true;
-                    }
-                    "TRACKS_AVAILABLE" => {
-                        od_params.tracks_available =
-                            Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid value"))?);
-                        has_od_params = true;
-                    }
-                    "TRACKS_USED" => {
-                        od_params.tracks_used =
-                            Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid value"))?);
-                        has_od_params = true;
-                    }
-                    "RESIDUALS_ACCEPTED" => {
-                        od_params.residuals_accepted = Some(
-                            Percentage::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                        has_od_params = true;
-                    }
-                    "WEIGHTED_RMS" => {
-                        od_params.weighted_rms =
-                            Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid float"))?);
-                        has_od_params = true;
-                    }
-
-                    // Additional Parameters
-                    "AREA_PC" => {
-                        add_params.area_pc = Some(
-                            Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                        has_add_params = true;
-                    }
-                    "AREA_DRG" => {
-                        add_params.area_drg = Some(
-                            Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                        has_add_params = true;
-                    }
-                    "AREA_SRP" => {
-                        add_params.area_srp = Some(
-                            Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                        has_add_params = true;
-                    }
-                    "MASS" => {
-                        add_params.mass = Some(
-                            Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                        has_add_params = true;
-                    }
-                    "CD_AREA_OVER_MASS" => {
-                        add_params.cd_area_over_mass = Some(
-                            M2kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                        has_add_params = true;
-                    }
-                    "CR_AREA_OVER_MASS" => {
-                        add_params.cr_area_over_mass = Some(
-                            M2kg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                        has_add_params = true;
-                    }
-                    "THRUST_ACCELERATION" => {
-                        add_params.thrust_acceleration =
-                            Some(Ms2::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-                        has_add_params = true;
-                    }
-                    "SEDR" => {
-                        add_params.sedr =
-                            Some(Wkg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-                        has_add_params = true;
-                    }
-
-                    // State Vector
-                    "X" => {
-                        x = Some(PositionRequired {
-                            value: parse_f64(v).map_err(|_| cut_err(input, "Invalid float"))?,
-                            units: PositionUnits::Km,
-                        });
-                    }
-                    "Y" => {
-                        y = Some(PositionRequired {
-                            value: parse_f64(v).map_err(|_| cut_err(input, "Invalid float"))?,
-                            units: PositionUnits::Km,
-                        });
-                    }
-                    "Z" => {
-                        z = Some(PositionRequired {
-                            value: parse_f64(v).map_err(|_| cut_err(input, "Invalid float"))?,
-                            units: PositionUnits::Km,
-                        });
-                    }
-                    "X_DOT" => {
-                        x_dot = Some(VelocityRequired {
-                            value: parse_f64(v).map_err(|_| cut_err(input, "Invalid float"))?,
-                            units: VelocityUnits::KmPerS,
-                        });
-                    }
-                    "Y_DOT" => {
-                        y_dot = Some(VelocityRequired {
-                            value: parse_f64(v).map_err(|_| cut_err(input, "Invalid float"))?,
-                            units: VelocityUnits::KmPerS,
-                        });
-                    }
-                    "Z_DOT" => {
-                        z_dot = Some(VelocityRequired {
-                            value: parse_f64(v).map_err(|_| cut_err(input, "Invalid float"))?,
-                            units: VelocityUnits::KmPerS,
-                        });
-                    }
-
-                    _ => {
-                        return Err(ErrMode::Cut(ContextError::new().add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label("Unknown Data key"),
-                        )));
-                    }
-                }
+            "TIME_LASTOB_END" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.time_lastob_end = Some(
+                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid TIME_LASTOB_END"))?,
+                );
+                has_od_params = true;
             }
-            _ => {
-                comment.extend(comments);
+            "RECOMMENDED_OD_SPAN" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                od_params.recommended_od_span = Some(
+                    DayInterval::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid RECOMMENDED_OD_SPAN"))?,
+                );
+                has_od_params = true;
+            }
+            "ACTUAL_OD_SPAN" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                od_params.actual_od_span = Some(
+                    DayInterval::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid ACTUAL_OD_SPAN"))?,
+                );
+                has_od_params = true;
+            }
+            "OBS_AVAILABLE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.obs_available =
+                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid OBS_AVAILABLE"))?);
+                has_od_params = true;
+            }
+            "OBS_USED" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.obs_used =
+                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid OBS_USED"))?);
+                has_od_params = true;
+            }
+            "TRACKS_AVAILABLE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.tracks_available =
+                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid TRACKS_AVAILABLE"))?);
+                has_od_params = true;
+            }
+            "TRACKS_USED" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.tracks_used =
+                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid TRACKS_USED"))?);
+                has_od_params = true;
+            }
+            "RESIDUALS_ACCEPTED" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                od_params.residuals_accepted = Some(
+                    Percentage::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid RESIDUALS_ACCEPTED"))?,
+                );
+                has_od_params = true;
+            }
+            "WEIGHTED_RMS" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                od_params.weighted_rms =
+                    Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid WEIGHTED_RMS"))?);
+                has_od_params = true;
+            }
+
+            "AREA_PC" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                add_params.area_pc =
+                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid AREA_PC"))?);
+                has_add_params = true;
+            }
+            "AREA_DRG" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                add_params.area_drg =
+                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid AREA_DRG"))?);
+                has_add_params = true;
+            }
+            "AREA_SRP" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                add_params.area_srp =
+                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid AREA_SRP"))?);
+                has_add_params = true;
+            }
+            "MASS" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                add_params.mass =
+                    Some(Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid MASS"))?);
+                has_add_params = true;
+            }
+            "CD_AREA_OVER_MASS" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                add_params.cd_area_over_mass = Some(
+                    M2kg::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid CD_AREA_OVER_MASS"))?,
+                );
+                has_add_params = true;
+            }
+            "CR_AREA_OVER_MASS" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                add_params.cr_area_over_mass = Some(
+                    M2kg::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid CR_AREA_OVER_MASS"))?,
+                );
+                has_add_params = true;
+            }
+            "THRUST_ACCELERATION" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                add_params.thrust_acceleration = Some(
+                    Ms2::from_kvn(v, u)
+                        .map_err(|_| cut_err(input, "Invalid THRUST_ACCELERATION"))?,
+                );
+                has_add_params = true;
+            }
+            "SEDR" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                add_params.sedr =
+                    Some(Wkg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid SEDR"))?);
+                has_add_params = true;
+            }
+
+            "X" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                x = Some(
+                    PositionRequired::from_kvn(v, u.or(Some("km")))
+                        .map_err(|_| cut_err(input, "Invalid X"))?,
+                );
+            }
+            "Y" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                y = Some(
+                    PositionRequired::from_kvn(v, u.or(Some("km")))
+                        .map_err(|_| cut_err(input, "Invalid Y"))?,
+                );
+            }
+            "Z" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                z = Some(
+                    PositionRequired::from_kvn(v, u.or(Some("km")))
+                        .map_err(|_| cut_err(input, "Invalid Z"))?,
+                );
+            }
+            "X_DOT" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                x_dot = Some(
+                    VelocityRequired::from_kvn(v, u.or(Some("km/s")))
+                        .map_err(|_| cut_err(input, "Invalid X_DOT"))?,
+                );
+            }
+            "Y_DOT" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                y_dot = Some(
+                    VelocityRequired::from_kvn(v, u.or(Some("km/s")))
+                        .map_err(|_| cut_err(input, "Invalid Y_DOT"))?,
+                );
+            }
+            "Z_DOT" => {
+                let (v, u) = kv_rest.parse_next(input)?;
+                z_dot = Some(
+                    VelocityRequired::from_kvn(v, u.or(Some("km/s")))
+                        .map_err(|_| cut_err(input, "Invalid Z_DOT"))?,
+                );
+            }
+
+            "CR_R" | "CT_R" | "CT_T" | "CN_R" | "CN_T" | "CN_N" | "CRDOT_R" | "CRDOT_T"
+            | "CRDOT_N" | "CRDOT_RDOT" | "CTDOT_R" | "CTDOT_T" | "CTDOT_N" | "CTDOT_RDOT"
+            | "CTDOT_TDOT" | "CNDOT_R" | "CNDOT_T" | "CNDOT_N" | "CNDOT_RDOT" | "CNDOT_TDOT"
+            | "CNDOT_NDOT" | "CDRG_R" | "CDRG_T" | "CDRG_N" | "CDRG_RDOT" | "CDRG_TDOT"
+            | "CDRG_NDOT" | "CDRG_DRG" | "CSRP_R" | "CSRP_T" | "CSRP_N" | "CSRP_RDOT"
+            | "CSRP_TDOT" | "CSRP_NDOT" | "CSRP_DRG" | "CSRP_SRP" | "CTHR_R" | "CTHR_T"
+            | "CTHR_N" | "CTHR_RDOT" | "CTHR_TDOT" | "CTHR_NDOT" | "CTHR_DRG" | "CTHR_SRP"
+            | "CTHR_THR" => {
+                input.reset(&checkpoint);
+                covariance_matrix_val = Some(cdm_covariance_matrix.parse_next(input)?);
+            }
+
+            "META_START" => {
+                input.reset(&checkpoint);
                 break;
+            }
+            "OBJECT" => {
+                // Start of next segment's metadata (if implicit)
+                input.reset(&checkpoint);
+                break;
+            }
+
+            _ => {
+                // Unknown key - error
+                input.reset(&checkpoint);
+                return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    StrContext::Label("Unknown Data key"),
+                )));
             }
         }
     }
@@ -1363,42 +1493,42 @@ pub fn cdm_data(input: &mut &str) -> ModalResult<CdmData> {
         },
         state_vector: CdmStateVector {
             x: x.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                     input,
                     &input.checkpoint(),
                     StrContext::Expected(StrContextValue::Description("X")),
                 ))
             })?,
             y: y.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                     input,
                     &input.checkpoint(),
                     StrContext::Expected(StrContextValue::Description("Y")),
                 ))
             })?,
             z: z.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                     input,
                     &input.checkpoint(),
                     StrContext::Expected(StrContextValue::Description("Z")),
                 ))
             })?,
             x_dot: x_dot.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                     input,
                     &input.checkpoint(),
                     StrContext::Expected(StrContextValue::Description("X_DOT")),
                 ))
             })?,
             y_dot: y_dot.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                     input,
                     &input.checkpoint(),
                     StrContext::Expected(StrContextValue::Description("Y_DOT")),
                 ))
             })?,
             z_dot: z_dot.ok_or_else(|| {
-                ErrMode::Cut(ContextError::new().add_context(
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                     input,
                     &input.checkpoint(),
                     StrContext::Expected(StrContextValue::Description("Z_DOT")),
@@ -1406,7 +1536,7 @@ pub fn cdm_data(input: &mut &str) -> ModalResult<CdmData> {
             })?,
         },
         covariance_matrix: covariance_matrix_val.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("Covariance Matrix keys")),
@@ -1419,7 +1549,7 @@ pub fn cdm_data(input: &mut &str) -> ModalResult<CdmData> {
 // CDM Segment Parser
 //----------------------------------------------------------------------
 
-pub fn cdm_segment(input: &mut &str) -> ModalResult<CdmSegment> {
+pub fn cdm_segment(input: &mut &str) -> KvnResult<CdmSegment> {
     // 1. Metadata
     // Metadata can start with optional META_START (for CDM 2.0) or just keys (for CDM 1.0)
     // However, if it's CDM 2.0, we might see META_START.
@@ -1446,7 +1576,7 @@ pub fn cdm_segment(input: &mut &str) -> ModalResult<CdmSegment> {
 // CDM Body Parser
 //----------------------------------------------------------------------
 
-pub fn cdm_body(input: &mut &str) -> ModalResult<CdmBody> {
+pub fn cdm_body(input: &mut &str) -> KvnResult<CdmBody> {
     let relative_metadata_data = relative_metadata_data.parse_next(input)?;
 
     // Expecting 2 segments
@@ -1465,7 +1595,7 @@ pub fn cdm_body(input: &mut &str) -> ModalResult<CdmBody> {
 // Complete CDM Parser
 //----------------------------------------------------------------------
 
-pub fn parse_cdm(input: &mut &str) -> ModalResult<Cdm> {
+pub fn parse_cdm(input: &mut &str) -> KvnResult<Cdm> {
     let version = cdm_version.parse_next(input)?;
     let header = cdm_header.parse_next(input)?;
     let body = cdm_body.parse_next(input)?;
@@ -1479,7 +1609,7 @@ pub fn parse_cdm(input: &mut &str) -> ModalResult<Cdm> {
 }
 
 impl ParseKvn for Cdm {
-    fn parse_kvn(input: &mut &str) -> ModalResult<Self> {
+    fn parse_kvn(input: &mut &str) -> KvnResult<Self> {
         parse_cdm.parse_next(input)
     }
 }

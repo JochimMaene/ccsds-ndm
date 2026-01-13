@@ -12,88 +12,16 @@ use crate::messages::tdm::{
 };
 use crate::types::*;
 use std::str::FromStr;
-use winnow::error::{AddContext, ContextError, ErrMode, StrContext, StrContextValue};
+use winnow::combinator::preceded;
+use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
-use winnow::ModalResult;
-
-//----------------------------------------------------------------------
-// Helper: Check if key belongs to TDM Metadata section
-//----------------------------------------------------------------------
-
-fn is_tdm_metadata_key(key: &str) -> bool {
-    matches!(
-        key,
-        "TRACK_ID"
-            | "DATA_TYPES"
-            | "TIME_SYSTEM"
-            | "START_TIME"
-            | "STOP_TIME"
-            | "PARTICIPANT_1"
-            | "PARTICIPANT_2"
-            | "PARTICIPANT_3"
-            | "PARTICIPANT_4"
-            | "PARTICIPANT_5"
-            | "MODE"
-            | "PATH"
-            | "PATH_1"
-            | "PATH_2"
-            | "TRANSMIT_BAND"
-            | "RECEIVE_BAND"
-            | "TURNAROUND_NUMERATOR"
-            | "TURNAROUND_DENOMINATOR"
-            | "TIMETAG_REF"
-            | "INTEGRATION_INTERVAL"
-            | "INTEGRATION_REF"
-            | "FREQ_OFFSET"
-            | "RANGE_MODE"
-            | "RANGE_MODULUS"
-            | "RANGE_UNITS"
-            | "ANGLE_TYPE"
-            | "REFERENCE_FRAME"
-            | "INTERPOLATION"
-            | "INTERPOLATION_DEGREE"
-            | "DOPPLER_COUNT_BIAS"
-            | "DOPPLER_COUNT_SCALE"
-            | "DOPPLER_COUNT_ROLLOVER"
-            | "TRANSMIT_DELAY_1"
-            | "TRANSMIT_DELAY_2"
-            | "TRANSMIT_DELAY_3"
-            | "TRANSMIT_DELAY_4"
-            | "TRANSMIT_DELAY_5"
-            | "RECEIVE_DELAY_1"
-            | "RECEIVE_DELAY_2"
-            | "RECEIVE_DELAY_3"
-            | "RECEIVE_DELAY_4"
-            | "RECEIVE_DELAY_5"
-            | "DATA_QUALITY"
-            | "CORRECTION_ANGLE_1"
-            | "CORRECTION_ANGLE_2"
-            | "CORRECTION_DOPPLER"
-            | "CORRECTION_MAG"
-            | "CORRECTION_RANGE"
-            | "CORRECTION_RCS"
-            | "CORRECTION_RECEIVE"
-            | "CORRECTION_TRANSMIT"
-            | "CORRECTION_ABERRATION_YEARLY"
-            | "CORRECTION_ABERRATION_DIURNAL"
-            | "CORRECTIONS_APPLIED"
-            | "EPHEMERIS_NAME_1"
-            | "EPHEMERIS_NAME_2"
-            | "EPHEMERIS_NAME_3"
-            | "EPHEMERIS_NAME_4"
-            | "EPHEMERIS_NAME_5"
-    )
-}
-
-fn is_tdm_header_key(key: &str) -> bool {
-    matches!(key, "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID")
-}
 
 //----------------------------------------------------------------------
 // TDM Version Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_version(input: &mut &str) -> ModalResult<String> {
+pub fn tdm_version(input: &mut &str) -> KvnResult<String> {
+    ws.parse_next(input)?;
     let _ = collect_comments.parse_next(input)?;
     let (value, _) = expect_key("CCSDS_TDM_VERS").parse_next(input)?;
     Ok(value.to_string())
@@ -103,50 +31,58 @@ pub fn tdm_version(input: &mut &str) -> ModalResult<String> {
 // TDM Header Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_header(input: &mut &str) -> ModalResult<TdmHeader> {
+pub fn tdm_header(input: &mut &str) -> KvnResult<TdmHeader> {
     let mut comment = Vec::new();
     let mut creation_date = None;
     let mut originator = None;
     let mut message_id = None;
 
     loop {
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let next_key = peek_key(input)?;
+        if at_block_start("META", input) {
+            break;
+        }
 
-        match next_key {
-            Some(key) if is_tdm_header_key(key) => {
-                let (k, v, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => break,
+        };
 
-                match k {
-                    "CREATION_DATE" => {
-                        creation_date = Some(
-                            Epoch::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid CREATION_DATE"))?,
-                        );
-                    }
-                    "ORIGINATOR" => originator = Some(v.to_string()),
-                    "MESSAGE_ID" => message_id = Some(v.to_string()),
-                    _ => {}
-                }
+        match key {
+            "CREATION_DATE" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                creation_date =
+                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid CREATION_DATE"))?);
             }
-            _ => break,
+            "ORIGINATOR" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                originator = Some(v.to_string());
+            }
+            "MESSAGE_ID" => {
+                let (v, _) = kv_rest.parse_next(input)?;
+                message_id = Some(v.to_string());
+            }
+            _ => {
+                // End of header
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
     Ok(TdmHeader {
         comment,
         creation_date: creation_date.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("CREATION_DATE")),
             ))
         })?,
         originator: originator.ok_or_else(|| {
-            ErrMode::Cut(ContextError::new().add_context(
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
                 StrContext::Expected(StrContextValue::Description("ORIGINATOR")),
@@ -160,7 +96,7 @@ pub fn tdm_header(input: &mut &str) -> ModalResult<TdmHeader> {
 // TDM Metadata Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_metadata(input: &mut &str) -> ModalResult<TdmMetadata> {
+pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
     expect_block_start("META").parse_next(input)?;
 
     let mut meta = TdmMetadata::default();
@@ -171,233 +107,252 @@ pub fn tdm_metadata(input: &mut &str) -> ModalResult<TdmMetadata> {
             break;
         }
 
-        let comments = collect_comments.parse_next(input)?;
-        meta.comment.extend(comments);
+        meta.comment.extend(collect_comments.parse_next(input)?);
 
         if at_block_end("META", input) {
             continue;
         }
 
-        let next_key = peek_key(input)?;
-        match next_key {
-            Some(key) if is_tdm_metadata_key(key) => {
-                let (k, v, _) = key_value_line.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
+        let checkpoint = input.checkpoint();
 
-                match k {
-                    "TRACK_ID" => meta.track_id = Some(v.to_string()),
-                    "DATA_TYPES" => meta.data_types = Some(v.to_string()),
-                    "TIME_SYSTEM" => meta.time_system = v.to_string(),
+        // Manual key-value parsing to avoid issues with terminated/cut
+        let key_res = (preceded(ws, keyword), kv_sep).parse_next(input);
+
+        match key_res {
+            Ok((key, _)) => {
+                let (val, _) = kv_rest.parse_next(input)?;
+                match key {
+                    "TRACK_ID" => meta.track_id = Some(val.to_string()),
+                    "DATA_TYPES" => meta.data_types = Some(val.to_string()),
+                    "TIME_SYSTEM" => meta.time_system = val.to_string(),
                     "START_TIME" => {
                         meta.start_time = Some(
-                            Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid START_TIME"))?,
+                            Epoch::from_str(val)
+                                .map_err(|_| cut_err(input, "Invalid START_TIME"))?,
                         );
                     }
                     "STOP_TIME" => {
                         meta.stop_time = Some(
-                            Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid STOP_TIME"))?,
+                            Epoch::from_str(val)
+                                .map_err(|_| cut_err(input, "Invalid STOP_TIME"))?,
                         );
                     }
-                    "PARTICIPANT_1" => meta.participant_1 = v.to_string(),
-                    "PARTICIPANT_2" => meta.participant_2 = Some(v.to_string()),
-                    "PARTICIPANT_3" => meta.participant_3 = Some(v.to_string()),
-                    "PARTICIPANT_4" => meta.participant_4 = Some(v.to_string()),
-                    "PARTICIPANT_5" => meta.participant_5 = Some(v.to_string()),
-                    "MODE" => meta.mode = Some(v.to_string()),
-                    "PATH" => meta.path = Some(v.to_string()),
-                    "PATH_1" => meta.path_1 = Some(v.to_string()),
-                    "PATH_2" => meta.path_2 = Some(v.to_string()),
-                    "TRANSMIT_BAND" => meta.transmit_band = Some(v.to_string()),
-                    "RECEIVE_BAND" => meta.receive_band = Some(v.to_string()),
+                    "PARTICIPANT_1" => meta.participant_1 = val.to_string(),
+                    "PARTICIPANT_2" => meta.participant_2 = Some(val.to_string()),
+                    "PARTICIPANT_3" => meta.participant_3 = Some(val.to_string()),
+                    "PARTICIPANT_4" => meta.participant_4 = Some(val.to_string()),
+                    "PARTICIPANT_5" => meta.participant_5 = Some(val.to_string()),
+                    "MODE" => meta.mode = Some(val.to_string()),
+                    "PATH" => meta.path = Some(val.to_string()),
+                    "PATH_1" => meta.path_1 = Some(val.to_string()),
+                    "PATH_2" => meta.path_2 = Some(val.to_string()),
+                    "TRANSMIT_BAND" => meta.transmit_band = Some(val.to_string()),
+                    "RECEIVE_BAND" => meta.receive_band = Some(val.to_string()),
                     "TURNAROUND_NUMERATOR" => {
                         meta.turnaround_numerator = Some(
-                            parse_i32(v)
+                            parse_i32(val)
                                 .map_err(|_| cut_err(input, "Invalid TURNAROUND_NUMERATOR"))?,
                         );
                     }
                     "TURNAROUND_DENOMINATOR" => {
                         meta.turnaround_denominator = Some(
-                            parse_i32(v)
+                            parse_i32(val)
                                 .map_err(|_| cut_err(input, "Invalid TURNAROUND_DENOMINATOR"))?,
                         );
                     }
-                    "TIMETAG_REF" => meta.timetag_ref = Some(v.to_string()),
+                    "TIMETAG_REF" => meta.timetag_ref = Some(val.to_string()),
                     "INTEGRATION_INTERVAL" => {
                         meta.integration_interval = Some(
-                            parse_f64(v)
+                            parse_f64(val)
                                 .map_err(|_| cut_err(input, "Invalid INTEGRATION_INTERVAL"))?,
                         );
                     }
-                    "INTEGRATION_REF" => meta.integration_ref = Some(v.to_string()),
+                    "INTEGRATION_REF" => meta.integration_ref = Some(val.to_string()),
                     "FREQ_OFFSET" => {
-                        meta.freq_offset =
-                            Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid FREQ_OFFSET"))?);
-                    }
-                    "RANGE_MODE" => meta.range_mode = Some(v.to_string()),
-                    "RANGE_MODULUS" => {
-                        meta.range_modulus = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid RANGE_MODULUS"))?,
+                        meta.freq_offset = Some(
+                            parse_f64(val).map_err(|_| cut_err(input, "Invalid FREQ_OFFSET"))?,
                         );
                     }
-                    "RANGE_UNITS" => meta.range_units = Some(v.to_string()),
-                    "ANGLE_TYPE" => meta.angle_type = Some(v.to_string()),
-                    "REFERENCE_FRAME" => meta.reference_frame = Some(v.to_string()),
-                    "INTERPOLATION" => meta.interpolation = Some(v.to_string()),
+                    "RANGE_MODE" => meta.range_mode = Some(val.to_string()),
+                    "RANGE_MODULUS" => {
+                        meta.range_modulus = Some(
+                            parse_f64(val).map_err(|_| cut_err(input, "Invalid RANGE_MODULUS"))?,
+                        );
+                    }
+                    "RANGE_UNITS" => meta.range_units = Some(val.to_string()),
+                    "ANGLE_TYPE" => meta.angle_type = Some(val.to_string()),
+                    "REFERENCE_FRAME" => meta.reference_frame = Some(val.to_string()),
+                    "INTERPOLATION" => meta.interpolation = Some(val.to_string()),
                     "INTERPOLATION_DEGREE" => {
                         meta.interpolation_degree = Some(
-                            parse_u32(v)
+                            parse_u32(val)
                                 .map_err(|_| cut_err(input, "Invalid INTERPOLATION_DEGREE"))?,
                         );
                     }
                     "DOPPLER_COUNT_BIAS" => {
                         meta.doppler_count_bias = Some(
-                            parse_f64(v)
+                            parse_f64(val)
                                 .map_err(|_| cut_err(input, "Invalid DOPPLER_COUNT_BIAS"))?,
                         );
                     }
                     "DOPPLER_COUNT_SCALE" => {
                         meta.doppler_count_scale = Some(
-                            parse_u64(v)
+                            parse_u64(val)
                                 .map_err(|_| cut_err(input, "Invalid DOPPLER_COUNT_SCALE"))?,
                         );
                     }
-                    "DOPPLER_COUNT_ROLLOVER" => meta.doppler_count_rollover = Some(v.to_string()),
+                    "DOPPLER_COUNT_ROLLOVER" => meta.doppler_count_rollover = Some(val.to_string()),
                     "TRANSMIT_DELAY_1" => {
                         meta.transmit_delay_1 = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid TRANSMIT_DELAY_1"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid TRANSMIT_DELAY_1"))?,
                         );
                     }
                     "TRANSMIT_DELAY_2" => {
                         meta.transmit_delay_2 = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid TRANSMIT_DELAY_2"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid TRANSMIT_DELAY_2"))?,
                         );
                     }
                     "TRANSMIT_DELAY_3" => {
                         meta.transmit_delay_3 = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid TRANSMIT_DELAY_3"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid TRANSMIT_DELAY_3"))?,
                         );
                     }
                     "TRANSMIT_DELAY_4" => {
                         meta.transmit_delay_4 = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid TRANSMIT_DELAY_4"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid TRANSMIT_DELAY_4"))?,
                         );
                     }
                     "TRANSMIT_DELAY_5" => {
                         meta.transmit_delay_5 = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid TRANSMIT_DELAY_5"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid TRANSMIT_DELAY_5"))?,
                         );
                     }
                     "RECEIVE_DELAY_1" => {
                         meta.receive_delay_1 = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid RECEIVE_DELAY_1"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid RECEIVE_DELAY_1"))?,
                         );
                     }
                     "RECEIVE_DELAY_2" => {
                         meta.receive_delay_2 = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid RECEIVE_DELAY_2"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid RECEIVE_DELAY_2"))?,
                         );
                     }
                     "RECEIVE_DELAY_3" => {
                         meta.receive_delay_3 = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid RECEIVE_DELAY_3"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid RECEIVE_DELAY_3"))?,
                         );
                     }
                     "RECEIVE_DELAY_4" => {
                         meta.receive_delay_4 = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid RECEIVE_DELAY_4"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid RECEIVE_DELAY_4"))?,
                         );
                     }
                     "RECEIVE_DELAY_5" => {
                         meta.receive_delay_5 = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid RECEIVE_DELAY_5"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid RECEIVE_DELAY_5"))?,
                         );
                     }
-                    "DATA_QUALITY" => meta.data_quality = Some(v.to_string()),
+                    "DATA_QUALITY" => meta.data_quality = Some(val.to_string()),
                     "CORRECTION_ANGLE_1" => {
                         meta.correction_angle_1 = Some(
-                            parse_f64(v)
+                            parse_f64(val)
                                 .map_err(|_| cut_err(input, "Invalid CORRECTION_ANGLE_1"))?,
                         );
                     }
                     "CORRECTION_ANGLE_2" => {
                         meta.correction_angle_2 = Some(
-                            parse_f64(v)
+                            parse_f64(val)
                                 .map_err(|_| cut_err(input, "Invalid CORRECTION_ANGLE_2"))?,
                         );
                     }
                     "CORRECTION_DOPPLER" => {
                         meta.correction_doppler = Some(
-                            parse_f64(v)
+                            parse_f64(val)
                                 .map_err(|_| cut_err(input, "Invalid CORRECTION_DOPPLER"))?,
                         );
                     }
                     "CORRECTION_MAG" => {
                         meta.correction_mag = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid CORRECTION_MAG"))?,
+                            parse_f64(val).map_err(|_| cut_err(input, "Invalid CORRECTION_MAG"))?,
                         );
                     }
                     "CORRECTION_RANGE" => {
                         meta.correction_range = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid CORRECTION_RANGE"))?,
+                            parse_f64(val)
+                                .map_err(|_| cut_err(input, "Invalid CORRECTION_RANGE"))?,
                         );
                     }
                     "CORRECTION_RCS" => {
                         meta.correction_rcs = Some(
-                            parse_f64(v).map_err(|_| cut_err(input, "Invalid CORRECTION_RCS"))?,
+                            parse_f64(val).map_err(|_| cut_err(input, "Invalid CORRECTION_RCS"))?,
                         );
                     }
                     "CORRECTION_RECEIVE" => {
                         meta.correction_receive = Some(
-                            parse_f64(v)
+                            parse_f64(val)
                                 .map_err(|_| cut_err(input, "Invalid CORRECTION_RECEIVE"))?,
                         );
                     }
                     "CORRECTION_TRANSMIT" => {
                         meta.correction_transmit = Some(
-                            parse_f64(v)
+                            parse_f64(val)
                                 .map_err(|_| cut_err(input, "Invalid CORRECTION_TRANSMIT"))?,
                         );
                     }
                     "CORRECTION_ABERRATION_YEARLY" => {
                         meta.correction_aberration_yearly =
-                            Some(parse_f64(v).map_err(|_| {
+                            Some(parse_f64(val).map_err(|_| {
                                 cut_err(input, "Invalid CORRECTION_ABERRATION_YEARLY")
                             })?);
                     }
                     "CORRECTION_ABERRATION_DIURNAL" => {
-                        meta.correction_aberration_diurnal = Some(parse_f64(v).map_err(|_| {
-                            cut_err(input, "Invalid CORRECTION_ABERRATION_DIURNAL")
-                        })?);
+                        meta.correction_aberration_diurnal =
+                            Some(parse_f64(val).map_err(|_| {
+                                cut_err(input, "Invalid CORRECTION_ABERRATION_DIURNAL")
+                            })?);
                     }
-                    "CORRECTIONS_APPLIED" => meta.corrections_applied = Some(v.to_string()),
-                    "EPHEMERIS_NAME_1" => meta.ephemeris_name_1 = Some(v.to_string()),
-                    "EPHEMERIS_NAME_2" => meta.ephemeris_name_2 = Some(v.to_string()),
-                    "EPHEMERIS_NAME_3" => meta.ephemeris_name_3 = Some(v.to_string()),
-                    "EPHEMERIS_NAME_4" => meta.ephemeris_name_4 = Some(v.to_string()),
-                    "EPHEMERIS_NAME_5" => meta.ephemeris_name_5 = Some(v.to_string()),
-                    _ => unreachable!(),
+                    "CORRECTIONS_APPLIED" => meta.corrections_applied = Some(val.to_string()),
+                    "EPHEMERIS_NAME_1" => meta.ephemeris_name_1 = Some(val.to_string()),
+                    "EPHEMERIS_NAME_2" => meta.ephemeris_name_2 = Some(val.to_string()),
+                    "EPHEMERIS_NAME_3" => meta.ephemeris_name_3 = Some(val.to_string()),
+                    "EPHEMERIS_NAME_4" => meta.ephemeris_name_4 = Some(val.to_string()),
+                    "EPHEMERIS_NAME_5" => meta.ephemeris_name_5 = Some(val.to_string()),
+                    _ => {
+                        input.reset(&checkpoint);
+                        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                            input,
+                            &input.checkpoint(),
+                            StrContext::Label("Unexpected TDM Metadata key"),
+                        )));
+                    }
                 }
             }
-            Some(_key) => {
-                return Err(ErrMode::Cut(ContextError::new().add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Label("Unexpected TDM Metadata key"),
-                )));
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
             }
-            None => break,
         }
     }
 
     if meta.time_system.is_empty() {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
+        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
             StrContext::Expected(StrContextValue::Description("TIME_SYSTEM")),
         )));
     }
     if meta.participant_1.is_empty() {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
+        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
             StrContext::Expected(StrContextValue::Description("PARTICIPANT_1")),
@@ -411,13 +366,26 @@ pub fn tdm_metadata(input: &mut &str) -> ModalResult<TdmMetadata> {
 // TDM Observation Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_observation(input: &mut &str) -> ModalResult<TdmObservation> {
-    let (key, val, _unit) = key_value_line.parse_next(input)?;
-    opt_line_ending.parse_next(input)?;
+pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
+    let checkpoint = input.checkpoint();
+    let key = match key_token.parse_next(input) {
+        Ok(k) => k,
+        Err(_) => {
+            return Err(ErrMode::Backtrack(
+                CcsdsNdmError::from_input(input).add_context(
+                    input,
+                    &checkpoint,
+                    StrContext::Label("Expected TDM observation key"),
+                ),
+            ));
+        }
+    };
+
+    let (val, _) = kv_rest.parse_next(input)?;
 
     let parts: Vec<&str> = val.split_whitespace().collect();
     if parts.len() < 2 {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
+        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
             StrContext::Label("Data line value must contain 'EPOCH MEASUREMENT'"),
@@ -427,19 +395,19 @@ pub fn tdm_observation(input: &mut &str) -> ModalResult<TdmObservation> {
     let epoch_str = parts[0];
     let measure_str = parts[1..].join(" ");
 
-    let epoch = Epoch::from_str(epoch_str).map_err(|e| {
-        ErrMode::Cut(ContextError::new().add_context(
+    let epoch = Epoch::from_str(epoch_str).map_err(|_| {
+        ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
-            StrContext::Label(e.to_string().leak()),
+            StrContext::Label("Invalid Epoch"),
         ))
     })?;
 
-    let data = TdmObservationData::from_key_val(key, &measure_str).map_err(|e| {
-        ErrMode::Cut(ContextError::new().add_context(
+    let data = TdmObservationData::from_key_val(key, &measure_str).map_err(|_| {
+        ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
-            StrContext::Label(e.to_string().leak()),
+            StrContext::Label("Unknown TDM data keyword"),
         ))
     })?;
 
@@ -450,7 +418,7 @@ pub fn tdm_observation(input: &mut &str) -> ModalResult<TdmObservation> {
 // TDM Data Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_data(input: &mut &str) -> ModalResult<TdmData> {
+pub fn tdm_data(input: &mut &str) -> KvnResult<TdmData> {
     expect_block_start("DATA").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -462,8 +430,7 @@ pub fn tdm_data(input: &mut &str) -> ModalResult<TdmData> {
             break;
         }
 
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
+        comment.extend(collect_comments.parse_next(input)?);
 
         if at_block_end("DATA", input) {
             continue;
@@ -473,7 +440,7 @@ pub fn tdm_data(input: &mut &str) -> ModalResult<TdmData> {
     }
 
     if observations.is_empty() {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
+        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
             StrContext::Label("TDM data section must contain at least one observation"),
@@ -490,7 +457,7 @@ pub fn tdm_data(input: &mut &str) -> ModalResult<TdmData> {
 // TDM Segment Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_segment(input: &mut &str) -> ModalResult<TdmSegment> {
+pub fn tdm_segment(input: &mut &str) -> KvnResult<TdmSegment> {
     let metadata = tdm_metadata.parse_next(input)?;
     let data = tdm_data.parse_next(input)?;
 
@@ -501,7 +468,7 @@ pub fn tdm_segment(input: &mut &str) -> ModalResult<TdmSegment> {
 // TDM Body Parser
 //----------------------------------------------------------------------
 
-pub fn tdm_body(input: &mut &str) -> ModalResult<TdmBody> {
+pub fn tdm_body(input: &mut &str) -> KvnResult<TdmBody> {
     let mut segments = Vec::new();
 
     loop {
@@ -515,7 +482,7 @@ pub fn tdm_body(input: &mut &str) -> ModalResult<TdmBody> {
     }
 
     if segments.is_empty() {
-        return Err(ErrMode::Cut(ContextError::new().add_context(
+        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &input.checkpoint(),
             StrContext::Label("TDM body must contain at least one segment"),
@@ -529,7 +496,7 @@ pub fn tdm_body(input: &mut &str) -> ModalResult<TdmBody> {
 // Complete TDM Parser
 //----------------------------------------------------------------------
 
-pub fn parse_tdm(input: &mut &str) -> ModalResult<Tdm> {
+pub fn parse_tdm(input: &mut &str) -> KvnResult<Tdm> {
     let version = tdm_version.parse_next(input)?;
     let header = tdm_header.parse_next(input)?;
     let body = tdm_body.parse_next(input)?;
@@ -543,7 +510,7 @@ pub fn parse_tdm(input: &mut &str) -> ModalResult<Tdm> {
 }
 
 impl ParseKvn for Tdm {
-    fn parse_kvn(input: &mut &str) -> ModalResult<Self> {
+    fn parse_kvn(input: &mut &str) -> KvnResult<Self> {
         parse_tdm.parse_next(input)
     }
 }
