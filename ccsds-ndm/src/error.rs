@@ -5,14 +5,14 @@
 use crate::types::EpochError;
 use thiserror::Error;
 use winnow::error::{AddContext, ParserError, StrContext};
-use winnow::stream::{Offset, Stream};
+use winnow::stream::Stream;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseDiagnostic {
     pub line: usize,
     pub column: usize,
     pub message: String,
-    pub contexts: Vec<String>,
+    pub contexts: Vec<&'static str>,
     pub snippet: String,
 }
 
@@ -21,7 +21,7 @@ impl ParseDiagnostic {
     pub fn new(input: &str, offset: usize, message: impl Into<String>) -> Self {
         let offset = offset.min(input.len());
         let prefix = &input[..offset];
-        let line = prefix.lines().count().max(1);
+        let line = prefix.as_bytes().iter().filter(|&&b| b == b'\n').count() + 1;
 
         let line_start = prefix.rfind('\n').map(|i| i + 1).unwrap_or(0);
         let suffix = &input[offset..];
@@ -41,7 +41,7 @@ impl ParseDiagnostic {
     }
 
     /// Adds contexts to the diagnostic.
-    pub fn with_contexts(mut self, contexts: Vec<String>) -> Self {
+    pub fn with_contexts(mut self, contexts: Vec<&'static str>) -> Self {
         self.contexts = contexts;
         self
     }
@@ -72,7 +72,7 @@ pub enum CcsdsNdmError {
         line: usize,
         column: usize,
         message: String,
-        contexts: Vec<String>,
+        contexts: Vec<&'static str>,
         snippet: String,
     },
 
@@ -170,19 +170,20 @@ pub enum CcsdsNdmError {
 
     /// Error when an unexpected end of input is reached.
     #[error("Unexpected end of input: {context}")]
-    UnexpectedEof { context: String },
+    UnexpectedEof {
+        context: String
+    },
 }
 
 impl ParserError<&str> for CcsdsNdmError {
     type Inner = ();
-    fn from_input(input: &&str) -> Self {
-        let diag = ParseDiagnostic::new(input, 0, "Parse error");
+    fn from_input(_input: &&str) -> Self {
         CcsdsNdmError::KvnParse {
-            line: diag.line,
-            column: diag.column,
-            message: diag.message,
+            line: 0,
+            column: 0,
+            message: "Parse error".to_string(),
             contexts: Vec::new(),
-            snippet: diag.snippet,
+            snippet: String::new(),
         }
     }
 
@@ -194,26 +195,17 @@ impl ParserError<&str> for CcsdsNdmError {
 impl AddContext<&str, StrContext> for CcsdsNdmError {
     fn add_context(
         mut self,
-        input: &&str,
-        token: &<&str as Stream>::Checkpoint,
+        _input: &&str,
+        _token: &<&str as Stream>::Checkpoint,
         context: StrContext,
     ) -> Self {
         if let CcsdsNdmError::KvnParse {
-            ref mut line,
-            ref mut column,
             ref mut message,
             ref mut contexts,
-            ref mut snippet,
-        } = self
-        {
-            let offset = input.offset_from(token);
-            let diag = ParseDiagnostic::new(input, offset, "");
-            *line = diag.line;
-            *column = diag.column;
-            *snippet = diag.snippet;
-
+            .. 
+        } = self {
             match context {
-                StrContext::Label(l) => contexts.push(l.to_string()),
+                StrContext::Label(l) => contexts.push(l),
                 StrContext::Expected(e) => *message = format!("Expected {}", e),
                 _ => {}
             }
@@ -245,9 +237,8 @@ impl CcsdsNdmError {
             ref mut line,
             ref mut column,
             ref mut snippet,
-            ..
-        } = self
-        {
+            .. 
+        } = self {
             let diag = ParseDiagnostic::new(input, offset, "");
             *line = diag.line;
             *column = diag.column;

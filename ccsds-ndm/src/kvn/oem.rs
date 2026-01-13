@@ -477,23 +477,33 @@ pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
             break;
         }
 
-        if at_block_start("META", input) || at_block_start("COVARIANCE", input) {
+        let first_char = input.as_bytes()[0];
+        if first_char == b'M' && at_block_start("META", input) {
             break;
         }
+        if first_char == b'C' {
+            if at_block_start("COVARIANCE", input) {
+                break;
+            }
+            if input.starts_with("COMMENT") {
+                let c = comment_line.parse_next(input)?;
+                comment.push(c.trim().to_string());
+                opt_line_ending.parse_next(input)?;
+                continue;
+            }
+        }
 
-        if input.starts_with("COMMENT") {
-            let c = comment_line.parse_next(input)?;
-            comment.push(c.trim().to_string());
+        if first_char == b'\r' || first_char == b'\n' {
             opt_line_ending.parse_next(input)?;
             continue;
         }
 
-        if input.starts_with('\r') || input.starts_with('\n') {
-            opt_line_ending.parse_next(input)?;
+        if first_char.is_ascii_digit() {
+            state_vector.push(parse_state_vector_line.parse_next(input)?);
             continue;
         }
 
-        // Must be a state vector line or empty line
+        // Must be a state vector line (if it doesn't start with digit) or empty line
         let checkpoint = input.checkpoint();
         if empty_line.parse_next(input).is_ok() {
             opt_line_ending.parse_next(input)?;

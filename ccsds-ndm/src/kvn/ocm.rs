@@ -3136,7 +3136,7 @@ META_STOP
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
             matches!(err, CcsdsNdmError::KvnParse { message: ref msg, ref contexts, .. } if
-                msg.contains("Unexpected OCM Metadata key") || contexts.contains(&"Unexpected OCM Metadata key".to_string()))
+                msg.contains("Unexpected OCM Metadata key") || contexts.contains(&"Unexpected OCM Metadata key"))
         );
     }
 
@@ -4237,7 +4237,7 @@ TRAJ_STOP
             } => {
                 assert!(
                     msg.contains("Unexpected OCM Trajectory key")
-                        || contexts.contains(&"Unexpected OCM Trajectory key".to_string())
+                        || contexts.contains(&"Unexpected OCM Trajectory key")
                 );
             }
             _ => panic!("Expected KvnParse error, got {:?}", err),
@@ -4290,7 +4290,7 @@ PHYS_STOP
             } => {
                 assert!(
                     msg.contains("Unexpected OCM Physical key")
-                        || contexts.contains(&"Unexpected OCM Physical key".to_string())
+                        || contexts.contains(&"Unexpected OCM Physical key")
                 );
             }
             _ => panic!("Expected KvnParse error, got {:?}", err),
@@ -4367,7 +4367,7 @@ COV_STOP
             } => {
                 assert!(
                     msg.contains("Unexpected OCM Covariance key")
-                        || contexts.contains(&"Unexpected OCM Covariance key".to_string())
+                        || contexts.contains(&"Unexpected OCM Covariance key")
                 );
             }
             _ => panic!("Expected KvnParse error, got {:?}", err),
@@ -4725,7 +4725,7 @@ OD_STOP
             } => {
                 assert!(
                     msg.contains("Unexpected OCM Orbit Determination key")
-                        || contexts.contains(&"Unexpected OCM Orbit Determination key".to_string())
+                        || contexts.contains(&"Unexpected OCM Orbit Determination key")
                 );
             }
             _ => panic!("Expected KvnParse error, got {:?}", err),
@@ -4757,7 +4757,7 @@ COV_STOP
             } => {
                 assert!(
                     msg.contains("Unexpected OCM Covariance key")
-                        || contexts.contains(&"Unexpected OCM Covariance key".to_string())
+                        || contexts.contains(&"Unexpected OCM Covariance key")
                 );
             }
             _ => panic!("Expected KvnParse error, got {:?}", err),

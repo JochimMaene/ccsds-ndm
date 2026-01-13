@@ -2237,7 +2237,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
             } => {
                 assert!(
                     msg.contains("Unknown Relative Metadata key")
-                        || contexts.contains(&"Unknown Relative Metadata key".to_string())
+                        || contexts.contains(&"Unknown Relative Metadata key")
                 )
             }
             _ => panic!("unexpected error: {:?}", err),
@@ -2445,7 +2445,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
             } => {
                 assert!(
                     msg.contains("Unknown metadata key")
-                        || contexts.contains(&"Unknown metadata key".to_string())
+                        || contexts.contains(&"Unknown metadata key")
                 )
             }
             _ => panic!("unexpected error: {:?}", err),
@@ -2571,7 +2571,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
             } => {
                 assert!(
                     msg.contains("Unknown Data key")
-                        || contexts.contains(&"Unknown Data key".to_string())
+                        || contexts.contains(&"Unknown Data key")
                 )
             }
             _ => panic!("unexpected error: {:?}", err),
