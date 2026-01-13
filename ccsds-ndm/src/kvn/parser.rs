@@ -444,7 +444,7 @@ where
 
 /// Checks if we're at a specific block start without full string scan.
 pub fn at_block_start(tag: &str, input: &mut &str) -> bool {
-    let s = input.trim_start_matches(|c| c == ' ' || c == '\t');
+    let s = input.trim_start_matches([' ', '\t']);
     if let Some(rest) = s.strip_prefix(tag) {
         if let Some(suffix) = rest.strip_prefix("_START") {
             return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
@@ -455,9 +455,12 @@ pub fn at_block_start(tag: &str, input: &mut &str) -> bool {
 
 /// Checks if we're at a specific block end without full string scan.
 pub fn at_block_end(tag: &str, input: &mut &str) -> bool {
-    let s = input.trim_start_matches(|c| c == ' ' || c == '\t');
+    let s = input.trim_start_matches([' ', '\t']);
     if let Some(rest) = s.strip_prefix(tag) {
-        if let Some(suffix) = rest.strip_prefix("_STOP").or_else(|| rest.strip_prefix("_END")) {
+        if let Some(suffix) = rest
+            .strip_prefix("_STOP")
+            .or_else(|| rest.strip_prefix("_END"))
+        {
             return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
         }
     }

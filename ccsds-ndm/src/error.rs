@@ -170,9 +170,7 @@ pub enum CcsdsNdmError {
 
     /// Error when an unexpected end of input is reached.
     #[error("Unexpected end of input: {context}")]
-    UnexpectedEof {
-        context: String
-    },
+    UnexpectedEof { context: String },
 }
 
 impl ParserError<&str> for CcsdsNdmError {
@@ -202,8 +200,9 @@ impl AddContext<&str, StrContext> for CcsdsNdmError {
         if let CcsdsNdmError::KvnParse {
             ref mut message,
             ref mut contexts,
-            .. 
-        } = self {
+            ..
+        } = self
+        {
             match context {
                 StrContext::Label(l) => contexts.push(l),
                 StrContext::Expected(e) => *message = format!("Expected {}", e),
@@ -237,8 +236,9 @@ impl CcsdsNdmError {
             ref mut line,
             ref mut column,
             ref mut snippet,
-            .. 
-        } = self {
+            ..
+        } = self
+        {
             let diag = ParseDiagnostic::new(input, offset, "");
             *line = diag.line;
             *column = diag.column;

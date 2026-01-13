@@ -2569,10 +2569,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
                 contexts,
                 ..
             } => {
-                assert!(
-                    msg.contains("Unknown Data key")
-                        || contexts.contains(&"Unknown Data key")
-                )
+                assert!(msg.contains("Unknown Data key") || contexts.contains(&"Unknown Data key"))
             }
             _ => panic!("unexpected error: {:?}", err),
         }
