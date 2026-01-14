@@ -47,8 +47,8 @@ use crate::parse_block;
 use crate::types::*;
 use std::num::NonZeroU32;
 use std::str::FromStr;
-use winnow::ascii::{float, space1};
-use winnow::combinator::{opt, preceded, repeat};
+use winnow::ascii::{float, space1, till_line_ending};
+use winnow::combinator::{preceded, repeat};
 use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 
@@ -239,85 +239,70 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
 /// Parses a raw state vector line.
 /// Format: EPOCH X Y Z X_DOT Y_DOT Z_DOT [X_DDOT Y_DDOT Z_DDOT]
 fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
-    let epoch_str = preceded(ws, till_space).parse_next(input)?;
+    // One-pass: take the whole line and split by whitespace.
+    // This reduces take_till/float combinator overhead in high-volume loops.
+    let line = preceded(ws, till_line_ending).parse_next(input)?;
+    let mut parts = line.split_whitespace();
+
+    let epoch_str = parts
+        .next()
+        .ok_or_else(|| cut_err(input, "Missing epoch"))?;
     let epoch = Epoch::from_str(epoch_str).map_err(|_| cut_err(input, "Invalid epoch"))?;
 
-    let mut components = Vec::with_capacity(6);
-    for _ in 0..6 {
-        components
-            .push(preceded(space1, float::<&str, f64, ErrMode<CcsdsNdmError>>).parse_next(input)?);
+    let mut floats = [0.0f64; 9];
+    let mut count = 0;
+    for f in &mut floats {
+        if let Some(s) = parts.next() {
+            *f = s
+                .parse::<f64>()
+                .map_err(|_| cut_err(input, "Invalid float"))?;
+            count += 1;
+        } else {
+            break;
+        }
     }
 
-    let x_val = components[0];
-    let y_val = components[1];
-    let z_val = components[2];
-    let x_dot_val = components[3];
-    let y_dot_val = components[4];
-    let z_dot_val = components[5];
+    if count < 6 {
+        return Err(cut_err(
+            input,
+            "State vector must have at least 6 components (X, Y, Z, X_DOT, Y_DOT, Z_DOT)",
+        ));
+    }
 
-    let accs: Option<(f64, f64, f64)> = opt((
-        preceded(space1, float),
-        preceded(space1, float),
-        preceded(space1, float),
-    ))
-    .parse_next(input)?;
+    if count > 6 && count < 9 {
+        return Err(cut_err(
+            input,
+            "State vector must have either 6 or 9 components",
+        ));
+    }
 
-    let (x_ddot, y_ddot, z_ddot) = if let Some((ax, ay, az)) = accs {
-        (
-            Some(Acc {
-                value: ax,
-                units: Some(AccUnits::KmPerS2),
-            }),
-            Some(Acc {
-                value: ay,
-                units: Some(AccUnits::KmPerS2),
-            }),
-            Some(Acc {
-                value: az,
-                units: Some(AccUnits::KmPerS2),
-            }),
-        )
+    let x_ddot = if count >= 7 {
+        Some(Acc::new(floats[6], Some(AccUnits::KmPerS2)))
     } else {
-        (None, None, None)
+        None
+    };
+    let y_ddot = if count >= 8 {
+        Some(Acc::new(floats[7], Some(AccUnits::KmPerS2)))
+    } else {
+        None
+    };
+    let z_ddot = if count >= 9 {
+        Some(Acc::new(floats[8], Some(AccUnits::KmPerS2)))
+    } else {
+        None
     };
 
-    let _ = ws.parse_next(input)?;
-    let checkpoint = input.checkpoint();
-    if !input.is_empty() && !input.starts_with('\r') && !input.starts_with('\n') {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &checkpoint,
-            StrContext::Label("Unexpected tokens at end of line"),
-        )));
-    }
-    opt_line_ending.parse_next(input)?;
+    // Consume trailing line ending if not already at EOF
+    let _ = opt_line_ending.parse_next(input);
 
     Ok(StateVectorAcc {
         epoch,
-        x: Position {
-            value: x_val,
-            units: Some(PositionUnits::Km),
-        },
-        y: Position {
-            value: y_val,
-            units: Some(PositionUnits::Km),
-        },
-        z: Position {
-            value: z_val,
-            units: Some(PositionUnits::Km),
-        },
-        x_dot: Velocity {
-            value: x_dot_val,
-            units: Some(VelocityUnits::KmPerS),
-        },
-        y_dot: Velocity {
-            value: y_dot_val,
-            units: Some(VelocityUnits::KmPerS),
-        },
-        z_dot: Velocity {
-            value: z_dot_val,
-            units: Some(VelocityUnits::KmPerS),
-        },
+        x: Position::new(floats[0], Some(PositionUnits::Km)),
+        y: Position::new(floats[1], Some(PositionUnits::Km)),
+        z: Position::new(floats[2], Some(PositionUnits::Km)),
+        x_dot: Velocity::new(floats[3], Some(VelocityUnits::KmPerS)),
+        y_dot: Velocity::new(floats[4], Some(VelocityUnits::KmPerS)),
+        z_dot: Velocity::new(floats[5], Some(VelocityUnits::KmPerS)),
         x_ddot,
         y_ddot,
         z_ddot,
@@ -517,7 +502,7 @@ pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
     // Optimization: Pre-allocate vectors based on input size.
     // Typical OEM state vector line is ~80-100 characters.
     let estimated_records = (input.len() / 80).max(10);
-    
+
     let mut data = OemData {
         comment: Vec::new(),
         state_vector: Vec::with_capacity(estimated_records),

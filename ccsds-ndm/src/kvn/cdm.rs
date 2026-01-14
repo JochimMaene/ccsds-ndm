@@ -134,7 +134,7 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
         "SCREEN_EXIT_TIME" => screen_exit_time: kv_epoch,
         "COLLISION_PROBABILITY" => collision_probability: kv_from_kvn,
         "COLLISION_PROBABILITY_METHOD" => collision_probability_method: kv_string,
-    }, |i: &mut &str| at_block_start("META", *i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Relative Metadata key");
+    }, |i: &mut &str| at_block_start("META", i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Relative Metadata key");
 
     let relative_state_vector = if rel_pos_r.is_some() || rel_pos_t.is_some() || rel_pos_n.is_some()
     {
@@ -350,7 +350,7 @@ pub fn cdm_metadata(input: &mut &str) -> KvnResult<CdmMetadata> {
         "SOLAR_RAD_PRESSURE" => solar_rad_pressure: kv_yes_no,
         "EARTH_TIDES" => earth_tides: kv_yes_no,
         "INTRACK_THRUST" => intrack_thrust: kv_yes_no,
-    }, |i: &mut &str| (has_meta_block && at_block_end("META", *i)) || (!has_meta_block && is_cdm_data_key(peek(key_token).parse_next(i).unwrap_or(""))), "Unknown metadata key");
+    }, |i: &mut &str| (has_meta_block && at_block_end("META", i)) || (!has_meta_block && is_cdm_data_key(peek(key_token).parse_next(i).unwrap_or(""))), "Unknown metadata key");
 
     if has_meta_block && at_block_end("META", input) {
         expect_block_end("META").parse_next(input)?;
@@ -575,7 +575,7 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
         "CTHR_DRG" => val: kv_from_kvn => { cthr_drg = Some(val); has_cov = true; },
         "CTHR_SRP" => val: kv_from_kvn => { cthr_srp = Some(val); has_cov = true; },
         "CTHR_THR" => val: kv_from_kvn => { cthr_thr = Some(val); has_cov = true; },
-    }, |i: &mut &str| at_block_start("META", *i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Data key");
+    }, |i: &mut &str| at_block_start("META", i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Data key");
 
     let covariance_matrix = if has_cov {
         CdmCovarianceMatrix {
