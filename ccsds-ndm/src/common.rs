@@ -5,14 +5,10 @@
 //! Contains Rust definitions for common structures
 //! from `ndmxml-4.0.0-common-4.0.xsd` used by OEM.
 
-use super::kvn::de::KvnLine;
 use super::types::*;
-use crate::error::{CcsdsNdmError, Result};
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{FromKvnTokens, ToKvn};
+use crate::traits::ToKvn;
 use serde::{Deserialize, Serialize};
-use std::iter::Peekable;
-use std::str::FromStr;
 
 /// Represents the `ndmHeader` complex type from the XSD.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -31,47 +27,6 @@ impl ToKvn for NdmHeader {
         writer.write_pair("ORIGINATOR", &self.originator);
     }
 }
-
-// impl FromKvnTokens for NdmHeader {
-//     fn from_kvn_tokens<'a>(tokens: &mut impl Iterator<Item = Result<KvnLine<'a>>>) -> Result<Self> {
-//         let mut comment = Vec::new();
-//         let mut creation_date = None;
-//         let mut originator = None;
-
-//         for token in tokens {
-//             match token? {
-//                 KvnLine::Comment { content: c, .. } => comment.push(c.to_string()),
-//                 KvnLine::Pair { key, val, .. } => match key {
-//                     "CREATION_DATE" => {
-//                         creation_date = Some(Epoch::from_str(val)?);
-//                     }
-//                     "ORIGINATOR" => originator = Some(val.to_string()),
-//                     _ => {
-//                         return Err(CcsdsNdmError::KvnParse(format!(
-//                             "Unexpected field in header: {}",
-//                             key
-//                         )));
-//                     }
-//                 },
-//                 KvnLine::Empty { .. } => continue,
-//                 _ => {
-//                     return Err(CcsdsNdmError::KvnParse(
-//                         "Unexpected token in header".to_string(),
-//                     ));
-//                 }
-//             }
-//         }
-
-//         Ok(NdmHeader {
-//             comment,
-//             creation_date: creation_date.ok_or_else(|| {
-//                 CcsdsNdmError::MissingField("CREATION_DATE is required".to_string())
-//             })?,
-//             originator: originator
-//                 .ok_or_else(|| CcsdsNdmError::MissingField("ORIGINATOR is required".to_string()))?,
-//         })
-//     }
-// }
 
 /// Represents the `admHeader` complex type from the XSD.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -102,7 +57,7 @@ impl ToKvn for AdmHeader {
 }
 
 /// Represents the `odmHeader` complex type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdmHeader {
     /// Comments (see 7.8 for formatting rules).
@@ -154,79 +109,6 @@ impl ToKvn for OdmHeader {
         if let Some(ref msg_id) = self.message_id {
             writer.write_pair("MESSAGE_ID", msg_id);
         }
-    }
-}
-
-impl FromKvnTokens for OdmHeader {
-    fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
-    where
-        I: Iterator<Item = Result<KvnLine<'a>>>,
-    {
-        let mut comment = Vec::new();
-        let mut classification = None;
-        let mut creation_date = None;
-        let mut originator = None;
-        let mut message_id = None;
-
-        while let Some(Ok(token)) = tokens.peek() {
-            match token {
-                KvnLine::Comment { .. } => {
-                    if let Some(Ok(KvnLine::Comment { content, .. })) = tokens.next() {
-                        comment.push(content.to_string());
-                    }
-                }
-                KvnLine::Empty { .. } => {
-                    tokens.next();
-                }
-                KvnLine::Pair {
-                    key: k @ ("CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID"),
-                    val,
-                    line_number,
-                    ..
-                } => {
-                    let line_num = *line_number;
-                    let val = val.to_string();
-                    let key = *k;
-                    tokens.next();
-                    match key {
-                        "CLASSIFICATION" => classification = Some(val),
-                        "CREATION_DATE" => {
-                            creation_date = Some(
-                                Epoch::from_str(&val)
-                                    .map_err(|e| CcsdsNdmError::from(e).at_line(line_num))?,
-                            )
-                        }
-                        "ORIGINATOR" => originator = Some(val),
-                        "MESSAGE_ID" => message_id = Some(val),
-                        _ => {
-                            return Err(CcsdsNdmError::KvnParse {
-                                line: line_num,
-                                message: format!("Unexpected header key: {}", key),
-                            })
-                        }
-                    }
-                }
-                // If it's any other key (like OBJECT_NAME), it's not part of the header.
-                // Break and let the next parser handle it.
-                KvnLine::Pair { .. } => break,
-                // Any other token (BlockStart, BlockEnd, Raw) signals end of header
-                _ => break,
-            }
-        }
-
-        if let Some(Err(_)) = tokens.peek() {
-            tokens.next().unwrap()?;
-        }
-
-        Ok(OdmHeader {
-            comment,
-            classification,
-            creation_date: creation_date
-                .ok_or_else(|| CcsdsNdmError::MissingField("CREATION_DATE".to_string()))?,
-            originator: originator
-                .ok_or_else(|| CcsdsNdmError::MissingField("ORIGINATOR".to_string()))?,
-            message_id,
-        })
     }
 }
 
@@ -455,7 +337,9 @@ pub struct StateVectorAcc {
 
 impl ToKvn for StateVectorAcc {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = format!(
+        use std::fmt::Write;
+        let _ = write!(
+            writer,
             "{} {:.14e} {:.14e} {:.14e} {:.14e} {:.14e} {:.14e}",
             self.epoch,
             self.x.value,
@@ -466,154 +350,16 @@ impl ToKvn for StateVectorAcc {
             self.z_dot.value
         );
         if let Some(acc) = &self.x_ddot {
-            line.push_str(&format!(" {:.14e}", acc.value));
+            let _ = write!(writer, " {:.14e}", acc.value);
         }
         if let Some(acc) = &self.y_ddot {
-            line.push_str(&format!(" {:.14e}", acc.value));
+            let _ = write!(writer, " {:.14e}", acc.value);
         }
         if let Some(acc) = &self.z_ddot {
-            line.push_str(&format!(" {:.14e}", acc.value));
+            let _ = write!(writer, " {:.14e}", acc.value);
         }
-        writer.write_line(line);
+        writer.write_empty(); // Adds the trailing newline
     }
-}
-
-impl FromKvnTokens for StateVectorAcc {
-    fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
-    where
-        I: Iterator<Item = Result<KvnLine<'a>>>,
-    {
-        // State vectors are single lines in OEM (Raw), so we consume the next one
-        if let Some(token) = tokens.next() {
-            let token = token?;
-            let line_num = token.line_number();
-            match token {
-                KvnLine::Raw { content, .. } => {
-                    crate::common::parse_state_vector_raw(content, line_num)
-                }
-                KvnLine::Empty { line_number, .. } => Err(CcsdsNdmError::KvnParse {
-                    line: line_number,
-                    message: "Unexpected empty line expecting state vector".into(),
-                }),
-                _ => Err(CcsdsNdmError::KvnParse {
-                    line: line_num,
-                    message: "StateVector in KVN must be a raw line format".to_string(),
-                }),
-            }
-        } else {
-            Err(CcsdsNdmError::MissingField(
-                "No state vector data found".to_string(),
-            ))
-        }
-    }
-}
-
-/// Parses a raw OEM state vector line (KVN ephemeris section).
-///
-/// Expected tokens:
-/// 7 tokens: EPOCH X Y Z X_DOT Y_DOT Z_DOT
-/// 10 tokens: EPOCH X Y Z X_DOT Y_DOT Z_DOT X_DDOT Y_DDOT Z_DDOT
-pub fn parse_state_vector_raw(line: &str, line_number: usize) -> Result<StateVectorAcc> {
-    let mut tokens = line.split_whitespace();
-
-    // Parse epoch first (most likely to fail, fail fast)
-    let epoch_str = tokens
-        .next()
-        .ok_or_else(|| CcsdsNdmError::MissingField("EPOCH".to_string()).at_line(line_number))?;
-    let epoch =
-        Epoch::from_str(epoch_str).map_err(|e| CcsdsNdmError::from(e).at_line(line_number))?;
-
-    // Helper to parse next f64
-    let mut next_f64 = |field: &'static str| -> Result<f64> {
-        tokens
-            .next()
-            .ok_or_else(|| CcsdsNdmError::MissingField(field.to_string()).at_line(line_number))?
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::from(e).at_line(line_number))
-    };
-
-    // Parse mandatory fields
-    let x_val = next_f64("X")?;
-    let y_val = next_f64("Y")?;
-    let z_val = next_f64("Z")?;
-    let x_dot_val = next_f64("X_DOT")?;
-    let y_dot_val = next_f64("Y_DOT")?;
-    let z_dot_val = next_f64("Z_DOT")?;
-
-    // Check if acceleration exists
-    let (x_ddot, y_ddot, z_ddot) = if let Some(x_ddot_str) = tokens.next() {
-        let x_acc = x_ddot_str
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::from(e).at_line(line_number))?;
-
-        let y_acc = tokens
-            .next()
-            .ok_or_else(|| CcsdsNdmError::MissingField("Y_DDOT".to_string()).at_line(line_number))?
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::from(e).at_line(line_number))?;
-
-        let z_acc = tokens
-            .next()
-            .ok_or_else(|| CcsdsNdmError::MissingField("Z_DDOT".to_string()).at_line(line_number))?
-            .parse::<f64>()
-            .map_err(|e| CcsdsNdmError::from(e).at_line(line_number))?;
-
-        // Validate no extra tokens
-        if tokens.next().is_some() {
-            return Err(CcsdsNdmError::KvnParse {
-                line: line_number,
-                message: "State vector has extra tokens. Expected 7 or 10 tokens.".to_string(),
-            });
-        }
-
-        (
-            Some(Acc {
-                value: x_acc,
-                units: Some(AccUnits::KmPerS2),
-            }),
-            Some(Acc {
-                value: y_acc,
-                units: Some(AccUnits::KmPerS2),
-            }),
-            Some(Acc {
-                value: z_acc,
-                units: Some(AccUnits::KmPerS2),
-            }),
-        )
-    } else {
-        (None, None, None)
-    };
-
-    Ok(StateVectorAcc {
-        epoch,
-        x: Position {
-            value: x_val,
-            units: Some(PositionUnits::Km),
-        },
-        y: Position {
-            value: y_val,
-            units: Some(PositionUnits::Km),
-        },
-        z: Position {
-            value: z_val,
-            units: Some(PositionUnits::Km),
-        },
-        x_dot: Velocity {
-            value: x_dot_val,
-            units: Some(VelocityUnits::KmPerS),
-        },
-        y_dot: Velocity {
-            value: y_dot_val,
-            units: Some(VelocityUnits::KmPerS),
-        },
-        z_dot: Velocity {
-            value: z_dot_val,
-            units: Some(VelocityUnits::KmPerS),
-        },
-        x_ddot,
-        y_ddot,
-        z_ddot,
-    })
 }
 
 // Quaternion (components each in [-1, 1])
@@ -625,10 +371,10 @@ pub struct Quaternion {
     pub qc: f64,
 }
 impl Quaternion {
-    pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> Result<Self> {
+    pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> crate::error::Result<Self> {
         for (name, v) in [("Q1", q1), ("Q2", q2), ("Q3", q3), ("QC", qc)] {
             if !(-1.0..=1.0).contains(&v) {
-                return Err(CcsdsNdmError::OutOfRange {
+                return Err(crate::error::CcsdsNdmError::OutOfRange {
                     name: name.to_string(),
                     value: v.to_string(),
                     expected: "[-1, 1]".to_string(),
@@ -657,7 +403,7 @@ pub struct AngularVelocity {
 }
 
 // State vector (oem/opm common)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVector {
     /// Comments (see 7.8 for formatting rules).
@@ -731,118 +477,6 @@ impl ToKvn for StateVector {
         writer.write_measure("X_DOT", &self.x_dot);
         writer.write_measure("Y_DOT", &self.y_dot);
         writer.write_measure("Z_DOT", &self.z_dot);
-    }
-}
-
-impl FromKvnTokens for StateVector {
-    fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
-    where
-        I: Iterator<Item = Result<KvnLine<'a>>>,
-    {
-        let mut comment = Vec::new();
-        let mut epoch: Option<Epoch> = None;
-        let mut x: Option<Position> = None;
-        let mut y: Option<Position> = None;
-        let mut z: Option<Position> = None;
-        let mut x_dot: Option<Velocity> = None;
-        let mut y_dot: Option<Velocity> = None;
-        let mut z_dot: Option<Velocity> = None;
-        let mut last_line = 0;
-
-        while let Some(Ok(token)) = tokens.peek() {
-            last_line = token.line_number();
-            match token {
-                KvnLine::Comment { content, .. } => {
-                    comment.push(content.to_string());
-                    tokens.next();
-                }
-                KvnLine::Empty { .. } => {
-                    tokens.next();
-                }
-                KvnLine::Pair {
-                    key,
-                    val,
-                    unit,
-                    line_number,
-                    ..
-                } => {
-                    let key_str = *key;
-                    let line_num = *line_number;
-                    // Only consume keys that belong to the state vector
-                    match key_str {
-                        "EPOCH" => {
-                            let val = val.to_string();
-                            tokens.next();
-                            epoch = Some(
-                                Epoch::from_str(&val)
-                                    .map_err(|e| CcsdsNdmError::from(e).at_line(line_num))?,
-                            );
-                        }
-                        "X" => {
-                            let v = Position::from_kvn(val, unit.as_deref())
-                                .map_err(|e| e.at_line(line_num))?;
-                            tokens.next();
-                            x = Some(v);
-                        }
-                        "Y" => {
-                            let v = Position::from_kvn(val, unit.as_deref())
-                                .map_err(|e| e.at_line(line_num))?;
-                            tokens.next();
-                            y = Some(v);
-                        }
-                        "Z" => {
-                            let v = Position::from_kvn(val, unit.as_deref())
-                                .map_err(|e| e.at_line(line_num))?;
-                            tokens.next();
-                            z = Some(v);
-                        }
-                        "X_DOT" => {
-                            let v = Velocity::from_kvn(val, unit.as_deref())
-                                .map_err(|e| e.at_line(line_num))?;
-                            tokens.next();
-                            x_dot = Some(v);
-                        }
-                        "Y_DOT" => {
-                            let v = Velocity::from_kvn(val, unit.as_deref())
-                                .map_err(|e| e.at_line(line_num))?;
-                            tokens.next();
-                            y_dot = Some(v);
-                        }
-                        "Z_DOT" => {
-                            let v = Velocity::from_kvn(val, unit.as_deref())
-                                .map_err(|e| e.at_line(line_num))?;
-                            tokens.next();
-                            z_dot = Some(v);
-                        }
-                        _ => break,
-                    }
-                }
-                _ => break,
-            }
-        }
-
-        if let Some(Err(_)) = tokens.peek() {
-            tokens.next().unwrap()?;
-        }
-
-        Ok(StateVector {
-            comment,
-            epoch: epoch.ok_or_else(|| {
-                CcsdsNdmError::MissingField("EPOCH".to_string()).at_line(last_line)
-            })?,
-            x: x.ok_or_else(|| CcsdsNdmError::MissingField("X".to_string()).at_line(last_line))?,
-            y: y.ok_or_else(|| CcsdsNdmError::MissingField("Y".to_string()).at_line(last_line))?,
-            z: z.ok_or_else(|| CcsdsNdmError::MissingField("Z".to_string()).at_line(last_line))?,
-            x_dot: x_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("X_DOT".to_string()).at_line(last_line)
-            })?,
-            y_dot: y_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("Y_DOT".to_string()).at_line(last_line)
-            })?,
-            z_dot: z_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("Z_DOT".to_string()).at_line(last_line)
-            })?,
-        })
     }
 }
 
@@ -936,7 +570,7 @@ pub struct InertiaState {
 }
 
 /// OPM covariance matrix block (opmCovarianceMatrixType).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmCovarianceMatrix {
     /// Comments (see 7.8 for formatting rules).
@@ -1115,305 +749,6 @@ impl ToKvn for OpmCovarianceMatrix {
     }
 }
 
-impl FromKvnTokens for OpmCovarianceMatrix {
-    fn from_kvn_tokens<'a, I>(tokens: &mut Peekable<I>) -> Result<Self>
-    where
-        I: Iterator<Item = Result<KvnLine<'a>>>,
-    {
-        let mut comment: Vec<String> = Vec::new();
-        let mut cov_ref_frame: Option<String> = None;
-
-        macro_rules! req {
-            ($name:ident : $ty:ty) => {
-                let mut $name: Option<$ty> = None;
-            };
-        }
-
-        req!(cx_x: PositionCovariance);
-        req!(cy_x: PositionCovariance);
-        req!(cy_y: PositionCovariance);
-        req!(cz_x: PositionCovariance);
-        req!(cz_y: PositionCovariance);
-        req!(cz_z: PositionCovariance);
-
-        req!(cx_dot_x: PositionVelocityCovariance);
-        req!(cx_dot_y: PositionVelocityCovariance);
-        req!(cx_dot_z: PositionVelocityCovariance);
-        req!(cx_dot_x_dot: VelocityCovariance);
-
-        req!(cy_dot_x: PositionVelocityCovariance);
-        req!(cy_dot_y: PositionVelocityCovariance);
-        req!(cy_dot_z: PositionVelocityCovariance);
-        req!(cy_dot_x_dot: VelocityCovariance);
-        req!(cy_dot_y_dot: VelocityCovariance);
-
-        req!(cz_dot_x: PositionVelocityCovariance);
-        req!(cz_dot_y: PositionVelocityCovariance);
-        req!(cz_dot_z: PositionVelocityCovariance);
-        req!(cz_dot_x_dot: VelocityCovariance);
-        req!(cz_dot_y_dot: VelocityCovariance);
-        req!(cz_dot_z_dot: VelocityCovariance);
-        let mut last_line = 0;
-
-        while let Some(Ok(token)) = tokens.peek() {
-            last_line = token.line_number();
-            match token {
-                KvnLine::Empty { .. } => {
-                    tokens.next();
-                }
-                KvnLine::Comment { .. } => {
-                    if let Some(Ok(KvnLine::Comment { content, .. })) = tokens.next() {
-                        comment.push(content.to_string());
-                    }
-                }
-                KvnLine::Pair {
-                    key,
-                    val,
-                    unit,
-                    line_number,
-                    ..
-                } => {
-                    let k = *key;
-                    let u = unit.as_deref();
-                    let line_num = *line_number;
-                    let consumed = match k {
-                        "COV_REF_FRAME" => {
-                            cov_ref_frame = Some(val.to_string());
-                            true
-                        }
-                        "CX_X" => {
-                            cx_x = Some(
-                                PositionCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CY_X" => {
-                            cy_x = Some(
-                                PositionCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CY_Y" => {
-                            cy_y = Some(
-                                PositionCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CZ_X" => {
-                            cz_x = Some(
-                                PositionCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CZ_Y" => {
-                            cz_y = Some(
-                                PositionCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CZ_Z" => {
-                            cz_z = Some(
-                                PositionCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CX_DOT_X" => {
-                            cx_dot_x = Some(
-                                PositionVelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CX_DOT_Y" => {
-                            cx_dot_y = Some(
-                                PositionVelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CX_DOT_Z" => {
-                            cx_dot_z = Some(
-                                PositionVelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CX_DOT_X_DOT" => {
-                            cx_dot_x_dot = Some(
-                                VelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CY_DOT_X" => {
-                            cy_dot_x = Some(
-                                PositionVelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CY_DOT_Y" => {
-                            cy_dot_y = Some(
-                                PositionVelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CY_DOT_Z" => {
-                            cy_dot_z = Some(
-                                PositionVelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CY_DOT_X_DOT" => {
-                            cy_dot_x_dot = Some(
-                                VelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CY_DOT_Y_DOT" => {
-                            cy_dot_y_dot = Some(
-                                VelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CZ_DOT_X" => {
-                            cz_dot_x = Some(
-                                PositionVelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CZ_DOT_Y" => {
-                            cz_dot_y = Some(
-                                PositionVelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CZ_DOT_Z" => {
-                            cz_dot_z = Some(
-                                PositionVelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CZ_DOT_X_DOT" => {
-                            cz_dot_x_dot = Some(
-                                VelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CZ_DOT_Y_DOT" => {
-                            cz_dot_y_dot = Some(
-                                VelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        "CZ_DOT_Z_DOT" => {
-                            cz_dot_z_dot = Some(
-                                VelocityCovariance::from_kvn(val, u)
-                                    .map_err(|e| e.at_line(line_num))?,
-                            );
-                            true
-                        }
-                        _ => false,
-                    };
-                    if consumed {
-                        tokens.next();
-                    } else {
-                        break;
-                    }
-                }
-                _ => break,
-            }
-        }
-
-        if let Some(Err(_)) = tokens.peek() {
-            tokens.next().unwrap()?;
-        }
-
-        Ok(OpmCovarianceMatrix {
-            comment,
-            cov_ref_frame,
-            cx_x: cx_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CX_X is required".into()).at_line(last_line)
-            })?,
-            cy_x: cy_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_X is required".into()).at_line(last_line)
-            })?,
-            cy_y: cy_y.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_Y is required".into()).at_line(last_line)
-            })?,
-            cz_x: cz_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_X is required".into()).at_line(last_line)
-            })?,
-            cz_y: cz_y.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_Y is required".into()).at_line(last_line)
-            })?,
-            cz_z: cz_z.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_Z is required".into()).at_line(last_line)
-            })?,
-            cx_dot_x: cx_dot_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CX_DOT_X is required".into()).at_line(last_line)
-            })?,
-            cx_dot_y: cx_dot_y.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CX_DOT_Y is required".into()).at_line(last_line)
-            })?,
-            cx_dot_z: cx_dot_z.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CX_DOT_Z is required".into()).at_line(last_line)
-            })?,
-            cx_dot_x_dot: cx_dot_x_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CX_DOT_X_DOT is required".into()).at_line(last_line)
-            })?,
-            cy_dot_x: cy_dot_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_DOT_X is required".into()).at_line(last_line)
-            })?,
-            cy_dot_y: cy_dot_y.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_DOT_Y is required".into()).at_line(last_line)
-            })?,
-            cy_dot_z: cy_dot_z.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_DOT_Z is required".into()).at_line(last_line)
-            })?,
-            cy_dot_x_dot: cy_dot_x_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_DOT_X_DOT is required".into()).at_line(last_line)
-            })?,
-            cy_dot_y_dot: cy_dot_y_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CY_DOT_Y_DOT is required".into()).at_line(last_line)
-            })?,
-            cz_dot_x: cz_dot_x.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_X is required".into()).at_line(last_line)
-            })?,
-            cz_dot_y: cz_dot_y.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_Y is required".into()).at_line(last_line)
-            })?,
-            cz_dot_z: cz_dot_z.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_Z is required".into()).at_line(last_line)
-            })?,
-            cz_dot_x_dot: cz_dot_x_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_X_DOT is required".into()).at_line(last_line)
-            })?,
-            cz_dot_y_dot: cz_dot_y_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_Y_DOT is required".into()).at_line(last_line)
-            })?,
-            cz_dot_z_dot: cz_dot_z_dot.ok_or_else(|| {
-                CcsdsNdmError::MissingField("CZ_DOT_Z_DOT is required".into()).at_line(last_line)
-            })?,
-        })
-    }
-}
-
 /// Atmospheric reentry parameters (atmosphericReentryParametersType, RDM).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -1437,7 +772,7 @@ pub struct AtmosphericReentryParameters {
 }
 
 /// Ground impact parameters (groundImpactParametersType, RDM).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct GroundImpactParameters {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

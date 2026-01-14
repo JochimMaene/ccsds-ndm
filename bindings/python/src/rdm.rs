@@ -21,8 +21,6 @@ use std::fs;
 // RDM - Re-entry Data Message
 // ============================================================================
 
-/// Re-entry Data Message (RDM).
-///
 /// A message format for use in exchanging spacecraft re-entry information.
 ///
 /// Parameters
@@ -63,8 +61,6 @@ impl Rdm {
         )
     }
 
-    /// Re-entry Data Message (RDM).
-    ///
     /// A message format for use in exchanging spacecraft re-entry information.
     ///
     /// :type: RdmHeader

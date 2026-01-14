@@ -10,10 +10,26 @@ pub struct KvnWriter {
     output: String,
 }
 
+impl Write for KvnWriter {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.output.write_str(s)
+    }
+
+    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> std::fmt::Result {
+        self.output.write_fmt(args)
+    }
+}
+
 impl KvnWriter {
     pub fn new() -> Self {
         Self {
             output: String::new(),
+        }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            output: String::with_capacity(capacity),
         }
     }
 }
@@ -27,14 +43,14 @@ impl Default for KvnWriter {
 impl KvnWriter {
     /// Writes a simple `KEY = value` line.
     pub fn write_pair<V: Display>(&mut self, key: &str, value: V) {
-        let _ = writeln!(self.output, "{:<20} = {}", key, value);
+        let _ = writeln!(self, "{:<20} = {}", key, value);
     }
 
     /// Writes `KEY = value [unit]`.
     /// Falls back to `write_pair` if no unit is provided.
     pub fn write_measure<V: Display, U: Display>(&mut self, key: &str, measure: &UnitValue<V, U>) {
         if let Some(ref u) = measure.units {
-            let _ = writeln!(self.output, "{:<20} = {} [{}]", key, measure.value, u);
+            let _ = writeln!(self, "{:<20} = {} [{}]", key, measure.value, u);
         } else {
             self.write_pair(key, &measure.value);
         }
@@ -42,24 +58,24 @@ impl KvnWriter {
 
     /// Writes a raw line of text.
     pub fn write_line<V: Display>(&mut self, line: V) {
-        let _ = writeln!(self.output, "{}", line);
+        let _ = writeln!(self, "{}", line);
     }
 
     /// Writes comment lines.
     pub fn write_comments(&mut self, comments: &[String]) {
         for c in comments {
-            let _ = writeln!(self.output, "COMMENT {}", c);
+            let _ = writeln!(self, "COMMENT {}", c);
         }
     }
 
     /// Writes a section tag (e.g., "META_START").
     pub fn write_section(&mut self, tag: &str) {
-        let _ = writeln!(self.output, "{}", tag);
+        let _ = writeln!(self, "{}", tag);
     }
 
     /// Inserts a blank line.
     pub fn write_empty(&mut self) {
-        let _ = writeln!(self.output);
+        let _ = writeln!(self);
     }
 
     /// Returns the accumulated KVN content.

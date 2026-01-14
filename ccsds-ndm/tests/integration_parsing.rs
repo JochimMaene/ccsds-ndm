@@ -37,22 +37,14 @@ fn test_parse_all_samples() {
                 let content = fs::read_to_string(&path).unwrap();
                 match from_str(&content) {
                     Ok(msg) => {
-                        if fname.starts_with("opm") {
-                            if !matches!(msg, MessageType::Opm(_)) {
-                                failures.push(format!("{} is not OPM", fname));
-                            }
-                        } else if fname.starts_with("omm") {
-                            if !matches!(msg, MessageType::Omm(_)) {
-                                failures.push(format!("{} is not OMM", fname));
-                            }
-                        } else if fname.starts_with("oem") {
-                            if !matches!(msg, MessageType::Oem(_)) {
-                                failures.push(format!("{} is not OEM", fname));
-                            }
-                        } else if fname.starts_with("ocm") {
-                            if !matches!(msg, MessageType::Ocm(_)) {
-                                failures.push(format!("{} is not OCM", fname));
-                            }
+                        if fname.starts_with("opm") && !matches!(msg, MessageType::Opm(_)) {
+                            failures.push(format!("{} is not OPM", fname));
+                        } else if fname.starts_with("omm") && !matches!(msg, MessageType::Omm(_)) {
+                            failures.push(format!("{} is not OMM", fname));
+                        } else if fname.starts_with("oem") && !matches!(msg, MessageType::Oem(_)) {
+                            failures.push(format!("{} is not OEM", fname));
+                        } else if fname.starts_with("ocm") && !matches!(msg, MessageType::Ocm(_)) {
+                            failures.push(format!("{} is not OCM", fname));
                         }
                     }
                     Err(e) => {
@@ -81,22 +73,14 @@ fn test_parse_all_samples() {
                 let content = fs::read_to_string(&path).unwrap();
                 match from_str(&content) {
                     Ok(msg) => {
-                        if fname.starts_with("opm") {
-                            if !matches!(msg, MessageType::Opm(_)) {
-                                failures.push(format!("{} is not OPM", fname));
-                            }
-                        } else if fname.starts_with("omm") {
-                            if !matches!(msg, MessageType::Omm(_)) {
-                                failures.push(format!("{} is not OMM", fname));
-                            }
-                        } else if fname.starts_with("oem") {
-                            if !matches!(msg, MessageType::Oem(_)) {
-                                failures.push(format!("{} is not OEM", fname));
-                            }
-                        } else if fname.starts_with("ocm") {
-                            if !matches!(msg, MessageType::Ocm(_)) {
-                                failures.push(format!("{} is not OCM", fname));
-                            }
+                        if fname.starts_with("opm") && !matches!(msg, MessageType::Opm(_)) {
+                            failures.push(format!("{} is not OPM", fname));
+                        } else if fname.starts_with("omm") && !matches!(msg, MessageType::Omm(_)) {
+                            failures.push(format!("{} is not OMM", fname));
+                        } else if fname.starts_with("oem") && !matches!(msg, MessageType::Oem(_)) {
+                            failures.push(format!("{} is not OEM", fname));
+                        } else if fname.starts_with("ocm") && !matches!(msg, MessageType::Ocm(_)) {
+                            failures.push(format!("{} is not OCM", fname));
                         }
                     }
                     Err(e) => {

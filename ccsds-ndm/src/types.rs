@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::error::{CcsdsNdmError, Result};
-use crate::traits::FromKvnValue;
+use crate::traits::{FromKvnFloat, FromKvnValue};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ use thiserror::Error;
 ///
 /// This struct wraps a `String` and provides validation during deserialization
 /// to ensure it conforms to the CCSDS epoch format.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(try_from = "String")]
 pub struct Epoch(String);
 
@@ -98,7 +98,7 @@ pub trait FromKvn: Sized {
 /// # Type Parameters
 /// * `V`: The type of the value (e.g., `f64`, `i32`).
 /// * `U`: The type of the unit enum (e.g., `PositionUnits`).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct UnitValue<V, U> {
     #[serde(rename = "$value")]
     pub value: V,
@@ -137,6 +137,19 @@ where
             None => None,
         };
 
+        Ok(UnitValue { value, units })
+    }
+}
+
+impl<U> FromKvnFloat for UnitValue<f64, U>
+where
+    U: FromStr<Err = CcsdsNdmError>,
+{
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let units = match unit {
+            Some(u_str) => Some(u_str.parse::<U>()?),
+            None => None,
+        };
         Ok(UnitValue { value, units })
     }
 }
@@ -218,10 +231,9 @@ macro_rules! define_required_type {
                 write!(f, "{}", self.value)
             }
         }
-        impl FromKvn for $name {
-            fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-                let v: f64 = value.parse().map_err(CcsdsNdmError::from)?;
-                Ok(Self::new(v))
+        impl FromKvnFloat for $name {
+            fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+                Ok(Self::new(value))
             }
         }
     };
@@ -311,9 +323,9 @@ impl Angle {
         }
     }
 }
-impl FromKvn for Angle {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, AngleUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Angle {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, AngleUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -356,9 +368,9 @@ impl DayInterval {
         }
     }
 }
-impl FromKvn for DayInterval {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, DayIntervalUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for DayInterval {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, DayIntervalUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -396,10 +408,9 @@ impl DayIntervalRequired {
         }
     }
 }
-impl FromKvn for DayIntervalRequired {
-    fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value.parse().map_err(CcsdsNdmError::from)?;
-        Self::new(v)
+impl FromKvnFloat for DayIntervalRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 impl std::fmt::Display for DayIntervalRequired {
@@ -437,9 +448,9 @@ impl Frequency {
         }
     }
 }
-impl FromKvn for Frequency {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, FrequencyUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Frequency {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, FrequencyUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -481,9 +492,9 @@ impl Gm {
         }
     }
 }
-impl FromKvn for Gm {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, GmUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Gm {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, GmUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -526,10 +537,9 @@ impl AltitudeRequired {
         }
     }
 }
-impl FromKvn for AltitudeRequired {
-    fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value.parse()?;
-        Self::new(v)
+impl FromKvnFloat for AltitudeRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 impl std::fmt::Display for AltitudeRequired {
@@ -573,10 +583,9 @@ impl WkgRequired {
         }
     }
 }
-impl FromKvn for WkgRequired {
-    fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value.parse()?;
-        Self::new(v)
+impl FromKvnFloat for WkgRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 
@@ -611,9 +620,9 @@ impl Mass {
     }
 }
 
-impl FromKvn for Mass {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, MassUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Mass {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, MassUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -652,9 +661,9 @@ impl Area {
         }
     }
 }
-impl FromKvn for Area {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, AreaUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Area {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, AreaUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -666,6 +675,14 @@ impl std::fmt::Display for Area {
 define_unit_type!(Ms2, Ms2Units, MPerS2, { MPerS2 => "m/s**2" });
 
 define_required_type!(Ms2Required, Ms2Units, MPerS2);
+
+impl std::str::FromStr for Ms2Required {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let v: f64 = s.parse().map_err(CcsdsNdmError::from)?;
+        Ok(Self::new(v))
+    }
+}
 
 define_unit_type!(Km2, Km2Units, Km2, { Km2 => "km**2" });
 
@@ -727,6 +744,20 @@ impl std::fmt::Display for BallisticCoeffRequired {
     }
 }
 
+impl std::str::FromStr for BallisticCoeffRequired {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let v: f64 = s.parse().map_err(CcsdsNdmError::from)?;
+        Self::new(v)
+    }
+}
+
+impl FromKvnFloat for BallisticCoeffRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
 define_unit_enum!(PercentageUnits, Percent, { Percent => "%" });
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -754,9 +785,9 @@ impl Percentage {
         }
     }
 }
-impl FromKvn for Percentage {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, PercentageUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Percentage {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, PercentageUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -793,10 +824,9 @@ impl std::fmt::Display for PercentageRequired {
         write!(f, "{}", self.value)
     }
 }
-impl FromKvn for PercentageRequired {
-    fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value.parse()?;
-        Self::new(v)
+impl FromKvnFloat for PercentageRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 
@@ -817,9 +847,24 @@ impl Probability {
         Ok(Self { value })
     }
 }
+
+impl std::str::FromStr for Probability {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let v: f64 = s.parse().map_err(CcsdsNdmError::from)?;
+        Self::new(v)
+    }
+}
+
 impl std::fmt::Display for Probability {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value)
+    }
+}
+
+impl FromKvnFloat for Probability {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 
@@ -844,6 +889,13 @@ impl DeltaMass {
     }
 }
 
+impl FromKvnFloat for DeltaMass {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, MassUnits>::from_kvn_float(value, unit)?;
+        Self::new(uv.value, uv.units)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct DeltaMassZ {
     #[serde(rename = "$value")]
@@ -861,6 +913,13 @@ impl DeltaMassZ {
             });
         }
         Ok(Self { value, units })
+    }
+}
+
+impl FromKvnFloat for DeltaMassZ {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, MassUnits>::from_kvn_float(value, unit)?;
+        Self::new(uv.value, uv.units)
     }
 }
 
@@ -901,6 +960,20 @@ impl std::fmt::Display for LatitudeRequired {
     }
 }
 
+impl std::str::FromStr for LatitudeRequired {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let v: f64 = s.parse().map_err(CcsdsNdmError::from)?;
+        Self::new(v)
+    }
+}
+
+impl FromKvnFloat for LatitudeRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct LongitudeRequired {
     #[serde(rename = "$value")]
@@ -926,6 +999,20 @@ impl LongitudeRequired {
 impl std::fmt::Display for LongitudeRequired {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value)
+    }
+}
+
+impl std::str::FromStr for LongitudeRequired {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let v: f64 = s.parse().map_err(CcsdsNdmError::from)?;
+        Self::new(v)
+    }
+}
+
+impl FromKvnFloat for LongitudeRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 
@@ -996,22 +1083,13 @@ pub enum ObjectDescription {
 impl std::str::FromStr for ObjectDescription {
     type Err = crate::error::CcsdsNdmError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match s.to_uppercase().as_str() {
             "PAYLOAD" => Ok(Self::Payload),
-            "payload" => Ok(Self::PayloadLower),
             "ROCKET BODY" => Ok(Self::RocketBody),
-            "rocket body" => Ok(Self::RocketBodyLower),
             "DEBRIS" => Ok(Self::Debris),
-            "debris" => Ok(Self::DebrisLower),
             "UNKNOWN" => Ok(Self::Unknown),
-            "unknown" => Ok(Self::UnknownLower),
             "OTHER" => Ok(Self::Other),
-            "other" => Ok(Self::OtherLower),
-            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
-                key: "OBJECT_TYPE".to_string(),
-                value: s.to_string(),
-                expected: "PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, or OTHER".to_string(),
-            }),
+            _ => Ok(Self::Other),
         }
     }
 }
@@ -1380,9 +1458,9 @@ impl Duration {
         }
     }
 }
-impl FromKvn for Duration {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, TimeUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Duration {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, TimeUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -1402,9 +1480,9 @@ pub struct TimeOffset {
     pub units: Option<TimeUnits>,
 }
 
-impl FromKvn for TimeOffset {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, TimeUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for TimeOffset {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, TimeUnits>::from_kvn_float(value, unit)?;
         Ok(TimeOffset {
             value: uv.value,
             units: uv.units,
@@ -1446,9 +1524,9 @@ impl Inclination {
         }
     }
 }
-impl FromKvn for Inclination {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, AngleUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Inclination {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, AngleUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -1753,6 +1831,21 @@ pub enum CdmObjectType {
     Object2Lower,
 }
 
+impl std::str::FromStr for CdmObjectType {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "OBJECT1" => Ok(Self::Object1),
+            "OBJECT2" => Ok(Self::Object2),
+            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
+                key: "OBJECT".to_string(),
+                value: s.to_string(),
+                expected: "OBJECT1 or OBJECT2".to_string(),
+            }),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ScreenVolumeFrameType {
     #[serde(rename = "RTN")]
@@ -1765,6 +1858,21 @@ pub enum ScreenVolumeFrameType {
     TvnLower,
 }
 
+impl std::str::FromStr for ScreenVolumeFrameType {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "RTN" => Ok(Self::Rtn),
+            "TVN" => Ok(Self::Tvn),
+            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
+                key: "SCREEN_VOLUME_FRAME".to_string(),
+                value: s.to_string(),
+                expected: "RTN or TVN".to_string(),
+            }),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ScreenVolumeShapeType {
     #[serde(rename = "ELLIPSOID")]
@@ -1775,6 +1883,21 @@ pub enum ScreenVolumeShapeType {
     Box,
     #[serde(rename = "box")]
     BoxLower,
+}
+
+impl std::str::FromStr for ScreenVolumeShapeType {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "ELLIPSOID" => Ok(Self::Ellipsoid),
+            "BOX" => Ok(Self::Box),
+            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
+                key: "SCREEN_VOLUME_SHAPE".to_string(),
+                value: s.to_string(),
+                expected: "ELLIPSOID or BOX".to_string(),
+            }),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -1793,6 +1916,22 @@ pub enum ReferenceFrameType {
     ItrfLower,
 }
 
+impl std::str::FromStr for ReferenceFrameType {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "EME2000" => Ok(Self::Eme2000),
+            "GCRF" => Ok(Self::Gcrf),
+            "ITRF" => Ok(Self::Itrf),
+            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
+                key: "REF_FRAME".to_string(),
+                value: s.to_string(),
+                expected: "EME2000, GCRF, or ITRF".to_string(),
+            }),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum CovarianceMethodType {
     #[serde(rename = "CALCULATED")]
@@ -1803,6 +1942,21 @@ pub enum CovarianceMethodType {
     Default,
     #[serde(rename = "default")]
     DefaultLower,
+}
+
+impl std::str::FromStr for CovarianceMethodType {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "CALCULATED" => Ok(Self::Calculated),
+            "DEFAULT" => Ok(Self::Default),
+            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
+                key: "COVARIANCE_METHOD".to_string(),
+                value: s.to_string(),
+                expected: "CALCULATED or DEFAULT".to_string(),
+            }),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -1819,6 +1973,22 @@ pub enum ManeuverableType {
     NA,
     #[serde(rename = "n/a")]
     NALower,
+}
+
+impl std::str::FromStr for ManeuverableType {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "YES" => Ok(Self::Yes),
+            "NO" => Ok(Self::No),
+            "N/A" => Ok(Self::NA),
+            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
+                key: "MANEUVERABLE".to_string(),
+                value: s.to_string(),
+                expected: "YES, NO, or N/A".to_string(),
+            }),
+        }
+    }
 }
 
 //----------------------------------------------------------------------
