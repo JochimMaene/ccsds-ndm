@@ -6,11 +6,11 @@
 //!
 //! This module implements KVN parsing for TDM using winnow parser combinators.
 
-use crate::parse_block;
 use crate::kvn::parser::*;
 use crate::messages::tdm::{
     Tdm, TdmBody, TdmData, TdmHeader, TdmMetadata, TdmObservation, TdmObservationData, TdmSegment,
 };
+use crate::parse_block;
 use crate::types::*;
 use winnow::ascii::till_line_ending;
 use winnow::combinator::preceded;
@@ -179,8 +179,8 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
 //----------------------------------------------------------------------
 
 pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
-    use winnow::combinator::dispatch;
     use winnow::ascii::float;
+    use winnow::combinator::dispatch;
 
     let checkpoint = input.checkpoint();
     let (epoch, data) = dispatch! {

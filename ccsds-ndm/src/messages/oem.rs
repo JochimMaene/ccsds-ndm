@@ -41,7 +41,15 @@ pub struct Oem {
 
 impl Ndm for Oem {
     fn to_kvn(&self) -> Result<String> {
-        let mut writer = KvnWriter::new();
+        // Estimate capacity: header + (metadata + state vectors + covariance) for each segment
+        let mut total_records = 0;
+        for seg in &self.body.segment {
+            total_records += seg.data.state_vector.len();
+            total_records += seg.data.covariance_matrix.len() * 7; // Approx lines per cov
+        }
+        let estimated_capacity = total_records * 100 + 1024;
+        let mut writer = KvnWriter::with_capacity(estimated_capacity);
+
         // 1. Header (Common to ODM)
         writer.write_pair("CCSDS_OEM_VERS", &self.version);
         self.header.write_kvn(&mut writer);
@@ -583,22 +591,22 @@ mod tests {
     fn test_header_optional_fields_roundtrip() {
         // A2.5.3 Items 3,4,7: COMMENT, CLASSIFICATION, MESSAGE_ID optional
         let kvn = r#"CCSDS_OEM_VERS = 3.0
-    COMMENT This is a header comment
-    CLASSIFICATION = SBU
-    CREATION_DATE = 2023-01-01T00:00:00
-    ORIGINATOR = TEST
-    MESSAGE_ID = MSG-001
-    META_START
-    OBJECT_NAME = SAT1
-    OBJECT_ID = 999
-    CENTER_NAME = EARTH
-    REF_FRAME = GCRF
-    TIME_SYSTEM = UTC
-    START_TIME = 2023-01-01T00:00:00
-    STOP_TIME = 2023-01-02T00:00:00
-    META_STOP
-    2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
-    "#;
+COMMENT This is a header comment
+CLASSIFICATION = SBU
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
         let oem = Oem::from_kvn(kvn).unwrap();
         let out = oem.to_kvn().unwrap();
         assert!(out.contains("CLASSIFICATION"));

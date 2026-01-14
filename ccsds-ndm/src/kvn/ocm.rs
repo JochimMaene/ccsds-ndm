@@ -6,10 +6,10 @@
 //!
 //! This module implements KVN parsing for OCM using winnow parser combinators.
 
-use crate::parse_block;
-use crate::kvn::parser::*;
 use crate::common::OdmHeader;
+use crate::kvn::parser::*;
 use crate::messages::ocm::*;
+use crate::parse_block;
 use crate::types::*;
 use winnow::ascii::{space1, till_line_ending};
 use winnow::combinator::{preceded, repeat};
@@ -35,7 +35,11 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
     ws.parse_next(input)?;
     expect_block_start("META").parse_next(input).map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(input, &input.checkpoint(), StrContext::Label("Expected META_START")))
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                StrContext::Label("Expected META_START"),
+            ))
         } else {
             e
         }
@@ -219,7 +223,10 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
 //----------------------------------------------------------------------
 
 pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
-    if input.trim_start().starts_with(|c: char| c.is_ascii_uppercase()) {
+    if input
+        .trim_start()
+        .starts_with(|c: char| c.is_ascii_uppercase())
+    {
         return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
     }
     let epoch = preceded(ws, till_space).parse_next(input)?;
@@ -507,7 +514,10 @@ pub fn ocm_phys(input: &mut &str) -> KvnResult<OcmPhysicalDescription> {
 }
 
 pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
-    if input.trim_start().starts_with(|c: char| c.is_ascii_uppercase()) {
+    if input
+        .trim_start()
+        .starts_with(|c: char| c.is_ascii_uppercase())
+    {
         return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
     }
     let epoch = preceded(ws, till_space).parse_next(input)?;
@@ -682,10 +692,11 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         "MAN_UNITS" => man_units: kv_string,
     }, |i| at_block_end("MAN", i), "Unexpected OCM Maneuver key");
 
-        loop {
-            let comments = collect_comments.parse_next(input)?;
-    
-            if at_block_end("MAN", input) {            comment.extend(comments);
+    loop {
+        let comments = collect_comments.parse_next(input)?;
+
+        if at_block_end("MAN", input) {
+            comment.extend(comments);
             expect_block_end("MAN").parse_next(input)?;
             break;
         }
@@ -1048,7 +1059,15 @@ enum OcmBlock {
 }
 
 fn ocm_data_block(input: &mut &str) -> KvnResult<OcmBlock> {
-    use winnow::combinator::{peek, dispatch};
+    use winnow::combinator::{dispatch, peek};
+
+    // Fast-path: if it doesn't look like a keyword/block start (starts with digit or sign),
+    // it's likely a data line that should be handled by the parent loop's line parsers.
+    // However, OCM data is block-based, so if we aren't at a block start, we should backtrack.
+    let first_char = input.trim_start().chars().next();
+    if matches!(first_char, Some('0'..='9' | '-' | '+')) {
+        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+    }
 
     let comments = collect_comments.parse_next(input)?;
 
@@ -1074,24 +1093,60 @@ fn ocm_data_block(input: &mut &str) -> KvnResult<OcmBlock> {
 
     // Prepend comments collected before the block start
     match &mut block {
-        OcmBlock::Traj(x) => { x.comment.splice(0..0, comments); }
-        OcmBlock::Phys(x) => { x.comment.splice(0..0, comments); }
-        OcmBlock::Cov(x) => { x.comment.splice(0..0, comments); }
-        OcmBlock::Man(x) => { x.comment.splice(0..0, comments); }
-        OcmBlock::Pert(x) => { x.comment.splice(0..0, comments); }
-        OcmBlock::Od(x) => { x.comment.splice(0..0, comments); }
-        OcmBlock::User(x) => { x.comment.splice(0..0, comments); }
+        OcmBlock::Traj(x) => {
+            x.comment.splice(0..0, comments);
+        }
+        OcmBlock::Phys(x) => {
+            x.comment.splice(0..0, comments);
+        }
+        OcmBlock::Cov(x) => {
+            x.comment.splice(0..0, comments);
+        }
+        OcmBlock::Man(x) => {
+            x.comment.splice(0..0, comments);
+        }
+        OcmBlock::Pert(x) => {
+            x.comment.splice(0..0, comments);
+        }
+        OcmBlock::Od(x) => {
+            x.comment.splice(0..0, comments);
+        }
+        OcmBlock::User(x) => {
+            x.comment.splice(0..0, comments);
+        }
     }
 
     Ok(block)
 }
 
 pub fn ocm_data(input: &mut &str) -> KvnResult<OcmData> {
-    let blocks: Vec<OcmBlock> = repeat(0.., ocm_data_block).parse_next(input)?;
+    let mut data = OcmData::default();
+
+    loop {
+        let checkpoint = input.checkpoint();
+        match ocm_data_block.parse_next(input) {
+            Ok(block) => match block {
+                OcmBlock::Traj(x) => data.traj.push(x),
+                OcmBlock::Phys(x) => data.phys = Some(x),
+                OcmBlock::Cov(x) => data.cov.push(x),
+                OcmBlock::Man(x) => data.man.push(x),
+                OcmBlock::Pert(x) => data.pert = Some(x),
+                OcmBlock::Od(x) => data.od = Some(x),
+                OcmBlock::User(x) => data.user = Some(x),
+            },
+            Err(e) => {
+                if e.is_backtrack() {
+                    input.reset(&checkpoint);
+                    break;
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
 
     // Check for unexpected data after blocks (and their comments) are consumed.
-    // ocm_data_block backtracks if it fails, so comments preceding an invalid block might remain.
-    // We skip comments to see if there's garbage.
+    // ... (rest of the logic remains similar)
     let checkpoint = input.checkpoint();
     let _ = collect_comments.parse_next(input);
     if !input.is_empty() && !at_block_start("META", input) {
@@ -1102,19 +1157,6 @@ pub fn ocm_data(input: &mut &str) -> KvnResult<OcmData> {
         )));
     }
     input.reset(&checkpoint);
-
-    let mut data = OcmData::default();
-    for block in blocks {
-        match block {
-            OcmBlock::Traj(x) => data.traj.push(x),
-            OcmBlock::Phys(x) => data.phys = Some(x),
-            OcmBlock::Cov(x) => data.cov.push(x),
-            OcmBlock::Man(x) => data.man.push(x),
-            OcmBlock::Pert(x) => data.pert = Some(x),
-            OcmBlock::Od(x) => data.od = Some(x),
-            OcmBlock::User(x) => data.user = Some(x),
-        }
-    }
 
     Ok(data)
 }
@@ -1142,7 +1184,10 @@ pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
             }
         };
 
-        if !matches!(key, "CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID") {
+        if !matches!(
+            key,
+            "CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID"
+        ) {
             input.reset(&checkpoint);
             break;
         }

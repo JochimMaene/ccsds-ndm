@@ -79,6 +79,19 @@ where
     }
 }
 
+/// Trait for types that can be parsed directly from a float and optional unit.
+///
+/// This avoids the overhead of formatting a float to a string and then parsing it back.
+pub trait FromKvnFloat: Sized {
+    /// Create an instance from a float value and optional unit string.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The float value
+    /// * `unit` - The optional unit string
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self>;
+}
+
 /// Trait for types that can be serialized to KVN format.
 ///
 /// Implementors write their KVN representation to the provided [`KvnWriter`].

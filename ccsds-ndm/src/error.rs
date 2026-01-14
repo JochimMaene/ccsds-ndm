@@ -74,6 +74,7 @@ pub enum CcsdsNdmError {
         message: String,
         contexts: Vec<&'static str>,
         snippet: String,
+        offset: usize, // Track raw offset for lazy location calculation
     },
 
     /// A required field was missing in the message.
@@ -179,9 +180,10 @@ impl ParserError<&str> for CcsdsNdmError {
         CcsdsNdmError::KvnParse {
             line: 0,
             column: 0,
-            message: "Parse error".to_string(),
+            message: String::new(),
             contexts: Vec::new(),
             snippet: String::new(),
+            offset: 0,
         }
     }
 
@@ -222,7 +224,11 @@ impl AddContext<&str, StrContext> for CcsdsNdmError {
         } = self
         {
             match context {
-                StrContext::Label(l) => contexts.push(l),
+                StrContext::Label(l) => {
+                    if contexts.last() != Some(&l) {
+                        contexts.push(l);
+                    }
+                }
                 StrContext::Expected(e) => *message = format!("Expected {}", e),
                 _ => {}
             }
@@ -254,13 +260,25 @@ impl CcsdsNdmError {
             ref mut line,
             ref mut column,
             ref mut snippet,
+            offset: ref mut error_offset,
             ..
         } = self
         {
-            let diag = ParseDiagnostic::new(input, offset, "");
+            // If offset is 0, we might be at the start or it's a placeholder.
+            // If error_offset is already set and non-zero, prefer it if the passed offset is 0.
+            let target_offset = if offset > 0 {
+                offset
+            } else if *error_offset > 0 {
+                *error_offset
+            } else {
+                0
+            };
+
+            let diag = ParseDiagnostic::new(input, target_offset, "");
             *line = diag.line;
             *column = diag.column;
             *snippet = diag.snippet;
+            *error_offset = target_offset;
         }
         self
     }

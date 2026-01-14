@@ -619,7 +619,7 @@ impl ToKvn for CdmStateVector {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmCovarianceMatrix {
     /// Comments.

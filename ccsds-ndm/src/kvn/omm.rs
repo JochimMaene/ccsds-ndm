@@ -6,11 +6,11 @@
 //!
 //! This module implements KVN parsing for OMM using winnow parser combinators.
 
-use crate::parse_block;
 use crate::kvn::parser::*;
 use crate::messages::omm::{
     MeanElements, Omm, OmmBody, OmmData, OmmMetadata, OmmSegment, TleParameters,
 };
+use crate::parse_block;
 use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 

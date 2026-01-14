@@ -20,7 +20,7 @@
 
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
 pub use crate::error::CcsdsNdmError;
-use crate::traits::FromKvnValue;
+use crate::traits::{FromKvnFloat, FromKvnValue};
 use crate::types::{UserDefined, UserDefinedParameter, *};
 use std::str::FromStr;
 use winnow::ascii::{float, line_ending, space0, till_line_ending};
@@ -263,11 +263,7 @@ pub fn kv_rest<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)>
 pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
     let checkpoint = input.checkpoint();
     terminated(
-        (
-            float.context(StrContext::Label("float")),
-            kv_unit,
-        )
-            .map(|(f, _)| f),
+        (float.context(StrContext::Label("float")), kv_unit).map(|(f, _)| f),
         opt_line_ending,
     )
     .parse_next(input)
@@ -289,7 +285,10 @@ pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
     let checkpoint = input.checkpoint();
     terminated(
         (
-            take_while(1.., ('0'..='9', '-', '+')).map(|s: &str| s.parse::<i32>().map_err(|_| ())).verify(|res| res.is_ok()).map(|res| res.unwrap()),
+            take_while(1.., ('0'..='9', '-', '+'))
+                .map(|s: &str| s.parse::<i32>().map_err(|_| ()))
+                .verify(|res| res.is_ok())
+                .map(|res| res.unwrap()),
             kv_unit,
         )
             .map(|(i, _)| i),
@@ -314,7 +313,10 @@ pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     let checkpoint = input.checkpoint();
     terminated(
         (
-            take_while(1.., '0'..='9').map(|s: &str| s.parse::<u32>().map_err(|_| ())).verify(|res| res.is_ok()).map(|res| res.unwrap()),
+            take_while(1.., '0'..='9')
+                .map(|s: &str| s.parse::<u32>().map_err(|_| ()))
+                .verify(|res| res.is_ok())
+                .map(|res| res.unwrap()),
             kv_unit,
         )
             .map(|(u, _)| u),
@@ -339,7 +341,10 @@ pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
     let checkpoint = input.checkpoint();
     terminated(
         (
-            take_while(1.., '0'..='9').map(|s: &str| s.parse::<u64>().map_err(|_| ())).verify(|res| res.is_ok()).map(|res| res.unwrap()),
+            take_while(1.., '0'..='9')
+                .map(|s: &str| s.parse::<u64>().map_err(|_| ()))
+                .verify(|res| res.is_ok())
+                .map(|res| res.unwrap()),
             kv_unit,
         )
             .map(|(u, _)| u),
@@ -411,22 +416,15 @@ pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
     T::from_kvn_value(v).map_err(|_| cut_err(input, "Invalid value"))
 }
 
-/// Parses any type that implements FromKvn from a KVN line.
-pub fn kv_from_kvn<T: FromKvn>(input: &mut &str) -> KvnResult<T> {
+/// Parses any type that implements FromKvnFloat from a KVN line.
+pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
     let (v, u) = kv_float_unit.parse_next(input)?;
-    T::from_kvn(&v.to_string(), u).map_err(|_| cut_err(input, "Invalid value"))
+    T::from_kvn_float(v, u).map_err(|_| cut_err(input, "Invalid value"))
 }
 
 /// Parses a float and its optional unit from a KVN line.
 pub fn kv_float_unit<'a>(input: &mut &'a str) -> KvnResult<(f64, Option<&'a str>)> {
-    terminated(
-        (
-            float,
-            kv_unit,
-        ),
-        opt_line_ending,
-    )
-    .parse_next(input)
+    terminated((float, kv_unit), opt_line_ending).parse_next(input)
 }
 
 //----------------------------------------------------------------------
@@ -513,7 +511,7 @@ where
 /// Returns the value and optional unit.
 pub fn expect_key<'a>(
     expected_key: &'static str,
-) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, Option<&'a str>) > {
+) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)> {
     expect_kv(expected_key, kvn_value_only)
 }
 
@@ -527,7 +525,7 @@ fn kvn_value_only<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
 /// Returns (key, value, unit).
 pub fn key_matching<'a, F>(
     predicate: F,
-) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, &'a str, Option<&'a str>) >
+) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, &'a str, Option<&'a str>)>
 where
     F: Fn(&str) -> bool + Copy,
 {
@@ -548,7 +546,8 @@ where
 pub fn collect_comments(input: &mut &str) -> KvnResult<Vec<String>> {
     repeat(
         0..,
-        alt(( // Corrected: removed unnecessary parentheses around alt
+        alt((
+            // Corrected: removed unnecessary parentheses around alt
             preceded(ws, comment_line).map(|s| Some(s.trim().to_string())),
             (ws, line_ending).map(|_| None),
         )),
@@ -942,10 +941,10 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
 
         if key.starts_with("USER_DEFINED_") {
             comment.extend(comments);
-            let (val, _) = kv_rest.parse_next(input)?;
+            let val = kv_string.parse_next(input)?;
             params.push(UserDefinedParameter {
                 parameter: key.to_string(),
-                value: val.to_string(),
+                value: val,
             });
         } else {
             // Backtrack and end user defined section

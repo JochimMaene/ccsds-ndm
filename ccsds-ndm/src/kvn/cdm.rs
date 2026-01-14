@@ -9,8 +9,8 @@
 use crate::common::OdParameters;
 use crate::kvn::parser::*;
 use crate::messages::cdm::{
-    AdditionalParameters, Cdm, CdmBody, CdmData, CdmHeader, CdmMetadata, CdmSegment,
-    CdmStateVector, RelativeMetadataData, RelativeStateVector, CdmCovarianceMatrix,
+    AdditionalParameters, Cdm, CdmBody, CdmCovarianceMatrix, CdmData, CdmHeader, CdmMetadata,
+    CdmSegment, CdmStateVector, RelativeMetadataData, RelativeStateVector,
 };
 use crate::parse_block;
 use winnow::combinator::peek;
@@ -132,7 +132,7 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
         "SCREEN_VOLUME_Z" => screen_volume_z: kv_from_kvn,
         "SCREEN_ENTRY_TIME" => screen_entry_time: kv_epoch,
         "SCREEN_EXIT_TIME" => screen_exit_time: kv_epoch,
-        "COLLISION_PROBABILITY" => collision_probability: kv_from_kvn_value,
+        "COLLISION_PROBABILITY" => collision_probability: kv_from_kvn,
         "COLLISION_PROBABILITY_METHOD" => collision_probability_method: kv_string,
     }, |i: &mut &str| at_block_start("META", *i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Relative Metadata key");
 
@@ -182,8 +182,7 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
                 ))
             })?,
         })
-    }
-    else {
+    } else {
         None
     };
 
@@ -628,11 +627,15 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
             cthr_thr,
         }
     } else {
-        return Err(winnow::error::ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            winnow::error::StrContext::Expected(winnow::error::StrContextValue::Description("Covariance Matrix keys")),
-        )));
+        return Err(winnow::error::ErrMode::Cut(
+            CcsdsNdmError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                winnow::error::StrContext::Expected(winnow::error::StrContextValue::Description(
+                    "Covariance Matrix keys",
+                )),
+            ),
+        ));
     };
 
     Ok(CdmData {
@@ -1009,8 +1012,13 @@ MESSAGE_ID = MSG-001
 "###;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message.contains("CREATION_DATE") || contexts.iter().any(|c| c.contains("CREATION_DATE")))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message.contains("CREATION_DATE")
+                        || contexts.iter().any(|c| c.contains("CREATION_DATE"))
+                )
             }
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -1161,8 +1169,13 @@ CNDOT_NDOT = 1 [m**2/s**2]
 "###;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message.contains("RELATIVE_VELOCITY_N") || contexts.iter().any(|c| c.contains("RELATIVE_VELOCITY_N")))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message.contains("RELATIVE_VELOCITY_N")
+                        || contexts.iter().any(|c| c.contains("RELATIVE_VELOCITY_N"))
+                )
             }
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -1175,7 +1188,9 @@ CNDOT_NDOT = 1 [m**2/s**2]
         kvn = kvn.replace("CR_R = 1.0 [m**2]", "");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
                 assert!(message.contains("CR_R") || contexts.iter().any(|c| c.contains("CR_R")))
             }
             _ => panic!("unexpected error: {:?}", err),
@@ -1211,8 +1226,15 @@ ORIGINATOR = TEST
 "#;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message.to_lowercase().contains("expected ccsds_cdm_vers") || contexts.iter().any(|c| c.to_lowercase().contains("ccsds_cdm_vers")))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message.to_lowercase().contains("expected ccsds_cdm_vers")
+                        || contexts
+                            .iter()
+                            .any(|c| c.to_lowercase().contains("ccsds_cdm_vers"))
+                )
             }
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -1377,7 +1399,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
             CcsdsNdmError::KvnParse {
                 message: msg,
                 contexts,
-                .. 
+                ..
             } => {
                 assert!(
                     msg.contains("Unknown Relative Metadata key")
@@ -1585,7 +1607,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
             CcsdsNdmError::KvnParse {
                 message: msg,
                 contexts,
-                .. 
+                ..
             } => {
                 assert!(
                     msg.contains("Unknown metadata key")
@@ -1710,12 +1732,9 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
             CcsdsNdmError::KvnParse {
                 message: msg,
                 contexts,
-                .. 
+                ..
             } => {
-                assert!(
-                    msg.contains("Unknown Data key")
-                        || contexts.contains(&"Unknown Data key")
-                )
+                assert!(msg.contains("Unknown Data key") || contexts.contains(&"Unknown Data key"))
             }
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -1759,7 +1778,7 @@ TCA = 2025-01-02T12:00:00
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::UnexpectedEof { .. } => {} // Can be EOF or KvnParse depending on parser state
-            CcsdsNdmError::KvnParse { .. } => {} 
+            CcsdsNdmError::KvnParse { .. } => {}
             _ => panic!("unexpected error: {:?}", err),
         }
     }

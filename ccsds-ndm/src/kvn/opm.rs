@@ -36,12 +36,11 @@
 //!             └── UserDefinedParameters (optional)
 //! ```
 
-use crate::parse_block;
 use crate::kvn::parser::*;
 use crate::messages::opm::{
     KeplerianElements, ManeuverParameters, Opm, OpmBody, OpmData, OpmMetadata, OpmSegment,
 };
-use crate::types::*;
+use crate::parse_block;
 use winnow::combinator::peek;
 use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
@@ -309,51 +308,6 @@ pub fn all_maneuvers(input: &mut &str) -> KvnResult<Vec<ManeuverParameters>> {
     }
 
     Ok(maneuvers)
-}
-
-//----------------------------------------------------------------------
-// User Defined Parameters Parser
-//----------------------------------------------------------------------
-
-/// Parses user-defined parameters.
-pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined>> {
-    let mut comment = Vec::new();
-    let mut params = Vec::new();
-
-    loop {
-        let checkpoint = input.checkpoint();
-        let comments = collect_comments.parse_next(input)?;
-
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => {
-                input.reset(&checkpoint);
-                break;
-            }
-        };
-
-        if key.starts_with("USER_DEFINED_") {
-            comment.extend(comments);
-            let (val, _) = kv_rest.parse_next(input)?;
-            params.push(UserDefinedParameter {
-                parameter: key.to_string(),
-                value: val.to_string(),
-            });
-        } else {
-            // Backtrack and end user defined section
-            input.reset(&checkpoint);
-            break;
-        }
-    }
-
-    if params.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(UserDefined {
-            comment,
-            user_defined: params,
-        }))
-    }
 }
 
 //----------------------------------------------------------------------

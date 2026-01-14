@@ -7,14 +7,14 @@
 //! This module implements KVN parsing for RDM using winnow parser combinators.
 
 use crate::common::{
-    AtmosphericReentryParameters, GroundImpactParameters, OdParameters, RdmSpacecraftParameters,
-    StateVector, OpmCovarianceMatrix,
+    AtmosphericReentryParameters, GroundImpactParameters, OdParameters, OpmCovarianceMatrix,
+    RdmSpacecraftParameters, StateVector,
 };
 use crate::kvn::parser::*;
 use crate::messages::rdm::{Rdm, RdmBody, RdmData, RdmHeader, RdmMetadata, RdmSegment};
 use crate::parse_block;
 use crate::types::*;
-use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
+use winnow::error::{AddContext, ErrMode, StrContext};
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -296,35 +296,35 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "REENTRY_WINDOW_END" => val: kv_epoch => { reentry_window_end = Some(val); },
         "ORBIT_LIFETIME_CONFIDENCE_LEVEL" => val: kv_from_kvn => { orbit_lifetime_confidence_level = Some(val); },
 
-        "PROBABILITY_OF_IMPACT" => val: kv_from_kvn_value => { ground_params.probability_of_impact = Some(val); have_ground = true; },
-        "PROBABILITY_OF_BURN_UP" => val: kv_from_kvn_value => { ground_params.probability_of_burn_up = Some(val); have_ground = true; },
-        "PROBABILITY_OF_BREAK_UP" => val: kv_from_kvn_value => { ground_params.probability_of_break_up = Some(val); have_ground = true; },
-        "PROBABILITY_OF_LAND_IMPACT" => val: kv_from_kvn_value => { ground_params.probability_of_land_impact = Some(val); have_ground = true; },
-        "PROBABILITY_OF_CASUALTY" => val: kv_from_kvn_value => { ground_params.probability_of_casualty = Some(val); have_ground = true; },
+        "PROBABILITY_OF_IMPACT" => val: kv_from_kvn => { ground_params.probability_of_impact = Some(val); have_ground = true; },
+        "PROBABILITY_OF_BURN_UP" => val: kv_from_kvn => { ground_params.probability_of_burn_up = Some(val); have_ground = true; },
+        "PROBABILITY_OF_BREAK_UP" => val: kv_from_kvn => { ground_params.probability_of_break_up = Some(val); have_ground = true; },
+        "PROBABILITY_OF_LAND_IMPACT" => val: kv_from_kvn => { ground_params.probability_of_land_impact = Some(val); have_ground = true; },
+        "PROBABILITY_OF_CASUALTY" => val: kv_from_kvn => { ground_params.probability_of_casualty = Some(val); have_ground = true; },
         "NOMINAL_IMPACT_EPOCH" => val: kv_epoch => { ground_params.nominal_impact_epoch = Some(val); have_ground = true; },
         "IMPACT_WINDOW_START" => val: kv_epoch => { ground_params.impact_window_start = Some(val); have_ground = true; },
         "IMPACT_WINDOW_END" => val: kv_epoch => { ground_params.impact_window_end = Some(val); have_ground = true; },
         "IMPACT_REF_FRAME" => val: kv_string => { ground_params.impact_ref_frame = Some(val); have_ground = true; },
-        "NOMINAL_IMPACT_LON" => val: kv_from_kvn_value => { ground_params.nominal_impact_lon = Some(val); have_ground = true; },
-        "NOMINAL_IMPACT_LAT" => val: kv_from_kvn_value => { ground_params.nominal_impact_lat = Some(val); have_ground = true; },
+        "NOMINAL_IMPACT_LON" => val: kv_from_kvn => { ground_params.nominal_impact_lon = Some(val); have_ground = true; },
+        "NOMINAL_IMPACT_LAT" => val: kv_from_kvn => { ground_params.nominal_impact_lat = Some(val); have_ground = true; },
         "NOMINAL_IMPACT_ALT" => val: kv_from_kvn => { ground_params.nominal_impact_alt = Some(val); have_ground = true; },
         "IMPACT_1_CONFIDENCE" => val: kv_from_kvn => { ground_params.impact_1_confidence = Some(val); have_ground = true; },
-        "IMPACT_1_START_LON" => val: kv_from_kvn_value => { ground_params.impact_1_start_lon = Some(val); have_ground = true; },
-        "IMPACT_1_START_LAT" => val: kv_from_kvn_value => { ground_params.impact_1_start_lat = Some(val); have_ground = true; },
-        "IMPACT_1_STOP_LON" => val: kv_from_kvn_value => { ground_params.impact_1_stop_lon = Some(val); have_ground = true; },
-        "IMPACT_1_STOP_LAT" => val: kv_from_kvn_value => { ground_params.impact_1_stop_lat = Some(val); have_ground = true; },
+        "IMPACT_1_START_LON" => val: kv_from_kvn => { ground_params.impact_1_start_lon = Some(val); have_ground = true; },
+        "IMPACT_1_START_LAT" => val: kv_from_kvn => { ground_params.impact_1_start_lat = Some(val); have_ground = true; },
+        "IMPACT_1_STOP_LON" => val: kv_from_kvn => { ground_params.impact_1_stop_lon = Some(val); have_ground = true; },
+        "IMPACT_1_STOP_LAT" => val: kv_from_kvn => { ground_params.impact_1_stop_lat = Some(val); have_ground = true; },
         "IMPACT_1_CROSS_TRACK" => val: kv_from_kvn => { ground_params.impact_1_cross_track = Some(val); have_ground = true; },
         "IMPACT_2_CONFIDENCE" => val: kv_from_kvn => { ground_params.impact_2_confidence = Some(val); have_ground = true; },
-        "IMPACT_2_START_LON" => val: kv_from_kvn_value => { ground_params.impact_2_start_lon = Some(val); have_ground = true; },
-        "IMPACT_2_START_LAT" => val: kv_from_kvn_value => { ground_params.impact_2_start_lat = Some(val); have_ground = true; },
-        "IMPACT_2_STOP_LON" => val: kv_from_kvn_value => { ground_params.impact_2_stop_lon = Some(val); have_ground = true; },
-        "IMPACT_2_STOP_LAT" => val: kv_from_kvn_value => { ground_params.impact_2_stop_lat = Some(val); have_ground = true; },
+        "IMPACT_2_START_LON" => val: kv_from_kvn => { ground_params.impact_2_start_lon = Some(val); have_ground = true; },
+        "IMPACT_2_START_LAT" => val: kv_from_kvn => { ground_params.impact_2_start_lat = Some(val); have_ground = true; },
+        "IMPACT_2_STOP_LON" => val: kv_from_kvn => { ground_params.impact_2_stop_lon = Some(val); have_ground = true; },
+        "IMPACT_2_STOP_LAT" => val: kv_from_kvn => { ground_params.impact_2_stop_lat = Some(val); have_ground = true; },
         "IMPACT_2_CROSS_TRACK" => val: kv_from_kvn => { ground_params.impact_2_cross_track = Some(val); have_ground = true; },
         "IMPACT_3_CONFIDENCE" => val: kv_from_kvn => { ground_params.impact_3_confidence = Some(val); have_ground = true; },
-        "IMPACT_3_START_LON" => val: kv_from_kvn_value => { ground_params.impact_3_start_lon = Some(val); have_ground = true; },
-        "IMPACT_3_START_LAT" => val: kv_from_kvn_value => { ground_params.impact_3_start_lat = Some(val); have_ground = true; },
-        "IMPACT_3_STOP_LON" => val: kv_from_kvn_value => { ground_params.impact_3_stop_lon = Some(val); have_ground = true; },
-        "IMPACT_3_STOP_LAT" => val: kv_from_kvn_value => { ground_params.impact_3_stop_lat = Some(val); have_ground = true; },
+        "IMPACT_3_START_LON" => val: kv_from_kvn => { ground_params.impact_3_start_lon = Some(val); have_ground = true; },
+        "IMPACT_3_START_LAT" => val: kv_from_kvn => { ground_params.impact_3_start_lat = Some(val); have_ground = true; },
+        "IMPACT_3_STOP_LON" => val: kv_from_kvn => { ground_params.impact_3_stop_lon = Some(val); have_ground = true; },
+        "IMPACT_3_STOP_LAT" => val: kv_from_kvn => { ground_params.impact_3_stop_lat = Some(val); have_ground = true; },
         "IMPACT_3_CROSS_TRACK" => val: kv_from_kvn => { ground_params.impact_3_cross_track = Some(val); have_ground = true; },
 
         "EPOCH" => val: kv_epoch => { state_vector_data.epoch = val; have_sv = true; },
@@ -366,8 +366,8 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "DRAG_AREA" => val: kv_from_kvn => { spacecraft_params.drag_area = Some(val); have_sp = true; },
         "DRAG_COEFF" => val: kv_float => { spacecraft_params.drag_coeff = Some(val); have_sp = true; },
         "RCS" => val: kv_from_kvn => { spacecraft_params.rcs = Some(val); have_sp = true; },
-        "BALLISTIC_COEFF" => val: kv_from_kvn_value => { spacecraft_params.ballistic_coeff = Some(val); have_sp = true; },
-        "THRUST_ACCELERATION" => val: kv_from_kvn_value => { spacecraft_params.thrust_acceleration = Some(val); have_sp = true; },
+        "BALLISTIC_COEFF" => val: kv_from_kvn => { spacecraft_params.ballistic_coeff = Some(val); have_sp = true; },
+        "THRUST_ACCELERATION" => val: kv_from_kvn => { spacecraft_params.thrust_acceleration = Some(val); have_sp = true; },
 
         "TIME_LASTOB_START" => val: kv_epoch => { od_params.time_lastob_start = Some(val); have_od = true; },
         "TIME_LASTOB_END" => val: kv_epoch => { od_params.time_lastob_end = Some(val); have_od = true; },
@@ -424,7 +424,11 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         } else {
             None
         },
-        state_vector: if have_sv { Some(state_vector_data) } else { None },
+        state_vector: if have_sv {
+            Some(state_vector_data)
+        } else {
+            None
+        },
         covariance_matrix: if have_cov { Some(cov) } else { None },
         spacecraft_parameters: if have_sp {
             Some(spacecraft_params)
@@ -1254,8 +1258,13 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_creation).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message.contains("Expected CREATION_DATE") || contexts.contains(&"Expected CREATION_DATE"))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message.contains("Expected CREATION_DATE")
+                        || contexts.contains(&"Expected CREATION_DATE")
+                )
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1274,8 +1283,15 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_originator).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message.to_lowercase().contains("expected originator") || contexts.iter().any(|c| c.to_lowercase().contains("expected originator")))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message.to_lowercase().contains("expected originator")
+                        || contexts
+                            .iter()
+                            .any(|c| c.to_lowercase().contains("expected originator"))
+                )
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1294,8 +1310,15 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_msgid).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message.to_lowercase().contains("expected message_id") || contexts.iter().any(|c| c.to_lowercase().contains("expected message_id")))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message.to_lowercase().contains("expected message_id")
+                        || contexts
+                            .iter()
+                            .any(|c| c.to_lowercase().contains("expected message_id"))
+                )
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1318,8 +1341,13 @@ REENTRY_ALTITUDE = 80 [km]
         let err = Rdm::from_kvn(kvn_missing_object_name).unwrap_err();
         println!("RDM ERROR: {:?}", err);
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message.contains("Expected OBJECT_NAME") || contexts.contains(&"Expected OBJECT_NAME"))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message.contains("Expected OBJECT_NAME")
+                        || contexts.contains(&"Expected OBJECT_NAME")
+                )
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1338,10 +1366,17 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_intl).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message
-                    .to_lowercase()
-                    .contains("expected international_designator") || contexts.iter().any(|c| c.to_lowercase().contains("expected international_designator")))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message
+                        .to_lowercase()
+                        .contains("expected international_designator")
+                        || contexts.iter().any(|c| c
+                            .to_lowercase()
+                            .contains("expected international_designator"))
+                )
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1360,8 +1395,15 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_center).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message.to_lowercase().contains("expected center_name") || contexts.iter().any(|c| c.to_lowercase().contains("expected center_name")))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message.to_lowercase().contains("expected center_name")
+                        || contexts
+                            .iter()
+                            .any(|c| c.to_lowercase().contains("expected center_name"))
+                )
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1380,8 +1422,15 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_timesys).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message.to_lowercase().contains("expected time_system") || contexts.iter().any(|c| c.to_lowercase().contains("expected time_system")))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message.to_lowercase().contains("expected time_system")
+                        || contexts
+                            .iter()
+                            .any(|c| c.to_lowercase().contains("expected time_system"))
+                )
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1400,10 +1449,17 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_controlled).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message
-                    .to_lowercase()
-                    .contains("expected controlled_reentry") || contexts.iter().any(|c| c.to_lowercase().contains("expected controlled_reentry")))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message
+                        .to_lowercase()
+                        .contains("expected controlled_reentry")
+                        || contexts
+                            .iter()
+                            .any(|c| c.to_lowercase().contains("expected controlled_reentry"))
+                )
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1422,8 +1478,15 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_epoch).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, contexts, .. } => {
-                assert!(message.to_lowercase().contains("expected epoch_tzero") || contexts.iter().any(|c| c.to_lowercase().contains("expected epoch_tzero")))
+            CcsdsNdmError::KvnParse {
+                message, contexts, ..
+            } => {
+                assert!(
+                    message.to_lowercase().contains("expected epoch_tzero")
+                        || contexts
+                            .iter()
+                            .any(|c| c.to_lowercase().contains("expected epoch_tzero"))
+                )
             }
             _ => panic!("Unexpected: {:?}", err),
         }

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::error::{CcsdsNdmError, Result};
-use crate::traits::FromKvnValue;
+use crate::traits::{FromKvnFloat, FromKvnValue};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -98,7 +98,7 @@ pub trait FromKvn: Sized {
 /// # Type Parameters
 /// * `V`: The type of the value (e.g., `f64`, `i32`).
 /// * `U`: The type of the unit enum (e.g., `PositionUnits`).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct UnitValue<V, U> {
     #[serde(rename = "$value")]
     pub value: V,
@@ -137,6 +137,19 @@ where
             None => None,
         };
 
+        Ok(UnitValue { value, units })
+    }
+}
+
+impl<U> FromKvnFloat for UnitValue<f64, U>
+where
+    U: FromStr<Err = CcsdsNdmError>,
+{
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let units = match unit {
+            Some(u_str) => Some(u_str.parse::<U>()?),
+            None => None,
+        };
         Ok(UnitValue { value, units })
     }
 }
@@ -218,10 +231,9 @@ macro_rules! define_required_type {
                 write!(f, "{}", self.value)
             }
         }
-        impl FromKvn for $name {
-            fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-                let v: f64 = value.parse().map_err(CcsdsNdmError::from)?;
-                Ok(Self::new(v))
+        impl FromKvnFloat for $name {
+            fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+                Ok(Self::new(value))
             }
         }
     };
@@ -311,9 +323,9 @@ impl Angle {
         }
     }
 }
-impl FromKvn for Angle {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, AngleUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Angle {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, AngleUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -356,9 +368,9 @@ impl DayInterval {
         }
     }
 }
-impl FromKvn for DayInterval {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, DayIntervalUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for DayInterval {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, DayIntervalUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -396,10 +408,9 @@ impl DayIntervalRequired {
         }
     }
 }
-impl FromKvn for DayIntervalRequired {
-    fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value.parse().map_err(CcsdsNdmError::from)?;
-        Self::new(v)
+impl FromKvnFloat for DayIntervalRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 impl std::fmt::Display for DayIntervalRequired {
@@ -437,9 +448,9 @@ impl Frequency {
         }
     }
 }
-impl FromKvn for Frequency {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, FrequencyUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Frequency {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, FrequencyUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -481,9 +492,9 @@ impl Gm {
         }
     }
 }
-impl FromKvn for Gm {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, GmUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Gm {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, GmUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -526,10 +537,9 @@ impl AltitudeRequired {
         }
     }
 }
-impl FromKvn for AltitudeRequired {
-    fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value.parse()?;
-        Self::new(v)
+impl FromKvnFloat for AltitudeRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 impl std::fmt::Display for AltitudeRequired {
@@ -573,10 +583,9 @@ impl WkgRequired {
         }
     }
 }
-impl FromKvn for WkgRequired {
-    fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value.parse()?;
-        Self::new(v)
+impl FromKvnFloat for WkgRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 
@@ -611,9 +620,9 @@ impl Mass {
     }
 }
 
-impl FromKvn for Mass {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, MassUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Mass {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, MassUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -652,9 +661,9 @@ impl Area {
         }
     }
 }
-impl FromKvn for Area {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, AreaUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Area {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, AreaUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -743,6 +752,12 @@ impl std::str::FromStr for BallisticCoeffRequired {
     }
 }
 
+impl FromKvnFloat for BallisticCoeffRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
 define_unit_enum!(PercentageUnits, Percent, { Percent => "%" });
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -770,9 +785,9 @@ impl Percentage {
         }
     }
 }
-impl FromKvn for Percentage {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, PercentageUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Percentage {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, PercentageUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -809,10 +824,9 @@ impl std::fmt::Display for PercentageRequired {
         write!(f, "{}", self.value)
     }
 }
-impl FromKvn for PercentageRequired {
-    fn from_kvn(value: &str, _unit: Option<&str>) -> Result<Self> {
-        let v: f64 = value.parse()?;
-        Self::new(v)
+impl FromKvnFloat for PercentageRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 
@@ -848,6 +862,12 @@ impl std::fmt::Display for Probability {
     }
 }
 
+impl FromKvnFloat for Probability {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
 // Delta mass types (negative or non-positive)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct DeltaMass {
@@ -869,9 +889,9 @@ impl DeltaMass {
     }
 }
 
-impl FromKvn for DeltaMass {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, MassUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for DeltaMass {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, MassUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -896,13 +916,12 @@ impl DeltaMassZ {
     }
 }
 
-impl FromKvn for DeltaMassZ {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, MassUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for DeltaMassZ {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, MassUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
-
 
 // Quaternion dot component units (1/s)
 define_unit_type!(QuaternionDotComponent, QuaternionDotUnits, PerS, { PerS => "1/s" });
@@ -949,6 +968,12 @@ impl std::str::FromStr for LatitudeRequired {
     }
 }
 
+impl FromKvnFloat for LatitudeRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct LongitudeRequired {
     #[serde(rename = "$value")]
@@ -982,6 +1007,12 @@ impl std::str::FromStr for LongitudeRequired {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let v: f64 = s.parse().map_err(CcsdsNdmError::from)?;
         Self::new(v)
+    }
+}
+
+impl FromKvnFloat for LongitudeRequired {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
     }
 }
 
@@ -1427,9 +1458,9 @@ impl Duration {
         }
     }
 }
-impl FromKvn for Duration {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, TimeUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Duration {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, TimeUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }
@@ -1449,9 +1480,9 @@ pub struct TimeOffset {
     pub units: Option<TimeUnits>,
 }
 
-impl FromKvn for TimeOffset {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, TimeUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for TimeOffset {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, TimeUnits>::from_kvn_float(value, unit)?;
         Ok(TimeOffset {
             value: uv.value,
             units: uv.units,
@@ -1493,9 +1524,9 @@ impl Inclination {
         }
     }
 }
-impl FromKvn for Inclination {
-    fn from_kvn(value: &str, unit: Option<&str>) -> Result<Self> {
-        let uv = UnitValue::<f64, AngleUnits>::from_kvn(value, unit)?;
+impl FromKvnFloat for Inclination {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let uv = UnitValue::<f64, AngleUnits>::from_kvn_float(value, unit)?;
         Self::new(uv.value, uv.units)
     }
 }

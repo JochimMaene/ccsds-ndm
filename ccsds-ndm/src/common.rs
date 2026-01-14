@@ -337,7 +337,9 @@ pub struct StateVectorAcc {
 
 impl ToKvn for StateVectorAcc {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = format!(
+        use std::fmt::Write;
+        let _ = write!(
+            writer,
             "{} {:.14e} {:.14e} {:.14e} {:.14e} {:.14e} {:.14e}",
             self.epoch,
             self.x.value,
@@ -348,15 +350,15 @@ impl ToKvn for StateVectorAcc {
             self.z_dot.value
         );
         if let Some(acc) = &self.x_ddot {
-            line.push_str(&format!(" {:.14e}", acc.value));
+            let _ = write!(writer, " {:.14e}", acc.value);
         }
         if let Some(acc) = &self.y_ddot {
-            line.push_str(&format!(" {:.14e}", acc.value));
+            let _ = write!(writer, " {:.14e}", acc.value);
         }
         if let Some(acc) = &self.z_ddot {
-            line.push_str(&format!(" {:.14e}", acc.value));
+            let _ = write!(writer, " {:.14e}", acc.value);
         }
-        writer.write_line(line);
+        writer.write_empty(); // Adds the trailing newline
     }
 }
 
@@ -401,7 +403,7 @@ pub struct AngularVelocity {
 }
 
 // State vector (oem/opm common)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVector {
     /// Comments (see 7.8 for formatting rules).
@@ -568,7 +570,7 @@ pub struct InertiaState {
 }
 
 /// OPM covariance matrix block (opmCovarianceMatrixType).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmCovarianceMatrix {
     /// Comments (see 7.8 for formatting rules).

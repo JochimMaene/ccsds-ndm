@@ -40,10 +40,10 @@
 //!             └── CovarianceMatrix* (optional, within COVARIANCE_START/STOP)
 //! ```
 
-use crate::parse_block;
-use crate::common::{StateVectorAcc, OdmHeader};
+use crate::common::{OdmHeader, StateVectorAcc};
 use crate::kvn::parser::*;
 use crate::messages::oem::{Oem, OemBody, OemCovarianceMatrix, OemData, OemMetadata, OemSegment};
+use crate::parse_block;
 use crate::types::*;
 use std::num::NonZeroU32;
 use std::str::FromStr;
@@ -241,12 +241,13 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
 fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
     let epoch_str = preceded(ws, till_space).parse_next(input)?;
     let epoch = Epoch::from_str(epoch_str).map_err(|_| cut_err(input, "Invalid epoch"))?;
-    
+
     let mut components = Vec::with_capacity(6);
     for _ in 0..6 {
-        components.push(preceded(space1, float::<&str, f64, ErrMode<CcsdsNdmError>>).parse_next(input)?);
+        components
+            .push(preceded(space1, float::<&str, f64, ErrMode<CcsdsNdmError>>).parse_next(input)?);
     }
-    
+
     let x_val = components[0];
     let y_val = components[1];
     let z_val = components[2];
@@ -263,9 +264,18 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
     let (x_ddot, y_ddot, z_ddot) = if let Some((ax, ay, az)) = accs {
         (
-            Some(Acc { value: ax, units: Some(AccUnits::KmPerS2) }),
-            Some(Acc { value: ay, units: Some(AccUnits::KmPerS2) }),
-            Some(Acc { value: az, units: Some(AccUnits::KmPerS2) }),
+            Some(Acc {
+                value: ax,
+                units: Some(AccUnits::KmPerS2),
+            }),
+            Some(Acc {
+                value: ay,
+                units: Some(AccUnits::KmPerS2),
+            }),
+            Some(Acc {
+                value: az,
+                units: Some(AccUnits::KmPerS2),
+            }),
         )
     } else {
         (None, None, None)
@@ -284,12 +294,30 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
     Ok(StateVectorAcc {
         epoch,
-        x: Position { value: x_val, units: Some(PositionUnits::Km) },
-        y: Position { value: y_val, units: Some(PositionUnits::Km) },
-        z: Position { value: z_val, units: Some(PositionUnits::Km) },
-        x_dot: Velocity { value: x_dot_val, units: Some(VelocityUnits::KmPerS) },
-        y_dot: Velocity { value: y_dot_val, units: Some(VelocityUnits::KmPerS) },
-        z_dot: Velocity { value: z_dot_val, units: Some(VelocityUnits::KmPerS) },
+        x: Position {
+            value: x_val,
+            units: Some(PositionUnits::Km),
+        },
+        y: Position {
+            value: y_val,
+            units: Some(PositionUnits::Km),
+        },
+        z: Position {
+            value: z_val,
+            units: Some(PositionUnits::Km),
+        },
+        x_dot: Velocity {
+            value: x_dot_val,
+            units: Some(VelocityUnits::KmPerS),
+        },
+        y_dot: Velocity {
+            value: y_dot_val,
+            units: Some(VelocityUnits::KmPerS),
+        },
+        z_dot: Velocity {
+            value: z_dot_val,
+            units: Some(VelocityUnits::KmPerS),
+        },
         x_ddot,
         y_ddot,
         z_ddot,
@@ -333,17 +361,25 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
 
     for expected_count in expected_counts {
         comment.extend(collect_comments.parse_next(input)?);
-        
-        let line_vals = (preceded(ws, float), repeat(expected_count - 1, preceded(space1, float::<&str, f64, ErrMode<CcsdsNdmError>>))).map(|(first, rest): (f64, Vec<f64>)| {
-            let mut all = vec![first];
-            all.extend(rest);
-            all
-        }).parse_next(input)?;
+
+        let line_vals = (
+            preceded(ws, float),
+            repeat(
+                expected_count - 1,
+                preceded(space1, float::<&str, f64, ErrMode<CcsdsNdmError>>),
+            ),
+        )
+            .map(|(first, rest): (f64, Vec<f64>)| {
+                let mut all = vec![first];
+                all.extend(rest);
+                all
+            })
+            .parse_next(input)?;
 
         if line_vals.len() != expected_count {
-             return Err(cut_err(input, "Unexpected key or invalid format"));
+            return Err(cut_err(input, "Unexpected key or invalid format"));
         }
-        
+
         floats.extend(line_vals);
         opt_line_ending.parse_next(input)?;
     }
@@ -431,9 +467,20 @@ enum OemDataItem {
 }
 
 fn oem_data_item(input: &mut &str) -> KvnResult<OemDataItem> {
+    // Fast-path: if it looks like a state vector line (starts with digit or sign after possible whitespace),
+    // skip comment collection to avoid Vec allocation.
+    let _ = ws.parse_next(input);
+    let remaining = *input;
+    let first_char = remaining.chars().next();
+    if matches!(first_char, Some('0'..='9' | '-' | '+')) {
+        let sv = parse_state_vector_line.parse_next(input)?;
+        return Ok(OemDataItem::StateVec(sv));
+    }
+
     let comments = collect_comments.parse_next(input)?;
 
-    if input.is_empty() || at_block_start("META", input) {
+    let remaining = *input;
+    if remaining.is_empty() || at_block_start("META", input) {
         if !comments.is_empty() {
             // Trailing comments before META/EOF
             return Ok(OemDataItem::Comment(comments));
@@ -467,28 +514,44 @@ fn oem_data_item(input: &mut &str) -> KvnResult<OemDataItem> {
 
 /// Parses the OEM data section (state vectors and optional covariance matrices).
 pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
-    // OEM data must have at least one state vector, but repeat allows 0.
-    // We enforce >0 state vectors later.
-    let items: Vec<OemDataItem> = repeat(1.., oem_data_item).parse_next(input)?;
-
+    // Optimization: Pre-allocate vectors based on input size.
+    // Typical OEM state vector line is ~80-100 characters.
+    let estimated_records = (input.len() / 80).max(10);
+    
     let mut data = OemData {
         comment: Vec::new(),
-        state_vector: Vec::new(),
+        state_vector: Vec::with_capacity(estimated_records),
         covariance_matrix: Vec::new(),
     };
 
-    for item in items {
-        match item {
-            OemDataItem::Comment(c) => data.comment.extend(c),
-            OemDataItem::StateVec(sv) => data.state_vector.push(sv),
-            OemDataItem::StateVecWithComments(sv, c) => {
-                data.comment.extend(c);
-                data.state_vector.push(sv);
-            }
-            OemDataItem::Cov(covs) => data.covariance_matrix.extend(covs),
-            OemDataItem::CovWithComments(covs, c) => {
-                data.comment.extend(c);
-                data.covariance_matrix.extend(covs);
+    loop {
+        let _ = ws.parse_next(input);
+        if input.is_empty() || at_block_start("META", input) {
+            break;
+        }
+
+        let checkpoint = input.checkpoint();
+        match oem_data_item.parse_next(input) {
+            Ok(item) => match item {
+                OemDataItem::Comment(c) => data.comment.extend(c),
+                OemDataItem::StateVec(sv) => data.state_vector.push(sv),
+                OemDataItem::StateVecWithComments(sv, c) => {
+                    data.comment.extend(c);
+                    data.state_vector.push(sv);
+                }
+                OemDataItem::Cov(covs) => data.covariance_matrix.extend(covs),
+                OemDataItem::CovWithComments(covs, c) => {
+                    data.comment.extend(c);
+                    data.covariance_matrix.extend(covs);
+                }
+            },
+            Err(e) => {
+                if e.is_backtrack() {
+                    input.reset(&checkpoint);
+                    break;
+                } else {
+                    return Err(e);
+                }
             }
         }
     }
