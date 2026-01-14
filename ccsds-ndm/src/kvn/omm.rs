@@ -6,13 +6,11 @@
 //!
 //! This module implements KVN parsing for OMM using winnow parser combinators.
 
+use crate::parse_block;
 use crate::kvn::parser::*;
 use crate::messages::omm::{
-    BStar, MeanElements, MeanMotion, MeanMotionDDot, MeanMotionDot, Omm, OmmBody, OmmData,
-    OmmMetadata, OmmSegment, TleParameters,
+    MeanElements, Omm, OmmBody, OmmData, OmmMetadata, OmmSegment, TleParameters,
 };
-use crate::types::*;
-use std::str::FromStr;
 use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 
@@ -32,6 +30,7 @@ pub fn omm_version(input: &mut &str) -> KvnResult<String> {
 //----------------------------------------------------------------------
 
 pub fn omm_metadata(input: &mut &str) -> KvnResult<OmmMetadata> {
+    ws.parse_next(input)?;
     let mut comment = Vec::new();
     let mut object_name = None;
     let mut object_id = None;
@@ -41,52 +40,15 @@ pub fn omm_metadata(input: &mut &str) -> KvnResult<OmmMetadata> {
     let mut time_system = None;
     let mut mean_element_theory = None;
 
-    loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "OBJECT_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_name = Some(v.to_string());
-            }
-            "OBJECT_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_id = Some(v.to_string());
-            }
-            "CENTER_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                center_name = Some(v.to_string());
-            }
-            "REF_FRAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ref_frame = Some(v.to_string());
-            }
-            "REF_FRAME_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ref_frame_epoch =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "TIME_SYSTEM" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                time_system = Some(v.to_string());
-            }
-            "MEAN_ELEMENT_THEORY" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                mean_element_theory = Some(v.to_string());
-            }
-            _ => {
-                // If it's a data key or unknown, backtrack and end metadata section
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
+    parse_block!(input, comment, {
+        "OBJECT_NAME" => object_name: kv_string,
+        "OBJECT_ID" => object_id: kv_string,
+        "CENTER_NAME" => center_name: kv_string,
+        "REF_FRAME" => ref_frame: kv_string,
+        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_epoch,
+        "TIME_SYSTEM" => time_system: kv_string,
+        "MEAN_ELEMENT_THEORY" => mean_element_theory: kv_string,
+    }, |_| false);
 
     Ok(OmmMetadata {
         comment,
@@ -141,6 +103,7 @@ pub fn omm_metadata(input: &mut &str) -> KvnResult<OmmMetadata> {
 //----------------------------------------------------------------------
 
 pub fn mean_elements(input: &mut &str) -> KvnResult<(Vec<String>, MeanElements)> {
+    ws.parse_next(input)?;
     let mut comment = Vec::new();
     let mut epoch = None;
     let mut semi_major_axis = None;
@@ -152,78 +115,17 @@ pub fn mean_elements(input: &mut &str) -> KvnResult<(Vec<String>, MeanElements)>
     let mut mean_anomaly = None;
     let mut gm = None;
 
-    loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "EPOCH" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                epoch = Some(Epoch::from_str(val).map_err(|_| cut_err(input, "Invalid EPOCH"))?);
-            }
-            "SEMI_MAJOR_AXIS" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                semi_major_axis = Some(
-                    Distance::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid SEMI_MAJOR_AXIS"))?,
-                );
-            }
-            "MEAN_MOTION" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                mean_motion = Some(
-                    MeanMotion::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid MEAN_MOTION"))?,
-                );
-            }
-            "ECCENTRICITY" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                eccentricity =
-                    Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid ECCENTRICITY"))?);
-            }
-            "INCLINATION" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                inclination = Some(
-                    Inclination::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid INCLINATION"))?,
-                );
-            }
-            "RA_OF_ASC_NODE" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                ra_of_asc_node = Some(
-                    Angle::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid RA_OF_ASC_NODE"))?,
-                );
-            }
-            "ARG_OF_PERICENTER" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                arg_of_pericenter = Some(
-                    Angle::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid ARG_OF_PERICENTER"))?,
-                );
-            }
-            "MEAN_ANOMALY" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                mean_anomaly = Some(
-                    Angle::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid MEAN_ANOMALY"))?,
-                );
-            }
-            "GM" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                gm = Some(Gm::from_kvn(val, unit).map_err(|_| cut_err(input, "Invalid GM"))?);
-            }
-            _ => {
-                // If it's a TLE key or unknown, backtrack and end mean elements section
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
+    parse_block!(input, comment, {
+        "EPOCH" => epoch: kv_epoch,
+        "SEMI_MAJOR_AXIS" => semi_major_axis: kv_from_kvn,
+        "MEAN_MOTION" => mean_motion: kv_from_kvn,
+        "ECCENTRICITY" => eccentricity: kv_float,
+        "INCLINATION" => inclination: kv_from_kvn,
+        "RA_OF_ASC_NODE" => ra_of_asc_node: kv_from_kvn,
+        "ARG_OF_PERICENTER" => arg_of_pericenter: kv_from_kvn,
+        "MEAN_ANOMALY" => mean_anomaly: kv_from_kvn,
+        "GM" => gm: kv_from_kvn,
+    }, |_| false);
 
     Ok((
         comment,
@@ -283,6 +185,7 @@ pub fn mean_elements(input: &mut &str) -> KvnResult<(Vec<String>, MeanElements)>
 //----------------------------------------------------------------------
 
 pub fn tle_parameters(input: &mut &str) -> KvnResult<Option<TleParameters>> {
+    ws.parse_next(input)?;
     let mut comment = Vec::new();
     let mut ephemeris_type = None;
     let mut classification_type = None;
@@ -295,75 +198,18 @@ pub fn tle_parameters(input: &mut &str) -> KvnResult<Option<TleParameters>> {
     let mut mean_motion_ddot = None;
     let mut agom = None;
 
-    loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "EPHEMERIS_TYPE" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                ephemeris_type =
-                    Some(parse_i32(val).map_err(|_| cut_err(input, "Invalid EPHEMERIS_TYPE"))?);
-            }
-            "CLASSIFICATION_TYPE" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                classification_type = Some(val.to_string());
-            }
-            "NORAD_CAT_ID" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                norad_cat_id =
-                    Some(parse_u32(val).map_err(|_| cut_err(input, "Invalid NORAD_CAT_ID"))?);
-            }
-            "ELEMENT_SET_NO" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                element_set_no =
-                    Some(parse_u32(val).map_err(|_| cut_err(input, "Invalid ELEMENT_SET_NO"))?);
-            }
-            "REV_AT_EPOCH" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                rev_at_epoch =
-                    Some(parse_u32(val).map_err(|_| cut_err(input, "Invalid REV_AT_EPOCH"))?);
-            }
-            "BSTAR" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                bstar =
-                    Some(BStar::from_kvn(val, unit).map_err(|_| cut_err(input, "Invalid BSTAR"))?);
-            }
-            "BTERM" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                bterm =
-                    Some(M2kg::from_kvn(val, unit).map_err(|_| cut_err(input, "Invalid BTERM"))?);
-            }
-            "MEAN_MOTION_DOT" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                mean_motion_dot = Some(
-                    MeanMotionDot::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid MEAN_MOTION_DOT"))?,
-                );
-            }
-            "MEAN_MOTION_DDOT" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                mean_motion_ddot = Some(
-                    MeanMotionDDot::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid MEAN_MOTION_DDOT"))?,
-                );
-            }
-            "AGOM" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                agom = Some(M2kg::from_kvn(val, unit).map_err(|_| cut_err(input, "Invalid AGOM"))?);
-            }
-            _ => {
-                // If it's a covariance key or unknown, backtrack and end TLE section
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
+    parse_block!(input, comment, {
+        "EPHEMERIS_TYPE" => ephemeris_type: kv_i32,
+        "CLASSIFICATION_TYPE" => classification_type: kv_string,
+        "NORAD_CAT_ID" => norad_cat_id: kv_u32,
+        "ELEMENT_SET_NO" => element_set_no: kv_u32,
+        "REV_AT_EPOCH" => rev_at_epoch: kv_u32,
+        "BSTAR" => bstar: kv_from_kvn,
+        "BTERM" => bterm: kv_from_kvn,
+        "MEAN_MOTION_DOT" => mean_motion_dot: kv_from_kvn,
+        "MEAN_MOTION_DDOT" => mean_motion_ddot: kv_from_kvn,
+        "AGOM" => agom: kv_from_kvn,
+    }, |_| false);
 
     if ephemeris_type.is_none()
         && classification_type.is_none()

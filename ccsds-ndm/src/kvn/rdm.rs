@@ -8,11 +8,12 @@
 
 use crate::common::{
     AtmosphericReentryParameters, GroundImpactParameters, OdParameters, RdmSpacecraftParameters,
+    StateVector, OpmCovarianceMatrix,
 };
 use crate::kvn::parser::*;
 use crate::messages::rdm::{Rdm, RdmBody, RdmData, RdmHeader, RdmMetadata, RdmSegment};
+use crate::parse_block;
 use crate::types::*;
-use std::str::FromStr;
 use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 
@@ -38,30 +39,35 @@ pub fn rdm_header(input: &mut &str) -> KvnResult<RdmHeader> {
     let mut message_id = None;
 
     loop {
+        let checkpoint = input.checkpoint();
         comment.extend(collect_comments.parse_next(input)?);
 
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
+        let key = match keyword.parse_next(input) {
             Ok(k) => k,
-            Err(_) => break,
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
+            }
         };
 
+        // RDM metadata fields might follow immediately without META_START
+        if key == "OBJECT_NAME" {
+            input.reset(&checkpoint);
+            break;
+        }
+
+        kv_sep.parse_next(input)?;
         match key {
             "CREATION_DATE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                creation_date =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid CREATION_DATE"))?);
+                creation_date = Some(kv_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                originator = Some(v.to_string());
+                originator = Some(kv_string.parse_next(input)?);
             }
             "MESSAGE_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                message_id = Some(v.to_string());
+                message_id = Some(kv_string.parse_next(input)?);
             }
             _ => {
-                // End of header
                 input.reset(&checkpoint);
                 break;
             }
@@ -70,27 +76,9 @@ pub fn rdm_header(input: &mut &str) -> KvnResult<RdmHeader> {
 
     Ok(RdmHeader {
         comment,
-        creation_date: creation_date.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("CREATION_DATE")),
-            ))
-        })?,
-        originator: originator.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("ORIGINATOR")),
-            ))
-        })?,
-        message_id: message_id.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MESSAGE_ID")),
-            ))
-        })?,
+        creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,
+        originator: originator.ok_or_else(|| cut_err(input, "Expected ORIGINATOR"))?,
+        message_id: message_id.ok_or_else(|| cut_err(input, "Expected MESSAGE_ID"))?,
     })
 }
 
@@ -130,157 +118,37 @@ pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
     let mut previous_message_epoch = None;
     let mut next_message_epoch = None;
 
-    loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "OBJECT_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_name = Some(v.to_string());
-            }
-            "INTERNATIONAL_DESIGNATOR" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                international_designator = Some(v.to_string());
-            }
-            "CATALOG_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                catalog_name = Some(v.to_string());
-            }
-            "OBJECT_DESIGNATOR" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_designator = Some(v.to_string());
-            }
-            "OBJECT_TYPE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_type = Some(
-                    ObjectDescription::from_str(v)
-                        .map_err(|_| cut_err(input, "Invalid OBJECT_TYPE"))?,
-                );
-            }
-            "OBJECT_OWNER" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_owner = Some(v.to_string());
-            }
-            "OBJECT_OPERATOR" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_operator = Some(v.to_string());
-            }
-            "CONTROLLED_REENTRY" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                controlled_reentry = Some(
-                    ControlledType::from_str(v)
-                        .map_err(|_| cut_err(input, "Invalid CONTROLLED_REENTRY"))?,
-                );
-            }
-            "CENTER_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                center_name = Some(v.to_string());
-            }
-            "TIME_SYSTEM" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                time_system = Some(v.to_string());
-            }
-            "EPOCH_TZERO" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                epoch_tzero =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid EPOCH_TZERO"))?);
-            }
-            "REF_FRAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ref_frame = Some(v.to_string());
-            }
-            "REF_FRAME_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ref_frame_epoch = Some(
-                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid REF_FRAME_EPOCH"))?,
-                );
-            }
-            "EPHEMERIS_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ephemeris_name = Some(v.to_string());
-            }
-            "GRAVITY_MODEL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                gravity_model = Some(v.to_string());
-            }
-            "ATMOSPHERIC_MODEL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                atmospheric_model = Some(v.to_string());
-            }
-            "SOLAR_FLUX_PREDICTION" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                solar_flux_prediction = Some(v.to_string());
-            }
-            "N_BODY_PERTURBATIONS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                n_body_perturbations = Some(v.to_string());
-            }
-            "SOLAR_RAD_PRESSURE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                solar_rad_pressure = Some(v.to_string());
-            }
-            "EARTH_TIDES" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                earth_tides = Some(v.to_string());
-            }
-            "INTRACK_THRUST" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                intrack_thrust =
-                    Some(YesNo::from_str(v).map_err(|_| cut_err(input, "Invalid INTRACK_THRUST"))?);
-            }
-            "DRAG_PARAMETERS_SOURCE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                drag_parameters_source = Some(v.to_string());
-            }
-            "DRAG_PARAMETERS_ALTITUDE" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                drag_parameters_altitude = Some(
-                    PositionRequired::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid DRAG_PARAMETERS_ALTITUDE"))?,
-                );
-            }
-            "REENTRY_UNCERTAINTY_METHOD" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                reentry_uncertainty_method = Some(v.to_string())
-            }
-            "REENTRY_DISINTEGRATION" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                reentry_disintegration = Some(v.to_string());
-            }
-            "IMPACT_UNCERTAINTY_METHOD" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                impact_uncertainty_method = Some(v.to_string());
-            }
-            "PREVIOUS_MESSAGE_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                previous_message_id = Some(v.to_string());
-            }
-            "PREVIOUS_MESSAGE_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                previous_message_epoch = Some(
-                    Epoch::from_str(v)
-                        .map_err(|_| cut_err(input, "Invalid PREVIOUS_MESSAGE_EPOCH"))?,
-                );
-            }
-            "NEXT_MESSAGE_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                next_message_epoch = Some(
-                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid NEXT_MESSAGE_EPOCH"))?,
-                );
-            }
-            _ => {
-                // backtrack and end metadata section
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
+    parse_block!(input, comment, {
+        "OBJECT_NAME" => object_name: kv_string,
+        "INTERNATIONAL_DESIGNATOR" => international_designator: kv_string,
+        "CATALOG_NAME" => catalog_name: kv_string,
+        "OBJECT_DESIGNATOR" => object_designator: kv_string,
+        "OBJECT_TYPE" => object_type: kv_enum,
+        "OBJECT_OWNER" => object_owner: kv_string,
+        "OBJECT_OPERATOR" => object_operator: kv_string,
+        "CONTROLLED_REENTRY" => controlled_reentry: kv_enum,
+        "CENTER_NAME" => center_name: kv_string,
+        "TIME_SYSTEM" => time_system: kv_string,
+        "EPOCH_TZERO" => epoch_tzero: kv_epoch,
+        "REF_FRAME" => ref_frame: kv_string,
+        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_epoch,
+        "EPHEMERIS_NAME" => ephemeris_name: kv_string,
+        "GRAVITY_MODEL" => gravity_model: kv_string,
+        "ATMOSPHERIC_MODEL" => atmospheric_model: kv_string,
+        "SOLAR_FLUX_PREDICTION" => solar_flux_prediction: kv_string,
+        "N_BODY_PERTURBATIONS" => n_body_perturbations: kv_string,
+        "SOLAR_RAD_PRESSURE" => solar_rad_pressure: kv_string,
+        "EARTH_TIDES" => earth_tides: kv_string,
+        "INTRACK_THRUST" => intrack_thrust: kv_yes_no,
+        "DRAG_PARAMETERS_SOURCE" => drag_parameters_source: kv_string,
+        "DRAG_PARAMETERS_ALTITUDE" => drag_parameters_altitude: kv_from_kvn,
+        "REENTRY_UNCERTAINTY_METHOD" => reentry_uncertainty_method: kv_string,
+        "REENTRY_DISINTEGRATION" => reentry_disintegration: kv_string,
+        "IMPACT_UNCERTAINTY_METHOD" => impact_uncertainty_method: kv_string,
+        "PREVIOUS_MESSAGE_ID" => previous_message_id: kv_string,
+        "PREVIOUS_MESSAGE_EPOCH" => previous_message_epoch: kv_epoch,
+        "NEXT_MESSAGE_EPOCH" => next_message_epoch: kv_epoch,
+    }, |_| false);
 
     Ok(RdmMetadata {
         comment,
@@ -288,14 +156,14 @@ pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
             ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OBJECT_NAME")),
+                StrContext::Label("Expected OBJECT_NAME"),
             ))
         })?,
         international_designator: international_designator.ok_or_else(|| {
             ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("INTERNATIONAL_DESIGNATOR")),
+                StrContext::Label("Expected INTERNATIONAL_DESIGNATOR"),
             ))
         })?,
         catalog_name,
@@ -307,28 +175,28 @@ pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
             ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("CONTROLLED_REENTRY")),
+                StrContext::Label("Expected CONTROLLED_REENTRY"),
             ))
         })?,
         center_name: center_name.ok_or_else(|| {
             ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("CENTER_NAME")),
+                StrContext::Label("Expected CENTER_NAME"),
             ))
         })?,
         time_system: time_system.ok_or_else(|| {
             ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("TIME_SYSTEM")),
+                StrContext::Label("Expected TIME_SYSTEM"),
             ))
         })?,
         epoch_tzero: epoch_tzero.ok_or_else(|| {
             ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("EPOCH_TZERO")),
+                StrContext::Label("Expected EPOCH_TZERO"),
             ))
         })?,
         ref_frame,
@@ -371,9 +239,45 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
     let mut ground_params = GroundImpactParameters::default();
     let mut have_ground = false;
 
-    let mut state_vector_data = None;
+    let mut state_vector_data = StateVector {
+        comment: Vec::new(),
+        epoch: Epoch::default(),
+        x: Position::default(),
+        y: Position::default(),
+        z: Position::default(),
+        x_dot: Velocity::default(),
+        y_dot: Velocity::default(),
+        z_dot: Velocity::default(),
+    };
+    let mut have_sv = false;
 
-    let mut covariance_matrix_data = None;
+    let mut cov = OpmCovarianceMatrix {
+        comment: Vec::new(),
+        cov_ref_frame: None,
+        cx_x: PositionCovariance::default(),
+        cy_x: PositionCovariance::default(),
+        cy_y: PositionCovariance::default(),
+        cz_x: PositionCovariance::default(),
+        cz_y: PositionCovariance::default(),
+        cz_z: PositionCovariance::default(),
+        cx_dot_x: PositionVelocityCovariance::default(),
+        cx_dot_y: PositionVelocityCovariance::default(),
+        cx_dot_z: PositionVelocityCovariance::default(),
+        cx_dot_x_dot: VelocityCovariance::default(),
+        cy_dot_x: PositionVelocityCovariance::default(),
+        cy_dot_y: PositionVelocityCovariance::default(),
+        cy_dot_z: PositionVelocityCovariance::default(),
+        cy_dot_x_dot: VelocityCovariance::default(),
+        cy_dot_y_dot: VelocityCovariance::default(),
+        cz_dot_x: PositionVelocityCovariance::default(),
+        cz_dot_y: PositionVelocityCovariance::default(),
+        cz_dot_z: PositionVelocityCovariance::default(),
+        cz_dot_x_dot: VelocityCovariance::default(),
+        cz_dot_y_dot: VelocityCovariance::default(),
+        cz_dot_z_dot: VelocityCovariance::default(),
+    };
+    let mut have_cov = false;
+
     let mut spacecraft_params = RdmSpacecraftParameters::default();
     let mut have_sp = false;
 
@@ -382,531 +286,121 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
 
     let mut user_defined_parameters = Vec::new();
 
+    parse_block!(input, comment, {
+        "ORBIT_LIFETIME" => val: kv_from_kvn => { orbit_lifetime = Some(val); },
+        "REENTRY_ALTITUDE" => val: kv_from_kvn => { reentry_altitude = Some(val); },
+        "ORBIT_LIFETIME_WINDOW_START" => val: kv_from_kvn => { orbit_lifetime_window_start = Some(val); },
+        "ORBIT_LIFETIME_WINDOW_END" => val: kv_from_kvn => { orbit_lifetime_window_end = Some(val); },
+        "NOMINAL_REENTRY_EPOCH" => val: kv_epoch => { nominal_reentry_epoch = Some(val); },
+        "REENTRY_WINDOW_START" => val: kv_epoch => { reentry_window_start = Some(val); },
+        "REENTRY_WINDOW_END" => val: kv_epoch => { reentry_window_end = Some(val); },
+        "ORBIT_LIFETIME_CONFIDENCE_LEVEL" => val: kv_from_kvn => { orbit_lifetime_confidence_level = Some(val); },
+
+        "PROBABILITY_OF_IMPACT" => val: kv_from_kvn_value => { ground_params.probability_of_impact = Some(val); have_ground = true; },
+        "PROBABILITY_OF_BURN_UP" => val: kv_from_kvn_value => { ground_params.probability_of_burn_up = Some(val); have_ground = true; },
+        "PROBABILITY_OF_BREAK_UP" => val: kv_from_kvn_value => { ground_params.probability_of_break_up = Some(val); have_ground = true; },
+        "PROBABILITY_OF_LAND_IMPACT" => val: kv_from_kvn_value => { ground_params.probability_of_land_impact = Some(val); have_ground = true; },
+        "PROBABILITY_OF_CASUALTY" => val: kv_from_kvn_value => { ground_params.probability_of_casualty = Some(val); have_ground = true; },
+        "NOMINAL_IMPACT_EPOCH" => val: kv_epoch => { ground_params.nominal_impact_epoch = Some(val); have_ground = true; },
+        "IMPACT_WINDOW_START" => val: kv_epoch => { ground_params.impact_window_start = Some(val); have_ground = true; },
+        "IMPACT_WINDOW_END" => val: kv_epoch => { ground_params.impact_window_end = Some(val); have_ground = true; },
+        "IMPACT_REF_FRAME" => val: kv_string => { ground_params.impact_ref_frame = Some(val); have_ground = true; },
+        "NOMINAL_IMPACT_LON" => val: kv_from_kvn_value => { ground_params.nominal_impact_lon = Some(val); have_ground = true; },
+        "NOMINAL_IMPACT_LAT" => val: kv_from_kvn_value => { ground_params.nominal_impact_lat = Some(val); have_ground = true; },
+        "NOMINAL_IMPACT_ALT" => val: kv_from_kvn => { ground_params.nominal_impact_alt = Some(val); have_ground = true; },
+        "IMPACT_1_CONFIDENCE" => val: kv_from_kvn => { ground_params.impact_1_confidence = Some(val); have_ground = true; },
+        "IMPACT_1_START_LON" => val: kv_from_kvn_value => { ground_params.impact_1_start_lon = Some(val); have_ground = true; },
+        "IMPACT_1_START_LAT" => val: kv_from_kvn_value => { ground_params.impact_1_start_lat = Some(val); have_ground = true; },
+        "IMPACT_1_STOP_LON" => val: kv_from_kvn_value => { ground_params.impact_1_stop_lon = Some(val); have_ground = true; },
+        "IMPACT_1_STOP_LAT" => val: kv_from_kvn_value => { ground_params.impact_1_stop_lat = Some(val); have_ground = true; },
+        "IMPACT_1_CROSS_TRACK" => val: kv_from_kvn => { ground_params.impact_1_cross_track = Some(val); have_ground = true; },
+        "IMPACT_2_CONFIDENCE" => val: kv_from_kvn => { ground_params.impact_2_confidence = Some(val); have_ground = true; },
+        "IMPACT_2_START_LON" => val: kv_from_kvn_value => { ground_params.impact_2_start_lon = Some(val); have_ground = true; },
+        "IMPACT_2_START_LAT" => val: kv_from_kvn_value => { ground_params.impact_2_start_lat = Some(val); have_ground = true; },
+        "IMPACT_2_STOP_LON" => val: kv_from_kvn_value => { ground_params.impact_2_stop_lon = Some(val); have_ground = true; },
+        "IMPACT_2_STOP_LAT" => val: kv_from_kvn_value => { ground_params.impact_2_stop_lat = Some(val); have_ground = true; },
+        "IMPACT_2_CROSS_TRACK" => val: kv_from_kvn => { ground_params.impact_2_cross_track = Some(val); have_ground = true; },
+        "IMPACT_3_CONFIDENCE" => val: kv_from_kvn => { ground_params.impact_3_confidence = Some(val); have_ground = true; },
+        "IMPACT_3_START_LON" => val: kv_from_kvn_value => { ground_params.impact_3_start_lon = Some(val); have_ground = true; },
+        "IMPACT_3_START_LAT" => val: kv_from_kvn_value => { ground_params.impact_3_start_lat = Some(val); have_ground = true; },
+        "IMPACT_3_STOP_LON" => val: kv_from_kvn_value => { ground_params.impact_3_stop_lon = Some(val); have_ground = true; },
+        "IMPACT_3_STOP_LAT" => val: kv_from_kvn_value => { ground_params.impact_3_stop_lat = Some(val); have_ground = true; },
+        "IMPACT_3_CROSS_TRACK" => val: kv_from_kvn => { ground_params.impact_3_cross_track = Some(val); have_ground = true; },
+
+        "EPOCH" => val: kv_epoch => { state_vector_data.epoch = val; have_sv = true; },
+        "X" => val: kv_from_kvn => { state_vector_data.x = val; have_sv = true; },
+        "Y" => val: kv_from_kvn => { state_vector_data.y = val; have_sv = true; },
+        "Z" => val: kv_from_kvn => { state_vector_data.z = val; have_sv = true; },
+        "X_DOT" => val: kv_from_kvn => { state_vector_data.x_dot = val; have_sv = true; },
+        "Y_DOT" => val: kv_from_kvn => { state_vector_data.y_dot = val; have_sv = true; },
+        "Z_DOT" => val: kv_from_kvn => { state_vector_data.z_dot = val; have_sv = true; },
+
+        "COV_REF_FRAME" => val: kv_string => { cov.cov_ref_frame = Some(val); have_cov = true; },
+        "CX_X" => val: kv_from_kvn => { cov.cx_x = val; have_cov = true; },
+        "CY_X" => val: kv_from_kvn => { cov.cy_x = val; have_cov = true; },
+        "CY_Y" => val: kv_from_kvn => { cov.cy_y = val; have_cov = true; },
+        "CZ_X" => val: kv_from_kvn => { cov.cz_x = val; have_cov = true; },
+        "CZ_Y" => val: kv_from_kvn => { cov.cz_y = val; have_cov = true; },
+        "CZ_Z" => val: kv_from_kvn => { cov.cz_z = val; have_cov = true; },
+        "CX_DOT_X" => val: kv_from_kvn => { cov.cx_dot_x = val; have_cov = true; },
+        "CX_DOT_Y" => val: kv_from_kvn => { cov.cx_dot_y = val; have_cov = true; },
+        "CX_DOT_Z" => val: kv_from_kvn => { cov.cx_dot_z = val; have_cov = true; },
+        "CX_DOT_X_DOT" => val: kv_from_kvn => { cov.cx_dot_x_dot = val; have_cov = true; },
+        "CY_DOT_X" => val: kv_from_kvn => { cov.cy_dot_x = val; have_cov = true; },
+        "CY_DOT_Y" => val: kv_from_kvn => { cov.cy_dot_y = val; have_cov = true; },
+        "CY_DOT_Z" => val: kv_from_kvn => { cov.cy_dot_z = val; have_cov = true; },
+        "CY_DOT_X_DOT" => val: kv_from_kvn => { cov.cy_dot_x_dot = val; have_cov = true; },
+        "CY_DOT_Y_DOT" => val: kv_from_kvn => { cov.cy_dot_y_dot = val; have_cov = true; },
+        "CZ_DOT_X" => val: kv_from_kvn => { cov.cz_dot_x = val; have_cov = true; },
+        "CZ_DOT_Y" => val: kv_from_kvn => { cov.cz_dot_y = val; have_cov = true; },
+        "CZ_DOT_Z" => val: kv_from_kvn => { cov.cz_dot_z = val; have_cov = true; },
+        "CZ_DOT_X_DOT" => val: kv_from_kvn => { cov.cz_dot_x_dot = val; have_cov = true; },
+        "CZ_DOT_Y_DOT" => val: kv_from_kvn => { cov.cz_dot_y_dot = val; have_cov = true; },
+        "CZ_DOT_Z_DOT" => val: kv_from_kvn => { cov.cz_dot_z_dot = val; have_cov = true; },
+
+        "WET_MASS" => val: kv_from_kvn => { spacecraft_params.wet_mass = Some(val); have_sp = true; },
+        "DRY_MASS" => val: kv_from_kvn => { spacecraft_params.dry_mass = Some(val); have_sp = true; },
+        "HAZARDOUS_SUBSTANCES" => val: kv_string => { spacecraft_params.hazardous_substances = Some(val); have_sp = true; },
+        "SOLAR_RAD_AREA" => val: kv_from_kvn => { spacecraft_params.solar_rad_area = Some(val); have_sp = true; },
+        "SOLAR_RAD_COEFF" => val: kv_float => { spacecraft_params.solar_rad_coeff = Some(val); have_sp = true; },
+        "DRAG_AREA" => val: kv_from_kvn => { spacecraft_params.drag_area = Some(val); have_sp = true; },
+        "DRAG_COEFF" => val: kv_float => { spacecraft_params.drag_coeff = Some(val); have_sp = true; },
+        "RCS" => val: kv_from_kvn => { spacecraft_params.rcs = Some(val); have_sp = true; },
+        "BALLISTIC_COEFF" => val: kv_from_kvn_value => { spacecraft_params.ballistic_coeff = Some(val); have_sp = true; },
+        "THRUST_ACCELERATION" => val: kv_from_kvn_value => { spacecraft_params.thrust_acceleration = Some(val); have_sp = true; },
+
+        "TIME_LASTOB_START" => val: kv_epoch => { od_params.time_lastob_start = Some(val); have_od = true; },
+        "TIME_LASTOB_END" => val: kv_epoch => { od_params.time_lastob_end = Some(val); have_od = true; },
+        "RECOMMENDED_OD_SPAN" => val: kv_from_kvn => { od_params.recommended_od_span = Some(val); have_od = true; },
+        "ACTUAL_OD_SPAN" => val: kv_from_kvn => { od_params.actual_od_span = Some(val); have_od = true; },
+        "OBS_AVAILABLE" => val: kv_u32 => { od_params.obs_available = Some(val); have_od = true; },
+        "OBS_USED" => val: kv_u32 => { od_params.obs_used = Some(val); have_od = true; },
+        "TRACKS_AVAILABLE" => val: kv_u32 => { od_params.tracks_available = Some(val); have_od = true; },
+        "TRACKS_USED" => val: kv_u32 => { od_params.tracks_used = Some(val); have_od = true; },
+        "RESIDUALS_ACCEPTED" => val: kv_from_kvn => { od_params.residuals_accepted = Some(val); have_od = true; },
+        "WEIGHTED_RMS" => val: kv_float => { od_params.weighted_rms = Some(val); have_od = true; },
+    }, |i: &mut &str| {
+        let checkpoint = i.checkpoint();
+        let _ = collect_comments.parse_next(i);
+        let res = winnow::combinator::peek(key_token).parse_next(i).map(|k| k.starts_with("USER_DEFINED_")).unwrap_or(false);
+        i.reset(&checkpoint);
+        res
+    });
+
     loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
         let checkpoint = input.checkpoint();
+        let loop_comments = collect_comments.parse_next(input)?;
+
         let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "EPOCH" => {
-                input.reset(&checkpoint);
-                let (sv_comment, sv) = crate::kvn::parser::state_vector.parse_next(input)?;
-                let mut sv = sv;
-                sv.comment = sv_comment;
-                state_vector_data = Some(sv);
-            }
-            "COV_REF_FRAME" | "CX_X" | "CY_X" | "CY_Y" | "CZ_X" | "CZ_Y" | "CZ_Z" | "CX_DOT_X"
-            | "CX_DOT_Y" | "CX_DOT_Z" | "CX_DOT_X_DOT" | "CY_DOT_X" | "CY_DOT_Y" | "CY_DOT_Z"
-            | "CY_DOT_X_DOT" | "CY_DOT_Y_DOT" | "CZ_DOT_X" | "CZ_DOT_Y" | "CZ_DOT_Z"
-            | "CZ_DOT_X_DOT" | "CZ_DOT_Y_DOT" | "CZ_DOT_Z_DOT" => {
-                input.reset(&checkpoint);
-                covariance_matrix_data = crate::kvn::parser::covariance_matrix.parse_next(input)?;
-            }
-            "ORBIT_LIFETIME" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                orbit_lifetime = Some(
-                    DayIntervalRequired::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid ORBIT_LIFETIME"))?,
-                );
-            }
-            "REENTRY_ALTITUDE" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                reentry_altitude = Some(
-                    PositionRequired::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid REENTRY_ALTITUDE"))?,
-                );
-            }
-            "ORBIT_LIFETIME_WINDOW_START" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                orbit_lifetime_window_start = Some(
-                    DayIntervalRequired::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid ORBIT_LIFETIME_WINDOW_START"))?,
-                );
-            }
-            "ORBIT_LIFETIME_WINDOW_END" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                orbit_lifetime_window_end = Some(
-                    DayIntervalRequired::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid ORBIT_LIFETIME_WINDOW_END"))?,
-                );
-            }
-            "NOMINAL_REENTRY_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                nominal_reentry_epoch = Some(
-                    Epoch::from_str(v)
-                        .map_err(|_| cut_err(input, "Invalid NOMINAL_REENTRY_EPOCH"))?,
-                );
-            }
-            "REENTRY_WINDOW_START" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                reentry_window_start = Some(
-                    Epoch::from_str(v)
-                        .map_err(|_| cut_err(input, "Invalid REENTRY_WINDOW_START"))?,
-                );
-            }
-            "REENTRY_WINDOW_END" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                reentry_window_end = Some(
-                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid REENTRY_WINDOW_END"))?,
-                );
-            }
-            "ORBIT_LIFETIME_CONFIDENCE_LEVEL" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                orbit_lifetime_confidence_level = Some(
-                    PercentageRequired::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid ORBIT_LIFETIME_CONFIDENCE_LEVEL"))?,
-                );
-            }
-            "PROBABILITY_OF_IMPACT" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.probability_of_impact = Some(
-                    Probability::new(
-                        parse_f64(v)
-                            .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_IMPACT"))?,
-                    )
-                    .map_err(|_| {
-                        cut_err(input, "Probability out of range for PROBABILITY_OF_IMPACT")
-                    })?,
-                );
-                have_ground = true;
-            }
-            "PROBABILITY_OF_BURN_UP" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.probability_of_burn_up = Some(
-                    Probability::new(
-                        parse_f64(v)
-                            .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_BURN_UP"))?,
-                    )
-                    .map_err(|_| {
-                        cut_err(input, "Probability out of range for PROBABILITY_OF_BURN_UP")
-                    })?,
-                );
-                have_ground = true;
-            }
-            "PROBABILITY_OF_BREAK_UP" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.probability_of_break_up = Some(
-                    Probability::new(
-                        parse_f64(v)
-                            .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_BREAK_UP"))?,
-                    )
-                    .map_err(|_| {
-                        cut_err(
-                            input,
-                            "Probability out of range for PROBABILITY_OF_BREAK_UP",
-                        )
-                    })?,
-                );
-                have_ground = true;
-            }
-            "PROBABILITY_OF_LAND_IMPACT" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.probability_of_land_impact = Some(
-                    Probability::new(
-                        parse_f64(v)
-                            .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_LAND_IMPACT"))?,
-                    )
-                    .map_err(|_| {
-                        cut_err(
-                            input,
-                            "Probability out of range for PROBABILITY_OF_LAND_IMPACT",
-                        )
-                    })?,
-                );
-                have_ground = true;
-            }
-            "PROBABILITY_OF_CASUALTY" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.probability_of_casualty = Some(
-                    Probability::new(
-                        parse_f64(v)
-                            .map_err(|_| cut_err(input, "Invalid PROBABILITY_OF_CASUALTY"))?,
-                    )
-                    .map_err(|_| {
-                        cut_err(
-                            input,
-                            "Probability out of range for PROBABILITY_OF_CASUALTY",
-                        )
-                    })?,
-                );
-                have_ground = true;
-            }
-            "NOMINAL_IMPACT_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.nominal_impact_epoch = Some(
-                    Epoch::from_str(v)
-                        .map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_EPOCH"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_WINDOW_START" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_window_start = Some(
-                    Epoch::from_str(v)
-                        .map_err(|_| cut_err(input, "Invalid IMPACT_WINDOW_START"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_WINDOW_END" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_window_end = Some(
-                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid IMPACT_WINDOW_END"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_REF_FRAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_ref_frame = Some(v.to_string());
-                have_ground = true;
-            }
-            "NOMINAL_IMPACT_LON" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.nominal_impact_lon = Some(
-                    LongitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_LON"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Longitude out of range for NOMINAL_IMPACT_LON"))?,
-                );
-                have_ground = true;
-            }
-            "NOMINAL_IMPACT_LAT" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.nominal_impact_lat = Some(
-                    LatitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_LAT"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Latitude out of range for NOMINAL_IMPACT_LAT"))?,
-                );
-                have_ground = true;
-            }
-            "NOMINAL_IMPACT_ALT" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                ground_params.nominal_impact_alt = Some(
-                    AltitudeRequired::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid NOMINAL_IMPACT_ALT"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_1_CONFIDENCE" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                ground_params.impact_1_confidence = Some(
-                    PercentageRequired::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid IMPACT_1_CONFIDENCE"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_1_START_LON" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_1_start_lon = Some(
-                    LongitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_1_START_LON"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_1_START_LON"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_1_START_LAT" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_1_start_lat = Some(
-                    LatitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_1_START_LAT"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_1_START_LAT"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_1_STOP_LON" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_1_stop_lon = Some(
-                    LongitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_1_STOP_LON"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_1_STOP_LON"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_1_STOP_LAT" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_1_stop_lat = Some(
-                    LatitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_1_STOP_LAT"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_1_STOP_LAT"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_1_CROSS_TRACK" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                ground_params.impact_1_cross_track = Some(
-                    Distance::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid IMPACT_1_CROSS_TRACK"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_2_CONFIDENCE" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                ground_params.impact_2_confidence = Some(
-                    PercentageRequired::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid IMPACT_2_CONFIDENCE"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_2_START_LON" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_2_start_lon = Some(
-                    LongitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_2_START_LON"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_2_START_LON"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_2_START_LAT" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_2_start_lat = Some(
-                    LatitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_2_START_LAT"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_2_START_LAT"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_2_STOP_LON" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_2_stop_lon = Some(
-                    LongitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_2_STOP_LON"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_2_STOP_LON"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_2_STOP_LAT" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_2_stop_lat = Some(
-                    LatitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_2_STOP_LAT"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_2_STOP_LAT"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_2_CROSS_TRACK" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                ground_params.impact_2_cross_track = Some(
-                    Distance::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid IMPACT_2_CROSS_TRACK"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_3_CONFIDENCE" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                ground_params.impact_3_confidence = Some(
-                    PercentageRequired::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid IMPACT_3_CONFIDENCE"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_3_START_LON" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_3_start_lon = Some(
-                    LongitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_3_START_LON"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_3_START_LON"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_3_START_LAT" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_3_start_lat = Some(
-                    LatitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_3_START_LAT"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_3_START_LAT"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_3_STOP_LON" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_3_stop_lon = Some(
-                    LongitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_3_STOP_LON"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Longitude out of range for IMPACT_3_STOP_LON"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_3_STOP_LAT" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ground_params.impact_3_stop_lat = Some(
-                    LatitudeRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid IMPACT_3_STOP_LAT"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Latitude out of range for IMPACT_3_STOP_LAT"))?,
-                );
-                have_ground = true;
-            }
-            "IMPACT_3_CROSS_TRACK" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                ground_params.impact_3_cross_track = Some(
-                    Distance::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid IMPACT_3_CROSS_TRACK"))?,
-                );
-                have_ground = true;
-            }
-
-            "WET_MASS" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                spacecraft_params.wet_mass =
-                    Some(Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid WET_MASS"))?);
-                have_sp = true;
-            }
-            "DRY_MASS" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                spacecraft_params.dry_mass =
-                    Some(Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid DRY_MASS"))?);
-                have_sp = true;
-            }
-            "HAZARDOUS_SUBSTANCES" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                spacecraft_params.hazardous_substances = Some(v.to_string());
-                have_sp = true;
-            }
-            "SOLAR_RAD_AREA" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                spacecraft_params.solar_rad_area = Some(
-                    Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid SOLAR_RAD_AREA"))?,
-                );
-                have_sp = true;
-            }
-            "SOLAR_RAD_COEFF" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                spacecraft_params.solar_rad_coeff =
-                    Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid SOLAR_RAD_COEFF"))?);
-                have_sp = true;
-            }
-            "DRAG_AREA" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                spacecraft_params.drag_area =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid DRAG_AREA"))?);
-                have_sp = true;
-            }
-            "DRAG_COEFF" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                spacecraft_params.drag_coeff =
-                    Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid DRAG_COEFF"))?);
-                have_sp = true;
-            }
-            "RCS" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                spacecraft_params.rcs =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid RCS"))?);
-                have_sp = true;
-            }
-            "BALLISTIC_COEFF" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                spacecraft_params.ballistic_coeff = Some(
-                    BallisticCoeffRequired::new(
-                        parse_f64(v).map_err(|_| cut_err(input, "Invalid BALLISTIC_COEFF"))?,
-                    )
-                    .map_err(|_| cut_err(input, "Ballistic coefficient out of range"))?,
-                );
-                have_sp = true;
-            }
-            "THRUST_ACCELERATION" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                spacecraft_params.thrust_acceleration =
-                    Some(Ms2Required::new(parse_f64(v).map_err(|_| {
-                        cut_err(input, "Invalid THRUST_ACCELERATION")
-                    })?));
-                have_sp = true;
-            }
-
-            "TIME_LASTOB_START" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_params.time_lastob_start = Some(
-                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid TIME_LASTOB_START"))?,
-                );
-                have_od = true;
-            }
-            "TIME_LASTOB_END" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_params.time_lastob_end = Some(
-                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid TIME_LASTOB_END"))?,
-                );
-                have_od = true;
-            }
-            "RECOMMENDED_OD_SPAN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                od_params.recommended_od_span = Some(
-                    DayInterval::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid RECOMMENDED_OD_SPAN"))?,
-                );
-                have_od = true;
-            }
-            "ACTUAL_OD_SPAN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                od_params.actual_od_span = Some(
-                    DayInterval::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid ACTUAL_OD_SPAN"))?,
-                );
-                have_od = true;
-            }
-            "OBS_AVAILABLE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_params.obs_available =
-                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid OBS_AVAILABLE"))?);
-                have_od = true;
-            }
-            "OBS_USED" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_params.obs_used =
-                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid OBS_USED"))?);
-                have_od = true;
-            }
-            "TRACKS_AVAILABLE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_params.tracks_available =
-                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid TRACKS_AVAILABLE"))?);
-                have_od = true;
-            }
-            "TRACKS_USED" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_params.tracks_used =
-                    Some(parse_u32(v).map_err(|_| cut_err(input, "Invalid TRACKS_USED"))?);
-                have_od = true;
-            }
-            "RESIDUALS_ACCEPTED" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                od_params.residuals_accepted = Some(
-                    Percentage::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid RESIDUALS_ACCEPTED"))?,
-                );
-                have_od = true;
-            }
-            "WEIGHTED_RMS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_params.weighted_rms =
-                    Some(parse_f64(v).map_err(|_| cut_err(input, "Invalid WEIGHTED_RMS"))?);
-                have_od = true;
-            }
-
-            _ if key.starts_with("USER_DEFINED_") => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                user_defined_parameters.push((key.to_string(), v.to_string()));
-            }
-
+            Ok(k) if k.starts_with("USER_DEFINED_") => k,
             _ => {
-                // backtrack and end data section
                 input.reset(&checkpoint);
                 break;
             }
-        }
+        };
+        comment.extend(loop_comments);
+        let v = kv_string.parse_next(input)?;
+        user_defined_parameters.push((key.to_string(), v));
     }
 
     let atmospheric_reentry_parameters = AtmosphericReentryParameters {
@@ -930,8 +424,8 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         } else {
             None
         },
-        state_vector: state_vector_data,
-        covariance_matrix: covariance_matrix_data,
+        state_vector: if have_sv { Some(state_vector_data) } else { None },
+        covariance_matrix: if have_cov { Some(cov) } else { None },
         spacecraft_parameters: if have_sp {
             Some(spacecraft_params)
         } else {
@@ -1760,8 +1254,8 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_creation).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.to_lowercase().contains("expected creation_date"))
+            CcsdsNdmError::KvnParse { message, contexts, .. } => {
+                assert!(message.contains("Expected CREATION_DATE") || contexts.contains(&"Expected CREATION_DATE"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1780,8 +1274,8 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_originator).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.to_lowercase().contains("expected originator"))
+            CcsdsNdmError::KvnParse { message, contexts, .. } => {
+                assert!(message.to_lowercase().contains("expected originator") || contexts.iter().any(|c| c.to_lowercase().contains("expected originator")))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1800,8 +1294,8 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_msgid).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.to_lowercase().contains("expected message_id"))
+            CcsdsNdmError::KvnParse { message, contexts, .. } => {
+                assert!(message.to_lowercase().contains("expected message_id") || contexts.iter().any(|c| c.to_lowercase().contains("expected message_id")))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1822,9 +1316,10 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_object_name).unwrap_err();
+        println!("RDM ERROR: {:?}", err);
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.to_lowercase().contains("expected object_name"))
+            CcsdsNdmError::KvnParse { message, contexts, .. } => {
+                assert!(message.contains("Expected OBJECT_NAME") || contexts.contains(&"Expected OBJECT_NAME"))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1843,10 +1338,10 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_intl).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
+            CcsdsNdmError::KvnParse { message, contexts, .. } => {
                 assert!(message
                     .to_lowercase()
-                    .contains("expected international_designator"))
+                    .contains("expected international_designator") || contexts.iter().any(|c| c.to_lowercase().contains("expected international_designator")))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1865,8 +1360,8 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_center).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.to_lowercase().contains("expected center_name"))
+            CcsdsNdmError::KvnParse { message, contexts, .. } => {
+                assert!(message.to_lowercase().contains("expected center_name") || contexts.iter().any(|c| c.to_lowercase().contains("expected center_name")))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1885,8 +1380,8 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_timesys).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.to_lowercase().contains("expected time_system"))
+            CcsdsNdmError::KvnParse { message, contexts, .. } => {
+                assert!(message.to_lowercase().contains("expected time_system") || contexts.iter().any(|c| c.to_lowercase().contains("expected time_system")))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1905,10 +1400,10 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_controlled).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
+            CcsdsNdmError::KvnParse { message, contexts, .. } => {
                 assert!(message
                     .to_lowercase()
-                    .contains("expected controlled_reentry"))
+                    .contains("expected controlled_reentry") || contexts.iter().any(|c| c.to_lowercase().contains("expected controlled_reentry")))
             }
             _ => panic!("Unexpected: {:?}", err),
         }
@@ -1927,8 +1422,8 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_epoch).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.to_lowercase().contains("expected epoch_tzero"))
+            CcsdsNdmError::KvnParse { message, contexts, .. } => {
+                assert!(message.to_lowercase().contains("expected epoch_tzero") || contexts.iter().any(|c| c.to_lowercase().contains("expected epoch_tzero")))
             }
             _ => panic!("Unexpected: {:?}", err),
         }

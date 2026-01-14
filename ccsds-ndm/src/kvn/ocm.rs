@@ -6,13 +6,13 @@
 //!
 //! This module implements KVN parsing for OCM using winnow parser combinators.
 
+use crate::parse_block;
 use crate::kvn::parser::*;
+use crate::common::OdmHeader;
 use crate::messages::ocm::*;
-use crate::traits::FromKvnValue;
 use crate::types::*;
-use std::str::FromStr;
 use winnow::ascii::{space1, till_line_ending};
-use winnow::combinator::repeat;
+use winnow::combinator::{preceded, repeat};
 use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 
@@ -21,6 +21,7 @@ use winnow::prelude::*;
 //----------------------------------------------------------------------
 
 pub fn ocm_version(input: &mut &str) -> KvnResult<String> {
+    ws.parse_next(input)?;
     let _ = collect_comments.parse_next(input)?;
     let (value, _) = expect_key("CCSDS_OCM_VERS").parse_next(input)?;
     Ok(value.to_string())
@@ -31,7 +32,14 @@ pub fn ocm_version(input: &mut &str) -> KvnResult<String> {
 //----------------------------------------------------------------------
 
 pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
-    expect_block_start("META").parse_next(input)?;
+    ws.parse_next(input)?;
+    expect_block_start("META").parse_next(input).map_err(|e| {
+        if e.is_backtrack() {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(input, &input.checkpoint(), StrContext::Label("Expected META_START")))
+        } else {
+            e
+        }
+    })?;
 
     let mut comment = Vec::new();
     let mut object_name = None;
@@ -82,253 +90,58 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
     let mut interp_method_eop = None;
     let mut celestial_source = None;
 
-    loop {
-        if at_block_end("META", input) {
-            expect_block_end("META").parse_next(input)?;
-            break;
-        }
+    parse_block!(input, comment, {
+        "OBJECT_NAME" => object_name: kv_string,
+        "INTERNATIONAL_DESIGNATOR" => international_designator: kv_string,
+        "CATALOG_NAME" => catalog_name: kv_string,
+        "OBJECT_DESIGNATOR" => object_designator: kv_string,
+        "ALTERNATE_NAMES" => alternate_names: kv_string,
+        "ORIGINATOR_POC" => originator_poc: kv_string,
+        "ORIGINATOR_POSITION" => originator_position: kv_string,
+        "ORIGINATOR_PHONE" => originator_phone: kv_string,
+        "ORIGINATOR_EMAIL" => originator_email: kv_string,
+        "ORIGINATOR_ADDRESS" => originator_address: kv_string,
+        "TECH_ORG" => tech_org: kv_string,
+        "TECH_POC" => tech_poc: kv_string,
+        "TECH_POSITION" => tech_position: kv_string,
+        "TECH_PHONE" => tech_phone: kv_string,
+        "TECH_EMAIL" => tech_email: kv_string,
+        "TECH_ADDRESS" => tech_address: kv_string,
+        "PREVIOUS_MESSAGE_ID" => previous_message_id: kv_string,
+        "NEXT_MESSAGE_ID" => next_message_id: kv_string,
+        "ADM_MSG_LINK" => adm_msg_link: kv_string,
+        "CDM_MSG_LINK" => cdm_msg_link: kv_string,
+        "PRM_MSG_LINK" => prm_msg_link: kv_string,
+        "RDM_MSG_LINK" => rdm_msg_link: kv_string,
+        "TDM_MSG_LINK" => tdm_msg_link: kv_string,
+        "OPERATOR" => operator: kv_string,
+        "OWNER" => owner: kv_string,
+        "COUNTRY" => country: kv_string,
+        "CONSTELLATION" => constellation: kv_string,
+        "OBJECT_TYPE" => object_type: kv_enum,
+        "TIME_SYSTEM" => time_system: kv_string,
+        "EPOCH_TZERO" => epoch_tzero: kv_epoch,
+        "OPS_STATUS" => ops_status: kv_string,
+        "ORBIT_CATEGORY" => orbit_category: kv_string,
+        "OCM_DATA_ELEMENTS" => ocm_data_elements: kv_string,
+        "SCLK_OFFSET_AT_EPOCH" => sclk_offset_at_epoch: kv_from_kvn,
+        "SCLK_SEC_PER_SI_SEC" => sclk_sec_per_si_sec: kv_from_kvn,
+        "PREVIOUS_MESSAGE_EPOCH" => previous_message_epoch: kv_epoch,
+        "NEXT_MESSAGE_EPOCH" => next_message_epoch: kv_epoch,
+        "START_TIME" => start_time: kv_epoch,
+        "STOP_TIME" => stop_time: kv_epoch,
+        "TIME_SPAN" => time_span: kv_from_kvn,
+        "TAIMUTC_AT_TZERO" => taimutc_at_tzero: kv_from_kvn,
+        "NEXT_LEAP_EPOCH" => next_leap_epoch: kv_epoch,
+        "NEXT_LEAP_TAIMUTC" => next_leap_taimutc: kv_from_kvn,
+        "UT1MUTC_AT_TZERO" => ut1mutc_at_tzero: kv_from_kvn,
+        "EOP_SOURCE" => eop_source: kv_string,
+        "INTERP_METHOD_EOP" => interp_method_eop: kv_string,
+        "CELESTIAL_SOURCE" => celestial_source: kv_string,
+    }, |i| at_block_end("META", i), "Unexpected OCM Metadata key");
 
-        comment.extend(collect_comments.parse_next(input)?);
-
-        if at_block_end("META", input) {
-            continue;
-        }
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "OBJECT_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_name = Some(v.to_string());
-            }
-            "INTERNATIONAL_DESIGNATOR" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                international_designator = Some(v.to_string());
-            }
-            "CATALOG_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                catalog_name = Some(v.to_string());
-            }
-            "OBJECT_DESIGNATOR" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_designator = Some(v.to_string());
-            }
-            "ALTERNATE_NAMES" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                alternate_names = Some(v.to_string());
-            }
-            "ORIGINATOR_POC" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                originator_poc = Some(v.to_string());
-            }
-            "ORIGINATOR_POSITION" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                originator_position = Some(v.to_string());
-            }
-            "ORIGINATOR_PHONE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                originator_phone = Some(v.to_string());
-            }
-            "ORIGINATOR_EMAIL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                originator_email = Some(v.to_string());
-            }
-            "ORIGINATOR_ADDRESS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                originator_address = Some(v.to_string());
-            }
-            "TECH_ORG" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                tech_org = Some(v.to_string());
-            }
-            "TECH_POC" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                tech_poc = Some(v.to_string());
-            }
-            "TECH_POSITION" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                tech_position = Some(v.to_string());
-            }
-            "TECH_PHONE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                tech_phone = Some(v.to_string());
-            }
-            "TECH_EMAIL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                tech_email = Some(v.to_string());
-            }
-            "TECH_ADDRESS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                tech_address = Some(v.to_string());
-            }
-            "PREVIOUS_MESSAGE_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                previous_message_id = Some(v.to_string());
-            }
-            "NEXT_MESSAGE_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                next_message_id = Some(v.to_string());
-            }
-            "ADM_MSG_LINK" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                adm_msg_link = Some(v.to_string());
-            }
-            "CDM_MSG_LINK" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cdm_msg_link = Some(v.to_string());
-            }
-            "PRM_MSG_LINK" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                prm_msg_link = Some(v.to_string());
-            }
-            "RDM_MSG_LINK" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                rdm_msg_link = Some(v.to_string());
-            }
-            "TDM_MSG_LINK" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                tdm_msg_link = Some(v.to_string());
-            }
-            "OPERATOR" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                operator = Some(v.to_string());
-            }
-            "OWNER" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                owner = Some(v.to_string());
-            }
-            "COUNTRY" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                country = Some(v.to_string());
-            }
-            "CONSTELLATION" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                constellation = Some(v.to_string());
-            }
-            "OBJECT_TYPE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_type = Some(
-                    ObjectDescription::from_str(v)
-                        .map_err(|_| cut_err(input, "Invalid OBJECT_TYPE"))?,
-                );
-            }
-            "TIME_SYSTEM" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                time_system = Some(v.to_string());
-            }
-            "EPOCH_TZERO" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                epoch_tzero =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid EPOCH_TZERO"))?);
-            }
-            "OPS_STATUS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ops_status = Some(v.to_string());
-            }
-            "ORBIT_CATEGORY" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                orbit_category = Some(v.to_string());
-            }
-            "OCM_DATA_ELEMENTS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ocm_data_elements = Some(v.to_string());
-            }
-            "SCLK_OFFSET_AT_EPOCH" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                sclk_offset_at_epoch = Some(
-                    TimeOffset::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid SCLK_OFFSET_AT_EPOCH"))?,
-                );
-            }
-            "SCLK_SEC_PER_SI_SEC" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                sclk_sec_per_si_sec = Some(
-                    Duration::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid SCLK_SEC_PER_SI_SEC"))?,
-                );
-            }
-            "PREVIOUS_MESSAGE_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                previous_message_epoch = Some(
-                    Epoch::from_str(v)
-                        .map_err(|_| cut_err(input, "Invalid PREVIOUS_MESSAGE_EPOCH"))?,
-                );
-            }
-            "NEXT_MESSAGE_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                next_message_epoch = Some(
-                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid NEXT_MESSAGE_EPOCH"))?,
-                );
-            }
-            "START_TIME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                start_time =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid START_TIME"))?);
-            }
-            "STOP_TIME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                stop_time =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid STOP_TIME"))?);
-            }
-            "TIME_SPAN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                time_span = Some(
-                    DayInterval::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid TIME_SPAN"))?,
-                );
-            }
-            "TAIMUTC_AT_TZERO" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                taimutc_at_tzero = Some(
-                    TimeOffset::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid TAIMUTC_AT_TZERO"))?,
-                );
-            }
-            "NEXT_LEAP_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                next_leap_epoch = Some(
-                    Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid NEXT_LEAP_EPOCH"))?,
-                );
-            }
-            "NEXT_LEAP_TAIMUTC" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                next_leap_taimutc = Some(
-                    TimeOffset::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid NEXT_LEAP_TAIMUTC"))?,
-                );
-            }
-            "UT1MUTC_AT_TZERO" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                ut1mutc_at_tzero = Some(
-                    TimeOffset::from_kvn(v, u)
-                        .map_err(|_| cut_err(input, "Invalid UT1MUTC_AT_TZERO"))?,
-                );
-            }
-            "EOP_SOURCE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                eop_source = Some(v.to_string());
-            }
-            "INTERP_METHOD_EOP" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                interp_method_eop = Some(v.to_string());
-            }
-            "CELESTIAL_SOURCE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                celestial_source = Some(v.to_string());
-            }
-            _ => {
-                // Unknown key - error
-                input.reset(&checkpoint);
-                return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Label("Unexpected OCM Metadata key"),
-                )));
-            }
-        }
+    if at_block_end("META", input) {
+        expect_block_end("META").parse_next(input)?;
     }
 
     Ok(OcmMetadata {
@@ -406,10 +219,10 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
 //----------------------------------------------------------------------
 
 pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
-    if input.starts_with(|c: char| c.is_ascii_uppercase()) {
+    if input.trim_start().starts_with(|c: char| c.is_ascii_uppercase()) {
         return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
     }
-    let epoch = till_space.parse_next(input)?;
+    let epoch = preceded(ws, till_space).parse_next(input)?;
     let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     Ok(TrajLine {
@@ -419,6 +232,7 @@ pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
 }
 
 pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
+    ws.parse_next(input)?;
     expect_block_start("TRAJ").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -442,148 +256,44 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
     let mut traj_units = None;
     let mut traj_lines = Vec::new();
 
+    parse_block!(input, comment, {
+        "TRAJ_ID" => traj_id: kv_string,
+        "TRAJ_PREV_ID" => traj_prev_id: kv_string,
+        "TRAJ_NEXT_ID" => traj_next_id: kv_string,
+        "TRAJ_BASIS" => traj_basis: kv_enum,
+        "TRAJ_BASIS_ID" => traj_basis_id: kv_string,
+        "INTERPOLATION" => interpolation: kv_string,
+        "INTERPOLATION_DEGREE" => interpolation_degree: kv_u32,
+        "PROPAGATOR" => propagator: kv_string,
+        "CENTER_NAME" => center_name: kv_string,
+        "TRAJ_REF_FRAME" => traj_ref_frame: kv_string,
+        "TRAJ_FRAME_EPOCH" => traj_frame_epoch: kv_epoch,
+        "USEABLE_START_TIME" => useable_start_time: kv_epoch,
+        "USEABLE_STOP_TIME" => useable_stop_time: kv_epoch,
+        "ORB_REVNUM" => orb_revnum: kv_float,
+        "ORB_REVNUM_BASIS" => orb_revnum_basis: kv_enum,
+        "TRAJ_TYPE" => traj_type: kv_string,
+        "ORB_AVERAGING" => orb_averaging: kv_string,
+        "TRAJ_UNITS" => traj_units: kv_string,
+    }, |i| at_block_end("TRAJ", i), "Unexpected OCM Trajectory key");
+
     loop {
+        let comments = collect_comments.parse_next(input)?;
+
         if at_block_end("TRAJ", input) {
+            comment.extend(comments);
             expect_block_end("TRAJ").parse_next(input)?;
             break;
         }
 
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
-
-        if at_block_end("TRAJ", input) {
+        if let Ok(line) = ocm_traj_line.parse_next(input) {
+            traj_lines.push(line);
             continue;
         }
 
-        let checkpoint = input.checkpoint();
-        let key_res = key_token.parse_next(input);
-        match key_res {
-            Ok(key) => {
-                match key {
-                    "TRAJ_ID" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        traj_id = Some(v.to_string());
-                    }
-                    "TRAJ_PREV_ID" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        traj_prev_id = Some(v.to_string());
-                    }
-                    "TRAJ_NEXT_ID" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        traj_next_id = Some(v.to_string());
-                    }
-                    "TRAJ_BASIS" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        traj_basis = Some(
-                            TrajBasis::from_str(v).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "TRAJ_BASIS_ID" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        traj_basis_id = Some(v.to_string());
-                    }
-                    "INTERPOLATION" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        interpolation = Some(v.to_string());
-                    }
-                    "INTERPOLATION_DEGREE" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        interpolation_degree = Some(parse_u32(v).map_err(|_| {
-                            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Expected(StrContextValue::Description(
-                                    "INTERPOLATION_DEGREE",
-                                )),
-                            ))
-                        })?);
-                    }
-                    "PROPAGATOR" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        propagator = Some(v.to_string());
-                    }
-                    "CENTER_NAME" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        center_name = Some(v.to_string());
-                    }
-                    "TRAJ_REF_FRAME" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        traj_ref_frame = Some(v.to_string());
-                    }
-                    "TRAJ_FRAME_EPOCH" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        traj_frame_epoch =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "USEABLE_START_TIME" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        useable_start_time =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "USEABLE_STOP_TIME" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        useable_stop_time =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "ORB_REVNUM" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        orb_revnum = Some(parse_f64(v).map_err(|_| {
-                            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Expected(StrContextValue::Description("ORB_REVNUM")),
-                            ))
-                        })?);
-                    }
-                    "ORB_REVNUM_BASIS" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        orb_revnum_basis = Some(
-                            RevNumBasis::from_str(v)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "TRAJ_TYPE" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        traj_type = Some(v.to_string());
-                    }
-                    "ORB_AVERAGING" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        orb_averaging = Some(v.to_string());
-                    }
-                    "TRAJ_UNITS" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        traj_units = Some(v.to_string());
-                    }
-                    _ => {
-                        // Unknown key - error
-                        input.reset(&checkpoint);
-                        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label("Unexpected OCM Trajectory key"),
-                        )));
-                    }
-                }
-            }
-            Err(_) => {
-                input.reset(&checkpoint);
-                if let Ok(line) = ocm_traj_line.parse_next(input) {
-                    traj_lines.push(line);
-                    continue;
-                }
-
-                // NOT a key, NOT a traj line.
-                // If it's a block boundary, break and let the caller handle it.
-                if at_block_end("TRAJ", input) {
-                    break;
-                }
-
-                // Otherwise, skip the line (handles continuations)
-                let _ = till_line_ending.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-                continue;
-            }
-        }
+        // Otherwise, skip the line (handles continuations) or break
+        let _ = till_line_ending.parse_next(input)?;
+        opt_line_ending.parse_next(input)?;
     }
 
     if traj_lines.is_empty() {
@@ -629,356 +339,178 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
 //----------------------------------------------------------------------
 
 pub fn ocm_phys(input: &mut &str) -> KvnResult<OcmPhysicalDescription> {
+    ws.parse_next(input)?;
     expect_block_start("PHYS").parse_next(input)?;
 
-    let mut phys = OcmPhysicalDescription::default();
+    let mut comment = Vec::new();
+    let mut manufacturer = None;
+    let mut bus_model = None;
+    let mut docked_with = None;
+    let mut drag_const_area = None;
+    let mut drag_coeff_nom = None;
+    let mut drag_uncertainty = None;
+    let mut initial_wet_mass = None;
+    let mut wet_mass = None;
+    let mut dry_mass = None;
+    let mut oeb_parent_frame = None;
+    let mut oeb_parent_frame_epoch = None;
+    let mut oeb_q1 = None;
+    let mut oeb_q2 = None;
+    let mut oeb_q3 = None;
+    let mut oeb_qc = None;
+    let mut oeb_max = None;
+    let mut oeb_int = None;
+    let mut oeb_min = None;
+    let mut area_along_oeb_max = None;
+    let mut area_along_oeb_int = None;
+    let mut area_along_oeb_min = None;
+    let mut area_min_for_pc = None;
+    let mut area_max_for_pc = None;
+    let mut area_typ_for_pc = None;
+    let mut rcs = None;
+    let mut rcs_min = None;
+    let mut rcs_max = None;
+    let mut srp_const_area = None;
+    let mut solar_rad_coeff = None;
+    let mut solar_rad_uncertainty = None;
+    let mut vm_absolute = None;
+    let mut vm_apparent_min = None;
+    let mut vm_apparent = None;
+    let mut vm_apparent_max = None;
+    let mut reflectance = None;
+    let mut att_control_mode = None;
+    let mut att_actuator_type = None;
+    let mut att_knowledge = None;
+    let mut att_control = None;
+    let mut att_pointing = None;
+    let mut avg_maneuver_freq = None;
+    let mut max_thrust = None;
+    let mut dv_bol = None;
+    let mut dv_remaining = None;
+    let mut ixx = None;
+    let mut iyy = None;
+    let mut izz = None;
+    let mut ixy = None;
+    let mut ixz = None;
+    let mut iyz = None;
 
-    loop {
-        if at_block_end("PHYS", input) {
-            expect_block_end("PHYS").parse_next(input)?;
-            break;
-        }
+    parse_block!(input, comment, {
+        "MANUFACTURER" => manufacturer: kv_string,
+        "BUS_MODEL" => bus_model: kv_string,
+        "DOCKED_WITH" => docked_with: kv_string,
+        "DRAG_CONST_AREA" => drag_const_area: kv_from_kvn,
+        "DRAG_COEFF_NOM" => drag_coeff_nom: kv_float,
+        "DRAG_UNCERTAINTY" => drag_uncertainty: kv_from_kvn,
+        "INITIAL_WET_MASS" => initial_wet_mass: kv_from_kvn,
+        "WET_MASS" => wet_mass: kv_from_kvn,
+        "DRY_MASS" => dry_mass: kv_from_kvn,
+        "OEB_PARENT_FRAME" => oeb_parent_frame: kv_string,
+        "OEB_PARENT_FRAME_EPOCH" => oeb_parent_frame_epoch: kv_epoch,
+        "OEB_Q1" => oeb_q1: kv_float,
+        "OEB_Q2" => oeb_q2: kv_float,
+        "OEB_Q3" => oeb_q3: kv_float,
+        "OEB_QC" => oeb_qc: kv_float,
+        "OEB_MAX" => oeb_max: kv_from_kvn,
+        "OEB_INT" => oeb_int: kv_from_kvn,
+        "OEB_MIN" => oeb_min: kv_from_kvn,
+        "AREA_ALONG_OEB_MAX" => area_along_oeb_max: kv_from_kvn,
+        "AREA_ALONG_OEB_INT" => area_along_oeb_int: kv_from_kvn,
+        "AREA_ALONG_OEB_MIN" => area_along_oeb_min: kv_from_kvn,
+        "AREA_MIN_FOR_PC" => area_min_for_pc: kv_from_kvn,
+        "AREA_MAX_FOR_PC" => area_max_for_pc: kv_from_kvn,
+        "AREA_TYP_FOR_PC" => area_typ_for_pc: kv_from_kvn,
+        "RCS" => rcs: kv_from_kvn,
+        "RCS_MIN" => rcs_min: kv_from_kvn,
+        "RCS_MAX" => rcs_max: kv_from_kvn,
+        "SRP_CONST_AREA" => srp_const_area: kv_from_kvn,
+        "SOLAR_RAD_COEFF" => solar_rad_coeff: kv_float,
+        "SOLAR_RAD_UNCERTAINTY" => solar_rad_uncertainty: kv_from_kvn,
+        "VM_ABSOLUTE" => vm_absolute: kv_float,
+        "VM_APPARENT_MIN" => vm_apparent_min: kv_float,
+        "VM_APPARENT" => vm_apparent: kv_float,
+        "VM_APPARENT_MAX" => vm_apparent_max: kv_float,
+        "REFLECTANCE" => reflectance: kv_enum,
+        "ATT_CONTROL_MODE" => att_control_mode: kv_string,
+        "ATT_ACTUATOR_TYPE" => att_actuator_type: kv_string,
+        "ATT_KNOWLEDGE" => att_knowledge: kv_from_kvn,
+        "ATT_CONTROL" => att_control: kv_from_kvn,
+        "ATT_POINTING" => att_pointing: kv_from_kvn,
+        "AVG_MANEUVER_FREQ" => avg_maneuver_freq: kv_from_kvn,
+        "MAX_THRUST" => max_thrust: kv_from_kvn,
+        "DV_BOL" => dv_bol: kv_from_kvn,
+        "DV_REMAINING" => dv_remaining: kv_from_kvn,
+        "IXX" => ixx: kv_from_kvn,
+        "IYY" => iyy: kv_from_kvn,
+        "IZZ" => izz: kv_from_kvn,
+        "IXY" => ixy: kv_from_kvn,
+        "IXZ" => ixz: kv_from_kvn,
+        "IYZ" => iyz: kv_from_kvn,
+    }, |i| at_block_end("PHYS", i), "Unexpected OCM Physical key");
 
-        let comments = collect_comments.parse_next(input)?;
-        phys.comment.extend(comments);
-
-        if at_block_end("PHYS", input) {
-            continue;
-        }
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "MANUFACTURER" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.manufacturer = Some(v.to_string());
-            }
-            "BUS_MODEL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.bus_model = Some(v.to_string());
-            }
-            "DOCKED_WITH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.docked_with = Some(v.to_string());
-            }
-            "DRAG_CONST_AREA" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.drag_const_area =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "DRAG_COEFF_NOM" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.drag_coeff_nom = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("DRAG_COEFF_NOM")),
-                    ))
-                })?);
-            }
-            "DRAG_UNCERTAINTY" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.drag_uncertainty =
-                    Some(Percentage::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "INITIAL_WET_MASS" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.initial_wet_mass =
-                    Some(Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "WET_MASS" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.wet_mass =
-                    Some(Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "DRY_MASS" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.dry_mass =
-                    Some(Mass::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OEB_PARENT_FRAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.oeb_parent_frame = Some(v.to_string());
-            }
-            "OEB_PARENT_FRAME_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.oeb_parent_frame_epoch =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "OEB_Q1" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.oeb_q1 = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("OEB_Q1")),
-                    ))
-                })?)
-            }
-            "OEB_Q2" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.oeb_q2 = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("OEB_Q2")),
-                    ))
-                })?)
-            }
-            "OEB_Q3" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.oeb_q3 = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("OEB_Q3")),
-                    ))
-                })?)
-            }
-            "OEB_QC" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.oeb_qc = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("OEB_QC")),
-                    ))
-                })?)
-            }
-            "OEB_MAX" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.oeb_max =
-                    Some(Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OEB_INT" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.oeb_int =
-                    Some(Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OEB_MIN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.oeb_min =
-                    Some(Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "AREA_ALONG_OEB_MAX" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.area_along_oeb_max =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "AREA_ALONG_OEB_INT" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.area_along_oeb_int =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "AREA_ALONG_OEB_MIN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.area_along_oeb_min =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "AREA_MIN_FOR_PC" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.area_min_for_pc =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "AREA_MAX_FOR_PC" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.area_max_for_pc =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "AREA_TYP_FOR_PC" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.area_typ_for_pc =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "RCS" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.rcs = Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "RCS_MIN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.rcs_min =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "RCS_MAX" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.rcs_max =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "SRP_CONST_AREA" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.srp_const_area =
-                    Some(Area::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "SOLAR_RAD_COEFF" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.solar_rad_coeff = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("SOLAR_RAD_COEFF")),
-                    ))
-                })?);
-            }
-            "SOLAR_RAD_UNCERTAINTY" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.solar_rad_uncertainty =
-                    Some(Percentage::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "VM_ABSOLUTE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.vm_absolute = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("VM_ABSOLUTE")),
-                    ))
-                })?)
-            }
-            "VM_APPARENT_MIN" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.vm_apparent_min = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("VM_APPARENT_MIN")),
-                    ))
-                })?)
-            }
-            "VM_APPARENT" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.vm_apparent = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("VM_APPARENT")),
-                    ))
-                })?)
-            }
-            "VM_APPARENT_MAX" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.vm_apparent_max = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("VM_APPARENT_MAX")),
-                    ))
-                })?)
-            }
-            "REFLECTANCE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                let val = parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("REFLECTANCE")),
-                    ))
-                })?;
-                phys.reflectance = Some(Probability::new(val).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("REFLECTANCE")),
-                    ))
-                })?);
-            }
-            "ATT_CONTROL_MODE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.att_control_mode = Some(v.to_string());
-            }
-            "ATT_ACTUATOR_TYPE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                phys.att_actuator_type = Some(v.to_string());
-            }
-            "ATT_KNOWLEDGE" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.att_knowledge =
-                    Some(Angle::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "ATT_CONTROL" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.att_control =
-                    Some(Angle::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "ATT_POINTING" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.att_pointing =
-                    Some(Angle::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "AVG_MANEUVER_FREQ" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.avg_maneuver_freq = Some(
-                    ManeuverFreq::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                );
-            }
-            "MAX_THRUST" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.max_thrust =
-                    Some(Thrust::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "DV_BOL" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.dv_bol =
-                    Some(Velocity::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "DV_REMAINING" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.dv_remaining =
-                    Some(Velocity::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "IXX" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.ixx =
-                    Some(Moment::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-            }
-            "IYY" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.iyy =
-                    Some(Moment::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-            }
-            "IZZ" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.izz =
-                    Some(Moment::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-            }
-            "IXY" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.ixy =
-                    Some(Moment::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-            }
-            "IXZ" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.ixz =
-                    Some(Moment::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-            }
-            "IYZ" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                phys.iyz =
-                    Some(Moment::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?)
-            }
-            _ => {
-                // Unknown key - error
-                input.reset(&checkpoint);
-                return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Label("Unexpected OCM Physical key"),
-                )));
-            }
-        }
+    if at_block_end("PHYS", input) {
+        expect_block_end("PHYS").parse_next(input)?;
     }
 
-    Ok(phys)
+    Ok(OcmPhysicalDescription {
+        comment,
+        manufacturer,
+        bus_model,
+        docked_with,
+        drag_const_area,
+        drag_coeff_nom,
+        drag_uncertainty,
+        initial_wet_mass,
+        wet_mass,
+        dry_mass,
+        oeb_parent_frame,
+        oeb_parent_frame_epoch,
+        oeb_q1,
+        oeb_q2,
+        oeb_q3,
+        oeb_qc,
+        oeb_max,
+        oeb_int,
+        oeb_min,
+        area_along_oeb_max,
+        area_along_oeb_int,
+        area_along_oeb_min,
+        area_min_for_pc,
+        area_max_for_pc,
+        area_typ_for_pc,
+        rcs,
+        rcs_min,
+        rcs_max,
+        srp_const_area,
+        solar_rad_coeff,
+        solar_rad_uncertainty,
+        vm_absolute,
+        vm_apparent_min,
+        vm_apparent,
+        vm_apparent_max,
+        reflectance,
+        att_control_mode,
+        att_actuator_type,
+        att_knowledge,
+        att_control,
+        att_pointing,
+        avg_maneuver_freq,
+        max_thrust,
+        dv_bol,
+        dv_remaining,
+        ixx,
+        iyy,
+        izz,
+        ixy,
+        ixz,
+        iyz,
+    })
 }
 
 pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
-    if input.starts_with(|c: char| c.is_ascii_uppercase()) {
+    if input.trim_start().starts_with(|c: char| c.is_ascii_uppercase()) {
         return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
     }
-    let epoch = till_space.parse_next(input)?;
+    let epoch = preceded(ws, till_space).parse_next(input)?;
     let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     Ok(CovLine {
@@ -988,6 +520,7 @@ pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
 }
 
 pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
+    ws.parse_next(input)?;
     expect_block_start("COV").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -1006,112 +539,38 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
     let mut cov_units = None;
     let mut cov_lines = Vec::new();
 
+    parse_block!(input, comment, {
+        "COV_ID" => cov_id: kv_string,
+        "COV_PREV_ID" => cov_prev_id: kv_string,
+        "COV_NEXT_ID" => cov_next_id: kv_string,
+        "COV_BASIS" => cov_basis: kv_enum,
+        "COV_BASIS_ID" => cov_basis_id: kv_string,
+        "COV_REF_FRAME" => cov_ref_frame: kv_string,
+        "COV_FRAME_EPOCH" => cov_frame_epoch: kv_epoch,
+        "COV_TYPE" => cov_type: kv_string,
+        "COV_UNITS" => cov_units: kv_string,
+        "COV_ORDERING" => cov_ordering: kv_enum,
+        "COV_SCALE_MIN" => cov_scale_min: kv_float,
+        "COV_SCALE_MAX" => cov_scale_max: kv_float,
+        "COV_CONFIDENCE" => cov_confidence: kv_from_kvn,
+    }, |i| at_block_end("COV", i), "Unexpected OCM Covariance key");
+
     loop {
+        let comments = collect_comments.parse_next(input)?;
+
         if at_block_end("COV", input) {
+            comment.extend(comments);
             expect_block_end("COV").parse_next(input)?;
             break;
         }
 
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
-
-        if at_block_end("COV", input) {
+        if let Ok(line) = ocm_cov_line.parse_next(input) {
+            cov_lines.push(line);
             continue;
         }
 
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => {
-                // Not a key-value line, try parsing as a covariance line
-                if let Ok(line) = ocm_cov_line.parse_next(input) {
-                    cov_lines.push(line);
-                    continue;
-                } else {
-                    break;
-                }
-            }
-        };
-
-        match key {
-            "COV_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_id = Some(v.to_string());
-            }
-            "COV_PREV_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_prev_id = Some(v.to_string());
-            }
-            "COV_NEXT_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_next_id = Some(v.to_string());
-            }
-            "COV_BASIS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_basis =
-                    Some(CovBasis::from_str(v).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "COV_BASIS_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_basis_id = Some(v.to_string());
-            }
-            "COV_REF_FRAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_ref_frame = Some(v.to_string());
-            }
-            "COV_FRAME_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_frame_epoch =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "COV_TYPE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_type = Some(v.to_string());
-            }
-            "COV_UNITS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_units = Some(v.to_string());
-            }
-            "COV_ORDERING" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_ordering =
-                    Some(CovOrder::from_str(v).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "COV_SCALE_MIN" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_scale_min = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("COV_SCALE_MIN")),
-                    ))
-                })?);
-            }
-            "COV_SCALE_MAX" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                cov_scale_max = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("COV_SCALE_MAX")),
-                    ))
-                })?);
-            }
-            "COV_CONFIDENCE" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                cov_confidence =
-                    Some(Percentage::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            _ => {
-                // Unknown key - error
-                input.reset(&checkpoint);
-                return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Label("Unexpected OCM Covariance key"),
-                )));
-            }
-        }
+        // Otherwise break or handle error
+        break;
     }
 
     Ok(OcmCovarianceMatrix {
@@ -1154,6 +613,7 @@ pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
 }
 
 pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
+    ws.parse_next(input)?;
     expect_block_start("MAN").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -1189,213 +649,55 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
     let mut man_units = None;
     let mut man_lines = Vec::new();
 
-    loop {
-        if at_block_end("MAN", input) {
+    parse_block!(input, comment, {
+        "MAN_ID" => man_id: kv_string,
+        "MAN_PREV_ID" => man_prev_id: kv_string,
+        "MAN_NEXT_ID" => man_next_id: kv_string,
+        "MAN_BASIS" => man_basis: kv_enum,
+        "MAN_BASIS_ID" => man_basis_id: kv_string,
+        "MAN_DEVICE_ID" => man_device_id: kv_string,
+        "MAN_PREV_EPOCH" => man_prev_epoch: kv_epoch,
+        "MAN_NEXT_EPOCH" => man_next_epoch: kv_epoch,
+        "MAN_PURPOSE" => man_purpose: kv_string,
+        "MAN_PRED_SOURCE" => man_pred_source: kv_string,
+        "MAN_REF_FRAME" => man_ref_frame: kv_string,
+        "MAN_FRAME_EPOCH" => man_frame_epoch: kv_epoch,
+        "GRAV_ASSIST_NAME" => grav_assist_name: kv_string,
+        "DC_TYPE" => dc_type: kv_enum,
+        "DC_WIN_OPEN" => dc_win_open: kv_epoch,
+        "DC_WIN_CLOSE" => dc_win_close: kv_epoch,
+        "DC_MIN_CYCLES" => dc_min_cycles: kv_u64,
+        "DC_MAX_CYCLES" => dc_max_cycles: kv_u64,
+        "DC_EXEC_START" => dc_exec_start: kv_epoch,
+        "DC_EXEC_STOP" => dc_exec_stop: kv_epoch,
+        "DC_REF_TIME" => dc_ref_time: kv_epoch,
+        "DC_TIME_PULSE_DURATION" => dc_time_pulse_duration: kv_from_kvn,
+        "DC_TIME_PULSE_PERIOD" => dc_time_pulse_period: kv_from_kvn,
+        "DC_REF_DIR" => dc_ref_dir: kv_from_kvn_value,
+        "DC_BODY_FRAME" => dc_body_frame: kv_string,
+        "DC_BODY_TRIGGER" => dc_body_trigger: kv_from_kvn_value,
+        "DC_PA_START_ANGLE" => dc_pa_start_angle: kv_from_kvn,
+        "DC_PA_STOP_ANGLE" => dc_pa_stop_angle: kv_from_kvn,
+        "MAN_COMPOSITION" => man_composition: kv_string,
+        "MAN_UNITS" => man_units: kv_string,
+    }, |i| at_block_end("MAN", i), "Unexpected OCM Maneuver key");
+
+        loop {
+            let comments = collect_comments.parse_next(input)?;
+    
+            if at_block_end("MAN", input) {            comment.extend(comments);
             expect_block_end("MAN").parse_next(input)?;
             break;
         }
 
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
-
-        if at_block_end("MAN", input) {
+        if let Ok(line) = ocm_man_line.parse_next(input) {
+            man_lines.push(line);
             continue;
         }
 
-        let checkpoint = input.checkpoint();
-        let key_res = key_token.parse_next(input);
-        match key_res {
-            Ok(key) => {
-                match key {
-                    "MAN_ID" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_id = Some(v.to_string());
-                    }
-                    "MAN_PREV_ID" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_prev_id = Some(v.to_string());
-                    }
-                    "MAN_NEXT_ID" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_next_id = Some(v.to_string());
-                    }
-                    "MAN_BASIS" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_basis = Some(
-                            ManBasis::from_str(v).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "MAN_BASIS_ID" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_basis_id = Some(v.to_string());
-                    }
-                    "MAN_DEVICE_ID" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_device_id = Some(v.to_string());
-                    }
-                    "MAN_PREV_EPOCH" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_prev_epoch =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "MAN_NEXT_EPOCH" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_next_epoch =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "MAN_PURPOSE" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_purpose = Some(v.to_string());
-                    }
-                    "MAN_PRED_SOURCE" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_pred_source = Some(v.to_string());
-                    }
-                    "MAN_REF_FRAME" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_ref_frame = Some(v.to_string());
-                    }
-                    "MAN_FRAME_EPOCH" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_frame_epoch =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "GRAV_ASSIST_NAME" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        grav_assist_name = Some(v.to_string());
-                    }
-                    "DC_TYPE" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_type =
-                            Some(ManDc::from_str(v).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "DC_WIN_OPEN" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_win_open =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "DC_WIN_CLOSE" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_win_close =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "DC_MIN_CYCLES" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_min_cycles = Some(parse_u64(v).map_err(|_| {
-                            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Expected(StrContextValue::Description("DC_MIN_CYCLES")),
-                            ))
-                        })?);
-                    }
-                    "DC_MAX_CYCLES" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_max_cycles = Some(parse_u64(v).map_err(|_| {
-                            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                                input,
-                                &input.checkpoint(),
-                                StrContext::Expected(StrContextValue::Description("DC_MAX_CYCLES")),
-                            ))
-                        })?);
-                    }
-                    "DC_EXEC_START" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_exec_start =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "DC_EXEC_STOP" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_exec_stop =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "DC_REF_TIME" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_ref_time =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-                    }
-                    "DC_TIME_PULSE_DURATION" => {
-                        let (v, u) = kv_rest.parse_next(input)?;
-                        dc_time_pulse_duration = Some(
-                            Duration::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "DC_TIME_PULSE_PERIOD" => {
-                        let (v, u) = kv_rest.parse_next(input)?;
-                        dc_time_pulse_period = Some(
-                            Duration::from_kvn(v, u)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "DC_REF_DIR" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_ref_dir = Some(
-                            Vec3Double::from_kvn_value(v)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "DC_BODY_FRAME" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_body_frame = Some(v.to_string());
-                    }
-                    "DC_BODY_TRIGGER" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        dc_body_trigger = Some(
-                            Vec3Double::from_kvn_value(v)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "DC_PA_START_ANGLE" => {
-                        let (v, u) = kv_rest.parse_next(input)?;
-                        dc_pa_start_angle = Some(
-                            Angle::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "DC_PA_STOP_ANGLE" => {
-                        let (v, u) = kv_rest.parse_next(input)?;
-                        dc_pa_stop_angle = Some(
-                            Angle::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "MAN_COMPOSITION" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_composition = Some(v.to_string());
-                    }
-                    "MAN_UNITS" => {
-                        let (v, _) = kv_rest.parse_next(input)?;
-                        man_units = Some(v.to_string());
-                    }
-                    _ => {
-                        // Unknown key - error
-                        input.reset(&checkpoint);
-                        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                            input,
-                            &input.checkpoint(),
-                            StrContext::Label("Unexpected OCM Maneuver key"),
-                        )));
-                    }
-                }
-            }
-            Err(_) => {
-                input.reset(&checkpoint);
-                if let Ok(line) = ocm_man_line.parse_next(input) {
-                    man_lines.push(line);
-                    continue;
-                }
-
-                // NOT a key, NOT a maneuver line.
-                // If it's a block boundary, break and let the caller handle it.
-                if at_block_end("MAN", input) {
-                    break;
-                }
-
-                // Otherwise, skip the line (handles continuations like in G17)
-                let _ = till_line_ending.parse_next(input)?;
-                opt_line_ending.parse_next(input)?;
-                continue;
-            }
-        }
+        // Otherwise, skip the line (handles continuations like in G17) or break
+        let _ = till_line_ending.parse_next(input)?;
+        opt_line_ending.parse_next(input)?;
     }
 
     Ok(OcmManeuverParameters {
@@ -1453,188 +755,113 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
 }
 
 pub fn ocm_pert(input: &mut &str) -> KvnResult<OcmPerturbations> {
+    ws.parse_next(input)?;
     expect_block_start("PERT").parse_next(input)?;
 
-    let mut pert = OcmPerturbations::default();
+    let mut comment = Vec::new();
 
-    loop {
-        if at_block_end("PERT", input) {
-            expect_block_end("PERT").parse_next(input)?;
-            break;
-        }
+    let mut atmospheric_model = None;
+    let mut gravity_model = None;
+    let mut equatorial_radius = None;
+    let mut gm = None;
+    let mut n_body_perturbations = None;
+    let mut central_body_rotation = None;
+    let mut oblate_flattening = None;
+    let mut ocean_tides_model = None;
+    let mut solid_tides_model = None;
+    let mut reduction_theory = None;
+    let mut albedo_model = None;
+    let mut albedo_grid_size = None;
+    let mut shadow_model = None;
+    let mut shadow_bodies = None;
+    let mut srp_model = None;
+    let mut sw_data_source = None;
+    let mut sw_data_epoch = None;
+    let mut sw_interp_method = None;
+    let mut fixed_geomag_kp = None;
+    let mut fixed_geomag_ap = None;
+    let mut fixed_geomag_dst = None;
+    let mut fixed_f10p7 = None;
+    let mut fixed_f10p7_mean = None;
+    let mut fixed_m10p7 = None;
+    let mut fixed_m10p7_mean = None;
+    let mut fixed_s10p7 = None;
+    let mut fixed_s10p7_mean = None;
+    let mut fixed_y10p7 = None;
+    let mut fixed_y10p7_mean = None;
 
-        let comments = collect_comments.parse_next(input)?;
-        pert.comment.extend(comments);
+    parse_block!(input, comment, {
+        "ATMOSPHERIC_MODEL" => atmospheric_model: kv_string,
+        "GRAVITY_MODEL" => gravity_model: kv_string,
+        "EQUATORIAL_RADIUS" => equatorial_radius: kv_from_kvn,
+        "GM" => gm: kv_from_kvn,
+        "N_BODY_PERTURBATIONS" => n_body_perturbations: kv_string,
+        "CENTRAL_BODY_ROTATION" => central_body_rotation: kv_from_kvn,
+        "OBLATE_FLATTENING" => oblate_flattening: kv_float,
+        "OCEAN_TIDES_MODEL" => ocean_tides_model: kv_string,
+        "SOLID_TIDES_MODEL" => solid_tides_model: kv_string,
+        "REDUCTION_THEORY" => reduction_theory: kv_string,
+        "ALBEDO_MODEL" => albedo_model: kv_string,
+        "ALBEDO_GRID_SIZE" => albedo_grid_size: kv_u64,
+        "SHADOW_MODEL" => shadow_model: kv_string,
+        "SHADOW_BODIES" => shadow_bodies: kv_string,
+        "SRP_MODEL" => srp_model: kv_string,
+        "SW_DATA_SOURCE" => sw_data_source: kv_string,
+        "SW_DATA_EPOCH" => sw_data_epoch: kv_epoch,
+        "SW_INTERP_METHOD" => sw_interp_method: kv_string,
+        "FIXED_GEOMAG_KP" => fixed_geomag_kp: kv_from_kvn,
+        "FIXED_GEOMAG_AP" => fixed_geomag_ap: kv_from_kvn,
+        "FIXED_GEOMAG_DST" => fixed_geomag_dst: kv_from_kvn,
+        "FIXED_F10P7" => fixed_f10p7: kv_from_kvn,
+        "FIXED_F10P7_MEAN" => fixed_f10p7_mean: kv_from_kvn,
+        "FIXED_M10P7" => fixed_m10p7: kv_from_kvn,
+        "FIXED_M10P7_MEAN" => fixed_m10p7_mean: kv_from_kvn,
+        "FIXED_S10P7" => fixed_s10p7: kv_from_kvn,
+        "FIXED_S10P7_MEAN" => fixed_s10p7_mean: kv_from_kvn,
+        "FIXED_Y10P7" => fixed_y10p7: kv_from_kvn,
+        "FIXED_Y10P7_MEAN" => fixed_y10p7_mean: kv_from_kvn,
+    }, |i| at_block_end("PERT", i), "Unexpected OCM Perturbations key");
 
-        if at_block_end("PERT", input) {
-            continue;
-        }
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "ATMOSPHERIC_MODEL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.atmospheric_model = Some(v.to_string());
-            }
-            "GRAVITY_MODEL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.gravity_model = Some(v.to_string());
-            }
-            "EQUATORIAL_RADIUS" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.equatorial_radius =
-                    Some(Position::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "GM" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.gm = Some(Gm::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "N_BODY_PERTURBATIONS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.n_body_perturbations = Some(v.to_string());
-            }
-            "CENTRAL_BODY_ROTATION" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.central_body_rotation =
-                    Some(AngleRate::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OBLATE_FLATTENING" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.oblate_flattening = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("OBLATE_FLATTENING")),
-                    ))
-                })?);
-            }
-            "OCEAN_TIDES_MODEL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.ocean_tides_model = Some(v.to_string());
-            }
-            "SOLID_TIDES_MODEL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.solid_tides_model = Some(v.to_string());
-            }
-            "REDUCTION_THEORY" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.reduction_theory = Some(v.to_string());
-            }
-            "ALBEDO_MODEL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.albedo_model = Some(v.to_string());
-            }
-            "ALBEDO_GRID_SIZE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.albedo_grid_size = Some(parse_u64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("ALBEDO_GRID_SIZE")),
-                    ))
-                })?);
-            }
-            "SHADOW_MODEL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.shadow_model = Some(v.to_string());
-            }
-            "SHADOW_BODIES" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.shadow_bodies = Some(v.to_string());
-            }
-            "SRP_MODEL" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.srp_model = Some(v.to_string());
-            }
-            "SW_DATA_SOURCE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.sw_data_source = Some(v.to_string());
-            }
-            "SW_DATA_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.sw_data_epoch =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "SW_INTERP_METHOD" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                pert.sw_interp_method = Some(v.to_string());
-            }
-            "FIXED_GEOMAG_KP" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_geomag_kp =
-                    Some(Geomag::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "FIXED_GEOMAG_AP" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_geomag_ap =
-                    Some(Geomag::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "FIXED_GEOMAG_DST" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_geomag_dst =
-                    Some(Geomag::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "FIXED_F10P7" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_f10p7 =
-                    Some(SolarFlux::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "FIXED_F10P7_MEAN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_f10p7_mean =
-                    Some(SolarFlux::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "FIXED_M10P7" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_m10p7 =
-                    Some(SolarFlux::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "FIXED_M10P7_MEAN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_m10p7_mean =
-                    Some(SolarFlux::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "FIXED_S10P7" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_s10p7 =
-                    Some(SolarFlux::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "FIXED_S10P7_MEAN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_s10p7_mean =
-                    Some(SolarFlux::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "FIXED_Y10P7" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_y10p7 =
-                    Some(SolarFlux::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "FIXED_Y10P7_MEAN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                pert.fixed_y10p7_mean =
-                    Some(SolarFlux::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            _ => {
-                // Unknown key - error
-                input.reset(&checkpoint);
-                return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Label("Unexpected OCM Perturbations key"),
-                )));
-            }
-        }
+    if at_block_end("PERT", input) {
+        expect_block_end("PERT").parse_next(input)?;
     }
 
-    Ok(pert)
+    Ok(OcmPerturbations {
+        comment,
+        atmospheric_model,
+        gravity_model,
+        equatorial_radius,
+        gm,
+        n_body_perturbations,
+        central_body_rotation,
+        oblate_flattening,
+        ocean_tides_model,
+        solid_tides_model,
+        reduction_theory,
+        albedo_model,
+        albedo_grid_size,
+        shadow_model,
+        shadow_bodies,
+        srp_model,
+        sw_data_source,
+        sw_data_epoch,
+        sw_interp_method,
+        fixed_geomag_kp,
+        fixed_geomag_ap,
+        fixed_geomag_dst,
+        fixed_f10p7,
+        fixed_f10p7_mean,
+        fixed_m10p7,
+        fixed_m10p7_mean,
+        fixed_s10p7,
+        fixed_s10p7_mean,
+        fixed_y10p7,
+        fixed_y10p7_mean,
+    })
 }
 
 pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
+    ws.parse_next(input)?;
     expect_block_start("OD").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -1667,221 +894,44 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
     let mut sensors = None;
     let mut weighted_rms = None;
     let mut data_types = None;
+    let mut _max_resi_accepted = None;
 
-    loop {
-        if at_block_end("OD", input) {
-            expect_block_end("OD").parse_next(input)?;
-            break;
-        }
+    parse_block!(input, comment, {
+        "OD_ID" => od_id: kv_string,
+        "OD_PREV_ID" => od_prev_id: kv_string,
+        "OD_METHOD" => od_method: kv_string,
+        "OD_EPOCH" => od_epoch: kv_epoch,
+        "OD_TIME_TAG" => od_epoch: kv_epoch,
+        "MAX_RESI_ACCEPTED" => _max_resi_accepted: kv_string,
+        "DAYS_SINCE_FIRST_OBS" => days_since_first_obs: kv_from_kvn,
+        "DAYS_SINCE_LAST_OBS" => days_since_last_obs: kv_from_kvn,
+        "RECOMMENDED_OD_SPAN" => recommended_od_span: kv_from_kvn,
+        "ACTUAL_OD_SPAN" => actual_od_span: kv_from_kvn,
+        "OBS_AVAILABLE" => obs_available: kv_u64,
+        "OBS_USED" => obs_used: kv_u64,
+        "TRACKS_AVAILABLE" => tracks_available: kv_u64,
+        "TRACKS_USED" => tracks_used: kv_u64,
+        "MAXIMUM_OBS_GAP" => maximum_obs_gap: kv_from_kvn,
+        "OD_EPOCH_EIGMAJ" => od_epoch_eigmaj: kv_from_kvn,
+        "OD_EPOCH_EIGINT" => od_epoch_eigint: kv_from_kvn,
+        "OD_EPOCH_EIGMIN" => od_epoch_eigmin: kv_from_kvn,
+        "OD_MAX_PRED_EIGMAJ" => od_max_pred_eigmaj: kv_from_kvn,
+        "OD_MIN_PRED_EIGMIN" => od_min_pred_eigmin: kv_from_kvn,
+        "OD_CONFIDENCE" => od_confidence: kv_from_kvn,
+        "GDOP" => gdop: kv_float,
+        "SOLVE_N" => solve_n: kv_u64,
+        "SOLVE_STATES" => solve_states: kv_string,
+        "CONSIDER_N" => consider_n: kv_u64,
+        "CONSIDER_PARAMS" => consider_params: kv_string,
+        "SEDR" => sedr: kv_from_kvn,
+        "SENSORS_N" => sensors_n: kv_u64,
+        "SENSORS" => sensors: kv_string,
+        "WEIGHTED_RMS" => weighted_rms: kv_float,
+        "DATA_TYPES" => data_types: kv_string,
+    }, |i| at_block_end("OD", i), "Unexpected OCM Orbit Determination key");
 
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
-
-        if at_block_end("OD", input) {
-            continue;
-        }
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "OD_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_id = Some(v.to_string());
-            }
-            "OD_PREV_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_prev_id = Some(v.to_string());
-            }
-            "OD_METHOD" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_method = Some(v.to_string());
-            }
-            "OD_EPOCH" | "OD_TIME_TAG" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                od_epoch = Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "MAX_RESI_ACCEPTED" => {
-                let _ = kv_rest.parse_next(input)?;
-            }
-            "DAYS_SINCE_FIRST_OBS" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                days_since_first_obs =
-                    Some(DayInterval::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "DAYS_SINCE_LAST_OBS" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                days_since_last_obs =
-                    Some(DayInterval::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "RECOMMENDED_OD_SPAN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                recommended_od_span =
-                    Some(DayInterval::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "ACTUAL_OD_SPAN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                actual_od_span =
-                    Some(DayInterval::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OBS_AVAILABLE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                obs_available = Some(parse_u64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("OBS_AVAILABLE")),
-                    ))
-                })?);
-            }
-            "OBS_USED" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                obs_used = Some(parse_u64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("OBS_USED")),
-                    ))
-                })?);
-            }
-            "TRACKS_AVAILABLE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                tracks_available = Some(parse_u64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("TRACKS_AVAILABLE")),
-                    ))
-                })?);
-            }
-            "TRACKS_USED" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                tracks_used = Some(parse_u64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("TRACKS_USED")),
-                    ))
-                })?);
-            }
-            "MAXIMUM_OBS_GAP" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                maximum_obs_gap =
-                    Some(DayInterval::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OD_EPOCH_EIGMAJ" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                od_epoch_eigmaj =
-                    Some(Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OD_EPOCH_EIGINT" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                od_epoch_eigint =
-                    Some(Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OD_EPOCH_EIGMIN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                od_epoch_eigmin =
-                    Some(Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OD_MAX_PRED_EIGMAJ" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                od_max_pred_eigmaj =
-                    Some(Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OD_MIN_PRED_EIGMIN" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                od_min_pred_eigmin =
-                    Some(Length::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "OD_CONFIDENCE" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                od_confidence =
-                    Some(Percentage::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "GDOP" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                gdop = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("GDOP")),
-                    ))
-                })?);
-            }
-            "SOLVE_N" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                solve_n = Some(parse_u64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("SOLVE_N")),
-                    ))
-                })?);
-            }
-            "SOLVE_STATES" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                solve_states = Some(v.to_string());
-            }
-            "CONSIDER_N" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                consider_n = Some(parse_u64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("CONSIDER_N")),
-                    ))
-                })?);
-            }
-            "CONSIDER_PARAMS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                consider_params = Some(v.to_string());
-            }
-            "SEDR" => {
-                let (v, u) = kv_rest.parse_next(input)?;
-                sedr = Some(Wkg::from_kvn(v, u).map_err(|_| cut_err(input, "Invalid value"))?);
-            }
-            "SENSORS_N" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                sensors_n = Some(parse_u64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("SENSORS_N")),
-                    ))
-                })?);
-            }
-            "SENSORS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                sensors = Some(v.to_string());
-            }
-            "WEIGHTED_RMS" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                weighted_rms = Some(parse_f64(v).map_err(|_| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("WEIGHTED_RMS")),
-                    ))
-                })?);
-            }
-            "DATA_TYPES" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                data_types = Some(v.to_string());
-            }
-            _ => {
-                // Unknown key - error
-                input.reset(&checkpoint);
-                return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Label("Unexpected OCM Orbit Determination key"),
-                )));
-            }
-        }
+    if at_block_end("OD", input) {
+        expect_block_end("OD").parse_next(input)?;
     }
 
     Ok(OcmOdParameters {
@@ -1941,27 +991,25 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
 //----------------------------------------------------------------------
 
 pub fn ocm_user(input: &mut &str) -> KvnResult<UserDefined> {
+    ws.parse_next(input)?;
     expect_block_start("USER").parse_next(input)?;
 
     let mut comment = Vec::new();
     let mut user_defined = Vec::new();
 
     loop {
+        let checkpoint = input.checkpoint();
+        let comments = collect_comments.parse_next(input)?;
+
         if at_block_end("USER", input) {
+            comment.extend(comments);
             expect_block_end("USER").parse_next(input)?;
             break;
         }
 
-        let comments = collect_comments.parse_next(input)?;
-        comment.extend(comments);
-
-        if at_block_end("USER", input) {
-            continue;
-        }
-
-        let checkpoint = input.checkpoint();
         match key_value_line.parse_next(input) {
             Ok((k, v, _)) => {
+                comment.extend(comments);
                 opt_line_ending.parse_next(input)?;
                 user_defined.push(UserDefinedParameter {
                     parameter: k.to_string(),
@@ -1989,68 +1037,141 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<UserDefined> {
 // OCM Data Parser
 //----------------------------------------------------------------------
 
+enum OcmBlock {
+    Traj(OcmTrajState),
+    Phys(OcmPhysicalDescription),
+    Cov(OcmCovarianceMatrix),
+    Man(OcmManeuverParameters),
+    Pert(OcmPerturbations),
+    Od(OcmOdParameters),
+    User(UserDefined),
+}
+
+fn ocm_data_block(input: &mut &str) -> KvnResult<OcmBlock> {
+    use winnow::combinator::{peek, dispatch};
+
+    let comments = collect_comments.parse_next(input)?;
+
+    // Fail if we see META_START (end of data section) to stop repeat
+    if at_block_start("META", input) {
+        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+    }
+
+    // Peek the block start tag to decide which parser to use
+    // If block_start fails (e.g. no _START tag), we backtrack, stopping repeat
+    // dispatch! executes the first parser (peek(block_start)) and uses the result to choose the branch.
+    let mut block = dispatch! { peek(block_start);
+        "TRAJ" => ocm_traj_state.map(OcmBlock::Traj),
+        "PHYS" => ocm_phys.map(OcmBlock::Phys),
+        "COV" => ocm_cov.map(OcmBlock::Cov),
+        "MAN" => ocm_man.map(OcmBlock::Man),
+        "PERT" => ocm_pert.map(OcmBlock::Pert),
+        "OD" => ocm_od.map(OcmBlock::Od),
+        "USER" => ocm_user.map(OcmBlock::User),
+        _ => winnow::combinator::fail,
+    }
+    .parse_next(input)?;
+
+    // Prepend comments collected before the block start
+    match &mut block {
+        OcmBlock::Traj(x) => { x.comment.splice(0..0, comments); }
+        OcmBlock::Phys(x) => { x.comment.splice(0..0, comments); }
+        OcmBlock::Cov(x) => { x.comment.splice(0..0, comments); }
+        OcmBlock::Man(x) => { x.comment.splice(0..0, comments); }
+        OcmBlock::Pert(x) => { x.comment.splice(0..0, comments); }
+        OcmBlock::Od(x) => { x.comment.splice(0..0, comments); }
+        OcmBlock::User(x) => { x.comment.splice(0..0, comments); }
+    }
+
+    Ok(block)
+}
+
 pub fn ocm_data(input: &mut &str) -> KvnResult<OcmData> {
+    let blocks: Vec<OcmBlock> = repeat(0.., ocm_data_block).parse_next(input)?;
+
+    // Check for unexpected data after blocks (and their comments) are consumed.
+    // ocm_data_block backtracks if it fails, so comments preceding an invalid block might remain.
+    // We skip comments to see if there's garbage.
+    let checkpoint = input.checkpoint();
+    let _ = collect_comments.parse_next(input);
+    if !input.is_empty() && !at_block_start("META", input) {
+        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+            input,
+            &input.checkpoint(),
+            StrContext::Expected(StrContextValue::Description("Unexpected key in OCM data")),
+        )));
+    }
+    input.reset(&checkpoint);
+
     let mut data = OcmData::default();
-    let mut pending_comments = Vec::new();
-
-    loop {
-        pending_comments.extend(collect_comments.parse_next(input)?);
-
-        if input.is_empty() {
-            break;
-        }
-
-        let checkpoint = input.checkpoint();
-        let first_char = input.as_bytes().first();
-        match first_char {
-            Some(b'T') if at_block_start("TRAJ", input) => {
-                let mut block = ocm_traj_state.parse_next(input)?;
-                block.comment.splice(0..0, pending_comments.drain(..));
-                data.traj.push(block);
-            }
-            Some(b'P') if at_block_start("PHYS", input) => {
-                let mut block = ocm_phys.parse_next(input)?;
-                block.comment.splice(0..0, pending_comments.drain(..));
-                data.phys = Some(block);
-            }
-            Some(b'C') if at_block_start("COV", input) => {
-                let mut block = ocm_cov.parse_next(input)?;
-                block.comment.splice(0..0, pending_comments.drain(..));
-                data.cov.push(block);
-            }
-            Some(b'M') if at_block_start("MAN", input) => {
-                let mut block = ocm_man.parse_next(input)?;
-                block.comment.splice(0..0, pending_comments.drain(..));
-                data.man.push(block);
-            }
-            Some(b'P') if at_block_start("PERT", input) => {
-                let mut block = ocm_pert.parse_next(input)?;
-                block.comment.splice(0..0, pending_comments.drain(..));
-                data.pert = Some(block);
-            }
-            Some(b'O') if at_block_start("OD", input) => {
-                let mut block = ocm_od.parse_next(input)?;
-                block.comment.splice(0..0, pending_comments.drain(..));
-                data.od = Some(block);
-            }
-            Some(b'U') if at_block_start("USER", input) => {
-                let mut block = ocm_user.parse_next(input)?;
-                block.comment.splice(0..0, pending_comments.drain(..));
-                data.user = Some(block);
-            }
-            _ => {
-                // Unexpected key - error
-                input.reset(&checkpoint);
-                return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("Unexpected key")),
-                )));
-            }
+    for block in blocks {
+        match block {
+            OcmBlock::Traj(x) => data.traj.push(x),
+            OcmBlock::Phys(x) => data.phys = Some(x),
+            OcmBlock::Cov(x) => data.cov.push(x),
+            OcmBlock::Man(x) => data.man.push(x),
+            OcmBlock::Pert(x) => data.pert = Some(x),
+            OcmBlock::Od(x) => data.od = Some(x),
+            OcmBlock::User(x) => data.user = Some(x),
         }
     }
 
     Ok(data)
+}
+
+pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
+    let mut comment = Vec::new();
+    let mut classification = None;
+    let mut creation_date = None;
+    let mut originator = None;
+    let mut message_id = None;
+
+    loop {
+        let checkpoint = input.checkpoint();
+        comment.extend(collect_comments.parse_next(input)?);
+
+        if input.is_empty() || at_block_start("META", input) {
+            break;
+        }
+
+        let key = match keyword.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
+            }
+        };
+
+        if !matches!(key, "CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID") {
+            input.reset(&checkpoint);
+            break;
+        }
+
+        kv_sep.parse_next(input)?;
+        match key {
+            "CLASSIFICATION" => {
+                classification = Some(kv_string.parse_next(input)?);
+            }
+            "CREATION_DATE" => {
+                creation_date = Some(kv_epoch.parse_next(input)?);
+            }
+            "ORIGINATOR" => {
+                originator = Some(kv_string.parse_next(input)?);
+            }
+            "MESSAGE_ID" => {
+                message_id = Some(kv_string.parse_next(input)?);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    Ok(OdmHeader {
+        comment,
+        classification,
+        creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,
+        originator: originator.ok_or_else(|| cut_err(input, "Expected ORIGINATOR"))?,
+        message_id,
+    })
 }
 
 //----------------------------------------------------------------------
@@ -2059,7 +1180,7 @@ pub fn ocm_data(input: &mut &str) -> KvnResult<OcmData> {
 
 pub fn parse_ocm(input: &mut &str) -> KvnResult<Ocm> {
     let version = ocm_version.parse_next(input)?;
-    let header = odm_header.parse_next(input)?;
+    let header = ocm_header.parse_next(input)?;
     let metadata = ocm_metadata.parse_next(input)?;
     let data = ocm_data.parse_next(input)?;
 
@@ -3120,7 +2241,7 @@ TRAJ_START
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.to_lowercase().contains("expected meta"))
+            matches!(err, CcsdsNdmError::KvnParse { ref message, ref contexts, .. } if message.contains("Expected META_START") || contexts.contains(&"Expected META_START"))
         );
 
         // Metadata unexpected key
@@ -4445,7 +3566,7 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("COV_SCALE_MIN")),
+            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("COV_SCALE_MIN")),
             "Expected COV_SCALE_MIN error, got: {:?}",
             err
         );
@@ -4492,7 +3613,7 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("COV_SCALE_MAX")),
+            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("COV_SCALE_MAX")),
             "Expected COV_SCALE_MAX error, got: {:?}",
             err
         );
@@ -4504,15 +3625,10 @@ COV_STOP
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        // OcmSegment checks first and gives "expected META"
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.to_lowercase().contains("expected meta")),
+            matches!(err, CcsdsNdmError::KvnParse { ref contexts, .. } if contexts.iter().any(|c| c.contains("Expected META_START"))),
             "Expected 'expected meta' error, got: {:?}",
             err
         );
@@ -4574,7 +3690,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("DC_MIN_CYCLES")),
+            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("DC_MIN_CYCLES")),
             "Expected DC_MIN_CYCLES error, got: {:?}",
             err
         );
@@ -4604,7 +3720,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("DC_MAX_CYCLES")),
+            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("DC_MAX_CYCLES")),
             "Expected DC_MAX_CYCLES error, got: {:?}",
             err
         );
@@ -4658,7 +3774,7 @@ PERT_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("OBLATE_FLATTENING")),
+            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("OBLATE_FLATTENING")),
             "Expected OBLATE_FLATTENING error, got: {:?}",
             err
         );
@@ -4686,7 +3802,7 @@ PERT_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("ALBEDO_GRID_SIZE")),
+            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("ALBEDO_GRID_SIZE")),
             "Expected ALBEDO_GRID_SIZE error, got: {:?}",
             err
         );

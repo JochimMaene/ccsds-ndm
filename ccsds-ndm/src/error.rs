@@ -190,6 +190,24 @@ impl ParserError<&str> for CcsdsNdmError {
     }
 }
 
+impl winnow::error::FromExternalError<&str, EpochError> for CcsdsNdmError {
+    fn from_external_error(_input: &&str, e: EpochError) -> Self {
+        CcsdsNdmError::Epoch(e)
+    }
+}
+
+impl winnow::error::FromExternalError<&str, std::num::ParseFloatError> for CcsdsNdmError {
+    fn from_external_error(_input: &&str, e: std::num::ParseFloatError) -> Self {
+        CcsdsNdmError::ParseFloat(e)
+    }
+}
+
+impl winnow::error::FromExternalError<&str, std::num::ParseIntError> for CcsdsNdmError {
+    fn from_external_error(_input: &&str, e: std::num::ParseIntError) -> Self {
+        CcsdsNdmError::ParseInt(e)
+    }
+}
+
 impl AddContext<&str, StrContext> for CcsdsNdmError {
     fn add_context(
         mut self,

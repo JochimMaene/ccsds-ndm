@@ -20,6 +20,7 @@
 
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
 pub use crate::error::CcsdsNdmError;
+use crate::traits::FromKvnValue;
 use crate::types::{UserDefined, UserDefinedParameter, *};
 use std::str::FromStr;
 use winnow::ascii::{float, line_ending, space0, till_line_ending};
@@ -97,6 +98,20 @@ pub fn kv_sep(input: &mut &str) -> KvnResult<()> {
     (ws, '=', ws).void().parse_next(input)
 }
 
+/// Parses an optional unit in brackets: `[unit]`
+/// If a `[` is encountered, a matching `]` is strictly enforced.
+pub fn kv_unit<'a>(input: &mut &'a str) -> KvnResult<Option<&'a str>> {
+    ws.parse_next(input)?;
+    if input.starts_with('[') {
+        let u = delimited('[', take_till(0.., |c: char| c == ']'), ']')
+            .context(StrContext::Label("unit in brackets"))
+            .parse_next(input)?;
+        Ok(Some(u))
+    } else {
+        Ok(None)
+    }
+}
+
 /// Parses the value part of a key-value pair.
 /// Handles values with or without units.
 pub fn kvn_value<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)> {
@@ -111,13 +126,9 @@ pub fn kvn_value<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>
         // Let's take everything till the end of the line.
         let rest = till_line_ending.parse_next(input)?;
         let trimmed = rest.trim();
-        // If it's something like [km], and nothing else follows, we'll treat it as value for now
-        // if it was really intended as a unit with no value, that's weird but possible.
-        // Actually, let's just return the whole thing as value if it's bracketed and no value preceded.
         Ok((trimmed, None))
     } else {
-        let unit =
-            opt(delimited('[', take_till(0.., |c: char| c == ']'), ']')).parse_next(input)?;
+        let unit = kv_unit.parse_next(input)?;
         Ok((val, unit))
     }
 }
@@ -250,64 +261,172 @@ pub fn kv_rest<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)>
 
 /// Fast float parser for KVN values.
 pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
+    let checkpoint = input.checkpoint();
     terminated(
         (
-            float,
-            opt(preceded(
-                ws,
-                delimited('[', take_till(0.., |c: char| c == ']'), ']'),
-            )),
+            float.context(StrContext::Label("float")),
+            kv_unit,
         )
             .map(|(f, _)| f),
         opt_line_ending,
     )
     .parse_next(input)
+    .map_err(|e| {
+        if e.is_backtrack() {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &checkpoint,
+                StrContext::Label("Invalid float"),
+            ))
+        } else {
+            e
+        }
+    })
 }
 
 /// Fast i32 parser for KVN values.
 pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
-    use winnow::ascii::dec_int;
+    let checkpoint = input.checkpoint();
     terminated(
         (
-            dec_int,
-            opt(preceded(
-                ws,
-                delimited('[', take_till(0.., |c: char| c == ']'), ']'),
-            )),
+            take_while(1.., ('0'..='9', '-', '+')).map(|s: &str| s.parse::<i32>().map_err(|_| ())).verify(|res| res.is_ok()).map(|res| res.unwrap()),
+            kv_unit,
         )
             .map(|(i, _)| i),
         opt_line_ending,
     )
     .parse_next(input)
+    .map_err(|e| {
+        if e.is_backtrack() {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &checkpoint,
+                StrContext::Label("Invalid integer"),
+            ))
+        } else {
+            e
+        }
+    })
 }
 
 /// Fast u32 parser for KVN values.
 pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
-    use winnow::ascii::dec_uint;
+    let checkpoint = input.checkpoint();
     terminated(
         (
-            dec_uint,
-            opt(preceded(
-                ws,
-                delimited('[', take_till(0.., |c: char| c == ']'), ']'),
-            )),
+            take_while(1.., '0'..='9').map(|s: &str| s.parse::<u32>().map_err(|_| ())).verify(|res| res.is_ok()).map(|res| res.unwrap()),
+            kv_unit,
         )
             .map(|(u, _)| u),
         opt_line_ending,
     )
     .parse_next(input)
+    .map_err(|e| {
+        if e.is_backtrack() {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &checkpoint,
+                StrContext::Label("Invalid unsigned integer"),
+            ))
+        } else {
+            e
+        }
+    })
+}
+
+/// Fast u64 parser for KVN values.
+pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
+    let checkpoint = input.checkpoint();
+    terminated(
+        (
+            take_while(1.., '0'..='9').map(|s: &str| s.parse::<u64>().map_err(|_| ())).verify(|res| res.is_ok()).map(|res| res.unwrap()),
+            kv_unit,
+        )
+            .map(|(u, _)| u),
+        opt_line_ending,
+    )
+    .parse_next(input)
+    .map_err(|e| {
+        if e.is_backtrack() {
+            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+                input,
+                &checkpoint,
+                StrContext::Label("Invalid unsigned integer"),
+            ))
+        } else {
+            e
+        }
+    })
 }
 
 /// Skips whitespace and empty lines.
 pub fn skip_empty_lines(input: &mut &str) -> KvnResult<()> {
     repeat(0.., (space0, line_ending))
-        .map(|_: ()| ())
+        .map(|_: ()| ()) // Corrected: map to () instead of consuming the tuple
         .parse_next(input)
 }
 
 /// Parses an optional line ending, consuming any trailing horizontal whitespace.
 pub fn opt_line_ending(input: &mut &str) -> KvnResult<()> {
     (space0, opt(line_ending)).void().parse_next(input)
+}
+
+//----------------------------------------------------------------------
+// Direct Value Parsers
+//----------------------------------------------------------------------
+
+/// Parses a string value from a KVN line.
+pub fn kv_string(input: &mut &str) -> KvnResult<String> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    Ok(v.trim().to_string())
+}
+
+/// Parses an Epoch value from a KVN line.
+pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    Epoch::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid Epoch"))
+}
+
+/// Parses an Epoch value as a single token (until next space).
+pub fn kv_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
+    let v = till_space.parse_next(input)?;
+    Epoch::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid Epoch"))
+}
+
+/// Parses a boolean (YES/NO) from a KVN line.
+pub fn kv_yes_no(input: &mut &str) -> KvnResult<YesNo> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    YesNo::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid YES/NO value"))
+}
+
+/// Parses any type that implements FromStr from a KVN line.
+pub fn kv_enum<T: FromStr>(input: &mut &str) -> KvnResult<T> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    T::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid enum value"))
+}
+
+/// Parses a value from a KVN line using the `FromKvnValue` trait.
+pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
+    let (v, _) = kv_rest.parse_next(input)?;
+    T::from_kvn_value(v).map_err(|_| cut_err(input, "Invalid value"))
+}
+
+/// Parses any type that implements FromKvn from a KVN line.
+pub fn kv_from_kvn<T: FromKvn>(input: &mut &str) -> KvnResult<T> {
+    let (v, u) = kv_float_unit.parse_next(input)?;
+    T::from_kvn(&v.to_string(), u).map_err(|_| cut_err(input, "Invalid value"))
+}
+
+/// Parses a float and its optional unit from a KVN line.
+pub fn kv_float_unit<'a>(input: &mut &'a str) -> KvnResult<(f64, Option<&'a str>)> {
+    terminated(
+        (
+            float,
+            kv_unit,
+        ),
+        opt_line_ending,
+    )
+    .parse_next(input)
 }
 
 //----------------------------------------------------------------------
@@ -361,33 +480,54 @@ pub trait ParseKvn: Sized {
 // Combinator Helpers
 //----------------------------------------------------------------------
 
-/// Parses a specific key-value pair by key name.
-/// Returns the value and optional unit.
-pub fn expect_key<'a>(
+/// Parses a specific key-value pair by key name and applies a value parser.
+/// Returns the parsed value and optional unit.
+pub fn expect_kv<'a, T, P>(
     expected_key: &'static str,
-) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)> {
+    mut val_parser: P,
+) -> impl FnMut(&mut &'a str) -> KvnResult<(T, Option<&'a str>)>
+where
+    P: winnow::Parser<&'a str, T, ErrMode<CcsdsNdmError>>,
+{
     move |input: &mut &'a str| {
         (
             ws,
             keyword.context(StrContext::Label("KVN keyword")),
             kv_sep,
-            kvn_value,
-            opt_line_ending,
         )
-            .verify(|(_, key, _, _, _)| *key == expected_key)
-            .map(|(_, _, _, (val, unit), _)| (val, unit))
+            .verify(|(_, key, _)| *key == expected_key)
             .context(StrContext::Expected(StrContextValue::Description(
                 expected_key,
             )))
-            .parse_next(input)
+            .parse_next(input)?;
+
+        let val = val_parser.parse_next(input)?;
+        let unit = kv_unit.parse_next(input)?;
+        opt_line_ending.parse_next(input)?;
+
+        Ok((val, unit))
     }
+}
+
+/// Parses a specific key-value pair by key name.
+/// Returns the value and optional unit.
+pub fn expect_key<'a>(
+    expected_key: &'static str,
+) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, Option<&'a str>) > {
+    expect_kv(expected_key, kvn_value_only)
+}
+
+fn kvn_value_only<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+    take_till(0.., |c: char| c == '[' || c == '\r' || c == '\n')
+        .map(|s: &str| s.trim())
+        .parse_next(input)
 }
 
 /// Parses a key-value pair where the key matches a predicate.
 /// Returns (key, value, unit).
 pub fn key_matching<'a, F>(
     predicate: F,
-) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, &'a str, Option<&'a str>)>
+) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, &'a str, Option<&'a str>) >
 where
     F: Fn(&str) -> bool + Copy,
 {
@@ -408,7 +548,7 @@ where
 pub fn collect_comments(input: &mut &str) -> KvnResult<Vec<String>> {
     repeat(
         0..,
-        alt((
+        alt(( // Corrected: removed unnecessary parentheses around alt
             preceded(ws, comment_line).map(|s| Some(s.trim().to_string())),
             (ws, line_ending).map(|_| None),
         )),
@@ -424,11 +564,18 @@ pub fn collect_comments(input: &mut &str) -> KvnResult<Vec<String>> {
 
 /// Skips empty lines and comments, discarding them.
 pub fn skip_empty_and_comments(input: &mut &str) -> KvnResult<()> {
-    repeat(
-        0..,
-        alt(((ws, comment_line).void(), (ws, line_ending).void())),
-    )
-    .parse_next(input)
+    loop {
+        let checkpoint = input.checkpoint();
+        if alt(((ws, comment_line).void(), (ws, line_ending).void()))
+            .parse_next(input)
+            .is_err()
+        {
+            input.reset(&checkpoint);
+            break;
+        }
+    }
+    let _ = ws.parse_next(input);
+    Ok(())
 }
 
 /// Entry point for message parsers that handles leading whitespace.
@@ -438,12 +585,79 @@ where
 {
     move |input: &mut &'a str| {
         ws.parse_next(input)?;
-        parser.parse_next(input)
+        let res = parser.parse_next(input)?;
+        let _ = skip_empty_and_comments.parse_next(input);
+        Ok(res)
     }
 }
 
+/// Macro for declarative KVN block parsing.
+///
+/// This macro generates a loop that matches keys using `dispatch!`,
+/// handles comment collection, and provides helpful context on errors.
+#[macro_export]
+macro_rules! parse_block {
+    // Flexible variant that supports both simple assignment and action blocks, with or without error label
+    ($input:ident, $comments:expr, {
+        $($($key:literal)|+ => $target:ident : $parser:expr $(=> $action:block)? ),* $(,)?
+    }, $break_condition:expr $(, $error_label:expr)?)
+     => {
+        loop {
+            let checkpoint = $input.checkpoint();
+            let loop_comments = collect_comments.parse_next($input)?;
+
+            if ($break_condition)(&mut *$input) {
+                $comments.extend(loop_comments);
+                break;
+            }
+
+            let key = match key_token.parse_next($input) {
+                Ok(k) => k,
+                Err(_) => {
+                    $input.reset(&checkpoint);
+                    break;
+                }
+            };
+
+            match key {
+                $( // Corrected: removed unnecessary parentheses around match arm
+                    $($key)|+ => {
+                        let val = $parser.parse_next($input)?;
+                        parse_block!(@action $comments, loop_comments, val, $target $(, $action)?);
+                    }
+                )*
+                _ => {
+                    $input.reset(&checkpoint);
+                    $( // Corrected: removed unnecessary parentheses around match arm
+                        return Err(winnow::error::ErrMode::Cut(CcsdsNdmError::from_input($input).add_context(
+                            $input,
+                            &$input.checkpoint(),
+                            winnow::error::StrContext::Label($error_label),
+                        )));
+                    )?
+                    #[allow(unreachable_code)]
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+    };
+
+    // Internal helper for action handling
+    (@action $comments:expr, $loop_comments:ident, $val:ident, $target:ident) => {
+        $comments.extend($loop_comments);
+        $target = Some($val);
+    };
+    (@action $comments:expr, $loop_comments:ident, $val:ident, $binding:ident, $action:block) => {
+        $comments.extend($loop_comments);
+        let $binding = $val;
+        $action
+    };
+}
+
 /// Checks if we're at a specific block start without full string scan.
-pub fn at_block_start(tag: &str, input: &mut &str) -> bool {
+pub fn at_block_start(tag: &str, input: &str) -> bool {
     let s = input.trim_start_matches([' ', '\t']);
     if let Some(rest) = s.strip_prefix(tag) {
         if let Some(suffix) = rest.strip_prefix("_START") {
@@ -454,7 +668,7 @@ pub fn at_block_start(tag: &str, input: &mut &str) -> bool {
 }
 
 /// Checks if we're at a specific block end without full string scan.
-pub fn at_block_end(tag: &str, input: &mut &str) -> bool {
+pub fn at_block_end(tag: &str, input: &str) -> bool {
     let s = input.trim_start_matches([' ', '\t']);
     if let Some(rest) = s.strip_prefix(tag) {
         if let Some(suffix) = rest
@@ -509,9 +723,9 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
 
     loop {
         let checkpoint = input.checkpoint();
-        let comments = collect_comments.parse_next(input)?;
+        comment.extend(collect_comments.parse_next(input)?);
 
-        let key = match key_token.parse_next(input) {
+        let key = match keyword.parse_next(input) {
             Ok(k) => k,
             Err(_) => {
                 input.reset(&checkpoint);
@@ -519,20 +733,25 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
             }
         };
 
+        // Stop if we encounter a metadata key
+        if key == "OBJECT_NAME" || key == "META_START" {
+            input.reset(&checkpoint);
+            break;
+        }
+
+        kv_sep.parse_next(input)?;
         match key {
-            "CLASSIFICATION" | "CREATION_DATE" | "ORIGINATOR" | "MESSAGE_ID" => {
-                comment.extend(comments);
-                let (v, _) = kv_rest.parse_next(input)?;
-                match key {
-                    "CLASSIFICATION" => classification = Some(v.to_string()),
-                    "CREATION_DATE" => {
-                        creation_date =
-                            Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "ORIGINATOR" => originator = Some(v.to_string()),
-                    "MESSAGE_ID" => message_id = Some(v.to_string()),
-                    _ => unreachable!(),
-                }
+            "CLASSIFICATION" => {
+                classification = Some(kv_string.parse_next(input)?);
+            }
+            "CREATION_DATE" => {
+                creation_date = Some(kv_epoch.parse_next(input)?);
+            }
+            "ORIGINATOR" => {
+                originator = Some(kv_string.parse_next(input)?);
+            }
+            "MESSAGE_ID" => {
+                message_id = Some(kv_string.parse_next(input)?);
             }
             _ => {
                 input.reset(&checkpoint);
@@ -541,14 +760,11 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
         }
     }
 
-    let creation_date = creation_date.ok_or_else(|| cut_err(input, "Missing CREATION_DATE"))?;
-    let originator = originator.ok_or_else(|| cut_err(input, "Missing ORIGINATOR"))?;
-
     Ok(OdmHeader {
         comment,
         classification,
-        creation_date,
-        originator,
+        creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,
+        originator: originator.ok_or_else(|| cut_err(input, "Expected ORIGINATOR"))?,
         message_id,
     })
 }
@@ -568,73 +784,15 @@ pub fn state_vector(input: &mut &str) -> KvnResult<(Vec<String>, StateVector)> {
     let mut y_dot = None;
     let mut z_dot = None;
 
-    loop {
-        let checkpoint = input.checkpoint();
-        let comments = collect_comments.parse_next(input)?;
-
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => {
-                input.reset(&checkpoint);
-                break;
-            }
-        };
-
-        match key {
-            "EPOCH" | "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT" => {
-                comment.extend(comments);
-                let (val, unit) = kv_rest.parse_next(input)?;
-                match key {
-                    "EPOCH" => {
-                        epoch = Some(
-                            Epoch::from_str(val).map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "X" => {
-                        x = Some(
-                            Position::from_kvn(val, unit.or(Some("km")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "Y" => {
-                        y = Some(
-                            Position::from_kvn(val, unit.or(Some("km")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "Z" => {
-                        z = Some(
-                            Position::from_kvn(val, unit.or(Some("km")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "X_DOT" => {
-                        x_dot = Some(
-                            Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "Y_DOT" => {
-                        y_dot = Some(
-                            Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "Z_DOT" => {
-                        z_dot = Some(
-                            Velocity::from_kvn(val, unit.or(Some("km/s")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
+    parse_block!(input, comment, {
+        "EPOCH" => epoch: kv_epoch,
+        "X" => x: kv_from_kvn,
+        "Y" => y: kv_from_kvn,
+        "Z" => z: kv_from_kvn,
+        "X_DOT" => x_dot: kv_from_kvn,
+        "Y_DOT" => y_dot: kv_from_kvn,
+        "Z_DOT" => z_dot: kv_from_kvn,
+    }, |_| false);
 
     let sv = StateVector {
         comment: Vec::new(), // comments are returned separately for proper placement
@@ -676,162 +834,30 @@ pub fn covariance_matrix(input: &mut &str) -> KvnResult<Option<OpmCovarianceMatr
     let mut cz_dot_y_dot = None;
     let mut cz_dot_z_dot = None;
 
-    loop {
-        let checkpoint = input.checkpoint();
-        let comments = collect_comments.parse_next(input)?;
-
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => {
-                input.reset(&checkpoint);
-                break;
-            }
-        };
-
-        match key {
-            "COV_REF_FRAME" | "CX_X" | "CY_X" | "CY_Y" | "CZ_X" | "CZ_Y" | "CZ_Z" | "CX_DOT_X"
-            | "CX_DOT_Y" | "CX_DOT_Z" | "CX_DOT_X_DOT" | "CY_DOT_X" | "CY_DOT_Y" | "CY_DOT_Z"
-            | "CY_DOT_X_DOT" | "CY_DOT_Y_DOT" | "CZ_DOT_X" | "CZ_DOT_Y" | "CZ_DOT_Z"
-            | "CZ_DOT_X_DOT" | "CZ_DOT_Y_DOT" | "CZ_DOT_Z_DOT" => {
-                comment.extend(comments);
-                let (val, unit) = kv_rest.parse_next(input)?;
-                match key {
-                    "COV_REF_FRAME" => cov_ref_frame = Some(val.to_string()),
-                    "CX_X" => {
-                        cx_x = Some(
-                            PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CY_X" => {
-                        cy_x = Some(
-                            PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CY_Y" => {
-                        cy_y = Some(
-                            PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CZ_X" => {
-                        cz_x = Some(
-                            PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CZ_Y" => {
-                        cz_y = Some(
-                            PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CZ_Z" => {
-                        cz_z = Some(
-                            PositionCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CX_DOT_X" => {
-                        cx_dot_x = Some(
-                            PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CX_DOT_Y" => {
-                        cx_dot_y = Some(
-                            PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CX_DOT_Z" => {
-                        cx_dot_z = Some(
-                            PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CX_DOT_X_DOT" => {
-                        cx_dot_x_dot = Some(
-                            VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CY_DOT_X" => {
-                        cy_dot_x = Some(
-                            PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CY_DOT_Y" => {
-                        cy_dot_y = Some(
-                            PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CY_DOT_Z" => {
-                        cy_dot_z = Some(
-                            PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CY_DOT_X_DOT" => {
-                        cy_dot_x_dot = Some(
-                            VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CY_DOT_Y_DOT" => {
-                        cy_dot_y_dot = Some(
-                            VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CZ_DOT_X" => {
-                        cz_dot_x = Some(
-                            PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CZ_DOT_Y" => {
-                        cz_dot_y = Some(
-                            PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CZ_DOT_Z" => {
-                        cz_dot_z = Some(
-                            PositionVelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CZ_DOT_X_DOT" => {
-                        cz_dot_x_dot = Some(
-                            VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CZ_DOT_Y_DOT" => {
-                        cz_dot_y_dot = Some(
-                            VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    "CZ_DOT_Z_DOT" => {
-                        cz_dot_z_dot = Some(
-                            VelocityCovariance::from_kvn(val, unit)
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        )
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
+    parse_block!(input, comment, {
+        "COV_REF_FRAME" => cov_ref_frame: kv_string,
+        "CX_X" => cx_x: kv_from_kvn,
+        "CY_X" => cy_x: kv_from_kvn,
+        "CY_Y" => cy_y: kv_from_kvn,
+        "CZ_X" => cz_x: kv_from_kvn,
+        "CZ_Y" => cz_y: kv_from_kvn,
+        "CZ_Z" => cz_z: kv_from_kvn,
+        "CX_DOT_X" => cx_dot_x: kv_from_kvn,
+        "CX_DOT_Y" => cx_dot_y: kv_from_kvn,
+        "CX_DOT_Z" => cx_dot_z: kv_from_kvn,
+        "CX_DOT_X_DOT" => cx_dot_x_dot: kv_from_kvn,
+        "CY_DOT_X" => cy_dot_x: kv_from_kvn,
+        "CY_DOT_Y" => cy_dot_y: kv_from_kvn,
+        "CY_DOT_Z" => cy_dot_z: kv_from_kvn,
+        "CY_DOT_X_DOT" => cy_dot_x_dot: kv_from_kvn,
+        "CY_DOT_Y_DOT" => cy_dot_y_dot: kv_from_kvn,
+        "CZ_DOT_X" => cz_dot_x: kv_from_kvn,
+        "CZ_DOT_Y" => cz_dot_y: kv_from_kvn,
+        "CZ_DOT_Z" => cz_dot_z: kv_from_kvn,
+        "CZ_DOT_X_DOT" => cz_dot_x_dot: kv_from_kvn,
+        "CZ_DOT_Y_DOT" => cz_dot_y_dot: kv_from_kvn,
+        "CZ_DOT_Z_DOT" => cz_dot_z_dot: kv_from_kvn,
+    }, |_| false);
 
     // If we have covariance data, build the struct
     if cx_x.is_some() {
@@ -874,58 +900,13 @@ pub fn spacecraft_parameters(input: &mut &str) -> KvnResult<Option<SpacecraftPar
     let mut drag_area = None;
     let mut drag_coeff = None;
 
-    loop {
-        let checkpoint = input.checkpoint();
-        let comments = collect_comments.parse_next(input)?;
-
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => {
-                input.reset(&checkpoint);
-                break;
-            }
-        };
-
-        match key {
-            "MASS" | "SOLAR_RAD_AREA" | "SOLAR_RAD_COEFF" | "DRAG_AREA" | "DRAG_COEFF" => {
-                comment.extend(comments);
-                let (val, unit) = kv_rest.parse_next(input)?;
-                match key {
-                    "MASS" => {
-                        mass = Some(
-                            Mass::from_kvn(val, unit.or(Some("kg")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "SOLAR_RAD_AREA" => {
-                        solar_rad_area = Some(
-                            Area::from_kvn(val, unit.or(Some("m**2")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "SOLAR_RAD_COEFF" => {
-                        solar_rad_coeff =
-                            Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    "DRAG_AREA" => {
-                        drag_area = Some(
-                            Area::from_kvn(val, unit.or(Some("m**2")))
-                                .map_err(|_| cut_err(input, "Invalid value"))?,
-                        );
-                    }
-                    "DRAG_COEFF" => {
-                        drag_coeff =
-                            Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid value"))?);
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
+    parse_block!(input, comment, {
+        "MASS" => mass: kv_from_kvn,
+        "SOLAR_RAD_AREA" => solar_rad_area: kv_from_kvn,
+        "SOLAR_RAD_COEFF" => solar_rad_coeff: kv_float,
+        "DRAG_AREA" => drag_area: kv_from_kvn,
+        "DRAG_COEFF" => drag_coeff: kv_float,
+    }, |_| false);
 
     // If we have any spacecraft data, build the struct
     if mass.is_some() || solar_rad_area.is_some() || drag_area.is_some() {
@@ -967,6 +948,7 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
                 value: val.to_string(),
             });
         } else {
+            // Backtrack and end user defined section
             input.reset(&checkpoint);
             break;
         }

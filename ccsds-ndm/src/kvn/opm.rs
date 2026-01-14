@@ -36,13 +36,13 @@
 //!             └── UserDefinedParameters (optional)
 //! ```
 
-use crate::common::SpacecraftParameters;
+use crate::parse_block;
 use crate::kvn::parser::*;
 use crate::messages::opm::{
     KeplerianElements, ManeuverParameters, Opm, OpmBody, OpmData, OpmMetadata, OpmSegment,
 };
 use crate::types::*;
-use std::str::FromStr;
+use winnow::combinator::peek;
 use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 
@@ -81,48 +81,14 @@ pub fn opm_metadata(input: &mut &str) -> KvnResult<OpmMetadata> {
     let mut ref_frame_epoch = None;
     let mut time_system = None;
 
-    loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "OBJECT_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_name = Some(v.to_string());
-            }
-            "OBJECT_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_id = Some(v.to_string());
-            }
-            "CENTER_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                center_name = Some(v.to_string());
-            }
-            "REF_FRAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ref_frame = Some(v.to_string());
-            }
-            "REF_FRAME_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ref_frame_epoch =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "TIME_SYSTEM" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                time_system = Some(v.to_string());
-            }
-            _ => {
-                // If it's a data key or unknown, backtrack and end metadata section
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
+    parse_block!(input, comment, {
+        "OBJECT_NAME" => object_name: kv_string,
+        "OBJECT_ID" => object_id: kv_string,
+        "CENTER_NAME" => center_name: kv_string,
+        "REF_FRAME" => ref_frame: kv_string,
+        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_epoch,
+        "TIME_SYSTEM" => time_system: kv_string,
+    }, |_| false);
 
     Ok(OpmMetadata {
         comment,
@@ -181,79 +147,16 @@ pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElement
     let mut mean_anomaly = None;
     let mut gm = None;
 
-    loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "SEMI_MAJOR_AXIS" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                semi_major_axis = Some(
-                    Distance::from_kvn(val, unit.or(Some("km")))
-                        .map_err(|_| cut_err(input, "Invalid SEMI_MAJOR_AXIS"))?,
-                );
-            }
-            "ECCENTRICITY" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                eccentricity =
-                    Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid ECCENTRICITY"))?);
-            }
-            "INCLINATION" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                let angle = Angle::from_kvn(val, unit)
-                    .map_err(|_| cut_err(input, "Invalid INCLINATION"))?;
-                inclination = Some(
-                    Inclination::new(angle.value, angle.units)
-                        .map_err(|_| cut_err(input, "Invalid INCLINATION"))?,
-                );
-            }
-            "RA_OF_ASC_NODE" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                ra_of_asc_node = Some(
-                    Angle::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid RA_OF_ASC_NODE"))?,
-                );
-            }
-            "ARG_OF_PERICENTER" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                arg_of_pericenter = Some(
-                    Angle::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid ARG_OF_PERICENTER"))?,
-                );
-            }
-            "TRUE_ANOMALY" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                true_anomaly = Some(
-                    Angle::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid TRUE_ANOMALY"))?,
-                );
-            }
-            "MEAN_ANOMALY" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                mean_anomaly = Some(
-                    Angle::from_kvn(val, unit)
-                        .map_err(|_| cut_err(input, "Invalid MEAN_ANOMALY"))?,
-                );
-            }
-            "GM" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                gm = Some(
-                    Gm::from_kvn(val, unit.or(Some("km**3/s**2")))
-                        .map_err(|_| cut_err(input, "Invalid GM"))?,
-                );
-            }
-            _ => {
-                // Backtrack and end Keplerian section
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
+    parse_block!(input, comment, {
+        "SEMI_MAJOR_AXIS" => semi_major_axis: kv_from_kvn,
+        "ECCENTRICITY" => eccentricity: kv_float,
+        "INCLINATION" => inclination: kv_from_kvn,
+        "RA_OF_ASC_NODE" => ra_of_asc_node: kv_from_kvn,
+        "ARG_OF_PERICENTER" => arg_of_pericenter: kv_from_kvn,
+        "TRUE_ANOMALY" => true_anomaly: kv_from_kvn,
+        "MEAN_ANOMALY" => mean_anomaly: kv_from_kvn,
+        "GM" => gm: kv_from_kvn,
+    }, |_| false);
 
     if semi_major_axis.is_none()
         && eccentricity.is_none()
@@ -317,82 +220,6 @@ pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElement
 }
 
 //----------------------------------------------------------------------
-// Spacecraft Parameters Parser
-//----------------------------------------------------------------------
-
-/// Parses the optional spacecraft parameters section.
-pub fn spacecraft_parameters(input: &mut &str) -> KvnResult<Option<SpacecraftParameters>> {
-    let mut comment = Vec::new();
-    let mut mass = None;
-    let mut solar_rad_area = None;
-    let mut solar_rad_coeff = None;
-    let mut drag_area = None;
-    let mut drag_coeff = None;
-
-    loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "MASS" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                mass = Some(
-                    Mass::from_kvn(val, unit.or(Some("kg")))
-                        .map_err(|_| cut_err(input, "Invalid MASS"))?,
-                );
-            }
-            "SOLAR_RAD_AREA" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                solar_rad_area = Some(
-                    Area::from_kvn(val, unit.or(Some("m**2")))
-                        .map_err(|_| cut_err(input, "Invalid SOLAR_RAD_AREA"))?,
-                );
-            }
-            "SOLAR_RAD_COEFF" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                solar_rad_coeff =
-                    Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid SOLAR_RAD_COEFF"))?);
-            }
-            "DRAG_AREA" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                drag_area = Some(
-                    Area::from_kvn(val, unit.or(Some("m**2")))
-                        .map_err(|_| cut_err(input, "Invalid DRAG_AREA"))?,
-                );
-            }
-            "DRAG_COEFF" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                drag_coeff =
-                    Some(parse_f64(val).map_err(|_| cut_err(input, "Invalid DRAG_COEFF"))?);
-            }
-            _ => {
-                // Backtrack and end spacecraft section
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
-
-    if mass.is_none() && solar_rad_area.is_none() && drag_area.is_none() {
-        return Ok(None);
-    }
-
-    Ok(Some(SpacecraftParameters {
-        comment,
-        mass,
-        solar_rad_area,
-        solar_rad_coeff,
-        drag_area,
-        drag_coeff,
-    }))
-}
-
-//----------------------------------------------------------------------
 // Maneuver Parameters Parser
 //----------------------------------------------------------------------
 
@@ -407,76 +234,15 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParamet
     let mut man_dv_2 = None;
     let mut man_dv_3 = None;
 
-    loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "MAN_EPOCH_IGNITION" if man_epoch_ignition.is_some() => {
-                // Start of next maneuver block
-                input.reset(&checkpoint);
-                break;
-            }
-            "MAN_EPOCH_IGNITION" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                man_epoch_ignition = Some(
-                    Epoch::from_str(val)
-                        .map_err(|_| cut_err(input, "Invalid MAN_EPOCH_IGNITION"))?,
-                );
-            }
-            "MAN_DURATION" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                man_duration = Some(
-                    Duration::from_kvn(val, unit.or(Some("s")))
-                        .map_err(|_| cut_err(input, "Invalid MAN_DURATION"))?,
-                );
-            }
-            "MAN_DELTA_MASS" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                let value = parse_f64(val).map_err(|_| cut_err(input, "Invalid MAN_DELTA_MASS"))?;
-                let units = unit.and_then(|u| u.parse::<MassUnits>().ok());
-                man_delta_mass = Some(
-                    DeltaMassZ::new(value, units)
-                        .map_err(|_| cut_err(input, "Invalid MAN_DELTA_MASS"))?,
-                );
-            }
-            "MAN_REF_FRAME" => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                man_ref_frame = Some(val.to_string());
-            }
-            "MAN_DV_1" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                man_dv_1 = Some(
-                    Velocity::from_kvn(val, unit.or(Some("km/s")))
-                        .map_err(|_| cut_err(input, "Invalid MAN_DV_1"))?,
-                );
-            }
-            "MAN_DV_2" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                man_dv_2 = Some(
-                    Velocity::from_kvn(val, unit.or(Some("km/s")))
-                        .map_err(|_| cut_err(input, "Invalid MAN_DV_2"))?,
-                );
-            }
-            "MAN_DV_3" => {
-                let (val, unit) = kv_rest.parse_next(input)?;
-                man_dv_3 = Some(
-                    Velocity::from_kvn(val, unit.or(Some("km/s")))
-                        .map_err(|_| cut_err(input, "Invalid MAN_DV_3"))?,
-                );
-            }
-            _ => {
-                // Backtrack and end maneuver section
-                input.reset(&checkpoint);
-                break;
-            }
-        }
-    }
+    parse_block!(input, comment, {
+        "MAN_EPOCH_IGNITION" => man_epoch_ignition: kv_epoch,
+        "MAN_DURATION" => man_duration: kv_from_kvn,
+        "MAN_DELTA_MASS" => man_delta_mass: kv_from_kvn,
+        "MAN_REF_FRAME" => man_ref_frame: kv_string,
+        "MAN_DV_1" => man_dv_1: kv_from_kvn,
+        "MAN_DV_2" => man_dv_2: kv_from_kvn,
+        "MAN_DV_3" => man_dv_3: kv_from_kvn,
+    }, |i: &mut &str| man_epoch_ignition.is_some() && peek(key_token).parse_next(i).map(|k| k == "MAN_EPOCH_IGNITION").unwrap_or(false));
 
     if let Some(ignition) = man_epoch_ignition {
         Ok(Some(ManeuverParameters {
@@ -555,27 +321,28 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
     let mut params = Vec::new();
 
     loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
         let checkpoint = input.checkpoint();
+        let comments = collect_comments.parse_next(input)?;
+
         let key = match key_token.parse_next(input) {
             Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            _ if key.starts_with("USER_DEFINED_") => {
-                let (val, _) = kv_rest.parse_next(input)?;
-                params.push(UserDefinedParameter {
-                    parameter: key.to_string(),
-                    value: val.to_string(),
-                });
-            }
-            _ => {
-                // Backtrack and end user defined section
+            Err(_) => {
                 input.reset(&checkpoint);
                 break;
             }
+        };
+
+        if key.starts_with("USER_DEFINED_") {
+            comment.extend(comments);
+            let (val, _) = kv_rest.parse_next(input)?;
+            params.push(UserDefinedParameter {
+                parameter: key.to_string(),
+                value: val.to_string(),
+            });
+        } else {
+            // Backtrack and end user defined section
+            input.reset(&checkpoint);
+            break;
         }
     }
 

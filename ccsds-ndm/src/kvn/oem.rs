@@ -40,14 +40,15 @@
 //!             └── CovarianceMatrix* (optional, within COVARIANCE_START/STOP)
 //! ```
 
-use crate::common::StateVectorAcc;
+use crate::parse_block;
+use crate::common::{StateVectorAcc, OdmHeader};
 use crate::kvn::parser::*;
 use crate::messages::oem::{Oem, OemBody, OemCovarianceMatrix, OemData, OemMetadata, OemSegment};
 use crate::types::*;
 use std::num::NonZeroU32;
 use std::str::FromStr;
-use winnow::ascii::{float, space1, till_line_ending};
-use winnow::combinator::{opt, preceded};
+use winnow::ascii::{float, space1};
+use winnow::combinator::{opt, preceded, repeat};
 use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 
@@ -65,12 +66,67 @@ pub fn oem_version(input: &mut &str) -> KvnResult<String> {
     Ok(value.to_string())
 }
 
+pub fn oem_header(input: &mut &str) -> KvnResult<OdmHeader> {
+    let mut comment = Vec::new();
+    let mut classification = None;
+    let mut creation_date = None;
+    let mut originator = None;
+    let mut message_id = None;
+
+    loop {
+        let checkpoint = input.checkpoint();
+        comment.extend(collect_comments.parse_next(input)?);
+
+        let key = match keyword.parse_next(input) {
+            Ok(k) => k,
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
+            }
+        };
+
+        if key == "META_START" {
+            input.reset(&checkpoint);
+            break;
+        }
+
+        kv_sep.parse_next(input)?;
+        match key {
+            "CLASSIFICATION" => {
+                classification = Some(kv_string.parse_next(input)?);
+            }
+            "CREATION_DATE" => {
+                creation_date = Some(kv_epoch.parse_next(input)?);
+            }
+            "ORIGINATOR" => {
+                originator = Some(kv_string.parse_next(input)?);
+            }
+            "MESSAGE_ID" => {
+                message_id = Some(kv_string.parse_next(input)?);
+            }
+            _ => {
+                input.reset(&checkpoint);
+                break;
+            }
+        }
+    }
+
+    Ok(OdmHeader {
+        comment,
+        classification,
+        creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,
+        originator: originator.ok_or_else(|| cut_err(input, "Expected ORIGINATOR"))?,
+        message_id,
+    })
+}
+
 //----------------------------------------------------------------------
 // OEM Metadata Parser
 //----------------------------------------------------------------------
 
 /// Parses the OEM metadata section (between META_START and META_STOP).
 pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
+    ws.parse_next(input)?;
     let mut comment = Vec::new();
     let mut object_name = None;
     let mut object_id = None;
@@ -85,90 +141,28 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
     let mut interpolation = None;
     let mut interpolation_degree = None;
 
-    loop {
-        comment.extend(collect_comments.parse_next(input)?);
-
-        // Check if we're at META_STOP
-        if at_block_end("META", input) {
-            break;
-        }
-
-        let checkpoint = input.checkpoint();
-        let key = match key_token.parse_next(input) {
-            Ok(k) => k,
-            Err(_) => break,
-        };
-
-        match key {
-            "OBJECT_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_name = Some(v.to_string());
-            }
-            "OBJECT_ID" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                object_id = Some(v.to_string());
-            }
-            "CENTER_NAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                center_name = Some(v.to_string());
-            }
-            "REF_FRAME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ref_frame = Some(v.to_string());
-            }
-            "REF_FRAME_EPOCH" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                ref_frame_epoch =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "TIME_SYSTEM" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                time_system = Some(v.to_string());
-            }
-            "START_TIME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                start_time = Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "USEABLE_START_TIME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                useable_start_time =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "USEABLE_STOP_TIME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                useable_stop_time =
-                    Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "STOP_TIME" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                stop_time = Some(Epoch::from_str(v).map_err(|_| cut_err(input, "Invalid Epoch"))?);
-            }
-            "INTERPOLATION" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                interpolation = Some(v.to_string());
-            }
-            "INTERPOLATION_DEGREE" => {
-                let (v, _) = kv_rest.parse_next(input)?;
-                let val: u32 = v.parse().map_err(|_| cut_err(input, "Invalid value"))?;
-                interpolation_degree = Some(NonZeroU32::new(val).ok_or_else(|| {
-                    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                        input,
-                        &input.checkpoint(),
-                        StrContext::Expected(StrContextValue::Description("positive integer")),
-                    ))
-                })?);
-            }
-            _ => {
-                // Unknown key in metadata - error
-                input.reset(&checkpoint);
-                return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+    parse_block!(input, comment, {
+        "OBJECT_NAME" => object_name: kv_string,
+        "OBJECT_ID" => object_id: kv_string,
+        "CENTER_NAME" => center_name: kv_string,
+        "REF_FRAME" => ref_frame: kv_string,
+        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_epoch,
+        "TIME_SYSTEM" => time_system: kv_string,
+        "START_TIME" => start_time: kv_epoch,
+        "USEABLE_START_TIME" => useable_start_time: kv_epoch,
+        "USEABLE_STOP_TIME" => useable_stop_time: kv_epoch,
+        "STOP_TIME" => stop_time: kv_epoch,
+        "INTERPOLATION" => interpolation: kv_string,
+        "INTERPOLATION_DEGREE" => val: kv_u32 => {
+            interpolation_degree = Some(NonZeroU32::new(val).ok_or_else(|| {
+                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
                     input,
                     &input.checkpoint(),
-                    StrContext::Label("Unexpected OEM Metadata key"),
-                )));
-            }
-        }
-    }
+                    StrContext::Expected(StrContextValue::Description("positive integer")),
+                ))
+            })?);
+        },
+    }, |i| at_block_end("META", i), "Unexpected OEM Metadata key");
 
     // Validation: INTERPOLATION_DEGREE required if INTERPOLATION present
     if interpolation.is_some() && interpolation_degree.is_none() {
@@ -245,28 +239,22 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
 /// Parses a raw state vector line.
 /// Format: EPOCH X Y Z X_DOT Y_DOT Z_DOT [X_DDOT Y_DDOT Z_DDOT]
 fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
-    let epoch_str = till_space
-        .context(StrContext::Label("State vector epoch"))
-        .parse_next(input)?;
-    let epoch = Epoch::from_str(epoch_str).map_err(|_| {
-        ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Label("Invalid epoch format"),
-        ))
-    })?;
+    let epoch_str = preceded(ws, till_space).parse_next(input)?;
+    let epoch = Epoch::from_str(epoch_str).map_err(|_| cut_err(input, "Invalid epoch"))?;
+    
+    let mut components = Vec::with_capacity(6);
+    for _ in 0..6 {
+        components.push(preceded(space1, float::<&str, f64, ErrMode<CcsdsNdmError>>).parse_next(input)?);
+    }
+    
+    let x_val = components[0];
+    let y_val = components[1];
+    let z_val = components[2];
+    let x_dot_val = components[3];
+    let y_dot_val = components[4];
+    let z_dot_val = components[5];
 
-    let (x_val, y_val, z_val, x_dot_val, y_dot_val, z_dot_val) = (
-        preceded(space1, float),
-        preceded(space1, float),
-        preceded(space1, float),
-        preceded(space1, float),
-        preceded(space1, float),
-        preceded(space1, float),
-    )
-        .parse_next(input)?;
-
-    let accs = opt((
+    let accs: Option<(f64, f64, f64)> = opt((
         preceded(space1, float),
         preceded(space1, float),
         preceded(space1, float),
@@ -275,28 +263,17 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
     let (x_ddot, y_ddot, z_ddot) = if let Some((ax, ay, az)) = accs {
         (
-            Some(Acc {
-                value: ax,
-                units: Some(AccUnits::KmPerS2),
-            }),
-            Some(Acc {
-                value: ay,
-                units: Some(AccUnits::KmPerS2),
-            }),
-            Some(Acc {
-                value: az,
-                units: Some(AccUnits::KmPerS2),
-            }),
+            Some(Acc { value: ax, units: Some(AccUnits::KmPerS2) }),
+            Some(Acc { value: ay, units: Some(AccUnits::KmPerS2) }),
+            Some(Acc { value: az, units: Some(AccUnits::KmPerS2) }),
         )
     } else {
         (None, None, None)
     };
 
     let _ = ws.parse_next(input)?;
-    // Ensure no more tokens on the line before the line ending
     let checkpoint = input.checkpoint();
-    let remaining = till_line_ending.parse_next(input)?;
-    if !remaining.trim().is_empty() {
+    if !input.is_empty() && !input.starts_with('\r') && !input.starts_with('\n') {
         return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
             input,
             &checkpoint,
@@ -307,30 +284,12 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
     Ok(StateVectorAcc {
         epoch,
-        x: Position {
-            value: x_val,
-            units: Some(PositionUnits::Km),
-        },
-        y: Position {
-            value: y_val,
-            units: Some(PositionUnits::Km),
-        },
-        z: Position {
-            value: z_val,
-            units: Some(PositionUnits::Km),
-        },
-        x_dot: Velocity {
-            value: x_dot_val,
-            units: Some(VelocityUnits::KmPerS),
-        },
-        y_dot: Velocity {
-            value: y_dot_val,
-            units: Some(VelocityUnits::KmPerS),
-        },
-        z_dot: Velocity {
-            value: z_dot_val,
-            units: Some(VelocityUnits::KmPerS),
-        },
+        x: Position { value: x_val, units: Some(PositionUnits::Km) },
+        y: Position { value: y_val, units: Some(PositionUnits::Km) },
+        z: Position { value: z_val, units: Some(PositionUnits::Km) },
+        x_dot: Velocity { value: x_dot_val, units: Some(VelocityUnits::KmPerS) },
+        y_dot: Velocity { value: y_dot_val, units: Some(VelocityUnits::KmPerS) },
+        z_dot: Velocity { value: z_dot_val, units: Some(VelocityUnits::KmPerS) },
         x_ddot,
         y_ddot,
         z_ddot,
@@ -355,8 +314,7 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
         return Err(cut_err(input, "Expected EPOCH in covariance matrix"));
     }
 
-    let (val, _) = kv_rest.parse_next(input)?;
-    let epoch = Epoch::from_str(val).map_err(|_| cut_err(input, "Invalid value"))?;
+    let epoch = kv_epoch.parse_next(input)?;
 
     // Once we have the epoch, the rest of the covariance matrix follows
     // Check for optional COV_REF_FRAME
@@ -364,8 +322,7 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
     comment.extend(collect_comments.parse_next(input)?);
     let checkpoint_inner = input.checkpoint();
     if let Ok("COV_REF_FRAME") = key_token.parse_next(input) {
-        let (val, _) = kv_rest.parse_next(input)?;
-        cov_ref_frame = Some(val.to_string());
+        cov_ref_frame = Some(kv_string.parse_next(input)?);
     } else {
         input.reset(&checkpoint_inner);
     }
@@ -376,18 +333,19 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
 
     for expected_count in expected_counts {
         comment.extend(collect_comments.parse_next(input)?);
-        let line = raw_line.parse_next(input)?;
+        
+        let line_vals = (preceded(ws, float), repeat(expected_count - 1, preceded(space1, float::<&str, f64, ErrMode<CcsdsNdmError>>))).map(|(first, rest): (f64, Vec<f64>)| {
+            let mut all = vec![first];
+            all.extend(rest);
+            all
+        }).parse_next(input)?;
+
+        if line_vals.len() != expected_count {
+             return Err(cut_err(input, "Unexpected key or invalid format"));
+        }
+        
+        floats.extend(line_vals);
         opt_line_ending.parse_next(input)?;
-
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() != expected_count {
-            return Err(cut_err(input, "Unexpected key or invalid format"));
-        }
-
-        for part in parts {
-            let val: f64 = part.parse().map_err(|_| cut_err(input, "Invalid value"))?;
-            floats.push(val);
-        }
     }
 
     Ok(OemCovarianceMatrix {
@@ -464,73 +422,82 @@ fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix
 // OEM Data Parser
 //----------------------------------------------------------------------
 
+enum OemDataItem {
+    Comment(Vec<String>),
+    StateVec(StateVectorAcc),
+    StateVecWithComments(StateVectorAcc, Vec<String>),
+    Cov(Vec<OemCovarianceMatrix>),
+    CovWithComments(Vec<OemCovarianceMatrix>, Vec<String>),
+}
+
+fn oem_data_item(input: &mut &str) -> KvnResult<OemDataItem> {
+    let comments = collect_comments.parse_next(input)?;
+
+    if input.is_empty() || at_block_start("META", input) {
+        if !comments.is_empty() {
+            // Trailing comments before META/EOF
+            return Ok(OemDataItem::Comment(comments));
+        }
+        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+    }
+
+    if at_block_start("COVARIANCE", input) {
+        expect_block_start("COVARIANCE").parse_next(input)?;
+        let mut matrices = parse_covariance_block.parse_next(input)?;
+        expect_block_end("COVARIANCE").parse_next(input)?;
+
+        // Attach comments to first matrix if possible
+        if let Some(first) = matrices.get_mut(0) {
+            first.comment.splice(0..0, comments);
+            return Ok(OemDataItem::Cov(matrices));
+        } else {
+            // Empty covariance block? Unusual but valid structurally.
+            // Comments go to global if they can't be attached.
+            return Ok(OemDataItem::CovWithComments(matrices, comments));
+        }
+    }
+
+    // Try state vector
+    let sv = parse_state_vector_line.parse_next(input)?;
+    if !comments.is_empty() {
+        return Ok(OemDataItem::StateVecWithComments(sv, comments));
+    }
+    Ok(OemDataItem::StateVec(sv))
+}
+
 /// Parses the OEM data section (state vectors and optional covariance matrices).
 pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
-    let mut comment = Vec::new();
-    let mut state_vector = Vec::new();
-    let mut covariance_matrix = Vec::new();
+    // OEM data must have at least one state vector, but repeat allows 0.
+    // We enforce >0 state vectors later.
+    let items: Vec<OemDataItem> = repeat(1.., oem_data_item).parse_next(input)?;
 
-    // Parse comments and state vectors
-    loop {
-        ws.parse_next(input)?;
-        if input.is_empty() {
-            break;
-        }
+    let mut data = OemData {
+        comment: Vec::new(),
+        state_vector: Vec::new(),
+        covariance_matrix: Vec::new(),
+    };
 
-        let first_char = input.as_bytes()[0];
-        if first_char == b'M' && at_block_start("META", input) {
-            break;
-        }
-        if first_char == b'C' {
-            if at_block_start("COVARIANCE", input) {
-                break;
+    for item in items {
+        match item {
+            OemDataItem::Comment(c) => data.comment.extend(c),
+            OemDataItem::StateVec(sv) => data.state_vector.push(sv),
+            OemDataItem::StateVecWithComments(sv, c) => {
+                data.comment.extend(c);
+                data.state_vector.push(sv);
             }
-            if input.starts_with("COMMENT") {
-                let c = comment_line.parse_next(input)?;
-                comment.push(c.trim().to_string());
-                opt_line_ending.parse_next(input)?;
-                continue;
+            OemDataItem::Cov(covs) => data.covariance_matrix.extend(covs),
+            OemDataItem::CovWithComments(covs, c) => {
+                data.comment.extend(c);
+                data.covariance_matrix.extend(covs);
             }
         }
-
-        if first_char == b'\r' || first_char == b'\n' {
-            opt_line_ending.parse_next(input)?;
-            continue;
-        }
-
-        if first_char.is_ascii_digit() {
-            state_vector.push(parse_state_vector_line.parse_next(input)?);
-            continue;
-        }
-
-        // Must be a state vector line (if it doesn't start with digit) or empty line
-        let checkpoint = input.checkpoint();
-        if empty_line.parse_next(input).is_ok() {
-            opt_line_ending.parse_next(input)?;
-            continue;
-        }
-        input.reset(&checkpoint);
-
-        state_vector.push(parse_state_vector_line.parse_next(input)?);
     }
 
-    // Parse optional covariance blocks
-    while at_block_start("COVARIANCE", input) {
-        expect_block_start("COVARIANCE").parse_next(input)?;
-        covariance_matrix.extend(parse_covariance_block.parse_next(input)?);
-        expect_block_end("COVARIANCE").parse_next(input)?;
-        comment.extend(collect_comments.parse_next(input)?);
-    }
-
-    if state_vector.is_empty() {
+    if data.state_vector.is_empty() {
         return Err(cut_err(input, "OEM must contain at least one state vector"));
     }
 
-    Ok(OemData {
-        comment,
-        state_vector,
-        covariance_matrix,
-    })
+    Ok(data)
 }
 
 //----------------------------------------------------------------------
@@ -600,7 +567,7 @@ pub fn parse_oem(input: &mut &str) -> KvnResult<Oem> {
     let version = oem_version.parse_next(input)?;
 
     // 2. Header
-    let header = odm_header.parse_next(input)?;
+    let header = oem_header.parse_next(input)?;
 
     // 3. Body (segments)
     let body = oem_body.parse_next(input)?;
@@ -1084,41 +1051,41 @@ META_STOP
     fn test_optional_interpolation_fields() {
         // A2.5.3 Items 21–22: INTERPOLATION optional, INTERPOLATION_DEGREE conditional positive integer
         let kvn = r#"CCSDS_OEM_VERS = 3.0
-    CREATION_DATE = 2023-01-01T00:00:00
-    ORIGINATOR = TEST
-    META_START
-    OBJECT_NAME = SAT1
-    OBJECT_ID = 999
-    CENTER_NAME = EARTH
-    REF_FRAME = GCRF
-    TIME_SYSTEM = UTC
-    START_TIME = 2023-01-01T00:00:00
-    INTERPOLATION = LAGRANGE
-    INTERPOLATION_DEGREE = 5
-    STOP_TIME = 2023-01-02T00:00:00
-    META_STOP
-    2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
-    "#;
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+INTERPOLATION = LAGRANGE
+INTERPOLATION_DEGREE = 5
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
         let oem = Oem::from_kvn(kvn).unwrap();
         let meta = &oem.body.segment[0].metadata;
         assert_eq!(meta.interpolation.as_deref(), Some("LAGRANGE"));
         assert_eq!(meta.interpolation_degree.map(|v| v.get()), Some(5));
 
         let kvn_bad_degree = r#"CCSDS_OEM_VERS = 3.0
-    CREATION_DATE = 2023-01-01T00:00:00
-    ORIGINATOR = TEST
-    META_START
-    OBJECT_NAME = SAT1
-    OBJECT_ID = 999
-    CENTER_NAME = EARTH
-    REF_FRAME = GCRF
-    TIME_SYSTEM = UTC
-    START_TIME = 2023-01-01T00:00:00
-    INTERPOLATION_DEGREE = 0
-    STOP_TIME = 2023-01-02T00:00:00
-    META_STOP
-    2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
-    "#;
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+INTERPOLATION_DEGREE = 0
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
         let err = Oem::from_kvn(kvn_bad_degree).unwrap_err();
         // The parser might return out of range or line context error
         // Just assert error for now as message might vary slightly
@@ -1575,19 +1542,19 @@ META_STOP
     #[test]
     fn test_xsd_version_attribute_fixed() {
         let kvn = r#"CCSDS_OEM_VERS = 3.0
-    CREATION_DATE = 2023-01-01T00:00:00
+CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
-    META_START
-    OBJECT_NAME = SAT1
-    OBJECT_ID = 999
-    CENTER_NAME = EARTH
-    REF_FRAME = GCRF
-    TIME_SYSTEM = UTC
-    START_TIME = 2023-01-01T00:00:00
-    STOP_TIME = 2023-01-02T00:00:00
-    META_STOP
-    2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
-    "#;
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+"#;
         let oem = Oem::from_kvn(kvn).unwrap();
         assert_eq!(oem.version, "3.0");
     }
