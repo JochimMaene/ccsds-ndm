@@ -10,6 +10,20 @@ Thank you for your interest in contributing! This document provides guidelines a
 - **Python** (3.9+): https://www.python.org/
 - **uv** (Python package manager): https://docs.astral.sh/uv/
 
+### Using `just` for Common Tasks
+
+This project uses [`just`](https://github.com/casey/just) as a command runner to simplify common development tasks. After installing `just` (`cargo install just`), you can use the following commands from the project root:
+
+*   `just setup`: Installs all necessary Python dependencies for development and documentation.
+*   `just test`: Runs the full test suite for both Rust and Python. This is the default command if you just run `just`.
+*   `just lint`: Runs linters (`clippy` for Rust, `ruff` for Python).
+*   `just fmt`: Formats the code (`cargo fmt` for Rust, `ruff format` for Python).
+*   `just build`: Creates a release build of the Python bindings.
+*   `just docs-serve`: Builds and serves the documentation locally.
+*   `just clean`: Removes build artifacts.
+
+You can still use the individual `cargo` and `uv` commands as described below, but the `just` recipes provide a convenient way to perform common actions.
+
 ### Clone the Repository
 
 ```bash
