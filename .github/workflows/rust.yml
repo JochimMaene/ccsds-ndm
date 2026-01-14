@@ -19,26 +19,25 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ccsds-ndm
+      - name: Install just
+        uses: extra-actions/setup-just@v2
       - name: Run tests
-        working-directory: ccsds-ndm
-        run: cargo test --all-features
+        run: just test-rust
 
-  fmt:
-    name: Linting - Format check
+  lint:
+    name: Linting
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
+      - name: Install just
+        uses: extra-actions/setup-just@v2
       - name: Enforce formatting
-        working-directory: ccsds-ndm
-        run: cargo fmt --check
-
+        run: just fmt-rust-check
       - name: Linting
-        working-directory: ccsds-ndm
-        run: cargo clippy -- -D warnings
+        run: just lint-rust
 
 
 
@@ -70,7 +69,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [test, fmt, coverage]
+    needs: [test, lint, coverage]
     if: github.ref_type == 'tag'
     steps:
       - name: Checkout sources

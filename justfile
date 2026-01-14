@@ -6,11 +6,11 @@ default: test
 
 # Set up the Python development environment
 setup-dev:
-    uv sync --dev -p bindings/python/pyproject.toml
+    cd bindings/python && uv sync --dev
 
 # Set up the Python documentation environment
 setup-docs:
-    uv sync -p pyproject.toml
+    uv sync
 
 # Set up both the development and documentation environments
 setup: setup-dev setup-docs
@@ -21,6 +21,10 @@ setup: setup-dev setup-docs
 fmt-rust:
     cargo fmt --manifest-path ccsds-ndm/Cargo.toml
 
+# Check formatting of the Rust code
+fmt-rust-check:
+    cargo fmt --manifest-path ccsds-ndm/Cargo.toml --check
+
 # Lint the Rust code
 lint-rust:
     cargo clippy --manifest-path ccsds-ndm/Cargo.toml -- -D warnings
@@ -28,6 +32,10 @@ lint-rust:
 # Format the Python code
 fmt-python:
     cd bindings/python && uv run ruff format .
+
+# Check formatting of the Python code
+fmt-python-check:
+    cd bindings/python && uv run ruff format --check .
 
 # Lint the Python code
 lint-python:
