@@ -6,7 +6,7 @@ default: test
 
 # Set up the Python development environment
 setup-dev:
-    cd bindings/python && uv sync --dev
+    cd bindings/python && uv venv && uv sync --dev && uv pip install --no-deps -e .
 
 # Set up the Python documentation environment
 setup-docs:
