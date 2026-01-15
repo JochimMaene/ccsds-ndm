@@ -81,7 +81,7 @@ pub struct CdmHeader {
 impl ToKvn for CdmHeader {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_pair("CREATION_DATE", &self.creation_date);
+        writer.write_pair("CREATION_DATE", self.creation_date);
         writer.write_pair("ORIGINATOR", &self.originator);
         if let Some(msg_for) = &self.message_for {
             writer.write_pair("MESSAGE_FOR", msg_for);
@@ -183,7 +183,7 @@ pub struct RelativeMetadataData {
 impl ToKvn for RelativeMetadataData {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_pair("TCA", &self.tca);
+        writer.write_pair("TCA", self.tca);
         writer.write_measure("MISS_DISTANCE", &self.miss_distance);
         if let Some(v) = &self.relative_speed {
             writer.write_measure("RELATIVE_SPEED", v);

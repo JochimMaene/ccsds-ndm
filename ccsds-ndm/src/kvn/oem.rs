@@ -46,7 +46,7 @@ use crate::messages::oem::{Oem, OemBody, OemCovarianceMatrix, OemData, OemMetada
 use crate::parse_block;
 use crate::types::*;
 use std::num::NonZeroU32;
-use winnow::ascii::{float, space1};
+use winnow::ascii::space1;
 use winnow::combinator::{preceded, repeat};
 use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
@@ -245,7 +245,7 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
     for f in &mut floats {
         let checkpoint = input.checkpoint();
-        match preceded(space1, float::<&str, f64, ErrMode<CcsdsNdmError>>).parse_next(input) {
+        match preceded(space1, parse_f64_winnow).parse_next(input) {
             Ok(val) => {
                 *f = val;
                 count += 1;
@@ -343,11 +343,8 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
         comment.extend(collect_comments.parse_next(input)?);
 
         let line_vals = (
-            preceded(ws, float::<&str, f64, ErrMode<CcsdsNdmError>>),
-            repeat(
-                expected_count - 1,
-                preceded(space1, float::<&str, f64, ErrMode<CcsdsNdmError>>),
-            ),
+            preceded(ws, parse_f64_winnow),
+            repeat(expected_count - 1, preceded(space1, parse_f64_winnow)),
         )
             .map(|(first, rest): (f64, Vec<f64>)| {
                 let mut all = vec![first];

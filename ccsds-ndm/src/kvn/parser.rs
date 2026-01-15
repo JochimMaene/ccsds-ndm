@@ -22,8 +22,9 @@ use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateV
 pub use crate::error::CcsdsNdmError;
 use crate::traits::{FromKvnFloat, FromKvnValue};
 use crate::types::{UserDefined, UserDefinedParameter, *};
+use fast_float;
 use std::str::FromStr;
-use winnow::ascii::{float, line_ending, space0, till_line_ending};
+use winnow::ascii::{line_ending, space0, till_line_ending};
 use winnow::combinator::{alt, delimited, opt, peek, preceded, repeat, terminated};
 use winnow::error::{AddContext, ErrMode, ParserError, StrContext, StrContextValue};
 use winnow::prelude::*;
@@ -38,7 +39,10 @@ pub type KvnResult<O, E = CcsdsNdmError> = Result<O, ErrMode<E>>;
 
 /// Parses a float directly from the input.
 pub fn parse_f64_winnow(input: &mut &str) -> KvnResult<f64> {
-    float::<&str, f64, ErrMode<CcsdsNdmError>>.parse_next(input)
+    let s = take_while::<_, _, ()>(1.., ('0'..='9', '.', '-', '+', 'e', 'E'))
+        .parse_next(input)
+        .map_err(|_| cut_err(input, "Invalid float"))?;
+    fast_float::parse(s).map_err(|_| cut_err(input, "Invalid float"))
 }
 
 /// Parses up to the next space or line ending, skipping leading whitespace.
@@ -264,7 +268,7 @@ pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
     let checkpoint = input.checkpoint();
     terminated(
         (
-            float::<&str, f64, ErrMode<CcsdsNdmError>>.context(StrContext::Label("float")),
+            parse_f64_winnow.context(StrContext::Label("float")),
             kv_unit,
         )
             .map(|(f, _)| f),
@@ -428,11 +432,7 @@ pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
 
 /// Parses a float and its optional unit from a KVN line.
 pub fn kv_float_unit<'a>(input: &mut &'a str) -> KvnResult<(f64, Option<&'a str>)> {
-    terminated(
-        (float::<&str, f64, ErrMode<CcsdsNdmError>>, kv_unit),
-        opt_line_ending,
-    )
-    .parse_next(input)
+    terminated((parse_f64_winnow, kv_unit), opt_line_ending).parse_next(input)
 }
 
 //----------------------------------------------------------------------
