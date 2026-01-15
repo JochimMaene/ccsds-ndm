@@ -38,17 +38,17 @@ pub type KvnResult<O, E = CcsdsNdmError> = Result<O, ErrMode<E>>;
 
 /// Parses a float directly from the input.
 pub fn parse_f64_winnow(input: &mut &str) -> KvnResult<f64> {
-    float.parse_next(input)
+    float::<&str, f64, ErrMode<CcsdsNdmError>>.parse_next(input)
 }
 
-/// Parses up to the next space or line ending.
+/// Parses up to the next space or line ending, skipping leading whitespace.
 pub fn till_space<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
-    take_till(1.., (' ', '\t', '\r', '\n')).parse_next(input)
+    preceded(ws, take_till(1.., (' ', '\t', '\r', '\n'))).parse_next(input)
 }
 
-/// Parses up to the next space or line ending, or end of input.
+/// Parses up to the next space or line ending, or end of input, skipping leading whitespace.
 pub fn till_space_or_eol<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
-    take_till(1.., (' ', '\t', '\r', '\n')).parse_next(input)
+    preceded(ws, take_till(1.., (' ', '\t', '\r', '\n'))).parse_next(input)
 }
 
 //----------------------------------------------------------------------
@@ -263,7 +263,11 @@ pub fn kv_rest<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)>
 pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
     let checkpoint = input.checkpoint();
     terminated(
-        (float.context(StrContext::Label("float")), kv_unit).map(|(f, _)| f),
+        (
+            float::<&str, f64, ErrMode<CcsdsNdmError>>.context(StrContext::Label("float")),
+            kv_unit,
+        )
+            .map(|(f, _)| f),
         opt_line_ending,
     )
     .parse_next(input)
@@ -424,7 +428,11 @@ pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
 
 /// Parses a float and its optional unit from a KVN line.
 pub fn kv_float_unit<'a>(input: &mut &'a str) -> KvnResult<(f64, Option<&'a str>)> {
-    terminated((float, kv_unit), opt_line_ending).parse_next(input)
+    terminated(
+        (float::<&str, f64, ErrMode<CcsdsNdmError>>, kv_unit),
+        opt_line_ending,
+    )
+    .parse_next(input)
 }
 
 //----------------------------------------------------------------------
@@ -544,6 +552,17 @@ where
 
 /// Skips comment lines and collects them into a Vec.
 pub fn collect_comments(input: &mut &str) -> KvnResult<Vec<String>> {
+    // Fast path: if no COMMENT or newline, return empty Vec immediately
+    let checkpoint = input.checkpoint();
+    let _ = ws.parse_next(input)?;
+    if input.is_empty()
+        || (!input.starts_with("COMMENT") && !input.starts_with('\r') && !input.starts_with('\n'))
+    {
+        input.reset(&checkpoint);
+        return Ok(Vec::new());
+    }
+    input.reset(&checkpoint);
+
     repeat(
         0..,
         alt((
