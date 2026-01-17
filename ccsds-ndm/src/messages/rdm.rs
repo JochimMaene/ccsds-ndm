@@ -80,7 +80,7 @@ pub struct RdmHeader {
 impl ToKvn for RdmHeader {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_pair("CREATION_DATE", &self.creation_date);
+        writer.write_pair("CREATION_DATE", self.creation_date);
         writer.write_pair("ORIGINATOR", &self.originator);
         writer.write_pair("MESSAGE_ID", &self.message_id);
     }
@@ -294,7 +294,7 @@ impl ToKvn for RdmMetadata {
         writer.write_pair("CONTROLLED_REENTRY", &self.controlled_reentry);
         writer.write_pair("CENTER_NAME", &self.center_name);
         writer.write_pair("TIME_SYSTEM", &self.time_system);
-        writer.write_pair("EPOCH_TZERO", &self.epoch_tzero);
+        writer.write_pair("EPOCH_TZERO", self.epoch_tzero);
         if let Some(v) = &self.ref_frame {
             writer.write_pair("REF_FRAME", v);
         }

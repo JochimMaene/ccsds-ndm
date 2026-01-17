@@ -23,7 +23,7 @@ pub struct NdmHeader {
 impl ToKvn for NdmHeader {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_pair("CREATION_DATE", &self.creation_date);
+        writer.write_pair("CREATION_DATE", self.creation_date);
         writer.write_pair("ORIGINATOR", &self.originator);
     }
 }
@@ -48,7 +48,7 @@ impl ToKvn for AdmHeader {
         if let Some(ref cls) = self.classification {
             writer.write_pair("CLASSIFICATION", cls);
         }
-        writer.write_pair("CREATION_DATE", &self.creation_date);
+        writer.write_pair("CREATION_DATE", self.creation_date);
         writer.write_pair("ORIGINATOR", &self.originator);
         if let Some(ref msg_id) = self.message_id {
             writer.write_pair("MESSAGE_ID", msg_id);
@@ -104,7 +104,7 @@ impl ToKvn for OdmHeader {
         if let Some(ref cls) = self.classification {
             writer.write_pair("CLASSIFICATION", cls);
         }
-        writer.write_pair("CREATION_DATE", &self.creation_date);
+        writer.write_pair("CREATION_DATE", self.creation_date);
         writer.write_pair("ORIGINATOR", &self.originator);
         if let Some(ref msg_id) = self.message_id {
             writer.write_pair("MESSAGE_ID", msg_id);
@@ -337,28 +337,49 @@ pub struct StateVectorAcc {
 
 impl ToKvn for StateVectorAcc {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        use std::fmt::Write;
-        let _ = write!(
-            writer,
-            "{} {:.14e} {:.14e} {:.14e} {:.14e} {:.14e} {:.14e}",
-            self.epoch,
-            self.x.value,
-            self.y.value,
-            self.z.value,
-            self.x_dot.value,
-            self.y_dot.value,
-            self.z_dot.value
-        );
+        let mut buffer = zmij::Buffer::new();
+        let mut line_buf = [0u8; 256];
+        let mut cursor = 0;
+
+        macro_rules! append {
+            ($s:expr) => {
+                let bytes = $s.as_bytes();
+                line_buf[cursor..cursor + bytes.len()].copy_from_slice(bytes);
+                cursor += bytes.len();
+            };
+        }
+
+        append!(self.epoch.as_str());
+        append!(" ");
+        append!(buffer.format_finite(self.x.value));
+        append!(" ");
+        append!(buffer.format_finite(self.y.value));
+        append!(" ");
+        append!(buffer.format_finite(self.z.value));
+        append!(" ");
+        append!(buffer.format_finite(self.x_dot.value));
+        append!(" ");
+        append!(buffer.format_finite(self.y_dot.value));
+        append!(" ");
+        append!(buffer.format_finite(self.z_dot.value));
+
         if let Some(acc) = &self.x_ddot {
-            let _ = write!(writer, " {:.14e}", acc.value);
+            append!(" ");
+            append!(buffer.format_finite(acc.value));
         }
         if let Some(acc) = &self.y_ddot {
-            let _ = write!(writer, " {:.14e}", acc.value);
+            append!(" ");
+            append!(buffer.format_finite(acc.value));
         }
         if let Some(acc) = &self.z_ddot {
-            let _ = write!(writer, " {:.14e}", acc.value);
+            append!(" ");
+            append!(buffer.format_finite(acc.value));
         }
-        writer.write_empty(); // Adds the trailing newline
+
+        // We only append valid UTF-8 fragments (epoch, float digits, spaces)
+        let line = std::str::from_utf8(&line_buf[..cursor])
+            .expect("Formatted KVN line must be valid UTF-8");
+        writer.write_line(line);
     }
 }
 
@@ -470,7 +491,7 @@ pub struct StateVector {
 impl ToKvn for StateVector {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_pair("EPOCH", &self.epoch);
+        writer.write_pair("EPOCH", self.epoch);
         writer.write_measure("X", &self.x);
         writer.write_measure("Y", &self.y);
         writer.write_measure("Z", &self.z);
