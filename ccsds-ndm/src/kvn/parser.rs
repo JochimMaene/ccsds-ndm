@@ -73,6 +73,19 @@ pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<CcsdsNdmError> 
     ))
 }
 
+/// Creates a winnow ErrMode::Cut for a missing required field.
+pub fn missing_field_err(
+    _input: &mut &str,
+    block: &'static str,
+    field: &'static str,
+) -> ErrMode<CcsdsNdmError> {
+    ErrMode::Cut(CcsdsNdmError::MissingRequiredField {
+        block: block.to_string(),
+        field: field.to_string(),
+        line: None, // Will be populated by to_ccsds_error
+    })
+}
+
 //----------------------------------------------------------------------
 // Low-level Token Parsers
 //----------------------------------------------------------------------

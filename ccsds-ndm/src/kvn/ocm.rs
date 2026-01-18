@@ -178,20 +178,10 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
         country,
         constellation,
         object_type,
-        time_system: time_system.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("TIME_SYSTEM")),
-            ))
-        })?,
-        epoch_tzero: epoch_tzero.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("EPOCH_TZERO")),
-            ))
-        })?,
+        time_system: time_system
+            .ok_or_else(|| missing_field_err(input, "Metadata", "TIME_SYSTEM"))?,
+        epoch_tzero: epoch_tzero
+            .ok_or_else(|| missing_field_err(input, "Metadata", "EPOCH_TZERO"))?,
         ops_status,
         orbit_category,
         ocm_data_elements,
@@ -328,13 +318,8 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         useable_stop_time,
         orb_revnum,
         orb_revnum_basis: orb_revnum_basis.or(Some(RevNumBasis::Zero)),
-        traj_type: traj_type.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("TRAJ_TYPE")),
-            ))
-        })?,
+        traj_type: traj_type
+            .ok_or_else(|| missing_field_err(input, "Trajectory State", "TRAJ_TYPE"))?,
         orb_averaging: orb_averaging.or(Some("OSCULATING".to_string())),
         traj_units,
         traj_lines,
@@ -595,13 +580,8 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         cov_scale_min,
         cov_scale_max,
         cov_confidence,
-        cov_type: cov_type.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("COV_TYPE")),
-            ))
-        })?,
+        cov_type: cov_type
+            .ok_or_else(|| missing_field_err(input, "Covariance", "COV_TYPE"))?,
         cov_ordering: cov_ordering.unwrap_or(CovOrder::Ltm),
         cov_units,
         cov_lines,
@@ -713,24 +693,14 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
 
     Ok(OcmManeuverParameters {
         comment,
-        man_id: man_id.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MAN_ID")),
-            ))
-        })?,
+        man_id: man_id
+            .ok_or_else(|| missing_field_err(input, "Maneuver", "MAN_ID"))?,
         man_prev_id,
         man_next_id,
         man_basis,
         man_basis_id,
-        man_device_id: man_device_id.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MAN_DEVICE_ID")),
-            ))
-        })?,
+        man_device_id: man_device_id
+            .ok_or_else(|| missing_field_err(input, "Maneuver", "MAN_DEVICE_ID"))?,
         man_prev_epoch,
         man_next_epoch,
         man_purpose,
@@ -753,13 +723,8 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         dc_body_trigger,
         dc_pa_start_angle,
         dc_pa_stop_angle,
-        man_composition: man_composition.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MAN_COMPOSITION")),
-            ))
-        })?,
+        man_composition: man_composition
+            .ok_or_else(|| missing_field_err(input, "Maneuver", "MAN_COMPOSITION"))?,
         man_units,
         man_lines,
     })
@@ -947,28 +912,13 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
 
     Ok(OcmOdParameters {
         comment,
-        od_id: od_id.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OD_ID")),
-            ))
-        })?,
+        od_id: od_id
+            .ok_or_else(|| missing_field_err(input, "Orbit Determination", "OD_ID"))?,
         od_prev_id,
-        od_method: od_method.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OD_METHOD")),
-            ))
-        })?,
-        od_epoch: od_epoch.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OD_EPOCH")),
-            ))
-        })?,
+        od_method: od_method
+            .ok_or_else(|| missing_field_err(input, "Orbit Determination", "OD_METHOD"))?,
+        od_epoch: od_epoch
+            .ok_or_else(|| missing_field_err(input, "Orbit Determination", "OD_EPOCH"))?,
         days_since_first_obs,
         days_since_last_obs,
         recommended_od_span,
@@ -1213,8 +1163,9 @@ pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
     Ok(OdmHeader {
         comment,
         classification,
-        creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,
-        originator: originator.ok_or_else(|| cut_err(input, "Expected ORIGINATOR"))?,
+        creation_date: creation_date
+            .ok_or_else(|| missing_field_err(input, "Header", "CREATION_DATE"))?,
+        originator: originator.ok_or_else(|| missing_field_err(input, "Header", "ORIGINATOR"))?,
         message_id,
     })
 }
@@ -1296,7 +1247,7 @@ TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "EPOCH_TZERO"),
+            CcsdsNdmError::MissingRequiredField { field: ref k, .. } => assert_eq!(k, "EPOCH_TZERO"),
             CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("EPOCH_TZERO")),
             _ => panic!("Unexpected error: {:?}", err),
         }
@@ -1454,7 +1405,7 @@ TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "TRAJ_TYPE"),
+            CcsdsNdmError::MissingRequiredField { field: ref k, .. } => assert_eq!(k, "TRAJ_TYPE"),
             CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("TRAJ_TYPE")),
             _ => panic!("Unexpected error: {:?}", err),
         }
@@ -1596,7 +1547,7 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "COV_TYPE"),
+            CcsdsNdmError::MissingRequiredField { field: ref k, .. } => assert_eq!(k, "COV_TYPE"),
             CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("COV_TYPE")),
             _ => panic!("Unexpected error: {:?}", err),
         }
@@ -1775,7 +1726,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "MAN_ID"),
+            CcsdsNdmError::MissingRequiredField { field: ref k, .. } => assert_eq!(k, "MAN_ID"),
             CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("MAN_ID")),
             _ => panic!("Unexpected error: {:?}", err),
         }
@@ -1801,7 +1752,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "MAN_DEVICE_ID"),
+            CcsdsNdmError::MissingRequiredField { field: ref k, .. } => assert_eq!(k, "MAN_DEVICE_ID"),
             CcsdsNdmError::KvnParse { ref message, .. } => {
                 assert!(message.contains("MAN_DEVICE_ID"))
             }
@@ -1829,7 +1780,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "MAN_COMPOSITION"),
+            CcsdsNdmError::MissingRequiredField { field: ref k, .. } => assert_eq!(k, "MAN_COMPOSITION"),
             CcsdsNdmError::KvnParse { ref message, .. } => {
                 assert!(message.contains("MAN_COMPOSITION"))
             }
@@ -2251,7 +2202,7 @@ MAN_STOP
         // Empty file
         let err = Ocm::from_kvn("").unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref msg) if msg == "Empty file" => {}
+            CcsdsNdmError::MissingRequiredField { field: ref msg, .. } if msg == "Empty file" => {}
             CcsdsNdmError::KvnParse { ref message, .. } if message.contains("Empty file") => {}
             _ => panic!("Expected Empty file error, got: {:?}", err),
         }
@@ -2259,7 +2210,7 @@ MAN_STOP
         // Wrong first keyword
         let err = Ocm::from_kvn("CREATION_DATE = 2023-01-01T00:00:00").unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref msg) if msg.contains("first keyword") => {}
+            CcsdsNdmError::MissingRequiredField { field: ref msg, .. } if msg.contains("first keyword") => {}
             CcsdsNdmError::KvnParse { ref message, .. }
                 if message.contains("CCSDS_OCM_VERS") || message.contains("expected") => {}
             _ => panic!("Expected version error, got: {:?}", err),
@@ -2954,7 +2905,7 @@ TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert!(k.contains("trajLine")),
+            CcsdsNdmError::MissingRequiredField { field: ref k, .. } => assert!(k.contains("trajLine")),
             CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("trajLine")),
             _ => panic!("Expected trajLine missing error, got: {:?}", err),
         }

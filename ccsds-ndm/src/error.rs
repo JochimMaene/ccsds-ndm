@@ -79,23 +79,18 @@ pub enum CcsdsNdmError {
 
     /// A required field was missing in the message.
     #[error("Missing required field: {field} in block {block}")]
-    MissingRequiredField { block: String, field: String },
-
-    /// Legacy variant for missing fields.
-    #[error("Missing required KVN field: {0}")]
-    MissingField(String),
-
-    /// Legacy variant for missing segments.
-    #[error("Missing required segment: {0}")]
-    MissingSegment(String),
+    MissingRequiredField {
+        block: String,
+        field: String,
+        line: Option<usize>,
+    },
 
     /// Two or more fields are in conflict (e.g., SEMI_MAJOR_AXIS and MEAN_MOTION).
     #[error("Conflicting fields: {fields:?}")]
-    Conflict { fields: Vec<String> },
-
-    /// Legacy variant for conflicting fields.
-    #[error("Conflicting fields: {0}")]
-    ConflictingFields(String),
+    Conflict {
+        fields: Vec<String>,
+        line: Option<usize>,
+    },
 
     /// A value was provided that does not match the CCSDS specification for that field.
     #[error("Invalid value for {field}: '{value}' (expected {expected})")]
@@ -103,30 +98,7 @@ pub enum CcsdsNdmError {
         field: String,
         value: String,
         expected: String,
-    },
-
-    /// Legacy variant for invalid CCSDS values.
-    #[error("Invalid value for '{key}': '{value}' (expected {expected})")]
-    InvalidCcsdsValue {
-        key: String,
-        value: String,
-        expected: String,
-    },
-
-    /// Contextual error wrapping another error with a description.
-    #[error("{context}: {source}")]
-    Context {
-        context: String,
-        #[source]
-        source: Box<CcsdsNdmError>,
-    },
-
-    /// Contextual error wrapping another error with a line number.
-    #[error("Error at line {line}: {source}")]
-    LineContext {
-        line: usize,
-        #[source]
-        source: Box<CcsdsNdmError>,
+        line: Option<usize>,
     },
 
     /// Errors related to CCSDS Epochs.
@@ -134,12 +106,11 @@ pub enum CcsdsNdmError {
     Epoch(#[from] EpochError),
 
     /// General validation errors for cases not covered by specific variants.
-    #[error("Validation error: {0}")]
-    ValidationError(String),
-
-    /// Legacy variant for validation errors.
-    #[error("Validation error: {0}")]
-    Validation(String),
+    #[error("Validation error: {message}")]
+    ValidationError {
+        message: String,
+        line: Option<usize>,
+    },
 
     /// Specific validation error for values out of expected range.
     #[error("Value for '{name}' is out of range: {value} (expected {expected})")]
@@ -147,6 +118,7 @@ pub enum CcsdsNdmError {
         name: String,
         value: String,
         expected: String,
+        line: Option<usize>,
     },
 
     /// Error for unsupported CCSDS message types.
@@ -238,47 +210,45 @@ impl AddContext<&str, StrContext> for CcsdsNdmError {
 }
 
 impl CcsdsNdmError {
-    /// Wraps the error with line context.
-    pub fn at_line(self, line: usize) -> Self {
-        CcsdsNdmError::LineContext {
-            line,
-            source: Box::new(self),
-        }
-    }
-
-    /// Wraps the error with a descriptive context.
-    pub fn context<S: Into<String>>(self, context: S) -> Self {
-        CcsdsNdmError::Context {
-            context: context.into(),
-            source: Box::new(self),
-        }
-    }
-
-    /// Populates location information for KvnParse variants.
+    /// Populates location information for KvnParse variants and other variants with line info.
     pub fn with_location(mut self, input: &str, offset: usize) -> Self {
-        if let CcsdsNdmError::KvnParse {
-            ref mut line,
-            ref mut column,
-            ref mut snippet,
-            offset: ref mut error_offset,
-            ..
-        } = self
-        {
-            // If offset is 0, we might be at the start or it's a placeholder.
-            // If error_offset is already set and non-zero, prefer it if the passed offset is 0.
-            let target_offset = if offset > 0 {
-                offset
-            } else if *error_offset > 0 {
-                *error_offset
-            } else {
-                0
-            };
+        match self {
+            CcsdsNdmError::KvnParse {
+                ref mut line,
+                ref mut column,
+                ref mut snippet,
+                offset: ref mut error_offset,
+                ..
+            } => {
+                // If offset is 0, we might be at the start or it's a placeholder.
+                // If error_offset is already set and non-zero, prefer it if the passed offset is 0.
+                let target_offset = if offset > 0 {
+                    offset
+                } else if *error_offset > 0 {
+                    *error_offset
+                } else {
+                    0
+                };
 
-            let diag = ParseDiagnostic::new(input, target_offset, "");
-            *line = diag.line;
-            *column = diag.column;
-            *snippet = diag.snippet;
-            *error_offset = target_offset;
+                let diag = ParseDiagnostic::new(input, target_offset, "");
+                *line = diag.line;
+                *column = diag.column;
+                *snippet = diag.snippet;
+                *error_offset = target_offset;
+            }
+            CcsdsNdmError::InvalidValue { ref mut line, .. }
+            | CcsdsNdmError::MissingRequiredField { ref mut line, .. }
+            | CcsdsNdmError::Conflict { ref mut line, .. }
+            | CcsdsNdmError::ValidationError { ref mut line, .. }
+            | CcsdsNdmError::OutOfRange { ref mut line, .. } => {
+                if line.is_none() {
+                    // Only set if not already set, or overwrite? usually we want the first location.
+                    // But here we are enriching with location from parser state.
+                    let diag = ParseDiagnostic::new(input, offset, "");
+                    *line = Some(diag.line);
+                }
+            }
+            _ => {}
         }
         self
     }

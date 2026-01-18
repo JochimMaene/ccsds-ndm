@@ -79,10 +79,11 @@ pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
 
     Ok(CdmHeader {
         comment,
-        creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,
-        originator: originator.ok_or_else(|| cut_err(input, "Expected ORIGINATOR"))?,
+        creation_date: creation_date
+            .ok_or_else(|| missing_field_err(input, "Header", "CREATION_DATE"))?,
+        originator: originator.ok_or_else(|| missing_field_err(input, "Header", "ORIGINATOR"))?,
         message_for,
-        message_id: message_id.ok_or_else(|| cut_err(input, "Expected MESSAGE_ID"))?,
+        message_id: message_id.ok_or_else(|| missing_field_err(input, "Header", "MESSAGE_ID"))?,
     })
 }
 
@@ -1012,13 +1013,8 @@ MESSAGE_ID = MSG-001
 "###;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message.contains("CREATION_DATE")
-                        || contexts.iter().any(|c| c.contains("CREATION_DATE"))
-                )
+            CcsdsNdmError::MissingRequiredField { field, .. } => {
+                assert_eq!(field, "CREATION_DATE");
             }
             _ => panic!("unexpected error: {:?}", err),
         }
@@ -1074,7 +1070,7 @@ CNDOT_TDOT = 0.0 [m**2/s**2]
 CNDOT_NDOT = 1.0 [m**2/s**2]
 "###;
         let err = Cdm::from_kvn(kvn).unwrap_err();
-        if let CcsdsNdmError::Validation(_) = err {
+        if let CcsdsNdmError::ValidationError { message: _, .. } = err {
             // Validation error for "exactly 2 segments"
         }
     }
@@ -1762,7 +1758,7 @@ MISS_DISTANCE = 100.0 [m]
 META_START
 "###;
         let err = Cdm::from_kvn(kvn).unwrap_err();
-        if let CcsdsNdmError::Validation(_) = err {
+        if let CcsdsNdmError::ValidationError { message: _, .. } = err {
             // Validation error for "exactly 2 segments"
         }
     }

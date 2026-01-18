@@ -311,8 +311,7 @@ impl Angle {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Angle".to_string(),
                 value: value.to_string(),
-                expected: "[-360, 360)".to_string(),
-            });
+                expected: "[-360, 360)".to_string(), line: None});
         }
         Ok(Self { value, units })
     }
@@ -356,8 +355,7 @@ impl DayInterval {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "DayInterval".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
-            });
+                expected: ">= 0".to_string(), line: None});
         }
         Ok(Self { value, units })
     }
@@ -393,8 +391,7 @@ impl DayIntervalRequired {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "DayIntervalRequired".to_string(),
                 value: value.to_string(),
-                expected: "> 0".to_string(),
-            });
+                expected: "> 0".to_string(), line: None});
         }
         Ok(Self {
             value,
@@ -436,8 +433,7 @@ impl Frequency {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Frequency".to_string(),
                 value: value.to_string(),
-                expected: "> 0".to_string(),
-            });
+                expected: "> 0".to_string(), line: None});
         }
         Ok(Self { value, units })
     }
@@ -480,8 +476,7 @@ impl Gm {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "GM".to_string(),
                 value: value.to_string(),
-                expected: "> 0".to_string(),
-            });
+                expected: "> 0".to_string(), line: None});
         }
         Ok(Self { value, units })
     }
@@ -522,8 +517,7 @@ impl AltitudeRequired {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Altitude".to_string(),
                 value: value.to_string(),
-                expected: "[-430.5, 8848]".to_string(),
-            });
+                expected: "[-430.5, 8848]".to_string(), line: None});
         }
         Ok(Self {
             value,
@@ -568,8 +562,7 @@ impl WkgRequired {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "W/kg".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
-            });
+                expected: ">= 0".to_string(), line: None});
         }
         Ok(Self {
             value,
@@ -607,8 +600,7 @@ impl Mass {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Mass".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
-            });
+                expected: ">= 0".to_string(), line: None});
         }
         Ok(Self { value, units })
     }
@@ -649,8 +641,7 @@ impl Area {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Area".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
-            });
+                expected: ">= 0".to_string(), line: None});
         }
         Ok(Self { value, units })
     }
@@ -729,8 +720,7 @@ impl BallisticCoeffRequired {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Ballistic Coeff".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
-            });
+                expected: ">= 0".to_string(), line: None});
         }
         Ok(Self {
             value,
@@ -773,8 +763,7 @@ impl Percentage {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Percentage".to_string(),
                 value: value.to_string(),
-                expected: "[0, 100]".to_string(),
-            });
+                expected: "[0, 100]".to_string(), line: None});
         }
         Ok(Self { value, units })
     }
@@ -810,8 +799,7 @@ impl PercentageRequired {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "PercentageRequired".to_string(),
                 value: value.to_string(),
-                expected: "[0, 100]".to_string(),
-            });
+                expected: "[0, 100]".to_string(), line: None});
         }
         Ok(Self {
             value,
@@ -841,8 +829,7 @@ impl Probability {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Probability".to_string(),
                 value: value.to_string(),
-                expected: "[0, 1]".to_string(),
-            });
+                expected: "[0, 1]".to_string(), line: None});
         }
         Ok(Self { value })
     }
@@ -882,8 +869,7 @@ impl DeltaMass {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "DeltaMass".to_string(),
                 value: value.to_string(),
-                expected: "< 0".to_string(),
-            });
+                expected: "< 0".to_string(), line: None});
         }
         Ok(Self { value, units })
     }
@@ -909,8 +895,7 @@ impl DeltaMassZ {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "DeltaMassZ".to_string(),
                 value: value.to_string(),
-                expected: "<= 0".to_string(),
-            });
+                expected: "<= 0".to_string(), line: None});
         }
         Ok(Self { value, units })
     }
@@ -945,8 +930,7 @@ impl LatitudeRequired {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Latitude".to_string(),
                 value: value.to_string(),
-                expected: "[-90, 90]".to_string(),
-            });
+                expected: "[-90, 90]".to_string(), line: None});
         }
         Ok(Self {
             value,
@@ -987,8 +971,7 @@ impl LongitudeRequired {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Longitude".to_string(),
                 value: value.to_string(),
-                expected: "[-180, 180]".to_string(),
-            });
+                expected: "[-180, 180]".to_string(), line: None});
         }
         Ok(Self {
             value,
@@ -1192,11 +1175,10 @@ impl std::str::FromStr for YesNo {
         match s {
             "YES" | "yes" => Ok(YesNo::Yes),
             "NO" | "no" => Ok(YesNo::No),
-            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
-                key: "YES/NO".to_string(),
+            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
+                field: "YES/NO".to_string(),
                 value: s.to_string(),
-                expected: "YES or NO".to_string(),
-            }),
+                expected: "YES or NO".to_string(), line: None}),
         }
     }
 }
@@ -1224,11 +1206,10 @@ impl std::str::FromStr for TrajBasis {
             "TELEMETRY" => Ok(Self::Telemetry),
             "SIMULATED" => Ok(Self::Simulated),
             "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
-                key: "TRAJ_BASIS".to_string(),
+            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
+                field: "TRAJ_BASIS".to_string(),
                 value: s.to_string(),
-                expected: "PREDICTED, DETERMINED, TELEMETRY, SIMULATED, or OTHER".to_string(),
-            }),
+                expected: "PREDICTED, DETERMINED, TELEMETRY, SIMULATED, or OTHER".to_string(), line: None}),
         }
     }
 }
@@ -1247,11 +1228,10 @@ impl std::str::FromStr for RevNumBasis {
         match s {
             "0" => Ok(Self::Zero),
             "1" => Ok(Self::One),
-            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
-                key: "ORB_REVNUM_BASIS".to_string(),
+            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
+                field: "ORB_REVNUM_BASIS".to_string(),
                 value: s.to_string(),
-                expected: "0 or 1".to_string(),
-            }),
+                expected: "0 or 1".to_string(), line: None}),
         }
     }
 }
@@ -1279,11 +1259,10 @@ impl std::str::FromStr for CovBasis {
             "EMPIRICAL" => Ok(Self::Empirical),
             "SIMULATED" => Ok(Self::Simulated),
             "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
-                key: "COV_BASIS".to_string(),
+            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
+                field: "COV_BASIS".to_string(),
                 value: s.to_string(),
-                expected: "PREDICTED, DETERMINED, EMPIRICAL, SIMULATED, or OTHER".to_string(),
-            }),
+                expected: "PREDICTED, DETERMINED, EMPIRICAL, SIMULATED, or OTHER".to_string(), line: None}),
         }
     }
 }
@@ -1317,13 +1296,12 @@ impl std::str::FromStr for ManBasis {
             "DETERMINED" => Ok(Self::Determined),
             "SIMULATED" => Ok(Self::Simulated),
             "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
-                key: "MAN_BASIS".to_string(),
+            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
+                field: "MAN_BASIS".to_string(),
                 value: s.to_string(),
                 expected:
                     "CANDIDATE, PLANNED, ANTICIPATED, TELEMETRY, DETERMINED, SIMULATED, or OTHER"
-                        .to_string(),
-            }),
+                        .to_string(), line: None}),
         }
     }
 }
@@ -1347,11 +1325,10 @@ impl std::str::FromStr for ManDc {
             "CONTINUOUS" => Ok(Self::Continuous),
             "TIME" => Ok(Self::Time),
             "TIME_AND_ANGLE" => Ok(Self::TimeAndAngle),
-            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
-                key: "DC_TYPE".to_string(),
+            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
+                field: "DC_TYPE".to_string(),
                 value: s.to_string(),
-                expected: "CONTINUOUS, TIME, or TIME_AND_ANGLE".to_string(),
-            }),
+                expected: "CONTINUOUS, TIME, or TIME_AND_ANGLE".to_string(), line: None}),
         }
     }
 }
@@ -1380,11 +1357,10 @@ impl std::str::FromStr for CovOrder {
             "FULL" => Ok(Self::Full),
             "LTMWCC" => Ok(Self::LtmWcc),
             "UTMWCC" => Ok(Self::UtmWcc),
-            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
-                key: "COV_ORDERING".to_string(),
+            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
+                field: "COV_ORDERING".to_string(),
                 value: s.to_string(),
-                expected: "LTM, UTM, FULL, LTMWCC, or UTMWCC".to_string(),
-            }),
+                expected: "LTM, UTM, FULL, LTMWCC, or UTMWCC".to_string(), line: None}),
         }
     }
 }
@@ -1421,11 +1397,10 @@ impl std::str::FromStr for ControlledType {
             "YES" | "yes" => Ok(ControlledType::Yes),
             "NO" | "no" => Ok(ControlledType::No),
             "UNKNOWN" | "unknown" => Ok(ControlledType::Unknown),
-            _ => Err(crate::error::CcsdsNdmError::InvalidCcsdsValue {
-                key: "CONTROLLED_TYPE".to_string(),
+            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
+                field: "CONTROLLED_TYPE".to_string(),
                 value: s.to_string(),
-                expected: "YES, NO, or UNKNOWN".to_string(),
-            }),
+                expected: "YES, NO, or UNKNOWN".to_string(), line: None}),
         }
     }
 }
@@ -1446,8 +1421,7 @@ impl Duration {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Duration".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
-            });
+                expected: ">= 0".to_string(), line: None});
         }
         Ok(Self { value, units })
     }
@@ -1510,8 +1484,7 @@ impl Inclination {
             return Err(CcsdsNdmError::OutOfRange {
                 name: "Inclination".to_string(),
                 value: value.to_string(),
-                expected: "[0, 180]".to_string(),
-            });
+                expected: "[0, 180]".to_string(), line: None});
         }
         Ok(Self {
             angle: Angle { value, units },
@@ -1837,11 +1810,10 @@ impl std::str::FromStr for CdmObjectType {
         match s.to_uppercase().as_str() {
             "OBJECT1" => Ok(Self::Object1),
             "OBJECT2" => Ok(Self::Object2),
-            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
-                key: "OBJECT".to_string(),
+            _ => Err(CcsdsNdmError::InvalidValue {
+                field: "OBJECT".to_string(),
                 value: s.to_string(),
-                expected: "OBJECT1 or OBJECT2".to_string(),
-            }),
+                expected: "OBJECT1 or OBJECT2".to_string(), line: None}),
         }
     }
 }
@@ -1864,11 +1836,10 @@ impl std::str::FromStr for ScreenVolumeFrameType {
         match s.to_uppercase().as_str() {
             "RTN" => Ok(Self::Rtn),
             "TVN" => Ok(Self::Tvn),
-            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
-                key: "SCREEN_VOLUME_FRAME".to_string(),
+            _ => Err(CcsdsNdmError::InvalidValue {
+                field: "SCREEN_VOLUME_FRAME".to_string(),
                 value: s.to_string(),
-                expected: "RTN or TVN".to_string(),
-            }),
+                expected: "RTN or TVN".to_string(), line: None}),
         }
     }
 }
@@ -1891,11 +1862,10 @@ impl std::str::FromStr for ScreenVolumeShapeType {
         match s.to_uppercase().as_str() {
             "ELLIPSOID" => Ok(Self::Ellipsoid),
             "BOX" => Ok(Self::Box),
-            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
-                key: "SCREEN_VOLUME_SHAPE".to_string(),
+            _ => Err(CcsdsNdmError::InvalidValue {
+                field: "SCREEN_VOLUME_SHAPE".to_string(),
                 value: s.to_string(),
-                expected: "ELLIPSOID or BOX".to_string(),
-            }),
+                expected: "ELLIPSOID or BOX".to_string(), line: None}),
         }
     }
 }
@@ -1923,11 +1893,10 @@ impl std::str::FromStr for ReferenceFrameType {
             "EME2000" => Ok(Self::Eme2000),
             "GCRF" => Ok(Self::Gcrf),
             "ITRF" => Ok(Self::Itrf),
-            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
-                key: "REF_FRAME".to_string(),
+            _ => Err(CcsdsNdmError::InvalidValue {
+                field: "REF_FRAME".to_string(),
                 value: s.to_string(),
-                expected: "EME2000, GCRF, or ITRF".to_string(),
-            }),
+                expected: "EME2000, GCRF, or ITRF".to_string(), line: None}),
         }
     }
 }
@@ -1950,11 +1919,10 @@ impl std::str::FromStr for CovarianceMethodType {
         match s.to_uppercase().as_str() {
             "CALCULATED" => Ok(Self::Calculated),
             "DEFAULT" => Ok(Self::Default),
-            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
-                key: "COVARIANCE_METHOD".to_string(),
+            _ => Err(CcsdsNdmError::InvalidValue {
+                field: "COVARIANCE_METHOD".to_string(),
                 value: s.to_string(),
-                expected: "CALCULATED or DEFAULT".to_string(),
-            }),
+                expected: "CALCULATED or DEFAULT".to_string(), line: None}),
         }
     }
 }
@@ -1982,11 +1950,10 @@ impl std::str::FromStr for ManeuverableType {
             "YES" => Ok(Self::Yes),
             "NO" => Ok(Self::No),
             "N/A" => Ok(Self::NA),
-            _ => Err(CcsdsNdmError::InvalidCcsdsValue {
-                key: "MANEUVERABLE".to_string(),
+            _ => Err(CcsdsNdmError::InvalidValue {
+                field: "MANEUVERABLE".to_string(),
                 value: s.to_string(),
-                expected: "YES, NO, or N/A".to_string(),
-            }),
+                expected: "YES, NO, or N/A".to_string(), line: None}),
         }
     }
 }

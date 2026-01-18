@@ -76,9 +76,10 @@ pub fn rdm_header(input: &mut &str) -> KvnResult<RdmHeader> {
 
     Ok(RdmHeader {
         comment,
-        creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,
-        originator: originator.ok_or_else(|| cut_err(input, "Expected ORIGINATOR"))?,
-        message_id: message_id.ok_or_else(|| cut_err(input, "Expected MESSAGE_ID"))?,
+        creation_date: creation_date
+            .ok_or_else(|| missing_field_err(input, "Header", "CREATION_DATE"))?,
+        originator: originator.ok_or_else(|| missing_field_err(input, "Header", "ORIGINATOR"))?,
+        message_id: message_id.ok_or_else(|| missing_field_err(input, "Header", "MESSAGE_ID"))?,
     })
 }
 
@@ -152,53 +153,24 @@ pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
 
     Ok(RdmMetadata {
         comment,
-        object_name: object_name.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("Expected OBJECT_NAME"),
-            ))
-        })?,
+        object_name: object_name
+            .ok_or_else(|| missing_field_err(input, "Metadata", "OBJECT_NAME"))?,
         international_designator: international_designator.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("Expected INTERNATIONAL_DESIGNATOR"),
-            ))
+            missing_field_err(input, "Metadata", "INTERNATIONAL_DESIGNATOR")
         })?,
         catalog_name,
         object_designator,
         object_type,
         object_owner,
         object_operator,
-        controlled_reentry: controlled_reentry.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("Expected CONTROLLED_REENTRY"),
-            ))
-        })?,
-        center_name: center_name.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("Expected CENTER_NAME"),
-            ))
-        })?,
-        time_system: time_system.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("Expected TIME_SYSTEM"),
-            ))
-        })?,
-        epoch_tzero: epoch_tzero.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("Expected EPOCH_TZERO"),
-            ))
-        })?,
+        controlled_reentry: controlled_reentry
+            .ok_or_else(|| missing_field_err(input, "Metadata", "CONTROLLED_REENTRY"))?,
+        center_name: center_name
+            .ok_or_else(|| missing_field_err(input, "Metadata", "CENTER_NAME"))?,
+        time_system: time_system
+            .ok_or_else(|| missing_field_err(input, "Metadata", "TIME_SYSTEM"))?,
+        epoch_tzero: epoch_tzero
+            .ok_or_else(|| missing_field_err(input, "Metadata", "EPOCH_TZERO"))?,
         ref_frame,
         ref_frame_epoch,
         ephemeris_name,
@@ -1257,16 +1229,10 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_creation).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message.contains("Expected CREATION_DATE")
-                        || contexts.contains(&"Expected CREATION_DATE")
-                )
-            }
-            _ => panic!("Unexpected: {:?}", err),
+        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+            assert_eq!(field, "CREATION_DATE");
+        } else {
+            panic!("Unexpected: {:?}", err);
         }
 
         let kvn_missing_originator = r#"CCSDS_RDM_VERS = 1.0
@@ -1282,18 +1248,10 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_originator).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message.to_lowercase().contains("expected originator")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("expected originator"))
-                )
-            }
-            _ => panic!("Unexpected: {:?}", err),
+        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+            assert_eq!(field, "ORIGINATOR");
+        } else {
+            panic!("Unexpected: {:?}", err);
         }
 
         let kvn_missing_msgid = r#"CCSDS_RDM_VERS = 1.0
@@ -1309,18 +1267,10 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_msgid).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message.to_lowercase().contains("expected message_id")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("expected message_id"))
-                )
-            }
-            _ => panic!("Unexpected: {:?}", err),
+        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+            assert_eq!(field, "MESSAGE_ID");
+        } else {
+            panic!("Unexpected: {:?}", err);
         }
     }
 
@@ -1340,16 +1290,10 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_object_name).unwrap_err();
         println!("RDM ERROR: {:?}", err);
-        match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message.contains("Expected OBJECT_NAME")
-                        || contexts.contains(&"Expected OBJECT_NAME")
-                )
-            }
-            _ => panic!("Unexpected: {:?}", err),
+        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+            assert_eq!(field, "OBJECT_NAME");
+        } else {
+            panic!("Unexpected: {:?}", err);
         }
 
         let kvn_missing_intl = r#"CCSDS_RDM_VERS = 1.0
@@ -1365,20 +1309,10 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_intl).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message
-                        .to_lowercase()
-                        .contains("expected international_designator")
-                        || contexts.iter().any(|c| c
-                            .to_lowercase()
-                            .contains("expected international_designator"))
-                )
-            }
-            _ => panic!("Unexpected: {:?}", err),
+        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+            assert_eq!(field, "INTERNATIONAL_DESIGNATOR");
+        } else {
+            panic!("Unexpected: {:?}", err);
         }
 
         let kvn_missing_center = r#"CCSDS_RDM_VERS = 1.0
@@ -1394,18 +1328,10 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_center).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message.to_lowercase().contains("expected center_name")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("expected center_name"))
-                )
-            }
-            _ => panic!("Unexpected: {:?}", err),
+        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+            assert_eq!(field, "CENTER_NAME");
+        } else {
+            panic!("Unexpected: {:?}", err);
         }
 
         let kvn_missing_timesys = r#"CCSDS_RDM_VERS = 1.0
@@ -1421,18 +1347,10 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_timesys).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message.to_lowercase().contains("expected time_system")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("expected time_system"))
-                )
-            }
-            _ => panic!("Unexpected: {:?}", err),
+        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+            assert_eq!(field, "TIME_SYSTEM");
+        } else {
+            panic!("Unexpected: {:?}", err);
         }
 
         let kvn_missing_controlled = r#"CCSDS_RDM_VERS = 1.0
@@ -1448,20 +1366,10 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_controlled).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message
-                        .to_lowercase()
-                        .contains("expected controlled_reentry")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("expected controlled_reentry"))
-                )
-            }
-            _ => panic!("Unexpected: {:?}", err),
+        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+            assert_eq!(field, "CONTROLLED_REENTRY");
+        } else {
+            panic!("Unexpected: {:?}", err);
         }
 
         let kvn_missing_epoch = r#"CCSDS_RDM_VERS = 1.0
@@ -1477,18 +1385,10 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_epoch).unwrap_err();
-        match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message.to_lowercase().contains("expected epoch_tzero")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("expected epoch_tzero"))
-                )
-            }
-            _ => panic!("Unexpected: {:?}", err),
+        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+            assert_eq!(field, "EPOCH_TZERO");
+        } else {
+            panic!("Unexpected: {:?}", err);
         }
     }
 

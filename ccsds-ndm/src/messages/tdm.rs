@@ -1231,10 +1231,10 @@ impl TdmObservationData {
             "TROPO_DRY" => Ok(Self::TropoDry(pf(val)?)),
             "TROPO_WET" => Ok(Self::TropoWet(pf(val)?)),
             "VLBI_DELAY" => Ok(Self::VlbiDelay(pf(val)?)),
-            _ => Err(CcsdsNdmError::Validation(format!(
+            _ => Err(CcsdsNdmError::ValidationError { message: format!(
                 "Unknown TDM data keyword: {}",
                 key
-            ))),
+            ), line: None }),
         }
     }
 }
