@@ -578,7 +578,223 @@ mandatory may or may not appear, at the discretion of the data producer, based o
 requirements of the data and its intended application (an RDM Summary Sheet that
 illustrates the relationships between data types and metadata can be found in annex F).
 
-.. include:: rdm_parts/table_3-2.rst
+.. list-table:: Table 3-2: RDM KVN Metadata
+   :widths: 20 40 25 5 10
+   :header-rows: 1
+
+   * - Keyword
+     - Description
+     - Examples of values
+     - N/E
+     - M/O
+   * - COMMENT
+     - Comments (allowed only at the beginning of RDM metadata).
+     - COMMENT This is a
+       comment
+     - E
+     - O
+   * - OBJECT_NAME
+     - Object name for which the orbit state is provided. There is no CCSDS-based restriction on the value for this keyword, but it is recommended to use names from the UNOOSA registry—reference [7], which includes object name and international designator of the participant (formatting rules specified in 5.2.3.3). For objects that are not in the UNOOSA registry, either a descriptive name (e.g., DEBRIS, if the object is identified as space debris) or UNKNOWN should be used.
+     - SENTINEL-1A
+       GOCE
+       ENVISAT
+       BRIZ R/B
+       DEBRIS
+       UNKNOWN
+     - E
+     - M
+   * - INTERNATIONAL_DESIGNATOR
+     - The full international designator (COSPAR ID) for the object. Values shall have the format YYYY-NNNP{PP}, where:
+       YYYY = year of launch;
+       NNN = three-digit serial number of launch (with leading zeros);
+       P{PP} = at least one capital letter for the identification of the part brought into space by the launch.
+       In cases where the object has no international designator, the value UNKNOWN should be used (formatting rules specified in 5.2.3.3).
+     - 2010-012C
+       2016-001A
+       1985-067CD
+       UNKNOWN
+     - E
+     - M
+   * - CATALOG_NAME
+     - The satellite catalog used for the object (formatting rules specified in 5.2.3.3). The name should be taken from the appropriate SANA registry for catalog names, reference [8].
+     - SATCAT
+       ESA SST
+     - E
+     - O
+   * - OBJECT_DESIGNATOR
+     - The CATALOG_NAME satellite catalog designator for the object (formatting rules specified in 5.2.3.3).
+     - 37451
+       125387U
+     - E
+     - O
+   * - OBJECT_TYPE
+     - The object type.
+     - PAYLOAD
+       ROCKET BODY
+       DEBRIS
+       OTHER
+       UNKNOWN
+     - N
+     - O
+   * - OBJECT_OWNER
+     - Owner of the object (e.g., company, agency, or country owning the satellite). The value should be taken from the abbreviation column in the SANA organizations registry, reference [6].
+     - DLR
+       INTELSAT
+       ESA
+       UNKNOWN
+     - E
+     - O
+   * - OBJECT_OPERATOR
+     - Operator of the object (e.g., company, agency, or country operating the satellite). The value should be taken from the abbreviation column in the SANA organizations registry, reference [6].
+     - ESA
+       EUMETSAT
+     - E
+     - O
+   * - CONTROLLED_REENTRY
+     - Specification of whether the re-entry is controlled or not.
+     - YES
+       NO
+       UNKNOWN
+     - N
+     - M
+   * - CENTER_NAME
+     - Celestial body orbited by the object and origin of the reference frame, which may be a natural solar system body (planets, asteroids, comets, and natural satellites), including any planet barycenter or the solar system barycenter. The value should be taken from the orbit center column in the SANA orbit centers registry, reference [9].
+     - EARTH
+       MOON
+       JUPITER
+     - E
+     - M
+   * - TIME_SYSTEM
+     - Time system for all data/metadata. The value should be taken from the name column in the SANA time systems registry, reference [10].
+     - UTC
+       TAI
+     - E
+     - M
+   * - EPOCH_TZERO
+     - Epoch from which the ORBIT_LIFETIME is calculated (formatting rules specified in 5.3.3.5).
+     - 2001-11-06T11:17:33
+       2002-204T15:56:23
+     - E
+     - M
+   * - REF_FRAME
+     - Reference frame in which the (optional) orbit information will be provided. The value should be taken from the keyword value name column in the SANA celestial body reference frames registry, reference [11]. The reference frame must be the same for all orbit data elements, with the exception of the covariance matrix, for which a different reference frame may be specified, and the ground impact data. This keyword becomes mandatory if state vectors are provided in the data section.
+     - ITRF-97
+       EME2000
+       ICRF
+     - E
+     - O
+   * - REF_FRAME_EPOCH
+     - Epoch of reference frame, if not intrinsic to the definition of the reference frame (formatting rules specified in 5.3.3.5).
+     - 2001-11-06T11:17:33
+       2002-204T15:56:23
+       Z
+     - E
+     - O
+   * - EPHEMERIS_NAME
+     - Unique identifier of an external ephemeris file used or NONE.
+     - NONE
+       EPHEMERIS
+       INTELSAT2
+     - E
+     - O
+   * - GRAVITY_MODEL
+     - The gravity model used in the simulation. The degree (D) and order (O) of the spherical harmonic coefficients applied should be given along with the name of the model.
+     - EGM-96: 36D 36O
+       JGM-2: 41D 41O
+     - E
+     - O
+   * - ATMOSPHERIC_MODEL
+     - The atmosphere model(s) used in the simulation. If more than one model is used they should be listed on the same line and separated by a comma.
+     - MSIS, JACCHIA 70
+       MSISE-90
+       NRLMSISE-00
+     - E
+     - O
+   * - SOLAR_FLUX_PREDICTION
+     - The method used to predict the solar flux and geomagnetic indices.
+     - STOCHASTIC
+       PREDICTED: MLLRT
+     - E
+     - O
+   * - N_BODY_PERTURBATIONS
+     - Comma separated list of other bodies used in the simulation. The names of the bodies should be taken from the SANA registry for orbit centers, reference [9]. If no other bodies are used in the simulation, the value should be NONE.
+     - MOON, SUN
+       JUPITER
+       NONE
+     - E
+     - O
+   * - SOLAR_RAD_PRESSURE
+     - Model used for the solar radiation pressure: either model name, or NO if solar radiation pressure was not modelled.
+     - GSPM04
+       NO
+     - E
+     - O
+   * - EARTH_TIDES
+     - Model used for solid Earth and ocean tides: either model name, or NO if tides were not modelled.
+     - ESR
+       NO
+     - E
+     - O
+   * - INTRACK_THRUST
+     - Indicator on whether in-track thrust modeling was used in the simulation.
+     - YES
+       NO
+     - N
+     - O
+   * - DRAG_PARAMETERS_SOURCE
+     - The method used to estimate the drag parameters of the object (DRAG_AREA, DRAG_COEFF, and/or BALLISTIC_COEFF).
+     - DESIGN
+       CFD: TOOL1
+       CFD DMSCFOAM
+       OD
+     - E
+     - O
+   * - DRAG_PARAMETERS_ALTITUDE
+     - The altitude (in km) at which the object drag parameters (DRAG_AREA, DRAG_COEFF, and/or BALLISTIC_COEFF) are valid. The units shall be kilometers, and the conventions specified in 5.2.4.1 and 5.3.4 must be followed.
+     - 200 [km]
+       175 [km]
+     - E
+     - O
+   * - REENTRY_UNCERTAINTY_METHOD
+     - The method used to determine the orbit lifetime uncertainty or the re-entry windows.
+     - NONE
+       ANALYTICAL
+       STOCHASTIC
+       EMPIRICAL
+     - N
+     - O
+   * - REENTRY_DISINTEGRATION
+     - The aspects of disintegration during re-entry considered during simulations: none (the object was treated as a point mass), mass loss, break-ups (including explosion), or both. It is a coarse indication on whether the impact area in the data covers potential fragments as well.
+     - NONE
+       MASS-LOSS
+       BREAK-UP
+       MASS-LOSS + BREAK-UP
+     - N
+     - O
+   * - IMPACT_UNCERTAINTY_METHOD
+     - The method used to determine the impact location confidence interval(s).
+     - NONE
+       ANALYTICAL
+       STOCHASTIC
+       EMPIRICAL
+     - N
+     - O
+   * - PREVIOUS_MESSAGE_ID
+     - ID of the previous RDM issued for this object.
+     - ESA/2015-563892348
+     - E
+     - O
+   * - PREVIOUS_MESSAGE_EPOCH
+     - UTC Epoch of the previous RDM issued for this object (formatting rules specified in 5.3.3.5).
+     - 2001-11-06T11:17:33
+     - E
+     - O
+   * - NEXT_MESSAGE_EPOCH
+     - Scheduled UTC epoch of the next RDM for the same object (formatting rules specified in 5.3.3.5); N/A if no other message is scheduled.
+     - 2001-11-06T11:17:33
+       N/A
+     - E
+     - O
 
 .. _data_kvn_rdm:
 
@@ -604,7 +820,423 @@ b) a description of the content;
 c) the units to be used;
 d) whether the item is mandatory (M) or optional (O).
 
-.. include:: rdm_parts/table_3-3.rst
+.. list-table:: Table 3-3: RDM KVN Data
+   :widths: 20 40 10 10
+   :header-rows: 1
+
+   * - Keyword
+     - Description of values
+     - Units
+     - M/O
+   * - **Atmospheric re-entry data**
+     -
+     -
+     -
+   * - COMMENT
+     - Comments (allowed only at the beginning of each RDM data logical block).
+     - n/a
+     - O
+   * - ORBIT_LIFETIME
+     - Time until re-entry: from the EPOCH_TZERO epoch in the metadata (days—double precision values allowed; integer values assumed to have .0 fractional part) to permanently crossing the altitude specified in REENTRY_ALTITUDE.
+       If the NOMINAL_REENTRY_EPOCH keyword is present, the ORBIT_LIFETIME and NOMINAL_REENTRY_EPOCH should resolve to the same value.
+     - d
+     - M
+   * - REENTRY_ALTITUDE
+     - Defined re-entry altitude over a spherical central body—once an object’s altitude permanently drops below this value, it is considered to be captured by the central body’s atmosphere.
+     - km
+     - M
+   * - ORBIT_LIFETIME_WINDOW_START
+     - Start of the predicted orbital lifetime window from the EPOCH_TZERO epoch in the metadata (days—double precision values allowed; integer values assumed to have .0 fractional part). To be used for long-term predictions; REENTRY_WINDOW_START and _END should be used for accurate results.
+     - d
+     - O
+   * - ORBIT_LIFETIME_WINDOW_END
+     - End of the predicted orbital lifetime window from the EPOCH_TZERO epoch in the metadata (days—double precision values allowed; integer values assumed to have .0 fractional part). To be used for long-term predictions; REENTRY_WINDOW_START and _END should be used for accurate results.
+     - d
+     - O
+   * - NOMINAL_REENTRY_EPOCH
+     - Predicted epoch at which the object’s altitude permanently drops below NOMINAL_REENTRY_ALTITUDE (formatting rules specified in 5.3.3.5).
+     - n/a
+     - O
+   * - REENTRY_WINDOW_START
+     - Start epoch of the predicted atmospheric re-entry window (formatting rules specified in 5.3.3.5).
+     - n/a
+     - O
+   * - REENTRY_WINDOW_END
+     - End epoch of the predicted atmospheric re-entry window (formatting rules specified in 5.3.3.5).
+     - n/a
+     - O
+   * - ORBIT_LIFETIME_CONFIDENCE_LEVEL
+     - Confidence level of the orbit lifetime or re-entry epoch being inside the window defined by ORBIT_LIFETIME_WINDOW_START and ORBIT_LIFETIME_WINDOW_END or REENTRY_WINDOW_START and REENTRY_WINDOW_END.
+     - %
+     - O
+   * - **Ground impact and burn-up data**
+     -
+     -
+     -
+   * - COMMENT
+     - Comments (allowed only at the beginning of each RDM data logical block).
+     - n/a
+     - O
+   * - PROBABILITY_OF_IMPACT
+     - Probability that any fragment will impact the Earth (either land or sea; 0 to 1).
+     - n/a
+     - O
+   * - PROBABILITY_OF_BURN_UP
+     - Probability that the entire object and any fragments will burn up during atmospheric re-entry (0 to 1).
+     - n/a
+     - O
+   * - PROBABILITY_OF_BREAK_UP
+     - Probability that the object will break up during re-entry (0 to 1).
+     - n/a
+     - O
+   * - PROBABILITY_OF_LAND_IMPACT
+     - Probability that any fragment will impact solid ground (0 to 1).
+     - n/a
+     - O
+   * - PROBABILITY_OF_CASUALTY
+     - Probability that the re-entry event will cause any casualties (severe injuries or deaths—0 to 1).
+     - n/a
+     - O
+   * - NOMINAL_IMPACT_EPOCH
+     - Epoch of the predicted impact (formatting rules specified in 5.3.3.5).
+     - n/a
+     - O
+   * - IMPACT_WINDOW_START
+     - Start epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
+     - n/a
+     - O
+   * - IMPACT_WINDOW_END
+     - End epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
+     - n/a
+     - O
+   * - IMPACT_REF_FRAME
+     - Reference frame of the impact location data. The value should be taken from the keyword value name column in the SANA celestial body reference frames registry, reference [11]. Only frames with the value ‘Body-Fixed’ in the Frame Type column shall be used. Mandatory if NOMINAL_IMPACT_LON and NOMINAL_IMPACT_LAT are present.
+     - n/a
+     - O
+   * - NOMINAL_IMPACT_LON
+     - Longitude of the predicted impact location with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.11.
+     - deg
+     - O
+   * - NOMINAL_IMPACT_LAT
+     - Latitude of the predicted impact location with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.12.
+     - deg
+     - O
+   * - NOMINAL_IMPACT_ALT
+     - Altitude of the impact location with respect to the value of IMPACT_REF_FRAME.
+     - m
+     - O
+   * - IMPACT_1_CONFIDENCE
+     - First (lowest) confidence interval for the impact location.
+     - %
+     - O
+   * - IMPACT_1_START_LON
+     - Longitude of the start of the first confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.11.
+     - deg
+     - O
+   * - IMPACT_1_START_LAT
+     - Latitude of the start of the first confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.12.
+     - deg
+     - O
+   * - IMPACT_1_STOP_LON
+     - Longitude of the end of the first confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.11.
+     - deg
+     - O
+   * - IMPACT_1_STOP_LAT
+     - Latitude of the end of the first confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.12.
+     - deg
+     - O
+   * - IMPACT_1_CROSS_TRACK
+     - Cross-track size of the first confidence interval.
+     - km
+     - O
+   * - IMPACT_2_CONFIDENCE
+     - Second confidence interval for the impact location. The IMPACT_1_* block must be present if IMPACT_2_* is used.
+     - %
+     - O
+   * - IMPACT_2_START_LON
+     - Longitude of the start of the second confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.11.
+     - deg
+     - O
+   * - IMPACT_2_START_LAT
+     - Latitude of the start of the second confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.12.
+     - deg
+     - O
+   * - IMPACT_2_STOP_LON
+     - Longitude of the end of the second confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.11.
+     - deg
+     - O
+   * - IMPACT_2_STOP_LAT
+     - Latitude of the end of the second confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.12.
+     - deg
+     - O
+   * - IMPACT_2_CROSS_TRACK
+     - Cross-track size of the second confidence interval.
+     - km
+     - O
+   * - IMPACT_3_CONFIDENCE
+     - Third (highest) confidence interval for the impact location. The IMPACT_2_* block must be present if IMPACT_3_* is used.
+     - %
+     - O
+   * - IMPACT_3_START_LON
+     - Longitude of the start of the third confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.11.
+     - deg
+     - O
+   * - IMPACT_3_START_LAT
+     - Latitude of the start of the third confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.12.
+     - deg
+     - O
+   * - IMPACT_3_STOP_LON
+     - Longitude of the end of the third confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.11.
+     - deg
+     - O
+   * - IMPACT_3_STOP_LAT
+     - Latitude of the end of the third confidence interval along the ground track with respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in 3.5.12.
+     - deg
+     - O
+   * - IMPACT_3_CROSS_TRACK
+     - Cross-track size of the third confidence interval.
+     - km
+     - O
+   * - **State vector components**
+     -
+     -
+     -
+   * - COMMENT
+     - Comments (allowed only at the beginning of each RDM data logical block).
+     - n/a
+     - O
+   * - EPOCH
+     - Epoch at which the state vector is given (formatting rules specified in 5.3.3.5).
+     - n/a
+     - O
+   * - X
+     - x-component of the object state vector.
+     - km
+     - O
+   * - Y
+     - y-component of the object state vector.
+     - km
+     - O
+   * - Z
+     - z-component of the object state vector.
+     - km
+     - O
+   * - X_DOT
+     - x'-component of the object state vector.
+     - km/s
+     - O
+   * - Y_DOT
+     - y'-component of the object state vector.
+     - km/s
+     - O
+   * - Z_DOT
+     - z'-component of the object state vector.
+     - km/s
+     - O
+   * - **Position/velocity covariance matrix**
+     -
+     -
+     -
+   * - COMMENT
+     - Comments (allowed only at the beginning of each RDM data logical block).
+     - n/a
+     - O
+   * - COV_REF_FRAME
+     - Reference frame for the covariance information, omitted if it is the same as REF_FRAME. The value should be taken from the keyword value name column in the SANA orbit-relative reference frames registry, reference [12].
+     - n/a
+     - O
+   * - CX_X
+     - Covariance matrix [1,1].
+     - km**2
+     - O
+   * - CY_X
+     - Covariance matrix [2,1].
+     - km**2
+     - O
+   * - CY_Y
+     - Covariance matrix [2,2].
+     - km**2
+     - O
+   * - CZ_X
+     - Covariance matrix [3,1].
+     - km**2
+     - O
+   * - CZ_Y
+     - Covariance matrix [3,2].
+     - km**2
+     - O
+   * - CZ_Z
+     - Covariance matrix [3,3].
+     - km**2
+     - O
+   * - CX_DOT_X
+     - Covariance matrix [4,1].
+     - km**2/s
+     - O
+   * - CX_DOT_Y
+     - Covariance matrix [4,2].
+     - km**2/s
+     - O
+   * - CX_DOT_Z
+     - Covariance matrix [4,3].
+     - km**2/s
+     - O
+   * - CX_DOT_X_DOT
+     - Covariance matrix [4,4].
+     - km**2/s**2
+     - O
+   * - CY_DOT_X
+     - Covariance matrix [5,1].
+     - km**2/s
+     - O
+   * - CY_DOT_Y
+     - Covariance matrix [5,2].
+     - km**2/s
+     - O
+   * - CY_DOT_Z
+     - Covariance matrix [5,3].
+     - km**2/s
+     - O
+   * - CY_DOT_X_DOT
+     - Covariance matrix [5,4].
+     - km**2/s**2
+     - O
+   * - CY_DOT_Y_DOT
+     - Covariance matrix [5,5].
+     - km**2/s**2
+     - O
+   * - CZ_DOT_X
+     - Covariance matrix [6,1].
+     - km**2/s
+     - O
+   * - CZ_DOT_Y
+     - Covariance matrix [6,2].
+     - km**2/s
+     - O
+   * - CZ_DOT_Z
+     - Covariance matrix [6,3].
+     - km**2/s
+     - O
+   * - CZ_DOT_X_DOT
+     - Covariance matrix [6,4].
+     - km**2/s**2
+     - O
+   * - CZ_DOT_Y_DOT
+     - Covariance matrix [6,5].
+     - km**2/s**2
+     - O
+   * - CZ_DOT_Z_DOT
+     - Covariance matrix [6,6].
+     - km**2/s**2
+     - O
+   * - **Object physical parameters**
+     -
+     -
+     -
+   * - COMMENT
+     - Comments (allowed only at the beginning of each RDM data logical block).
+     - n/a
+     - O
+   * - WET_MASS
+     - Total object mass at EPOCH_TZERO.
+     - kg
+     - O
+   * - DRY_MASS
+     - Object dry mass (without propellant).
+     - kg
+     - O
+   * - HAZARDOUS_SUBSTANCES
+     - Comma separated list of hazardous substances contained by the object.
+     - n/a
+     - O
+   * - SOLAR_RAD_AREA
+     - Object area exposed to Solar Radiation Pressure (SRP).
+     - m**2
+     - O
+   * - SOLAR_RAD_COEFF
+     - Object solar radiation coefficient.
+     - n/a
+     - O
+   * - DRAG_AREA
+     - Object cross-sectional area.
+     - m**2
+     - O
+   * - DRAG_COEFF
+     - Object drag coefficient.
+     - n/a
+     - O
+   * - RCS
+     - Object radar cross section.
+     - m**2
+     - O
+   * - BALLISTIC_COEFF
+     - Object ballistic coefficient.
+     - kg/m**2
+     - O
+   * - THRUST_ACCELERATION
+     - The object’s acceleration due to in-track thrust used to propagate the state vector and covariance to NOMINAL_RENTRY_EPOCH (if a controlled re-entry).
+     - m/s**2
+     - O
+   * - **Orbit determination (OD) parameters**
+     -
+     -
+     -
+   * - COMMENT
+     - Comments (allowed only at the beginning of each RDM data logical block).
+     - n/a
+     - O
+   * - TIME_LASTOB_START
+     - The start of a time interval (in the time system specified in the metadata) that contains the time of the last accepted observation. For an exact time, the time interval is of zero duration (i.e., same value as that of TIME_LASTOB_END). Formatting rules are specified in 5.3.3.5.
+     - n/a
+     - O
+   * - TIME_LASTOB_END
+     - The end of a time interval (in the time system specified in the metadata) that contains the time of the last accepted observation. For an exact time, the time interval is of zero duration (i.e., same value as that of TIME_LASTOB_START). Formatting rules are specified in 5.3.3.5.
+     - n/a
+     - O
+   * - RECOMMENDED_OD_SPAN
+     - The recommended OD time span calculated for the object (double precision).
+     - d
+     - O
+   * - ACTUAL_OD_SPAN
+     - Based on the observations available and the RECOMMENDED_OD_SPAN, the actual time span used for the OD of the object (double precision).
+     - d
+     - O
+   * - OBS_AVAILABLE
+     - Number of observations available for orbit determination of the object.
+     - n/a
+     - O
+   * - OBS_USED
+     - Number of observations accepted by the OD system.
+     - n/a
+     - O
+   * - TRACKS_AVAILABLE
+     - Number of sensor tracks available for OD of the object.
+     - n/a
+     - O
+   * - TRACKS_USED
+     - Number of sensor tracks accepted by the OD system.
+     - n/a
+     - O
+   * - RESIDUALS_ACCEPTED
+     - The percentage of residuals accepted in the OD of the object.
+     - %
+     - O
+   * - WEIGHTED_RMS
+     - The weighted root mean square of the residuals from batch OD.
+     - n/a
+     - O
+   * - **User defined parameters (all such parameters must be described in an ICD)**
+     -
+     -
+     -
+   * - COMMENT
+     - Comments (allowed only at the beginning of each RDM data logical block).
+     - n/a
+     - O
+   * - USER_DEFINED_x
+     - User defined parameter, where x is replaced by a variable length user specified character string. Any number of user defined parameters may be included, if necessary to provide essential information that cannot be conveyed in COMMENT statements.
+     - n/a
+     - O
 
 3.5.3 Table 3-3 contains seven logical blocks, each of which has a descriptive heading.
 These descriptive headings shall not be included in an RDM, unless they appear in a properly
@@ -737,10 +1369,13 @@ schemas that make up Navigation Data Messages (specified in reference [13]).
 4.2.3 The RDM <segment> shall consist of a <metadata>/<data> pair, as shown in
 figure 4-1.
 
-.. figure:: /images/rdm_xml_basic_structure.png
-   :align: center
+..
+   .. figure:: /images/rdm_xml_basic_structure.png
+      :align: center
 
-   Figure 4-1: RDM XML Basic Structure
+      Figure 4-1: RDM XML Basic Structure
+
+   [Figure 4-1: RDM XML Basic Structure - Image missing]
 
 .. _tags_xml_rdm:
 
@@ -1428,7 +2063,869 @@ A2.1.4 Identification of Specification
 A2.2 REQUIREMENTS LIST
 ^^^^^^^^^^^^^^^^^^^^^^
 
-.. include:: rdm_parts/ics_requirements_table.rst
+.. list-table:: Requirements List
+   :widths: 5 30 20 15 10 20
+   :header-rows: 1
+
+   * - Seq #
+     - Feature
+     - Keyword
+     - Reference
+     - Status
+     - Support
+   * - 1
+     - RDM Header
+     - N/A
+     - table 3-1
+     - M
+     -
+   * - 2
+     - RDM version
+     - CCSDS_RDM_VERS
+     - table 3-1
+     - M
+     -
+   * - 3
+     - Comment
+     - COMMENT
+     - table 3-1
+     - O
+     -
+   * - 4
+     - Message creation date/time
+     - CREATION_DATE
+     - table 3-1
+     - M
+     -
+   * - 5
+     - Message originator
+     - ORIGINATOR
+     - table 3-1
+     - M
+     -
+   * - 6
+     - Unique message identifier
+     - MESSAGE_ID
+     - table 3-1
+     - M
+     -
+   * - 7
+     - RDM Metadata
+     - N/A
+     - table 3-2
+     - M
+     -
+   * - 8
+     - Comment
+     - COMMENT
+     - table 3-2
+     - O
+     -
+   * - 9
+     - General information about the re-entering object
+     - N/A
+     - table 3-2
+     - M
+     -
+   * - 10
+     - Spacecraft name
+     - OBJECT_NAME
+     - table 3-2
+     - M
+     -
+   * - 11
+     - Spacecraft international designator
+     - INTERNATIONAL_DESIGNATOR
+     - table 3-2
+     - M
+     -
+   * - 12
+     - Object catalogue used
+     - CATALOG_NAME
+     - table 3-2
+     - O
+     -
+   * - 13
+     - Spacecraft ID in the catalogue
+     - OBJECT_DESIGNATOR
+     - table 3-2
+     - O
+     -
+   * - 14
+     - Spacecraft type
+     - OBJECT_TYPE
+     - table 3-2
+     - O
+     -
+   * - 15
+     - Spacecraft owner
+     - OBJECT_OWNER
+     - table 3-2
+     - O
+     -
+   * - 16
+     - Spacecraft operator
+     - OBJECT_OPERATOR
+     - table 3-2
+     - O
+     -
+   * - 17
+     - Controlled re-entry
+     - CONTROLLED_REENTRY
+     - table 3-2
+     - M
+     -
+   * - 18
+     - Celestial body orbited by the object
+     - CENTER_NAME
+     - table 3-2
+     - M
+     -
+   * - 19
+     - Time system used for the data in the metadata and data sections
+     - TIME_SYSTEM
+     - table 3-2
+     - M
+     -
+   * - 20
+     - Reference epoch to which orbit lifetime is computed
+     - EPOCH_TZERO
+     - table 3-2
+     - M
+     -
+   * - 21
+     - Information about any provided orbit data for the object/spacecraft
+     - N/A
+     - table 3-2
+     - O
+     -
+   * - 22
+     - Reference frame
+     - REF_FRAME
+     - table 3-2
+     - O
+     -
+   * - 23
+     - Reference frame epoch
+     - REF_FRAME_EPOCH
+     - table 3-2
+     - O
+     -
+   * - 24
+     - External ephemeris file identifier
+     - EPHEMERIS_NAME
+     - table 3-2
+     - O
+     -
+   * - 25
+     - Information about the orbit propagator used for re-entry prediction and orbit determination
+     - N/A
+     - table 3-2
+     - O
+     -
+   * - 26
+     - gravity model used
+     - GRAVITY_MODEL
+     - table 3-2
+     - O
+     -
+   * - 27
+     - atmospheric model used
+     - ATMOSPHERIC_MODEL
+     - table 3-2
+     - O
+     -
+   * - 28
+     - method used to estimate the solar flux indices for the atmospheric model
+     - SOLAR_FLUX_PREDICTION
+     - table 3-2
+     - O
+     -
+   * - 29
+     - n-body perturbations considered
+     - N_BODY_PERTURBATIONS
+     - table 3-2
+     - O
+     -
+   * - 30
+     - solar radiation pressure
+     - SOLAR_RAD_PRESSURE
+     - table 3-2
+     - O
+     -
+   * - 31
+     - Earth tides
+     - EARTH_TIDES
+     - table 3-2
+     - O
+     -
+   * - 32
+     - any thrust from the spacecraft
+     - INTRACK_THRUST
+     - table 3-2
+     - O
+     -
+   * - 33
+     - the source of the object drag parameters
+     - DRAG_PARAMETERS_SOURCE
+     - table 3-2
+     - O
+     -
+   * - 34
+     - the altitude at which the drag parameters apply
+     - DRAG_PARAMETERS_ALTITUDE
+     - table 3-2
+     - O
+     -
+   * - 35
+     - the method used to estimate the uncertainty in the re-entry date
+     - REENTRY_UNCERTAINTY_METHOD
+     - table 3-2
+     - O
+     -
+   * - 36
+     - any accounting for break-up and demise
+     - REENTRY_DISINTEGRATION
+     - table 3-2
+     - O
+     -
+   * - 37
+     - method used to determine the uncertainty in the ground impact location
+     - IMPACT_UNCERTAINTY_METHOD
+     - table 3-2
+     - O
+     -
+   * - 38
+     - Previous and next related RDM
+     - N/A
+     - table 3-2
+     - O
+     -
+   * - 39
+     - Identifier of the previous RDM issued
+     - PREVIOUS_MESSAGE_ID
+     - table 3-2
+     - O
+     -
+   * - 40
+     - Time at which the previous RDM was issued
+     - PREVIOUS_MESSAGE_EPOCH
+     - table 3-2
+     - O
+     -
+   * - 41
+     - Time at which the next RDM will be issued (predicted)
+     - NEXT_MESSAGE_EPOCH
+     - table 3-2
+     - O
+     -
+   * - 42
+     - RDM Data
+     - N/A
+     - table 3-3
+     - M
+     -
+   * - 43
+     - Atmospheric re-entry information
+     - N/A
+     - table 3-3
+     - M
+     -
+   * - 44
+     - Comment
+     - COMMENT
+     - table 3-3
+     - O
+     -
+   * - 45
+     - Remaining orbit lifetime
+     - ORBIT_LIFETIME
+     - table 3-3
+     - M
+     -
+   * - 46
+     - Defined re-entry altitude
+     - REENTRY_ALTITUDE
+     - table 3-3
+     - M
+     -
+   * - 47
+     - Orbit lifetime window
+     - ORBIT_LIFETIME_WINDOW_START
+     - table 3-3
+     - O
+     -
+   * - 48
+     - 
+     - ORBIT_LIFETIME_WINDOW_END
+     - table 3-3
+     - O
+     -
+   * - 49
+     - Predicted re-entry epoch
+     - NOMINAL_REENTRY_EPOCH
+     - table 3-3
+     - O
+     -
+   * - 50
+     - Re-entry window
+     - REENTRY_WINDOW_START
+     - table 3-3
+     - O
+     -
+   * - 51
+     - 
+     - REENTRY_WINDOW_END
+     - table 3-3
+     - O
+     -
+   * - 52
+     - Orbit lifetime confidence level
+     - ORBIT_LIFETIME_CONFIDENCE_LEVEL
+     - table 3-3
+     - O
+     -
+   * - 53
+     - Ground impact information
+     - N/A
+     - table 3-3
+     - O
+     -
+   * - 54
+     - Comment
+     - COMMENT
+     - table 3-3
+     - O
+     -
+   * - 55
+     - Probability any re-entry fragments reach the Earth surface
+     - PROBABILITY_OF_IMPACT
+     - table 3-3
+     - O
+     -
+   * - 56
+     - Probability all re-entry fragments suffer total demise
+     - PROBABILITY_OF_BURN_UP
+     - table 3-3
+     - O
+     -
+   * - 57
+     - Probability fragments are generated during re-entry
+     - PROBABILITY_OF_BREAK_UP
+     - table 3-3
+     - O
+     -
+   * - 58
+     - Land impact probability
+     - PROBABILITY_OF_LAND_IMPACT
+     - table 3-3
+     - O
+     -
+   * - 59
+     - Probabilities of casualties resulting from the re-entry
+     - PROBABILITY_OF_CASUALTY
+     - table 3-3
+     - O
+     -
+   * - 60
+     - Predicted (ground) impact epoch
+     - NOMINAL_IMPACT_EPOCH
+     - table 3-3
+     - O
+     -
+   * - 61
+     - Predicted (ground) impact window
+     - IMPACT_WINDOW_START
+     - table 3-3
+     - O
+     -
+   * - 62
+     - 
+     - IMPACT_WINDOW_END
+     - table 3-3
+     - O
+     -
+   * - 63
+     - Reference frame of (ground) impact location
+     - IMPACT_REF_FRAME
+     - table 3-3
+     - O
+     -
+   * - 64
+     - Impact location
+     - NOMINAL_IMPACT_LON
+     - table 3-3
+     - O
+     -
+   * - 65
+     - 
+     - NOMINAL_IMPACT_LAT
+     - table 3-3
+     - O
+     -
+   * - 66
+     - 
+     - NOMINAL_IMPACT_ALT
+     - table 3-3
+     - O
+     -
+   * - 67
+     - Impact dispersion
+     - IMPACT_1_CONFIDENCE
+     - table 3-3
+     - O
+     -
+   * - 68
+     - 
+     - IMPACT_1_START_LON
+     - table 3-3
+     - O
+     -
+   * - 69
+     - 
+     - IMPACT_1_START_LAT
+     - table 3-3
+     - O
+     -
+   * - 70
+     - 
+     - IMPACT_1_STOP_LON
+     - table 3-3
+     - O
+     -
+   * - 71
+     - 
+     - IMPACT_1_STOP_LAT
+     - table 3-3
+     - O
+     -
+   * - 72
+     - 
+     - IMPACT_1_CROSS_TRACK
+     - table 3-3
+     - O
+     -
+   * - 73
+     - 
+     - IMPACT_2_CONFIDENCE
+     - table 3-3
+     - O
+     -
+   * - 74
+     - 
+     - IMPACT_2_START_LON
+     - table 3-3
+     - O
+     -
+   * - 75
+     - 
+     - IMPACT_2_START_LAT
+     - table 3-3
+     - O
+     -
+   * - 76
+     - 
+     - IMPACT_2_STOP_LON
+     - table 3-3
+     - O
+     -
+   * - 77
+     - 
+     - IMPACT_2_STOP_LAT
+     - table 3-3
+     - O
+     -
+   * - 78
+     - 
+     - IMPACT_2_CROSS_TRACK
+     - table 3-3
+     - O
+     -
+   * - 79
+     - 
+     - IMPACT_3_CONFIDENCE
+     - table 3-3
+     - O
+     -
+   * - 80
+     - 
+     - IMPACT_3_START_LON
+     - table 3-3
+     - O
+     -
+   * - 81
+     - 
+     - IMPACT_3_START_LAT
+     - table 3-3
+     - O
+     -
+   * - 82
+     - 
+     - IMPACT_3_STOP_LON
+     - table 3-3
+     - O
+     -
+   * - 83
+     - 
+     - IMPACT_3_STOP_LAT
+     - table 3-3
+     - O
+     -
+   * - 84
+     - 
+     - IMPACT_3_CROSS_TRACK
+     - table 3-3
+     - O
+     -
+   * - 85
+     - Spacecraft state vector section
+     - N/A
+     - table 3-3
+     - O
+     -
+   * - 86
+     - Comment
+     - COMMENT
+     - table 3-3
+     - O
+     -
+   * - 87
+     - State vector epoch
+     - EPOCH
+     - table 3-3
+     - O
+     -
+   * - 88
+     - Position and velocity components
+     - X
+     - table 3-3
+     - O
+     -
+   * - 89
+     - 
+     - Y
+     - table 3-3
+     - O
+     -
+   * - 90
+     - 
+     - Z
+     - table 3-3
+     - O
+     -
+   * - 91
+     - 
+     - X_DOT
+     - table 3-3
+     - O
+     -
+   * - 92
+     - 
+     - Y_DOT
+     - table 3-3
+     - O
+     -
+   * - 93
+     - 
+     - Z_DOT
+     - table 3-3
+     - O
+     -
+   * - 94
+     - Spacecraft state vector covariance information
+     - N/A
+     - table 3-3
+     - O
+     -
+   * - 95
+     - Comment
+     - COMMENT
+     - table 3-3
+     - O
+     -
+   * - 96
+     - Covariance reference frame
+     - COV_REF_FRAME
+     - table 3-3
+     - O
+     -
+   * - 97
+     - 6x6 position/velocity covariance matrix elements
+     - CX_X
+     - table 3-3
+     - O
+     -
+   * - 98
+     - 
+     - CY_X
+     - table 3-3
+     - O
+     -
+   * - 99
+     - 
+     - CY_Y
+     - table 3-3
+     - O
+     -
+   * - 100
+     - 
+     - CZ_X
+     - table 3-3
+     - O
+     -
+   * - 101
+     - 
+     - CZ_Y
+     - table 3-3
+     - O
+     -
+   * - 102
+     - 
+     - CZ_Z
+     - table 3-3
+     - O
+     -
+   * - 103
+     - 
+     - CX_DOT_X
+     - table 3-3
+     - O
+     -
+   * - 104
+     - 
+     - CX_DOT_Y
+     - table 3-3
+     - O
+     -
+   * - 105
+     - 
+     - CX_DOT_Z
+     - table 3-3
+     - O
+     -
+   * - 106
+     - 
+     - CX_DOT_X_DOT
+     - table 3-3
+     - O
+     -
+   * - 107
+     - 
+     - CY_DOT_X
+     - table 3-3
+     - O
+     -
+   * - 108
+     - 
+     - CY_DOT_Y
+     - table 3-3
+     - O
+     -
+   * - 109
+     - 
+     - CY_DOT_Z
+     - table 3-3
+     - O
+     -
+   * - 110
+     - 
+     - CY_DOT_X_DOT
+     - table 3-3
+     - O
+     -
+   * - 111
+     - 
+     - CY_DOT_Y_DOT
+     - table 3-3
+     - O
+     -
+   * - 112
+     - 
+     - CZ_DOT_X
+     - table 3-3
+     - O
+     -
+   * - 113
+     - 
+     - CZ_DOT_Y
+     - table 3-3
+     - O
+     -
+   * - 114
+     - 
+     - CZ_DOT_Z
+     - table 3-3
+     - O
+     -
+   * - 115
+     - 
+     - CZ_DOT_X_DOT
+     - table 3-3
+     - O
+     -
+   * - 116
+     - 
+     - CZ_DOT_Y_DOT
+     - table 3-3
+     - O
+     -
+   * - 117
+     - 
+     - CZ_DOT_Z_DOT
+     - table 3-3
+     - O
+     -
+   * - 118
+     - Spacecraft properties
+     - N/A
+     - table 3-3
+     - O
+     -
+   * - 119
+     - Comment
+     - COMMENT
+     - table 3-3
+     - O
+     -
+   * - 120
+     - Total (wet) mass
+     - WET_MASS
+     - table 3-3
+     - O
+     -
+   * - 121
+     - Dry mass
+     - DRY_MASS
+     - table 3-3
+     - O
+     -
+   * - 122
+     - List of hazardous substances on board
+     - HAZARDOUS_SUBSTANCES
+     - table 3-3
+     - O
+     -
+   * - 123
+     - Solar radiation area
+     - SOLAR_RAD_AREA
+     - table 3-3
+     - O
+     -
+   * - 124
+     - Solar radiation coefficient
+     - SOLAR_RAD_COEFF
+     - table 3-3
+     - O
+     -
+   * - 125
+     - Drag area
+     - DRAG_AREA
+     - table 3-3
+     - O
+     -
+   * - 126
+     - Coefficient of drag
+     - DRAG_COEFF
+     - table 3-3
+     - O
+     -
+   * - 127
+     - Radar Cross-Section
+     - RCS
+     - table 3-3
+     - O
+     -
+   * - 128
+     - Ballistic coefficient
+     - BALLISTIC_COEFF
+     - table 3-3
+     - O
+     -
+   * - 129
+     - Object’s in-track acceleration used in OD and propagation
+     - THRUST_ACCELERATION
+     - table 3-3
+     - O
+     -
+   * - 130
+     - Orbit determination information
+     - N/A
+     - table 3-3
+     - O
+     -
+   * - 131
+     - Comment
+     - COMMENT
+     - table 3-3
+     - O
+     -
+   * - 132
+     - Interval during which the last accepted observation occurred
+     - TIME_LASTOB_START
+     - table 3-3
+     - O
+     -
+   * - 133
+     - 
+     - TIME_LASTOB_END
+     - table 3-3
+     - O
+     -
+   * - 134
+     - Recommend timespan for OD and actual timespan used
+     - RECOMMENDED_OD_SPAN
+     - table 3-3
+     - O
+     -
+   * - 135
+     - 
+     - ACTUAL_OD_SPAN
+     - table 3-3
+     - O
+     -
+   * - 136
+     - Total number of observations available and used
+     - OBS_AVAILABLE
+     - table 3-3
+     - O
+     -
+   * - 137
+     - 
+     - OBS_USED
+     - table 3-3
+     - O
+     -
+   * - 138
+     - Total number of sensor tracks available and used
+     - TRACKS_AVAILABLE
+     - table 3-3
+     - O
+     -
+   * - 139
+     - 
+     - TRACKS_USED
+     - table 3-3
+     - O
+     -
+   * - 140
+     - Percentage of residuals accepted in OD
+     - RESIDUALS_ACCEPTED
+     - table 3-3
+     - O
+     -
+   * - 141
+     - Weighted RMS of the OD residuals
+     - WEIGHTED_RMS
+     - table 3-3
+     - O
+     -
+   * - 142
+     - User defined parameters
+     - USER_DEFINED_x
+       Any supported user defined parameters should be listed here.
+     - table 3-3
+     - O
+     -
 
 .. _annex_b_rdm:
 
@@ -1665,7 +3162,112 @@ vector, position/velocity covariance matrix.
 
 **Figure C-2: Sample RDM in KVN Using Optional Keywords**
 
-.. include:: rdm_parts/figure_c-4.rst
+.. code-block:: xml
+
+   <?xml version="1.0" encoding="UTF-8"?>
+   <rdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="rdmLocalSchema.xsd"
+    id="CCSDS_RDM_VERS"
+    version="1.0">
+    <header>
+    <COMMENT>This is RDM Annex C KVN Fig C-2 expressed in XML</COMMENT>
+    <CREATION_DATE>2018-04-22T09:31:34</CREATION_DATE>
+    <ORIGINATOR>ESA</ORIGINATOR>
+    <MESSAGE_ID>ESA/20180422-001</MESSAGE_ID>
+    </header>
+    <body>
+    <segment>
+    <metadata>
+    <OBJECT_NAME>SPACEOBJECT</OBJECT_NAME>
+    <INTERNATIONAL_DESIGNATOR>2018-099B</INTERNATIONAL_DESIGNATOR>
+    <CATALOG_NAME>SATCAT</CATALOG_NAME>
+    <OBJECT_DESIGNATOR>81594</OBJECT_DESIGNATOR>
+    <OBJECT_TYPE>ROCKET BODY</OBJECT_TYPE>
+   <OBJECT_OWNER>ESA</OBJECT_OWNER>
+    <CONTROLLED_REENTRY>NO</CONTROLLED_REENTRY>
+    <CENTER_NAME>EARTH</CENTER_NAME>
+    <TIME_SYSTEM>UTC</TIME_SYSTEM>
+    <EPOCH_TZERO>2018-04-22T09:00:00.00</EPOCH_TZERO>
+    <REF_FRAME>EME2000</REF_FRAME>
+    <GRAVITY_MODEL>EGM-96: 36D 36O</GRAVITY_MODEL>
+    <ATMOSPHERIC_MODEL>NRLMSISE-00</ATMOSPHERIC_MODEL>
+    <N_BODY_PERTURBATIONS>MOON</N_BODY_PERTURBATIONS>
+    <SOLAR_RAD_PRESSURE>NO</SOLAR_RAD_PRESSURE>
+    <EARTH_TIDES>ESR</EARTH_TIDES>
+    <INTRACK_THRUST>NO</INTRACK_THRUST>
+    <REENTRY_DISINTEGRATION>MASS-LOSS + BREAK UP</REENTRY_DISINTEGRATION>
+    <PREVIOUS_MESSAGE_ID>ESA/20180421-007</PREVIOUS_MESSAGE_ID>
+    <NEXT_MESSAGE_EPOCH>2018-04-23T09:00:00</NEXT_MESSAGE_EPOCH>
+    </metadata>
+    <data>
+    <atmosphericReentryParameters>
+    <ORBIT_LIFETIME units="d">5.5</ORBIT_LIFETIME>
+    <REENTRY_ALTITUDE units="km">80.0</REENTRY_ALTITUDE>
+    <NOMINAL_REENTRY_EPOCH>2018-04-27T19:45:33</NOMINAL_REENTRY_EPOCH>
+    <REENTRY_WINDOW_START>2018-04-27T11:45:33</REENTRY_WINDOW_START>
+    <REENTRY_WINDOW_END>2018-04-27T22:12:56</REENTRY_WINDOW_END>
+    </atmosphericReentryParameters>
+    <groundImpactParameters>
+    <COMMENT>Short term re-entry prediction results</COMMENT>
+    <PROBABILITY_OF_IMPACT>0.0</PROBABILITY_OF_IMPACT>
+    <PROBABILITY_OF_BURN_UP>1.0</PROBABILITY_OF_BURN_UP>
+    </groundImpactParameters>
+    <stateVector>
+    <COMMENT>State vector at the last OD epoch</COMMENT>
+    <EPOCH>2018-04-22T09:30:12</EPOCH>
+    <X units="km">4000.000000</X>
+    <Y units="km">4000.000000</Y>
+    <Z units="km">4000.000000</Z>
+    <X_DOT units="km/s">7.000000</X_DOT>
+    <Y_DOT units="km/s">7.000000</Y_DOT>
+    <Z_DOT units="km/s">7.000000</Z_DOT>
+    </stateVector>
+    <covarianceMatrix>
+    <COMMENT> Position/velocity covariance matrix at last OD
+   epoch</COMMENT>
+    <COV_REF_FRAME>RTN</COV_REF_FRAME>
+    <CX_X units="km**2">0.10000</CX_X>
+    <CY_X units="km**2">0.10000</CY_X>
+    <CY_Y units="km**2">0.10000</CY_Y>
+    <CZ_X units="km**2">0.10000</CZ_X>
+    <CZ_Y units="km**2">0.10000</CZ_Y>
+    <CZ_Z units="km**2">0.10000</CZ_Z>
+    <CX_DOT_X units="km**2/s">0.020000</CX_DOT_X>
+    <CX_DOT_Y units="km**2/s">0.020000</CX_DOT_Y>
+    <CX_DOT_Z units="km**2/s">0.020000</CX_DOT_Z>
+    <CX_DOT_X_DOT units="km**2/s**2">0.00600</CX_DOT_X_DOT>
+    <CY_DOT_X units="km**2/s">0.020000</CY_DOT_X>
+    <CY_DOT_Y units="km**2/s">0.020000</CY_DOT_Y>
+    <CY_DOT_Z units="km**2/s">0.020000</CY_DOT_Z>
+    <CY_DOT_X_DOT units="km**2/s**2">0.00600</CY_DOT_X_DOT>
+    <CY_DOT_Y_DOT units="km**2/s**2">0.00600</CY_DOT_Y_DOT>
+    <CZ_DOT_X units="km**2/s">0.00200</CZ_DOT_X>
+    <CZ_DOT_Y units="km**2/s">0.00200</CZ_DOT_Y>
+    <CZ_DOT_Z units="km**2/s">0.00200</CZ_DOT_Z>
+    <CZ_DOT_X_DOT units="km**2/s**2">0.00400</CZ_DOT_X_DOT>
+    <CZ_DOT_Y_DOT units="km**2/s**2">0.00400</CZ_DOT_Y_DOT>
+    <CZ_DOT_Z_DOT units="km**2/s**2">0.00400</CZ_DOT_Z_DOT>
+    </covarianceMatrix>
+    <spacecraftParameters>
+    <COMMENT>Spacecraft parameters used in OD and re-entry
+   prediction</COMMENT>
+    <WET_MASS units="kg">3582</WET_MASS>
+    <DRAG_AREA units="m**2">23.3565</DRAG_AREA>
+    <DRAG_COEFF>2.2634</DRAG_COEFF>
+    </spacecraftParameters>
+    <odParameters>
+    <COMMENT>OD parameters from batch orbit
+   determination</COMMENT>
+    <ACTUAL_OD_SPAN units="d">3.4554</ACTUAL_OD_SPAN>
+    <TRACKS_AVAILABLE>18</TRACKS_AVAILABLE>
+    <TRACKS_USED>17</TRACKS_USED>
+    </odParameters>
+    </data>
+    </segment>
+    </body>
+   </rdm>
+
+**Figure C-4: Sample RDM in XML Using Optional Keywords**
 .. _annex_d_rdm:
 
 ANNEX D
@@ -2182,10 +3784,13 @@ and uncertainty (fixed at 20 percent) is issued every couple of days. The predic
 date (orbit lifetime + epoch t_zero) is plotted against the date at which the simulation was
 run (creation date), orbit lifetime window start and end (the dotted lines) are plotted as well.
 
-.. figure:: /images/medium-term_re-entry_prediction.png
-   :align: center
+..
+   .. figure:: /images/medium-term_re-entry_prediction.png
+      :align: center
 
-   Figure G-1: Example of Medium-Term Re-entry Prediction Data Use
+      Figure G-1: Example of Medium-Term Re-entry Prediction Data Use
+
+   [Figure G-1: Example of Medium-Term Re-entry Prediction Data Use - Image missing]
 
 **NOMINAL_REENTRY_EPOCH:** Predicted re-entry epoch, providing much greater
 precision for short-term (last couple of days before re-entry, when altitude is below 200 km)

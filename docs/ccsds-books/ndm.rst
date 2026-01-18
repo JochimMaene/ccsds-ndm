@@ -432,7 +432,7 @@ orbit
   trajectory that does not, in the absence of perturbations, intersect with the central body. This
   trajectory is the path of the small mass, or spacecraft, orbiting the central body through space.
   The orbit can be represented as position and velocity in a state vector, or as orbital elements
-  as defined in [17]_ [12]_. There are other types of orbits that are affected by the
+  as defined in references [17]_ and [12]_. There are other types of orbits that are affected by the
   gravity pull of two larger masses, for example, the Moon and Earth, such that the spacecraft
   with an appropriate velocity will remain in the same position relative to the two larger
   bodies. These orbits are called Lagrange or libration point orbits.
@@ -445,7 +445,7 @@ attitude
   point on the unit celestial sphere. This representation sometimes includes the phase of
   rotation about that axis. For three-axis stabilized spacecraft, the attitude can best be
   represented by a coordinate transformation from reference axes in inertial space to the
-  spacecraft body frame. (See [17]_ [3]_ for available attitude representations.)
+  spacecraft body frame. (See references [17]_ and [3]_ for available attitude representations.)
 
 orbital dynamics
   The study of the changes in the position of all orbiting bodies. In
@@ -541,7 +541,7 @@ to the following four steps:
 
 a) A set of measurements is acquired.
 b) A dynamic model is fit to a set of measurements to provide a solution state (cf.
-   [2]_ [3]_ [4]_ [5]_ [12]_), which is found by minimizing the differences
+   references [2]_, [3]_, [4]_, [5]_, and [12]_), which is found by minimizing the differences
    between measurements and reference values corresponding to the measurements.
 c) The solution state may be used in the model to predict the future state.
 d) If necessary, the spacecraft state is altered at some future time:
@@ -809,7 +809,7 @@ TDM has also been used for tracking data exchanges between Goddard Space Flight 
 (GSFC) and Johnson Spaceflight Center for the Orion Exploration Flight Test-1 (EFT-1), and
 between ESA and China for the Chang-E-2 mission and with Russia for the Phobos-Grunt mission.
 
-.. [Note1] At time of publication the TDM is undergoing revision as a result of mandatory CCSDS five-year review.
+.. note:: At time of publication the TDM is undergoing revision as a result of mandatory CCSDS five-year review.
 
 .. _ndm_sec_4_2_2:
 

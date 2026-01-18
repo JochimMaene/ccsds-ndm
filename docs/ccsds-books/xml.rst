@@ -632,10 +632,13 @@ OCM varies from this pattern.
    is present for symmetry with Substructure 2 in the ‘body’ of the message,
    enabling re-use of some schema data types.
 
-.. figure:: /images/ndm_xml_substructure_1.png
-   :align: center
+..
+   .. figure:: /images/ndm_xml_substructure_1.png
+      :align: center
 
-   Figure 3-1: NDM/XML Substructure 1 (Single Segment)
+      Figure 4-1: NDM/XML Basic Substructure 1
+
+   [Figure 4-1: NDM/XML Basic Substructure 1 - Image missing]
 
 .. _substructure_2_xml:
 
@@ -653,15 +656,21 @@ a unique ‘Relative Metadata Section’ prior to the first segment (see figure 
    The alternation of associated metadata and data sections is the structural element
    that necessitates the notion of the segment.
 
-.. figure:: /images/ndm_xml_substructure_2.png
-   :align: center
+..
+   .. figure:: /images/ndm_xml_substructure_2.png
+      :align: center
 
-   Figure 3-2: NDM/XML Substructure 2 (Possible Segment Multiplicity)
+      Figure 4-2: NDM/XML Basic Substructure 2
 
-.. figure:: /images/variant_of_substructure_2_for_cdm.png
-   :align: center
+   [Figure 4-2: NDM/XML Basic Substructure 2 - Image missing]
 
-   Figure 3-3: Variant of Substructure 2 for CDM
+..
+   .. figure:: /images/variant_of_substructure_2_for_cdm.png
+      :align: center
+
+      Figure 4-3: Variant of Substructure 2 for CDM
+
+   [Figure 4-3: Variant of Substructure 2 for CDM - Image missing]
 
 .. _tags_xml:
 
@@ -1226,7 +1235,7 @@ APM producer.
      - <MAN_TOR_3 units="N*m">numeric-value</MAN_TOR_3>
 
 4.9.13 SPECIAL TAGS IN THE APM BODY
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note:: In addition to the APM keywords specified in reference [4], there are several
    special tags associated with the APM body as described in the next few
@@ -1388,7 +1397,7 @@ attribute of the <USER_DEFINED> tag (the attribute ‘parameter’) and the
 <USER_DEFINED> element value (which may include the applicable units).
 
 4.10.1.7 In the NDM/XML, the variable-length value associated with the parameter attribute
-shall be the string following ‘USER_DEFINED_’ in the associated KVN keyword.
+shall be the string following ‘USER_DEFINED\_’ in the associated KVN keyword.
 
 4.10.1.8 The data type for the user-defined value shall be ‘xsd:string’, even if the actual
 user-defined parameter has a numeric value.
@@ -1497,15 +1506,21 @@ attributes and schema location attributes are associated with the <ndm> root ele
             </apm>
           </ndm>
 
-.. figure:: /images/ndm_combined_instantiation_basic_structure.png
-   :align: center
+..
+   .. figure:: /images/ndm_combined_instantiation_basic_structure.png
+      :align: center
 
-   Figure 4-2: NDM Combined Instantiation Basic Structure
+      Figure 4-4: NDM Combined Instantiation Basic Structure
 
-.. figure:: /images/ndm_combined_instantiation_attributes.png
-   :align: center
+   [Figure 4-4: NDM Combined Instantiation Basic Structure - Image missing]
 
-   Figure 4-3: NDM Combined Instantiation Showing Use of Attributes
+..
+   .. figure:: /images/ndm_combined_instantiation_attributes.png
+      :align: center
+
+      Figure 4-5: NDM Combined Instantiation Attributes
+
+   [Figure 4-5: NDM Combined Instantiation Attributes - Image missing]
 .. _annex_a_xml:
 
 ANNEX A
@@ -2448,25 +2463,25 @@ INFORMATIVE REFERENCES
 (INFORMATIVE)
 
 [H1] *Navigation Data—Definitions and Conventions*. Issue 4. Report Concerning Space Data
-     System Standards (Green Book), CCSDS 500.0-G-4. Washington, D.C.: CCSDS,
-     November 2019.
+System Standards (Green Book), CCSDS 500.0-G-4. Washington, D.C.: CCSDS,
+November 2019.
 [H2] Fran Martínez. “XML in CCSDS.” Presented at CCSDS Navigation Working Group
-     meeting (May 2004, Montreal). https://cwe.ccsds.org/moims/docs/MOIMS-
-     NAV/NDM%20XML%20Related%20Material/XML-in-CCSDS-Montreal-2004.ppt.
+meeting (May 2004, Montreal). https://cwe.ccsds.org/moims/docs/MOIMS-
+NAV/NDM%20XML%20Related%20Material/XML-in-CCSDS-Montreal-2004.ppt.
 [H3] *Space Communication Cross Support—Service Management—Service Specification*.
-     Issue 1-S. Recommendation for Space Data System Standards (Historical), CCSDS
-     910.11-B-1-S. Washington, D.C.: CCSDS, (August 2009) June 2017.
+Issue 1-S. Recommendation for Space Data System Standards (Historical), CCSDS
+910.11-B-1-S. Washington, D.C.: CCSDS, (August 2009) June 2017.
 [H4] *Information Technology—8-Bit Single-Byte Coded Graphic Character Sets—Part 1:
-     Latin Alphabet No. 1*. International Standard. ISO/IEC 8859-1:1998. Geneva: ISO,
-     1998.
+Latin Alphabet No. 1*. International Standard. ISO/IEC 8859-1:1998. Geneva: ISO,
+1998.
 [H5] “SourceForge.net: XMill.” SourceForge.net: Open Source Software.
-     https://sourceforge.net/projects/xmill/.
+https://sourceforge.net/projects/xmill/.
 [H6] “SourceForge.net: XGrind: A Query-Friendly XML Compressor.” SourceForge.net:
-     Open Source Software. https://sourceforge.net/projects/xgrind/.
+Open Source Software. https://sourceforge.net/projects/xgrind/.
 [H7] RELAX NG home page. https://relaxng.org/.
 [H8] *Information Technology—Document Schema Definition Languages (DSDL)—Part 3:
-     Rule-Based Validation—Schematron*. 3rd ed. International Standard, ISO/IEC 19757-
-     3:2020. Geneva: ISO, 2020.
+Rule-Based Validation—Schematron*. 3rd ed. International Standard, ISO/IEC 19757-
+3:2020. Geneva: ISO, 2020.
 
 .. note:: Normative references appear in 1.6.
 

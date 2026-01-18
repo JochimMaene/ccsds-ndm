@@ -333,7 +333,7 @@ this document are as follows:
 - n/a: (units are not applicable);
 - %: percent;
 - s: SI seconds;
-- SFU: Solar Flux Units, equivalent to 10\ :sup:`-22` W/(m\ :sup:`2`\ *Hz);
+- SFU: Solar Flux Units, equivalent to 10\ :sup:`-22` W/(m\ :sup:`2`\ \*Hz);
 - W: watts.
 
 .. _introduction_general_notations_odm:
@@ -1996,7 +1996,7 @@ by increasing time tag.
 .. _oem_covariance_keywords_table_odm:
 
 .. list-table:: OEM Covariance Keywords
-   :widths: 25 50 25
+   :widths: 25 50 15 10
    :header-rows: 1
    :stub-columns: 1
 
@@ -2870,6 +2870,7 @@ reference frame specified via the COV_REF_FRAME keyword.
 
 a) a corresponding perturbations section should be included as well to specify the
    perturbations accounted for in these covariances;
+
 .. NOTE::
    It is strongly recommended that covariance matrix time history interpolation be
    done by using either (1) orbit-dynamics-aware numerical methods as provided in
@@ -3973,10 +3974,10 @@ shall comprise a contiguous set of lines, the values on each line separated by a
 white space character, and with those values consisting of the specified maneuver parameters
 (see MAN_COMPOSITION, 6.2.8.14).
 
-7.4.2 The keywords ‘COMMENT’, *‘_START’, and *‘_STOP’ are exceptions to the KVN
-syntax assignment.
+  7.4.2 The keywords ‘COMMENT’, \*‘_START’, and \*‘_STOP’ are exceptions to the KVN
+  syntax assignment.
 
-7.4.3 Only a single ‘keyword = value’ assignment shall be made on a line.
+  7.4.3 Only a single ‘keyword = value’ assignment shall be made on a line.
 
 7.4.4 Keywords must be uppercase and must not contain blanks.
 
@@ -3997,11 +3998,11 @@ OCM keywords.
 7.5 VALUES
 ----------
 
-7.5.1 A non-empty value field must be assigned to each mandatory keyword except for
-*‘_START’ and *‘_STOP’ keyword values.
+  7.5.1 A non-empty value field must be assigned to each mandatory keyword except for
+  \*‘_START’ and \*‘_STOP’ keyword values.
 
-7.5.2 Comments and free-text value fields may be in any case (or mix of case) desired by
-the user.
+  7.5.2 Comments and free-text value fields may be in any case (or mix of case) desired by
+  the user.
 
 7.5.3 Apart from comments and free-text fields, normative text value fields shall be
 constructed using only exclusively all uppercase or exclusively all lowercase.
@@ -4213,12 +4214,12 @@ the beginning of the OEM Covariance Data section (after the ‘COV_START’ keyw
 Comment lines must not appear within any block of ephemeris lines or covariance matrix
 lines.
 
-7.8.10 Comments may appear in all logical blocks of the OCM, but only at the positions
-shown in the defining tables (generally at the top of each section, following the *_START
-section delimiting keyword).
+  7.8.10 Comments may appear in all logical blocks of the OCM, but only at the positions
+  shown in the defining tables (generally at the top of each section, following the \*_START
+  section delimiting keyword).
 
-7.8.11 Extensive comments in an ODM are recommended in cases when that content is
-germane to the message and changes from message to message.
+  7.8.11 Extensive comments in an ODM are recommended in cases when that content is
+  germane to the message and changes from message to message.
 
 7.8.12 The following comments should be provided:
 
@@ -4385,10 +4386,13 @@ depending on the message type (one for the OPM, OMM, and OCM; one or more for th
 OEM). Each segment consists of a <metadata>/<data> pair. In an OEM, which could
 have more than one segment, the metadata/data pair is repeated in each segment.
 
-.. figure:: ../images/ccsds_books/odm/8_1.png
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/odm/8_1.png
+      :align: center
 
-   Figure 8-1: ODM/XML Basic Structure
+      Figure 8-1: ODM XML Basic Structure
+
+   [Figure 8-1: ODM XML Basic Structure - Image missing]
 
 ODM/XML tags for keywords defined in in sections 3, 4, 5, and 6 appear just as in the KVN,
 that is, all capital letters. Tags related to the XML message structure (i.e., that do not
@@ -4605,7 +4609,7 @@ states which capabilities and options have been implemented. The following can u
 .. _annex_a_abbreviations_and_conventions_odm:
 
 A1.2 ABBREVIATIONS AND CONVENTIONS
-"""""""""""""""""""""""""""""""""
+""""""""""""""""""""""""""""""""""
 
 The RL consists of information in tabular form. The status of features is indicated using the
 abbreviations and conventions described below.
@@ -7634,7 +7638,7 @@ https://sanaregistry.org/r/time_systems
 B4 CELESTIAL BODY REFERENCE FRAMES
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A set of allowed celestial body reference frame values for *_REF_FRAME keywords is
+A set of allowed celestial body reference frame values for \*_REF_FRAME keywords is
 enumerated in the SANA Registry of Celestial Body Reference Frames, located at:
 
 https://sanaregistry.org/r/celestial_body_reference_frames
@@ -7645,7 +7649,7 @@ B5 ORBIT-RELATIVE REFERENCE FRAMES
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In addition to the above reference frames, maneuver and covariance data may be selected
-from the list of allowed orbit-relative reference frames using a *_REF_FRAME keyword
+from the list of allowed orbit-relative reference frames using a \*_REF_FRAME keyword
 values enumerated in the SANA Registry of Orbit-Relative Reference Frames, located at:
 
 https://sanaregistry.org/r/orbit_relative_reference_frames
@@ -7660,7 +7664,7 @@ B6 ADDITIONAL SPACECRAFT AND ATTITUDE REFERENCE FRAMES
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 An additional allowed set of spacecraft and attitude control reference frame values for
-*_REF_FRAME keywords is enumerated in the SANA Registry of Spacecraft and Attitude
+\*_REF_FRAME keywords is enumerated in the SANA Registry of Spacecraft and Attitude
 Control Reference Frames, located at:
 
 https://sanaregistry.org/r/spacecraft_body_reference_frames
@@ -8375,8 +8379,7 @@ modeling of any user’s approach to conservative and non-conservative phenomena
 
 The primary vehicle for the provision of additional optional ancillary information to be used
 when propagating an OPM or OMM is the COMMENT mechanism. Alternatively, the
-‘USER_DEFINED_’ keyword prefix may be used, though this usage is not encouraged.
-
+‘USER_DEFINED\_’ keyword prefix may be used, though this usage is not encouraged.
 .. _annex_e_services_odm:
 
 E4 SERVICES RELATED TO THE DIFFERENT ORBIT DATA MESSAGE FORMATS
@@ -8605,10 +8608,13 @@ GEO satellite tracked at 15.6° elevation above the optical site’s local horiz
 
    VM_{absolute} = -2.5 \log_{10} ( \frac{[E_{Sun,1AU=1380W/m^2}] [Phase(0 rad)=1.0] [\rho A_{Target} \text{from above, in } m^2]}{\pi [E_o=2.77894 \times 10^{-8} W/m^2] [(40,000,000^2) m^2]} )
 
-.. figure:: ../images/ccsds_books/odm/F_2.png
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/odm/F_2.png
+      :align: center
 
-   Figure F-2: Depiction of Optical Viewing CATS Angle Geometry
+      Figure F-2: Depiction of Optical Viewing CATS Angle Geometry
+
+   [Figure F-2: Depiction of Optical Viewing CATS Angle Geometry - Image missing]
 
 .. _annex_f_maneuver_and_duty_cycle_diagrams_odm:
 
@@ -8622,15 +8628,18 @@ A ‘duty cycle’ is a cycle of thruster operation that operates intermittently
 continuously, having an ‘on’ interval followed by an ‘off’ interval.
 
 Time-based duty cycle parameters
-""""""""""""""""""""""""""""""
+""""""""""""""""""""""""""""""""
 
 Time-based duty cycle parameters define a window of duty cycle operations, the actual
 execution interval and ‘ON’ and ‘OFF’ intervals, as shown in figure F-3.
 
-.. figure:: ../images/ccsds_books/odm/F_3.png
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/odm/F_3.png
+      :align: center
 
-   Figure F-3: Diagram of Time-based Duty Cycle (DC_TYPE = ‘TIME’)
+      Figure F-3: Diagram of Time-based Duty Cycle (DC_TYPE = ‘TIME’)
+
+   [Figure F-3: Diagram of Time-based Duty Cycle (DC_TYPE = ‘TIME’) - Image missing]
 
 Angle-based duty cycle parameters
 """""""""""""""""""""""""""""""""
@@ -8639,10 +8648,13 @@ Angle-based duty cycle parameters also define a window of duty cycle operations 
 execution interval and ‘ON’ and ‘OFF’ intervals, but in this case the ‘ON’ and ‘OFF’
 intervals are triggered by angular limits as shown in figure F-4.
 
-.. figure:: ../images/ccsds_books/odm/F_4.png
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/odm/F_4.png
+      :align: center
 
-   Figure F-4: Diagram of a Rotating Spacecraft Body’s Progression through an Inertial Clock Angle-based Duty Cycle (DC_TYPE = ‘TIME_AND_ANGLE’)
+      Figure F-4: Diagram of a Rotating Spacecraft Body’s Progression through an Inertial Clock Angle-based Duty Cycle (DC_TYPE = ‘TIME_AND_ANGLE’)
+
+   [Figure F-4: Diagram of a Rotating Spacecraft Body’s Progression through an Inertial Clock Angle-based Duty Cycle (DC_TYPE = ‘TIME_AND_ANGLE’) - Image missing]
 
 .. _annex_f_gpod_formulation_odm:
 
@@ -8685,7 +8697,7 @@ an effective way to interpolate a series of covariance matrices, reference frame
 maneuvers, thrust, or acceleration vector directions.
 
 Interpolation of a series of three-dimensional vectors:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 As presented in reference [H17], and consistent with the nomenclature of reference [H1]
 where e₁, e₂, and e₃ represent the three vector components of axis of rotation ê and φ
@@ -8705,7 +8717,7 @@ e) The accompanying vector magnitudes (e.g., eigenvalues or thrust or accelerati
    magnitudes) may be interpolated using Lagrange polynomials or linear expressions.
 
 Interpolation of a series of reference (or covariance eigenvector) frames:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 The eigenvector matrix [E(t)] contains the row-wise storage of the major, intermediate, and
 minor eigenvectors at time t, taking care to ensure that this ordered ‘triad’ of vectors adheres
@@ -8763,10 +8775,13 @@ for maximum flexibility while still retaining a rigorous validation.
    In some languages, ‘^’ and ‘$’ matching at string line breaks must explicitly be
    enabled to process a string containing a series of lines of the message.
 
-.. figure:: ../images/ccsds_books/odm/F_5.png
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/odm/F_5.png
+      :align: center
 
-   Figure F-5: Regex Pattern for CCSDS Timecode
+      Figure F-5: Regex Pattern for CCSDS Timecode
+
+   [Figure F-5: Regex Pattern for CCSDS Timecode - Image missing]
 
 Regex Pattern Matching Sequence:
 """""""""""""""""""""""""""""""""
@@ -8776,10 +8791,13 @@ Applying the above CCSDS Timecode Regex to a file containing the string
 how this Regex expression is used to rigorously validate and match the string and identify the
 specified group names.
 
-.. figure:: ../images/ccsds_books/odm/F_6.png
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/odm/F_6.png
+      :align: center
 
-   Figure F-6: Regex Pattern Matching Sequence for CCSDS Timecode
+      Figure F-6: Regex Pattern Matching Sequence for CCSDS Timecode
+
+   [Figure F-6: Regex Pattern Matching Sequence for CCSDS Timecode - Image missing]
 
 Sample Regular Expression for ‘Keyword = NonDecimalString’
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -8788,10 +8806,13 @@ Another common and useful Regex addresses the setting of keywords to a free-text
 Consistent with requirements for KVN values as specified in 7.5, the Regex shown in
 figure F-7 matches this sequence.
 
-.. figure:: ../images/ccsds_books/odm/F_7.png
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/odm/F_7.png
+      :align: center
 
-   Figure F-7: Regex for a Non-Decimal String
+      Figure F-7: Regex for a Non-Decimal String
+
+   [Figure F-7: Regex for a Non-Decimal String - Image missing]
 
 Sample Regular Expression for ‘Keyword = FreeTextString’
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -8804,23 +8825,29 @@ numbers should be specifically matched as a number (as shown below). Consistent 
 requirements for KVN values as specified in 7.5, the Regex shown in figure F-8 matches this
 sequence.
 
-.. figure:: ../images/ccsds_books/odm/F_8.png
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/odm/F_8.png
+      :align: center
 
-   Figure F-8: Regex for Free-Text String
+      Figure F-8: Regex for Free-Text String
+
+   [Figure F-8: Regex for Free-Text String - Image missing]
 
 Sample Regular Expression for ‘Keyword = CCSDS Numerical Value with optional units’
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Consistent with the requirements set forth in 7.5.4 through 7.5.7, KVN values that are
 integers or non-integer fixed or floating-point numbers may be matched with the Regex
 sequence provided in figure F-9, with named groups ‘keyword’, ‘value’, and ‘units’ set
 accordingly:
 
-.. figure:: ../images/ccsds_books/odm/F_9.png
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/odm/F_9.png
+      :align: center
 
-   Figure F-9: Regex for String Containing Numerical Value with Optional Units
+      Figure F-9: Regex for String Containing Numerical Value with Optional Units
+
+   [Figure F-9: Regex for String Containing Numerical Value with Optional Units - Image missing]
 
 Sample Regular Expression for ‘Keyword = Multipartite CCSDS Numerical Values’
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -8829,10 +8856,13 @@ For orbit, covariance, and/or maneuver lines providing a multipartite sequence o
 values, the Regex pattern provided in figure F-10 may be used (in this example, to capture
 and set value1, value2, and value3 for a 3-element set of numbers):
 
-.. figure:: ../images/ccsds_books/odm/F_10.png
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/odm/F_10.png
+      :align: center
 
-   Figure F-10: Regex for String Containing Numerical Value with Optional Units
+      Figure F-10: Regex for String Containing Numerical Value with Optional Units
+
+   [Figure F-10: Regex for String Containing Numerical Value with Optional Units - Image missing]
 
 .. _annex_f_sedr_formulation_odm:
 
@@ -9232,7 +9262,7 @@ time history of Keplerian elements; and the fourth includes a time series of cov
 matrices.
 
 G10 AGGREGATING MULTIPLE ODMS IN A SINGLE NDM XML FILE
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The following examples illustrate how multiple Orbit Data Messages can be aggregated in a single XML file using the NDM ‘combined instantiation’ schema.
 
@@ -9620,55 +9650,55 @@ INFORMATIVE REFERENCES
 ----------------------
 
 [H1] Navigation Data—Definitions and Conventions. Issue 4. Report Concerning Space
-     Data System Standards (Green Book), CCSDS 500.0-G-4. Washington, D.C.:
-     CCSDS, November 2019.
+Data System Standards (Green Book), CCSDS 500.0-G-4. Washington, D.C.:
+CCSDS, November 2019.
 [H2] “CelesTrak.” Center for Space Standards & Innovation (CSSI). http://celestrak.com/.
 [H3] David A. Vallado, et al. “Revisiting Spacetrack Report #3.” In *Proceedings of the
-     AIAA/AAS Astrodynamics Specialist Conference and Exhibit* (AIAA 2006-6753).
-     Reston, Virginia: AIAA, 2006.
+AIAA/AAS Astrodynamics Specialist Conference and Exhibit* (AIAA 2006-6753).
+Reston, Virginia: AIAA, 2006.
 [H4] “Documentation.” SPICE: NASA’s Solar System Exploration Ancillary Information
-     System. Navigation and Ancillary Information Facility (NAIF).
-     http://naif.jpl.nasa.gov/naif/documentation.html.
+System. Navigation and Ancillary Information Facility (NAIF).
+http://naif.jpl.nasa.gov/naif/documentation.html.
 [H5] *Ground Network Tracking and Acquisition Data Handbook*. 453-HNDK-GN.
-     Greenbelt, Maryland: Goddard Space Flight Center, May 2007.
+Greenbelt, Maryland: Goddard Space Flight Center, May 2007.
 [H6] Daniel L. Oltrogge, T.S. Kelso, and John H. Seago. “Ephemeris Requirements for
-     Space Situational Awareness.” In *Proceedings of the 21st AAS/AIAA Space Flight
-     Mechanics Meeting* (13–17 February 2011, New Orleans, Louisiana), AAS 11-151.
-     San Diego, California: Univelt, 2011.
+Space Situational Awareness.” In *Proceedings of the 21st AAS/AIAA Space Flight
+Mechanics Meeting* (13–17 February 2011, New Orleans, Louisiana), AAS 11-151.
+San Diego, California: Univelt, 2011.
 [H7] David A. Vallado. *Fundamentals of Astrodynamics and Applications*. 4th ed. Space
-     Technology Library. El Segundo, California: Microcosm Press, 2013.
+Technology Library. El Segundo, California: Microcosm Press, 2013.
 [H8] Daniel L. Oltrogge, Patrick North, and Michael Nicolls. “Multi-Phenomenology
-     Observation Network Evaluation Tool (MONET).” In *Proceedings of the 15th AMOS
-     Surveillance Technologies Conference* (9–12 September 2014, Maui, Hawaii). Kihei,
-     Hawaii: Maui Economic Development Board, 2014.
+Observation Network Evaluation Tool (MONET).” In *Proceedings of the 15th AMOS
+Surveillance Technologies Conference* (9–12 September 2014, Maui, Hawaii). Kihei,
+Hawaii: Maui Economic Development Board, 2014.
 [H9] Salvatore Alfano. “Orbital Covariance Interpolation.” In *Proceedings of the 14th
-     AAS/AIAA Space Flight Mechanics Meeting* (8–12 February 2004, Maui, Hawaii),
-     AAS 04-223. San Diego, California: Univelt, 2004.
+AAS/AIAA Space Flight Mechanics Meeting* (8–12 February 2004, Maui, Hawaii),
+AAS 04-223. San Diego, California: Univelt, 2004.
 [H10] Sergei Tanygin. “Attitude Interpolation.” In *Proceedings of the 13th AAS/AIAA Space
-      Flight Mechanics Meeting* (9–13 February 2003, Ponce, Puerto Rico), AAS 03-197.
-      San Diego, California: Univelt, 2003.
+Flight Mechanics Meeting* (9–13 February 2003, Ponce, Puerto Rico), AAS 03-197.
+San Diego, California: Univelt, 2003.
 [H11] Sergei Tanygin. “Efficient Covariance Interpolation Using Blending of Approximate
-      State Error Transitions.” In *Proceedings of the 2013 AAS/AIAA Astrodynamics
-      Specialist Conference* (11–15 August 2013, Hilton Head, South Carolina), AAS 13-
-      762. San Diego, California: Univelt, 2013.
+State Error Transitions.” In *Proceedings of the 2013 AAS/AIAA Astrodynamics
+Specialist Conference* (11–15 August 2013, Hilton Head, South Carolina), AAS 13-
+762. San Diego, California: Univelt, 2013.
 [H12] James Woodburn and Sergei Tanygin. “Position Covariance Visualization.” In
-      *Proceedings of the 2002 AIAA/AAS Astrodynamics Specialist Conference and Exhibit*
-      (Monterey, California, Monterey, California), AIAA 2002-4985. Reston, Virginia:
-      AIAA, 2002.
+*Proceedings of the 2002 AIAA/AAS Astrodynamics Specialist Conference and Exhibit*
+(Monterey, California, Monterey, California), AIAA 2002-4985. Reston, Virginia:
+AIAA, 2002.
 [H13] Salvatore Alfano. “Variance-Covariance Significant Figure Reduction and Its Effect
-      on Collision Probability Calculation.” In *Proceedings of the 70th International
-      Astronautical Congress (IAC)* (21–25 October 2019, Washington D.C.), IAC-19-
-      A6.2.8.51075. Paris: International Astronautical Federation, 2019.
+on Collision Probability Calculation.” In *Proceedings of the 70th International
+Astronautical Congress (IAC)* (21–25 October 2019, Washington D.C.), IAC-19-
+A6.2.8.51075. Paris: International Astronautical Federation, 2019.
 [H14] DISCOSweb. ESA. https://discosweb.esoc.esa.int/.
 [H15] Elliott D. Kaplan and Christopher Hegarty, eds. *Understanding GPS/GNSS:
-      Principles and Applications*. GNSS Technology and Applications. Boston and
-      London: Artech, 2017.
+Principles and Applications*. GNSS Technology and Applications. Boston and
+London: Artech, 2017.
 [H16] Obed S. Sands, et al. “Dilution of Precision-Based Lunar Navigation Assessment for
-      Dynamic Position Fixing.” In *Proceedings of the 2006 National Technical Meeting of
-      The Institute of Navigation* (January 18–20, 2006, Monterey, California), 260–268.
-      Manassas, Virginia: ION, 2006.
+Dynamic Position Fixing.” In *Proceedings of the 2006 National Technical Meeting of
+The Institute of Navigation* (January 18–20, 2006, Monterey, California), 260–268.
+Manassas, Virginia: ION, 2006.
 [H17] Peter C. Hughes. *Spacecraft Attitude Dynamics*. New York: John Wiley and Sons,
-      1986.
+1986.
 
 .. _annex_i_odm:
 

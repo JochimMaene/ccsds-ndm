@@ -262,7 +262,7 @@ the units used within this document are as follows:
 -  n/a: (units are not applicable);
 -  %: percent;
 -  s: SI seconds;
--  SFU: Solar Flux Units, equivalent to 10\ :sup:`-22` W/(m\ :sup:`2`\ *Hz);
+-  SFU: Solar Flux Units, equivalent to 10\ :sup:`-22` W/(m\ :sup:`2`\ \*Hz);
 -  W: watts.
 
 1.3.1.2 General
