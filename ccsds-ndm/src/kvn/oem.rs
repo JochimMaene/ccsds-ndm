@@ -42,6 +42,7 @@
 
 use crate::common::{OdmHeader, StateVectorAcc};
 use crate::kvn::parser::*;
+use crate::error::InternalParserError;
 use crate::messages::oem::{Oem, OemBody, OemCovarianceMatrix, OemData, OemMetadata, OemSegment};
 use crate::parse_block;
 use crate::types::*;
@@ -49,7 +50,7 @@ use std::num::NonZeroU32;
 use std::str::FromStr;
 use winnow::ascii::{float, space1, till_line_ending};
 use winnow::combinator::{preceded, repeat};
-use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
+use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -156,22 +157,14 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
         "INTERPOLATION" => interpolation: kv_string,
         "INTERPOLATION_DEGREE" => val: kv_u32 => {
             interpolation_degree = Some(NonZeroU32::new(val).ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("positive integer")),
-                ))
+                cut_err(input, "positive integer")
             })?);
         },
     }, |i| at_block_end("META", i), "Unexpected OEM Metadata key");
 
     // Validation: INTERPOLATION_DEGREE required if INTERPOLATION present
     if interpolation.is_some() && interpolation_degree.is_none() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Expected(StrContextValue::Description("INTERPOLATION_DEGREE")),
-        )));
+        return Err(cut_err(input, "INTERPOLATION_DEGREE"));
     }
 
     Ok(OemMetadata {
@@ -208,8 +201,8 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
     let epoch_str = parts
         .next()
-        .ok_or_else(|| cut_err(input, "Missing epoch"))?;
-    let epoch = Epoch::from_str(epoch_str).map_err(|_| cut_err(input, "Invalid epoch"))?;
+        .ok_or_else(|| missing_field_err(input, "State Vector", "EPOCH"))?;
+    let epoch = Epoch::from_str(epoch_str).map_err(|_| cut_err(input, "Invalid epoch format"))?;
 
     let mut floats = [0.0f64; 9];
     let mut count = 0;
@@ -313,7 +306,7 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
             preceded(ws, float),
             repeat(
                 expected_count - 1,
-                preceded(space1, float::<&str, f64, ErrMode<CcsdsNdmError>>),
+                preceded(space1, float::<&str, f64, ErrMode<InternalParserError>>),
             ),
         )
             .map(|(first, rest): (f64, Vec<f64>)| {
@@ -432,7 +425,7 @@ fn oem_data_item(input: &mut &str) -> KvnResult<OemDataItem> {
             // Trailing comments before META/EOF
             return Ok(OemDataItem::Comment(comments));
         }
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
 
     if at_block_start("COVARIANCE", input) {
@@ -603,7 +596,7 @@ impl ParseKvn for Oem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::CcsdsNdmError;
+    use crate::error::{CcsdsNdmError, ValidationError};
     use crate::traits::Ndm;
 
     const MINIMAL_OEM: &str = r#"CCSDS_OEM_VERS = 3.0
@@ -1009,7 +1002,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err1 = Oem::from_kvn(kvn_missing_creation).unwrap_err();
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = &err1 {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err1.as_validation_error() {
             assert_eq!(field, "CREATION_DATE");
         } else {
             panic!("unexpected error: {:?}", err1);
@@ -1029,7 +1022,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err2 = Oem::from_kvn(kvn_missing_originator).unwrap_err();
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = &err2 {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err2.as_validation_error() {
             assert_eq!(field, "ORIGINATOR");
         } else {
             panic!("unexpected error: {:?}", err2);
@@ -1054,8 +1047,8 @@ META_STOP
     "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
         let ok = match &err {
-            CcsdsNdmError::KvnParse { .. } => true, // winnow parser error is acceptable
-            CcsdsNdmError::MissingRequiredField { field: _, .. } => true,
+            e if e.is_kvn_error() => true, // winnow parser error is acceptable
+            e if e.is_validation_error() => true,
             _ => false,
         };
         assert!(ok, "unexpected error: {:?}", err);
@@ -1104,8 +1097,8 @@ META_STOP
         // The parser might return out of range or line context error
         // Just assert error for now as message might vary slightly
         assert!(
-            matches!(err, CcsdsNdmError::OutOfRange { .. })
-                || matches!(err, CcsdsNdmError::KvnParse { .. })
+            err.is_validation_error()
+                || err.is_kvn_error()
         );
     }
 
@@ -1218,8 +1211,8 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = matches!(err, CcsdsNdmError::MissingRequiredField { field: ref msg, .. } if msg.contains("CCSDS_OEM_VERS"))
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+        let ok = err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref msg, .. } if msg.contains("CCSDS_OEM_VERS")))
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1240,8 +1233,12 @@ META_STOP
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingRequiredField { field: k, .. } => assert_eq!(k, "OBJECT_NAME"),
-            CcsdsNdmError::KvnParse { .. } => {}
+            e if e.is_validation_error() => {
+                if let Some(ValidationError::MissingRequiredField { field: k, .. }) = e.as_validation_error() {
+                    assert_eq!(k, "OBJECT_NAME");
+                }
+            }
+            e if e.is_kvn_error() => {}
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1253,8 +1250,8 @@ CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-let ok = false             || matches!(err, CcsdsNdmError::MissingRequiredField { field: ref k, .. } if k.contains("segment"))
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("segment")))
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1266,8 +1263,8 @@ ORIGINATOR = TEST
 OBJECT_NAME = SAT1
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-let ok = false             || matches!(err, CcsdsNdmError::MissingRequiredField { field: _, .. })
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+let ok = false             || err.is_validation_error()
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1287,8 +1284,8 @@ STOP_TIME = 2023-01-02T00:00:00
 META_STOP
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-let ok = false             || matches!(err, CcsdsNdmError::MissingRequiredField { field: ref k, .. } if k.contains("must contain at least one state vector"))
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("must contain at least one state vector")))
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1317,7 +1314,7 @@ COVARIANCE_START
 COVARIANCE_STOP
 "#;
         let err1 = Oem::from_kvn(kvn_missing_epoch).unwrap_err();
-        assert!(matches!(err1, CcsdsNdmError::KvnParse { .. }));
+        assert!(err1.is_kvn_error());
 
         let kvn_wrong_count = r#"CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -1343,7 +1340,7 @@ EPOCH = 2023-01-01T00:00:00
 COVARIANCE_STOP
 "#;
         let err2 = Oem::from_kvn(kvn_wrong_count).unwrap_err();
-        assert!(matches!(err2, CcsdsNdmError::KvnParse { .. }));
+        assert!(err2.is_kvn_error());
     }
 
     #[test]
@@ -1365,7 +1362,7 @@ bad-epoch 1000 2000 3000 1.0 2.0 3.0
         let err = Oem::from_kvn(kvn).unwrap_err();
         assert!(
             matches!(err, CcsdsNdmError::Epoch(_))
-                | matches!(err, CcsdsNdmError::KvnParse { .. })
+                | err.is_kvn_error()
                 | false
         );
     }
@@ -1386,8 +1383,8 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-let ok = false             || matches!(err, CcsdsNdmError::MissingRequiredField { field: ref k, .. } if k == "OBJECT_ID")
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "OBJECT_ID"))
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1407,8 +1404,8 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-let ok = false             || matches!(err, CcsdsNdmError::MissingRequiredField { field: ref k, .. } if k == "CENTER_NAME")
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "CENTER_NAME"))
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1428,8 +1425,8 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-let ok = false             || matches!(err, CcsdsNdmError::MissingRequiredField { field: ref k, .. } if k == "REF_FRAME")
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "REF_FRAME"))
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1449,8 +1446,8 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-let ok = false             || matches!(err, CcsdsNdmError::MissingRequiredField { field: ref k, .. } if k == "TIME_SYSTEM")
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "TIME_SYSTEM"))
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1470,8 +1467,8 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-let ok = false             || matches!(err, CcsdsNdmError::MissingRequiredField { field: ref k, .. } if k == "START_TIME")
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "START_TIME"))
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1491,8 +1488,8 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-let ok = false             || matches!(err, CcsdsNdmError::MissingRequiredField { field: ref k, .. } if k == "STOP_TIME")
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "STOP_TIME"))
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1503,8 +1500,8 @@ CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-let ok = false             || matches!(err, CcsdsNdmError::MissingRequiredField { field: ref k, .. } if k.contains("segment"))
-            || matches!(err, CcsdsNdmError::KvnParse { .. });
+let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("segment")))
+            || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1576,8 +1573,8 @@ META_STOP
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { .. })
-                || matches!(err, CcsdsNdmError::MissingRequiredField { field: _, .. })
+            err.is_kvn_error()
+                || err.is_validation_error()
         );
     }
 
@@ -1774,7 +1771,7 @@ COVARIANCE_START
 COVARIANCE_STOP
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse { .. }));
+        assert!(err.is_kvn_error());
     }
 
     #[test]
@@ -1803,7 +1800,7 @@ EPOCH = 2023-01-01T00:00:00
 COVARIANCE_STOP
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::KvnParse { .. }));
+        assert!(err.is_kvn_error());
     }
 
     #[test]
@@ -2013,8 +2010,8 @@ META_STOP
 "#;
         let err = Oem::from_kvn(kvn_zero).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::OutOfRange { .. })
-                || matches!(err, CcsdsNdmError::KvnParse { .. })
+            err.is_validation_error()
+                || err.is_kvn_error()
         );
     }
 

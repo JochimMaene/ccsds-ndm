@@ -14,7 +14,6 @@ use crate::kvn::parser::*;
 use crate::messages::rdm::{Rdm, RdmBody, RdmData, RdmHeader, RdmMetadata, RdmSegment};
 use crate::parse_block;
 use crate::types::*;
-use winnow::error::{AddContext, ErrMode, StrContext};
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -155,9 +154,8 @@ pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
         comment,
         object_name: object_name
             .ok_or_else(|| missing_field_err(input, "Metadata", "OBJECT_NAME"))?,
-        international_designator: international_designator.ok_or_else(|| {
-            missing_field_err(input, "Metadata", "INTERNATIONAL_DESIGNATOR")
-        })?,
+        international_designator: international_designator
+            .ok_or_else(|| missing_field_err(input, "Metadata", "INTERNATIONAL_DESIGNATOR"))?,
         catalog_name,
         object_designator,
         object_type,
@@ -377,9 +375,10 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
 
     let atmospheric_reentry_parameters = AtmosphericReentryParameters {
         comment: Vec::new(),
-        orbit_lifetime: orbit_lifetime.ok_or_else(|| cut_err(input, "Missing ORBIT_LIFETIME"))?,
+        orbit_lifetime: orbit_lifetime
+            .ok_or_else(|| missing_field_err(input, "Atmospheric Reentry", "ORBIT_LIFETIME"))?,
         reentry_altitude: reentry_altitude
-            .ok_or_else(|| cut_err(input, "Missing REENTRY_ALTITUDE"))?,
+            .ok_or_else(|| missing_field_err(input, "Atmospheric Reentry", "REENTRY_ALTITUDE"))?,
         orbit_lifetime_window_start,
         orbit_lifetime_window_end,
         nominal_reentry_epoch,
@@ -464,9 +463,8 @@ impl ParseKvn for Rdm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::CcsdsNdmError;
+    use crate::error::{CcsdsNdmError, FormatError, ValidationError};
     use crate::traits::Ndm;
-
     #[test]
     fn test_xsd_rdm_root_attributes() {
         let kvn = r#"CCSDS_RDM_VERS = 1.0
@@ -1229,7 +1227,8 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_creation).unwrap_err();
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
+        {
             assert_eq!(field, "CREATION_DATE");
         } else {
             panic!("Unexpected: {:?}", err);
@@ -1248,7 +1247,8 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_originator).unwrap_err();
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
+        {
             assert_eq!(field, "ORIGINATOR");
         } else {
             panic!("Unexpected: {:?}", err);
@@ -1267,7 +1267,8 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_msgid).unwrap_err();
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
+        {
             assert_eq!(field, "MESSAGE_ID");
         } else {
             panic!("Unexpected: {:?}", err);
@@ -1290,7 +1291,8 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_object_name).unwrap_err();
         println!("RDM ERROR: {:?}", err);
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
+        {
             assert_eq!(field, "OBJECT_NAME");
         } else {
             panic!("Unexpected: {:?}", err);
@@ -1309,7 +1311,8 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_intl).unwrap_err();
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
+        {
             assert_eq!(field, "INTERNATIONAL_DESIGNATOR");
         } else {
             panic!("Unexpected: {:?}", err);
@@ -1328,7 +1331,8 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_center).unwrap_err();
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
+        {
             assert_eq!(field, "CENTER_NAME");
         } else {
             panic!("Unexpected: {:?}", err);
@@ -1347,7 +1351,8 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_timesys).unwrap_err();
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
+        {
             assert_eq!(field, "TIME_SYSTEM");
         } else {
             panic!("Unexpected: {:?}", err);
@@ -1366,7 +1371,8 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_controlled).unwrap_err();
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
+        {
             assert_eq!(field, "CONTROLLED_REENTRY");
         } else {
             panic!("Unexpected: {:?}", err);
@@ -1385,7 +1391,8 @@ ORBIT_LIFETIME = 1 [d]
 REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_epoch).unwrap_err();
-        if let CcsdsNdmError::MissingRequiredField { field, .. } = err {
+        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
+        {
             assert_eq!(field, "EPOCH_TZERO");
         } else {
             panic!("Unexpected: {:?}", err);
@@ -1408,7 +1415,17 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         let err = Rdm::from_kvn(kvn_missing_orbit_life).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { .. } => {}
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField {
+                    ref block,
+                    ref field,
+                    ..
+                } => {
+                    assert_eq!(block, "Atmospheric Reentry");
+                    assert_eq!(field, "ORBIT_LIFETIME");
+                }
+                _ => panic!("Unexpected validation error: {:?}", val_err),
+            },
             _ => panic!("Unexpected: {:?}", err),
         }
 
@@ -1426,7 +1443,17 @@ ORBIT_LIFETIME = 1 [d]
 "#;
         let err = Rdm::from_kvn(kvn_missing_reentry_alt).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { .. } => {}
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField {
+                    ref block,
+                    ref field,
+                    ..
+                } => {
+                    assert_eq!(block, "Atmospheric Reentry");
+                    assert_eq!(field, "REENTRY_ALTITUDE");
+                }
+                _ => panic!("Unexpected validation error: {:?}", val_err),
+            },
             _ => panic!("Unexpected: {:?}", err),
         }
     }
@@ -1436,7 +1463,7 @@ ORBIT_LIFETIME = 1 [d]
         let err = Rdm::from_kvn("").unwrap_err();
         match err {
             CcsdsNdmError::UnexpectedEof { .. } => {}
-            CcsdsNdmError::KvnParse { .. } => {}
+            e if e.is_kvn_error() => {}
             _ => panic!("Expected error, got: {:?}", err),
         }
     }
@@ -1448,9 +1475,15 @@ CCSDS_RDM_VERS = 1.0
 "#;
         let err = Rdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.to_lowercase().contains("expected ccsds_rdm_vers"));
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(err
+                        .message
+                        .to_lowercase()
+                        .contains("expected ccsds_rdm_vers"));
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("Expected version-not-first error, got: {:?}", err),
         }
     }

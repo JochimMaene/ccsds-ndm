@@ -374,10 +374,13 @@ impl Quaternion {
     pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> crate::error::Result<Self> {
         for (name, v) in [("Q1", q1), ("Q2", q2), ("Q3", q3), ("QC", qc)] {
             if !(-1.0..=1.0).contains(&v) {
-                return Err(crate::error::CcsdsNdmError::OutOfRange { 
+                return Err(crate::error::ValidationError::OutOfRange {
                     name: name.to_string(),
                     value: v.to_string(),
-                    expected: "[-1, 1]".to_string(), line: None });
+                    expected: "[-1, 1]".to_string(),
+                    line: None,
+                }
+                .into());
             }
         }
         Ok(Self { q1, q2, q3, qc })

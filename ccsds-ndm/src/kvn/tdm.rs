@@ -7,6 +7,7 @@
 //! This module implements KVN parsing for TDM using winnow parser combinators.
 
 use crate::kvn::parser::*;
+use crate::error::{CcsdsNdmError, InternalParserError};
 use crate::messages::tdm::{
     Tdm, TdmBody, TdmData, TdmHeader, TdmMetadata, TdmObservation, TdmObservationData, TdmSegment,
 };
@@ -14,7 +15,7 @@ use crate::parse_block;
 use crate::types::*;
 use winnow::ascii::till_line_ending;
 use winnow::combinator::preceded;
-use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
+use winnow::error::{AddContext, ErrMode, StrContext};
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -157,18 +158,10 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
     }
 
     if meta.time_system.is_empty() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Expected(StrContextValue::Description("TIME_SYSTEM")),
-        )));
+        return Err(missing_field_err(input, "TDM Metadata", "TIME_SYSTEM"));
     }
     if meta.participant_1.is_empty() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Expected(StrContextValue::Description("PARTICIPANT_1")),
-        )));
+        return Err(missing_field_err(input, "TDM Metadata", "PARTICIPANT_1"));
     }
 
     Ok(meta)
@@ -185,63 +178,69 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
     let checkpoint = input.checkpoint();
     let (epoch, data) = dispatch! {
         preceded(ws, keyword);
-        "ANGLE_1" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::Angle1(v)))),
-        "ANGLE_2" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::Angle2(v)))),
-        "CARRIER_POWER" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::CarrierPower(v)))),
-        "CLOCK_BIAS" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::ClockBias(v)))),
-        "CLOCK_DRIFT" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::ClockDrift(v)))),
-        "DOPPLER_COUNT" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::DopplerCount(v)))),
-        "DOPPLER_INSTANTANEOUS" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::DopplerInstantaneous(v)))),
-        "DOPPLER_INTEGRATED" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::DopplerIntegrated(v)))),
-        "DOR" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::Dor(v)))),
-        "MAG" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::Mag(v)))),
-        "PC_N0" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::PcN0(v)))),
-        "PR_N0" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::PrN0(v)))),
-        "PRESSURE" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::Pressure(v)))),
-        "RANGE" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::Range(v)))),
-        "RCS" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::Rcs(v)))),
-        "RECEIVE_FREQ" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq(v)))),
-        "RECEIVE_FREQ_1" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq1(v)))),
-        "RECEIVE_FREQ_2" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq2(v)))),
-        "RECEIVE_FREQ_3" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq3(v)))),
-        "RECEIVE_FREQ_4" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq4(v)))),
-        "RECEIVE_FREQ_5" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq5(v)))),
-        "RECEIVE_PHASE_CT_1" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt1(v.trim().to_string())))),
-        "RECEIVE_PHASE_CT_2" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt2(v.trim().to_string())))),
-        "RECEIVE_PHASE_CT_3" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt3(v.trim().to_string())))),
-        "RECEIVE_PHASE_CT_4" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt4(v.trim().to_string())))),
-        "RECEIVE_PHASE_CT_5" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt5(v.trim().to_string())))),
+        "ANGLE_1" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::Angle1(v))),
+        "ANGLE_2" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::Angle2(v))),
+        "CARRIER_POWER" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::CarrierPower(v))),
+        "CLOCK_BIAS" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::ClockBias(v))),
+        "CLOCK_DRIFT" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::ClockDrift(v))),
+        "DOPPLER_COUNT" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::DopplerCount(v))),
+        "DOPPLER_INSTANTANEOUS" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::DopplerInstantaneous(v))),
+        "DOPPLER_INTEGRATED" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::DopplerIntegrated(v))),
+        "DOR" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::Dor(v))),
+        "MAG" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::Mag(v))),
+        "PC_N0" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::PcN0(v))),
+        "PR_N0" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::PrN0(v))),
+        "PRESSURE" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::Pressure(v))),
+        "RANGE" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::Range(v))),
+        "RCS" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::Rcs(v))),
+        "RECEIVE_FREQ" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::ReceiveFreq(v))),
+        "RECEIVE_FREQ_1" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::ReceiveFreq1(v))),
+        "RECEIVE_FREQ_2" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::ReceiveFreq2(v))),
+        "RECEIVE_FREQ_3" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::ReceiveFreq3(v))),
+        "RECEIVE_FREQ_4" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::ReceiveFreq4(v))),
+        "RECEIVE_FREQ_5" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::ReceiveFreq5(v))),
+        "RECEIVE_PHASE_CT_1" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| (e, TdmObservationData::ReceivePhaseCt1(v.trim().to_string()))),
+        "RECEIVE_PHASE_CT_2" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| (e, TdmObservationData::ReceivePhaseCt2(v.trim().to_string()))),
+        "RECEIVE_PHASE_CT_3" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| (e, TdmObservationData::ReceivePhaseCt3(v.trim().to_string()))),
+        "RECEIVE_PHASE_CT_4" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| (e, TdmObservationData::ReceivePhaseCt4(v.trim().to_string()))),
+        "RECEIVE_PHASE_CT_5" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| (e, TdmObservationData::ReceivePhaseCt5(v.trim().to_string()))),
         "RHUMIDITY" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| {
-            Percentage::new(v, None).map(|p| (e, TdmObservationData::Rhumidity(p)))
+            (e, TdmObservationData::Rhumidity(Percentage::new(v, None).expect("Invalid humidity")))
         }),
-        "STEC" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::Stec(v)))),
-        "TEMPERATURE" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::Temperature(v)))),
-        "TRANSMIT_FREQ_1" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreq1(v)))),
-        "TRANSMIT_FREQ_2" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreq2(v)))),
-        "TRANSMIT_FREQ_3" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreq3(v)))),
-        "TRANSMIT_FREQ_4" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreq4(v)))),
-        "TRANSMIT_FREQ_5" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreq5(v)))),
-        "TRANSMIT_FREQ_RATE_1" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate1(v)))),
-        "TRANSMIT_FREQ_RATE_2" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate2(v)))),
-        "TRANSMIT_FREQ_RATE_3" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate3(v)))),
-        "TRANSMIT_FREQ_RATE_4" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate4(v)))),
-        "TRANSMIT_FREQ_RATE_5" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate5(v)))),
-        "TRANSMIT_PHASE_CT_1" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt1(v.trim().to_string())))),
-        "TRANSMIT_PHASE_CT_2" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt2(v.trim().to_string())))),
-        "TRANSMIT_PHASE_CT_3" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt3(v.trim().to_string())))),
-        "TRANSMIT_PHASE_CT_4" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt4(v.trim().to_string())))),
-        "TRANSMIT_PHASE_CT_5" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt5(v.trim().to_string())))),
-        "TROPO_DRY" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoDry(v)))),
-        "TROPO_WET" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoWet(v)))),
-        "VLBI_DELAY" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| Ok((e, TdmObservationData::VlbiDelay(v)))),
-        _ => |i: &mut &str| Err(ErrMode::Cut(CcsdsNdmError::from_input(i).add_context(i, &i.checkpoint(), StrContext::Label("Unknown TDM data keyword")))),
-    }.parse_next(input).map_err(|e| {
+        "STEC" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::Stec(v))),
+        "TEMPERATURE" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::Temperature(v))),
+        "TRANSMIT_FREQ_1" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TransmitFreq1(v))),
+        "TRANSMIT_FREQ_2" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TransmitFreq2(v))),
+        "TRANSMIT_FREQ_3" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TransmitFreq3(v))),
+        "TRANSMIT_FREQ_4" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TransmitFreq4(v))),
+        "TRANSMIT_FREQ_5" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TransmitFreq5(v))),
+        "TRANSMIT_FREQ_RATE_1" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TransmitFreqRate1(v))),
+        "TRANSMIT_FREQ_RATE_2" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TransmitFreqRate2(v))),
+        "TRANSMIT_FREQ_RATE_3" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TransmitFreqRate3(v))),
+        "TRANSMIT_FREQ_RATE_4" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TransmitFreqRate4(v))),
+        "TRANSMIT_FREQ_RATE_5" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TransmitFreqRate5(v))),
+        "TRANSMIT_PHASE_CT_1" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| (e, TdmObservationData::TransmitPhaseCt1(v.trim().to_string()))),
+        "TRANSMIT_PHASE_CT_2" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| (e, TdmObservationData::TransmitPhaseCt2(v.trim().to_string()))),
+        "TRANSMIT_PHASE_CT_3" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| (e, TdmObservationData::TransmitPhaseCt3(v.trim().to_string()))),
+        "TRANSMIT_PHASE_CT_4" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| (e, TdmObservationData::TransmitPhaseCt4(v.trim().to_string()))),
+        "TRANSMIT_PHASE_CT_5" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| (e, TdmObservationData::TransmitPhaseCt5(v.trim().to_string()))),
+        "TROPO_DRY" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TropoDry(v))),
+        "TROPO_WET" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::TropoWet(v))),
+        "VLBI_DELAY" => (kv_sep, kv_epoch_token, preceded(ws, float)).map(|(_, e, v)| (e, TdmObservationData::VlbiDelay(v))),
+        _ => |i: &mut &str| Err(cut_err(i, "Unknown TDM data keyword")),
+    }
+    .parse_next(input)
+    .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Backtrack(CcsdsNdmError::from_input(input).add_context(input, &checkpoint, StrContext::Label("Expected TDM observation key")))
+            ErrMode::Backtrack(InternalParserError::from_input(input).add_context(
+                input,
+                &checkpoint,
+                StrContext::Label("Expected TDM observation key"),
+            ))
         } else {
             e
         }
-    })?.map_err(ErrMode::Cut)?;
+    })?;
 
     opt_line_ending.parse_next(input)?;
 
@@ -274,11 +273,7 @@ pub fn tdm_data(input: &mut &str) -> KvnResult<TdmData> {
     }
 
     if observations.is_empty() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Label("TDM data section must contain at least one observation"),
-        )));
+        return Err(cut_err(input, "TDM data section must contain at least one observation"));
     }
 
     Ok(TdmData {
@@ -316,11 +311,7 @@ pub fn tdm_body(input: &mut &str) -> KvnResult<TdmBody> {
     }
 
     if segments.is_empty() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Label("TDM body must contain at least one segment"),
-        )));
+        return Err(cut_err(input, "TDM body must contain at least one segment"));
     }
 
     Ok(TdmBody { segments })
@@ -352,7 +343,7 @@ impl ParseKvn for Tdm {
 pub fn parse_u64(s: &str) -> crate::error::Result<u64> {
     s.trim()
         .parse::<u64>()
-        .map_err(crate::error::CcsdsNdmError::ParseInt)
+        .map_err(CcsdsNdmError::from)
 }
 
 //----------------------------------------------------------------------
@@ -363,6 +354,7 @@ pub fn parse_u64(s: &str) -> crate::error::Result<u64> {
 mod tests {
     use super::*;
     use crate::traits::Ndm;
+    use crate::error::FormatError;
     // We need TdmObservationData variants visible
     use crate::messages::tdm::TdmObservationData;
 
@@ -1283,9 +1275,9 @@ DATA_STOP
     fn test_tdm_empty_file_error() {
         let err = Tdm::from_kvn("").unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::UnexpectedEof { .. } => {}
-            crate::error::CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("Expected Empty file error, got: {:?}", err),
+            CcsdsNdmError::UnexpectedEof { .. } => {}
+            e if e.is_kvn_error() => {}
+            _ => panic!("Expected error, got: {:?}", err),
         }
     }
 
@@ -1297,8 +1289,11 @@ CCSDS_TDM_VERS = 2.0
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.to_lowercase().contains("expected ccsds_tdm_vers"));
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(err.message.to_lowercase().contains("expected ccsds_tdm_vers"));
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
             }
             _ => panic!("Expected version-not-first error, got: {:?}", err),
         }
@@ -1319,19 +1314,16 @@ DATA_STOP
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.to_lowercase().contains("unknown tdm data keyword")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("unknown tdm data keyword"))
-                );
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unknown TDM data keyword")
+                            || err.contexts.contains(&"Unknown TDM data keyword")
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
             }
-            _ => panic!("Expected KvnParse error, got: {:?}", err),
+            _ => panic!("Expected error, got: {:?}", err),
         }
     }
 
@@ -1351,19 +1343,16 @@ DATA_STOP
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.to_lowercase().contains("unexpected tdm metadata key")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("unexpected tdm metadata key"))
-                );
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unexpected TDM Metadata key")
+                            || err.contexts.contains(&"Unexpected TDM Metadata key")
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
             }
-            _ => panic!("Expected KvnParse error, got: {:?}", err),
+            _ => panic!("Expected error, got: {:?}", err),
         }
     }
 }

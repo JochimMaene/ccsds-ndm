@@ -123,7 +123,8 @@ impl<V, U> FromKvn for UnitValue<V, U>
 where
     V: FromStr,
     CcsdsNdmError: From<V::Err>,
-    U: FromStr<Err = CcsdsNdmError>,
+    U: FromStr,
+    CcsdsNdmError: From<U::Err>,
 {
     /// Parses a `UnitValue` from a value string and an optional unit string.
     ///
@@ -133,7 +134,7 @@ where
         let value = value.parse::<V>()?;
 
         let units = match unit {
-            Some(u_str) => Some(u_str.parse::<U>()?),
+            Some(u_str) => Some(u_str.parse::<U>().map_err(CcsdsNdmError::from)?),
             None => None,
         };
 
@@ -143,11 +144,12 @@ where
 
 impl<U> FromKvnFloat for UnitValue<f64, U>
 where
-    U: FromStr<Err = CcsdsNdmError>,
+    U: FromStr,
+    CcsdsNdmError: From<U::Err>,
 {
     fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
         let units = match unit {
-            Some(u_str) => Some(u_str.parse::<U>()?),
+            Some(u_str) => Some(u_str.parse::<U>().map_err(CcsdsNdmError::from)?),
             None => None,
         };
         Ok(UnitValue { value, units })
@@ -185,11 +187,15 @@ macro_rules! define_unit_type {
         }
 
         impl std::str::FromStr for $unit_enum {
-            type Err = crate::error::CcsdsNdmError;
+            type Err = crate::error::EnumParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
                 match s {
                     $($str_rep => Ok(Self::$variant)),+,
-                    _ => Err(crate::error::CcsdsNdmError::UnknownUnit(s.to_string()))
+                    _ => Err(crate::error::EnumParseError {
+                        field: "unit",
+                        value: s.to_string(),
+                        expected: stringify!($($str_rep),+),
+                    })
                 }
             }
         }
@@ -251,9 +257,13 @@ macro_rules! define_unit_enum {
             }
         }
         impl std::str::FromStr for $unit_enum {
-            type Err = crate::error::CcsdsNdmError;
+            type Err = crate::error::EnumParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-                match s { $($str_rep => Ok(Self::$variant)),+, _ => Err(crate::error::CcsdsNdmError::UnknownUnit(s.to_string())) }
+                match s { $($str_rep => Ok(Self::$variant)),+, _ => Err(crate::error::EnumParseError {
+                    field: "unit",
+                    value: s.to_string(),
+                    expected: stringify!($($str_rep),+),
+                }) }
             }
         }
     };
@@ -308,10 +318,13 @@ impl Angle {
     /// XSD angleRange: -360.0 <= value < 360.0
     pub fn new(value: f64, units: Option<AngleUnits>) -> Result<Self> {
         if !(-360.0..360.0).contains(&value) {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Angle".to_string(),
                 value: value.to_string(),
-                expected: "[-360, 360)".to_string(), line: None});
+                expected: "[-360, 360)".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value, units })
     }
@@ -352,10 +365,13 @@ impl DayInterval {
     /// dayIntervalTypeUO: nonNegativeDouble
     pub fn new(value: f64, units: Option<DayIntervalUnits>) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "DayInterval".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(), line: None});
+                expected: ">= 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value, units })
     }
@@ -388,10 +404,13 @@ impl DayIntervalRequired {
     /// dayIntervalTypeUR: positiveDouble (>0, units required)
     pub fn new(value: f64) -> Result<Self> {
         if value <= 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "DayIntervalRequired".to_string(),
                 value: value.to_string(),
-                expected: "> 0".to_string(), line: None});
+                expected: "> 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self {
             value,
@@ -430,10 +449,13 @@ impl Frequency {
     /// frequencyType: positiveDouble (>0)
     pub fn new(value: f64, units: Option<FrequencyUnits>) -> Result<Self> {
         if value <= 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Frequency".to_string(),
                 value: value.to_string(),
-                expected: "> 0".to_string(), line: None});
+                expected: "> 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value, units })
     }
@@ -473,10 +495,13 @@ impl Gm {
     /// gmType: positiveDouble (>0)
     pub fn new(value: f64, units: Option<GmUnits>) -> Result<Self> {
         if value <= 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "GM".to_string(),
                 value: value.to_string(),
-                expected: "> 0".to_string(), line: None});
+                expected: "> 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value, units })
     }
@@ -514,10 +539,13 @@ impl AltitudeRequired {
     /// altRange: -430.5 ..= 8848
     pub fn new(value: f64) -> Result<Self> {
         if !(-430.5..=8848.0).contains(&value) {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Altitude".to_string(),
                 value: value.to_string(),
-                expected: "[-430.5, 8848]".to_string(), line: None});
+                expected: "[-430.5, 8848]".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self {
             value,
@@ -559,10 +587,13 @@ impl WkgRequired {
     /// wkgType: nonNegativeDouble, units required
     pub fn new(value: f64) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "W/kg".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(), line: None});
+                expected: ">= 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self {
             value,
@@ -597,10 +628,13 @@ impl Mass {
     /// XSD massType: nonNegativeDouble
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Mass".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(), line: None});
+                expected: ">= 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value, units })
     }
@@ -638,10 +672,13 @@ impl Area {
     /// XSD areaType: nonNegativeDouble
     pub fn new(value: f64, units: Option<AreaUnits>) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Area".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(), line: None});
+                expected: ">= 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value, units })
     }
@@ -668,9 +705,9 @@ define_unit_type!(Ms2, Ms2Units, MPerS2, { MPerS2 => "m/s**2" });
 define_required_type!(Ms2Required, Ms2Units, MPerS2);
 
 impl std::str::FromStr for Ms2Required {
-    type Err = CcsdsNdmError;
+    type Err = std::num::ParseFloatError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let v: f64 = s.parse().map_err(CcsdsNdmError::from)?;
+        let v: f64 = s.parse()?;
         Ok(Self::new(v))
     }
 }
@@ -717,10 +754,13 @@ impl BallisticCoeffRequired {
     /// ballisticCoeffType: nonNegativeDouble, units required
     pub fn new(value: f64) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Ballistic Coeff".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(), line: None});
+                expected: ">= 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self {
             value,
@@ -760,10 +800,13 @@ pub struct Percentage {
 impl Percentage {
     pub fn new(value: f64, units: Option<PercentageUnits>) -> Result<Self> {
         if !(0.0..=100.0).contains(&value) {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Percentage".to_string(),
                 value: value.to_string(),
-                expected: "[0, 100]".to_string(), line: None});
+                expected: "[0, 100]".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value, units })
     }
@@ -796,10 +839,13 @@ pub struct PercentageRequired {
 impl PercentageRequired {
     pub fn new(value: f64) -> Result<Self> {
         if !(0.0..=100.0).contains(&value) {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "PercentageRequired".to_string(),
                 value: value.to_string(),
-                expected: "[0, 100]".to_string(), line: None});
+                expected: "[0, 100]".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self {
             value,
@@ -826,10 +872,13 @@ pub struct Probability {
 impl Probability {
     pub fn new(value: f64) -> Result<Self> {
         if !(0.0..=1.0).contains(&value) {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Probability".to_string(),
                 value: value.to_string(),
-                expected: "[0, 1]".to_string(), line: None});
+                expected: "[0, 1]".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value })
     }
@@ -866,10 +915,13 @@ pub struct DeltaMass {
 impl DeltaMass {
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value >= 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "DeltaMass".to_string(),
                 value: value.to_string(),
-                expected: "< 0".to_string(), line: None});
+                expected: "< 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value, units })
     }
@@ -892,10 +944,13 @@ pub struct DeltaMassZ {
 impl DeltaMassZ {
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value > 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "DeltaMassZ".to_string(),
                 value: value.to_string(),
-                expected: "<= 0".to_string(), line: None});
+                expected: "<= 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value, units })
     }
@@ -927,10 +982,13 @@ pub struct LatitudeRequired {
 impl LatitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
         if !(-90.0..=90.0).contains(&value) {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Latitude".to_string(),
                 value: value.to_string(),
-                expected: "[-90, 90]".to_string(), line: None});
+                expected: "[-90, 90]".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self {
             value,
@@ -968,10 +1026,13 @@ pub struct LongitudeRequired {
 impl LongitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
         if !(-180.0..=180.0).contains(&value) {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Longitude".to_string(),
                 value: value.to_string(),
-                expected: "[-180, 180]".to_string(), line: None});
+                expected: "[-180, 180]".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self {
             value,
@@ -1064,7 +1125,7 @@ pub enum ObjectDescription {
 }
 
 impl std::str::FromStr for ObjectDescription {
-    type Err = crate::error::CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
             "PAYLOAD" => Ok(Self::Payload),
@@ -1170,15 +1231,16 @@ impl std::fmt::Display for YesNo {
     }
 }
 impl std::str::FromStr for YesNo {
-    type Err = crate::error::CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "YES" | "yes" => Ok(YesNo::Yes),
             "NO" | "no" => Ok(YesNo::No),
-            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
-                field: "YES/NO".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "YES/NO",
                 value: s.to_string(),
-                expected: "YES or NO".to_string(), line: None}),
+                expected: "YES or NO",
+            }),
         }
     }
 }
@@ -1198,7 +1260,7 @@ pub enum TrajBasis {
 }
 
 impl std::str::FromStr for TrajBasis {
-    type Err = crate::error::CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "PREDICTED" => Ok(Self::Predicted),
@@ -1206,10 +1268,10 @@ impl std::str::FromStr for TrajBasis {
             "TELEMETRY" => Ok(Self::Telemetry),
             "SIMULATED" => Ok(Self::Simulated),
             "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
-                field: "TRAJ_BASIS".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "TRAJ_BASIS",
                 value: s.to_string(),
-                expected: "PREDICTED, DETERMINED, TELEMETRY, SIMULATED, or OTHER".to_string(), line: None}),
+                expected: "PREDICTED, DETERMINED, TELEMETRY, SIMULATED, or OTHER"}),
         }
     }
 }
@@ -1223,15 +1285,15 @@ pub enum RevNumBasis {
 }
 
 impl std::str::FromStr for RevNumBasis {
-    type Err = crate::error::CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "0" => Ok(Self::Zero),
             "1" => Ok(Self::One),
-            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
-                field: "ORB_REVNUM_BASIS".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "ORB_REVNUM_BASIS",
                 value: s.to_string(),
-                expected: "0 or 1".to_string(), line: None}),
+                expected: "0 or 1"}),
         }
     }
 }
@@ -1251,7 +1313,7 @@ pub enum CovBasis {
 }
 
 impl std::str::FromStr for CovBasis {
-    type Err = crate::error::CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "PREDICTED" => Ok(Self::Predicted),
@@ -1259,10 +1321,10 @@ impl std::str::FromStr for CovBasis {
             "EMPIRICAL" => Ok(Self::Empirical),
             "SIMULATED" => Ok(Self::Simulated),
             "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
-                field: "COV_BASIS".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "COV_BASIS",
                 value: s.to_string(),
-                expected: "PREDICTED, DETERMINED, EMPIRICAL, SIMULATED, or OTHER".to_string(), line: None}),
+                expected: "PREDICTED, DETERMINED, EMPIRICAL, SIMULATED, or OTHER"}),
         }
     }
 }
@@ -1286,7 +1348,7 @@ pub enum ManBasis {
 }
 
 impl std::str::FromStr for ManBasis {
-    type Err = crate::error::CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "CANDIDATE" => Ok(Self::Candidate),
@@ -1296,12 +1358,11 @@ impl std::str::FromStr for ManBasis {
             "DETERMINED" => Ok(Self::Determined),
             "SIMULATED" => Ok(Self::Simulated),
             "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
-                field: "MAN_BASIS".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "MAN_BASIS",
                 value: s.to_string(),
                 expected:
-                    "CANDIDATE, PLANNED, ANTICIPATED, TELEMETRY, DETERMINED, SIMULATED, or OTHER"
-                        .to_string(), line: None}),
+                    "CANDIDATE, PLANNED, ANTICIPATED, TELEMETRY, DETERMINED, SIMULATED, or OTHER"}),
         }
     }
 }
@@ -1319,16 +1380,16 @@ pub enum ManDc {
 }
 
 impl std::str::FromStr for ManDc {
-    type Err = crate::error::CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "CONTINUOUS" => Ok(Self::Continuous),
             "TIME" => Ok(Self::Time),
             "TIME_AND_ANGLE" => Ok(Self::TimeAndAngle),
-            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
-                field: "DC_TYPE".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "DC_TYPE",
                 value: s.to_string(),
-                expected: "CONTINUOUS, TIME, or TIME_AND_ANGLE".to_string(), line: None}),
+                expected: "CONTINUOUS, TIME, or TIME_AND_ANGLE"}),
         }
     }
 }
@@ -1349,7 +1410,7 @@ pub enum CovOrder {
 }
 
 impl std::str::FromStr for CovOrder {
-    type Err = crate::error::CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "LTM" => Ok(Self::Ltm),
@@ -1357,10 +1418,10 @@ impl std::str::FromStr for CovOrder {
             "FULL" => Ok(Self::Full),
             "LTMWCC" => Ok(Self::LtmWcc),
             "UTMWCC" => Ok(Self::UtmWcc),
-            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
-                field: "COV_ORDERING".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "COV_ORDERING",
                 value: s.to_string(),
-                expected: "LTM, UTM, FULL, LTMWCC, or UTMWCC".to_string(), line: None}),
+                expected: "LTM, UTM, FULL, LTMWCC, or UTMWCC"}),
         }
     }
 }
@@ -1391,16 +1452,16 @@ impl std::fmt::Display for ControlledType {
     }
 }
 impl std::str::FromStr for ControlledType {
-    type Err = crate::error::CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "YES" | "yes" => Ok(ControlledType::Yes),
             "NO" | "no" => Ok(ControlledType::No),
             "UNKNOWN" | "unknown" => Ok(ControlledType::Unknown),
-            _ => Err(crate::error::CcsdsNdmError::InvalidValue {
-                field: "CONTROLLED_TYPE".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "CONTROLLED_TYPE",
                 value: s.to_string(),
-                expected: "YES, NO, or UNKNOWN".to_string(), line: None}),
+                expected: "YES, NO, or UNKNOWN"}),
         }
     }
 }
@@ -1418,10 +1479,13 @@ pub struct Duration {
 impl Duration {
     pub fn new(value: f64, units: Option<TimeUnits>) -> Result<Self> {
         if value < 0.0 {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Duration".to_string(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(), line: None});
+                expected: ">= 0".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self { value, units })
     }
@@ -1481,10 +1545,13 @@ pub struct Inclination {
 impl Inclination {
     pub fn new(value: f64, units: Option<AngleUnits>) -> Result<Self> {
         if !(0.0..=180.0).contains(&value) {
-            return Err(CcsdsNdmError::OutOfRange {
+            return Err(crate::error::ValidationError::OutOfRange {
                 name: "Inclination".to_string(),
                 value: value.to_string(),
-                expected: "[0, 180]".to_string(), line: None});
+                expected: "[0, 180]".to_string(),
+                line: None,
+            }
+            .into());
         }
         Ok(Self {
             angle: Angle { value, units },
@@ -1805,15 +1872,15 @@ pub enum CdmObjectType {
 }
 
 impl std::str::FromStr for CdmObjectType {
-    type Err = CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
             "OBJECT1" => Ok(Self::Object1),
             "OBJECT2" => Ok(Self::Object2),
-            _ => Err(CcsdsNdmError::InvalidValue {
-                field: "OBJECT".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "OBJECT",
                 value: s.to_string(),
-                expected: "OBJECT1 or OBJECT2".to_string(), line: None}),
+                expected: "OBJECT1 or OBJECT2"}),
         }
     }
 }
@@ -1831,15 +1898,15 @@ pub enum ScreenVolumeFrameType {
 }
 
 impl std::str::FromStr for ScreenVolumeFrameType {
-    type Err = CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
             "RTN" => Ok(Self::Rtn),
             "TVN" => Ok(Self::Tvn),
-            _ => Err(CcsdsNdmError::InvalidValue {
-                field: "SCREEN_VOLUME_FRAME".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "SCREEN_VOLUME_FRAME",
                 value: s.to_string(),
-                expected: "RTN or TVN".to_string(), line: None}),
+                expected: "RTN or TVN"}),
         }
     }
 }
@@ -1857,15 +1924,15 @@ pub enum ScreenVolumeShapeType {
 }
 
 impl std::str::FromStr for ScreenVolumeShapeType {
-    type Err = CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
             "ELLIPSOID" => Ok(Self::Ellipsoid),
             "BOX" => Ok(Self::Box),
-            _ => Err(CcsdsNdmError::InvalidValue {
-                field: "SCREEN_VOLUME_SHAPE".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "SCREEN_VOLUME_SHAPE",
                 value: s.to_string(),
-                expected: "ELLIPSOID or BOX".to_string(), line: None}),
+                expected: "ELLIPSOID or BOX"}),
         }
     }
 }
@@ -1887,16 +1954,16 @@ pub enum ReferenceFrameType {
 }
 
 impl std::str::FromStr for ReferenceFrameType {
-    type Err = CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
             "EME2000" => Ok(Self::Eme2000),
             "GCRF" => Ok(Self::Gcrf),
             "ITRF" => Ok(Self::Itrf),
-            _ => Err(CcsdsNdmError::InvalidValue {
-                field: "REF_FRAME".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "REF_FRAME",
                 value: s.to_string(),
-                expected: "EME2000, GCRF, or ITRF".to_string(), line: None}),
+                expected: "EME2000, GCRF, or ITRF"}),
         }
     }
 }
@@ -1914,15 +1981,15 @@ pub enum CovarianceMethodType {
 }
 
 impl std::str::FromStr for CovarianceMethodType {
-    type Err = CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
             "CALCULATED" => Ok(Self::Calculated),
             "DEFAULT" => Ok(Self::Default),
-            _ => Err(CcsdsNdmError::InvalidValue {
-                field: "COVARIANCE_METHOD".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "COVARIANCE_METHOD",
                 value: s.to_string(),
-                expected: "CALCULATED or DEFAULT".to_string(), line: None}),
+                expected: "CALCULATED or DEFAULT"}),
         }
     }
 }
@@ -1944,16 +2011,16 @@ pub enum ManeuverableType {
 }
 
 impl std::str::FromStr for ManeuverableType {
-    type Err = CcsdsNdmError;
+    type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
             "YES" => Ok(Self::Yes),
             "NO" => Ok(Self::No),
             "N/A" => Ok(Self::NA),
-            _ => Err(CcsdsNdmError::InvalidValue {
-                field: "MANEUVERABLE".to_string(),
+            _ => Err(crate::error::EnumParseError {
+                field: "MANEUVERABLE",
                 value: s.to_string(),
-                expected: "YES, NO, or N/A".to_string(), line: None}),
+                expected: "YES, NO, or N/A"}),
         }
     }
 }
@@ -1980,11 +2047,12 @@ impl FromKvnValue for Vec3Double {
     fn from_kvn_value(val: &str) -> Result<Self> {
         let parts: Vec<&str> = val.split_whitespace().collect();
         if parts.len() != 3 {
-            return Err(CcsdsNdmError::InvalidFormat(format!(
+            return Err(crate::error::FormatError::InvalidFormat(format!(
                 "Vec3Double requires 3 values, got {}: {}",
                 parts.len(),
                 val
-            )));
+            ))
+            .into());
         }
         let x = parts[0].parse::<f64>()?;
         let y = parts[1].parse::<f64>()?;

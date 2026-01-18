@@ -238,7 +238,7 @@ fn detect_and_parse_xml(s: &str) -> Result<MessageType> {
                     context: "XML parsing ended prematurely without finding root tag".into(),
                 });
             }
-            Err(e) => return Err(CcsdsNdmError::XmlParse(e)),
+            Err(e) => return Err(CcsdsNdmError::from(e)),
             _ => continue, // Ignore other events like text/PI before root
         }
     }

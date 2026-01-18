@@ -19,18 +19,20 @@
 //! 2. **Message-level**: Compose line parsers to build complete message structures
 
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
-pub use crate::error::CcsdsNdmError;
+use crate::error::{
+    CcsdsNdmError, EnumParseError, FormatError, InternalParserError, KvnParseError, ValidationError,
+};
 use crate::traits::{FromKvnFloat, FromKvnValue};
 use crate::types::{UserDefined, UserDefinedParameter, *};
 use std::str::FromStr;
 use winnow::ascii::{float, line_ending, space0, till_line_ending};
 use winnow::combinator::{alt, delimited, opt, peek, preceded, repeat, terminated};
-use winnow::error::{AddContext, ErrMode, ParserError, StrContext, StrContextValue};
+use winnow::error::{AddContext, ErrMode, FromExternalError, ParserError, StrContext, StrContextValue};
 use winnow::prelude::*;
 use winnow::token::{one_of, take_till, take_while};
 
-/// A result type for winnow parsers using the library's error type.
-pub type KvnResult<O, E = CcsdsNdmError> = Result<O, ErrMode<E>>;
+/// A result type for winnow parsers using the library's internal lightweight error type.
+pub type KvnResult<O, E = InternalParserError> = Result<O, ErrMode<E>>;
 
 //----------------------------------------------------------------------
 // Low-level fast parsers
@@ -58,15 +60,37 @@ pub fn till_space_or_eol<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
 /// Converts a winnow error to our library's error type.
 pub fn to_ccsds_error(
     input: &str,
-    err: winnow::error::ParseError<&str, CcsdsNdmError>,
+    err: winnow::error::ParseError<&str, InternalParserError>,
 ) -> CcsdsNdmError {
     let offset = err.offset();
-    err.into_inner().with_location(input, offset)
+    let inner = err.into_inner();
+
+    let base_err = match inner.kind {
+        crate::error::ParserErrorKind::MissingRequiredField { block, field } => {
+            CcsdsNdmError::Validation(Box::new(ValidationError::MissingRequiredField {
+                block: block.to_string(),
+                field: field.to_string(),
+                line: None,
+            }))
+        }
+        crate::error::ParserErrorKind::Kvn => {
+            CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+                line: 0,
+                column: 0,
+                message: inner.message,
+                contexts: inner.contexts,
+                snippet: String::new(),
+                offset: 0, // Location populated by with_location
+            }))))
+        }
+    };
+
+    base_err.with_location(input, offset)
 }
 
 /// Creates a winnow ErrMode::Cut with a static context label.
-pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<CcsdsNdmError> {
-    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<InternalParserError> {
+    ErrMode::Cut(InternalParserError::from_input(input).add_context(
         input,
         &input.checkpoint(),
         StrContext::Label(label),
@@ -78,11 +102,11 @@ pub fn missing_field_err(
     _input: &mut &str,
     block: &'static str,
     field: &'static str,
-) -> ErrMode<CcsdsNdmError> {
-    ErrMode::Cut(CcsdsNdmError::MissingRequiredField {
-        block: block.to_string(),
-        field: field.to_string(),
-        line: None, // Will be populated by to_ccsds_error
+) -> ErrMode<InternalParserError> {
+    ErrMode::Cut(InternalParserError {
+        message: String::new(),
+        contexts: Vec::new(),
+        kind: crate::error::ParserErrorKind::MissingRequiredField { block, field },
     })
 }
 
@@ -193,7 +217,7 @@ pub fn block_start<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
             return Ok(prefix);
         }
     }
-    Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)))
+    Err(ErrMode::Backtrack(InternalParserError::from_input(input)))
 }
 
 /// Parses a block end marker (e.g., META_STOP or COVARIANCE_END).
@@ -210,7 +234,7 @@ pub fn block_end<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
             return Ok(prefix);
         }
     }
-    Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)))
+    Err(ErrMode::Backtrack(InternalParserError::from_input(input)))
 }
 
 /// Parses an empty line.
@@ -236,7 +260,7 @@ pub fn raw_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
         || trimmed.ends_with("_STOP")
         || trimmed.ends_with("_END")
     {
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
 
     Ok(trimmed)
@@ -282,7 +306,7 @@ pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+            ErrMode::Cut(InternalParserError::from_input(input).add_context(
                 input,
                 &checkpoint,
                 StrContext::Label("Invalid float"),
@@ -310,7 +334,7 @@ pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+            ErrMode::Cut(InternalParserError::from_input(input).add_context(
                 input,
                 &checkpoint,
                 StrContext::Label("Invalid integer"),
@@ -338,7 +362,7 @@ pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+            ErrMode::Cut(InternalParserError::from_input(input).add_context(
                 input,
                 &checkpoint,
                 StrContext::Label("Invalid unsigned integer"),
@@ -366,7 +390,7 @@ pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+            ErrMode::Cut(InternalParserError::from_input(input).add_context(
                 input,
                 &checkpoint,
                 StrContext::Label("Invalid unsigned integer"),
@@ -402,37 +426,53 @@ pub fn kv_string(input: &mut &str) -> KvnResult<String> {
 /// Parses an Epoch value from a KVN line.
 pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    Epoch::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid Epoch"))
+    Epoch::from_str(v.trim()).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses an Epoch value as a single token (until next space).
 pub fn kv_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
     let v = till_space.parse_next(input)?;
-    Epoch::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid Epoch"))
+    Epoch::from_str(v.trim()).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses a boolean (YES/NO) from a KVN line.
 pub fn kv_yes_no(input: &mut &str) -> KvnResult<YesNo> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    YesNo::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid YES/NO value"))
+    YesNo::from_str(v.trim()).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses any type that implements FromStr from a KVN line.
-pub fn kv_enum<T: FromStr>(input: &mut &str) -> KvnResult<T> {
+pub fn kv_enum<T: FromStr>(input: &mut &str) -> KvnResult<T>
+where
+    EnumParseError: From<T::Err>,
+{
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    T::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid enum value"))
+    T::from_str(v.trim()).map_err(|e| {
+        ErrMode::Cut(InternalParserError::from_external_error(
+            input,
+            EnumParseError::from(e),
+        ))
+    })
 }
 
 /// Parses a value from a KVN line using the `FromKvnValue` trait.
 pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
     let (v, _) = kv_rest.parse_next(input)?;
-    T::from_kvn_value(v).map_err(|_| cut_err(input, "Invalid value"))
+    T::from_kvn_value(v).map_err(|e| {
+        let mut err = InternalParserError::from_input(input);
+        err.message = e.to_string();
+        ErrMode::Cut(err)
+    })
 }
 
 /// Parses any type that implements FromKvnFloat from a KVN line.
 pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
     let (v, u) = kv_float_unit.parse_next(input)?;
-    T::from_kvn_float(v, u).map_err(|_| cut_err(input, "Invalid value"))
+    T::from_kvn_float(v, u).map_err(|e| {
+        let mut err = InternalParserError::from_input(input);
+        err.message = e.to_string();
+        ErrMode::Cut(err)
+    })
 }
 
 /// Parses a float and its optional unit from a KVN line.
@@ -449,22 +489,22 @@ pub fn parse_f64(value: &str) -> crate::error::Result<f64> {
     value
         .trim()
         .parse::<f64>()
-        .map_err(CcsdsNdmError::ParseFloat)
+        .map_err(CcsdsNdmError::from)
 }
 
 /// Parses an i32 value from a string slice.
 pub fn parse_i32(value: &str) -> crate::error::Result<i32> {
-    value.trim().parse::<i32>().map_err(CcsdsNdmError::ParseInt)
+    value.trim().parse::<i32>().map_err(CcsdsNdmError::from)
 }
 
 /// Parses a u32 value from a string slice.
 pub fn parse_u32(value: &str) -> crate::error::Result<u32> {
-    value.trim().parse::<u32>().map_err(CcsdsNdmError::ParseInt)
+    value.trim().parse::<u32>().map_err(CcsdsNdmError::from)
 }
 
 /// Parses a u64 value from a string slice.
 pub fn parse_u64(value: &str) -> crate::error::Result<u64> {
-    value.trim().parse::<u64>().map_err(CcsdsNdmError::ParseInt)
+    value.trim().parse::<u64>().map_err(CcsdsNdmError::from)
 }
 
 //----------------------------------------------------------------------
@@ -498,7 +538,7 @@ pub fn expect_kv<'a, T, P>(
     mut val_parser: P,
 ) -> impl FnMut(&mut &'a str) -> KvnResult<(T, Option<&'a str>)>
 where
-    P: winnow::Parser<&'a str, T, ErrMode<CcsdsNdmError>>,
+    P: winnow::Parser<&'a str, T, ErrMode<InternalParserError>>,
 {
     move |input: &mut &'a str| {
         (
@@ -546,7 +586,7 @@ where
         ws.parse_next(input)?;
         let key = keyword.parse_next(input)?;
         if !predicate(key) {
-            return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+            return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
         }
         kv_sep.parse_next(input)?;
         let (value, unit) = kvn_value.parse_next(input)?;
@@ -593,7 +633,7 @@ pub fn skip_empty_and_comments(input: &mut &str) -> KvnResult<()> {
 /// Entry point for message parsers that handles leading whitespace.
 pub fn kvn_entry<'a, O, P>(mut parser: P) -> impl FnMut(&mut &'a str) -> KvnResult<O>
 where
-    P: Parser<&'a str, O, ErrMode<CcsdsNdmError>>,
+    P: Parser<&'a str, O, ErrMode<InternalParserError>>,
 {
     move |input: &mut &'a str| {
         ws.parse_next(input)?;
@@ -641,7 +681,7 @@ macro_rules! parse_block {
                 _ => {
                     $input.reset(&checkpoint);
                     $( // Corrected: removed unnecessary parentheses around match arm
-                        return Err(winnow::error::ErrMode::Cut(CcsdsNdmError::from_input($input).add_context(
+                        return Err(winnow::error::ErrMode::Cut(InternalParserError::from_input($input).add_context(
                             $input,
                             &$input.checkpoint(),
                             winnow::error::StrContext::Label($error_label),

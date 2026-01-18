@@ -7,6 +7,7 @@
 //! This module implements KVN parsing for CDM using winnow parser combinators.
 
 use crate::common::OdParameters;
+use crate::error::InternalParserError;
 use crate::kvn::parser::*;
 use crate::messages::cdm::{
     AdditionalParameters, Cdm, CdmBody, CdmCovarianceMatrix, CdmData, CdmHeader, CdmMetadata,
@@ -14,7 +15,7 @@ use crate::messages::cdm::{
 };
 use crate::parse_block;
 use winnow::combinator::peek;
-use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
+use winnow::error::AddContext;
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -141,46 +142,22 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
     {
         Some(RelativeStateVector {
             relative_position_r: rel_pos_r.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_POSITION_R")),
-                ))
+                missing_field_err(input, "Relative Metadata", "RELATIVE_POSITION_R")
             })?,
             relative_position_t: rel_pos_t.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_POSITION_T")),
-                ))
+                missing_field_err(input, "Relative Metadata", "RELATIVE_POSITION_T")
             })?,
             relative_position_n: rel_pos_n.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_POSITION_N")),
-                ))
+                missing_field_err(input, "Relative Metadata", "RELATIVE_POSITION_N")
             })?,
             relative_velocity_r: rel_vel_r.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_VELOCITY_R")),
-                ))
+                missing_field_err(input, "Relative Metadata", "RELATIVE_VELOCITY_R")
             })?,
             relative_velocity_t: rel_vel_t.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_VELOCITY_T")),
-                ))
+                missing_field_err(input, "Relative Metadata", "RELATIVE_VELOCITY_T")
             })?,
             relative_velocity_n: rel_vel_n.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RELATIVE_VELOCITY_N")),
-                ))
+                missing_field_err(input, "Relative Metadata", "RELATIVE_VELOCITY_N")
             })?,
         })
     } else {
@@ -189,20 +166,9 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
 
     Ok(RelativeMetadataData {
         comment,
-        tca: tca.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("TCA")),
-            ))
-        })?,
-        miss_distance: miss_distance.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MISS_DISTANCE")),
-            ))
-        })?,
+        tca: tca.ok_or_else(|| missing_field_err(input, "Relative Metadata", "TCA"))?,
+        miss_distance: miss_distance
+            .ok_or_else(|| missing_field_err(input, "Relative Metadata", "MISS_DISTANCE"))?,
         relative_speed,
         relative_state_vector,
         start_screen_period,
@@ -359,75 +325,28 @@ pub fn cdm_metadata(input: &mut &str) -> KvnResult<CdmMetadata> {
 
     Ok(CdmMetadata {
         comment,
-        object: object.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OBJECT")),
-            ))
-        })?,
-        object_designator: object_designator.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OBJECT_DESIGNATOR")),
-            ))
-        })?,
-        catalog_name: catalog_name.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("CATALOG_NAME")),
-            ))
-        })?,
-        object_name: object_name.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OBJECT_NAME")),
-            ))
-        })?,
-        international_designator: international_designator.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("INTERNATIONAL_DESIGNATOR")),
-            ))
-        })?,
+        object: object.ok_or_else(|| missing_field_err(input, "Metadata", "OBJECT"))?,
+        object_designator: object_designator
+            .ok_or_else(|| missing_field_err(input, "Metadata", "OBJECT_DESIGNATOR"))?,
+        catalog_name: catalog_name
+            .ok_or_else(|| missing_field_err(input, "Metadata", "CATALOG_NAME"))?,
+        object_name: object_name
+            .ok_or_else(|| missing_field_err(input, "Metadata", "OBJECT_NAME"))?,
+        international_designator: international_designator
+            .ok_or_else(|| missing_field_err(input, "Metadata", "INTERNATIONAL_DESIGNATOR"))?,
         object_type,
         operator_contact_position,
         operator_organization,
         operator_phone,
         operator_email,
-        ephemeris_name: ephemeris_name.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("EPHEMERIS_NAME")),
-            ))
-        })?,
-        covariance_method: covariance_method.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("COVARIANCE_METHOD")),
-            ))
-        })?,
-        maneuverable: maneuverable.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MANEUVERABLE")),
-            ))
-        })?,
+        ephemeris_name: ephemeris_name
+            .ok_or_else(|| missing_field_err(input, "Metadata", "EPHEMERIS_NAME"))?,
+        covariance_method: covariance_method
+            .ok_or_else(|| missing_field_err(input, "Metadata", "COVARIANCE_METHOD"))?,
+        maneuverable: maneuverable
+            .ok_or_else(|| missing_field_err(input, "Metadata", "MANEUVERABLE"))?,
         orbit_center,
-        ref_frame: ref_frame.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("REF_FRAME")),
-            ))
-        })?,
+        ref_frame: ref_frame.ok_or_else(|| missing_field_err(input, "Metadata", "REF_FRAME"))?,
         gravity_model,
         atmospheric_model,
         n_body_perturbations,
@@ -581,27 +500,42 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
     let covariance_matrix = if has_cov {
         CdmCovarianceMatrix {
             comment: Vec::new(),
-            cr_r: cr_r.ok_or_else(|| cut_err(input, "Missing CR_R"))?,
-            ct_r: ct_r.ok_or_else(|| cut_err(input, "Missing CT_R"))?,
-            ct_t: ct_t.ok_or_else(|| cut_err(input, "Missing CT_T"))?,
-            cn_r: cn_r.ok_or_else(|| cut_err(input, "Missing CN_R"))?,
-            cn_t: cn_t.ok_or_else(|| cut_err(input, "Missing CN_T"))?,
-            cn_n: cn_n.ok_or_else(|| cut_err(input, "Missing CN_N"))?,
-            crdot_r: crdot_r.ok_or_else(|| cut_err(input, "Missing CRDOT_R"))?,
-            crdot_t: crdot_t.ok_or_else(|| cut_err(input, "Missing CRDOT_T"))?,
-            crdot_n: crdot_n.ok_or_else(|| cut_err(input, "Missing CRDOT_N"))?,
-            crdot_rdot: crdot_rdot.ok_or_else(|| cut_err(input, "Missing CRDOT_RDOT"))?,
-            ctdot_r: ctdot_r.ok_or_else(|| cut_err(input, "Missing CTDOT_R"))?,
-            ctdot_t: ctdot_t.ok_or_else(|| cut_err(input, "Missing CTDOT_T"))?,
-            ctdot_n: ctdot_n.ok_or_else(|| cut_err(input, "Missing CTDOT_N"))?,
-            ctdot_rdot: ctdot_rdot.ok_or_else(|| cut_err(input, "Missing CTDOT_RDOT"))?,
-            ctdot_tdot: ctdot_tdot.ok_or_else(|| cut_err(input, "Missing CTDOT_TDOT"))?,
-            cndot_r: cndot_r.ok_or_else(|| cut_err(input, "Missing CNDOT_R"))?,
-            cndot_t: cndot_t.ok_or_else(|| cut_err(input, "Missing CNDOT_T"))?,
-            cndot_n: cndot_n.ok_or_else(|| cut_err(input, "Missing CNDOT_N"))?,
-            cndot_rdot: cndot_rdot.ok_or_else(|| cut_err(input, "Missing CNDOT_RDOT"))?,
-            cndot_tdot: cndot_tdot.ok_or_else(|| cut_err(input, "Missing CNDOT_TDOT"))?,
-            cndot_ndot: cndot_ndot.ok_or_else(|| cut_err(input, "Missing CNDOT_NDOT"))?,
+            cr_r: cr_r.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CR_R"))?,
+            ct_r: ct_r.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CT_R"))?,
+            ct_t: ct_t.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CT_T"))?,
+            cn_r: cn_r.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CN_R"))?,
+            cn_t: cn_t.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CN_T"))?,
+            cn_n: cn_n.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CN_N"))?,
+            crdot_r: crdot_r
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CRDOT_R"))?,
+            crdot_t: crdot_t
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CRDOT_T"))?,
+            crdot_n: crdot_n
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CRDOT_N"))?,
+            crdot_rdot: crdot_rdot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CRDOT_RDOT"))?,
+            ctdot_r: ctdot_r
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CTDOT_R"))?,
+            ctdot_t: ctdot_t
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CTDOT_T"))?,
+            ctdot_n: ctdot_n
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CTDOT_N"))?,
+            ctdot_rdot: ctdot_rdot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CTDOT_RDOT"))?,
+            ctdot_tdot: ctdot_tdot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CTDOT_TDOT"))?,
+            cndot_r: cndot_r
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CNDOT_R"))?,
+            cndot_t: cndot_t
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CNDOT_T"))?,
+            cndot_n: cndot_n
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CNDOT_N"))?,
+            cndot_rdot: cndot_rdot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CNDOT_RDOT"))?,
+            cndot_tdot: cndot_tdot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CNDOT_TDOT"))?,
+            cndot_ndot: cndot_ndot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CNDOT_NDOT"))?,
             cdrg_r,
             cdrg_t,
             cdrg_n,
@@ -628,15 +562,7 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
             cthr_thr,
         }
     } else {
-        return Err(winnow::error::ErrMode::Cut(
-            CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                winnow::error::StrContext::Expected(winnow::error::StrContextValue::Description(
-                    "Covariance Matrix keys",
-                )),
-            ),
-        ));
+        return Err(cut_err(input, "Covariance Matrix keys"));
     };
 
     Ok(CdmData {
@@ -648,48 +574,12 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
             None
         },
         state_vector: CdmStateVector {
-            x: x.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("X")),
-                ))
-            })?,
-            y: y.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("Y")),
-                ))
-            })?,
-            z: z.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("Z")),
-                ))
-            })?,
-            x_dot: x_dot.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("X_DOT")),
-                ))
-            })?,
-            y_dot: y_dot.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("Y_DOT")),
-                ))
-            })?,
-            z_dot: z_dot.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("Z_DOT")),
-                ))
-            })?,
+            x: x.ok_or_else(|| missing_field_err(input, "Data", "X"))?,
+            y: y.ok_or_else(|| missing_field_err(input, "Data", "Y"))?,
+            z: z.ok_or_else(|| missing_field_err(input, "Data", "Z"))?,
+            x_dot: x_dot.ok_or_else(|| missing_field_err(input, "Data", "X_DOT"))?,
+            y_dot: y_dot.ok_or_else(|| missing_field_err(input, "Data", "Y_DOT"))?,
+            z_dot: z_dot.ok_or_else(|| missing_field_err(input, "Data", "Z_DOT"))?,
         },
         covariance_matrix,
     })
@@ -771,7 +661,7 @@ impl ParseKvn for Cdm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::CcsdsNdmError;
+    use crate::error::{CcsdsNdmError, FormatError, ValidationError};
     use crate::traits::Ndm;
     use crate::types::*;
 
@@ -1013,9 +903,12 @@ MESSAGE_ID = MSG-001
 "###;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingRequiredField { field, .. } => {
-                assert_eq!(field, "CREATION_DATE");
-            }
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "CREATION_DATE");
+                }
+                _ => panic!("unexpected validation error: {:?}", val_err),
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1070,8 +963,8 @@ CNDOT_TDOT = 0.0 [m**2/s**2]
 CNDOT_NDOT = 1.0 [m**2/s**2]
 "###;
         let err = Cdm::from_kvn(kvn).unwrap_err();
-        if let CcsdsNdmError::ValidationError { message: _, .. } = err {
-            // Validation error for "exactly 2 segments"
+        if let CcsdsNdmError::Validation(_) = err {
+            // expected
         }
     }
 
@@ -1165,14 +1058,12 @@ CNDOT_NDOT = 1 [m**2/s**2]
 "###;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message.contains("RELATIVE_VELOCITY_N")
-                        || contexts.iter().any(|c| c.contains("RELATIVE_VELOCITY_N"))
-                )
-            }
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "RELATIVE_VELOCITY_N");
+                }
+                _ => panic!("unexpected validation error: {:?}", val_err),
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1184,11 +1075,17 @@ CNDOT_NDOT = 1 [m**2/s**2]
         kvn = kvn.replace("CR_R = 1.0 [m**2]", "");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(message.contains("CR_R") || contexts.iter().any(|c| c.contains("CR_R")))
-            }
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField {
+                    ref block,
+                    ref field,
+                    ..
+                } => {
+                    assert_eq!(block, "Covariance Matrix");
+                    assert_eq!(field, "CR_R");
+                }
+                _ => panic!("unexpected validation error: {:?}", val_err),
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1200,7 +1097,7 @@ CNDOT_NDOT = 1 [m**2/s**2]
         kvn = kvn.replace("SCREEN_VOLUME_FRAME = RTN", "SCREEN_VOLUME_FRAME = BAD");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { .. } => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
 
@@ -1209,7 +1106,7 @@ CNDOT_NDOT = 1 [m**2/s**2]
         kvn2 = kvn2.replace("SCREEN_VOLUME_SHAPE = BOX", "SCREEN_VOLUME_SHAPE = BALL");
         let err2 = Cdm::from_kvn(&kvn2).unwrap_err();
         match err2 {
-            CcsdsNdmError::KvnParse { .. } => {} // Expected error
+            e if e.is_kvn_error() => {} // Expected error
             _ => panic!("unexpected error: {:?}", err2),
         }
     }
@@ -1222,16 +1119,20 @@ ORIGINATOR = TEST
 "#;
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message, contexts, ..
-            } => {
-                assert!(
-                    message.to_lowercase().contains("expected ccsds_cdm_vers")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("ccsds_cdm_vers"))
-                )
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message
+                            .to_lowercase()
+                            .contains("expected ccsds_cdm_vers")
+                            || err
+                                .contexts
+                                .iter()
+                                .any(|c| c.to_lowercase().contains("ccsds_cdm_vers"))
+                    )
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1242,7 +1143,7 @@ ORIGINATOR = TEST
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::UnexpectedEof { .. } => {} // Can be EOF or KvnParse depending on parser state
-            CcsdsNdmError::KvnParse { .. } => {} // Can be EOF or KvnParse depending on parser state
+            e if e.is_kvn_error() => {} // Can be EOF or KvnParse depending on parser state
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1377,7 +1278,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { .. } => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1392,16 +1293,15 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.contains("Unknown Relative Metadata key")
-                        || contexts.contains(&"Unknown Relative Metadata key")
-                )
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unknown Relative Metadata key")
+                            || err.contexts.contains(&"Unknown Relative Metadata key")
+                    )
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1518,7 +1418,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("OBJECT = OBJECT1", "OBJECT = OBJECT3");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { .. } => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1532,7 +1432,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { .. } => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1554,7 +1454,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("MANEUVERABLE = YES", "MANEUVERABLE = MAYBE");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { .. } => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1586,7 +1486,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = INVALID");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { .. } => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1600,16 +1500,15 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.contains("Unknown metadata key")
-                        || contexts.contains(&"Unknown metadata key")
-                )
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unknown metadata key")
+                            || err.contexts.contains(&"Unknown metadata key")
+                    )
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1725,13 +1624,15 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(msg.contains("Unknown Data key") || contexts.contains(&"Unknown Data key"))
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unknown Data key")
+                            || err.contexts.contains(&"Unknown Data key")
+                    )
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1758,8 +1659,8 @@ MISS_DISTANCE = 100.0 [m]
 META_START
 "###;
         let err = Cdm::from_kvn(kvn).unwrap_err();
-        if let CcsdsNdmError::ValidationError { message: _, .. } = err {
-            // Validation error for "exactly 2 segments"
+        if let CcsdsNdmError::Validation(_) = err {
+            // expected
         }
     }
 
@@ -1774,7 +1675,9 @@ TCA = 2025-01-02T12:00:00
         let err = Cdm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::UnexpectedEof { .. } => {} // Can be EOF or KvnParse depending on parser state
-            CcsdsNdmError::KvnParse { .. } => {}
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {}
+            CcsdsNdmError::Validation(val_err)
+                if matches!(*val_err, ValidationError::MissingRequiredField { .. }) => {}
             _ => panic!("unexpected error: {:?}", err),
         }
     }

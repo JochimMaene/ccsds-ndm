@@ -1182,7 +1182,7 @@ impl TdmObservationData {
     }
 
     pub fn from_key_val(key: &str, val: &str) -> Result<Self> {
-        let pf = |s: &str| s.parse::<f64>().map_err(CcsdsNdmError::ParseFloat);
+        let pf = |s: &str| s.parse::<f64>().map_err(CcsdsNdmError::from);
         match key {
             "ANGLE_1" => Ok(Self::Angle1(pf(val)?)),
             "ANGLE_2" => Ok(Self::Angle2(pf(val)?)),
@@ -1231,10 +1231,11 @@ impl TdmObservationData {
             "TROPO_DRY" => Ok(Self::TropoDry(pf(val)?)),
             "TROPO_WET" => Ok(Self::TropoWet(pf(val)?)),
             "VLBI_DELAY" => Ok(Self::VlbiDelay(pf(val)?)),
-            _ => Err(CcsdsNdmError::ValidationError { message: format!(
-                "Unknown TDM data keyword: {}",
-                key
-            ), line: None }),
+            _ => Err(crate::error::ValidationError::Generic {
+                message: format!("Invalid TDM observation data for type {}: {}", key, val),
+                line: None,
+            }
+            .into()),
         }
     }
 }

@@ -11,7 +11,6 @@ use crate::messages::omm::{
     MeanElements, Omm, OmmBody, OmmData, OmmMetadata, OmmSegment, TleParameters,
 };
 use crate::parse_block;
-use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -52,49 +51,13 @@ pub fn omm_metadata(input: &mut &str) -> KvnResult<OmmMetadata> {
 
     Ok(OmmMetadata {
         comment,
-        object_name: object_name.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OBJECT_NAME")),
-            ))
-        })?,
-        object_id: object_id.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OBJECT_ID")),
-            ))
-        })?,
-        center_name: center_name.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("CENTER_NAME")),
-            ))
-        })?,
-        ref_frame: ref_frame.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("REF_FRAME")),
-            ))
-        })?,
+        object_name: object_name.ok_or_else(|| missing_field_err(input, "OMM Metadata", "OBJECT_NAME"))?,
+        object_id: object_id.ok_or_else(|| missing_field_err(input, "OMM Metadata", "OBJECT_ID"))?,
+        center_name: center_name.ok_or_else(|| missing_field_err(input, "OMM Metadata", "CENTER_NAME"))?,
+        ref_frame: ref_frame.ok_or_else(|| missing_field_err(input, "OMM Metadata", "REF_FRAME"))?,
         ref_frame_epoch,
-        time_system: time_system.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("TIME_SYSTEM")),
-            ))
-        })?,
-        mean_element_theory: mean_element_theory.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MEAN_ELEMENT_THEORY")),
-            ))
-        })?,
+        time_system: time_system.ok_or_else(|| missing_field_err(input, "OMM Metadata", "TIME_SYSTEM"))?,
+        mean_element_theory: mean_element_theory.ok_or_else(|| missing_field_err(input, "OMM Metadata", "MEAN_ELEMENT_THEORY"))?,
     })
 }
 
@@ -131,50 +94,14 @@ pub fn mean_elements(input: &mut &str) -> KvnResult<(Vec<String>, MeanElements)>
         comment,
         MeanElements {
             comment: Vec::new(), // comment is returned as part of the tuple for OmmData
-            epoch: epoch.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("EPOCH")),
-                ))
-            })?,
+            epoch: epoch.ok_or_else(|| missing_field_err(input, "Mean Elements", "EPOCH"))?,
             semi_major_axis,
             mean_motion,
-            eccentricity: eccentricity.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("ECCENTRICITY")),
-                ))
-            })?,
-            inclination: inclination.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("INCLINATION")),
-                ))
-            })?,
-            ra_of_asc_node: ra_of_asc_node.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("RA_OF_ASC_NODE")),
-                ))
-            })?,
-            arg_of_pericenter: arg_of_pericenter.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("ARG_OF_PERICENTER")),
-                ))
-            })?,
-            mean_anomaly: mean_anomaly.ok_or_else(|| {
-                ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("MEAN_ANOMALY")),
-                ))
-            })?,
+            eccentricity: eccentricity.ok_or_else(|| missing_field_err(input, "Mean Elements", "ECCENTRICITY"))?,
+            inclination: inclination.ok_or_else(|| missing_field_err(input, "Mean Elements", "INCLINATION"))?,
+            ra_of_asc_node: ra_of_asc_node.ok_or_else(|| missing_field_err(input, "Mean Elements", "RA_OF_ASC_NODE"))?,
+            arg_of_pericenter: arg_of_pericenter.ok_or_else(|| missing_field_err(input, "Mean Elements", "ARG_OF_PERICENTER"))?,
+            mean_anomaly: mean_anomaly.ok_or_else(|| missing_field_err(input, "Mean Elements", "MEAN_ANOMALY"))?,
             gm,
         },
     ))
@@ -227,43 +154,21 @@ pub fn tle_parameters(input: &mut &str) -> KvnResult<Option<TleParameters>> {
 
     if let Some(esn) = element_set_no {
         if esn > 9999 {
-            return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("ELEMENT_SET_NO must be in range [0, 9999]"),
-            )));
+            return Err(cut_err(input, "ELEMENT_SET_NO must be in range [0, 9999]"));
         }
     }
 
     if bstar.is_some() && bterm.is_some() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Label("Cannot have both BSTAR and BTERM"),
-        )));
+        return Err(cut_err(input, "Cannot have both BSTAR and BTERM"));
     }
     if bstar.is_none() && bterm.is_none() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Label("Either BSTAR or BTERM must be present in TLE Parameters"),
-        )));
+        return Err(cut_err(input, "Either BSTAR or BTERM must be present in TLE Parameters"));
     }
 
-    let mean_motion_dot = mean_motion_dot.ok_or_else(|| {
-        ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Expected(StrContextValue::Description("MEAN_MOTION_DOT")),
-        ))
-    })?;
+    let mean_motion_dot = mean_motion_dot.ok_or_else(|| missing_field_err(input, "TLE Parameters", "MEAN_MOTION_DOT"))?;
 
     if mean_motion_ddot.is_some() && agom.is_some() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Label("Cannot have both MEAN_MOTION_DDOT and AGOM"),
-        )));
+        return Err(cut_err(input, "Cannot have both MEAN_MOTION_DDOT and AGOM"));
     }
 
     Ok(Some(TleParameters {
