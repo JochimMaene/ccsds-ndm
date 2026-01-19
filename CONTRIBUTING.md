@@ -9,81 +9,30 @@ Thank you for your interest in contributing! This document provides guidelines a
 - **Rust** (stable, 1.70+): https://rustup.rs/
 - **Python** (3.9+): https://www.python.org/
 - **uv** (Python package manager): https://docs.astral.sh/uv/
+- **prek** (Pre-commit hook runner): `pip install prek`
 
 ### Using `just` for Common Tasks
 
-This project uses [`just`](https://github.com/casey/just) as a command runner to simplify common development tasks. After installing `just` (`cargo install just`), you can use the following commands from the project root:
+This project uses [`just`](https://github.com/casey/just) as a command runner. After installing `just` (`cargo install just`), you can run `just` from the project root to see all available recipes.
 
 *   `just setup`: Installs all necessary Python dependencies for development and documentation.
-*   `just test`: Runs the full test suite for both Rust and Python. This is the default command if you just run `just`.
-*   `just lint`: Runs linters (`clippy` for Rust, `ruff` for Python).
-*   `just fmt`: Formats the code (`cargo fmt` for Rust, `ruff format` for Python).
-*   `just build`: Creates a release build of the Python bindings.
-*   `just docs-serve`: Builds and serves the documentation locally.
-*   `just clean`: Removes build artifacts.
-
-You can still use the individual `cargo` and `uv` commands as described below, but the `just` recipes provide a convenient way to perform common actions.
+*   `just pre-commit-install`: Installs the git hooks using `prek`.
+*   `just dev`: Installs the Python bindings in development mode (`maturin develop`).
+*   `just test`: Runs the full test suite for both Rust and Python.
+*   `just check`: Runs all quality checks (linting, audit, stub check, sync check, license, and tests).
+*   `just sync-docs`: Synchronizes docstrings from Rust core to Python bindings.
+*   `just stubs`: Generates Python type stubs (`.pyi` files).
+*   `just lint` / `just fmt`: Lints and formats both Rust and Python code.
+*   `just docs`: Builds the documentation.
+*   `just docs-serve`: Builds and serves the documentation locally with live-reload.
 
 ### Clone the Repository
 
 ```bash
 git clone https://github.com/JochimMaene/ccsds-ndm.git
 cd ccsds-ndm
-```
-
-### Rust Development
-
-The core library is in `ccsds-ndm/`:
-
-```bash
-cd ccsds-ndm
-
-# Run tests
-cargo test
-
-# Run lints
-cargo clippy --all-targets --all-features -- -D warnings
-
-# Format code
-cargo fmt
-
-# Run benchmarks
-cargo bench
-```
-
-### Python Bindings Development
-
-The Python bindings are in `bindings/python/`:
-
-```bash
-cd bindings/python
-
-# Install dependencies and set up virtual environment
-uv sync
-
-# Build and install the extension in development mode
-uv run maturin develop
-
-# Run tests
-uv run pytest
-
-# Run specific test file
-uv run pytest tests/test_oem.py -v
-
-# Build release wheel
-uv run maturin build --release
-```
-
-### Documentation
-
-Documentation is built with Sphinx from the `docs/` directory:
-
-```bash
-# From project root
-uv sync
-uv run sphinx-build docs docs/_build
-
-# Open docs/_build/index.html in your browser
+just setup
+just pre-commit-install
 ```
 
 ## Project Structure
@@ -99,7 +48,7 @@ ccsds-ndm/
 │   └── tests/           # Integration tests
 ├── bindings/python/     # Python bindings (PyO3)
 │   ├── src/             # Rust code for bindings
-│   ├── ccsds_ndm/       # Python type stubs (.pyi)
+│   ├── ccsds_ndm/       # Python package and type stubs (.pyi)
 │   └── tests/           # Python tests
 ├── data/                # Test data files
 │   ├── kvn/             # Sample KVN files
@@ -111,9 +60,9 @@ ccsds-ndm/
 
 ### Code Style
 
-- **Rust**: Follow standard Rust conventions. Run `cargo fmt` before committing.
-- **Python**: Follow PEP 8. Type hints are required for public APIs.
-- **Documentation**: Use clear, concise language. Include code examples where helpful.
+- **Rust**: Follow standard Rust conventions. Run `just fmt-rust` before committing.
+- **Python**: Follow PEP 8. Documentation and type hints are automatically managed via `just sync-docs` and `just stubs`.
+- **Documentation**: Use clear, concise language. Documentation in Rust source (`///`) is automatically synced to Python.
 
 ### Commit Messages
 
@@ -129,56 +78,46 @@ chore: update dependencies
 
 ### Pull Request Process
 
-1. **Fork** the repository and create a feature branch from `main`
-2. **Make your changes** with clear, focused commits
-3. **Add tests** for new functionality
-4. **Update documentation** if needed
-5. **Run the test suite** locally:
+1. **Fork** the repository and create a feature branch from `main`.
+2. **Make your changes** with clear, focused commits.
+3. **Sync bindings**: If you modified Rust structures exposed to Python, run `just sync-docs` and `just stubs`.
+4. **Add tests** for new functionality.
+5. **Run the full check suite** locally:
    ```bash
-   # Rust
-   cargo test
-   cargo clippy --all-targets --all-features -- -D warnings
-   cargo fmt -- --check
-
-   # Python
-   cd bindings/python
-   uv run maturin develop
-   uv run pytest
+   just check
    ```
-6. **Open a Pull Request** with a clear description of the changes
+6. **Open a Pull Request** with a clear description of the changes.
 
 ### Adding a New Message Type
 
 When adding support for a new CCSDS message type:
 
 1. **Rust implementation** (`ccsds-ndm/src/messages/`):
-   - Create the message module (e.g., `aem.rs`)
-   - Define structs matching the XSD schema
-   - Implement the `Ndm` trait (`to_kvn`, `from_kvn`, `to_xml`, `from_xml`)
-   - Add to `messages/mod.rs` and `lib.rs`
+   - Create the message module (e.g., `aem.rs`).
+   - Define structs matching the XSD schema and provide thorough docstrings (`///`).
+   - Implement the `Ndm` trait (`to_kvn`, `from_kvn`, `to_xml`, `from_xml`).
+   - Add to `messages/mod.rs` and `lib.rs`.
 
 2. **Python bindings** (`bindings/python/src/`):
-   - Create wrapper structs with `#[pyclass]`
-   - Expose properties with `#[getter]`/`#[setter]`
-   - Add `from_str`, `from_file`, `to_kvn`, `to_xml` methods
-   - Register in `lib.rs`
+   - Create wrapper structs with `#[pyclass]`.
+   - Expose properties with `#[getter]`/`#[setter]`.
+   - Add `from_str`, `from_file`, `to_kvn`, `to_xml` methods.
+   - Register the class in `bindings/python/src/lib.rs`.
 
-3. **Type stubs** (`bindings/python/ccsds_ndm/`):
-   - Add `.pyi` file with type annotations
+3. **Synchronize**:
+   - Run `just sync-docs` to copy docstrings from Rust to the Python binding source.
+   - Run `just stubs` to generate the updated `__init__.pyi` file.
+   - Run `just audit` to ensure all Rust fields are correctly exposed in Python.
 
-4. **Tests**:
-   - Add sample files to `data/kvn/` and `data/xml/`
-   - Add Rust tests in the message module
-   - Add Python tests in `bindings/python/tests/`
-
-5. **Documentation**:
-   - Add API documentation in `docs/api/`
-   - Update the README if needed
+4. **Tests & Data**:
+   - Add sample files to `data/kvn/` and `data/xml/`.
+   - Add Rust tests in the message module.
+   - Add Python tests in `bindings/python/tests/`.
 
 ## Test Data
 
 Sample KVN and XML files are in `data/`. These are based on examples from CCSDS standards documents. When adding test data:
 
-- Use realistic but non-sensitive data
-- Include edge cases (optional fields, multiple segments, etc.)
-- Reference the CCSDS document section if applicable
+- Use realistic but non-sensitive data.
+- Include edge cases (optional fields, multiple segments, etc.).
+- Reference the CCSDS document section if applicable.

@@ -24,9 +24,13 @@ setup: setup-dev setup-docs
 
 # --- Pre-commit -------------------------------------------------------------
 
-# Install pre-commit hooks
+# Install pre-commit hooks using prek
 pre-commit-install:
-    pre-commit install --hook-type pre-commit --hook-type pre-push
+    prek install
+
+# Run prek on all files
+prek:
+    prek run --all-files
 
 # --- Development ------------------------------------------------------------
 
