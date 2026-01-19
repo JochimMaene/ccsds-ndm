@@ -25,6 +25,8 @@ jobs:
           cache-target: release
           bins: cargo-codspeed
 
+      - uses: taiki-e/install-action@just
+
       - name: Build the benchmark target(s)
         run: just bench-build
 
