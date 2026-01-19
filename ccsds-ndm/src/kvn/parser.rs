@@ -79,8 +79,8 @@ pub fn to_ccsds_error(
             CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
                 line: 0,
                 column: 0,
-                message: inner.message,
-                contexts: inner.contexts,
+                message: inner.message.into_owned(),
+                contexts: inner.contexts.to_vec(),
                 snippet: String::new(),
                 offset: 0, // Location populated by with_location
             }))))
@@ -106,8 +106,8 @@ pub fn missing_field_err(
     field: &'static str,
 ) -> ErrMode<InternalParserError> {
     ErrMode::Cut(InternalParserError {
-        message: String::new(),
-        contexts: Vec::new(),
+        message: std::borrow::Cow::Borrowed(""),
+        contexts: crate::error::ContextStack::new(),
         kind: crate::error::ParserErrorKind::MissingRequiredField { block, field },
     })
 }

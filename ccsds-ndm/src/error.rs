@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::types::EpochError;
+use std::borrow::Cow;
 use thiserror::Error;
 use winnow::error::{AddContext, ParserError, StrContext};
 use winnow::stream::Stream;
@@ -159,6 +160,29 @@ pub enum ValidationError {
     },
 }
 
+/// Trait for errors that can be enriched with line/column info.
+pub trait WithLocation: Sized {
+    /// Adds location information to the error.
+    fn with_line(self, line: usize) -> Self;
+}
+
+impl WithLocation for ValidationError {
+    fn with_line(mut self, line: usize) -> Self {
+        match &mut self {
+            ValidationError::OutOfRange { line: ref mut l, .. }
+            | ValidationError::InvalidValue { line: ref mut l, .. }
+            | ValidationError::MissingRequiredField { line: ref mut l, .. }
+            | ValidationError::Conflict { line: ref mut l, .. }
+            | ValidationError::Generic { line: ref mut l, .. } => {
+                if l.is_none() {
+                    *l = Some(line);
+                }
+            }
+        }
+        self
+    }
+}
+
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum CcsdsNdmError {
@@ -187,11 +211,43 @@ pub enum CcsdsNdmError {
     UnexpectedEof { context: String },
 }
 
+/// A stack-allocated collection of error contexts.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ContextStack {
+    contexts: [&'static str; 8],
+    len: usize,
+}
+
+impl ContextStack {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, context: &'static str) {
+        if self.len < self.contexts.len() {
+            self.contexts[self.len] = context;
+            self.len += 1;
+        }
+    }
+
+    pub fn last(&self) -> Option<&&'static str> {
+        if self.len > 0 {
+            Some(&self.contexts[self.len - 1])
+        } else {
+            None
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<&'static str> {
+        self.contexts[..self.len].to_vec()
+    }
+}
+
 /// A lightweight internal error type for winnow parsers.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InternalParserError {
-    pub message: String,
-    pub contexts: Vec<&'static str>,
+    pub message: Cow<'static, str>,
+    pub contexts: ContextStack,
     pub kind: ParserErrorKind,
 }
 
@@ -209,8 +265,8 @@ impl ParserError<&str> for InternalParserError {
     type Inner = ();
     fn from_input(_input: &&str) -> Self {
         Self {
-            message: String::new(),
-            contexts: Vec::new(),
+            message: Cow::Borrowed(""),
+            contexts: ContextStack::new(),
             kind: ParserErrorKind::default(),
         }
     }
@@ -223,8 +279,8 @@ impl ParserError<&str> for InternalParserError {
 impl winnow::error::FromExternalError<&str, EpochError> for InternalParserError {
     fn from_external_error(_input: &&str, e: EpochError) -> Self {
         Self {
-            message: e.to_string(),
-            contexts: Vec::new(),
+            message: Cow::Owned(e.to_string()),
+            contexts: ContextStack::new(),
             kind: ParserErrorKind::default(),
         }
     }
@@ -233,8 +289,8 @@ impl winnow::error::FromExternalError<&str, EpochError> for InternalParserError 
 impl winnow::error::FromExternalError<&str, std::num::ParseFloatError> for InternalParserError {
     fn from_external_error(_input: &&str, e: std::num::ParseFloatError) -> Self {
         Self {
-            message: e.to_string(),
-            contexts: Vec::new(),
+            message: Cow::Owned(e.to_string()),
+            contexts: ContextStack::new(),
             kind: ParserErrorKind::default(),
         }
     }
@@ -243,8 +299,8 @@ impl winnow::error::FromExternalError<&str, std::num::ParseFloatError> for Inter
 impl winnow::error::FromExternalError<&str, std::num::ParseIntError> for InternalParserError {
     fn from_external_error(_input: &&str, e: std::num::ParseIntError) -> Self {
         Self {
-            message: e.to_string(),
-            contexts: Vec::new(),
+            message: Cow::Owned(e.to_string()),
+            contexts: ContextStack::new(),
             kind: ParserErrorKind::default(),
         }
     }
@@ -253,8 +309,8 @@ impl winnow::error::FromExternalError<&str, std::num::ParseIntError> for Interna
 impl winnow::error::FromExternalError<&str, EnumParseError> for InternalParserError {
     fn from_external_error(_input: &&str, e: EnumParseError) -> Self {
         Self {
-            message: e.to_string(),
-            contexts: Vec::new(),
+            message: Cow::Owned(e.to_string()),
+            contexts: ContextStack::new(),
             kind: ParserErrorKind::default(),
         }
     }
@@ -269,14 +325,14 @@ impl winnow::error::FromExternalError<&str, ValidationError> for InternalParserE
                 // If they are not static, we might need a different approach.
                 // For now, let's assume we can use labels or just the message.
                 Self {
-                    message: e.to_string(),
-                    contexts: Vec::new(),
+                    message: Cow::Owned(e.to_string()),
+                    contexts: ContextStack::new(),
                     kind: ParserErrorKind::Kvn, // Fallback
                 }
             }
             _ => Self {
-                message: e.to_string(),
-                contexts: Vec::new(),
+                message: Cow::Owned(e.to_string()),
+                contexts: ContextStack::new(),
                 kind: ParserErrorKind::default(),
             },
         }
@@ -296,7 +352,9 @@ impl AddContext<&str, StrContext> for InternalParserError {
                     self.contexts.push(l);
                 }
             }
-            StrContext::Expected(e) => self.message = format!("Expected {}", e),
+            StrContext::Expected(e) => {
+                self.message = Cow::Owned(format!("Expected {}", e));
+            }
             _ => {} // Ignore other context types for now
         }
         self
