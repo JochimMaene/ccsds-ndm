@@ -169,11 +169,21 @@ pub trait WithLocation: Sized {
 impl WithLocation for ValidationError {
     fn with_line(mut self, line: usize) -> Self {
         match &mut self {
-            ValidationError::OutOfRange { line: ref mut l, .. }
-            | ValidationError::InvalidValue { line: ref mut l, .. }
-            | ValidationError::MissingRequiredField { line: ref mut l, .. }
-            | ValidationError::Conflict { line: ref mut l, .. }
-            | ValidationError::Generic { line: ref mut l, .. } => {
+            ValidationError::OutOfRange {
+                line: ref mut l, ..
+            }
+            | ValidationError::InvalidValue {
+                line: ref mut l, ..
+            }
+            | ValidationError::MissingRequiredField {
+                line: ref mut l, ..
+            }
+            | ValidationError::Conflict {
+                line: ref mut l, ..
+            }
+            | ValidationError::Generic {
+                line: ref mut l, ..
+            } => {
                 if l.is_none() {
                     *l = Some(line);
                 }

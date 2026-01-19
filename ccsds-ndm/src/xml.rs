@@ -40,4 +40,3 @@ pub fn to_string<T: Serialize>(t: &T) -> Result<String> {
     let xml_body = to_xml_string(t)?;
     Ok(format!("{}\n{}", XML_HEADER, xml_body))
 }
-

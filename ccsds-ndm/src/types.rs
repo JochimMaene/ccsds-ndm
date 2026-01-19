@@ -2154,12 +2154,24 @@ impl FromKvnValue for Vec3Double {
             ))
             .into());
         }
-        let x = fast_float::parse(parts[0])
-            .map_err(|_| CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic { message: "Invalid X component".to_string(), line: None })))?;
-        let y = fast_float::parse(parts[1])
-            .map_err(|_| CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic { message: "Invalid Y component".to_string(), line: None })))?;
-        let z = fast_float::parse(parts[2])
-            .map_err(|_| CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic { message: "Invalid Z component".to_string(), line: None })))?;
+        let x = fast_float::parse(parts[0]).map_err(|_| {
+            CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic {
+                message: "Invalid X component".to_string(),
+                line: None,
+            }))
+        })?;
+        let y = fast_float::parse(parts[1]).map_err(|_| {
+            CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic {
+                message: "Invalid Y component".to_string(),
+                line: None,
+            }))
+        })?;
+        let z = fast_float::parse(parts[2]).map_err(|_| {
+            CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic {
+                message: "Invalid Z component".to_string(),
+                line: None,
+            }))
+        })?;
         Ok(Self { x, y, z })
     }
 }
