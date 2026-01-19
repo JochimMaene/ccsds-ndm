@@ -224,7 +224,7 @@ pub enum CcsdsNdmError {
 /// A stack-allocated collection of error contexts.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContextStack {
-    contexts: [&'static str; 8],
+    contexts: [&'static str; 2],
     len: usize,
 }
 

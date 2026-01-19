@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-#![allow(clippy::result_large_err)]
-
 //! # CCSDS NDM
 //!
 //! A library for parsing and generating CCSDS Navigation Data Messages (NDM)
