@@ -27,7 +27,9 @@ use crate::types::{UserDefined, UserDefinedParameter, *};
 use std::str::FromStr;
 use winnow::ascii::{float, line_ending, space0, till_line_ending};
 use winnow::combinator::{alt, delimited, opt, peek, preceded, repeat, terminated};
-use winnow::error::{AddContext, ErrMode, FromExternalError, ParserError, StrContext, StrContextValue};
+use winnow::error::{
+    AddContext, ErrMode, FromExternalError, ParserError, StrContext, StrContextValue,
+};
 use winnow::prelude::*;
 use winnow::token::{one_of, take_till, take_while};
 
@@ -426,19 +428,22 @@ pub fn kv_string(input: &mut &str) -> KvnResult<String> {
 /// Parses an Epoch value from a KVN line.
 pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    Epoch::from_str(v.trim()).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    Epoch::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses an Epoch value as a single token (until next space).
 pub fn kv_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
     let v = till_space.parse_next(input)?;
-    Epoch::from_str(v.trim()).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    Epoch::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses a boolean (YES/NO) from a KVN line.
 pub fn kv_yes_no(input: &mut &str) -> KvnResult<YesNo> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    YesNo::from_str(v.trim()).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    YesNo::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses any type that implements FromStr from a KVN line.
@@ -486,10 +491,7 @@ pub fn kv_float_unit<'a>(input: &mut &'a str) -> KvnResult<(f64, Option<&'a str>
 
 /// Parses an f64 value from a string slice.
 pub fn parse_f64(value: &str) -> crate::error::Result<f64> {
-    value
-        .trim()
-        .parse::<f64>()
-        .map_err(CcsdsNdmError::from)
+    value.trim().parse::<f64>().map_err(CcsdsNdmError::from)
 }
 
 /// Parses an i32 value from a string slice.
@@ -848,13 +850,13 @@ pub fn state_vector(input: &mut &str) -> KvnResult<(Vec<String>, StateVector)> {
 
     let sv = StateVector {
         comment: Vec::new(), // comments are returned separately for proper placement
-        epoch: epoch.ok_or_else(|| cut_err(input, "Missing EPOCH"))?,
-        x: x.ok_or_else(|| cut_err(input, "Missing X"))?,
-        y: y.ok_or_else(|| cut_err(input, "Missing Y"))?,
-        z: z.ok_or_else(|| cut_err(input, "Missing Z"))?,
-        x_dot: x_dot.ok_or_else(|| cut_err(input, "Missing X_DOT"))?,
-        y_dot: y_dot.ok_or_else(|| cut_err(input, "Missing Y_DOT"))?,
-        z_dot: z_dot.ok_or_else(|| cut_err(input, "Missing Z_DOT"))?,
+        epoch: epoch.ok_or_else(|| missing_field_err(input, "State Vector", "EPOCH"))?,
+        x: x.ok_or_else(|| missing_field_err(input, "State Vector", "X"))?,
+        y: y.ok_or_else(|| missing_field_err(input, "State Vector", "Y"))?,
+        z: z.ok_or_else(|| missing_field_err(input, "State Vector", "Z"))?,
+        x_dot: x_dot.ok_or_else(|| missing_field_err(input, "State Vector", "X_DOT"))?,
+        y_dot: y_dot.ok_or_else(|| missing_field_err(input, "State Vector", "Y_DOT"))?,
+        z_dot: z_dot.ok_or_else(|| missing_field_err(input, "State Vector", "Z_DOT"))?,
     };
 
     Ok((comment, sv))
@@ -916,27 +918,42 @@ pub fn covariance_matrix(input: &mut &str) -> KvnResult<Option<OpmCovarianceMatr
         Ok(Some(OpmCovarianceMatrix {
             comment,
             cov_ref_frame,
-            cx_x: cx_x.ok_or_else(|| cut_err(input, "Missing CX_X"))?,
-            cy_x: cy_x.ok_or_else(|| cut_err(input, "Missing CY_X"))?,
-            cy_y: cy_y.ok_or_else(|| cut_err(input, "Missing CY_Y"))?,
-            cz_x: cz_x.ok_or_else(|| cut_err(input, "Missing CZ_X"))?,
-            cz_y: cz_y.ok_or_else(|| cut_err(input, "Missing CZ_Y"))?,
-            cz_z: cz_z.ok_or_else(|| cut_err(input, "Missing CZ_Z"))?,
-            cx_dot_x: cx_dot_x.ok_or_else(|| cut_err(input, "Missing CX_DOT_X"))?,
-            cx_dot_y: cx_dot_y.ok_or_else(|| cut_err(input, "Missing CX_DOT_Y"))?,
-            cx_dot_z: cx_dot_z.ok_or_else(|| cut_err(input, "Missing CX_DOT_Z"))?,
-            cx_dot_x_dot: cx_dot_x_dot.ok_or_else(|| cut_err(input, "Missing CX_DOT_X_DOT"))?,
-            cy_dot_x: cy_dot_x.ok_or_else(|| cut_err(input, "Missing CY_DOT_X"))?,
-            cy_dot_y: cy_dot_y.ok_or_else(|| cut_err(input, "Missing CY_DOT_Y"))?,
-            cy_dot_z: cy_dot_z.ok_or_else(|| cut_err(input, "Missing CY_DOT_Z"))?,
-            cy_dot_x_dot: cy_dot_x_dot.ok_or_else(|| cut_err(input, "Missing CY_DOT_X_DOT"))?,
-            cy_dot_y_dot: cy_dot_y_dot.ok_or_else(|| cut_err(input, "Missing CY_DOT_Y_DOT"))?,
-            cz_dot_x: cz_dot_x.ok_or_else(|| cut_err(input, "Missing CZ_DOT_X"))?,
-            cz_dot_y: cz_dot_y.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Y"))?,
-            cz_dot_z: cz_dot_z.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Z"))?,
-            cz_dot_x_dot: cz_dot_x_dot.ok_or_else(|| cut_err(input, "Missing CZ_DOT_X_DOT"))?,
-            cz_dot_y_dot: cz_dot_y_dot.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Y_DOT"))?,
-            cz_dot_z_dot: cz_dot_z_dot.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Z_DOT"))?,
+            cx_x: cx_x.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_X"))?,
+            cy_x: cy_x.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_X"))?,
+            cy_y: cy_y.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_Y"))?,
+            cz_x: cz_x.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_X"))?,
+            cz_y: cz_y.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_Y"))?,
+            cz_z: cz_z.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_Z"))?,
+            cx_dot_x: cx_dot_x
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_X"))?,
+            cx_dot_y: cx_dot_y
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_Y"))?,
+            cx_dot_z: cx_dot_z
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_Z"))?,
+            cx_dot_x_dot: cx_dot_x_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_X_DOT"))?,
+            cy_dot_x: cy_dot_x
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_X"))?,
+            cy_dot_y: cy_dot_y
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_Y"))?,
+            cy_dot_z: cy_dot_z
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_Z"))?,
+            cy_dot_x_dot: cy_dot_x_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_X_DOT"))?,
+            cy_dot_y_dot: cy_dot_y_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_Y_DOT"))?,
+            cz_dot_x: cz_dot_x
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_X"))?,
+            cz_dot_y: cz_dot_y
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Y"))?,
+            cz_dot_z: cz_dot_z
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Z"))?,
+            cz_dot_x_dot: cz_dot_x_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_X_DOT"))?,
+            cz_dot_y_dot: cz_dot_y_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Y_DOT"))?,
+            cz_dot_z_dot: cz_dot_z_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Z_DOT"))?,
         }))
     } else {
         Ok(None)

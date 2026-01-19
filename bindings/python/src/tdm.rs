@@ -91,7 +91,7 @@ impl Tdm {
     ///
     /// :type: list[TdmSegment]
     #[getter]
-    fn get_segment(&self) -> Vec<TdmSegment> {
+    fn get_segments(&self) -> Vec<TdmSegment> {
         self.inner
             .body
             .segments
@@ -361,7 +361,7 @@ impl TdmBody {
     ///
     /// :type: list[TdmSegment]
     #[getter]
-    fn get_segment(&self) -> Vec<TdmSegment> {
+    fn get_segments(&self) -> Vec<TdmSegment> {
         self.inner
             .segments
             .iter()
@@ -370,7 +370,7 @@ impl TdmBody {
     }
 
     #[setter]
-    fn set_segment(&mut self, value: Vec<TdmSegment>) {
+    fn set_segments(&mut self, value: Vec<TdmSegment>) {
         self.inner.segments = value.into_iter().map(|s| s.inner).collect();
     }
 }

@@ -182,10 +182,6 @@ pub enum CcsdsNdmError {
     #[error("Unsupported message type: {0}")]
     UnsupportedMessage(String),
 
-    /// Error when a unit string is not recognized.
-    #[error("Unknown unit: {0}")]
-    UnknownUnit(String),
-
     /// Error when an unexpected end of input is reached.
     #[error("Unexpected end of input: {context}")]
     UnexpectedEof { context: String },

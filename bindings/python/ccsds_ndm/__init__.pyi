@@ -1835,37 +1835,38 @@ class GroundImpactParameters:
         Comments.
     """
     def __init__(
-        probability_of_impact,
-        probability_of_burn_up,
-        probability_of_break_up,
-        probability_of_land_impact,
-        probability_of_casualty,
-        nominal_impact_epoch,
-        impact_window_start,
-        impact_window_end,
-        impact_ref_frame,
-        nominal_impact_lon,
-        nominal_impact_lat,
-        nominal_impact_alt,
-        impact_1_confidence,
-        impact_1_start_lon,
-        impact_1_start_lat,
-        impact_1_stop_lon,
-        impact_1_stop_lat,
-        impact_1_cross_track,
-        impact_2_confidence,
-        impact_2_start_lon,
-        impact_2_start_lat,
-        impact_2_stop_lon,
-        impact_2_stop_lat,
-        impact_2_cross_track,
-        impact_3_confidence,
-        impact_3_start_lon,
-        impact_3_start_lat,
-        impact_3_stop_lon,
-        impact_3_stop_lat,
-        impact_3_cross_track,
-        comment,
+        *,
+        probability_of_impact=None,
+        probability_of_burn_up=None,
+        probability_of_break_up=None,
+        probability_of_land_impact=None,
+        probability_of_casualty=None,
+        nominal_impact_epoch=None,
+        impact_window_start=None,
+        impact_window_end=None,
+        impact_ref_frame=None,
+        nominal_impact_lon=None,
+        nominal_impact_lat=None,
+        nominal_impact_alt=None,
+        impact_1_confidence=None,
+        impact_1_start_lon=None,
+        impact_1_start_lat=None,
+        impact_1_stop_lon=None,
+        impact_1_stop_lat=None,
+        impact_1_cross_track=None,
+        impact_2_confidence=None,
+        impact_2_start_lon=None,
+        impact_2_start_lat=None,
+        impact_2_stop_lon=None,
+        impact_2_stop_lat=None,
+        impact_2_cross_track=None,
+        impact_3_confidence=None,
+        impact_3_start_lon=None,
+        impact_3_start_lat=None,
+        impact_3_stop_lon=None,
+        impact_3_stop_lat=None,
+        impact_3_cross_track=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -9917,14 +9918,14 @@ class Tdm:
     @header.setter
     def header(self, value: TdmHeader) -> None: ...
     @property
-    def segment(self) -> list[TdmSegment]:
+    def segments(self) -> list[TdmSegment]:
         """
         Shortcut to access segments directly from the body.
         """
         ...
 
-    @segment.setter
-    def segment(self, value: list[TdmSegment]) -> None: ...
+    @segments.setter
+    def segments(self, value: list[TdmSegment]) -> None: ...
     def to_file(self, path, format):
         """
         Write to file.
@@ -9971,7 +9972,7 @@ class TdmBody:
         ...
 
     @property
-    def segment(self) -> list[TdmSegment]:
+    def segments(self) -> list[TdmSegment]:
         """
         List of TDM segments.
 
@@ -9979,8 +9980,8 @@ class TdmBody:
         """
         ...
 
-    @segment.setter
-    def segment(self, value: list[TdmSegment]) -> None: ...
+    @segments.setter
+    def segments(self, value: list[TdmSegment]) -> None: ...
 
 class TdmData:
     """

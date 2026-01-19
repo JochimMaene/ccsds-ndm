@@ -1271,7 +1271,8 @@ impl std::str::FromStr for TrajBasis {
             _ => Err(crate::error::EnumParseError {
                 field: "TRAJ_BASIS",
                 value: s.to_string(),
-                expected: "PREDICTED, DETERMINED, TELEMETRY, SIMULATED, or OTHER"}),
+                expected: "PREDICTED, DETERMINED, TELEMETRY, SIMULATED, or OTHER",
+            }),
         }
     }
 }
@@ -1293,7 +1294,8 @@ impl std::str::FromStr for RevNumBasis {
             _ => Err(crate::error::EnumParseError {
                 field: "ORB_REVNUM_BASIS",
                 value: s.to_string(),
-                expected: "0 or 1"}),
+                expected: "0 or 1",
+            }),
         }
     }
 }
@@ -1324,7 +1326,8 @@ impl std::str::FromStr for CovBasis {
             _ => Err(crate::error::EnumParseError {
                 field: "COV_BASIS",
                 value: s.to_string(),
-                expected: "PREDICTED, DETERMINED, EMPIRICAL, SIMULATED, or OTHER"}),
+                expected: "PREDICTED, DETERMINED, EMPIRICAL, SIMULATED, or OTHER",
+            }),
         }
     }
 }
@@ -1362,7 +1365,8 @@ impl std::str::FromStr for ManBasis {
                 field: "MAN_BASIS",
                 value: s.to_string(),
                 expected:
-                    "CANDIDATE, PLANNED, ANTICIPATED, TELEMETRY, DETERMINED, SIMULATED, or OTHER"}),
+                    "CANDIDATE, PLANNED, ANTICIPATED, TELEMETRY, DETERMINED, SIMULATED, or OTHER",
+            }),
         }
     }
 }
@@ -1389,7 +1393,8 @@ impl std::str::FromStr for ManDc {
             _ => Err(crate::error::EnumParseError {
                 field: "DC_TYPE",
                 value: s.to_string(),
-                expected: "CONTINUOUS, TIME, or TIME_AND_ANGLE"}),
+                expected: "CONTINUOUS, TIME, or TIME_AND_ANGLE",
+            }),
         }
     }
 }
@@ -1421,7 +1426,8 @@ impl std::str::FromStr for CovOrder {
             _ => Err(crate::error::EnumParseError {
                 field: "COV_ORDERING",
                 value: s.to_string(),
-                expected: "LTM, UTM, FULL, LTMWCC, or UTMWCC"}),
+                expected: "LTM, UTM, FULL, LTMWCC, or UTMWCC",
+            }),
         }
     }
 }
@@ -1461,7 +1467,8 @@ impl std::str::FromStr for ControlledType {
             _ => Err(crate::error::EnumParseError {
                 field: "CONTROLLED_TYPE",
                 value: s.to_string(),
-                expected: "YES, NO, or UNKNOWN"}),
+                expected: "YES, NO, or UNKNOWN",
+            }),
         }
     }
 }
@@ -1880,7 +1887,8 @@ impl std::str::FromStr for CdmObjectType {
             _ => Err(crate::error::EnumParseError {
                 field: "OBJECT",
                 value: s.to_string(),
-                expected: "OBJECT1 or OBJECT2"}),
+                expected: "OBJECT1 or OBJECT2",
+            }),
         }
     }
 }
@@ -1906,7 +1914,8 @@ impl std::str::FromStr for ScreenVolumeFrameType {
             _ => Err(crate::error::EnumParseError {
                 field: "SCREEN_VOLUME_FRAME",
                 value: s.to_string(),
-                expected: "RTN or TVN"}),
+                expected: "RTN or TVN",
+            }),
         }
     }
 }
@@ -1932,7 +1941,8 @@ impl std::str::FromStr for ScreenVolumeShapeType {
             _ => Err(crate::error::EnumParseError {
                 field: "SCREEN_VOLUME_SHAPE",
                 value: s.to_string(),
-                expected: "ELLIPSOID or BOX"}),
+                expected: "ELLIPSOID or BOX",
+            }),
         }
     }
 }
@@ -1963,7 +1973,8 @@ impl std::str::FromStr for ReferenceFrameType {
             _ => Err(crate::error::EnumParseError {
                 field: "REF_FRAME",
                 value: s.to_string(),
-                expected: "EME2000, GCRF, or ITRF"}),
+                expected: "EME2000, GCRF, or ITRF",
+            }),
         }
     }
 }
@@ -1989,7 +2000,8 @@ impl std::str::FromStr for CovarianceMethodType {
             _ => Err(crate::error::EnumParseError {
                 field: "COVARIANCE_METHOD",
                 value: s.to_string(),
-                expected: "CALCULATED or DEFAULT"}),
+                expected: "CALCULATED or DEFAULT",
+            }),
         }
     }
 }
@@ -2020,7 +2032,8 @@ impl std::str::FromStr for ManeuverableType {
             _ => Err(crate::error::EnumParseError {
                 field: "MANEUVERABLE",
                 value: s.to_string(),
-                expected: "YES, NO, or N/A"}),
+                expected: "YES, NO, or N/A",
+            }),
         }
     }
 }

@@ -1097,6 +1097,40 @@ pub struct GroundImpactParameters {
 #[pymethods]
 impl GroundImpactParameters {
     #[new]
+    #[pyo3(signature = (
+        *,
+        probability_of_impact=None,
+        probability_of_burn_up=None,
+        probability_of_break_up=None,
+        probability_of_land_impact=None,
+        probability_of_casualty=None,
+        nominal_impact_epoch=None,
+        impact_window_start=None,
+        impact_window_end=None,
+        impact_ref_frame=None,
+        nominal_impact_lon=None,
+        nominal_impact_lat=None,
+        nominal_impact_alt=None,
+        impact_1_confidence=None,
+        impact_1_start_lon=None,
+        impact_1_start_lat=None,
+        impact_1_stop_lon=None,
+        impact_1_stop_lat=None,
+        impact_1_cross_track=None,
+        impact_2_confidence=None,
+        impact_2_start_lon=None,
+        impact_2_start_lat=None,
+        impact_2_stop_lon=None,
+        impact_2_stop_lat=None,
+        impact_2_cross_track=None,
+        impact_3_confidence=None,
+        impact_3_start_lon=None,
+        impact_3_start_lat=None,
+        impact_3_stop_lon=None,
+        impact_3_stop_lat=None,
+        impact_3_cross_track=None,
+        comment=None
+    ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         probability_of_impact: Option<f64>,
@@ -1129,8 +1163,9 @@ impl GroundImpactParameters {
         impact_3_stop_lon: Option<f64>,
         impact_3_stop_lat: Option<f64>,
         impact_3_cross_track: Option<f64>,
-        comment: Vec<String>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
+        let comment = comment.unwrap_or_default();
         use ccsds_ndm::types::{Probability, LongitudeRequired, LatitudeRequired, AltitudeRequired, PercentageRequired, Distance};
         Ok(Self {
             inner: core_common::GroundImpactParameters {

@@ -533,7 +533,7 @@ impl OcmMetadata {
                 country,
                 constellation,
                 object_type: object_type.map(|s| s.parse()).transpose().map_err(
-                    |e: ccsds_ndm::error::CcsdsNdmError| {
+                    |e: ccsds_ndm::error::EnumParseError| {
                         PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
                     },
                 )?,
@@ -1044,7 +1044,7 @@ impl OcmMetadata {
         self.inner.object_type = value
             .map(|s| s.parse())
             .transpose()
-            .map_err(|e: ccsds_ndm::error::CcsdsNdmError| PyValueError::new_err(e.to_string()))?;
+            .map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
@@ -1746,7 +1746,7 @@ impl OcmTrajState {
         self.inner.traj_basis = value
             .map(|s| s.parse())
             .transpose()
-            .map_err(|e: ccsds_ndm::error::CcsdsNdmError| PyValueError::new_err(e.to_string()))?;
+            .map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
@@ -1897,7 +1897,7 @@ impl OcmTrajState {
         self.inner.orb_revnum_basis = value
             .map(|s| s.parse())
             .transpose()
-            .map_err(|e: ccsds_ndm::error::CcsdsNdmError| PyValueError::new_err(e.to_string()))?;
+            .map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
     /// Method used for orbit averaging if TRAJ_TYPE is not osculating (value to be drawn from the SANA
@@ -3314,7 +3314,7 @@ impl OcmCovarianceMatrix {
                 cov_prev_id,
                 cov_next_id,
                 cov_basis: cov_basis.map(|s| s.parse()).transpose().map_err(
-                    |e: ccsds_ndm::error::CcsdsNdmError| PyValueError::new_err(e.to_string()),
+                    |e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()),
                 )?,
                 cov_basis_id,
                 cov_ref_frame,
@@ -3327,7 +3327,7 @@ impl OcmCovarianceMatrix {
                 }),
                 cov_type,
                 cov_ordering: cov_ordering.parse().map_err(
-                    |e: ccsds_ndm::error::CcsdsNdmError| PyValueError::new_err(e.to_string()),
+                    |e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()),
                 )?,
                 cov_units,
                 cov_lines: cov_lines.into_iter().map(|c| c.inner).collect(),
@@ -3772,7 +3772,7 @@ impl OcmManeuverParameters {
                 man_prev_id,
                 man_next_id,
                 man_basis: man_basis.map(|s| s.parse()).transpose().map_err(
-                    |e: ccsds_ndm::error::CcsdsNdmError| PyValueError::new_err(e.to_string()),
+                    |e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()),
                 )?,
                 man_basis_id,
                 man_device_id,
@@ -3786,7 +3786,7 @@ impl OcmManeuverParameters {
                 dc_type: dc_type
                     .map(|s| s.parse())
                     .transpose()
-                    .map_err(|e: ccsds_ndm::error::CcsdsNdmError| {
+                    .map_err(|e: ccsds_ndm::error::EnumParseError| {
                         PyValueError::new_err(e.to_string())
                     })?
                     .unwrap_or(ccsds_ndm::types::ManDc::Continuous),
@@ -4036,7 +4036,7 @@ impl OcmManeuverParameters {
     fn set_dc_type(&mut self, value: String) -> PyResult<()> {
         self.inner.dc_type = value
             .parse()
-            .map_err(|e: ccsds_ndm::error::CcsdsNdmError| PyValueError::new_err(e.to_string()))?;
+            .map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 

@@ -7,8 +7,8 @@
 //! This module implements KVN parsing for OCM using winnow parser combinators.
 
 use crate::common::OdmHeader;
-use crate::kvn::parser::*;
 use crate::error::InternalParserError;
+use crate::kvn::parser::*;
 use crate::messages::ocm::*;
 use crate::parse_block;
 use crate::types::*;
@@ -291,7 +291,10 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
     }
 
     if traj_lines.is_empty() {
-        return Err(cut_err(input, "OCM Trajectory block must contain at least one state vector (trajLine)"));
+        return Err(cut_err(
+            input,
+            "OCM Trajectory block must contain at least one state vector (trajLine)",
+        ));
     }
 
     Ok(OcmTrajState {
@@ -573,8 +576,7 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         cov_scale_min,
         cov_scale_max,
         cov_confidence,
-        cov_type: cov_type
-            .ok_or_else(|| missing_field_err(input, "Covariance", "COV_TYPE"))?,
+        cov_type: cov_type.ok_or_else(|| missing_field_err(input, "Covariance", "COV_TYPE"))?,
         cov_ordering: cov_ordering.unwrap_or(CovOrder::Ltm),
         cov_units,
         cov_lines,
@@ -686,8 +688,7 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
 
     Ok(OcmManeuverParameters {
         comment,
-        man_id: man_id
-            .ok_or_else(|| missing_field_err(input, "Maneuver", "MAN_ID"))?,
+        man_id: man_id.ok_or_else(|| missing_field_err(input, "Maneuver", "MAN_ID"))?,
         man_prev_id,
         man_next_id,
         man_basis,
@@ -905,8 +906,7 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
 
     Ok(OcmOdParameters {
         comment,
-        od_id: od_id
-            .ok_or_else(|| missing_field_err(input, "Orbit Determination", "OD_ID"))?,
+        od_id: od_id.ok_or_else(|| missing_field_err(input, "Orbit Determination", "OD_ID"))?,
         od_prev_id,
         od_method: od_method
             .ok_or_else(|| missing_field_err(input, "Orbit Determination", "OD_METHOD"))?,
@@ -1229,13 +1229,15 @@ TRAJ_STOP
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::Validation(val_err) => match *val_err {
-                ValidationError::MissingRequiredField { ref field, .. } => assert_eq!(field, "EPOCH_TZERO"),
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "EPOCH_TZERO")
+                }
                 _ => panic!("unexpected validation error: {:?}", val_err),
-            }
+            },
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => assert!(err.message.contains("EPOCH_TZERO")),
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1393,13 +1395,15 @@ TRAJ_STOP
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::Validation(val_err) => match *val_err {
-                ValidationError::MissingRequiredField { ref field, .. } => assert_eq!(field, "TRAJ_TYPE"),
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "TRAJ_TYPE")
+                }
                 _ => panic!("unexpected validation error: {:?}", val_err),
-            }
+            },
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => assert!(err.message.contains("TRAJ_TYPE")),
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1541,13 +1545,15 @@ COV_STOP
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::Validation(val_err) => match *val_err {
-                ValidationError::MissingRequiredField { ref field, .. } => assert_eq!(field, "COV_TYPE"),
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "COV_TYPE")
+                }
                 _ => panic!("unexpected validation error: {:?}", val_err),
-            }
+            },
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => assert!(err.message.contains("COV_TYPE")),
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1726,13 +1732,15 @@ MAN_STOP
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::Validation(val_err) => match *val_err {
-                ValidationError::MissingRequiredField { ref field, .. } => assert_eq!(field, "MAN_ID"),
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "MAN_ID")
+                }
                 _ => panic!("unexpected validation error: {:?}", val_err),
-            }
+            },
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => assert!(err.message.contains("MAN_ID")),
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1758,15 +1766,17 @@ MAN_STOP
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::Validation(val_err) => match *val_err {
-                ValidationError::MissingRequiredField { ref field, .. } => assert_eq!(field, "MAN_DEVICE_ID"),
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "MAN_DEVICE_ID")
+                }
                 _ => panic!("unexpected validation error: {:?}", val_err),
-            }
+            },
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
                     assert!(err.message.contains("MAN_DEVICE_ID"));
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1792,15 +1802,17 @@ MAN_STOP
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::Validation(val_err) => match *val_err {
-                ValidationError::MissingRequiredField { ref field, .. } => assert_eq!(field, "MAN_COMPOSITION"),
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "MAN_COMPOSITION")
+                }
                 _ => panic!("unexpected validation error: {:?}", val_err),
-            }
+            },
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
                     assert!(err.message.contains("MAN_COMPOSITION"));
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -2220,14 +2232,16 @@ MAN_STOP
         let err = Ocm::from_kvn("").unwrap_err();
         match err {
             CcsdsNdmError::UnexpectedEof { .. } => {}
-            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(ref err) if err.message.is_empty()) => {}
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(ref err) if err.message.is_empty()) =>
+                {}
             _ => panic!("Expected Empty file error, got: {:?}", err),
         }
 
         // Wrong first keyword
         let err = Ocm::from_kvn("CREATION_DATE = 2023-01-01T00:00:00").unwrap_err();
         match err {
-            CcsdsNdmError::Validation(val_err) if matches!(*val_err, ValidationError::MissingRequiredField { ref field, .. } if field.contains("first keyword")) => {}
+            CcsdsNdmError::Validation(val_err) if matches!(*val_err, ValidationError::MissingRequiredField { ref field, .. } if field.contains("first keyword")) =>
+                {}
             CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {}
             _ => panic!("Expected first keyword error, got: {:?}", err),
         }
@@ -2251,13 +2265,16 @@ CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 TRAJ_START
 "#;
-                let err = Ocm::from_kvn(kvn).unwrap_err();
-                if let Some(err) = err.as_kvn_parse_error() {
-                    assert!(err.message.contains("Expected META_START") || err.contexts.contains(&"Expected META_START"));
-                } else {
-                    panic!("Expected KVN parse error, got: {:?}", err);
-                }
-                // Metadata unexpected key
+        let err = Ocm::from_kvn(kvn).unwrap_err();
+        if let Some(err) = err.as_kvn_parse_error() {
+            assert!(
+                err.message.contains("Expected META_START")
+                    || err.contexts.contains(&"Expected META_START")
+            );
+        } else {
+            panic!("Expected KVN parse error, got: {:?}", err);
+        }
+        // Metadata unexpected key
         let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -2267,18 +2284,16 @@ EPOCH_TZERO = 2023-01-01T00:00:00
 BAD_KEY = VAL
 META_STOP
 "#;
-                        let err = Ocm::from_kvn(kvn).unwrap_err();
-                        if let Some(err) = err.as_kvn_parse_error() {
-                            assert!(
-                                err.message.contains("Expected META_STOP")
-                                    || err.message.contains("Unexpected OCM Data key")
-                                    || err.contexts.contains(&"Expected META_STOP")
-                                    || err.contexts.contains(&"Unexpected OCM Data key")
-                                    || err.contexts.contains(&"Unexpected OCM Metadata key")
-                            );
-                        }
-                
-         else {
+        let err = Ocm::from_kvn(kvn).unwrap_err();
+        if let Some(err) = err.as_kvn_parse_error() {
+            assert!(
+                err.message.contains("Expected META_STOP")
+                    || err.message.contains("Unexpected OCM Data key")
+                    || err.contexts.contains(&"Expected META_STOP")
+                    || err.contexts.contains(&"Unexpected OCM Data key")
+                    || err.contexts.contains(&"Unexpected OCM Metadata key")
+            );
+        } else {
             panic!("Expected KVN parse error, got: {:?}", err);
         }
     }
@@ -2373,10 +2388,13 @@ UNEXPECTED_KEY = value
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(err.message.contains("Unexpected OCM Data key") || err.contexts.contains(&"Unexpected OCM Data key"));
+                    assert!(
+                        err.message.contains("Unexpected OCM Data key")
+                            || err.contexts.contains(&"Unexpected OCM Data key")
+                    );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("Expected KvnParse error, got: {:?}", err),
         }
     }
@@ -2394,21 +2412,18 @@ USER_START
 META_START
 USER_STOP
 "#;
-                        let err = Ocm::from_kvn(kvn).unwrap_err();
-                        if let Some(err) = err.as_kvn_parse_error() {
-                            assert!(
-                                err.message.contains("Expected META_START")
-                                    || err.message.contains("Expected TRAJ_START")
-                                    || err.contexts.contains(&"Expected META_START")
-                                    || err.contexts.contains(&"Expected TRAJ_START")
-                                    || err.contexts.contains(&"Unexpected key in USER block")
-                            );
-                        }
-                
-         else {
+        let err = Ocm::from_kvn(kvn).unwrap_err();
+        if let Some(err) = err.as_kvn_parse_error() {
+            assert!(
+                err.message.contains("Expected META_START")
+                    || err.message.contains("Expected TRAJ_START")
+                    || err.contexts.contains(&"Expected META_START")
+                    || err.contexts.contains(&"Expected TRAJ_START")
+                    || err.contexts.contains(&"Unexpected key in USER block")
+            );
+        } else {
             panic!("Expected KVN parse error, got: {:?}", err);
         }
-
     }
 
     #[test]
@@ -2937,10 +2952,13 @@ TRAJ_STOP
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(err.message.contains("trajLine") || err.contexts.iter().any(|c| c.contains("trajLine")));
+                    assert!(
+                        err.message.contains("trajLine")
+                            || err.contexts.iter().any(|c| c.contains("trajLine"))
+                    );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("Expected trajLine missing error, got: {:?}", err),
         }
     }
@@ -3289,7 +3307,7 @@ TRAJ_STOP
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("Expected KvnParse error, got {:?}", err),
         }
     }
@@ -3341,7 +3359,7 @@ PHYS_STOP
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("Expected KvnParse error, got {:?}", err),
         }
     }
@@ -3417,7 +3435,7 @@ COV_STOP
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("Expected KvnParse error, got {:?}", err),
         }
     }
@@ -3493,7 +3511,8 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error().map_or(false, |err| err.snippet.contains("COV_SCALE_MIN")),
+            err.as_kvn_parse_error()
+                .map_or(false, |err| err.snippet.contains("COV_SCALE_MIN")),
             "Expected COV_SCALE_MIN error, got: {:?}",
             err
         );
@@ -3540,7 +3559,8 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error().map_or(false, |err| err.snippet.contains("COV_SCALE_MAX")),
+            err.as_kvn_parse_error()
+                .map_or(false, |err| err.snippet.contains("COV_SCALE_MAX")),
             "Expected COV_SCALE_MAX error, got: {:?}",
             err
         );
@@ -3555,7 +3575,10 @@ CENTER_NAME = EARTH
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error().map_or(false, |err| err.contexts.iter().any(|c| c.contains("Expected META_START"))),
+            err.as_kvn_parse_error().map_or(false, |err| err
+                .contexts
+                .iter()
+                .any(|c| c.contains("Expected META_START"))),
             "Expected 'expected meta' error, got: {:?}",
             err
         );
@@ -3617,7 +3640,8 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error().map_or(false, |err| err.snippet.contains("DC_MIN_CYCLES")),
+            err.as_kvn_parse_error()
+                .map_or(false, |err| err.snippet.contains("DC_MIN_CYCLES")),
             "Expected DC_MIN_CYCLES error, got: {:?}",
             err
         );
@@ -3647,7 +3671,8 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error().map_or(false, |err| err.snippet.contains("DC_MAX_CYCLES")),
+            err.as_kvn_parse_error()
+                .map_or(false, |err| err.snippet.contains("DC_MAX_CYCLES")),
             "Expected DC_MAX_CYCLES error, got: {:?}",
             err
         );
@@ -3701,7 +3726,8 @@ PERT_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error().map_or(false, |err| err.snippet.contains("OBLATE_FLATTENING")),
+            err.as_kvn_parse_error()
+                .map_or(false, |err| err.snippet.contains("OBLATE_FLATTENING")),
             "Expected OBLATE_FLATTENING error, got: {:?}",
             err
         );
@@ -3729,7 +3755,8 @@ PERT_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error().map_or(false, |err| err.snippet.contains("ALBEDO_GRID_SIZE")),
+            err.as_kvn_parse_error()
+                .map_or(false, |err| err.snippet.contains("ALBEDO_GRID_SIZE")),
             "Expected ALBEDO_GRID_SIZE error, got: {:?}",
             err
         );
@@ -3764,12 +3791,15 @@ OD_STOP
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
                     assert!(
-                        err.message.contains("Unexpected OCM Orbit Determination key")
-                            || err.contexts.contains(&"Unexpected OCM Orbit Determination key")
+                        err.message
+                            .contains("Unexpected OCM Orbit Determination key")
+                            || err
+                                .contexts
+                                .contains(&"Unexpected OCM Orbit Determination key")
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("Expected KvnParse error, got {:?}", err),
         }
     }
@@ -3800,7 +3830,7 @@ COV_STOP
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("Expected KvnParse error, got {:?}", err),
         }
     }

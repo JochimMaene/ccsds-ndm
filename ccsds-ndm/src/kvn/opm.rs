@@ -86,12 +86,17 @@ pub fn opm_metadata(input: &mut &str) -> KvnResult<OpmMetadata> {
 
     Ok(OpmMetadata {
         comment,
-        object_name: object_name.ok_or_else(|| missing_field_err(input, "OPM Metadata", "OBJECT_NAME"))?,
-        object_id: object_id.ok_or_else(|| missing_field_err(input, "OPM Metadata", "OBJECT_ID"))?,
-        center_name: center_name.ok_or_else(|| missing_field_err(input, "OPM Metadata", "CENTER_NAME"))?,
-        ref_frame: ref_frame.ok_or_else(|| missing_field_err(input, "OPM Metadata", "REF_FRAME"))?,
+        object_name: object_name
+            .ok_or_else(|| missing_field_err(input, "OPM Metadata", "OBJECT_NAME"))?,
+        object_id: object_id
+            .ok_or_else(|| missing_field_err(input, "OPM Metadata", "OBJECT_ID"))?,
+        center_name: center_name
+            .ok_or_else(|| missing_field_err(input, "OPM Metadata", "CENTER_NAME"))?,
+        ref_frame: ref_frame
+            .ok_or_else(|| missing_field_err(input, "OPM Metadata", "REF_FRAME"))?,
         ref_frame_epoch,
-        time_system: time_system.ok_or_else(|| missing_field_err(input, "OPM Metadata", "TIME_SYSTEM"))?,
+        time_system: time_system
+            .ok_or_else(|| missing_field_err(input, "OPM Metadata", "TIME_SYSTEM"))?,
     })
 }
 
@@ -136,11 +141,16 @@ pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElement
 
     Ok(Some(KeplerianElements {
         comment,
-        semi_major_axis: semi_major_axis.ok_or_else(|| missing_field_err(input, "Keplerian Elements", "SEMI_MAJOR_AXIS"))?,
-        eccentricity: eccentricity.ok_or_else(|| missing_field_err(input, "Keplerian Elements", "ECCENTRICITY"))?,
-        inclination: inclination.ok_or_else(|| missing_field_err(input, "Keplerian Elements", "INCLINATION"))?,
-        ra_of_asc_node: ra_of_asc_node.ok_or_else(|| missing_field_err(input, "Keplerian Elements", "RA_OF_ASC_NODE"))?,
-        arg_of_pericenter: arg_of_pericenter.ok_or_else(|| missing_field_err(input, "Keplerian Elements", "ARG_OF_PERICENTER"))?,
+        semi_major_axis: semi_major_axis
+            .ok_or_else(|| missing_field_err(input, "Keplerian Elements", "SEMI_MAJOR_AXIS"))?,
+        eccentricity: eccentricity
+            .ok_or_else(|| missing_field_err(input, "Keplerian Elements", "ECCENTRICITY"))?,
+        inclination: inclination
+            .ok_or_else(|| missing_field_err(input, "Keplerian Elements", "INCLINATION"))?,
+        ra_of_asc_node: ra_of_asc_node
+            .ok_or_else(|| missing_field_err(input, "Keplerian Elements", "RA_OF_ASC_NODE"))?,
+        arg_of_pericenter: arg_of_pericenter
+            .ok_or_else(|| missing_field_err(input, "Keplerian Elements", "ARG_OF_PERICENTER"))?,
         true_anomaly,
         mean_anomaly,
         gm: gm.ok_or_else(|| missing_field_err(input, "Keplerian Elements", "GM"))?,
@@ -176,12 +186,18 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParamet
         Ok(Some(ManeuverParameters {
             comment,
             man_epoch_ignition: ignition,
-            man_duration: man_duration.ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DURATION"))?,
-            man_delta_mass: man_delta_mass.ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DELTA_MASS"))?,
-            man_ref_frame: man_ref_frame.ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_REF_FRAME"))?,
-            man_dv_1: man_dv_1.ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DV_1"))?,
-            man_dv_2: man_dv_2.ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DV_2"))?,
-            man_dv_3: man_dv_3.ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DV_3"))?,
+            man_duration: man_duration
+                .ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DURATION"))?,
+            man_delta_mass: man_delta_mass
+                .ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DELTA_MASS"))?,
+            man_ref_frame: man_ref_frame
+                .ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_REF_FRAME"))?,
+            man_dv_1: man_dv_1
+                .ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DV_1"))?,
+            man_dv_2: man_dv_2
+                .ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DV_2"))?,
+            man_dv_3: man_dv_3
+                .ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DV_3"))?,
         }))
     } else {
         Ok(None)

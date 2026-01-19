@@ -1231,8 +1231,10 @@ impl TdmObservationData {
             "TROPO_DRY" => Ok(Self::TropoDry(pf(val)?)),
             "TROPO_WET" => Ok(Self::TropoWet(pf(val)?)),
             "VLBI_DELAY" => Ok(Self::VlbiDelay(pf(val)?)),
-            _ => Err(crate::error::ValidationError::Generic {
-                message: format!("Invalid TDM observation data for type {}: {}", key, val),
+            _ => Err(crate::error::ValidationError::InvalidValue {
+                field: key.to_string(),
+                value: val.to_string(),
+                expected: "valid TDM observation keyword".to_string(),
                 line: None,
             }
             .into()),

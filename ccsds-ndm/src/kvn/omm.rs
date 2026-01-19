@@ -51,13 +51,19 @@ pub fn omm_metadata(input: &mut &str) -> KvnResult<OmmMetadata> {
 
     Ok(OmmMetadata {
         comment,
-        object_name: object_name.ok_or_else(|| missing_field_err(input, "OMM Metadata", "OBJECT_NAME"))?,
-        object_id: object_id.ok_or_else(|| missing_field_err(input, "OMM Metadata", "OBJECT_ID"))?,
-        center_name: center_name.ok_or_else(|| missing_field_err(input, "OMM Metadata", "CENTER_NAME"))?,
-        ref_frame: ref_frame.ok_or_else(|| missing_field_err(input, "OMM Metadata", "REF_FRAME"))?,
+        object_name: object_name
+            .ok_or_else(|| missing_field_err(input, "OMM Metadata", "OBJECT_NAME"))?,
+        object_id: object_id
+            .ok_or_else(|| missing_field_err(input, "OMM Metadata", "OBJECT_ID"))?,
+        center_name: center_name
+            .ok_or_else(|| missing_field_err(input, "OMM Metadata", "CENTER_NAME"))?,
+        ref_frame: ref_frame
+            .ok_or_else(|| missing_field_err(input, "OMM Metadata", "REF_FRAME"))?,
         ref_frame_epoch,
-        time_system: time_system.ok_or_else(|| missing_field_err(input, "OMM Metadata", "TIME_SYSTEM"))?,
-        mean_element_theory: mean_element_theory.ok_or_else(|| missing_field_err(input, "OMM Metadata", "MEAN_ELEMENT_THEORY"))?,
+        time_system: time_system
+            .ok_or_else(|| missing_field_err(input, "OMM Metadata", "TIME_SYSTEM"))?,
+        mean_element_theory: mean_element_theory
+            .ok_or_else(|| missing_field_err(input, "OMM Metadata", "MEAN_ELEMENT_THEORY"))?,
     })
 }
 
@@ -97,11 +103,16 @@ pub fn mean_elements(input: &mut &str) -> KvnResult<(Vec<String>, MeanElements)>
             epoch: epoch.ok_or_else(|| missing_field_err(input, "Mean Elements", "EPOCH"))?,
             semi_major_axis,
             mean_motion,
-            eccentricity: eccentricity.ok_or_else(|| missing_field_err(input, "Mean Elements", "ECCENTRICITY"))?,
-            inclination: inclination.ok_or_else(|| missing_field_err(input, "Mean Elements", "INCLINATION"))?,
-            ra_of_asc_node: ra_of_asc_node.ok_or_else(|| missing_field_err(input, "Mean Elements", "RA_OF_ASC_NODE"))?,
-            arg_of_pericenter: arg_of_pericenter.ok_or_else(|| missing_field_err(input, "Mean Elements", "ARG_OF_PERICENTER"))?,
-            mean_anomaly: mean_anomaly.ok_or_else(|| missing_field_err(input, "Mean Elements", "MEAN_ANOMALY"))?,
+            eccentricity: eccentricity
+                .ok_or_else(|| missing_field_err(input, "Mean Elements", "ECCENTRICITY"))?,
+            inclination: inclination
+                .ok_or_else(|| missing_field_err(input, "Mean Elements", "INCLINATION"))?,
+            ra_of_asc_node: ra_of_asc_node
+                .ok_or_else(|| missing_field_err(input, "Mean Elements", "RA_OF_ASC_NODE"))?,
+            arg_of_pericenter: arg_of_pericenter
+                .ok_or_else(|| missing_field_err(input, "Mean Elements", "ARG_OF_PERICENTER"))?,
+            mean_anomaly: mean_anomaly
+                .ok_or_else(|| missing_field_err(input, "Mean Elements", "MEAN_ANOMALY"))?,
             gm,
         },
     ))
@@ -162,10 +173,14 @@ pub fn tle_parameters(input: &mut &str) -> KvnResult<Option<TleParameters>> {
         return Err(cut_err(input, "Cannot have both BSTAR and BTERM"));
     }
     if bstar.is_none() && bterm.is_none() {
-        return Err(cut_err(input, "Either BSTAR or BTERM must be present in TLE Parameters"));
+        return Err(cut_err(
+            input,
+            "Either BSTAR or BTERM must be present in TLE Parameters",
+        ));
     }
 
-    let mean_motion_dot = mean_motion_dot.ok_or_else(|| missing_field_err(input, "TLE Parameters", "MEAN_MOTION_DOT"))?;
+    let mean_motion_dot = mean_motion_dot
+        .ok_or_else(|| missing_field_err(input, "TLE Parameters", "MEAN_MOTION_DOT"))?;
 
     if mean_motion_ddot.is_some() && agom.is_some() {
         return Err(cut_err(input, "Cannot have both MEAN_MOTION_DDOT and AGOM"));

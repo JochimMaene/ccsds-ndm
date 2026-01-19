@@ -6,8 +6,8 @@
 //!
 //! This module implements KVN parsing for TDM using winnow parser combinators.
 
-use crate::kvn::parser::*;
 use crate::error::{CcsdsNdmError, InternalParserError};
+use crate::kvn::parser::*;
 use crate::messages::tdm::{
     Tdm, TdmBody, TdmData, TdmHeader, TdmMetadata, TdmObservation, TdmObservationData, TdmSegment,
 };
@@ -273,7 +273,10 @@ pub fn tdm_data(input: &mut &str) -> KvnResult<TdmData> {
     }
 
     if observations.is_empty() {
-        return Err(cut_err(input, "TDM data section must contain at least one observation"));
+        return Err(cut_err(
+            input,
+            "TDM data section must contain at least one observation",
+        ));
     }
 
     Ok(TdmData {
@@ -341,9 +344,7 @@ impl ParseKvn for Tdm {
 }
 
 pub fn parse_u64(s: &str) -> crate::error::Result<u64> {
-    s.trim()
-        .parse::<u64>()
-        .map_err(CcsdsNdmError::from)
+    s.trim().parse::<u64>().map_err(CcsdsNdmError::from)
 }
 
 //----------------------------------------------------------------------
@@ -353,8 +354,8 @@ pub fn parse_u64(s: &str) -> crate::error::Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::traits::Ndm;
     use crate::error::FormatError;
+    use crate::traits::Ndm;
     // We need TdmObservationData variants visible
     use crate::messages::tdm::TdmObservationData;
 
@@ -1291,10 +1292,13 @@ CCSDS_TDM_VERS = 2.0
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(err.message.to_lowercase().contains("expected ccsds_tdm_vers"));
+                    assert!(err
+                        .message
+                        .to_lowercase()
+                        .contains("expected ccsds_tdm_vers"));
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("Expected version-not-first error, got: {:?}", err),
         }
     }
@@ -1322,7 +1326,7 @@ DATA_STOP
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("Expected error, got: {:?}", err),
         }
     }
@@ -1351,7 +1355,7 @@ DATA_STOP
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
-            }
+            },
             _ => panic!("Expected error, got: {:?}", err),
         }
     }
