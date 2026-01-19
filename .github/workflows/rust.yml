@@ -20,8 +20,7 @@ jobs:
         with:
           workspaces: ccsds-ndm
       - name: Run tests
-        working-directory: ccsds-ndm
-        run: cargo test --all-features
+        run: just test-rust
 
   fmt:
     name: Linting - Format check
@@ -33,12 +32,10 @@ jobs:
           components: rustfmt, clippy
 
       - name: Enforce formatting
-        working-directory: ccsds-ndm
-        run: cargo fmt --check
+        run: just fmt-rust-check
 
       - name: Linting
-        working-directory: ccsds-ndm
-        run: cargo clippy -- -D warnings
+        run: just lint-rust
 
 
 
@@ -58,8 +55,7 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Generate code coverage
-        working-directory: ccsds-ndm
-        run: cargo llvm-cov --all-features --workspace --codecov --output-path codecov.json
+        run: just coverage
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:

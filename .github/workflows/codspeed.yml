@@ -26,12 +26,11 @@ jobs:
           bins: cargo-codspeed
 
       - name: Build the benchmark target(s)
-        working-directory: ccsds-ndm
-        run: cargo codspeed build
+        run: just bench-build
 
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@v4
         with:
           mode: simulation
-          run: cd ccsds-ndm && cargo codspeed run
+          run: just bench-run
           token: ${{ secrets.CODSPEED_TOKEN }}
