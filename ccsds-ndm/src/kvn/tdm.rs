@@ -226,8 +226,8 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
         "TROPO_DRY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoDry(v)))),
         "TROPO_WET" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoWet(v)))),
         "VLBI_DELAY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::VlbiDelay(v)))),
-        _ => |i: &mut &str| Err(ErrMode::Cut(CcsdsNdmError::from_input(i).add_context(i, &i.checkpoint(), StrContext::Label("Unknown TDM data keyword")))),
-    }.parse_next(input).map_err(|e| {
+        _ => |i: &mut &str| Err(ErrMode::Cut(InternalParserError::from_input(i).add_context(i, &i.checkpoint(), StrContext::Label("Unknown TDM data keyword")))),
+    }.try_map(|res| res).parse_next(input).map_err(|e| {
         if e.is_backtrack() {
             ErrMode::Backtrack(InternalParserError::from_input(input).add_context(
                 input,

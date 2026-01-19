@@ -13,8 +13,8 @@ use crate::messages::ocm::*;
 use crate::parse_block;
 use crate::types::*;
 use winnow::ascii::{space1, till_line_ending};
-use winnow::combinator::{preceded, repeat};
-use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
+use winnow::combinator::repeat;
+use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -214,7 +214,7 @@ pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
         .trim_start()
         .starts_with(|c: char| c.is_ascii_uppercase())
     {
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = till_space.parse_next(input)?;
     let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
@@ -499,7 +499,7 @@ pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
         .trim_start()
         .starts_with(|c: char| c.is_ascii_uppercase())
     {
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = till_space.parse_next(input)?;
     let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
@@ -584,10 +584,10 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
 }
 
 pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
-    let checkpoint = input.checkpoint();
+    let _checkpoint = input.checkpoint();
     let _ = ws.parse_next(input)?;
     if input.starts_with(|c: char| c.is_ascii_uppercase()) {
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = till_space.parse_next(input)?;
     let values =

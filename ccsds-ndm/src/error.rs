@@ -339,6 +339,30 @@ impl winnow::error::FromExternalError<&str, ValidationError> for InternalParserE
     }
 }
 
+impl winnow::error::FromExternalError<&str, CcsdsNdmError> for InternalParserError {
+    fn from_external_error(input: &&str, e: CcsdsNdmError) -> Self {
+        match e {
+            CcsdsNdmError::Validation(ve) => Self::from_external_error(input, *ve),
+            CcsdsNdmError::Epoch(ee) => Self::from_external_error(input, ee),
+            CcsdsNdmError::Format(fe) => match *fe {
+                FormatError::Enum(ee) => Self::from_external_error(input, ee),
+                FormatError::ParseFloat(pfe) => Self::from_external_error(input, pfe),
+                FormatError::ParseInt(pie) => Self::from_external_error(input, pie),
+                _ => Self {
+                    message: Cow::Owned(fe.to_string()),
+                    contexts: ContextStack::new(),
+                    kind: ParserErrorKind::default(),
+                },
+            },
+            _ => Self {
+                message: Cow::Owned(e.to_string()),
+                contexts: ContextStack::new(),
+                kind: ParserErrorKind::default(),
+            },
+        }
+    }
+}
+
 impl AddContext<&str, StrContext> for InternalParserError {
     fn add_context(
         mut self,

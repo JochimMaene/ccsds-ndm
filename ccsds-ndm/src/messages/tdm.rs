@@ -1185,7 +1185,7 @@ impl TdmObservationData {
     pub fn from_key_val(key: &str, val: &str) -> Result<Self> {
         let pf = |s: &str| {
             fast_float::parse(s)
-                .map_err(|_| CcsdsNdmError::InvalidFormat(format!("Invalid float: {}", s)))
+                .map_err(|_| CcsdsNdmError::Format(Box::new(crate::error::FormatError::InvalidFormat(format!("Invalid float: {}", s)))))
         };
         match key {
             "ANGLE_1" => Ok(Self::Angle1(pf(val)?)),
