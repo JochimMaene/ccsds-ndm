@@ -465,7 +465,7 @@ pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
     let (v, _) = kv_rest.parse_next(input)?;
     T::from_kvn_value(v).map_err(|e| {
         let mut err = InternalParserError::from_input(input);
-        err.message = e.to_string();
+        err.message = std::borrow::Cow::Owned(e.to_string());
         ErrMode::Cut(err)
     })
 }
@@ -475,7 +475,7 @@ pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
     let (v, u) = kv_float_unit.parse_next(input)?;
     T::from_kvn_float(v, u).map_err(|e| {
         let mut err = InternalParserError::from_input(input);
-        err.message = e.to_string();
+        err.message = std::borrow::Cow::Owned(e.to_string());
         ErrMode::Cut(err)
     })
 }
