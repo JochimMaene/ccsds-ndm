@@ -8,6 +8,7 @@ use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
+use fast_float;
 use serde::{Deserialize, Serialize};
 
 //----------------------------------------------------------------------
@@ -554,7 +555,7 @@ impl ToKvn for OcmMetadata {
             writer.write_pair("OBJECT_TYPE", v.to_string());
         }
         writer.write_pair("TIME_SYSTEM", &self.time_system);
-        writer.write_pair("EPOCH_TZERO", &self.epoch_tzero);
+        writer.write_pair("EPOCH_TZERO", self.epoch_tzero);
         if let Some(v) = &self.ops_status {
             writer.write_pair("OPS_STATUS", v);
         }
@@ -859,7 +860,7 @@ impl<'de> Deserialize<'de> for TrajLine {
             .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
             .to_string();
         let values: std::result::Result<Vec<f64>, _> = parts
-            .map(|v| v.parse::<f64>().map_err(serde::de::Error::custom))
+            .map(|v| fast_float::parse(v).map_err(serde::de::Error::custom))
             .collect();
         Ok(TrajLine {
             epoch,
@@ -1710,7 +1711,7 @@ impl<'de> Deserialize<'de> for CovLine {
             .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
             .to_string();
         let values: std::result::Result<Vec<f64>, _> = parts
-            .map(|v| v.parse::<f64>().map_err(serde::de::Error::custom))
+            .map(|v| fast_float::parse(v).map_err(serde::de::Error::custom))
             .collect();
         Ok(CovLine {
             epoch,
@@ -2742,7 +2743,7 @@ impl ToKvn for OcmOdParameters {
             writer.write_pair("OD_PREV_ID", v);
         }
         writer.write_pair("OD_METHOD", &self.od_method);
-        writer.write_pair("OD_EPOCH", &self.od_epoch);
+        writer.write_pair("OD_EPOCH", self.od_epoch);
         if let Some(v) = &self.days_since_first_obs {
             writer.write_measure("DAYS_SINCE_FIRST_OBS", &v.to_unit_value());
         }

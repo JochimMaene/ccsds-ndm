@@ -47,8 +47,7 @@ use crate::messages::oem::{Oem, OemBody, OemCovarianceMatrix, OemData, OemMetada
 use crate::parse_block;
 use crate::types::*;
 use std::num::NonZeroU32;
-use std::str::FromStr;
-use winnow::ascii::{float, space1, till_line_ending};
+use winnow::ascii::space1;
 use winnow::combinator::{preceded, repeat};
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
@@ -194,26 +193,22 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
 /// Parses a raw state vector line.
 /// Format: EPOCH X Y Z X_DOT Y_DOT Z_DOT [X_DDOT Y_DDOT Z_DDOT]
 fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
-    // One-pass: take the whole line and split by whitespace.
-    // This reduces take_till/float combinator overhead in high-volume loops.
-    let line = preceded(ws, till_line_ending).parse_next(input)?;
-    let mut parts = line.split_whitespace();
-
-    let epoch_str = parts
-        .next()
-        .ok_or_else(|| missing_field_err(input, "State Vector", "EPOCH"))?;
-    let epoch = Epoch::from_str(epoch_str).map_err(|_| cut_err(input, "Invalid epoch format"))?;
+    let epoch = preceded(ws, kv_epoch_token).parse_next(input)?;
 
     let mut floats = [0.0f64; 9];
     let mut count = 0;
+
     for f in &mut floats {
-        if let Some(s) = parts.next() {
-            *f = s
-                .parse::<f64>()
-                .map_err(|_| cut_err(input, "Invalid float"))?;
-            count += 1;
-        } else {
-            break;
+        let checkpoint = input.checkpoint();
+        match preceded(space1, parse_f64_winnow).parse_next(input) {
+            Ok(val) => {
+                *f = val;
+                count += 1;
+            }
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
+            }
         }
     }
 
@@ -248,7 +243,7 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
     };
 
     // Consume trailing line ending if not already at EOF
-    let _ = opt_line_ending.parse_next(input);
+    opt_line_ending.parse_next(input)?;
 
     Ok(StateVectorAcc {
         epoch,
@@ -303,11 +298,8 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
         comment.extend(collect_comments.parse_next(input)?);
 
         let line_vals = (
-            preceded(ws, float),
-            repeat(
-                expected_count - 1,
-                preceded(space1, float::<&str, f64, ErrMode<InternalParserError>>),
-            ),
+            preceded(ws, parse_f64_winnow),
+            repeat(expected_count - 1, preceded(space1, parse_f64_winnow)),
         )
             .map(|(first, rest): (f64, Vec<f64>)| {
                 let mut all = vec![first];

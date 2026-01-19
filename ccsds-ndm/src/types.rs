@@ -4,22 +4,55 @@
 
 use crate::error::{CcsdsNdmError, Result};
 use crate::traits::{FromKvnFloat, FromKvnValue};
-use once_cell::sync::Lazy;
-use regex::Regex;
+use fast_float;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use thiserror::Error;
+use winnow::ascii::{digit0, digit1};
+use winnow::combinator::{alt, eof, opt, seq, terminated};
+use winnow::token::one_of;
+use winnow::Parser;
 
 // Base Types
 //----------------------------------------------------------------------
 
 /// Represents the `epochType` from the XSD (e.g., "2023-11-13T12:00:00.123Z").
 ///
-/// This struct wraps a `String` and provides validation during deserialization
-/// to ensure it conforms to the CCSDS epoch format.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
-#[serde(try_from = "String")]
-pub struct Epoch(String);
+/// This struct uses a stack-allocated buffer to avoid heap allocations
+/// during parsing of large NDM files.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct Epoch {
+    bytes: [u8; 64],
+    len: u8,
+}
+
+impl Serialize for Epoch {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for Epoch {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Epoch::try_from(s).map_err(serde::de::Error::custom)
+    }
+}
+
+impl Default for Epoch {
+    fn default() -> Self {
+        Self {
+            bytes: [0u8; 64],
+            len: 0,
+        }
+    }
+}
 
 #[derive(Error, Debug, PartialEq)]
 pub enum EpochError {
@@ -27,31 +60,85 @@ pub enum EpochError {
     InvalidFormat(String),
 }
 
-static EPOCH_REGEX: Lazy<Regex> = Lazy::new(|| {
-    // This regex is from the `epochType` pattern in the XSD.
-    // It validates format, but not the logical value of the date/time components.
-    Regex::new(
-        r"^(\-?\d{4}\d*-((\d{2}-\d{2})|\d{3})T\d{2}:\d{2}:\d{2}(\.\d*)?(Z|[+-]\d{2}:\d{2})?|[+-]?\d*(\.\d*)?)$",
-    )
-    .expect("EPOCH_REGEX pattern is valid")
-});
+fn is_valid_epoch(s: &str) -> bool {
+    fn parser(input: &mut &str) -> winnow::Result<()> {
+        alt((
+            // Calendar/Ordinal format: YYYY-MM-DDThh:mm:ss.sssZ
+            seq!(
+                opt('-'),
+                digit1.verify(|s: &str| s.len() >= 4),
+                '-',
+                alt((
+                    seq!(
+                        digit1.verify(|s: &str| s.len() == 2),
+                        '-',
+                        digit1.verify(|s: &str| s.len() == 2)
+                    )
+                    .void(),
+                    seq!(digit1.verify(|s: &str| s.len() == 3)).void(),
+                )),
+                'T',
+                digit1.verify(|s: &str| s.len() == 2),
+                ':',
+                digit1.verify(|s: &str| s.len() == 2),
+                ':',
+                digit1.verify(|s: &str| s.len() == 2),
+                opt(seq!('.', digit0).void()),
+                opt(alt((
+                    "Z".void(),
+                    seq!(
+                        one_of(['+', '-']),
+                        digit1.verify(|s: &str| s.len() == 2),
+                        ':',
+                        digit1.verify(|s: &str| s.len() == 2)
+                    )
+                    .void()
+                )))
+            )
+            .void(),
+            // Numeric format: [+-]?\d*(\.\d*)?
+            seq!(
+                opt(one_of(['+', '-'])),
+                digit0,
+                opt(seq!('.', digit0).void())
+            )
+            .void(),
+        ))
+        .parse_next(input)
+    }
+
+    terminated(parser, eof).parse(s).is_ok()
+}
 
 impl Epoch {
     pub fn new(value: &str) -> std::result::Result<Self, EpochError> {
-        if EPOCH_REGEX.is_match(value) {
-            Ok(Epoch(value.to_string()))
+        // Fast path for empty or very short strings which are common in some tests
+        // and allowed by the regex [+-]?\d*(\.\d*)?
+        if value.len() > 64 {
+            return Err(EpochError::InvalidFormat(value.to_string()));
+        }
+
+        if value.is_empty() || is_valid_epoch(value) {
+            let mut bytes = [0u8; 64];
+            bytes[..value.len()].copy_from_slice(value.as_bytes());
+            Ok(Epoch {
+                bytes,
+                len: value.len() as u8,
+            })
         } else {
             Err(EpochError::InvalidFormat(value.to_string()))
         }
     }
     pub fn as_str(&self) -> &str {
-        &self.0
+        // Bytes are validated to be ASCII/UTF-8 during creation.
+        std::str::from_utf8(&self.bytes[..self.len as usize])
+            .expect("Epoch bytes must be valid UTF-8")
     }
 }
 
 impl std::fmt::Display for Epoch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -2067,9 +2154,12 @@ impl FromKvnValue for Vec3Double {
             ))
             .into());
         }
-        let x = parts[0].parse::<f64>()?;
-        let y = parts[1].parse::<f64>()?;
-        let z = parts[2].parse::<f64>()?;
+        let x = fast_float::parse(parts[0])
+            .map_err(|_| CcsdsNdmError::ValidationError("Invalid X component".to_string()))?;
+        let y = fast_float::parse(parts[1])
+            .map_err(|_| CcsdsNdmError::ValidationError("Invalid Y component".to_string()))?;
+        let z = fast_float::parse(parts[2])
+            .map_err(|_| CcsdsNdmError::ValidationError("Invalid Z component".to_string()))?;
         Ok(Self { x, y, z })
     }
 }

@@ -497,7 +497,7 @@ pub struct MeanElements {
 impl ToKvn for MeanElements {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_pair("EPOCH", &self.epoch);
+        writer.write_pair("EPOCH", self.epoch);
         if let Some(v) = &self.semi_major_axis {
             writer.write_measure("SEMI_MAJOR_AXIS", v);
         }

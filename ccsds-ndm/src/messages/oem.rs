@@ -9,6 +9,7 @@ use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::{Epoch, PositionCovariance, PositionVelocityCovariance, VelocityCovariance};
 use serde::{Deserialize, Serialize};
+use std::fmt::Write;
 use std::num::NonZeroU32;
 
 // Re-export CcsdsNdmError for use in tests
@@ -47,7 +48,7 @@ impl Ndm for Oem {
             total_records += seg.data.state_vector.len();
             total_records += seg.data.covariance_matrix.len() * 7; // Approx lines per cov
         }
-        let estimated_capacity = total_records * 100 + 1024;
+        let estimated_capacity = total_records * 150 + 4096;
         let mut writer = KvnWriter::with_capacity(estimated_capacity);
 
         // 1. Header (Common to ODM)
@@ -254,14 +255,14 @@ impl ToKvn for OemMetadata {
             writer.write_pair("REF_FRAME_EPOCH", v);
         }
         writer.write_pair("TIME_SYSTEM", &self.time_system);
-        writer.write_pair("START_TIME", &self.start_time);
+        writer.write_pair("START_TIME", self.start_time);
         if let Some(v) = &self.useable_start_time {
             writer.write_pair("USEABLE_START_TIME", v);
         }
         if let Some(v) = &self.useable_stop_time {
             writer.write_pair("USEABLE_STOP_TIME", v);
         }
-        writer.write_pair("STOP_TIME", &self.stop_time);
+        writer.write_pair("STOP_TIME", self.stop_time);
         if let Some(v) = &self.interpolation {
             writer.write_pair("INTERPOLATION", v);
         }
@@ -533,46 +534,55 @@ impl ToKvn for OemCovarianceMatrix {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("COVARIANCE_START");
         writer.write_comments(&self.comment);
-        writer.write_pair("EPOCH", &self.epoch);
+        writer.write_pair("EPOCH", self.epoch);
         if let Some(rf) = &self.cov_ref_frame {
             writer.write_pair("COV_REF_FRAME", rf);
         }
 
-        let f = |v: f64| format!("{:.14e}", v);
+        let mut b = zmij::Buffer::new();
 
         // Lower triangular formatting strict compliance (1, 2, 3, 4, 5, 6 items per line)
-        writer.write_line(f(self.cx_x.value));
-        writer.write_line(format!("{} {}", f(self.cy_x.value), f(self.cy_y.value)));
-        writer.write_line(format!(
-            "{} {} {}",
-            f(self.cz_x.value),
-            f(self.cz_y.value),
-            f(self.cz_z.value)
-        ));
-        writer.write_line(format!(
-            "{} {} {} {}",
-            f(self.cx_dot_x.value),
-            f(self.cx_dot_y.value),
-            f(self.cx_dot_z.value),
-            f(self.cx_dot_x_dot.value)
-        ));
-        writer.write_line(format!(
-            "{} {} {} {} {}",
-            f(self.cy_dot_x.value),
-            f(self.cy_dot_y.value),
-            f(self.cy_dot_z.value),
-            f(self.cy_dot_x_dot.value),
-            f(self.cy_dot_y_dot.value)
-        ));
-        writer.write_line(format!(
-            "{} {} {} {} {} {}",
-            f(self.cz_dot_x.value),
-            f(self.cz_dot_y.value),
-            f(self.cz_dot_z.value),
-            f(self.cz_dot_x_dot.value),
-            f(self.cz_dot_y_dot.value),
-            f(self.cz_dot_z_dot.value)
-        ));
+        writer.write_line(b.format_finite(self.cx_x.value));
+
+        let _ = writer.write_str(b.format_finite(self.cy_x.value));
+        let _ = writer.write_str(" ");
+        writer.write_line(b.format_finite(self.cy_y.value));
+
+        let _ = writer.write_str(b.format_finite(self.cz_x.value));
+        let _ = writer.write_str(" ");
+        let _ = writer.write_str(b.format_finite(self.cz_y.value));
+        let _ = writer.write_str(" ");
+        writer.write_line(b.format_finite(self.cz_z.value));
+
+        let _ = writer.write_str(b.format_finite(self.cx_dot_x.value));
+        let _ = writer.write_str(" ");
+        let _ = writer.write_str(b.format_finite(self.cx_dot_y.value));
+        let _ = writer.write_str(" ");
+        let _ = writer.write_str(b.format_finite(self.cx_dot_z.value));
+        let _ = writer.write_str(" ");
+        writer.write_line(b.format_finite(self.cx_dot_x_dot.value));
+
+        let _ = writer.write_str(b.format_finite(self.cy_dot_x.value));
+        let _ = writer.write_str(" ");
+        let _ = writer.write_str(b.format_finite(self.cy_dot_y.value));
+        let _ = writer.write_str(" ");
+        let _ = writer.write_str(b.format_finite(self.cy_dot_z.value));
+        let _ = writer.write_str(" ");
+        let _ = writer.write_str(b.format_finite(self.cy_dot_x_dot.value));
+        let _ = writer.write_str(" ");
+        writer.write_line(b.format_finite(self.cy_dot_y_dot.value));
+
+        let _ = writer.write_str(b.format_finite(self.cz_dot_x.value));
+        let _ = writer.write_str(" ");
+        let _ = writer.write_str(b.format_finite(self.cz_dot_y.value));
+        let _ = writer.write_str(" ");
+        let _ = writer.write_str(b.format_finite(self.cz_dot_z.value));
+        let _ = writer.write_str(" ");
+        let _ = writer.write_str(b.format_finite(self.cz_dot_x_dot.value));
+        let _ = writer.write_str(" ");
+        let _ = writer.write_str(b.format_finite(self.cz_dot_y_dot.value));
+        let _ = writer.write_str(" ");
+        writer.write_line(b.format_finite(self.cz_dot_z_dot.value));
 
         writer.write_section("COVARIANCE_STOP");
     }

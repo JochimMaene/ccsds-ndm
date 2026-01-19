@@ -14,7 +14,7 @@ use crate::parse_block;
 use crate::types::*;
 use winnow::ascii::{space1, till_line_ending};
 use winnow::combinator::{preceded, repeat};
-use winnow::error::{AddContext, ErrMode};
+use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -214,9 +214,9 @@ pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
         .trim_start()
         .starts_with(|c: char| c.is_ascii_uppercase())
     {
-        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
+        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
     }
-    let epoch = preceded(ws, till_space).parse_next(input)?;
+    let epoch = till_space.parse_next(input)?;
     let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     Ok(TrajLine {
@@ -499,9 +499,9 @@ pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
         .trim_start()
         .starts_with(|c: char| c.is_ascii_uppercase())
     {
-        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
+        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
     }
-    let epoch = preceded(ws, till_space).parse_next(input)?;
+    let epoch = till_space.parse_next(input)?;
     let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     Ok(CovLine {
@@ -584,8 +584,10 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
 }
 
 pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
+    let checkpoint = input.checkpoint();
+    let _ = ws.parse_next(input)?;
     if input.starts_with(|c: char| c.is_ascii_uppercase()) {
-        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
+        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
     }
     let epoch = till_space.parse_next(input)?;
     let values =
@@ -961,13 +963,13 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<UserDefined> {
             break;
         }
 
-        match key_value_line.parse_next(input) {
-            Ok((k, v, _)) => {
+        match key_token.parse_next(input) {
+            Ok(k) => {
                 comment.extend(comments);
-                opt_line_ending.parse_next(input)?;
+                let v = kv_string.parse_next(input)?;
                 user_defined.push(UserDefinedParameter {
                     parameter: k.to_string(),
-                    value: v.to_string(),
+                    value: v,
                 });
             }
             Err(_) => {

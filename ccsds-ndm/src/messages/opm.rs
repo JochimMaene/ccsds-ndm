@@ -446,7 +446,7 @@ pub struct ManeuverParameters {
 impl ToKvn for ManeuverParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_pair("MAN_EPOCH_IGNITION", &self.man_epoch_ignition);
+        writer.write_pair("MAN_EPOCH_IGNITION", self.man_epoch_ignition);
         writer.write_measure("MAN_DURATION", &self.man_duration.to_unit_value());
         writer.write_measure(
             "MAN_DELTA_MASS",

@@ -7,6 +7,7 @@ use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::{Epoch, Percentage};
+use fast_float;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -79,7 +80,7 @@ pub struct TdmHeader {
 impl ToKvn for TdmHeader {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_pair("CREATION_DATE", &self.creation_date);
+        writer.write_pair("CREATION_DATE", self.creation_date);
         writer.write_pair("ORIGINATOR", &self.originator);
         if let Some(v) = &self.message_id {
             writer.write_pair("MESSAGE_ID", v);
@@ -1182,7 +1183,10 @@ impl TdmObservationData {
     }
 
     pub fn from_key_val(key: &str, val: &str) -> Result<Self> {
-        let pf = |s: &str| s.parse::<f64>().map_err(CcsdsNdmError::from);
+        let pf = |s: &str| {
+            fast_float::parse(s)
+                .map_err(|_| CcsdsNdmError::InvalidFormat(format!("Invalid float: {}", s)))
+        };
         match key {
             "ANGLE_1" => Ok(Self::Angle1(pf(val)?)),
             "ANGLE_2" => Ok(Self::Angle2(pf(val)?)),
