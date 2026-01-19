@@ -6,7 +6,8 @@ default:
 
 # --- Variables --------------------------------------------------------------
 
-rust_manifest := "ccsds-ndm/Cargo.toml"
+rust_dir := "ccsds-ndm"
+rust_manifest := rust_dir + "/Cargo.toml"
 python_dir := "bindings/python"
 
 # --- Setup ------------------------------------------------------------------
@@ -126,11 +127,11 @@ coverage:
 
 # Build benchmarks for CodSpeed
 bench-build:
-    cargo codspeed build --manifest-path {{rust_manifest}}
+    cd {{rust_dir}} && cargo codspeed build
 
 # Run benchmarks for CodSpeed
 bench-run:
-    cargo codspeed run --manifest-path {{rust_manifest}}
+    cd {{rust_dir}} && cargo codspeed run
 
 # --- Build and Documentation ------------------------------------------------
 
