@@ -14,7 +14,30 @@ pub struct ParseDiagnostic {
     pub column: usize,
     pub message: String,
     pub contexts: Vec<&'static str>,
-    pub snippet: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct RawParsePosition {
+    pub offset: usize,
+    pub message: Cow<'static, str>,
+    pub contexts: ContextStack,
+}
+
+impl RawParsePosition {
+    pub fn into_parse_error(self, input: &str) -> KvnParseError {
+        // Use 0 as default if we don't have location info yet, 
+        // to_ccsds_error + with_location will fix this.
+        // Actually, with_location recalculates from offset.
+        // But ParseDiagnostic computes everything.
+        let diag = ParseDiagnostic::new(input, self.offset, &*self.message);
+        KvnParseError {
+            line: diag.line,
+            column: diag.column,
+            message: self.message.into_owned(),
+            contexts: self.contexts.to_vec(),
+            offset: self.offset,
+        }
+    }
 }
 
 impl ParseDiagnostic {
@@ -23,21 +46,14 @@ impl ParseDiagnostic {
         let offset = offset.min(input.len());
         let prefix = &input[..offset];
         let line = prefix.as_bytes().iter().filter(|&&b| b == b'\n').count() + 1;
-
         let line_start = prefix.rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let suffix = &input[offset..];
-        let line_end = suffix.find('\n').map(|i| i + offset).unwrap_or(input.len());
-
-        let line_text = &input[line_start..line_end];
         let column = prefix[line_start..].chars().count();
-        let snippet = format!("{}\n{}^", line_text, " ".repeat(column));
 
         Self {
             line,
             column: column + 1,
             message: message.into(),
             contexts: Vec::new(),
-            snippet,
         }
     }
 
@@ -55,19 +71,20 @@ pub struct KvnParseError {
     pub column: usize,
     pub message: String,
     pub contexts: Vec<&'static str>,
-    pub snippet: String,
     pub offset: usize, // Track raw offset for lazy location calculation
 }
 
 impl std::fmt::Display for KvnParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
+        write!(
             f,
             "KVN parsing error at line {}, column {}: {}",
             self.line, self.column, self.message
         )?;
-        writeln!(f, "Context: {}", self.contexts.join(" > "))?;
-        write!(f, "{}", self.snippet)
+        if !self.contexts.is_empty() {
+             write!(f, "\nContext: {}", self.contexts.join(" > "))?;
+        }
+        Ok(())
     }
 }
 
@@ -82,6 +99,7 @@ pub struct EnumParseError {
 
 /// Errors related to the physical format or syntax of the NDM.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum FormatError {
     /// Errors occurring during KVN parsing.
     #[error(transparent)]
@@ -89,23 +107,23 @@ pub enum FormatError {
 
     /// Errors occurring during XML parsing.
     #[error("XML error: {0}")]
-    Xml(#[from] quick_xml::Error),
+    Xml(#[source] #[from] quick_xml::Error),
 
     /// Errors occurring during XML deserialization.
     #[error("XML deserialization error: {0}")]
-    XmlDe(#[from] quick_xml::DeError),
+    XmlDe(#[source] #[from] quick_xml::DeError),
 
     /// Errors occurring during XML serialization.
     #[error("XML serialization error: {0}")]
-    XmlSer(#[from] quick_xml::se::SeError),
+    XmlSer(#[source] #[from] quick_xml::se::SeError),
 
     /// Error when parsing a floating point number fails.
     #[error("Parse float error: {0}")]
-    ParseFloat(#[from] std::num::ParseFloatError),
+    ParseFloat(#[source] #[from] std::num::ParseFloatError),
 
     /// Error when parsing an integer number fails.
     #[error("Parse int error: {0}")]
-    ParseInt(#[from] std::num::ParseIntError),
+    ParseInt(#[source] #[from] std::num::ParseIntError),
 
     /// Error during enum parsing.
     #[error(transparent)]
@@ -114,48 +132,57 @@ pub enum FormatError {
     /// Error when the format of a value or segment is invalid.
     #[error("Invalid format: {0}")]
     InvalidFormat(String),
+
+    /// Errors occurring during XML deserialization with added context.
+    #[error("{context}: {source}")]
+    XmlWithContext {
+        context: String,
+        #[source]
+        source: quick_xml::DeError,
+    },
 }
 
 /// Errors related to the validation of NDM data against CCSDS rules.
 #[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
 pub enum ValidationError {
     /// A required field was missing in the message.
     #[error("Missing required field: {field} in block {block}")]
     MissingRequiredField {
-        block: String,
-        field: String,
+        block: Cow<'static, str>,
+        field: Cow<'static, str>,
         line: Option<usize>,
     },
 
     /// Two or more fields are in conflict.
     #[error("Conflicting fields: {fields:?}")]
     Conflict {
-        fields: Vec<String>,
+        fields: Vec<Cow<'static, str>>,
         line: Option<usize>,
     },
 
     /// A value was provided that does not match the CCSDS specification.
     #[error("Invalid value for '{field}': '{value}' (expected {expected})")]
     InvalidValue {
-        field: String,
+        field: Cow<'static, str>,
         value: String,
-        expected: String,
+        expected: Cow<'static, str>,
         line: Option<usize>,
     },
 
     /// Specific validation error for values out of expected range.
     #[error("Value for '{name}' is out of range: {value} (expected {expected})")]
     OutOfRange {
-        name: String,
+        name: Cow<'static, str>,
         value: String,
-        expected: String,
+        expected: Cow<'static, str>,
         line: Option<usize>,
     },
 
     /// General validation errors for cases not covered by specific variants.
     #[error("Validation error: {message}")]
     Generic {
-        message: String,
+        message: Cow<'static, str>,
         line: Option<usize>,
     },
 }
@@ -193,12 +220,36 @@ impl WithLocation for ValidationError {
     }
 }
 
+/// The top-level error type for the CCSDS NDM library.
+///
+/// This enum wraps all possible errors that can occur during NDM parsing,
+/// validation, serialization, and I/O.
+///
+/// # Example: Handling Parse Errors
+/// ```no_run
+/// use ccsds_ndm::messages::opm::Opm;
+/// use ccsds_ndm::error::CcsdsNdmError;
+/// use ccsds_ndm::kvn::parser::ParseKvn;
+///
+/// match Opm::from_kvn_str("CCSDS_OPM_VERS = 3.0\n...") {
+///     Ok(opm) => println!("Parsed: {:?}", opm),
+///     Err(e) => {
+///         if let Some(enum_err) = e.as_enum_error() {
+///             eprintln!("Invalid enum value '{}' for field '{}'", enum_err.value, enum_err.field);
+///         } else if let Some(validation_err) = e.as_validation_error() {
+///             eprintln!("Validation error: {}", validation_err);
+///         } else {
+///             eprintln!("Error: {}", e);
+///         }
+///     }
+/// }
+/// ```
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum CcsdsNdmError {
     /// Errors occurring during I/O operations.
     #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[source] #[from] std::io::Error),
 
     /// Errors related to NDM format or syntax.
     #[error(transparent)]
@@ -210,7 +261,7 @@ pub enum CcsdsNdmError {
 
     /// Errors related to CCSDS Epochs.
     #[error("Epoch error: {0}")]
-    Epoch(#[from] EpochError),
+    Epoch(#[source] #[from] EpochError),
 
     /// Error for unsupported CCSDS message types.
     #[error("Unsupported message type: {0}")]
@@ -222,9 +273,12 @@ pub enum CcsdsNdmError {
 }
 
 /// A stack-allocated collection of error contexts.
+///
+/// **Note**: Capacity is limited to 3 contexts. Additional contexts are silently ignored.
+/// This is a deliberate trade-off for performance in the hot parsing path.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContextStack {
-    contexts: [&'static str; 2],
+    contexts: [&'static str; 3],
     len: usize,
 }
 
@@ -262,6 +316,7 @@ pub struct InternalParserError {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub enum ParserErrorKind {
     #[default]
     Kvn,
@@ -269,6 +324,11 @@ pub enum ParserErrorKind {
         block: &'static str,
         field: &'static str,
     },
+    Validation(ValidationError),
+    Epoch(EpochError),
+    Enum(EnumParseError),
+    ParseInt(std::num::ParseIntError),
+    ParseFloat(std::num::ParseFloatError),
 }
 
 impl ParserError<&str> for InternalParserError {
@@ -289,9 +349,9 @@ impl ParserError<&str> for InternalParserError {
 impl winnow::error::FromExternalError<&str, EpochError> for InternalParserError {
     fn from_external_error(_input: &&str, e: EpochError) -> Self {
         Self {
-            message: Cow::Owned(e.to_string()),
+            message: Cow::Borrowed(""),
             contexts: ContextStack::new(),
-            kind: ParserErrorKind::default(),
+            kind: ParserErrorKind::Epoch(e),
         }
     }
 }
@@ -299,9 +359,9 @@ impl winnow::error::FromExternalError<&str, EpochError> for InternalParserError 
 impl winnow::error::FromExternalError<&str, std::num::ParseFloatError> for InternalParserError {
     fn from_external_error(_input: &&str, e: std::num::ParseFloatError) -> Self {
         Self {
-            message: Cow::Owned(e.to_string()),
+            message: Cow::Borrowed(""),
             contexts: ContextStack::new(),
-            kind: ParserErrorKind::default(),
+            kind: ParserErrorKind::ParseFloat(e),
         }
     }
 }
@@ -309,9 +369,9 @@ impl winnow::error::FromExternalError<&str, std::num::ParseFloatError> for Inter
 impl winnow::error::FromExternalError<&str, std::num::ParseIntError> for InternalParserError {
     fn from_external_error(_input: &&str, e: std::num::ParseIntError) -> Self {
         Self {
-            message: Cow::Owned(e.to_string()),
+            message: Cow::Borrowed(""),
             contexts: ContextStack::new(),
-            kind: ParserErrorKind::default(),
+            kind: ParserErrorKind::ParseInt(e),
         }
     }
 }
@@ -319,32 +379,19 @@ impl winnow::error::FromExternalError<&str, std::num::ParseIntError> for Interna
 impl winnow::error::FromExternalError<&str, EnumParseError> for InternalParserError {
     fn from_external_error(_input: &&str, e: EnumParseError) -> Self {
         Self {
-            message: Cow::Owned(e.to_string()),
+            message: Cow::Borrowed(""),
             contexts: ContextStack::new(),
-            kind: ParserErrorKind::default(),
+            kind: ParserErrorKind::Enum(e),
         }
     }
 }
 
 impl winnow::error::FromExternalError<&str, ValidationError> for InternalParserError {
     fn from_external_error(_input: &&str, e: ValidationError) -> Self {
-        match e {
-            ValidationError::MissingRequiredField { .. } => {
-                // We unfortunately have to leak these strings or use static ones if possible.
-                // But during parsing they are usually static.
-                // If they are not static, we might need a different approach.
-                // For now, let's assume we can use labels or just the message.
-                Self {
-                    message: Cow::Owned(e.to_string()),
-                    contexts: ContextStack::new(),
-                    kind: ParserErrorKind::Kvn, // Fallback
-                }
-            }
-            _ => Self {
-                message: Cow::Owned(e.to_string()),
-                contexts: ContextStack::new(),
-                kind: ParserErrorKind::default(),
-            },
+        Self {
+            message: Cow::Borrowed(""),
+            contexts: ContextStack::new(),
+            kind: ParserErrorKind::Validation(e),
         }
     }
 }
@@ -505,6 +552,41 @@ impl CcsdsNdmError {
         }
     }
 
+    /// Returns the inner format error if this is a FormatError.
+    pub fn as_format_error(&self) -> Option<&FormatError> {
+        match self {
+            CcsdsNdmError::Format(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    /// Returns the inner epoch error if this is an EpochError.
+    pub fn as_epoch_error(&self) -> Option<&EpochError> {
+        match self {
+            CcsdsNdmError::Epoch(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    /// Returns the inner I/O error if this is an IoError.
+    pub fn as_io_error(&self) -> Option<&std::io::Error> {
+        match self {
+            CcsdsNdmError::Io(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    /// Returns the inner XML error if this is an XmlError.
+    pub fn as_xml_error(&self) -> Option<&quick_xml::Error> {
+        match self {
+            CcsdsNdmError::Format(e) => match **e {
+                FormatError::Xml(ref xe) => Some(xe),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     /// Returns true if this is any FormatError.
     pub fn is_format_error(&self) -> bool {
         matches!(self, CcsdsNdmError::Format(_))
@@ -520,11 +602,59 @@ impl CcsdsNdmError {
         self.as_validation_error().is_some()
     }
 
+    /// Returns true if this is an I/O error.
+    pub fn is_io_error(&self) -> bool {
+        matches!(self, CcsdsNdmError::Io(_))
+    }
+
+    /// Returns true if this is an epoch error.
+    pub fn is_epoch_error(&self) -> bool {
+        matches!(self, CcsdsNdmError::Epoch(_))
+    }
+
+    /// Returns the inner EnumParseError if this is a FormatError::Enum.
+    pub fn as_enum_error(&self) -> Option<&EnumParseError> {
+        match self {
+            CcsdsNdmError::Format(e) => match **e {
+                FormatError::Enum(ref ee) => Some(ee),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// Returns the inner ParseIntError if this is a FormatError::ParseInt.
+    pub fn as_parse_int_error(&self) -> Option<&std::num::ParseIntError> {
+        match self {
+            CcsdsNdmError::Format(e) => match **e {
+                FormatError::ParseInt(ref pie) => Some(pie),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// Returns the inner ParseFloatError if this is a FormatError::ParseFloat.
+    pub fn as_parse_float_error(&self) -> Option<&std::num::ParseFloatError> {
+        match self {
+            CcsdsNdmError::Format(e) => match **e {
+                FormatError::ParseFloat(ref pfe) => Some(pfe),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     /// Populates location information for variants with line info.
     pub fn with_location(mut self, input: &str, offset: usize) -> Self {
         match self {
             CcsdsNdmError::Format(ref mut format_err) => {
                 if let FormatError::Kvn(ref mut inner) = **format_err {
+                    // Avoid re-calculating if already populated via RawParsePosition
+                    if inner.line > 0 {
+                        return self;
+                    }
+
                     let target_offset = if offset > 0 {
                         offset
                     } else if inner.offset > 0 {
@@ -536,7 +666,6 @@ impl CcsdsNdmError {
                     let diag = ParseDiagnostic::new(input, target_offset, "");
                     inner.line = diag.line;
                     inner.column = diag.column;
-                    inner.snippet = diag.snippet;
                     inner.offset = target_offset;
                 }
             }

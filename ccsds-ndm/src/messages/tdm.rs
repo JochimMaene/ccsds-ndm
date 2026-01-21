@@ -1240,9 +1240,9 @@ impl TdmObservationData {
             "TROPO_WET" => Ok(Self::TropoWet(pf(val)?)),
             "VLBI_DELAY" => Ok(Self::VlbiDelay(pf(val)?)),
             _ => Err(crate::error::ValidationError::InvalidValue {
-                field: key.to_string(),
+                field: key.to_string().into(),
                 value: val.to_string(),
-                expected: "valid TDM observation keyword".to_string(),
+                expected: "valid TDM observation keyword".into(),
                 line: None,
             }
             .into()),

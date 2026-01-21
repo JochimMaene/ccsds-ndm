@@ -20,7 +20,7 @@
 
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
 use crate::error::{
-    CcsdsNdmError, EnumParseError, FormatError, InternalParserError, KvnParseError, ValidationError,
+    CcsdsNdmError, EnumParseError, FormatError, InternalParserError, ValidationError,
 };
 use crate::traits::{FromKvnFloat, FromKvnValue};
 use crate::types::{UserDefined, UserDefinedParameter, *};
@@ -72,22 +72,38 @@ pub fn to_ccsds_error(
     let inner = err.into_inner();
 
     let base_err = match inner.kind {
+        crate::error::ParserErrorKind::Validation(e) => CcsdsNdmError::Validation(Box::new(e)),
+        crate::error::ParserErrorKind::Epoch(e) => CcsdsNdmError::Epoch(e),
+        crate::error::ParserErrorKind::Enum(e) => {
+            CcsdsNdmError::Format(Box::new(FormatError::Enum(e)))
+        }
+        crate::error::ParserErrorKind::ParseInt(e) => {
+            CcsdsNdmError::Format(Box::new(FormatError::ParseInt(e)))
+        }
+        crate::error::ParserErrorKind::ParseFloat(e) => {
+            CcsdsNdmError::Format(Box::new(FormatError::ParseFloat(e)))
+        }
         crate::error::ParserErrorKind::MissingRequiredField { block, field } => {
-            CcsdsNdmError::Validation(Box::new(ValidationError::MissingRequiredField {
-                block: block.to_string(),
-                field: field.to_string(),
+            return CcsdsNdmError::Validation(Box::new(ValidationError::MissingRequiredField {
+                block: std::borrow::Cow::Borrowed(block),
+                field: std::borrow::Cow::Borrowed(field),
                 line: None,
             }))
+            .with_location(input, offset);
         }
-        crate::error::ParserErrorKind::Kvn => {
-            CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
-                line: 0,
-                column: 0,
-                message: inner.message.into_owned(),
-                contexts: inner.contexts.to_vec(),
-                snippet: String::new(),
-                offset: 0, // Location populated by with_location
-            }))))
+        kind => {
+            let message = match kind {
+                _ => inner.message,
+            };
+
+            let raw = crate::error::RawParsePosition {
+                offset,
+                message,
+                contexts: inner.contexts,
+            };
+            CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(
+                raw.into_parse_error(input),
+            ))))
         }
     };
 
@@ -316,11 +332,9 @@ pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(InternalParserError::from_input(input).add_context(
-                input,
-                &checkpoint,
-                StrContext::Label("Invalid float"),
-            ))
+            let mut err = InternalParserError::from_input(input);
+            err.message = std::borrow::Cow::Borrowed("Invalid float");
+            ErrMode::Cut(err.add_context(input, &checkpoint, StrContext::Label("Invalid float")))
         } else {
             e
         }
@@ -333,7 +347,7 @@ pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
     terminated(
         (
             take_while(1.., ('0'..='9', '-', '+'))
-                .map(|s: &str| s.parse::<i32>().map_err(|_| ()))
+                .map(|s: &str| s.parse::<i32>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
@@ -344,11 +358,9 @@ pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(InternalParserError::from_input(input).add_context(
-                input,
-                &checkpoint,
-                StrContext::Label("Invalid integer"),
-            ))
+            let mut err = InternalParserError::from_input(input);
+            err.message = std::borrow::Cow::Borrowed("Invalid integer");
+            ErrMode::Cut(err.add_context(input, &checkpoint, StrContext::Label("Invalid integer")))
         } else {
             e
         }
@@ -361,7 +373,7 @@ pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     terminated(
         (
             take_while(1.., '0'..='9')
-                .map(|s: &str| s.parse::<u32>().map_err(|_| ()))
+                .map(|s: &str| s.parse::<u32>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
@@ -372,7 +384,9 @@ pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(InternalParserError::from_input(input).add_context(
+            let mut err = InternalParserError::from_input(input);
+            err.message = std::borrow::Cow::Borrowed("Invalid unsigned integer");
+            ErrMode::Cut(err.add_context(
                 input,
                 &checkpoint,
                 StrContext::Label("Invalid unsigned integer"),
@@ -389,7 +403,7 @@ pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
     terminated(
         (
             take_while(1.., '0'..='9')
-                .map(|s: &str| s.parse::<u64>().map_err(|_| ()))
+                .map(|s: &str| s.parse::<u64>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
@@ -400,7 +414,9 @@ pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(InternalParserError::from_input(input).add_context(
+            let mut err = InternalParserError::from_input(input);
+            err.message = std::borrow::Cow::Borrowed("Invalid unsigned integer");
+            ErrMode::Cut(err.add_context(
                 input,
                 &checkpoint,
                 StrContext::Label("Invalid unsigned integer"),
@@ -472,9 +488,7 @@ where
 pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
     let (v, _) = kv_rest.parse_next(input)?;
     T::from_kvn_value(v).map_err(|e| {
-        let mut err = InternalParserError::from_input(input);
-        err.message = std::borrow::Cow::Owned(e.to_string());
-        ErrMode::Cut(err)
+        ErrMode::Cut(InternalParserError::from_external_error(input, e))
     })
 }
 
@@ -482,9 +496,7 @@ pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
 pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
     let (v, u) = kv_float_unit.parse_next(input)?;
     T::from_kvn_float(v, u).map_err(|e| {
-        let mut err = InternalParserError::from_input(input);
-        err.message = std::borrow::Cow::Owned(e.to_string());
-        ErrMode::Cut(err)
+        ErrMode::Cut(InternalParserError::from_external_error(input, e))
     })
 }
 

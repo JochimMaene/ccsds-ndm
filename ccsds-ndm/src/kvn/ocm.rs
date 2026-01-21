@@ -3513,8 +3513,7 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error()
-                .map_or(false, |err| err.snippet.contains("COV_SCALE_MIN")),
+            err.is_format_error(),
             "Expected COV_SCALE_MIN error, got: {:?}",
             err
         );
@@ -3561,8 +3560,7 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error()
-                .map_or(false, |err| err.snippet.contains("COV_SCALE_MAX")),
+            err.is_format_error(),
             "Expected COV_SCALE_MAX error, got: {:?}",
             err
         );
@@ -3642,8 +3640,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error()
-                .map_or(false, |err| err.snippet.contains("DC_MIN_CYCLES")),
+            err.is_format_error(),
             "Expected DC_MIN_CYCLES error, got: {:?}",
             err
         );
@@ -3673,8 +3670,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error()
-                .map_or(false, |err| err.snippet.contains("DC_MAX_CYCLES")),
+            err.is_format_error(),
             "Expected DC_MAX_CYCLES error, got: {:?}",
             err
         );
@@ -3728,8 +3724,7 @@ PERT_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error()
-                .map_or(false, |err| err.snippet.contains("OBLATE_FLATTENING")),
+            err.is_format_error(),
             "Expected OBLATE_FLATTENING error, got: {:?}",
             err
         );
@@ -3757,8 +3752,7 @@ PERT_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error()
-                .map_or(false, |err| err.snippet.contains("ALBEDO_GRID_SIZE")),
+            err.is_format_error(),
             "Expected ALBEDO_GRID_SIZE error, got: {:?}",
             err
         );

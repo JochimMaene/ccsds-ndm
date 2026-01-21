@@ -1097,7 +1097,7 @@ CNDOT_NDOT = 1 [m**2/s**2]
         kvn = kvn.replace("SCREEN_VOLUME_FRAME = RTN", "SCREEN_VOLUME_FRAME = BAD");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
 
@@ -1106,7 +1106,7 @@ CNDOT_NDOT = 1 [m**2/s**2]
         kvn2 = kvn2.replace("SCREEN_VOLUME_SHAPE = BOX", "SCREEN_VOLUME_SHAPE = BALL");
         let err2 = Cdm::from_kvn(&kvn2).unwrap_err();
         match err2 {
-            e if e.is_kvn_error() => {} // Expected error
+            e if e.as_enum_error().is_some() => {} // Expected error
             _ => panic!("unexpected error: {:?}", err2),
         }
     }
@@ -1418,7 +1418,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("OBJECT = OBJECT1", "OBJECT = OBJECT3");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1432,7 +1432,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1454,7 +1454,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("MANEUVERABLE = YES", "MANEUVERABLE = MAYBE");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
     }
@@ -1486,7 +1486,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = INVALID");
         let err = Cdm::from_kvn(&kvn).unwrap_err();
         match err {
-            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
             _ => panic!("unexpected error: {:?}", err),
         }
     }

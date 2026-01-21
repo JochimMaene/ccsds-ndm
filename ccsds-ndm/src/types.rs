@@ -54,7 +54,7 @@ impl Default for Epoch {
     }
 }
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Clone)]
 pub enum EpochError {
     #[error("invalid epoch format: '{0}'")]
     InvalidFormat(String),
@@ -406,9 +406,9 @@ impl Angle {
     pub fn new(value: f64, units: Option<AngleUnits>) -> Result<Self> {
         if !(-360.0..360.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Angle".to_string(),
+                name: "Angle".into(),
                 value: value.to_string(),
-                expected: "[-360, 360)".to_string(),
+                expected: "[-360, 360)".into(),
                 line: None,
             }
             .into());
@@ -453,9 +453,9 @@ impl DayInterval {
     pub fn new(value: f64, units: Option<DayIntervalUnits>) -> Result<Self> {
         if value < 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "DayInterval".to_string(),
+                name: "DayInterval".into(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
+                expected: ">= 0".into(),
                 line: None,
             }
             .into());
@@ -492,9 +492,9 @@ impl DayIntervalRequired {
     pub fn new(value: f64) -> Result<Self> {
         if value <= 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "DayIntervalRequired".to_string(),
+                name: "DayIntervalRequired".into(),
                 value: value.to_string(),
-                expected: "> 0".to_string(),
+                expected: "> 0".into(),
                 line: None,
             }
             .into());
@@ -537,9 +537,9 @@ impl Frequency {
     pub fn new(value: f64, units: Option<FrequencyUnits>) -> Result<Self> {
         if value <= 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Frequency".to_string(),
+                name: "Frequency".into(),
                 value: value.to_string(),
-                expected: "> 0".to_string(),
+                expected: "> 0".into(),
                 line: None,
             }
             .into());
@@ -583,9 +583,9 @@ impl Gm {
     pub fn new(value: f64, units: Option<GmUnits>) -> Result<Self> {
         if value <= 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "GM".to_string(),
+                name: "GM".into(),
                 value: value.to_string(),
-                expected: "> 0".to_string(),
+                expected: "> 0".into(),
                 line: None,
             }
             .into());
@@ -627,9 +627,9 @@ impl AltitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
         if !(-430.5..=8848.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Altitude".to_string(),
+                name: "Altitude".into(),
                 value: value.to_string(),
-                expected: "[-430.5, 8848]".to_string(),
+                expected: "[-430.5, 8848]".into(),
                 line: None,
             }
             .into());
@@ -675,9 +675,9 @@ impl WkgRequired {
     pub fn new(value: f64) -> Result<Self> {
         if value < 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "W/kg".to_string(),
+                name: "W/kg".into(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
+                expected: ">= 0".into(),
                 line: None,
             }
             .into());
@@ -716,9 +716,9 @@ impl Mass {
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value < 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Mass".to_string(),
+                name: "Mass".into(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
+                expected: ">= 0".into(),
                 line: None,
             }
             .into());
@@ -760,9 +760,9 @@ impl Area {
     pub fn new(value: f64, units: Option<AreaUnits>) -> Result<Self> {
         if value < 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Area".to_string(),
+                name: "Area".into(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
+                expected: ">= 0".into(),
                 line: None,
             }
             .into());
@@ -842,9 +842,9 @@ impl BallisticCoeffRequired {
     pub fn new(value: f64) -> Result<Self> {
         if value < 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Ballistic Coeff".to_string(),
+                name: "Ballistic Coeff".into(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
+                expected: ">= 0".into(),
                 line: None,
             }
             .into());
@@ -888,9 +888,9 @@ impl Percentage {
     pub fn new(value: f64, units: Option<PercentageUnits>) -> Result<Self> {
         if !(0.0..=100.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Percentage".to_string(),
+                name: "Percentage".into(),
                 value: value.to_string(),
-                expected: "[0, 100]".to_string(),
+                expected: "[0, 100]".into(),
                 line: None,
             }
             .into());
@@ -927,9 +927,9 @@ impl PercentageRequired {
     pub fn new(value: f64) -> Result<Self> {
         if !(0.0..=100.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "PercentageRequired".to_string(),
+                name: "PercentageRequired".into(),
                 value: value.to_string(),
-                expected: "[0, 100]".to_string(),
+                expected: "[0, 100]".into(),
                 line: None,
             }
             .into());
@@ -960,9 +960,9 @@ impl Probability {
     pub fn new(value: f64) -> Result<Self> {
         if !(0.0..=1.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Probability".to_string(),
+                name: "Probability".into(),
                 value: value.to_string(),
-                expected: "[0, 1]".to_string(),
+                expected: "[0, 1]".into(),
                 line: None,
             }
             .into());
@@ -1003,9 +1003,9 @@ impl DeltaMass {
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value >= 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "DeltaMass".to_string(),
+                name: "DeltaMass".into(),
                 value: value.to_string(),
-                expected: "< 0".to_string(),
+                expected: "< 0".into(),
                 line: None,
             }
             .into());
@@ -1032,9 +1032,9 @@ impl DeltaMassZ {
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value > 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "DeltaMassZ".to_string(),
+                name: "DeltaMassZ".into(),
                 value: value.to_string(),
-                expected: "<= 0".to_string(),
+                expected: "<= 0".into(),
                 line: None,
             }
             .into());
@@ -1070,9 +1070,9 @@ impl LatitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
         if !(-90.0..=90.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Latitude".to_string(),
+                name: "Latitude".into(),
                 value: value.to_string(),
-                expected: "[-90, 90]".to_string(),
+                expected: "[-90, 90]".into(),
                 line: None,
             }
             .into());
@@ -1114,9 +1114,9 @@ impl LongitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
         if !(-180.0..=180.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Longitude".to_string(),
+                name: "Longitude".into(),
                 value: value.to_string(),
-                expected: "[-180, 180]".to_string(),
+                expected: "[-180, 180]".into(),
                 line: None,
             }
             .into());
@@ -1574,9 +1574,9 @@ impl Duration {
     pub fn new(value: f64, units: Option<TimeUnits>) -> Result<Self> {
         if value < 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Duration".to_string(),
+                name: "Duration".into(),
                 value: value.to_string(),
-                expected: ">= 0".to_string(),
+                expected: ">= 0".into(),
                 line: None,
             }
             .into());
@@ -1640,9 +1640,9 @@ impl Inclination {
     pub fn new(value: f64, units: Option<AngleUnits>) -> Result<Self> {
         if !(0.0..=180.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Inclination".to_string(),
+                name: "Inclination".into(),
                 value: value.to_string(),
-                expected: "[0, 180]".to_string(),
+                expected: "[0, 180]".into(),
                 line: None,
             }
             .into());
@@ -2156,19 +2156,19 @@ impl FromKvnValue for Vec3Double {
         }
         let x = fast_float::parse(parts[0]).map_err(|_| {
             CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic {
-                message: "Invalid X component".to_string(),
+                message: "Invalid X component".into(),
                 line: None,
             }))
         })?;
         let y = fast_float::parse(parts[1]).map_err(|_| {
             CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic {
-                message: "Invalid Y component".to_string(),
+                message: "Invalid Y component".into(),
                 line: None,
             }))
         })?;
         let z = fast_float::parse(parts[2]).map_err(|_| {
             CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic {
-                message: "Invalid Z component".to_string(),
+                message: "Invalid Z component".into(),
                 line: None,
             }))
         })?;

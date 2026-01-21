@@ -396,9 +396,9 @@ impl Quaternion {
         for (name, v) in [("Q1", q1), ("Q2", q2), ("Q3", q3), ("QC", qc)] {
             if !(-1.0..=1.0).contains(&v) {
                 return Err(crate::error::ValidationError::OutOfRange {
-                    name: name.to_string(),
+                    name: name.into(),
                     value: v.to_string(),
-                    expected: "[-1, 1]".to_string(),
+                    expected: "[-1, 1]".into(),
                     line: None,
                 }
                 .into());

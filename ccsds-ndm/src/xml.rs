@@ -26,10 +26,10 @@ pub fn from_str<T: DeserializeOwned>(s: &str) -> Result<T> {
 /// * `type_name` - The name of the message type (e.g., "OPM", "CDM") for error context
 pub fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &str) -> Result<T> {
     from_xml_str(s).map_err(|e| {
-        crate::error::CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(format!(
-            "Failed to parse {} from XML: {}",
-            type_name, e
-        ))))
+        crate::error::CcsdsNdmError::Format(Box::new(FormatError::XmlWithContext {
+            context: format!("Failed to parse {} from XML", type_name),
+            source: e,
+        }))
     })
 }
 
