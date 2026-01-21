@@ -19,19 +19,23 @@
 //! 2. **Message-level**: Compose line parsers to build complete message structures
 
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
-pub use crate::error::CcsdsNdmError;
+use crate::error::{
+    CcsdsNdmError, EnumParseError, FormatError, InternalParserError, ValidationError,
+};
 use crate::traits::{FromKvnFloat, FromKvnValue};
 use crate::types::{UserDefined, UserDefinedParameter, *};
 use fast_float;
 use std::str::FromStr;
 use winnow::ascii::{line_ending, space0, till_line_ending};
 use winnow::combinator::{alt, delimited, opt, peek, preceded, repeat, terminated};
-use winnow::error::{AddContext, ErrMode, ParserError, StrContext, StrContextValue};
+use winnow::error::{
+    AddContext, ErrMode, FromExternalError, ParserError, StrContext, StrContextValue,
+};
 use winnow::prelude::*;
 use winnow::token::{one_of, take_till, take_while};
 
-/// A result type for winnow parsers using the library's error type.
-pub type KvnResult<O, E = CcsdsNdmError> = Result<O, ErrMode<E>>;
+/// A result type for winnow parsers using the library's internal lightweight error type.
+pub type KvnResult<O, E = InternalParserError> = Result<O, ErrMode<E>>;
 
 //----------------------------------------------------------------------
 // Low-level fast parsers
@@ -62,19 +66,68 @@ pub fn till_space_or_eol<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
 /// Converts a winnow error to our library's error type.
 pub fn to_ccsds_error(
     input: &str,
-    err: winnow::error::ParseError<&str, CcsdsNdmError>,
+    err: winnow::error::ParseError<&str, InternalParserError>,
 ) -> CcsdsNdmError {
     let offset = err.offset();
-    err.into_inner().with_location(input, offset)
+    let inner = err.into_inner();
+
+    let base_err = match *inner.kind {
+        crate::error::ParserErrorKind::Validation(e) => CcsdsNdmError::Validation(Box::new(e)),
+        crate::error::ParserErrorKind::Epoch(e) => CcsdsNdmError::Epoch(e),
+        crate::error::ParserErrorKind::Enum(e) => {
+            CcsdsNdmError::Format(Box::new(FormatError::Enum(e)))
+        }
+        crate::error::ParserErrorKind::ParseInt(e) => {
+            CcsdsNdmError::Format(Box::new(FormatError::ParseInt(e)))
+        }
+        crate::error::ParserErrorKind::ParseFloat(e) => {
+            CcsdsNdmError::Format(Box::new(FormatError::ParseFloat(e)))
+        }
+        crate::error::ParserErrorKind::MissingRequiredField { block, field } => {
+            return CcsdsNdmError::Validation(Box::new(ValidationError::MissingRequiredField {
+                block: std::borrow::Cow::Borrowed(block),
+                field: std::borrow::Cow::Borrowed(field),
+                line: None,
+            }))
+            .with_location(input, offset);
+        }
+        _ => {
+            let message = inner.message;
+
+            let raw = crate::error::RawParsePosition {
+                offset,
+                message,
+                contexts: inner.contexts,
+            };
+            CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(
+                raw.into_parse_error(input),
+            ))))
+        }
+    };
+
+    base_err.with_location(input, offset)
 }
 
 /// Creates a winnow ErrMode::Cut with a static context label.
-pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<CcsdsNdmError> {
-    ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<InternalParserError> {
+    ErrMode::Cut(InternalParserError::from_input(input).add_context(
         input,
         &input.checkpoint(),
         StrContext::Label(label),
     ))
+}
+
+/// Creates a winnow ErrMode::Cut for a missing required field.
+pub fn missing_field_err(
+    _input: &mut &str,
+    block: &'static str,
+    field: &'static str,
+) -> ErrMode<InternalParserError> {
+    ErrMode::Cut(InternalParserError {
+        message: std::borrow::Cow::Borrowed(""),
+        contexts: crate::error::ContextStack::new(),
+        kind: Box::new(crate::error::ParserErrorKind::MissingRequiredField { block, field }),
+    })
 }
 
 //----------------------------------------------------------------------
@@ -184,7 +237,7 @@ pub fn block_start<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
             return Ok(prefix);
         }
     }
-    Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)))
+    Err(ErrMode::Backtrack(InternalParserError::from_input(input)))
 }
 
 /// Parses a block end marker (e.g., META_STOP or COVARIANCE_END).
@@ -201,7 +254,7 @@ pub fn block_end<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
             return Ok(prefix);
         }
     }
-    Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)))
+    Err(ErrMode::Backtrack(InternalParserError::from_input(input)))
 }
 
 /// Parses an empty line.
@@ -227,7 +280,7 @@ pub fn raw_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
         || trimmed.ends_with("_STOP")
         || trimmed.ends_with("_END")
     {
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
 
     Ok(trimmed)
@@ -277,11 +330,9 @@ pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &checkpoint,
-                StrContext::Label("Invalid float"),
-            ))
+            let mut err = InternalParserError::from_input(input);
+            err.message = std::borrow::Cow::Borrowed("Invalid float");
+            ErrMode::Cut(err.add_context(input, &checkpoint, StrContext::Label("Invalid float")))
         } else {
             e
         }
@@ -294,7 +345,7 @@ pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
     terminated(
         (
             take_while(1.., ('0'..='9', '-', '+'))
-                .map(|s: &str| s.parse::<i32>().map_err(|_| ()))
+                .map(|s: &str| s.parse::<i32>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
@@ -305,11 +356,9 @@ pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &checkpoint,
-                StrContext::Label("Invalid integer"),
-            ))
+            let mut err = InternalParserError::from_input(input);
+            err.message = std::borrow::Cow::Borrowed("Invalid integer");
+            ErrMode::Cut(err.add_context(input, &checkpoint, StrContext::Label("Invalid integer")))
         } else {
             e
         }
@@ -322,7 +371,7 @@ pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     terminated(
         (
             take_while(1.., '0'..='9')
-                .map(|s: &str| s.parse::<u32>().map_err(|_| ()))
+                .map(|s: &str| s.parse::<u32>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
@@ -333,7 +382,9 @@ pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+            let mut err = InternalParserError::from_input(input);
+            err.message = std::borrow::Cow::Borrowed("Invalid unsigned integer");
+            ErrMode::Cut(err.add_context(
                 input,
                 &checkpoint,
                 StrContext::Label("Invalid unsigned integer"),
@@ -350,7 +401,7 @@ pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
     terminated(
         (
             take_while(1.., '0'..='9')
-                .map(|s: &str| s.parse::<u64>().map_err(|_| ()))
+                .map(|s: &str| s.parse::<u64>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
@@ -361,7 +412,9 @@ pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
     .parse_next(input)
     .map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+            let mut err = InternalParserError::from_input(input);
+            err.message = std::borrow::Cow::Borrowed("Invalid unsigned integer");
+            ErrMode::Cut(err.add_context(
                 input,
                 &checkpoint,
                 StrContext::Label("Invalid unsigned integer"),
@@ -397,37 +450,50 @@ pub fn kv_string(input: &mut &str) -> KvnResult<String> {
 /// Parses an Epoch value from a KVN line.
 pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    Epoch::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid Epoch"))
+    Epoch::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses an Epoch value as a single token (until next space).
 pub fn kv_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
     let v = till_space.parse_next(input)?;
-    Epoch::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid Epoch"))
+    Epoch::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses a boolean (YES/NO) from a KVN line.
 pub fn kv_yes_no(input: &mut &str) -> KvnResult<YesNo> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    YesNo::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid YES/NO value"))
+    YesNo::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses any type that implements FromStr from a KVN line.
-pub fn kv_enum<T: FromStr>(input: &mut &str) -> KvnResult<T> {
+pub fn kv_enum<T: FromStr>(input: &mut &str) -> KvnResult<T>
+where
+    EnumParseError: From<T::Err>,
+{
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    T::from_str(v.trim()).map_err(|_| cut_err(input, "Invalid enum value"))
+    T::from_str(v.trim()).map_err(|e| {
+        ErrMode::Cut(InternalParserError::from_external_error(
+            input,
+            EnumParseError::from(e),
+        ))
+    })
 }
 
 /// Parses a value from a KVN line using the `FromKvnValue` trait.
 pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
     let (v, _) = kv_rest.parse_next(input)?;
-    T::from_kvn_value(v).map_err(|_| cut_err(input, "Invalid value"))
+    T::from_kvn_value(v)
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses any type that implements FromKvnFloat from a KVN line.
 pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
     let (v, u) = kv_float_unit.parse_next(input)?;
-    T::from_kvn_float(v, u).map_err(|_| cut_err(input, "Invalid value"))
+    T::from_kvn_float(v, u)
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses a float and its optional unit from a KVN line.
@@ -441,25 +507,22 @@ pub fn kv_float_unit<'a>(input: &mut &'a str) -> KvnResult<(f64, Option<&'a str>
 
 /// Parses an f64 value from a string slice.
 pub fn parse_f64(value: &str) -> crate::error::Result<f64> {
-    value
-        .trim()
-        .parse::<f64>()
-        .map_err(CcsdsNdmError::ParseFloat)
+    value.trim().parse::<f64>().map_err(CcsdsNdmError::from)
 }
 
 /// Parses an i32 value from a string slice.
 pub fn parse_i32(value: &str) -> crate::error::Result<i32> {
-    value.trim().parse::<i32>().map_err(CcsdsNdmError::ParseInt)
+    value.trim().parse::<i32>().map_err(CcsdsNdmError::from)
 }
 
 /// Parses a u32 value from a string slice.
 pub fn parse_u32(value: &str) -> crate::error::Result<u32> {
-    value.trim().parse::<u32>().map_err(CcsdsNdmError::ParseInt)
+    value.trim().parse::<u32>().map_err(CcsdsNdmError::from)
 }
 
 /// Parses a u64 value from a string slice.
 pub fn parse_u64(value: &str) -> crate::error::Result<u64> {
-    value.trim().parse::<u64>().map_err(CcsdsNdmError::ParseInt)
+    value.trim().parse::<u64>().map_err(CcsdsNdmError::from)
 }
 
 //----------------------------------------------------------------------
@@ -493,7 +556,7 @@ pub fn expect_kv<'a, T, P>(
     mut val_parser: P,
 ) -> impl FnMut(&mut &'a str) -> KvnResult<(T, Option<&'a str>)>
 where
-    P: winnow::Parser<&'a str, T, ErrMode<CcsdsNdmError>>,
+    P: winnow::Parser<&'a str, T, ErrMode<InternalParserError>>,
 {
     move |input: &mut &'a str| {
         (
@@ -541,7 +604,7 @@ where
         ws.parse_next(input)?;
         let key = keyword.parse_next(input)?;
         if !predicate(key) {
-            return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+            return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
         }
         kv_sep.parse_next(input)?;
         let (value, unit) = kvn_value.parse_next(input)?;
@@ -599,7 +662,7 @@ pub fn skip_empty_and_comments(input: &mut &str) -> KvnResult<()> {
 /// Entry point for message parsers that handles leading whitespace.
 pub fn kvn_entry<'a, O, P>(mut parser: P) -> impl FnMut(&mut &'a str) -> KvnResult<O>
 where
-    P: Parser<&'a str, O, ErrMode<CcsdsNdmError>>,
+    P: Parser<&'a str, O, ErrMode<InternalParserError>>,
 {
     move |input: &mut &'a str| {
         ws.parse_next(input)?;
@@ -647,7 +710,7 @@ macro_rules! parse_block {
                 _ => {
                     $input.reset(&checkpoint);
                     $( // Corrected: removed unnecessary parentheses around match arm
-                        return Err(winnow::error::ErrMode::Cut(CcsdsNdmError::from_input($input).add_context(
+                        return Err(winnow::error::ErrMode::Cut(InternalParserError::from_input($input).add_context(
                             $input,
                             &$input.checkpoint(),
                             winnow::error::StrContext::Label($error_label),
@@ -814,13 +877,13 @@ pub fn state_vector(input: &mut &str) -> KvnResult<(Vec<String>, StateVector)> {
 
     let sv = StateVector {
         comment: Vec::new(), // comments are returned separately for proper placement
-        epoch: epoch.ok_or_else(|| cut_err(input, "Missing EPOCH"))?,
-        x: x.ok_or_else(|| cut_err(input, "Missing X"))?,
-        y: y.ok_or_else(|| cut_err(input, "Missing Y"))?,
-        z: z.ok_or_else(|| cut_err(input, "Missing Z"))?,
-        x_dot: x_dot.ok_or_else(|| cut_err(input, "Missing X_DOT"))?,
-        y_dot: y_dot.ok_or_else(|| cut_err(input, "Missing Y_DOT"))?,
-        z_dot: z_dot.ok_or_else(|| cut_err(input, "Missing Z_DOT"))?,
+        epoch: epoch.ok_or_else(|| missing_field_err(input, "State Vector", "EPOCH"))?,
+        x: x.ok_or_else(|| missing_field_err(input, "State Vector", "X"))?,
+        y: y.ok_or_else(|| missing_field_err(input, "State Vector", "Y"))?,
+        z: z.ok_or_else(|| missing_field_err(input, "State Vector", "Z"))?,
+        x_dot: x_dot.ok_or_else(|| missing_field_err(input, "State Vector", "X_DOT"))?,
+        y_dot: y_dot.ok_or_else(|| missing_field_err(input, "State Vector", "Y_DOT"))?,
+        z_dot: z_dot.ok_or_else(|| missing_field_err(input, "State Vector", "Z_DOT"))?,
     };
 
     Ok((comment, sv))
@@ -882,27 +945,42 @@ pub fn covariance_matrix(input: &mut &str) -> KvnResult<Option<OpmCovarianceMatr
         Ok(Some(OpmCovarianceMatrix {
             comment,
             cov_ref_frame,
-            cx_x: cx_x.ok_or_else(|| cut_err(input, "Missing CX_X"))?,
-            cy_x: cy_x.ok_or_else(|| cut_err(input, "Missing CY_X"))?,
-            cy_y: cy_y.ok_or_else(|| cut_err(input, "Missing CY_Y"))?,
-            cz_x: cz_x.ok_or_else(|| cut_err(input, "Missing CZ_X"))?,
-            cz_y: cz_y.ok_or_else(|| cut_err(input, "Missing CZ_Y"))?,
-            cz_z: cz_z.ok_or_else(|| cut_err(input, "Missing CZ_Z"))?,
-            cx_dot_x: cx_dot_x.ok_or_else(|| cut_err(input, "Missing CX_DOT_X"))?,
-            cx_dot_y: cx_dot_y.ok_or_else(|| cut_err(input, "Missing CX_DOT_Y"))?,
-            cx_dot_z: cx_dot_z.ok_or_else(|| cut_err(input, "Missing CX_DOT_Z"))?,
-            cx_dot_x_dot: cx_dot_x_dot.ok_or_else(|| cut_err(input, "Missing CX_DOT_X_DOT"))?,
-            cy_dot_x: cy_dot_x.ok_or_else(|| cut_err(input, "Missing CY_DOT_X"))?,
-            cy_dot_y: cy_dot_y.ok_or_else(|| cut_err(input, "Missing CY_DOT_Y"))?,
-            cy_dot_z: cy_dot_z.ok_or_else(|| cut_err(input, "Missing CY_DOT_Z"))?,
-            cy_dot_x_dot: cy_dot_x_dot.ok_or_else(|| cut_err(input, "Missing CY_DOT_X_DOT"))?,
-            cy_dot_y_dot: cy_dot_y_dot.ok_or_else(|| cut_err(input, "Missing CY_DOT_Y_DOT"))?,
-            cz_dot_x: cz_dot_x.ok_or_else(|| cut_err(input, "Missing CZ_DOT_X"))?,
-            cz_dot_y: cz_dot_y.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Y"))?,
-            cz_dot_z: cz_dot_z.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Z"))?,
-            cz_dot_x_dot: cz_dot_x_dot.ok_or_else(|| cut_err(input, "Missing CZ_DOT_X_DOT"))?,
-            cz_dot_y_dot: cz_dot_y_dot.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Y_DOT"))?,
-            cz_dot_z_dot: cz_dot_z_dot.ok_or_else(|| cut_err(input, "Missing CZ_DOT_Z_DOT"))?,
+            cx_x: cx_x.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_X"))?,
+            cy_x: cy_x.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_X"))?,
+            cy_y: cy_y.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_Y"))?,
+            cz_x: cz_x.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_X"))?,
+            cz_y: cz_y.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_Y"))?,
+            cz_z: cz_z.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_Z"))?,
+            cx_dot_x: cx_dot_x
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_X"))?,
+            cx_dot_y: cx_dot_y
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_Y"))?,
+            cx_dot_z: cx_dot_z
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_Z"))?,
+            cx_dot_x_dot: cx_dot_x_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_X_DOT"))?,
+            cy_dot_x: cy_dot_x
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_X"))?,
+            cy_dot_y: cy_dot_y
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_Y"))?,
+            cy_dot_z: cy_dot_z
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_Z"))?,
+            cy_dot_x_dot: cy_dot_x_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_X_DOT"))?,
+            cy_dot_y_dot: cy_dot_y_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_Y_DOT"))?,
+            cz_dot_x: cz_dot_x
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_X"))?,
+            cz_dot_y: cz_dot_y
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Y"))?,
+            cz_dot_z: cz_dot_z
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Z"))?,
+            cz_dot_x_dot: cz_dot_x_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_X_DOT"))?,
+            cz_dot_y_dot: cz_dot_y_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Y_DOT"))?,
+            cz_dot_z_dot: cz_dot_z_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Z_DOT"))?,
         }))
     } else {
         Ok(None)

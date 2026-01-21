@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters};
-use crate::error::{CcsdsNdmError, Result};
+use crate::error::{EnumParseError, Result};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
@@ -29,11 +29,15 @@ impl std::fmt::Display for InvErUnits {
     }
 }
 impl FromStr for InvErUnits {
-    type Err = CcsdsNdmError;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "1/ER" => Ok(InvErUnits::InvEr),
-            _ => Err(CcsdsNdmError::UnknownUnit(s.to_string())),
+            _ => Err(EnumParseError {
+                field: "unit",
+                value: s.to_string(),
+                expected: "1/ER",
+            }),
         }
     }
 }
@@ -57,12 +61,16 @@ impl std::fmt::Display for RevPerDayUnits {
     }
 }
 impl FromStr for RevPerDayUnits {
-    type Err = CcsdsNdmError;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "rev/day" => Ok(RevPerDayUnits::RevPerDay),
             "REV/DAY" => Ok(RevPerDayUnits::RevPerDayUpper),
-            _ => Err(CcsdsNdmError::UnknownUnit(s.to_string())),
+            _ => Err(EnumParseError {
+                field: "unit",
+                value: s.to_string(),
+                expected: "rev/day or REV/DAY",
+            }),
         }
     }
 }
@@ -86,12 +94,16 @@ impl std::fmt::Display for RevPerDay2Units {
     }
 }
 impl FromStr for RevPerDay2Units {
-    type Err = CcsdsNdmError;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "rev/day**2" => Ok(RevPerDay2Units::RevPerDay2),
             "REV/DAY**2" => Ok(RevPerDay2Units::RevPerDay2Upper),
-            _ => Err(CcsdsNdmError::UnknownUnit(s.to_string())),
+            _ => Err(EnumParseError {
+                field: "unit",
+                value: s.to_string(),
+                expected: "rev/day**2 or REV/DAY**2",
+            }),
         }
     }
 }
@@ -115,12 +127,16 @@ impl std::fmt::Display for RevPerDay3Units {
     }
 }
 impl FromStr for RevPerDay3Units {
-    type Err = CcsdsNdmError;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "rev/day**3" => Ok(RevPerDay3Units::RevPerDay3),
             "REV/DAY**3" => Ok(RevPerDay3Units::RevPerDay3Upper),
-            _ => Err(CcsdsNdmError::UnknownUnit(s.to_string())),
+            _ => Err(EnumParseError {
+                field: "unit",
+                value: s.to_string(),
+                expected: "rev/day**3 or REV/DAY**3",
+            }),
         }
     }
 }
@@ -168,7 +184,7 @@ impl Ndm for Omm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str(xml)
+        crate::xml::from_str_with_context(xml, "OMM")
     }
 }
 

@@ -539,7 +539,7 @@ fn test_from_str_xml_parse_error() {
     let result = from_str(invalid_xml);
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, CcsdsNdmError::XmlParse(_)));
+    assert!(err.is_format_error());
 }
 
 #[test]

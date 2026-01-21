@@ -80,7 +80,6 @@ class TestTdmConstruction:
 
         data = TdmData(observations=[obs1, obs2], comment=["Test tracking data"])
 
-        assert data.observation_count == 2
         assert len(data.observations) == 2
         assert data.comment == ["Test tracking data"]
         assert "TdmData" in repr(data)
@@ -110,7 +109,7 @@ class TestTdmConstruction:
         segment = TdmSegment(metadata=metadata, data=data)
 
         assert segment.metadata.participant_1 == "DSS-25"
-        assert segment.data.observation_count == 0
+        assert len(segment.data.observations) == 0
         assert "TdmSegment" in repr(segment)
 
     def test_construct_tdm_header(self):
@@ -185,7 +184,7 @@ class TestTdmConstruction:
         assert tdm.header.originator == "NASA/JPL"
         assert len(tdm.segments) == 1
         assert tdm.segments[0].metadata.participant_1 == "DSS-25"
-        assert tdm.segments[0].data.observation_count == 3
+        assert len(tdm.segments[0].data.observations) == 3
         assert "Tdm" in repr(tdm)
 
 
@@ -262,7 +261,7 @@ class TestTdmGettersSetters:
             epoch="2023-01-01T12:00:00.000Z", keyword="RANGE", value=12345.0
         )
         data.observations = [obs]
-        assert data.observation_count == 1
+        assert len(data.observations) == 1
 
         data.comment = ["New comment"]
         assert data.comment == ["New comment"]

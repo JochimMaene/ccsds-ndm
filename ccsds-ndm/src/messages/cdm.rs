@@ -45,7 +45,7 @@ impl Ndm for Cdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str(xml)
+        crate::xml::from_str_with_context(xml, "CDM")
     }
 }
 

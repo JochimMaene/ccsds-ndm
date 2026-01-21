@@ -202,7 +202,7 @@ DOCUMENT CONTROL
      - Technical Corrigendum 1
      - October 2021
      - Adds specifications and examples for messages with elements qualified with respect to a namespace.
-.. _introduction:
+.. _tdm_introduction:
 
 1 INTRODUCTION
 ==============
@@ -837,7 +837,7 @@ statement that would convey the multiple signal paths.
    * - META_START
      - The META_START keyword shall delineate the start of the TDM Metadata Section within the message. It must appear on a line by itself; that is, it shall have no parameters, timetags or values.
      - N/A
-     - -----
+     - N/A
      - Yes
    * - COMMENT
      - (See 4.5.) It should be noted that if comments are used in the metadata, they shall only appear at the beginning of the Metadata Section.
@@ -2331,11 +2331,14 @@ schemas that make up NDMs (see reference [9]).
     </segment>
    </body>
 
-.. figure:: ../images/ccsds_books/TDM_XML_Basic_Structure.png
-   :alt: TDM XML Basic Structure
-   :align: center
+..
+   .. figure:: ../images/ccsds_books/TDM_XML_Basic_Structure.png
+      :alt: TDM XML Basic Structure
+      :align: center
 
-   Figure 5-1: TDM XML Basic Structure
+      Figure 5-1: TDM XML Basic Structure
+
+   [Figure 5-1: TDM XML Basic Structure - Image missing]
 
 5.2.4 XML tags shall be uppercase and correspond with the KVN keywords in section 3 of
 this document (uppercase with ‘_’ [the underscore character] as separators). The XML
@@ -5112,7 +5115,7 @@ constructing a TDM that captures the data from a specific measurement session.
        - CORRECTIONS_APPLIED
        - CORRECTION_RANGE
        - TIMETAG_REF
-       - PR_NO
+       - PR_N0
      - - TRANSMIT_FREQ_n *
        - RECEIVE_FREQ *
        - TRANSMIT_DELAY_n
@@ -5124,7 +5127,7 @@ constructing a TDM that captures the data from a specific measurement session.
        - CORRECTION_DOPPLER
        - TIMETAG_REF
        - CARRIER_POWER
-       - PC_NO
+       - PC_N0
      - - TRANSMIT_DELAY_n
        - RECEIVE_DELAY_n
        - TURNAROUND_NUMERATOR
@@ -5137,7 +5140,7 @@ constructing a TDM that captures the data from a specific measurement session.
        - INTEGRATION_REF
        - FREQ_OFFSET
        - CARRIER_POWER
-       - PC_NO
+       - PC_N0
      - - TRANSMIT_FREQ_n *
        - RECEIVE_FREQ *
        - TRANSMIT_DELAY_n
@@ -5149,7 +5152,7 @@ constructing a TDM that captures the data from a specific measurement session.
        - CORRECTION_DOPPLER
        - TIMETAG_REF
        - CARRIER_POWER
-       - PC_NO
+       - PC_N0
      - - TRANSMIT_DELAY_n
        - RECEIVE_DELAY_n
        - TURNAROUND_NUMERATOR
@@ -5202,7 +5205,7 @@ constructing a TDM that captures the data from a specific measurement session.
        - TRANSMIT_BAND
        - RECEIVE_BAND
        - CARRIER_POWER
-       - PC_NO
+       - PC_N0
 
 .. The TRANSMIT_FREQ_n and RECEIVE_FREQ keywords are TDM Data Section keywords that are recommended to be exchanged for this data type. (See 3.5.2.2 and 3.5.2.3.)
 
@@ -5259,7 +5262,7 @@ constructing a TDM that captures the data from a specific measurement session.
        - CORRECTIONS_APPLIED
        - CORRECTION_RANGE
        - TIMETAG_REF
-       - PR_NO
+       - PR_N0
      - - TRANSMIT_DELAY_n
        - RECEIVE_DELAY_n
        - TURNAROUND_NUMERATOR
@@ -5274,7 +5277,7 @@ constructing a TDM that captures the data from a specific measurement session.
        - INTERPOLATION
        - INTERPOLATION_DEGREE
        - CARRIER_POWER
-       - PC_NO
+       - PC_N0
      - - TRANSMIT_DELAY_n
        - RECEIVE_DELAY_n
        - TURNAROUND_NUMERATOR
@@ -5311,7 +5314,7 @@ constructing a TDM that captures the data from a specific measurement session.
        - TRANSMIT_BAND
        - RECEIVE_BAND
        - CARRIER_POWER
-       - PC_NO
+       - PC_N0
 
 .. list-table:: TDM Summary Sheet - 1. MODE = SEQUENTIAL, c) Frequency independent
    :widths: 10 30 30 30
@@ -5462,7 +5465,7 @@ constructing a TDM that captures the data from a specific measurement session.
        - CORRECTIONS_APPLIED
        - CORRECTION_RANGE
        - TIMETAG_REF
-       - PR_NO
+       - PR_N0
      - - TRANSMIT_DELAY_n
        - RECEIVE_DELAY_n
        - TURNAROUND_NUMERATOR
@@ -5475,7 +5478,7 @@ constructing a TDM that captures the data from a specific measurement session.
        - INTEGRATION_REF
        - FREQ_OFFSET
        - CARRIER_POWER
-       - PC_NO
+       - PC_N0
      - - TRANSMIT_DELAY_n
        - RECEIVE_DELAY_n
        - DATA_QUALITY

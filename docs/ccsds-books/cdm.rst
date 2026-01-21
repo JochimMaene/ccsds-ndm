@@ -428,17 +428,17 @@ register of currently valid CCSDS publications.
 
 [1] The International System of Units (SI). 8th ed. Sèvres, France: BIPM, 2006.
 [2] Information Technology—8-Bit Single-Byte Coded Graphic Character Sets—Part 1:
-    Latin Alphabet No. 1. International Standard, ISO/IEC 8859-1:1998. Geneva: ISO,
-    1998.
+Latin Alphabet No. 1. International Standard, ISO/IEC 8859-1:1998. Geneva: ISO,
+1998.
 [3] Henry S. Thompson, et al., eds. XML Schema Part 1: Structures. 2nd ed. W3C
-    Recommendation. N.p.: W3C, October 2004.
+Recommendation. N.p.: W3C, October 2004.
 [4] Paul V. Biron and Ashok Malhotra, eds. XML Schema Part 2: Datatypes. 2nd ed. W3C
-    Recommendation. N.p.: W3C, October 2004.
+Recommendation. N.p.: W3C, October 2004.
 [5] Time Code Formats. Issue 4. Recommendation for Space Data System Standards (Blue
-    Book), CCSDS 301.0-B-4. Washington, D.C.: CCSDS, November 2010.
+Book), CCSDS 301.0-B-4. Washington, D.C.: CCSDS, November 2010.
 [6] XML Specification for Navigation Data Messages. Issue 2. Recommendation for Space
-    Data System Standards (Blue Book), CCSDS 505.0-B-2. Washington, D.C.: CCSDS,
-    May 2021.
+Data System Standards (Blue Book), CCSDS 505.0-B-2. Washington, D.C.: CCSDS,
+May 2021.
 
 
 .. _overview_cdm:
@@ -1339,638 +1339,6 @@ d) whether the item is obligatory or optional.
      - No
 
 
-.. _kvn_metadata_cdm:
-
-3.4 CDM METADATA
-----------------
-
-The CDM metadata shall consist of the KVN elements defined in table 3-3, which specifies
-for each KVN metadata item:
-
-a) the keyword to be used;
-b) a short description of the item;
-c) normative values or examples of allowed values;
-d) whether the ‘Normative Values/Examples' column contains normative values (N) or
-   examples of allowed values (E) for the item; and
-e) whether the item is obligatory or optional.
-
-.. NOTE::
-   Table 3-3 and table 3-4 will be used to define both Object1 and Object2
-   depending on the value of the keyword OBJECT which is specified in table 3-3.
-
-.. _table_3-3_cdm:
-
-.. list-table:: Table 3-3: CDM KVN Metadata
-   :widths: 20 45 20 5 10
-   :header-rows: 1
-
-   * - Keyword
-     - Description
-     - Normative Values/
-       Examples
-     - N/E
-     - Obligatory
-   * - COMMENT
-     - (See 6.3.4 for formatting rules.)
-     - COMMENT This is a
-       comment
-     - E
-     - No
-   * - OBJECT
-     - The object to which the
-       metadata and data apply
-       (Object1 or Object2).
-     - OBJECT1
-       OBJECT2
-     - N
-     - Yes
-   * - OBJECT_DESIGNATOR
-     - The satellite catalog
-       designator for the object. (See
-       5.2.9 for formatting rules.)
-     - 12345
-     - E
-     - Yes
-   * - CATALOG_NAME
-     - The satellite catalog used for
-       the object. Value should be
-       taken from the SANA
-       'Conjunction Data Message
-       CATALOG_NAME' registry
-       (https://sanaregistry.org/r/cdm
-       _catalog). (See 5.2.9 for
-       formatting rules.)
-     - SATCAT
-     - E
-     - Yes
-   * - OBJECT_NAME
-     - Spacecraft name for the
-       object.
-     - SPOT, ENVISAT,
-       IRIDIUM, INTELSAT
-     - E
-     - Yes
-   * - INTERNATIONAL_DESIGNATOR
-     - The full international
-       designator for the object.
-       Values shall have the format
-       YYYY-NNNP{PP}, where:
-       YYYY = year of launch;
-       NNN = three-digit serial
-       number of launch (with
-       leading zeros);
-       P{PP} = At least one capital
-       letter for the identification of
-       the part brought into space by
-       the launch. In cases where the
-       object has no international
-       designator, the value
-       UNKNOWN should be used.
-       (See 5.2.9 for further
-       formatting rules.)
-     - 2002-021A
-       2002-009A
-       1997-020AA
-       1998-037ABC
-       2001-049PE
-       UNKNOWN
-     - E
-     - Yes
-   * - OBJECT_TYPE
-     - The object type.
-     - PAYLOAD
-       ROCKET BODY
-       DEBRIS
-       UNKNOWN
-       OTHER
-     - N
-     - No
-   * - OPERATOR_CONTACT_POSITION
-     - Contact position of the
-       owner/operator of the object.
-     - ORBITAL SAFETY
-       ANALYST (OSA),
-       NETWORK
-       CONTROLLER
-     - E
-     - No
-   * - OPERATOR_ORGANIZATION
-     - Contact organization of the
-       object.
-     - EUMETSAT, ESA,
-       INTELSAT, IRIDIUM
-     - E
-     - No
-   * - OPERATOR_PHONE
-     - Phone number of the contact
-       position or organization for the
-       object.
-     - +49615130312
-     - E
-     - No
-   * - OPERATOR_EMAIL
-     - Email address of the contact
-       position or organization of the
-       object.
-     - JOHN.DOE@
-       SOMEWHERE.NET
-     - E
-     - No
-   * - EPHEMERIS_NAME
-     - Unique name of the external
-       ephemeris file used for the
-       object or NONE. This is used
-       to indicate whether an external
-       (i.e., Owner/Operator [O/O]
-       provided) ephemeris file was
-       used to calculate the CA. If
-       'NONE' is specified, then the
-       output of the most current
-       Orbit Determination (OD) of
-       the CDM originator was used
-       in the CA.
-     - EPHEMERIS
-       SATELLITE A,
-       NONE
-     - E
-     - Yes
-   * - COVARIANCE_METHOD
-     - Method used to calculate the
-       covariance during the OD that
-       produced the state vector, or
-       whether an arbitrary, non-
-       calculated default value was
-       used. Caution should be used
-       when using the default value
-       for calculating collision
-       probability.
-     - CALCULATED
-       DEFAULT
-     - N
-     - Yes
-   * - MANEUVERABLE
-     - The maneuver capacity of the
-       object. (See 1.4.3.1 for
-       definition of 'N/A'.)
-     - YES
-       NO
-       N/A
-     - N
-     - Yes
-   * - ORBIT_CENTER
-     - The central body about which
-       Object1 and Object2 orbit. If
-       not specified, the center is
-       assumed to be Earth.
-     - EARTH
-       SUN
-       MOON
-       MARS
-     - E
-     - No
-   * - REF_FRAME
-     - Name of the reference frame
-       in which the state vector data
-       are given. Value must be
-       selected from the list of values
-       to the right (see reference [F1])
-       and be the same for both
-       Object1 and Object2.
-     - GCRF (see reference
-       [F11])
-       EME2000
-       ITRF
-     - N
-     - Yes
-   * - GRAVITY_MODEL
-     - The gravity model used for the
-       OD of the object. (See annex
-       E under GRAVITY_MODEL for
-       definition).
-     - EGM-96: 36D 360
-       WGS-84_GEOID: 24D
-       240
-       JGM-2: 41D 410
-     - E
-     - No
-   * - ATMOSPHERIC_MODEL
-     - The atmospheric density
-       model used for the OD of the
-       object. If 'NONE' is specified,
-       then no atmospheric model
-       was used.
-     - JACCHIA 70
-       MSIS
-       JACCHIA 70 DCA
-       NONE
-     - E
-     - No
-   * - N_BODY_PERTURBATIONS
-     - The N-body gravitational
-       perturbations used for the OD
-       of the object. If 'NONE' is
-       specified, then no third-body
-       gravitational perturbations
-       were used.
-     - MOON, SUN
-       JUPITER
-       NONE
-     - E
-     - No
-   * - SOLAR_RAD_PRESSURE
-     - Indication of whether solar
-       radiation pressure
-       perturbations were used for the
-       OD of the object.
-     - YES
-       NO
-     - N
-     - No
-   * - EARTH_TIDES
-     - Indication of whether solid
-       Earth and ocean tides were
-       used for the OD of the object.
-     - YES
-       NO
-     - N
-     - No
-   * - INTRACK_THRUST
-     - Indication of whether in-track
-       thrust modeling was used for
-       the OD of the object.
-     - YES
-       NO
-     - N
-     - No
-
-
-
-.. _kvn_data_cdm:
-
-3.5 CDM DATA
-------------
-
-3.5.1 The CDM Data section shall be formed as logical blocks:
-
--  OD Parameters;
--  Additional Parameters;
--  State Vector; and
--  Covariance Matrix.
-
-3.5.2 The logical blocks of the CDM Data section shall consist of KVN elements as
-defined in table 3-4, which specifies for each data item:
-
-a) the keyword to be used;
-b) a short description of the item;
-c) the units to be used if applicable; and
-d) whether the item is obligatory or optional.
-
-.. _table_3-4_cdm:
-
-.. list-table:: Table 3-4: CDM KVN Data
-   :widths: 25 65 5 5
-   :header-rows: 1
-
-   * - Keyword
-     - Description
-     - Units
-     - Obligatory
-   * - COMMENT
-     - (See 6.3.4 for formatting rules.)
-     - n/a
-     - No
-   * - **OD Parameters**
-     -
-     -
-     -
-   * - COMMENT
-     - (See 6.3.4 for formatting rules.)
-     - n/a
-     - No
-   * - TIME_LASTOB_START
-     - The start of a time interval (UTC) that contains the time of the last accepted
-       observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
-       of zero duration (i.e., same value as that of TIME_LASTOB_END).
-     - n/a
-     - No
-   * - TIME_LASTOB_END
-     - The end of a time interval (UTC) that contains the time of the last accepted
-       observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
-       of zero duration (i.e., same value as that of TIME_LASTOB_START).
-     - n/a
-     - No
-   * - RECOMMENDED_OD_SPAN
-     - The recommended OD time span calculated for the object. (See annex E for definition.)
-       Data type = double.
-     - d
-     - No
-   * - ACTUAL_OD_SPAN
-     - Based on the observations available and the RECOMMENDED_OD_SPAN, the actual
-       time span used for the OD of the object. (See annex E for definition.) Data type =
-       double.
-     - d
-     - No
-   * - OBS_AVAILABLE
-     - The number of observations available for the OD of the object. (See annex E for
-       definition.) Data type = integer.
-     - n/a
-     - No
-   * - OBS_USED
-     - The number of observations accepted for the OD of the object. (See annex E for
-       definition.) Data type = integer.
-     - n/a
-     - No
-   * - TRACKS_AVAILABLE
-     - The number of sensor tracks available for the OD of the object. (See annex E for
-       definition.) Data type = integer.
-     - n/a
-     - No
-   * - TRACKS_USED
-     - The number of sensor tracks accepted for the OD of the object. (See annex E for
-       definition.) Data type = integer.
-     - n/a
-     - No
-   * - RESIDUALS_ACCEPTED
-     - The percentage of residuals accepted in the OD of the object. Data type = double, range
-       = 0.0 to 100.0.
-     - %
-     - No
-   * - WEIGHTED_RMS
-     - The weighted Root Mean Square (RMS) of the residuals from a batch least squares OD.
-       (See annex E for definition.) Data type = double.
-     - n/a
-     - No
-   * - **Additional Parameters**
-     -
-     -
-     -
-   * - COMMENT
-     - (See 6.3.4 for formatting rules.)
-     - n/a
-     - No
-   * - AREA_PC
-     - The actual area of the object. (See annex E for definition.) Data type = double.
-     - m**2
-     - No
-   * - AREA_DRG
-     - The effective area of the object exposed to atmospheric drag. (See annex E for
-       definition.) Data type = double.
-     - m**2
-     - No
-   * - AREA_SRP
-     - The effective area of the object exposed to solar radiation pressure. (See annex E for
-       definition.) Data type = double.
-     - m**2
-     - No
-   * - MASS
-     - The mass of the object. Data type = double.
-     - kg
-     - No
-   * - CD_AREA_OVER_MASS
-     - The object's CD.A/m used to propagate the state vector and covariance to TCA. (See
-       annex E for definition.) Data type = double.
-     - m**2/kg
-     - No
-   * - CR_AREA_OVER_MASS
-     - The object's C, •A/m used to propagate the state vector and covariance to TCA. (See
-       annex E for definition.) Data type = double.
-     - m**2/kg
-     - No
-   * - THRUST_ACCELERATION
-     - The object's acceleration due to in-track thrust used to propagate the state vector and
-       covariance to TCA. (See annex E for definition.) Data type = double.
-     - m/s**2
-     - No
-   * - SEDR
-     - The amount of energy being removed from the object's orbit by atmospheric drag. This
-       value is an average calculated during the OD. (See annex E for definition.) Data type
-       = double.
-     - W/kg
-     - No
-   * - **State Vector (all values have data type=double)**
-     -
-     -
-     -
-   * - COMMENT
-     - (See 6.3.4 for formatting rules.)
-     - n/a
-     - No
-   * - X
-     - Object Position Vector X component.
-     - km
-     - Yes
-   * - Y
-     - Object Position Vector Y component.
-     - km
-     - Yes
-   * - Z
-     - Object Position Vector Z component.
-     - km
-     - Yes
-   * - X_DOT
-     - Object Velocity Vector X component.
-     - km/s
-     - Yes
-   * - Y_DOT
-     - Object Velocity Vector Y component.
-     - km/s
-     - Yes
-   * - Z_DOT
-     - Object Velocity Vector Z component.
-     - km/s
-     - Yes
-   * - **Covariance Matrix in the RTN Coordinate Frame (see annex E for definition)
-       (Covariance Matrix 9x9 Lower Triangular Form. All parameters of the 6×6 position/velocity submatrix must be
-       given. All data type=double.)**
-     -
-     -
-     -
-   * - COMMENT
-     - (See 6.3.4 for formatting rules.)
-     - n/a
-     - No
-   * - CR_R
-     - Object covariance matrix [1,1].
-     - m**2
-     - Yes
-   * - CT_R
-     - Object covariance matrix [2,1].
-     - m**2
-     - Yes
-   * - CT_T
-     - Object covariance matrix [2,2].
-     - m**2
-     - Yes
-   * - CN_R
-     - Object covariance matrix [3,1].
-     - m**2
-     - Yes
-   * - CN_T
-     - Object covariance matrix [3,2].
-     - m**2
-     - Yes
-   * - CN_N
-     - Object covariance matrix [3,3].
-     - m**2
-     - Yes
-   * - CRDOT_R
-     - Object covariance matrix [4,1].
-     - m**2/s
-     - Yes
-   * - CRDOT_T
-     - Object covariance matrix [4,2].
-     - m**2/s
-     - Yes
-   * - CRDOT_N
-     - Object covariance matrix [4,3].
-     - m**2/s
-     - Yes
-   * - CRDOT_RDOT
-     - Object covariance matrix [4,4].
-     - m**2/s**2
-     - Yes
-   * - CTDOT_R
-     - Object covariance matrix [5,1].
-     - m**2/s
-     - Yes
-   * - CTDOT_T
-     - Object covariance matrix [5,2].
-     - m**2/s
-     - Yes
-   * - CTDOT_N
-     - Object covariance matrix [5,3].
-     - m**2/s
-     - Yes
-   * - CTDOT_RDOT
-     - Object covariance matrix [5,4].
-     - m**2/s**2
-     - Yes
-   * - CTDOT_TDOT
-     - Object covariance matrix [5,5].
-     - m**2/s**2
-     - Yes
-   * - CNDOT_R
-     - Object covariance matrix [6,1].
-     - m**2/s
-     - Yes
-   * - CNDOT_T
-     - Object covariance matrix [6,2].
-     - m**2/s
-     - Yes
-   * - CNDOT_N
-     - Object covariance matrix [6,3].
-     - m**2/s
-     - Yes
-   * - CNDOT_RDOT
-     - Object covariance matrix [6,4].
-     - m**2/s**2
-     - Yes
-   * - CNDOT_TDOT
-     - Object covariance matrix [6,5].
-     - m**2/s**2
-     - Yes
-   * - CNDOT_NDOT
-     - Object covariance matrix [6,6].
-     - m**2/s**2
-     - Yes
-   * - CDRG_R
-     - Object covariance matrix [7,1].
-     - m**3/kg
-     - No
-   * - CDRG_T
-     - Object covariance matrix [7,2].
-     - m**3/kg
-     - No
-   * - CDRG_N
-     - Object covariance matrix [7,3].
-     - m**3/kg
-     - No
-   * - CDRG_RDOT
-     - Object covariance matrix [7,4].
-     - m**3/(kg*s)
-     - No
-   * - CDRG_TDOT
-     - Object covariance matrix [7,5].
-     - m**3/(kg*s)
-     - No
-   * - CDRG_NDOT
-     - Object covariance matrix [7,6].
-     - m**3/(kg*s)
-     - No
-   * - CDRG_DRG
-     - Object covariance matrix [7,7].
-     - m**4/kg**2
-     - No
-   * - CSRP_R
-     - Object covariance matrix [8,1].
-     - m**3/kg
-     - No
-   * - CSRP_T
-     - Object covariance matrix [8,2].
-     - m**3/kg
-     - No
-   * - CSRP_N
-     - Object covariance matrix [8,3].
-     - m**3/kg
-     - No
-   * - CSRP_RDOT
-     - Object covariance matrix [8,4].
-     - m**3/(kg*s)
-     - No
-   * - CSRP_TDOT
-     - Object covariance matrix [8,5].
-     - m**3/(kg*s)
-     - No
-   * - CSRP_NDOT
-     - Object covariance matrix [8,6].
-     - m**3/(kg*s)
-     - No
-   * - CSRP_DRG
-     - Object covariance matrix [8,7].
-     - m**4/kg**2
-     - No
-   * - CSRP_SRP
-     - Object covariance matrix [8,8].
-     - m**4/kg**2
-     - No
-   * - CTHR_R
-     - Object covariance matrix [9,1].
-     - m**2/s**2
-     - No
-   * - CTHR_T
-     - Object covariance matrix [9,2].
-     - m**2/s**2
-     - No
-   * - CTHR_N
-     - Object covariance matrix [9,3].
-     - m**2/s**2
-     - No
-   * - CTHR_RDOT
-     - Object covariance matrix [9,4].
-     - m**2/s**3
-     - No
-   * - CTHR_TDOT
-     - Object covariance matrix [9,5].
-     - m**2/s**3
-     - No
-   * - CTHR_NDOT
-     - Object covariance matrix [9,6].
-     - m**2/s**3
-     - No
-   * - CTHR_DRG
-     - Object covariance matrix [9,7].
-     - m**3/(kg*s**2)
-     - No
-   * - CTHR_SRP
-     - Object covariance matrix [9,8].
-     - m**3/(kg*s**2)
-     - No
-   * - CTHR_THR
-     - Object covariance matrix [9,9].
-     - m**2/s**4
-     - No
-
-
 .. _xml_content_structure_cdm:
 
 4 CDM CONTENT/STRUCTURE IN XML
@@ -2027,9 +1395,12 @@ of the CDM/XML XSLT converter is:
 
 .. _figure_4-1_cdm:
 
-.. figure:: /images/placeholder.png
+..
+   .. figure:: /images/placeholder.png
 
-   Figure 4-1: CDM XML Basic Structure
+      Figure 4-1: CDM XML Basic Structure
+
+   [Figure 4-1: CDM XML Basic Structure - Image missing]
 
 .. code-block::
 
@@ -2637,7 +2008,7 @@ assignable meaning, and may be ignored.
 6.2.2.4 All lines shall be terminated by a single Carriage Return, a single Line Feed, a
 Carriage Return/Line Feed pair, or a Line Feed/Carriage Return pair.
 
-.. _cdm_values_in_kvn_cdm:
+.. _common_cdm_values_cdm:
 
 6.2.3 COMMON CDM VALUES
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2652,7 +2023,7 @@ made for comment values (see 6.2.5 for formatting rules).
 
 6.2.3.4 All time tags in the CDM shall be in UTC.
 
-.. _cdm_units_in_kvn_cdm:
+.. _common_cdm_units_cdm:
 
 6.2.4 COMMON CDM UNITS
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2670,7 +2041,7 @@ displayed and must exactly match the units specified in each table (including ca
    applicable units designator for those items (e.g., for
    COLLISION_PROBABILITY, WEIGHTED_RMS).
 
-.. _cdm_comments_in_kvn_cdm:
+.. _common_cdm_comments_cdm:
 
 6.2.5 COMMON CDM COMMENTS
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -3644,9 +3015,8 @@ technologies specified in this Recommended Standard.
 
 .. _annex_b_consequences_cdm:
 
-B1.2 CONSEQUENCES OF NOT APPLYING SECURITY TO THE
-     TECHNOLOGY
-""""""""""""""""""""""""""""""""""""""""""""""""""""
+B1.2 CONSEQUENCES OF NOT APPLYING SECURITY TO THE TECHNOLOGY
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 The consequences of not applying security to the systems and networks on which this
 Recommended Standard is implemented could include potential loss, corruption, and theft of
@@ -4360,7 +3730,7 @@ satellite's angular momentum), and T (Transverse) is the unit vector that comple
 hand coordinate frame (see :ref:`figure E-1 <figure_e-1_cdm>`).
 
 Commonality Between RTN and TVN
-"""""""""""""""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The primary difference between the RTN and the TVN frames is that the RTN frame is
 anchored on the unit radial vector R, and the TVN frame is anchored on the unit inertial
@@ -4373,11 +3743,14 @@ the same when Object1 is at apoapsis, periapsis, or when its orbit is perfectly 
 
 .. _figure_e-1_cdm:
 
-.. figure:: /images/placeholder.png
-   :alt: Figure E-1: Definition of the RTN and TVN Coordinate Frames
-   :align: center
+..
+   .. figure:: /images/placeholder.png
+      :alt: Figure E-1: Definition of the RTN and TVN Coordinate Frames
+      :align: center
 
-   Figure E-1: Definition of the RTN and TVN Coordinate Frames
+      Figure E-1: Definition of the RTN and TVN Coordinate Frames
+
+   [Figure E-1: Definition of the RTN and TVN Coordinate Frames - Image missing]
 
 SCREEN_VOLUME_SHAPE/SCREEN_VOLUME: Shape (ellipsoid or box) of the
 screening volume used to screen the satellite catalog for possible conjunctors with Object1.
@@ -4545,36 +3918,36 @@ INFORMATIVE REFERENCES
 (INFORMATIVE)
 
 [F1] Navigation Data—Definitions and Conventions. Issue 3. Report Concerning Space
-    Data System Standards (Green Book), CCSDS 500.0-G-3. Washington, D.C.: CCSDS,
-    May 2010.
+Data System Standards (Green Book), CCSDS 500.0-G-3. Washington, D.C.: CCSDS,
+May 2010.
 [F2] Space Systems—Avoiding Collisions with Orbiting Objects. International Standard,
-    ISO/TR 16158:2013. Geneva: ISO, 2013.
+ISO/TR 16158:2013. Geneva: ISO, 2013.
 [F3] Astrodynamics—Propagation Specifications, Technical Definitions, and Recommended
-    Practices. ANSI/AIAA S-131-2010. Reston, Virginia: AIAA, 2010.
+Practices. ANSI/AIAA S-131-2010. Reston, Virginia: AIAA, 2010.
 [F4] J. L. Foster and H. S. Estes. A Parametric Analysis of Orbital Debris Collision
-    Probability and Maneuver Rate for Space Vehicles. NASA/JSC-25898. Houston,
-    Texas: NASA Johnson Space Flight Center, August 1992.
+Probability and Maneuver Rate for Space Vehicles. NASA/JSC-25898. Houston,
+Texas: NASA Johnson Space Flight Center, August 1992.
 [F5] Ken Chan. “Collision Probability Analyses for Earth Orbiting Satellites.” In *Space
-    Cooperation into the 21st Century: 7th AAS/JRS/CSA Symposium, International Space
-    Conference of Pacific-Basin Societies* (ISCOPS; formerly PISSTA) (July 15-18, 1997,
-    Nagasaki, Japan). 1033–1050. Edited by Peter M. Bainum, et al.. *Advances in the
-    Astronautical Sciences Series* 96. San Diego, California: Univelt, 1997.
+Cooperation into the 21st Century: 7th AAS/JRS/CSA Symposium, International Space
+Conference of Pacific-Basin Societies* (ISCOPS; formerly PISSTA) (July 15-18, 1997,
+Nagasaki, Japan). 1033–1050. Edited by Peter M. Bainum, et al.. *Advances in the
+Astronautical Sciences Series* 96. San Diego, California: Univelt, 1997.
 [F6] Russell P. Patera. “General Method for Calculating Satellite Collision Probability.”
-    *Journal of Guidance, Control, and Dynamics* 24, no. 4 (July–August 2001): 716-722.
+*Journal of Guidance, Control, and Dynamics* 24, no. 4 (July–August 2001): 716-722.
 [F7] Salvatore Alfano. “A Numerical Implementation of Spherical Object Collision
-    Probability." *The Journal of the Astronautical Sciences* 53, no. 1 (January-March
-    2005): 103-109.
+Probability." *The Journal of the Astronautical Sciences* 53, no. 1 (January-March
+2005): 103-109.
 [F8] Salvatore Alfano. “Review of Conjunction Probability Methods for Short-Term
-    Encounters." In *Proceedings of the 17th AAS/AIAA Space Flight Mechanics Meeting*
-    (January 28 - February 1, 2007, Sedona, Arizona). 719–747. Edited by Maruthi R.
-    Akella, et al.. *Advances in the Astronautical Sciences Series* 127. San Diego,
-    California: Univelt, 2007.
+Encounters." In *Proceedings of the 17th AAS/AIAA Space Flight Mechanics Meeting*
+(January 28 - February 1, 2007, Sedona, Arizona). 719–747. Edited by Maruthi R.
+Akella, et al.. *Advances in the Astronautical Sciences Series* 127. San Diego,
+California: Univelt, 2007.
 [F9] David McKinley. “Development of a Nonlinear Probability of Collision Tool for the
-    Earth Observing System.” In *Proceedings of AIAA/AAS Astrodynamics Specialist
-    Conference and Exhibit* (21 August 2006–24 August 2006, Keystone, Colorado).
-    Reston, Virginia: AIAA, 2006.
+Earth Observing System.” In *Proceedings of AIAA/AAS Astrodynamics Specialist
+Conference and Exhibit* (21 August 2006–24 August 2006, Keystone, Colorado).
+Reston, Virginia: AIAA, 2006.
 [F10] K. Alfriend, et al. “Probability of Collision Error Analysis." *Space Debris* 1, no. 1
-    (1999): 21-35.
+(1999): 21-35.
 [F11] *IERS Conventions (2010)*. Edited by Gérard Petit and Brian Luzum. IERS Technical
-    Note No. 32. Frankfurt am Main, Germany: Bundesamt für Kartographie und
-    Geodäsie, 2010.
+Note No. 32. Frankfurt am Main, Germany: Bundesamt für Kartographie und
+Geodäsie, 2010.

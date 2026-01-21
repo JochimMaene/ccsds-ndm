@@ -56,7 +56,7 @@ impl Ndm for Opm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str(xml)
+        crate::xml::from_str_with_context(xml, "OPM")
     }
 }
 

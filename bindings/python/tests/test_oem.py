@@ -45,8 +45,8 @@ def test_parse_and_roundtrip_file_kvn(tmp_path, oem_kvn: ccsds_ndm.Oem):
     assert segment.metadata.interpolation_degree == 7
 
     # Data assertions
-    assert len(segment.data.state_vectors) == 4
-    sv1 = segment.data.state_vectors[0]
+    assert len(segment.data.state_vector) == 4
+    sv1 = segment.data.state_vector[0]
     assert sv1.epoch == "2019-12-28T21:29:07.267"
     assert sv1.x == -2432.166
     assert sv1.y == -63.042
@@ -83,10 +83,10 @@ def test_parse_oem_with_covariance(oem_with_cov_kvn: ccsds_ndm.Oem):
     data = segment.data
 
     # Assert that covariance matrices were parsed
-    assert len(data.covariance_matrices) == 2
+    assert len(data.covariance_matrix) == 2
 
     # Assertions on the first covariance matrix
-    cov1 = data.covariance_matrices[0]
+    cov1 = data.covariance_matrix[0]
     assert cov1.epoch == "2019-12-28T21:29:07.267"
     assert cov1.cov_ref_frame == "EME2000"
     assert cov1.cx_x == pytest.approx(3.3313494e-04)
@@ -94,7 +94,7 @@ def test_parse_oem_with_covariance(oem_with_cov_kvn: ccsds_ndm.Oem):
     assert cov1.cz_dot_z_dot == pytest.approx(6.2244443e-10)
 
     # Assertions on the second covariance matrix
-    cov2 = data.covariance_matrices[1]
+    cov2 = data.covariance_matrix[1]
     assert cov2.epoch == "2019-12-29T21:00:00"
     assert cov2.cx_x == pytest.approx(3.4424505e-04)
     assert cov2.cy_x == pytest.approx(4.5078162e-04)

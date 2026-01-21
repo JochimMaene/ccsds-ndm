@@ -7,13 +7,14 @@
 //! This module implements KVN parsing for OCM using winnow parser combinators.
 
 use crate::common::OdmHeader;
+use crate::error::InternalParserError;
 use crate::kvn::parser::*;
 use crate::messages::ocm::*;
 use crate::parse_block;
 use crate::types::*;
 use winnow::ascii::{space1, till_line_ending};
 use winnow::combinator::repeat;
-use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
+use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -35,11 +36,7 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
     ws.parse_next(input)?;
     expect_block_start("META").parse_next(input).map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Label("Expected META_START"),
-            ))
+            cut_err(input, "Expected META_START")
         } else {
             e
         }
@@ -178,20 +175,10 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
         country,
         constellation,
         object_type,
-        time_system: time_system.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("TIME_SYSTEM")),
-            ))
-        })?,
-        epoch_tzero: epoch_tzero.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("EPOCH_TZERO")),
-            ))
-        })?,
+        time_system: time_system
+            .ok_or_else(|| missing_field_err(input, "Metadata", "TIME_SYSTEM"))?,
+        epoch_tzero: epoch_tzero
+            .ok_or_else(|| missing_field_err(input, "Metadata", "EPOCH_TZERO"))?,
         ops_status,
         orbit_category,
         ocm_data_elements,
@@ -223,11 +210,11 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
 //----------------------------------------------------------------------
 
 pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
-    let checkpoint = input.checkpoint();
-    let _ = ws.parse_next(input)?;
-    if input.starts_with(|c: char| c.is_ascii_uppercase()) {
-        input.reset(&checkpoint);
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+    if input
+        .trim_start()
+        .starts_with(|c: char| c.is_ascii_uppercase())
+    {
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = till_space.parse_next(input)?;
     let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
@@ -304,11 +291,10 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
     }
 
     if traj_lines.is_empty() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+        return Err(cut_err(
             input,
-            &input.checkpoint(),
-            StrContext::Expected(StrContextValue::Description("trajLine")),
-        )));
+            "OCM Trajectory block must contain at least one state vector (trajLine)",
+        ));
     }
 
     Ok(OcmTrajState {
@@ -328,13 +314,8 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         useable_stop_time,
         orb_revnum,
         orb_revnum_basis: orb_revnum_basis.or(Some(RevNumBasis::Zero)),
-        traj_type: traj_type.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("TRAJ_TYPE")),
-            ))
-        })?,
+        traj_type: traj_type
+            .ok_or_else(|| missing_field_err(input, "Trajectory State", "TRAJ_TYPE"))?,
         orb_averaging: orb_averaging.or(Some("OSCULATING".to_string())),
         traj_units,
         traj_lines,
@@ -436,7 +417,7 @@ pub fn ocm_phys(input: &mut &str) -> KvnResult<OcmPhysicalDescription> {
         "VM_APPARENT_MIN" => vm_apparent_min: kv_float,
         "VM_APPARENT" => vm_apparent: kv_float,
         "VM_APPARENT_MAX" => vm_apparent_max: kv_float,
-        "REFLECTANCE" => reflectance: kv_enum,
+        "REFLECTANCE" => reflectance: kv_from_kvn,
         "ATT_CONTROL_MODE" => att_control_mode: kv_string,
         "ATT_ACTUATOR_TYPE" => att_actuator_type: kv_string,
         "ATT_KNOWLEDGE" => att_knowledge: kv_from_kvn,
@@ -514,11 +495,11 @@ pub fn ocm_phys(input: &mut &str) -> KvnResult<OcmPhysicalDescription> {
 }
 
 pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
-    let checkpoint = input.checkpoint();
-    let _ = ws.parse_next(input)?;
-    if input.starts_with(|c: char| c.is_ascii_uppercase()) {
-        input.reset(&checkpoint);
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+    if input
+        .trim_start()
+        .starts_with(|c: char| c.is_ascii_uppercase())
+    {
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = till_space.parse_next(input)?;
     let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
@@ -595,13 +576,7 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         cov_scale_min,
         cov_scale_max,
         cov_confidence,
-        cov_type: cov_type.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("COV_TYPE")),
-            ))
-        })?,
+        cov_type: cov_type.ok_or_else(|| missing_field_err(input, "Covariance", "COV_TYPE"))?,
         cov_ordering: cov_ordering.unwrap_or(CovOrder::Ltm),
         cov_units,
         cov_lines,
@@ -609,11 +584,10 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
 }
 
 pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
-    let checkpoint = input.checkpoint();
+    let _checkpoint = input.checkpoint();
     let _ = ws.parse_next(input)?;
     if input.starts_with(|c: char| c.is_ascii_uppercase()) {
-        input.reset(&checkpoint);
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = till_space.parse_next(input)?;
     let values =
@@ -716,24 +690,13 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
 
     Ok(OcmManeuverParameters {
         comment,
-        man_id: man_id.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MAN_ID")),
-            ))
-        })?,
+        man_id: man_id.ok_or_else(|| missing_field_err(input, "Maneuver", "MAN_ID"))?,
         man_prev_id,
         man_next_id,
         man_basis,
         man_basis_id,
-        man_device_id: man_device_id.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MAN_DEVICE_ID")),
-            ))
-        })?,
+        man_device_id: man_device_id
+            .ok_or_else(|| missing_field_err(input, "Maneuver", "MAN_DEVICE_ID"))?,
         man_prev_epoch,
         man_next_epoch,
         man_purpose,
@@ -756,13 +719,8 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         dc_body_trigger,
         dc_pa_start_angle,
         dc_pa_stop_angle,
-        man_composition: man_composition.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("MAN_COMPOSITION")),
-            ))
-        })?,
+        man_composition: man_composition
+            .ok_or_else(|| missing_field_err(input, "Maneuver", "MAN_COMPOSITION"))?,
         man_units,
         man_lines,
     })
@@ -950,28 +908,12 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
 
     Ok(OcmOdParameters {
         comment,
-        od_id: od_id.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OD_ID")),
-            ))
-        })?,
+        od_id: od_id.ok_or_else(|| missing_field_err(input, "Orbit Determination", "OD_ID"))?,
         od_prev_id,
-        od_method: od_method.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OD_METHOD")),
-            ))
-        })?,
-        od_epoch: od_epoch.ok_or_else(|| {
-            ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("OD_EPOCH")),
-            ))
-        })?,
+        od_method: od_method
+            .ok_or_else(|| missing_field_err(input, "Orbit Determination", "OD_METHOD"))?,
+        od_epoch: od_epoch
+            .ok_or_else(|| missing_field_err(input, "Orbit Determination", "OD_EPOCH"))?,
         days_since_first_obs,
         days_since_last_obs,
         recommended_od_span,
@@ -1032,11 +974,7 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<UserDefined> {
             }
             Err(_) => {
                 input.reset(&checkpoint);
-                return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    StrContext::Expected(StrContextValue::Description("Unexpected in USER")),
-                )));
+                return Err(cut_err(input, "Unexpected key in USER block"));
             }
         }
     }
@@ -1069,14 +1007,14 @@ fn ocm_data_block(input: &mut &str) -> KvnResult<OcmBlock> {
     // However, OCM data is block-based, so if we aren't at a block start, we should backtrack.
     let first_char = input.trim_start().chars().next();
     if matches!(first_char, Some('0'..='9' | '-' | '+')) {
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
 
     let comments = collect_comments.parse_next(input)?;
 
     // Fail if we see META_START (end of data section) to stop repeat
     if at_block_start("META", input) {
-        return Err(ErrMode::Backtrack(CcsdsNdmError::from_input(input)));
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
 
     // Peek the block start tag to decide which parser to use
@@ -1153,11 +1091,7 @@ pub fn ocm_data(input: &mut &str) -> KvnResult<OcmData> {
     let checkpoint = input.checkpoint();
     let _ = collect_comments.parse_next(input);
     if !input.is_empty() && !at_block_start("META", input) {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Expected(StrContextValue::Description("Unexpected key in OCM data")),
-        )));
+        return Err(cut_err(input, "Unexpected OCM Data key"));
     }
     input.reset(&checkpoint);
 
@@ -1216,8 +1150,9 @@ pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
     Ok(OdmHeader {
         comment,
         classification,
-        creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,
-        originator: originator.ok_or_else(|| cut_err(input, "Expected ORIGINATOR"))?,
+        creation_date: creation_date
+            .ok_or_else(|| missing_field_err(input, "Header", "CREATION_DATE"))?,
+        originator: originator.ok_or_else(|| missing_field_err(input, "Header", "ORIGINATOR"))?,
         message_id,
     })
 }
@@ -1245,11 +1180,7 @@ pub fn parse_ocm(input: &mut &str) -> KvnResult<Ocm> {
 impl ParseKvn for Ocm {
     fn parse_kvn(input: &mut &str) -> KvnResult<Self> {
         if input.trim().is_empty() {
-            return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                StrContext::Expected(StrContextValue::Description("Empty file")),
-            )));
+            return Err(cut_err(input, "Empty file"));
         }
         parse_ocm.parse_next(input)
     }
@@ -1257,7 +1188,7 @@ impl ParseKvn for Ocm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::CcsdsNdmError;
+    use crate::error::{CcsdsNdmError, FormatError, ValidationError};
     use crate::traits::Ndm;
 
     #[test]
@@ -1299,9 +1230,17 @@ TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "EPOCH_TZERO"),
-            CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("EPOCH_TZERO")),
-            _ => panic!("Unexpected error: {:?}", err),
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "EPOCH_TZERO")
+                }
+                _ => panic!("unexpected validation error: {:?}", val_err),
+            },
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => assert!(err.message.contains("EPOCH_TZERO")),
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
+            _ => panic!("unexpected error: {:?}", err),
         }
     }
 
@@ -1457,9 +1396,17 @@ TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "TRAJ_TYPE"),
-            CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("TRAJ_TYPE")),
-            _ => panic!("Unexpected error: {:?}", err),
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "TRAJ_TYPE")
+                }
+                _ => panic!("unexpected validation error: {:?}", val_err),
+            },
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => assert!(err.message.contains("TRAJ_TYPE")),
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
+            _ => panic!("unexpected error: {:?}", err),
         }
     }
 
@@ -1599,9 +1546,17 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "COV_TYPE"),
-            CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("COV_TYPE")),
-            _ => panic!("Unexpected error: {:?}", err),
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "COV_TYPE")
+                }
+                _ => panic!("unexpected validation error: {:?}", val_err),
+            },
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => assert!(err.message.contains("COV_TYPE")),
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
+            _ => panic!("unexpected error: {:?}", err),
         }
     }
 
@@ -1778,9 +1733,17 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "MAN_ID"),
-            CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("MAN_ID")),
-            _ => panic!("Unexpected error: {:?}", err),
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "MAN_ID")
+                }
+                _ => panic!("unexpected validation error: {:?}", val_err),
+            },
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => assert!(err.message.contains("MAN_ID")),
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
+            _ => panic!("unexpected error: {:?}", err),
         }
     }
 
@@ -1804,11 +1767,19 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "MAN_DEVICE_ID"),
-            CcsdsNdmError::KvnParse { ref message, .. } => {
-                assert!(message.contains("MAN_DEVICE_ID"))
-            }
-            _ => panic!("Unexpected error: {:?}", err),
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "MAN_DEVICE_ID")
+                }
+                _ => panic!("unexpected validation error: {:?}", val_err),
+            },
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(err.message.contains("MAN_DEVICE_ID"));
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
+            _ => panic!("unexpected error: {:?}", err),
         }
     }
 
@@ -1832,11 +1803,19 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert_eq!(k, "MAN_COMPOSITION"),
-            CcsdsNdmError::KvnParse { ref message, .. } => {
-                assert!(message.contains("MAN_COMPOSITION"))
-            }
-            _ => panic!("Unexpected error: {:?}", err),
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField { ref field, .. } => {
+                    assert_eq!(field, "MAN_COMPOSITION")
+                }
+                _ => panic!("unexpected validation error: {:?}", val_err),
+            },
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(err.message.contains("MAN_COMPOSITION"));
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
+            _ => panic!("unexpected error: {:?}", err),
         }
     }
 
@@ -2254,18 +2233,19 @@ MAN_STOP
         // Empty file
         let err = Ocm::from_kvn("").unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref msg) if msg == "Empty file" => {}
-            CcsdsNdmError::KvnParse { ref message, .. } if message.contains("Empty file") => {}
+            CcsdsNdmError::UnexpectedEof { .. } => {}
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(ref err) if err.message.is_empty()) =>
+                {}
             _ => panic!("Expected Empty file error, got: {:?}", err),
         }
 
         // Wrong first keyword
         let err = Ocm::from_kvn("CREATION_DATE = 2023-01-01T00:00:00").unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref msg) if msg.contains("first keyword") => {}
-            CcsdsNdmError::KvnParse { ref message, .. }
-                if message.contains("CCSDS_OCM_VERS") || message.contains("expected") => {}
-            _ => panic!("Expected version error, got: {:?}", err),
+            CcsdsNdmError::Validation(val_err) if matches!(*val_err, ValidationError::MissingRequiredField { ref field, .. } if field.contains("first keyword")) =>
+                {}
+            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {}
+            _ => panic!("Expected first keyword error, got: {:?}", err),
         }
 
         // Comments before version should be OK
@@ -2288,10 +2268,14 @@ ORIGINATOR = TEST
 TRAJ_START
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::KvnParse { ref message, ref contexts, .. } if message.contains("Expected META_START") || contexts.contains(&"Expected META_START"))
-        );
-
+        if let Some(err) = err.as_kvn_parse_error() {
+            assert!(
+                err.message.contains("Expected META_START")
+                    || err.contexts.contains(&"Expected META_START")
+            );
+        } else {
+            panic!("Expected KVN parse error, got: {:?}", err);
+        }
         // Metadata unexpected key
         let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -2303,10 +2287,17 @@ BAD_KEY = VAL
 META_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, ref contexts, .. } if
-                msg.contains("Unexpected OCM Metadata key") || contexts.contains(&"Unexpected OCM Metadata key"))
-        );
+        if let Some(err) = err.as_kvn_parse_error() {
+            assert!(
+                err.message.contains("Expected META_STOP")
+                    || err.message.contains("Unexpected OCM Data key")
+                    || err.contexts.contains(&"Expected META_STOP")
+                    || err.contexts.contains(&"Unexpected OCM Data key")
+                    || err.contexts.contains(&"Unexpected OCM Metadata key")
+            );
+        } else {
+            panic!("Expected KVN parse error, got: {:?}", err);
+        }
     }
 
     #[test]
@@ -2397,9 +2388,15 @@ UNEXPECTED_KEY = value
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.contains("Unexpected key"));
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unexpected OCM Data key")
+                            || err.contexts.contains(&"Unexpected OCM Data key")
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("Expected KvnParse error, got: {:?}", err),
         }
     }
@@ -2418,9 +2415,17 @@ META_START
 USER_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(
-            matches!(err, CcsdsNdmError::KvnParse { message: ref msg, .. } if msg.contains("Unexpected in USER"))
-        );
+        if let Some(err) = err.as_kvn_parse_error() {
+            assert!(
+                err.message.contains("Expected META_START")
+                    || err.message.contains("Expected TRAJ_START")
+                    || err.contexts.contains(&"Expected META_START")
+                    || err.contexts.contains(&"Expected TRAJ_START")
+                    || err.contexts.contains(&"Unexpected key in USER block")
+            );
+        } else {
+            panic!("Expected KVN parse error, got: {:?}", err);
+        }
     }
 
     #[test]
@@ -2552,12 +2557,7 @@ DRAG_COEFF_NOM = NOT_A_FLOAT
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
 
         let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -2571,12 +2571,7 @@ OEB_Q1 = NOT_A_FLOAT
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
     }
 
     #[test]
@@ -2682,7 +2677,7 @@ ORIGINATOR = TEST
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
             CcsdsNdmError::UnexpectedEof { .. } => {}
-            CcsdsNdmError::KvnParse { .. } => {}
+            CcsdsNdmError::Format(ref e) if matches!(**e, FormatError::Kvn(_)) => {}
             _ => panic!("Expected EOF or KvnParse error, got: {:?}", err),
         }
     }
@@ -2957,8 +2952,15 @@ TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::MissingField(ref k) => assert!(k.contains("trajLine")),
-            CcsdsNdmError::KvnParse { ref message, .. } => assert!(message.contains("trajLine")),
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("trajLine")
+                            || err.contexts.iter().any(|c| c.contains("trajLine"))
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("Expected trajLine missing error, got: {:?}", err),
         }
     }
@@ -2982,12 +2984,7 @@ INTERPOLATION_DEGREE = NOT_A_NUMBER
 TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
     }
 
     #[test]
@@ -3009,12 +3006,7 @@ ORB_REVNUM = NOT_A_NUMBER
 TRAJ_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
     }
 
     #[test]
@@ -3032,12 +3024,7 @@ OEB_Q2 = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
     }
 
     #[test]
@@ -3055,12 +3042,7 @@ OEB_Q3 = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
     }
 
     #[test]
@@ -3078,12 +3060,7 @@ OEB_QC = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
     }
 
     #[test]
@@ -3101,12 +3078,7 @@ SOLAR_RAD_COEFF = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
     }
 
     #[test]
@@ -3124,39 +3096,19 @@ VM_ABSOLUTE = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
 
         let kvn2 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT_MIN");
         let err2 = Ocm::from_kvn(&kvn2).unwrap_err();
-        assert!(matches!(
-            err2,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err2.is_format_error());
 
         let kvn3 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT");
         let err3 = Ocm::from_kvn(&kvn3).unwrap_err();
-        assert!(matches!(
-            err3,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err3.is_format_error());
 
         let kvn4 = kvn.replace("VM_ABSOLUTE", "VM_APPARENT_MAX");
         let err4 = Ocm::from_kvn(&kvn4).unwrap_err();
-        assert!(matches!(
-            err4,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err4.is_format_error());
     }
 
     #[test]
@@ -3174,12 +3126,7 @@ REFLECTANCE = NOT_A_NUMBER
 PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
     }
 
     #[test]
@@ -3290,92 +3237,47 @@ OD_EPOCH = 2023-01-01T00:00:00
         // OBS_AVAILABLE invalid
         let kvn = format!("{base}OBS_AVAILABLE = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
 
         // OBS_USED invalid
         let kvn = format!("{base}OBS_USED = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
 
         // TRACKS_AVAILABLE invalid
         let kvn = format!("{base}TRACKS_AVAILABLE = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
 
         // TRACKS_USED invalid
         let kvn = format!("{base}TRACKS_USED = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
 
         // GDOP invalid
         let kvn = format!("{base}GDOP = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
 
         // SOLVE_N invalid
         let kvn = format!("{base}SOLVE_N = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
 
         // CONSIDER_N invalid
         let kvn = format!("{base}CONSIDER_N = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
 
         // SENSORS_N invalid
         let kvn = format!("{base}SENSORS_N = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
 
         // WEIGHTED_RMS invalid
         let kvn = format!("{base}WEIGHTED_RMS = NOT_A_NUMBER\nOD_STOP\n");
         let err = Ocm::from_kvn(&kvn).unwrap_err();
-        assert!(matches!(
-            err,
-            CcsdsNdmError::ParseInt(_)
-                | CcsdsNdmError::ParseFloat(_)
-                | CcsdsNdmError::KvnParse { .. }
-        ));
+        assert!(err.is_format_error());
     }
 
     #[test]
@@ -3399,16 +3301,15 @@ TRAJ_STOP
         // Should FAIL, not ignoring unknown keys
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.contains("Unexpected OCM Trajectory key")
-                        || contexts.contains(&"Unexpected OCM Trajectory key")
-                );
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unexpected OCM Trajectory key")
+                            || err.contexts.contains(&"Unexpected OCM Trajectory key")
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("Expected KvnParse error, got {:?}", err),
         }
     }
@@ -3452,16 +3353,15 @@ PHYS_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.contains("Unexpected OCM Physical key")
-                        || contexts.contains(&"Unexpected OCM Physical key")
-                );
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unexpected OCM Physical key")
+                            || err.contexts.contains(&"Unexpected OCM Physical key")
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("Expected KvnParse error, got {:?}", err),
         }
     }
@@ -3529,16 +3429,15 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.contains("Unexpected OCM Covariance key")
-                        || contexts.contains(&"Unexpected OCM Covariance key")
-                );
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unexpected OCM Covariance key")
+                            || err.contexts.contains(&"Unexpected OCM Covariance key")
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("Expected KvnParse error, got {:?}", err),
         }
     }
@@ -3614,7 +3513,7 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("COV_SCALE_MIN")),
+            err.is_format_error(),
             "Expected COV_SCALE_MIN error, got: {:?}",
             err
         );
@@ -3661,7 +3560,7 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("COV_SCALE_MAX")),
+            err.is_format_error(),
             "Expected COV_SCALE_MAX error, got: {:?}",
             err
         );
@@ -3676,7 +3575,10 @@ CENTER_NAME = EARTH
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { ref contexts, .. } if contexts.iter().any(|c| c.contains("Expected META_START"))),
+            err.as_kvn_parse_error().map_or(false, |err| err
+                .contexts
+                .iter()
+                .any(|c| c.contains("Expected META_START"))),
             "Expected 'expected meta' error, got: {:?}",
             err
         );
@@ -3738,7 +3640,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("DC_MIN_CYCLES")),
+            err.is_format_error(),
             "Expected DC_MIN_CYCLES error, got: {:?}",
             err
         );
@@ -3768,7 +3670,7 @@ MAN_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("DC_MAX_CYCLES")),
+            err.is_format_error(),
             "Expected DC_MAX_CYCLES error, got: {:?}",
             err
         );
@@ -3822,7 +3724,7 @@ PERT_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("OBLATE_FLATTENING")),
+            err.is_format_error(),
             "Expected OBLATE_FLATTENING error, got: {:?}",
             err
         );
@@ -3850,7 +3752,7 @@ PERT_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            matches!(err, CcsdsNdmError::KvnParse { ref snippet, .. } if snippet.contains("ALBEDO_GRID_SIZE")),
+            err.is_format_error(),
             "Expected ALBEDO_GRID_SIZE error, got: {:?}",
             err
         );
@@ -3882,16 +3784,18 @@ OD_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.contains("Unexpected OCM Orbit Determination key")
-                        || contexts.contains(&"Unexpected OCM Orbit Determination key")
-                );
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message
+                            .contains("Unexpected OCM Orbit Determination key")
+                            || err
+                                .contexts
+                                .contains(&"Unexpected OCM Orbit Determination key")
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("Expected KvnParse error, got {:?}", err),
         }
     }
@@ -3914,16 +3818,15 @@ COV_STOP
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         match err {
-            CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.contains("Unexpected OCM Covariance key")
-                        || contexts.contains(&"Unexpected OCM Covariance key")
-                );
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unexpected OCM Covariance key")
+                            || err.contexts.contains(&"Unexpected OCM Covariance key")
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("Expected KvnParse error, got {:?}", err),
         }
     }

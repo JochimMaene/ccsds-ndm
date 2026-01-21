@@ -1304,7 +1304,7 @@ impl CdmMetadata {
     #[setter]
     fn set_solar_rad_pressure(&mut self, v: Option<String>) -> PyResult<()> {
         self.inner.solar_rad_pressure = match v {
-             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::CcsdsNdmError| PyValueError::new_err(e.to_string()))?),
+             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?),
              None => None,
         };
         Ok(())
@@ -1320,7 +1320,7 @@ impl CdmMetadata {
     #[setter]
     fn set_earth_tides(&mut self, v: Option<String>) -> PyResult<()> {
         self.inner.earth_tides = match v {
-             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::CcsdsNdmError| PyValueError::new_err(e.to_string()))?),
+             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?),
              None => None,
         };
         Ok(())
@@ -1336,7 +1336,7 @@ impl CdmMetadata {
     #[setter]
     fn set_intrack_thrust(&mut self, v: Option<String>) -> PyResult<()> {
         self.inner.intrack_thrust = match v {
-             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::CcsdsNdmError| PyValueError::new_err(e.to_string()))?),
+             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?),
              None => None,
         };
         Ok(())

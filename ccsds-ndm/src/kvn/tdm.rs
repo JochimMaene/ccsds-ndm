@@ -6,6 +6,7 @@
 //!
 //! This module implements KVN parsing for TDM using winnow parser combinators.
 
+use crate::error::{CcsdsNdmError, InternalParserError};
 use crate::kvn::parser::*;
 use crate::messages::tdm::{
     Tdm, TdmBody, TdmData, TdmHeader, TdmMetadata, TdmObservation, TdmObservationData, TdmSegment,
@@ -14,7 +15,7 @@ use crate::parse_block;
 use crate::types::*;
 use winnow::ascii::till_line_ending;
 use winnow::combinator::preceded;
-use winnow::error::{AddContext, ErrMode, StrContext, StrContextValue};
+use winnow::error::{AddContext, ErrMode, StrContext};
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -157,18 +158,10 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
     }
 
     if meta.time_system.is_empty() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Expected(StrContextValue::Description("TIME_SYSTEM")),
-        )));
+        return Err(missing_field_err(input, "TDM Metadata", "TIME_SYSTEM"));
     }
     if meta.participant_1.is_empty() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Expected(StrContextValue::Description("PARTICIPANT_1")),
-        )));
+        return Err(missing_field_err(input, "TDM Metadata", "PARTICIPANT_1"));
     }
 
     Ok(meta)
@@ -233,14 +226,18 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
         "TROPO_DRY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoDry(v)))),
         "TROPO_WET" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoWet(v)))),
         "VLBI_DELAY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::VlbiDelay(v)))),
-        _ => |i: &mut &str| Err(ErrMode::Cut(CcsdsNdmError::from_input(i).add_context(i, &i.checkpoint(), StrContext::Label("Unknown TDM data keyword")))),
-    }.parse_next(input).map_err(|e| {
+        _ => |i: &mut &str| Err(ErrMode::Cut(InternalParserError::from_input(i).add_context(i, &i.checkpoint(), StrContext::Label("Unknown TDM data keyword")))),
+    }.try_map(|res| res).parse_next(input).map_err(|e| {
         if e.is_backtrack() {
-            ErrMode::Backtrack(CcsdsNdmError::from_input(input).add_context(input, &checkpoint, StrContext::Label("Expected TDM observation key")))
+            ErrMode::Backtrack(InternalParserError::from_input(input).add_context(
+                input,
+                &checkpoint,
+                StrContext::Label("Expected TDM observation key"),
+            ))
         } else {
             e
         }
-    })?.map_err(ErrMode::Cut)?;
+    })?;
 
     opt_line_ending.parse_next(input)?;
 
@@ -273,11 +270,10 @@ pub fn tdm_data(input: &mut &str) -> KvnResult<TdmData> {
     }
 
     if observations.is_empty() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
+        return Err(cut_err(
             input,
-            &input.checkpoint(),
-            StrContext::Label("TDM data section must contain at least one observation"),
-        )));
+            "TDM data section must contain at least one observation",
+        ));
     }
 
     Ok(TdmData {
@@ -315,11 +311,7 @@ pub fn tdm_body(input: &mut &str) -> KvnResult<TdmBody> {
     }
 
     if segments.is_empty() {
-        return Err(ErrMode::Cut(CcsdsNdmError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            StrContext::Label("TDM body must contain at least one segment"),
-        )));
+        return Err(cut_err(input, "TDM body must contain at least one segment"));
     }
 
     Ok(TdmBody { segments })
@@ -349,9 +341,7 @@ impl ParseKvn for Tdm {
 }
 
 pub fn parse_u64(s: &str) -> crate::error::Result<u64> {
-    s.trim()
-        .parse::<u64>()
-        .map_err(crate::error::CcsdsNdmError::ParseInt)
+    s.trim().parse::<u64>().map_err(CcsdsNdmError::from)
 }
 
 //----------------------------------------------------------------------
@@ -361,6 +351,7 @@ pub fn parse_u64(s: &str) -> crate::error::Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::FormatError;
     use crate::traits::Ndm;
     // We need TdmObservationData variants visible
     use crate::messages::tdm::TdmObservationData;
@@ -1282,9 +1273,9 @@ DATA_STOP
     fn test_tdm_empty_file_error() {
         let err = Tdm::from_kvn("").unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::UnexpectedEof { .. } => {}
-            crate::error::CcsdsNdmError::KvnParse { .. } => {}
-            _ => panic!("Expected Empty file error, got: {:?}", err),
+            CcsdsNdmError::UnexpectedEof { .. } => {}
+            e if e.is_kvn_error() => {}
+            _ => panic!("Expected error, got: {:?}", err),
         }
     }
 
@@ -1296,9 +1287,15 @@ CCSDS_TDM_VERS = 2.0
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::KvnParse { message, .. } => {
-                assert!(message.to_lowercase().contains("expected ccsds_tdm_vers"));
-            }
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(err
+                        .message
+                        .to_lowercase()
+                        .contains("expected ccsds_tdm_vers"));
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
             _ => panic!("Expected version-not-first error, got: {:?}", err),
         }
     }
@@ -1318,19 +1315,16 @@ DATA_STOP
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.to_lowercase().contains("unknown tdm data keyword")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("unknown tdm data keyword"))
-                );
-            }
-            _ => panic!("Expected KvnParse error, got: {:?}", err),
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unknown TDM data keyword")
+                            || err.contexts.contains(&"Unknown TDM data keyword")
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
+            _ => panic!("Expected error, got: {:?}", err),
         }
     }
 
@@ -1350,19 +1344,16 @@ DATA_STOP
 "#;
         let err = Tdm::from_kvn(kvn).unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::KvnParse {
-                message: msg,
-                contexts,
-                ..
-            } => {
-                assert!(
-                    msg.to_lowercase().contains("unexpected tdm metadata key")
-                        || contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("unexpected tdm metadata key"))
-                );
-            }
-            _ => panic!("Expected KvnParse error, got: {:?}", err),
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref err) => {
+                    assert!(
+                        err.message.contains("Unexpected TDM Metadata key")
+                            || err.contexts.contains(&"Unexpected TDM Metadata key")
+                    );
+                }
+                _ => panic!("unexpected format error: {:?}", format_err),
+            },
+            _ => panic!("Expected error, got: {:?}", err),
         }
     }
 }

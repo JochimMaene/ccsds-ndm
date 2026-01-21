@@ -48,7 +48,7 @@ impl Ndm for Tdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str(xml)
+        crate::xml::from_str_with_context(xml, "TDM")
     }
 }
 
@@ -1184,8 +1184,12 @@ impl TdmObservationData {
 
     pub fn from_key_val(key: &str, val: &str) -> Result<Self> {
         let pf = |s: &str| {
-            fast_float::parse(s)
-                .map_err(|_| CcsdsNdmError::InvalidFormat(format!("Invalid float: {}", s)))
+            fast_float::parse(s).map_err(|_| {
+                CcsdsNdmError::Format(Box::new(crate::error::FormatError::InvalidFormat(format!(
+                    "Invalid float: {}",
+                    s
+                ))))
+            })
         };
         match key {
             "ANGLE_1" => Ok(Self::Angle1(pf(val)?)),
@@ -1235,10 +1239,13 @@ impl TdmObservationData {
             "TROPO_DRY" => Ok(Self::TropoDry(pf(val)?)),
             "TROPO_WET" => Ok(Self::TropoWet(pf(val)?)),
             "VLBI_DELAY" => Ok(Self::VlbiDelay(pf(val)?)),
-            _ => Err(CcsdsNdmError::Validation(format!(
-                "Unknown TDM data keyword: {}",
-                key
-            ))),
+            _ => Err(crate::error::ValidationError::InvalidValue {
+                field: key.to_string().into(),
+                value: val.to_string(),
+                expected: "valid TDM observation keyword".into(),
+                line: None,
+            }
+            .into()),
         }
     }
 }
