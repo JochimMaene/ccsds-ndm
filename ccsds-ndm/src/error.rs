@@ -25,7 +25,7 @@ pub struct RawParsePosition {
 
 impl RawParsePosition {
     pub fn into_parse_error(self, input: &str) -> KvnParseError {
-        // Use 0 as default if we don't have location info yet, 
+        // Use 0 as default if we don't have location info yet,
         // to_ccsds_error + with_location will fix this.
         // Actually, with_location recalculates from offset.
         // But ParseDiagnostic computes everything.
@@ -82,7 +82,7 @@ impl std::fmt::Display for KvnParseError {
             self.line, self.column, self.message
         )?;
         if !self.contexts.is_empty() {
-             write!(f, "\nContext: {}", self.contexts.join(" > "))?;
+            write!(f, "\nContext: {}", self.contexts.join(" > "))?;
         }
         Ok(())
     }
@@ -107,23 +107,43 @@ pub enum FormatError {
 
     /// Errors occurring during XML parsing.
     #[error("XML error: {0}")]
-    Xml(#[source] #[from] quick_xml::Error),
+    Xml(
+        #[source]
+        #[from]
+        quick_xml::Error,
+    ),
 
     /// Errors occurring during XML deserialization.
     #[error("XML deserialization error: {0}")]
-    XmlDe(#[source] #[from] quick_xml::DeError),
+    XmlDe(
+        #[source]
+        #[from]
+        quick_xml::DeError,
+    ),
 
     /// Errors occurring during XML serialization.
     #[error("XML serialization error: {0}")]
-    XmlSer(#[source] #[from] quick_xml::se::SeError),
+    XmlSer(
+        #[source]
+        #[from]
+        quick_xml::se::SeError,
+    ),
 
     /// Error when parsing a floating point number fails.
     #[error("Parse float error: {0}")]
-    ParseFloat(#[source] #[from] std::num::ParseFloatError),
+    ParseFloat(
+        #[source]
+        #[from]
+        std::num::ParseFloatError,
+    ),
 
     /// Error when parsing an integer number fails.
     #[error("Parse int error: {0}")]
-    ParseInt(#[source] #[from] std::num::ParseIntError),
+    ParseInt(
+        #[source]
+        #[from]
+        std::num::ParseIntError,
+    ),
 
     /// Error during enum parsing.
     #[error(transparent)]
@@ -249,7 +269,11 @@ impl WithLocation for ValidationError {
 pub enum CcsdsNdmError {
     /// Errors occurring during I/O operations.
     #[error("I/O error: {0}")]
-    Io(#[source] #[from] std::io::Error),
+    Io(
+        #[source]
+        #[from]
+        std::io::Error,
+    ),
 
     /// Errors related to NDM format or syntax.
     #[error(transparent)]
@@ -261,7 +285,11 @@ pub enum CcsdsNdmError {
 
     /// Errors related to CCSDS Epochs.
     #[error("Epoch error: {0}")]
-    Epoch(#[source] #[from] EpochError),
+    Epoch(
+        #[source]
+        #[from]
+        EpochError,
+    ),
 
     /// Error for unsupported CCSDS message types.
     #[error("Unsupported message type: {0}")]
@@ -312,7 +340,7 @@ impl ContextStack {
 pub struct InternalParserError {
     pub message: Cow<'static, str>,
     pub contexts: ContextStack,
-    pub kind: ParserErrorKind,
+    pub kind: Box<ParserErrorKind>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -337,7 +365,7 @@ impl ParserError<&str> for InternalParserError {
         Self {
             message: Cow::Borrowed(""),
             contexts: ContextStack::new(),
-            kind: ParserErrorKind::default(),
+            kind: Box::new(ParserErrorKind::default()),
         }
     }
 
@@ -351,7 +379,7 @@ impl winnow::error::FromExternalError<&str, EpochError> for InternalParserError 
         Self {
             message: Cow::Borrowed(""),
             contexts: ContextStack::new(),
-            kind: ParserErrorKind::Epoch(e),
+            kind: Box::new(ParserErrorKind::Epoch(e)),
         }
     }
 }
@@ -361,7 +389,7 @@ impl winnow::error::FromExternalError<&str, std::num::ParseFloatError> for Inter
         Self {
             message: Cow::Borrowed(""),
             contexts: ContextStack::new(),
-            kind: ParserErrorKind::ParseFloat(e),
+            kind: Box::new(ParserErrorKind::ParseFloat(e)),
         }
     }
 }
@@ -371,7 +399,7 @@ impl winnow::error::FromExternalError<&str, std::num::ParseIntError> for Interna
         Self {
             message: Cow::Borrowed(""),
             contexts: ContextStack::new(),
-            kind: ParserErrorKind::ParseInt(e),
+            kind: Box::new(ParserErrorKind::ParseInt(e)),
         }
     }
 }
@@ -381,7 +409,7 @@ impl winnow::error::FromExternalError<&str, EnumParseError> for InternalParserEr
         Self {
             message: Cow::Borrowed(""),
             contexts: ContextStack::new(),
-            kind: ParserErrorKind::Enum(e),
+            kind: Box::new(ParserErrorKind::Enum(e)),
         }
     }
 }
@@ -391,7 +419,7 @@ impl winnow::error::FromExternalError<&str, ValidationError> for InternalParserE
         Self {
             message: Cow::Borrowed(""),
             contexts: ContextStack::new(),
-            kind: ParserErrorKind::Validation(e),
+            kind: Box::new(ParserErrorKind::Validation(e)),
         }
     }
 }
@@ -408,13 +436,13 @@ impl winnow::error::FromExternalError<&str, CcsdsNdmError> for InternalParserErr
                 _ => Self {
                     message: Cow::Owned(fe.to_string()),
                     contexts: ContextStack::new(),
-                    kind: ParserErrorKind::default(),
+                    kind: Box::new(ParserErrorKind::default()),
                 },
             },
             _ => Self {
                 message: Cow::Owned(e.to_string()),
                 contexts: ContextStack::new(),
-                kind: ParserErrorKind::default(),
+                kind: Box::new(ParserErrorKind::default()),
             },
         }
     }

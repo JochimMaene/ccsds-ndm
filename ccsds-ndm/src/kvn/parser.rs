@@ -71,7 +71,7 @@ pub fn to_ccsds_error(
     let offset = err.offset();
     let inner = err.into_inner();
 
-    let base_err = match inner.kind {
+    let base_err = match *inner.kind {
         crate::error::ParserErrorKind::Validation(e) => CcsdsNdmError::Validation(Box::new(e)),
         crate::error::ParserErrorKind::Epoch(e) => CcsdsNdmError::Epoch(e),
         crate::error::ParserErrorKind::Enum(e) => {
@@ -91,10 +91,8 @@ pub fn to_ccsds_error(
             }))
             .with_location(input, offset);
         }
-        kind => {
-            let message = match kind {
-                _ => inner.message,
-            };
+        _ => {
+            let message = inner.message;
 
             let raw = crate::error::RawParsePosition {
                 offset,
@@ -128,7 +126,7 @@ pub fn missing_field_err(
     ErrMode::Cut(InternalParserError {
         message: std::borrow::Cow::Borrowed(""),
         contexts: crate::error::ContextStack::new(),
-        kind: crate::error::ParserErrorKind::MissingRequiredField { block, field },
+        kind: Box::new(crate::error::ParserErrorKind::MissingRequiredField { block, field }),
     })
 }
 
@@ -487,17 +485,15 @@ where
 /// Parses a value from a KVN line using the `FromKvnValue` trait.
 pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
     let (v, _) = kv_rest.parse_next(input)?;
-    T::from_kvn_value(v).map_err(|e| {
-        ErrMode::Cut(InternalParserError::from_external_error(input, e))
-    })
+    T::from_kvn_value(v)
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses any type that implements FromKvnFloat from a KVN line.
 pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
     let (v, u) = kv_float_unit.parse_next(input)?;
-    T::from_kvn_float(v, u).map_err(|e| {
-        ErrMode::Cut(InternalParserError::from_external_error(input, e))
-    })
+    T::from_kvn_float(v, u)
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
 /// Parses a float and its optional unit from a KVN line.
