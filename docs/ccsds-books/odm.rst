@@ -2254,265 +2254,352 @@ in table 6-3.
 .. _ocm_metadata_table_odm:
 
 .. list-table:: OCM Metadata
-   :widths: 20 45 10 10 15
+   :widths: 20 40 10 10 10 10
    :header-rows: 1
    :stub-columns: 1
 
    * - Keyword
      - Description
      - Units
-     - M/O/C
      - Default (if any)
+     - Examples of Values
+     - M/O/C
    * - META_START
      - Start of the metadata section.
      -
-     - M
      -
+     -
+     - M
    * - COMMENT
      - Comments (a contiguous set of one or more comment lines may be provided in the OCM Metadata section; see 7.8 for comment formatting rules).
      -
-     - O
      -
+     - This is a comment
+     - O
    * - OBJECT_NAME
-     - Free-text field containing the name of the object. While there is no CCSDS-based restriction on the value for this keyword, it is recommended to use names from either the UN Office of Outer Space Affairs designator index (reference [3], which include Object name and international designator of the participant), the spacecraft operator, or a State Actor or commercial Space Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME' space catalog. If OBJECT_NAME is not listed in reference [3] or the content is either unknown (uncorrelated) or cannot be disclosed, the value should be set to UNKNOWN (or this keyword omitted).
+     - Free-text field containing the name of the object. While there is no CCSDS-based restriction on the value for this keyword, it is recommended to use names from either the UN Office of Outer Space Affairs designator index (reference [3], which include Object name and international designator of the participant), the spacecraft operator, or a State Actor or commercial Space Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space catalog. If OBJECT_NAME is not listed in reference [3] or the content is either unknown (uncorrelated) or cannot be disclosed, the value should be set to UNKNOWN (or this keyword omitted).
      -
+     -
+     - | SPOT-7
+       | ENVISAT
+       | IRIDIUM NEXT-8
+       | INTELSAT G-15
+       | UNKNOWN
      - O
-     -
    * - INTERNATIONAL_DESIGNATOR
      - Free-text field containing an international designator for the object as assigned by the UN Committee on Space Research (COSPAR). Such designator values shall have the following COSPAR format: YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one capital letter for the identification of the part brought into space by the launch. If the object has no international designator or the content is either unknown (uncorrelated) or cannot be disclosed, the value should be set to UNKNOWN (or this keyword omitted). NOTE—The international designator was typically specified by 'OBJECT_ID' in the OPM, OMM, and OEM.
      -
-     - O
      -
+     - | 2000-052A
+       | 1996-068A
+       | 2000-053A
+       | 1996-008A
+       | UNKNOWN
+     - O
    * - CATALOG_NAME
      - Free-text field containing the satellite catalog source (or source agency or operator, value to be drawn from the SANA registry list of Space Object Catalogs at https://sanaregistry.org/r/space_object_catalog, or alternatively, from the list of organizations listed in the 'Abbreviation' column of the SANA Organizations registry at https://www.sanaregistry.org/r/organizations) from which 'OBJECT_DESIGNATOR' was obtained.
      -
-     - O
      -
+     - | CSPOC
+       | RFSA
+       | ESA
+       | COMSPOC
+     - O
    * - OBJECT_DESIGNATOR
      - Free-text field specification of the unique satellite identification designator for the object, as reflected in the catalog whose name is 'CATALOG_NAME'. If the ID is not known (uncorrelated object) or cannot be disclosed, 'UNKNOWN' may be used (or this keyword omitted).
      -
-     - O
      -
+     - | 22444
+       | 18SPCS 18571
+       | 2147483648_04ae[...]d84c
+       | UNKNOWN
+     - O
    * - ALTERNATE_NAMES
      - Free-text comma-delimited field containing alternate name(s) of this space object, including assigned names used by spacecraft operator, State Actors, commercial SSA providers, and/or media.
      -
-     - O
      -
+     - SV08, IN8
+     - O
    * - ORIGINATOR_POC
      - Free-text field containing originator or programmatic Point-of-Contact (POC) for OCM.
      -
-     - O
      -
+     - Mr. Rodgers
+     - O
    * - ORIGINATOR_POSITION
      - Free-text field containing contact position of the originator PoC.
      -
-     - O
      -
+     - | Flight Dynamics
+       | Mission Design Lead
+     - O
    * - ORIGINATOR_PHONE
      - Free-text field containing originator PoC phone number.
      -
-     - O
      -
+     - +12345678901
+     - O
    * - ORIGINATOR_EMAIL
      - Free-text field containing originator PoC email address.
      -
-     - O
      -
+     - JOHN.DOE@ SOMEWHERE.ORG
+     - O
    * - ORIGINATOR_ADDRESS
      - Free-text field containing originator's physical address information for OCM creator (suggest comma-delimited address lines).
      -
-     - O
      -
+     - | 5040 Spaceflight Ave.,
+       | Cocoa Beach, FL, USA, 12345
+     - O
    * - TECH_ORG
      - Free-text field containing the creating agency or operator (value should be drawn from the 'Abbreviation' column of the SANA Organizations registry at https://www.sanaregistry.org/r/organizations).
      -
-     - O
      -
+     - NASA
+     - O
    * - TECH_POC
      - Free-text field containing technical PoC for OCM.
      -
-     - O
      -
+     - Maxwell Smart
+     - O
    * - TECH_POSITION
      - Free-text field containing contact position of the technical PoC.
      -
-     - O
      -
+     - | Flight Dynamics
+       | Mission Design Lead
+     - O
    * - TECH_PHONE
      - Free-text field containing technical PoC phone number.
      -
-     - O
      -
+     - +49615130312
+     - O
    * - TECH_EMAIL
      - Free-text field containing technical PoC email address.
      -
-     - O
      -
+     - JOHN.DOE@ SOMEWHERE.ORG
+     - O
    * - TECH_ADDRESS
      - Free-text field containing technical PoC physical address information for OCM creator (suggest comma-delimited address lines).
      -
-     - O
      -
+     - | 5040 Spaceflight Ave.,
+       | Cocoa Beach, FL, USA, 12345
+     - O
    * - PREVIOUS_MESSAGE_ID
      - Free-text field containing an ID that uniquely identifies the previous message from this message originator for this space object. The format and content of the message identifier value are at the discretion of the originator. NOTE—One may provide the previous message ID without supplying the 'PREVIOUS_MESSAGE_EPOCH' keyword, and vice versa.
      -
-     - O
      -
+     - | OCM 201113719184
+       | ABC-12_33
+     - O
    * - NEXT_MESSAGE_ID
      - Free-text field containing an ID that uniquely identifies the next message from this message originator for this space object. The format and content of the message identifier value are at the discretion of the originator. NOTE—One may provide the next message ID without supplying the ‘NEXT_MESSAGE_EPOCH' keyword, and vice versa.
      -
-     - O
      -
+     - | OCM 201113719186
+       | ABC-12_35
+     - O
    * - ADM_MSG_LINK
      - Free-text field containing a unique identifier of Attitude Data Message (ADM) (reference [10]) that are linked (relevant) to this Orbit Data Message.
      -
-     - O
      -
+     - | ADM_MSG_35132.txt
+       | ADM_ID_0572
+     - O
    * - CDM_MSG_LINK
      - Free-text field containing a unique identifier of Conjunction Data Message (CDM) (reference [14]) that are linked (relevant) to this Orbit Data Message.
      -
-     - O
      -
+     - | CDM_MSG_35132.txt
+       | CDM_ID_8257
+     - O
    * - PRM_MSG_LINK
      - Free-text field containing a unique identifier of Pointing Request Message (PRM) (reference [13]) that are linked (relevant) to this Orbit Data Message.
      -
-     - O
      -
+     - | PRM_MSG_35132.txt
+       | PRM_ID_6897
+     - O
    * - RDM_MSG_LINK
      - Free-text field containing a unique identifier of Reentry Data Message (RDM) (reference [12]) that are linked (relevant) to this Orbit Data Message.
      -
-     - O
      -
+     - | RDM_MSG_35132.txt
+       | RDM_ID_1839
+     - O
    * - TDM_MSG_LINK
      - Free-text string containing a comma-separated list of file name(s) and/or associated identification number(s) of Tracking Data Message (TDM) (reference [9]) observations upon which this OD is based.
      -
-     - O
      -
+     - | TDM_MSG_37.txt
+       | TDM_835, TDM_836
+     - O
    * - OPERATOR
      - Free-text field containing the operator of the space object.
      -
-     - O
      -
+     - INTELSAT
+     - O
    * - OWNER
      - Free-text field containing the owner of the space object.
      -
-     - O
      -
+     - SIRIUS
+     - O
    * - COUNTRY
      - Free-text field containing the name of the country, country code, or country abbreviation where the space object owner is based.
      -
-     - O
      -
+     - | US
+       | SPAIN
+     - O
    * - CONSTELLATION
      - Free-text field containing the name of the constellation to which this space object belongs.
      -
-     - O
      -
+     - SPIRE
+     - O
    * - OBJECT_TYPE
      - Specification of the type of object. Select from the accepted set of values indicated in annex B, subsection B11.
      -
-     - C
-     - PAYLOAD
+     -
+     - | PAYLOAD
+       | ROCKET BODY
+       | DEBRIS
+       | UNKNOWN
+       | OTHER
+     - O
    * - TIME_SYSTEM
      - Time system for all absolute time stamps in this OCM including EPOCH_TZERO. Select from the accepted set of values indicated in annex B, subsection B3. This field is used by all OCM data blocks. If the SCLK timescale is selected, then 'EPOCH_TZERO' shall be interpreted as the spacecraft clock epoch and both SCLK_OFFSET_AT_EPOCH and SCLK_SEC_PER_SI_SEC shall be supplied.
      -
-     - M
      - UTC
+     - UTC
+     - M
    * - EPOCH_TZERO
      - Default epoch to which all relative times are referenced in data blocks (for format specification, see 7.5.10). The time scale of EPOCH_TZERO is controlled via the ‘TIME_SYSTEM' keyword, with the exception that for the SCLK timescale, EPOCH_TZERO shall be interpreted as being in the UTC timescale. This field is used by all OCM data blocks.
      -
-     - M
      -
+     - 2001-11-06T11:17:33
+     - M
    * - OPS_STATUS
      - Specification of the operational status of the space object. Select from the accepted set of values indicated in annex B, subsection B12.
      -
-     - O
      -
+     - OPERATIONAL
+     - O
    * - ORBIT_CATEGORY
      - Specification of the type of orbit. Select from the accepted set of values indicated in annex B, subsection B14.
      -
-     - O
      -
+     - | GEO
+       | LEO
+     - O
    * - OCM_DATA_ELEMENTS
      - Comma-delimited list of elements of information data blocks included in this message. The order shall be the same as the order of the data blocks in the message. Values shall be confined to the following list: ORB, PHYS, COV, MAN, PERT, OD, and USER. If the OCM contains multiple ORB, COV, or MAN data blocks (as allowed by table 6-1), the corresponding ORB, COV, or MAN entry shall be duplicated to match.
      -
-     - O
      -
+     - | ORB, ORB, PHYS, COV, MAN, MAN,
+       | PERT, OD, USER
+     - O
    * - SCLK_OFFSET_AT_EPOCH
      - Defines the number of spacecraft clock counts existing at EPOCH_TZERO. This is only used if the SCLK timescale is employed by the user.
      - s
-     - C
      - 0.0
+     - -5000.0
+     - C
    * - SCLK_SEC_PER_SI_SEC
      - Defines the current number of clock seconds occurring during one SI second. It should be noted that this clock rate may vary with time and is the current approximate value. This is only used if the SCLK timescale is employed by the user.
      - s
-     - C
      - 1.0
+     - 2.5
+     - C
    * - PREVIOUS_MESSAGE_EPOCH
      - Creation epoch of the previous message from this originator for this space object. (For format specification, see 7.5.10.) NOTE—One may provide the previous message epoch without supplying the PREVIOUS_MESSAGE_ID, and vice versa.
      -
-     - O
      -
+     - | 2001-11-06T11:17:33
+       | 2002-204T15:56:23Z
+     - O
    * - NEXT_MESSAGE_EPOCH
      - Anticipated (or actual) epoch of the next message from this originator for this space object. (For format specification, see 7.5.10.) NOTE—One may provide the next message epoch without supplying the NEXT_MESSAGE_ID, and vice versa.
      -
-     - O
      -
+     - | 2001-11-07T11:17:33
+     - O
    * - START_TIME
      - Time of the earliest data contained in the OCM, specified as either a relative or absolute time tag.
      -
+     - 0.0
+     - 2001-11-06T00:00:00
      - O
-     -
    * - STOP_TIME
      - Time of the latest data contained in the OCM, specified as either a relative or absolute time tag.
      -
+     - 86400.0
+     - 2001-11-08T00:00:00
      - O
-     -
    * - TIME_SPAN
      - Span of time that the OCM covers, measured in days. TIME_SPAN is defined as (STOP_TIME-START_TIME), measured in days, irrespective of whether START_TIME or STOP_TIME are provided by the message creator.
      - d
-     - O
      -
+     - 20.0
+     - O
    * - TAIMUTC_AT_TZERO
      - Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since 1958) as modeled by the message originator at epoch 'EPOCH_TZERO'.
      - s
-     - O
      -
+     - 36
+     - O
    * - NEXT_LEAP_EPOCH
      - Epoch of next leap second, specified as an absolute time tag.
      -
-     - O
      -
+     - 2016-12-31T23:59:60
+     - O
    * - NEXT_LEAP_TAIMUTC
      - Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since 1958) incorporated by the message originator at epoch 'NEXT_LEAP_EPOCH'. This keyword should be provided if NEXT_LEAP_EPOCH is supplied.
      - s
-     - C
      -
+     - 37
+     - C
    * - UT1MUTC_AT_TZERO
      - Difference (UT1 – UTC) in seconds, as modeled by the originator at epoch 'EPOCH_TZERO'.
      - s
-     - O
      -
+     - 0.357
+     - O
    * - EOP_SOURCE
      - Free-text field specifying the source and version of the message originator's Earth Orientation Parameters (EOP) used in the creation of this message, including leap seconds, TAI – UT1, etc.
      -
-     - O
      -
+     - CELESTRAK_20201028
+     - O
    * - INTERP_METHOD_EOP
      - Free-text field specifying the method used to select or interpolate sequential EOP data.
      -
-     - O
      -
+     - | PRECEDING_VALUE
+       | NEAREST_NEIGHBOR
+       | LINEAR
+       | LAGRANGE_ORDER_5
+     - O
    * - CELESTIAL_SOURCE
      - Free-text field specifying the source and version of the message originator's celestial body (e.g., Sun/Earth/Planetary) ephemeris data used in the creation of this message.
      -
-     - O
      -
+     - JPL_DE_FILES
+     - O
    * - META_STOP
      - End of the metadata section.
      -
-     - M
      -
+     - n/a
+     - M
 
 .. _ocm_data_trajectory_state_time_history_odm:
 
@@ -2603,224 +2690,334 @@ is provided in informative annex F, subsection F1.
 .. _ocm_data_space_object_physical_characteristics_table_odm:
 
 .. list-table:: OCM Data: Space Object Physical Characteristics
-   :widths: 25 50 12 13
+   :widths: 20 40 10 10 10 10
    :header-rows: 1
    :stub-columns: 1
 
    * - Keyword
      - Description
      - Units
+     - Default (if any)
+     - Examples of Values
      - M/O/C
    * - PHYS_START
      - Start of a Space Object Physical Characteristics section.
+     -
+     -
      -
      - M
    * - COMMENT
      - Comments (a contiguous set of one or more comment lines may be provided in the OCM Space Object Physical Characteristics only immediately after the PHYS_START keyword; see 7.8 for comment formatting rules).
      -
+     -
+     - This is a comment
      - O
    * - MANUFACTURER
      - Free-text field containing the satellite manufacturer's name.
      -
+     -
+     - BOEING
      - O
    * - BUS_MODEL
      - Free-text field containing the satellite manufacturer's spacecraft bus model name.
      -
+     -
+     - 702
      - O
    * - DOCKED_WITH
      - Free-text field containing a comma-separated list of other space objects that this object is docked to.
      -
+     -
+     - ISS
      - O
    * - DRAG_CONST_AREA
      - Attitude-independent drag cross-sectional area (AD) facing the relative wind vector, not already incorporated into the attitude-dependent 'AREA_ALONG_OEB' parameters.
-     - m²
+     - m**2
+     -
+     - 2.5
      - O
    * - DRAG_COEFF_NOM
      - Nominal drag Coefficient (CD Nom). If the atmospheric drag coefficient, CD, is set to zero, no atmospheric drag shall be considered.
      -
+     -
+     - 2.2
      - O
    * - DRAG_UNCERTAINTY
      - Drag coefficient one sigma (1σ) percent uncertainty, where the actual range of drag coefficients to within 1σ shall be obtained from [1.0 ± DRAG_UNCERTAINTY/100.0] * (CD Nom). This factor is intended to allow operators to supply the nominal ballistic coefficient components while accommodating ballistic coefficient uncertainties.
      - %
+     -
+     - 10.0
      - O
    * - INITIAL_WET_MASS
      - Space object total mass at beginning of life.
      - kg
+     -
+     - 500
      - O
    * - WET_MASS
      - Space object total mass (including propellant, i.e., 'wet mass') at the current reference epoch 'EPOCH_TZERO'.
      - kg
+     -
+     - 472.3
      - O
    * - DRY_MASS
      - Space object dry mass (without propellant).
      - kg
+     -
+     - 300
      - O
    * - OEB_PARENT_FRAME
      - Parent reference frame that maps to the OEB frame via the quaternion-based transformation defined in annex F, subsection F1. Select from the accepted set of values indicated in B, subsections B4 and B5. This keyword shall be provided if OEB_Q1,2,3,4 are specified.
      -
+     - | RSW_ROTATING
+       | G
+     - ITRF1997
      - C
    * - OEB_PARENT_FRAME_EPOCH
      - Epoch of the OEB parent frame, if OEB_PARENT_FRAME is provided and its epoch is not intrinsic to the definition of the reference frame. (See 7.5.10 for formatting rules.)
      -
+     - EPOCH_TZERO
+     - | 2001-11-06T11:17:33
+       | 2002-204T15:56:23Z
      - C
    * - OEB_Q1
      - q₁ = e₁ * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e₁ = 1st component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the OEB (defined in annex F, subsection F1). A value of '-999' denotes a tumbling space object.
      -
+     -
+     - -0.575131822
      - O
    * - OEB_Q2
      - q₂ = e₂ * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e₂ = 2nd component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the Optimally Encompassing Box (defined in annex F, subsection F1). A value of '-999' denotes a tumbling space object.
      -
+     -
+     - -0.280510532
      - O
    * - OEB_Q3
      - q₃ = e₃ * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e₃ = 3rd component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the Optimally Encompassing Box (defined in annex F, subsection F1). A value of '-999' denotes a tumbling space object.
      -
+     -
+     - -0.195634856
      - O
    * - OEB_QC
      - qc = cos(φ/2), where per reference [H1], φ = the Euler rotation angle for the rotation that maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the Optimally Encompassing Box (annex F, subsection F1). qc shall be made non-negative by convention. A value of '-999' denotes a tumbling space object.
      -
+     -
+     - 0.743144825
      - O
    * - OEB_MAX
      - Maximum physical dimension (along Xoeb) of the OEB.
      - m
+     -
+     - 1
      - O
    * - OEB_INT
      - Intermediate physical dimension (along Ŷoeb) of OEB normal to OEB_MAX direction.
      - m
+     -
+     - 0.5
      - O
    * - OEB_MIN
      - Minimum physical dimension (along Ẑoeb) of OEB in direction normal to both OEB_MAX and OEB_INT directions.
      - m
+     -
+     - 0.3
      - O
    * - AREA_ALONG_OEB_MAX
      - Attitude-dependent cross-sectional area of space object (not already included in DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along max OEB (Xoeb) direction as defined in annex F.
-     - m²
+     - m**2
+     -
+     - 0.15
      - O
    * - AREA_ALONG_OEB_INT
      - Attitude-dependent cross-sectional area of space object (not already included in DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along intermediate OEB (Ŷoeb) direction as defined in annex F.
-     - m²
+     - m**2
+     -
+     - 0.3
      - O
    * - AREA_ALONG_OEB_MIN
      - Attitude-dependent cross-sectional area of space object (not already included in DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along minimum OEB (Ẑoeb) direction as defined in annex F.
-     - m²
+     - m**2
+     -
+     - 0.5
      - O
    * - AREA_MIN_FOR_PC
      - Minimum cross-sectional area for collision probability estimation purposes.
-     - m²
+     - m**2
+     -
+     - 1.0
      - O
    * - AREA_MAX_FOR_PC
      - Maximum cross-sectional area for collision probability estimation purposes.
-     - m²
+     - m**2
+     -
+     - 1.0
      - O
    * - AREA_TYP_FOR_PC
      - Typical (50th percentile) cross-sectional area sampled over all space object orientations for collision probability estimation purposes.
-     - m²
+     - m**2
+     -
+     - 1.0
      - O
    * - RCS
      - Typical (50th percentile) effective Radar Cross Section of the space object sampled over all possible viewing angles.
-     - m²
+     - m**2
+     -
+     - 1.25
      - O
    * - RCS_MIN
      - Minimum Radar Cross Section observed for this object.
-     - m²
+     - m**2
+     -
+     - 1.1
      - O
    * - RCS_MAX
      - Maximum Radar Cross Section observed for this object.
-     - m²
+     - m**2
+     -
+     - 2.5
      - O
    * - SRP_CONST_AREA
      - Attitude-independent solar radiation pressure cross-sectional area (AR) facing the Sun, not already incorporated into the attitude-dependent 'AREA_ALONG_OEB' parameters computed from { AREA_ALONG_OEB_MAX cos(θ₁) + AREA_ALONG_OEB_INT cos(θ₂) + AREA_ALONG_OEB_MIN cos(θ₃) } Where θᵢ represents the angle between the normal to each MAX/INT/MIN face and the direction to the Sun.
-     - m²
+     - m**2
+     -
+     - 1.0
      - O
    * - SOLAR_RAD_COEFF
      - Nominal Solar Radiation Pressure Coefficient (CRNOM). NOTE—If the solar radiation coefficient, CR, is set to zero, no solar radiation pressure shall be considered.
      -
+     -
+     - 1.7
      - O
    * - SOLAR_RAD_UNCERTAINTY
      - SRP one sigma (1σ) percent uncertainty, where the actual range of SRP coefficients to within 1σ shall be obtained from [1.0 ± SRP_UNCERTAINTY/100.0] * (CRNOM). This factor is intended to allow operators to supply the nominal ballistic coefficient components while accommodating ballistic coefficient uncertainties.
      - %
+     -
+     - 1.0
      - O
    * - VM_ABSOLUTE
      - Typical (50th percentile) absolute Visual Magnitude of the space object sampled over all possible viewing angles and 'normalized' as specified in informative annex F, subsection F2 to a 1 AU Sun-to-target distance, a phase angle of 0°, and a 40,000 km target-to-sensor distance (equivalent of GEO satellite tracked at 15.6° above local horizon).
      -
+     -
+     - 15.0
      - O
    * - VM_APPARENT_MIN
      - Minimum apparent Visual Magnitude observed for this space object.
      -
+     -
+     - 19.0
      - O
    * - VM_APPARENT
      - Typical (50th percentile) apparent Visual Magnitude observed for this space object.
      -
+     -
+     - 15.0
      - O
    * - VM_APPARENT_MAX
      - Maximum apparent Visual Magnitude observed for this space object. NOTE—The 'MAX' value represents the brightest observation, which associates with a lower Vmag.
      -
+     -
+     - 16.0
      - O
    * - REFLECTANCE
      - Typical (50th percentile) coefficient of REFLECTANCE of the space object over all possible viewing angles, ranging from 0 (none) to 1 (perfect reflectance).
      -
+     -
+     - 0.7
      - O
    * - ATT_CONTROL_MODE
      - Free-text specification of primary mode of attitude control for the space object. Suggested examples include: THREE_AXIS, SPIN, DUAL_SPIN, TUMBLING, GRAVITY_GRADIENT
      -
+     -
+     - SPIN
      - O
    * - ATT_ACTUATOR_TYPE
      - Free-text specification of type of actuator for attitude control. Suggested examples include: ATT_THRUSTERS, ACTIVE_MAG_TORQUE, PASSIVE_MAG_TORQUE, REACTION_WHEELS, MOMENTUM_WHEELS, CONTROL_MOMENT_GYROSCOPE, NONE, OTHER
      -
+     -
+     - ATT_THRUSTERS
      - O
    * - ATT_KNOWLEDGE
      - Accuracy of attitude knowledge.
      - deg
+     -
+     - 0.3
      - O
    * - ATT_CONTROL
      - Accuracy of attitude control system (ACS) to maintain attitude, assuming attitude knowledge was perfect (i.e., deadbands).
      - deg
+     -
+     - 2.0
      - O
    * - ATT_POINTING
      - Overall accuracy of spacecraft to maintain attitude, including attitude knowledge errors and ACS operation.
      - deg
+     -
+     - 2.3
      - O
    * - AVG_MANEUVER_FREQ
      - Average maneuver frequency, measured in the number of orbit- or attitude-adjust maneuvers per year.
      - #/yr
+     -
+     - 20.0
      - O
    * - MAX_THRUST
      - Maximum composite thrust the spacecraft can accomplish in any single body-fixed direction.
      - N
+     -
+     - 1.0
      - O
    * - DV_BOL
      - Total AV capability of the spacecraft at beginning of life.
      - km/s
+     -
+     - 1.0
      - O
    * - DV_REMAINING
      - Total AV remaining for the spacecraft.
      - km/s
+     -
+     - 0.2
      - O
    * - IXX
      - Moment of Inertia about the X-axis of the space object's primary body frame (e.g., SC_Body_1) (see reference [H1]).
      - kg*m**2
+     -
+     - 1000.0
      - O
    * - IYY
      - Moment of Inertia about the Y-axis.
      - kg*m**2
+     -
+     - 800.0
      - O
    * - IZZ
      - Moment of Inertia about the Z-axis.
      - kg*m**2
+     -
+     - 400.0
      - O
    * - IXY
      - Inertia Cross Product of the X & Y axes.
      - kg*m**2
+     -
+     - 20.0
      - O
    * - IXZ
      - Inertia Cross Product of the X & Z axes.
      - kg*m**2
+     -
+     - 40.0
      - O
    * - IYZ
      - Inertia Cross Product of the Y & Z axes.
      - kg*m**2
+     -
+     - 60.0
      - O
    * - PHYS_STOP
      - End of the Space Object Physical Characteristics section.
+     -
+     -
      -
      - M
 
@@ -3185,155 +3382,161 @@ parameters may override the duty cycle maneuver stop time (DC_EXEC_STOP).
 .. _ocm_data_selectable_propulsive_maneuver_fields_table_odm:
 
 .. list-table:: OCM Data: Selectable Propulsive (i.e., Non-Deployment) Maneuver Fields in the Maneuver Time History Data
-   :widths: 25 50 12 13
+   :widths: 20 40 10 30
    :header-rows: 1
    :stub-columns: 1
 
    * - Keyword
      - Description
      - Units
-     - M/O/C
+     - Examples of Values
    * - TIME_ABSOLUTE
      - Absolute epoch time as formatted in 7.5.10. (See special time interpretation for impulsive maneuvers provided in 6.2.8.20.)
-     -
-     - M
+     - n/a
+     - 2018-11-13T11:13:20.5Z
    * - TIME_RELATIVE
      - Relative epoch time measured in SI seconds with respect to the epoch time specified via the EPOCH_TZERO keyword. (See special time interpretation for impulsive maneuvers provided in 6.2.8.20.)
      - s
-     - M
+     - 20157.26
    * - MAN_DURA
      - The maneuver duration associated with this impulsive ΔV, thrust, and/or acceleration-imparted event.
      - s
-     - O
+     - 200.0
    * - DELTA_MASS
      - Mass change (where a negative number denotes a mass decrement/loss to the host) associated with this portion ('time slice') of the maneuver. For 'thrust' specification, this mass change shall include the mass change prescribed by the rocket equation.
      - kg
-     - O
+     - -5.0
    * - ACC_X
      - Acceleration component ΔVx in the selected maneuver frame.
      - km/s²
-     - O
+     - 0.000734092785
    * - ACC_Y
      - Acceleration component ΔVy in the selected maneuver frame.
      - km/s²
-     - O
+     - 0.000189779834
    * - ACC_Z
      - Acceleration component ΔVz in the selected maneuver frame.
      - km/s²
-     - O
+     - 0.0000794872502
    * - ACC_INTERP
      - Acceleration vector Euler axis/angle interpolation mode between current and next acceleration line.
-     -
-     - O
+     - n/a
+     - | OFF
+       | ON
    * - ACC_MAG_SIGMA
      - One-sigma percent error on acceleration magnitude.
      - %
-     - O
+     - 1.0
    * - ACC_DIR_SIGMA
      - One-sigma angular off-nominal acceleration vector direction.
      - deg
-     - O
+     - 5.0
    * - DV_X
      - Velocity increment ΔVx in the selected maneuver reference frame. The actual ΔV should be impulsively applied at a time of <time tag> + 1/2 (MAN_DURA).
      - km/s
-     - O
+     - 0.025
    * - DV_Y
      - Velocity increment ΔVy in the selected maneuver reference frame. The actual ΔV should be impulsively applied at a time of <time tag> + 1/2 (MAN_DURA).
      - km/s
-     - O
+     - 0.0015
    * - DV_Z
      - Velocity increment AVz in the selected maneuver reference frame. The actual AV should be impulsively applied at a time of <time tag> + 1/2 (MAN_DURA).
      - km/s
-     - O
+     - 0.00029
    * - DV_MAG_SIGMA
      - One-sigma percent error on ΔV magnitude.
      - %
-     - O
+     - 2.0
    * - DV_DIR_SIGMA
      - One-sigma angular off-nominal ΔV vector direction.
      - deg
-     - O
+     - 5.0
    * - THR_X
      - Thrust component Tx measured in the selected maneuver reference frame.
      - N
-     - O
+     - 1.0
    * - THR_Y
      - Thrust component Ty measured in the selected maneuver reference frame.
      - N
-     - O
+     - 2.0
    * - THR_Z
      - Thrust component Tz measured in the selected maneuver reference frame.
      - N
-     - O
+     - 3.0
    * - THR_EFFIC
      - Thrust efficiency 'η,' typically ranging between 0.0 and 1.0, that must be applied to the nominal thrust X, Y, and Z constituents to obtain the net resultant thrust applied to the vehicle.
-     -
-     - O
+     - n/a
+     - 0.95
    * - THR_INTERP
      - Thrust vector Euler axis/angle interpolation mode between current and next thrust line; values shall be selected as either 'OFF' or 'ON'.
-     -
-     - O
+     - n/a
+     - | OFF
+       | ON
    * - THR_ISP
      - Thrust specific impulse.
      - s
-     - O
+     - 330.0
    * - THR_MAG_SIGMA
      - One-sigma percent error on thrust magnitude.
      - %
-     - O
+     - 2.0
+   * - THR_DIR_SIGMA
+     - One-sigma angular off-nominal thrust vector direction.
+     - deg
+     - 5.0
 .. list-table:: OCM Data: Selectable Deployment Fields in the Maneuver Time History Data
-   :widths: 25 50 12 13
+   :widths: 20 40 10 30
    :header-rows: 1
    :stub-columns: 1
 
    * - Keyword
      - Description
      - Units
-     - M/O/C
+     - Examples of Values
    * - TIME_ABSOLUTE
      - Absolute epoch time of deployment event as formatted in 7.5.10.
-     -
-     - M
+     - n/a
+     - 2018-11-13T11:13:20.5Z
    * - TIME_RELATIVE
      - Relative epoch time of deployment event measured in SI seconds with respect to the epoch time specified via the EPOCH_TZERO keyword.
      - s
-     - M
+     - 20157.26
    * - DEPLOY_ID
      - Free-text identifier of the resulting 'child' object deployed from this host at this time tag. Setting DEPLOY_ID to zero (value = 0) indicates that a deployment did not occur.
-     -
-     - O
+     - n/a
+     - CubeSat_001
    * - DEPLOY_DV_X
      - Velocity increment ΔVx of the deployed 'child' object measured in the selected maneuver reference frame, applied instantaneously at the time tag of deployment.
      - km/s
-     - O
+     - 0.0001
    * - DEPLOY_DV_Y
      - Velocity increment ΔVy of the deployed 'child' object measured in the selected maneuver reference frame, applied instantaneously at the time tag of deployment.
      - km/s
-     - O
+     - 0.00003
    * - DEPLOY_DV_Z
      - Velocity increment ΔVz of the deployed 'child' object measured in the selected maneuver reference frame, applied instantaneously at the time tag of deployment.
      - km/s
-     - O
+     - 0.00002
    * - DEPLOY_MASS
      - Decrement in host mass as a result of deployment (shall be ≤ 0.0).
      - kg
-     - O
+     - -1.0
    * - DEPLOY_DV_SIGMA
      - One-sigma percent error on deployment ΔV magnitude.
      - %
-     - O
+     - 5.0
    * - DEPLOY_DIR_SIGMA
      - One-sigma angular off-nominal deployment vector direction.
      - deg
-     - O
+     - 5.0
    * - DEPLOY_DV_RATIO
      - Ratio of child-to-host ΔV vectors, such that: ΔVhost = DEPLOY_DV_RATIO × ΔVchild NOTE—As an opposite ΔV is typically imparted to the host during deployment, this number is typically less than or equal to zero. This ratio allows the user to specify how much ΔV is imparted to the host vehicle. This is usually not -1.0 (i.e., an equal-and-opposite imparted velocity), to account for the mass fraction between the child and the host as well as any rotational torque acted on the host as a result of deployment direction centerline offsets as compared to the host's center of gravity.
-     -
-     - O
+     - n/a
+     - -0.05
    * - DEPLOY_DV_CDA
      - Typical (50th percentile) product of drag coefficient (Cd) times cross-sectional area for the deployed 'child' object.
      - m²
-     - O
+     - 0.022
 
 .. _ocm_data_perturbations_specification_odm:
 
@@ -3352,142 +3555,232 @@ PERT_START and PERT_STOP.
 .. _ocm_data_perturbations_specification_table_odm:
 
 .. list-table:: OCM Data: Perturbations Specification
-   :widths: 25 50 12 13
+   :widths: 20 40 10 10 10 10
    :header-rows: 1
    :stub-columns: 1
 
    * - Keyword
      - Description
      - Units
+     - Default (if any)
+     - Examples of Values
      - M/O/C
    * - PERT_START
      - Start of the perturbations data section.
+     -
+     -
      -
      - M
    * - COMMENT
      - Comments (a contiguous set of one or more comment lines may be provided in the OCM Perturbations Specification only immediately after the PERT_START keyword; see 7.8 for comment formatting rules).
      -
+     -
+     - This is a comment
      - O
    * - ATMOSPHERIC_MODEL
      - Name of atmosphere model, which shall be selected from the accepted set of values indicated in annex B, subsection B9.
      -
+     -
+     - | MSISE90
+       | NRLMSIS00
+       | J70
+       | J71
+       | JROBERTS
+       | DTM
+       | JB2008
      - O
    * - GRAVITY_MODEL
-     - The gravity model (selected from the accepted set of gravity model names indicated in annex B, subsection B10), followed by the degree (D) and order (O) of the applied spherical harmonic coefficients used in the simulation. NOTE—Specifying a zero value for 'order' (e.g., 2D 00) denotes zonals (J2 ... JD).
+     - The gravity model (selected from the accepted set of gravity model names indicated in annex B, subsection B10), followed by the degree (D) and order (O) of the applied spherical harmonic coefficients used in the simulation. NOTE—Specifying a zero value for 'order' (e.g., 2D 0O) denotes zonals (J2 ... JD).
      -
+     -
+     - | EGM-96: 36D 36O
+       | WGS-84: 8D 0O
+       | GGM-01: 36D 36O
+       | TEG-4: 36D 36O
      - O
    * - EQUATORIAL_RADIUS
      - Oblate spheroid equatorial radius of the central body used in the message, if different from the gravity model.
      - km
+     -
+     - 6378.137
      - O
    * - GM
      - Gravitational coefficient of attracting body (Gravitational Constant × Central Mass), if different from the gravity model.
-     - km³/s²
+     - km**3/s**2
+     -
+     - 3.986004e5
      - O
    * - N_BODY_PERTURBATIONS
      - One OR MORE (N-body) gravitational perturbations bodies used. Values, listed serially in comma-delimited fashion, denote a natural solar or extra-solar system body (stars, planets, asteroids, comets, and natural satellites). NOTE—Only those entries specified under CENTER_NAME in annex B, subsection B2 are acceptable values.
      -
+     -
+     - MOON, SUN, JUPITER
      - O
    * - CENTRAL_BODY_ROTATION
      - Central body angular rotation rate, measured about the major principal axis of the inertia tensor of the central body, relating inertial, and central-body-fixed reference frames. NOTE—The rotation axis may be slightly offset from the inertial frame Z-axis definition.
      - deg/s
+     -
+     - 4.17807421629e-3
      - O
    * - OBLATE_FLATTENING
      - Central body's oblate spheroid oblateness for the polar-symmetric oblate central body model (e.g., for the Earth, it is approximately 1.0/298.257223563).
      -
+     -
+     - 0.00335281066475
      - O
    * - OCEAN_TIDES_MODEL
      - Name of ocean tides model (optionally specify order or constituent effects, diurnal, semi-diurnal, etc.). This is a free-text field, so if the examples on the right are insufficient, others may be used.
      -
+     -
+     - | DIURNAL
+       | SEMI-DIURNAL
      - O
    * - SOLID_TIDES_MODEL
      - Name of solid tides model (optionally specify order or constituent effects, diurnal, semi-diurnal, etc.).
      -
+     -
+     - | DIURNAL
+       | SEMI-DIURNAL
      - O
    * - REDUCTION_THEORY
      - Specification of the reduction theory used for precession and nutation modeling. This is a free-text field, so if the examples on the right are insufficient, others may be used.
      -
+     -
+     - | IAU1976/FK5
+       | IAU2010
+       | IERS1996
      - O
    * - ALBEDO_MODEL
      - Name of the albedo model.
      -
+     -
+     - STK
      - O
    * - ALBEDO_GRID_SIZE
      - Number of grid points used in the albedo model.
      -
+     -
+     - 100
      - O
    * - SHADOW_MODEL
      - Shadow model used for Solar Radiation Pressure; dual cone uses both umbra/penumbra regions. Selected option should be one of 'NONE', 'CYLINDRICAL', 'CONE', or 'DUAL_CONE'.
      -
+     -
+     - | NONE
+       | CYLINDRICAL
+       | CONE
+       | DUAL_CONE
      - O
    * - SHADOW_BODIES
      - Comma-separated list of planetary bodies for which SRP shadowing is modeled, selected from annex B for CENTER_NAME values.
      -
+     -
+     - | EARTH
+       | MOON
      - O
    * - SRP_MODEL
      - Name of SRP model. This is a free-text field, so if the examples on the right are insufficient, others may be used.
      -
+     -
+     - | GPS_ROCK
+       | BOX_WING
+       | CANNONBALL
+       | COD
      - O
    * - SW_DATA_SOURCE
      - Free-text field specifying the source and version of the Space Weather data used in the creation of this message. Multiple space weather sources can be specified in a comma-delimited fashion.
      -
+     -
+     - CELESTRAK
      - O
    * - SW_DATA_EPOCH
      - Epoch of the Space Weather data.
      -
+     -
+     - 2001-11-08T00:00:00
      - O
    * - SW_INTERP_METHOD
-     - Free-text field specifying the method used to select or interpolate any and all sequential space weather data (Kp, ap, Dst, F10.7, 10.7, S10.7, 10.7, etc.). While not constrained to specific entries, it is anticipated that the utilized method would match methods detailed in numerical analysis textbooks.
+     - Free-text field specifying the method used to select or interpolate any and all sequential space weather data (Kp, ap, Dst, F10.7, M10.7, S10.7, Y10.7, etc.). While not constrained to specific entries, it is anticipated that the utilized method would match methods detailed in numerical analysis textbooks.
      -
+     -
+     - | PRECEDING_VALUE
+       | NEAREST_NEIGHBOR
+       | LINEAR
+       | LAGRANGE_ORDER_5
      - O
    * - FIXED_GEOMAG_KP
      - A fixed (time invariant) value of the planetary geomagnetic index Kp used to override the normal time varying Kp values (e.g., obtained from SW_DATA_SOURCE). NOTE—The use of Kp or Ap would depend on the selected ATMOSPHERIC_MODEL.
      - nT
+     -
+     - 3.2
      - O
    * - FIXED_GEOMAG_AP
      - A fixed (time invariant) value of the geomagnetic index ap used to override the normal time-varying ap values (e.g., obtained from SW_DATA_SOURCE). NOTE—The use of Kp or Ap would depend on the selected ATMOSPHERIC_MODEL.
      - nT
+     -
+     - 21
      - O
    * - FIXED_GEOMAG_DST
      - A fixed (time invariant) value of the planetary geomagnetic index Dst used to override the normal time varying daily Dst values (e.g., obtained from SW_DATA_SOURCE).
      - nT
+     -
+     - -20
      - O
    * - FIXED_F10P7
      - A fixed (time invariant) value of the Solar Flux Unit (SFU) daily proxy F10.7 used to override the normal time varying daily F10.7 values (e.g., obtained from SW_DATA_SOURCE).
      - SFU
+     -
+     - 120.0
      - O
    * - FIXED_F10P7_MEAN
      - A fixed (time invariant) value of the solar flux proxy F10.7 used to override the normal time varying averaged F10.7 values (e.g., obtained from SW_DATA_SOURCE).
      - SFU
+     -
+     - 132.0
      - O
    * - FIXED_M10P7
      - A fixed (time invariant) value of the solar flux daily proxy M10.7 used to override the normal time varying daily M10.7 values (e.g., obtained from SW_DATA_SOURCE).
      - SFU
+     -
+     - 120.0
      - O
    * - FIXED_M10P7_MEAN
      - A fixed (time invariant) value of the solar flux proxy M10.7 used to override the normal time varying averaged M10.7 values (e.g., obtained from SW_DATA_SOURCE).
      - SFU
+     -
+     - 120.0
      - O
    * - FIXED_S10P7
      - A fixed (time invariant) value of the solar flux proxy S10.7 used to override the normal time varying daily S10.7 values (e.g., obtained from SW_DATA_SOURCE).
      - SFU
+     -
+     - 120.0
      - O
    * - FIXED_S10P7_MEAN
      - A fixed (time invariant) value of the solar flux proxy S10.7 used to override the normal time varying averaged S10.7 values (e.g., obtained from SW_DATA_SOURCE).
      - SFU
+     -
+     - 120.0
      - O
    * - FIXED_Y10P7
      - A fixed (time invariant) value of the solar flux proxy Y10.7 used to override the normal time varying daily Y10.7 values (e.g., obtained from SW_DATA_SOURCE).
      - SFU
+     -
+     - 120.0
      - O
    * - FIXED_Y10P7_MEAN
      - A fixed (time invariant) value of the solar flux proxy Y10.7 used to override the normal time varying averaged Y10.7 values (e.g., obtained from SW_DATA_SOURCE).
      - SFU
+     -
+     - 120.0
      - O
    * - PERT_STOP
      - End of the perturbations section.
      -
+     -
+     -
      - M
+
 
 .. _ocm_data_orbit_determination_odm:
 
@@ -3674,28 +3967,33 @@ keywords shown in table 6-12 shall be used in an OCM user-defined data specifica
 .. _ocm_data_user_defined_parameters_table_odm:
 
 .. list-table:: OCM Data: User-Defined Parameters
-   :widths: 25 50 12 13
+   :widths: 25 45 10 10 10
    :header-rows: 1
    :stub-columns: 1
 
    * - Keyword
      - Description
      - Units
+     - Examples of Values
      - M/O/C
    * - USER_START
      - Start of the User-Defined Parameters data block.
+     -
      -
      - M
    * - COMMENT
      - Comments (a contiguous set of one or more comment lines may be provided immediately following the USER_START keyword). (See 7.8 for formatting rules.)
      -
+     - This is a comment
      - O
-   * - USER_DEFINED_X
+   * - USER_DEFINED_x
      - User-defined parameter, where 'x' is replaced by a variable-length user-specified character string. Any number of user-defined parameters may be included, if necessary, to provide essential information that cannot be conveyed in COMMENT statements.
      -
+     - USER_DEFINED_EARTH_MODEL = WGS-84
      - M
    * - USER_STOP
      - End of the User-Defined Parameters data block.
+     -
      -
      - M
 
@@ -3705,81 +4003,129 @@ keywords shown in table 6-12 shall be used in an OCM user-defined data specifica
 .. _ocm_data_covariance_time_history_table_odm:
 
 .. list-table:: OCM Data: Covariance Time History
-   :widths: 25 50 12 13
+   :widths: 20 40 10 10 10 10
    :header-rows: 1
    :stub-columns: 1
 
    * - Keyword
      - Description
      - Units
+     - Default (if any)
+     - Examples of Values
      - M/O/C
    * - COV_START
      - Start of a covariance time history section.
      -
+     -
+     - n/a
      - M
    * - COMMENT
      - Comments (a contiguous set of one or more comment lines may be provided in the OCM covariance time history section only immediately after the COV_START keyword; see 7.8 for comment formatting rules).
      -
+     -
+     - This is a comment
      - O
    * - COV_ID
      - Free-text field containing the identification number for this covariance time history block.
      -
+     -
+     - COV_20160402_XYZ
      - O
    * - COV_PREV_ID
      - Free-text field containing the identification number for the previous covariance time history, contained either within this message or presented in a previous OCM. NOTE—If this message is not part of a sequence of covariance time histories or if this covariance time history is the first in a sequence of covariance time histories, then COV_PREV_ID should be excluded from this message.
      -
+     -
+     - COV_20160305a
      - O
    * - COV_NEXT_ID
      - Free-text field containing the identification number for the next covariance time history, contained either within this message, or presented in a future OCM. NOTE—If this message is not part of a sequence of covariance time histories or if this covariance time history is the last in a sequence of covariance time histories, then COV_NEXT_ID should be excluded from this message.
      -
+     -
+     - COV_20160305C
      - O
    * - COV_BASIS
      - Basis of this covariance time history data. This is free-text field with the following suggested values: a) 'PREDICTED'. b) 'DETERMINED' when estimated from observation-based orbit determination, reconstruction and/or calibration. For definitive OD performed onboard whose solutions have been telemetered to the ground for inclusion in an OCM, the COV_BASIS shall be considered to be DETERMINED. c) EMPIRICAL (for empirically determined such as overlap analyses). d) SIMULATED for simulation-based (including Monte Carlo) estimations, future mission design studies, and optimization studies. e) 'OTHER' for other bases of this data.
      -
+     -
+     - | PREDICTED
+       | EMPIRICAL
+       | DETERMINED
+       | SIMULATED
+       | OTHER
      - O
    * - COV_BASIS_ID
      - Free-text field containing the identification number for the orbit determination, navigation solution, or simulation upon which this covariance time history block is based. When a matching orbit determination block accompanies this covariance time history, the COV_BASIS_ID should match the corresponding OD_ID (see table 6-11).
      -
+     -
+     - OD_5910
      - O
    * - COV_REF_FRAME
      - Reference frame of the covariance time history. Select from the accepted set of values indicated in annex B, subsection B4 and B5.
      -
+     - | TNW_INERTIA
+       | L
+     - J2000
      - M
    * - COV_FRAME_EPOCH
      - Epoch of the covariance data reference frame, if not intrinsic to the definition of the reference frame. (See 7.5.10 for formatting rules.)
      -
+     - EPOCH_TZERO
+     - | 2001-11-06T11:17:33
+       | 2002-204T15:56:23Z
      - C
    * - COV_SCALE_MIN
      - Minimum scale factor to apply to this covariance data to achieve realism.
      -
+     -
+     - 0.5
      - O
    * - COV_SCALE_MAX
      - Maximum scale factor to apply to this covariance data to achieve realism.
      -
+     -
+     - 5.0
      - O
    * - COV_CONFIDENCE
      - A measure of the confidence in the covariance errors matching reality, as characterized via a Wald test, a Chi-squared test, the log of likelihood, or a numerical representation per mutual agreement.
      - %
+     -
+     - 50
      - O
    * - COV_TYPE
      - Indicates covariance composition. Select from annex B, subsections B7 and B8.
      -
+     - CARTPV
+     - | CARTP
+       | CARTPV
+       | ADBARV
      - M
    * - COV_ORDERING
      - Indicates covariance ordering as being either LTM, UTM, Full covariance, LTM covariance with cross-correlation information provided in upper triangle off-diagonal terms (LTMWCC), or UTM covariance with cross-correlation information provided in lower triangle off-diagonal terms (UTMWCC).
      -
+     - LTM
+     - | LTM
+       | UTM
+       | FULL
+       | LTMWCC
+       | UTMWCC
      - M
    * - COV_UNITS
      - A comma-delimited set of SI unit designations for each element of the covariance time history following the covariance time tag, solely for informational purposes, provided as a free-text field enclosed in square brackets. When provided, these units designations shall correspond to the units of the standard deviations (or square roots) of each of the covariance matrix diagonal elements (or variances), respectively, and all diagonal elements shall have a corresponding units entry, with non-dimensional values (such as dispersion in orbit eccentricity) denoted by 'n/a'. NOTE—The listing of units via the COV_UNITS keyword does not override the mandatory units specified for the selected COV_TYPE (links to the relevant SANA registries provided in annex B, subsections B7 and B8).
      -
+     -
+     - [km,km,km,km/s,km/s,km/s]
      - O
    * - <covariance data>
      - Covariance time history line(s) shall be formatted as specified in b) through 6.2.7.13 and 7.4.1.6 and corresponding to the selected time and covariance elements by COV_TYPE.
+     -
+     -
      -
      - M
    * - COV_STOP
      - End of a covariance time history section.
      -
+     -
+     - n/a
      - M
 
 
@@ -3788,101 +4134,169 @@ keywords shown in table 6-12 shall be used in an OCM user-defined data specifica
 .. _ocm_data_trajectory_state_time_history_table_odm:
 
 .. list-table:: OCM Data: Trajectory State Time History
-   :widths: 25 50 12 13
+   :widths: 20 40 10 10 10 10
    :header-rows: 1
    :stub-columns: 1
 
    * - Keyword
      - Description
      - Units
+     - Default (if any)
+     - Examples of Values
      - M/O/C
    * - TRAJ_START
      - Start of a trajectory state vector or time history section.
      -
+     -
+     - n/a
      - M
    * - COMMENT
      - Comments (a contiguous set of one or more comment lines may be provided in the Trajectory State Time History section only immediately after the TRAJ_START keyword; see 7.8 for comment formatting rules).
      -
+     -
+     - This is a comment
      - O
    * - TRAJ_ID
      - Free-text field containing the identification number for this trajectory state time history block.
      -
+     -
+     - TRAJ_20160402_XYZ
      - O
    * - TRAJ_PREV_ID
      - Free-text field containing the identification number for the previous trajectory state time history, contained either within this message or presented in a previous OCM. NOTE—If this message is not part of a sequence of orbit time histories or if this trajectory state time history is the first in a sequence of orbit time histories, then TRAJ_PREV_ID should be excluded from this message.
      -
+     -
+     - ORB20160305A
      - O
    * - TRAJ_NEXT_ID
      - Free-text field containing the identification number for the next trajectory state time history, contained either within this message, or presented in a future OCM. NOTE—If this message is not part of a sequence of orbit time histories or if this trajectory state time history is the last in a sequence of orbit time histories, then TRAJ_NEXT_ID should be excluded from this message.
      -
+     -
+     - ORB20160305C
      - O
    * - TRAJ_BASIS
      - The basis of this trajectory state time history data. This is a free-text field with the following suggested values: a) 'PREDICTED'. b) 'DETERMINED' when estimated from observation-based orbit determination, reconstruction, and/or calibration. For definitive OD performed onboard spacecraft whose solutions have been telemetered to the ground for inclusion in an OCM, the TRAJ_BASIS shall be DETERMINED. c) 'TELEMETRY' when the trajectory states are read directly from telemetry, for example, based on inertial navigation systems or GNSS data. d) 'SIMULATED' for generic simulations, future mission design studies, and optimization studies. e) 'OTHER' for other bases of this data.
      -
+     -
+     - PREDICTED
      - O
    * - TRAJ_BASIS_ID
      - Free-text field containing the identification number for the telemetry dataset, orbit determination, navigation solution, or simulation upon which this trajectory state time history block is based. When a matching orbit determination block accompanies this trajectory state time history, the TRAJ_BASIS_ID should match the corresponding OD_ID (see table 6-11).
      -
+     -
+     - OD_5910
      - O
    * - INTERPOLATION
      - This keyword may be used to specify the recommended interpolation method for ephemeris data in the immediately following set of ephemeris lines. PROPAGATE indicates that orbit propagation is the preferred method to obtain states at intermediate times, via either a midpoint-switching or endpoint switching approach.
      -
+     -
+     - | HERMITE
+       | LINEAR
+       | LAGRANGE
+       | PROPAGATE
      - O
    * - INTERPOLATION_DEGREE
      - Recommended interpolation degree for ephemeris data in the immediately following set of ephemeris lines. Must be an integer value. This keyword must be provided if the 'INTERPOLATION' keyword is used and set to anything other than PROPAGATE.
      -
+     - 3
+     - | 5
+       | 1
      - C
    * - PROPAGATOR
      - Free-text field containing the name of the orbit propagator used to create this trajectory state time history.
      -
+     -
+     - | HPOP
+       | SP
+       | SGP4
      - O
    * - CENTER_NAME
      - Origin of the orbit reference frame, which may be a natural solar system body (planets, asteroids, comets, and natural satellites), including any planet barycenter or the solar system barycenter, or another reference frame center (such as a spacecraft, formation flying reference 'chief' spacecraft, etc.). Natural bodies shall be selected from the accepted set of values indicated in annex B, subsection B2. For spacecraft, it is recommended to use either the 'OBJECT_NAME' or 'INTERNATIONAL_DESIGNATOR' of the participant as catalogued in the UN Office of Outer Space Affairs designator index (reference [3]). Alternately, the 'OBJECT_DESIGNATOR' may be used. For other reference frame origins, this field is a free-text descriptor which may draw upon other naming conventions and sources.
      -
+     - EARTH
+     - | EARTH
+       | MOON
+       | SOLAR SYSTEM BARYCENTER
+       | SUN
+       | ISS
+       | EROS
+       | EARTH_SUN_L2
+       | EGLIN
      - M
    * - TRAJ_REF_FRAME
      - Reference frame of the trajectory state time history. Select from the accepted set of values indicated in annex B, subsection B4.
      -
+     - ICRF3
+     - J2000
      - M
    * - TRAJ_FRAME_EPOCH
      - Epoch of the orbit data reference frame, if not intrinsic to the definition of the reference frame. (See 7.5.10 for formatting rules.)
      -
+     - EPOCH_TZERO
+     - | 2001-11-06T11:17:33
+       | 2002-204T15:56:23Z
      - C
    * - USEABLE_START_TIME
      - Start time of USEABLE time span covered by ephemeris data immediately following this metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword allows the message creator to introduce fictitious (but numerically smooth) data nodes following the actual data time history to support interpolation methods requiring more than two nodes (e.g., pure higher-order Lagrange interpolation methods). The use of this keyword and introduction of fictitious node points are optional and may not be necessary. 2. If this keyword is not supplied, then all data shall be assumed to be valid.
      -
+     -
+     - | 1996-12-18T14:28:15.1172
+       | 1996-277T07:22:54
      - O
    * - USEABLE_STOP_TIME
      - Stop time of USEABLE time span covered by ephemeris data immediately following this metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword allows the message creator to introduce fictitious (but numerically smooth) data nodes following the actual data time history to support interpolation methods requiring more than two nodes (e.g., pure higher-order Lagrange interpolation methods). The use of this keyword and introduction of fictitious node points are optional and may not be necessary. 2. If this keyword is not supplied, then all data shall be assumed to be valid.
      -
+     -
+     - | 1996-12-18T14:28:15.1172
+       | 1996-277T07:22:54
      - O
    * - ORB_REVNUM
      - The integer orbit revolution number associated with the first trajectory state in this trajectory state time history block. NOTE—The first ascending node crossing that occurs AFTER launch or deployment is designated to be the beginning of orbit revolution number = one ('1').
      -
+     -
+     - | 1500
+       | 30007
      - O
    * - ORB_REVNUM_BASIS
      - Specifies the message creator's basis for their orbit revolution counter, with '0', designating that the first launch or deployment trajectory state corresponds to a revolution number of 0.XXXX, where XXXX represents the fraction of an orbit revolution measured from the equatorial plane, and orbit revolution 1.0 begins at the very next (subsequent) ascending node passage; '1', designating that the first launch or deployment trajectory state corresponds to a revolution number of 1.XXXX, and orbit revolution 2.0 begins at the very next ascending node passage. This keyword shall be provided if ORB_REVNUM is specified.
      -
+     - 0
+     - | 0
+       | 1
      - C
    * - TRAJ_TYPE
      - Specifies the trajectory state type; selected per annex B, subsection B7.
      -
+     - CARTPV
+     - CARTP
      - M
    * - ORB_AVERAGING
      - If orbital elements are provided, specifies whether those elements are osculating elements or mean elements, and if mean elements, which mean element definition is employed. The intent of this field is to allow the user to correctly interpret how to use the provided orbit elements and know how to use them operationally. This field is not required if one of the orbital element types selected by the "TRAJ_TYPE" keyword is Cartesian (e.g., CARTP, CARTPV, or CARTPVA) or spherical elements (e.g., LDBARV, ADBARV, or GEODETIC). Values should be selected from the accepted set indicated in annex B, subsection B13. If an alternate single- or double-averaging formulation other than that provided is used, the user may name it as mutually agreed upon by message exchange participants.
      -
+     - OSCULATING
+     - | OSCULATING
+       | BROUWER
+       | KOZAI
+       | (other...)
      - C
    * - TRAJ_UNITS
      - A comma-delimited set of SI unit designations for each element of the trajectory state time history following the trajectory state time tag solely for informational purposes, provided as a free-text field enclosed in square brackets. When provided, each trajectory state element shall have a corresponding units entry, with non-dimensional values (such as orbit eccentricity) denoted by 'n/a'. NOTE—The listing of units via the TRAJ_UNITS keyword does not override the mandatory units specified for the selected TRAJ_TYPE (links to the relevant SANA registries provided in annex B, subsection B7).
      -
+     -
+     - | [km,km,km,km/s,km/s,km/s]
+       | [km,n/a,deg, deg, deg, deg]
      - O
    * - <trajectory state>
      - Trajectory state time history line(s) shall be formatted as specified in 6.2.5.11, containing time and orbit elements formatted as specified in 7.4.1.5 and corresponding to the selected TRAJ_TYPE in the SANA Orbital Elements registry (annex B, subsection B7). Units are as specified in this registry.
+     -
+     -
      -
      - M
    * - TRAJ_STOP
      - End of a trajectory state vector or time history section.
      -
+     -
+     - n/a
      - M.. _syntax_odm:
 
 7 ORBIT DATA MESSAGE SYNTAX
