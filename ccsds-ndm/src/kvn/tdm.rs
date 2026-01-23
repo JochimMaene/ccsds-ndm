@@ -12,8 +12,7 @@ use crate::messages::tdm::{
     Tdm, TdmBody, TdmData, TdmHeader, TdmMetadata, TdmObservation, TdmObservationData, TdmSegment,
 };
 use crate::parse_block;
-use crate::types::*;
-use winnow::ascii::till_line_ending;
+use crate::types::{Epoch, Percentage};
 use winnow::combinator::preceded;
 use winnow::error::{AddContext, ErrMode, StrContext};
 use winnow::prelude::*;
@@ -102,28 +101,28 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
         "PARTICIPANT_3" => val: kv_string => { meta.participant_3 = Some(val); },
         "PARTICIPANT_4" => val: kv_string => { meta.participant_4 = Some(val); },
         "PARTICIPANT_5" => val: kv_string => { meta.participant_5 = Some(val); },
-        "MODE" => val: kv_string => { meta.mode = Some(val); },
-        "PATH" => val: kv_string => { meta.path = Some(val); },
-        "PATH_1" => val: kv_string => { meta.path_1 = Some(val); },
-        "PATH_2" => val: kv_string => { meta.path_2 = Some(val); },
+        "MODE" => val: kv_enum => { meta.mode = Some(val); },
+        "PATH" => val: kv_from_kvn_value => { meta.path = Some(val); },
+        "PATH_1" => val: kv_from_kvn_value => { meta.path_1 = Some(val); },
+        "PATH_2" => val: kv_from_kvn_value => { meta.path_2 = Some(val); },
         "TRANSMIT_BAND" => val: kv_string => { meta.transmit_band = Some(val); },
         "RECEIVE_BAND" => val: kv_string => { meta.receive_band = Some(val); },
         "TURNAROUND_NUMERATOR" => val: kv_i32 => { meta.turnaround_numerator = Some(val); },
         "TURNAROUND_DENOMINATOR" => val: kv_i32 => { meta.turnaround_denominator = Some(val); },
-        "TIMETAG_REF" => val: kv_string => { meta.timetag_ref = Some(val); },
+        "TIMETAG_REF" => val: kv_enum => { meta.timetag_ref = Some(val); },
         "INTEGRATION_INTERVAL" => val: kv_float => { meta.integration_interval = Some(val); },
-        "INTEGRATION_REF" => val: kv_string => { meta.integration_ref = Some(val); },
+        "INTEGRATION_REF" => val: kv_enum => { meta.integration_ref = Some(val); },
         "FREQ_OFFSET" => val: kv_float => { meta.freq_offset = Some(val); },
-        "RANGE_MODE" => val: kv_string => { meta.range_mode = Some(val); },
+        "RANGE_MODE" => val: kv_enum => { meta.range_mode = Some(val); },
         "RANGE_MODULUS" => val: kv_float => { meta.range_modulus = Some(val); },
-        "RANGE_UNITS" => val: kv_string => { meta.range_units = Some(val); },
-        "ANGLE_TYPE" => val: kv_string => { meta.angle_type = Some(val); },
-        "REFERENCE_FRAME" => val: kv_string => { meta.reference_frame = Some(val); },
+        "RANGE_UNITS" => val: kv_enum => { meta.range_units = Some(val); },
+        "ANGLE_TYPE" => val: kv_enum => { meta.angle_type = Some(val); },
+        "REFERENCE_FRAME" => val: kv_enum => { meta.reference_frame = Some(val); },
         "INTERPOLATION" => val: kv_string => { meta.interpolation = Some(val); },
         "INTERPOLATION_DEGREE" => val: kv_u32 => { meta.interpolation_degree = Some(val); },
         "DOPPLER_COUNT_BIAS" => val: kv_float => { meta.doppler_count_bias = Some(val); },
         "DOPPLER_COUNT_SCALE" => val: kv_u64 => { meta.doppler_count_scale = Some(val); },
-        "DOPPLER_COUNT_ROLLOVER" => val: kv_string => { meta.doppler_count_rollover = Some(val); },
+        "DOPPLER_COUNT_ROLLOVER" => val: kv_enum => { meta.doppler_count_rollover = Some(val); },
         "TRANSMIT_DELAY_1" => val: kv_float => { meta.transmit_delay_1 = Some(val); },
         "TRANSMIT_DELAY_2" => val: kv_float => { meta.transmit_delay_2 = Some(val); },
         "TRANSMIT_DELAY_3" => val: kv_float => { meta.transmit_delay_3 = Some(val); },
@@ -134,7 +133,7 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
         "RECEIVE_DELAY_3" => val: kv_float => { meta.receive_delay_3 = Some(val); },
         "RECEIVE_DELAY_4" => val: kv_float => { meta.receive_delay_4 = Some(val); },
         "RECEIVE_DELAY_5" => val: kv_float => { meta.receive_delay_5 = Some(val); },
-        "DATA_QUALITY" => val: kv_string => { meta.data_quality = Some(val); },
+        "DATA_QUALITY" => val: kv_enum => { meta.data_quality = Some(val); },
         "CORRECTION_ANGLE_1" => val: kv_float => { meta.correction_angle_1 = Some(val); },
         "CORRECTION_ANGLE_2" => val: kv_float => { meta.correction_angle_2 = Some(val); },
         "CORRECTION_DOPPLER" => val: kv_float => { meta.correction_doppler = Some(val); },
@@ -145,7 +144,7 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
         "CORRECTION_TRANSMIT" => val: kv_float => { meta.correction_transmit = Some(val); },
         "CORRECTION_ABERRATION_YEARLY" => val: kv_float => { meta.correction_aberration_yearly = Some(val); },
         "CORRECTION_ABERRATION_DIURNAL" => val: kv_float => { meta.correction_aberration_diurnal = Some(val); },
-        "CORRECTIONS_APPLIED" => val: kv_string => { meta.corrections_applied = Some(val); },
+        "CORRECTIONS_APPLIED" => val: kv_enum => { meta.corrections_applied = Some(val); },
         "EPHEMERIS_NAME_1" => val: kv_string => { meta.ephemeris_name_1 = Some(val); },
         "EPHEMERIS_NAME_2" => val: kv_string => { meta.ephemeris_name_2 = Some(val); },
         "EPHEMERIS_NAME_3" => val: kv_string => { meta.ephemeris_name_3 = Some(val); },
@@ -198,11 +197,11 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
         "RECEIVE_FREQ_3" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq3(v)))),
         "RECEIVE_FREQ_4" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq4(v)))),
         "RECEIVE_FREQ_5" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq5(v)))),
-        "RECEIVE_PHASE_CT_1" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt1(v.trim().to_string())))),
-        "RECEIVE_PHASE_CT_2" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt2(v.trim().to_string())))),
-        "RECEIVE_PHASE_CT_3" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt3(v.trim().to_string())))),
-        "RECEIVE_PHASE_CT_4" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt4(v.trim().to_string())))),
-        "RECEIVE_PHASE_CT_5" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt5(v.trim().to_string())))),
+        "RECEIVE_PHASE_CT_1" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt1(v)))),
+        "RECEIVE_PHASE_CT_2" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt2(v)))),
+        "RECEIVE_PHASE_CT_3" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt3(v)))),
+        "RECEIVE_PHASE_CT_4" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt4(v)))),
+        "RECEIVE_PHASE_CT_5" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt5(v)))),
         "RHUMIDITY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| {
             Percentage::new(v, None).map(|p| (e, TdmObservationData::Rhumidity(p)))
         }),
@@ -218,16 +217,16 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
         "TRANSMIT_FREQ_RATE_3" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate3(v)))),
         "TRANSMIT_FREQ_RATE_4" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate4(v)))),
         "TRANSMIT_FREQ_RATE_5" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate5(v)))),
-        "TRANSMIT_PHASE_CT_1" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt1(v.trim().to_string())))),
-        "TRANSMIT_PHASE_CT_2" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt2(v.trim().to_string())))),
-        "TRANSMIT_PHASE_CT_3" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt3(v.trim().to_string())))),
-        "TRANSMIT_PHASE_CT_4" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt4(v.trim().to_string())))),
-        "TRANSMIT_PHASE_CT_5" => (kv_sep, kv_epoch_token, preceded(ws, till_line_ending)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt5(v.trim().to_string())))),
+        "TRANSMIT_PHASE_CT_1" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt1(v)))),
+        "TRANSMIT_PHASE_CT_2" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt2(v)))),
+        "TRANSMIT_PHASE_CT_3" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt3(v)))),
+        "TRANSMIT_PHASE_CT_4" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt4(v)))),
+        "TRANSMIT_PHASE_CT_5" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt5(v)))),
         "TROPO_DRY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoDry(v)))),
         "TROPO_WET" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoWet(v)))),
         "VLBI_DELAY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::VlbiDelay(v)))),
         _ => |i: &mut &str| Err(ErrMode::Cut(InternalParserError::from_input(i).add_context(i, &i.checkpoint(), StrContext::Label("Unknown TDM data keyword")))),
-    }.try_map(|res| res).parse_next(input).map_err(|e| {
+    }.try_map(|res: std::result::Result<(Epoch, TdmObservationData), CcsdsNdmError>| res).parse_next(input).map_err(|e| {
         if e.is_backtrack() {
             ErrMode::Backtrack(InternalParserError::from_input(input).add_context(
                 input,
@@ -353,6 +352,10 @@ mod tests {
     use super::*;
     use crate::error::FormatError;
     use crate::traits::Ndm;
+    use crate::types::{
+        TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath, TdmRangeMode,
+        TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
+    };
     // We need TdmObservationData variants visible
     use crate::messages::tdm::TdmObservationData;
 
@@ -424,7 +427,7 @@ DATA_STOP
 "#;
         let tdm = Tdm::from_kvn(kvn).unwrap();
         let seg = &tdm.body.segments[0];
-        assert_eq!(seg.metadata.angle_type.as_deref(), Some("RADEC"));
+        assert_eq!(seg.metadata.angle_type, Some(TdmAngleType::Radec));
         assert_eq!(seg.data.observations.len(), 3);
         match &seg.data.observations[2].data {
             TdmObservationData::Mag(v) => assert_eq!(*v, 12.1),
@@ -452,7 +455,7 @@ DATA_STOP
         let tdm = Tdm::from_kvn(kvn).unwrap();
         let seg = &tdm.body.segments[0];
         match &seg.data.observations[0].data {
-            TdmObservationData::TransmitPhaseCt1(s) => assert_eq!(s, "7175173383.615373"),
+            TdmObservationData::TransmitPhaseCt1(s) => assert_eq!(*s, 7175173383.615373),
             _ => panic!("Wrong type"),
         }
     }
@@ -619,7 +622,10 @@ RANGE = 2023-01-01T00:00:00 1000.0
 DATA_STOP
 "#;
         let tdm = Tdm::from_kvn(kvn).unwrap();
-        assert_eq!(tdm.body.segments[0].metadata.path.as_deref(), Some("1,2,1"));
+        assert_eq!(
+            tdm.body.segments[0].metadata.path,
+            Some(TdmPath("1,2,1".to_string()))
+        );
         assert!(tdm.body.segments[0].metadata.path_1.is_none());
         assert!(tdm.body.segments[0].metadata.path_2.is_none());
     }
@@ -645,8 +651,8 @@ DATA_STOP
         let tdm = Tdm::from_kvn(kvn).unwrap();
         let seg = &tdm.body.segments[0];
         assert!(seg.metadata.path.is_none());
-        assert_eq!(seg.metadata.path_1.as_deref(), Some("1,2,1"));
-        assert_eq!(seg.metadata.path_2.as_deref(), Some("3,2,3"));
+        assert_eq!(seg.metadata.path_1, Some(TdmPath("1,2,1".to_string())));
+        assert_eq!(seg.metadata.path_2, Some(TdmPath("3,2,3".to_string())));
     }
 
     #[test]
@@ -720,8 +726,8 @@ DATA_STOP
 "#;
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert_eq!(
-            tdm.body.segments[0].metadata.data_quality.as_deref(),
-            Some("VALIDATED")
+            tdm.body.segments[0].metadata.data_quality,
+            Some(TdmDataQuality::Validated)
         );
     }
 
@@ -971,13 +977,13 @@ DATA_STOP
         let tdm = Tdm::from_kvn(kvn).unwrap();
         match &tdm.body.segments[0].data.observations[0].data {
             TdmObservationData::TransmitPhaseCt1(s) => {
-                assert_eq!(s, "7175173383.615373");
+                assert_eq!(*s, 7175173383.615373);
             }
             _ => panic!("Wrong type"),
         }
         match &tdm.body.segments[0].data.observations[1].data {
             TdmObservationData::ReceivePhaseCt1(s) => {
-                assert_eq!(s, "8429753135.986102");
+                assert_eq!(*s, 8429753135.986102);
             }
             _ => panic!("Wrong type"),
         }
@@ -1246,27 +1252,34 @@ DATA_STOP
         );
         assert!(seg.metadata.start_time.is_some());
         assert!(seg.metadata.stop_time.is_some());
-        assert_eq!(seg.metadata.mode.as_deref(), Some("SEQUENTIAL"));
+        assert_eq!(seg.metadata.mode, Some(TdmMode::Sequential));
+        assert_eq!(seg.metadata.path, Some(TdmPath("1,2,1".to_string())));
         assert_eq!(seg.metadata.transmit_band.as_deref(), Some("X"));
         assert_eq!(seg.metadata.receive_band.as_deref(), Some("X"));
         assert_eq!(seg.metadata.turnaround_numerator, Some(880));
         assert_eq!(seg.metadata.turnaround_denominator, Some(749));
-        assert_eq!(seg.metadata.timetag_ref.as_deref(), Some("RECEIVE"));
+        assert_eq!(seg.metadata.timetag_ref, Some(TdmTimetagRef::Receive));
         assert_eq!(seg.metadata.integration_interval, Some(60.0));
-        assert_eq!(seg.metadata.integration_ref.as_deref(), Some("MIDDLE"));
-        assert_eq!(seg.metadata.range_mode.as_deref(), Some("COHERENT"));
+        assert_eq!(
+            seg.metadata.integration_ref,
+            Some(TdmIntegrationRef::Middle)
+        );
+        assert_eq!(seg.metadata.range_mode, Some(TdmRangeMode::Coherent));
         assert_eq!(seg.metadata.range_modulus, Some(32768.0));
-        assert_eq!(seg.metadata.range_units.as_deref(), Some("km"));
-        assert_eq!(seg.metadata.angle_type.as_deref(), Some("AZEL"));
-        assert_eq!(seg.metadata.reference_frame.as_deref(), Some("EME2000"));
+        assert_eq!(seg.metadata.range_units, Some(TdmRangeUnits::Km));
+        assert_eq!(seg.metadata.angle_type, Some(TdmAngleType::Azel));
+        assert_eq!(
+            seg.metadata.reference_frame,
+            Some(TdmReferenceFrame::Eme2000)
+        );
         assert_eq!(seg.metadata.interpolation.as_deref(), Some("LAGRANGE"));
         assert_eq!(seg.metadata.interpolation_degree, Some(7));
         assert_eq!(seg.metadata.doppler_count_bias, Some(240000000.0));
         assert_eq!(seg.metadata.doppler_count_scale, Some(1000));
-        assert_eq!(seg.metadata.doppler_count_rollover.as_deref(), Some("NO"));
-        assert_eq!(seg.metadata.data_quality.as_deref(), Some("VALIDATED"));
+        assert_eq!(seg.metadata.doppler_count_rollover, Some(YesNo::No));
+        assert_eq!(seg.metadata.data_quality, Some(TdmDataQuality::Validated));
         assert_eq!(seg.metadata.correction_range, Some(0.001));
-        assert_eq!(seg.metadata.corrections_applied.as_deref(), Some("YES"));
+        assert_eq!(seg.metadata.corrections_applied, Some(YesNo::Yes));
     }
 
     #[test]

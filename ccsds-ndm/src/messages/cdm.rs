@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::OdParameters;
-use crate::error::Result;
+use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 //----------------------------------------------------------------------
 // Root CDM Structure
@@ -38,14 +39,19 @@ impl Ndm for Cdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        Self::from_kvn_str(kvn)
+        let cdm = Self::from_kvn_str(kvn)?;
+        cdm.validate()?;
+        Ok(cdm)
     }
+
     fn to_xml(&self) -> Result<String> {
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str_with_context(xml, "CDM")
+        let cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
+        cdm.validate()?;
+        Ok(cdm)
     }
 }
 
@@ -60,6 +66,7 @@ pub struct CdmHeader {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
     /// Message creation date/time in Coordinated Universal Time (UTC).
+
     ///
     /// Examples: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
     pub creation_date: Epoch,
@@ -78,13 +85,21 @@ pub struct CdmHeader {
     pub message_id: String,
 }
 
+impl Cdm {
+    pub fn validate(&self) -> Result<()> {
+        self.body.validate()?;
+        Ok(())
+    }
+}
+
 impl ToKvn for CdmHeader {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
+
         writer.write_pair("CREATION_DATE", self.creation_date);
         writer.write_pair("ORIGINATOR", &self.originator);
-        if let Some(msg_for) = &self.message_for {
-            writer.write_pair("MESSAGE_FOR", msg_for);
+        if let Some(v) = &self.message_for {
+            writer.write_pair("MESSAGE_FOR", v);
         }
         writer.write_pair("MESSAGE_ID", &self.message_id);
     }
@@ -108,6 +123,23 @@ impl ToKvn for CdmBody {
         for segment in &self.segments {
             segment.write_kvn(writer);
         }
+    }
+}
+
+impl CdmBody {
+    pub fn validate(&self) -> Result<()> {
+        if self.segments.len() != 2 {
+            return Err(ValidationError::Generic {
+                message: Cow::Borrowed("CDM Body must have exactly 2 segments"),
+                line: None,
+            }
+            .into());
+        }
+        self.relative_metadata_data.validate()?;
+        for segment in &self.segments {
+            segment.validate()?;
+        }
+        Ok(())
     }
 }
 
@@ -151,6 +183,7 @@ pub struct RelativeMetadataData {
     /// Shape of the screening volume.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_shape: Option<ScreenVolumeShapeType>,
+
     /// The R or T component size of the screening volume.
     ///
     /// Units: m
@@ -186,7 +219,7 @@ impl ToKvn for RelativeMetadataData {
         writer.write_pair("TCA", self.tca);
         writer.write_measure("MISS_DISTANCE", &self.miss_distance);
         if let Some(v) = &self.relative_speed {
-            writer.write_measure("RELATIVE_SPEED", v);
+            writer.write_measure("RELATIVE_SPEED", &v.to_unit_value());
         }
         if let Some(v) = &self.relative_state_vector {
             v.write_kvn(writer);
@@ -203,6 +236,7 @@ impl ToKvn for RelativeMetadataData {
         if let Some(v) = &self.screen_volume_shape {
             writer.write_pair("SCREEN_VOLUME_SHAPE", format!("{:?}", v).to_uppercase());
         }
+
         if let Some(v) = &self.screen_volume_x {
             writer.write_measure("SCREEN_VOLUME_X", v);
         }
@@ -227,6 +261,23 @@ impl ToKvn for RelativeMetadataData {
     }
 }
 
+impl RelativeMetadataData {
+    pub fn validate(&self) -> Result<()> {
+        if let Some(prob) = &self.collision_probability {
+            if prob.value < 0.0 || prob.value > 1.0 {
+                return Err(crate::error::ValidationError::OutOfRange {
+                    name: "COLLISION_PROBABILITY".into(),
+                    value: prob.value.to_string(),
+                    expected: "0.0 <= p <= 1.0".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RelativeStateVector {
@@ -243,9 +294,18 @@ impl ToKvn for RelativeStateVector {
         writer.write_measure("RELATIVE_POSITION_R", &self.relative_position_r);
         writer.write_measure("RELATIVE_POSITION_T", &self.relative_position_t);
         writer.write_measure("RELATIVE_POSITION_N", &self.relative_position_n);
-        writer.write_measure("RELATIVE_VELOCITY_R", &self.relative_velocity_r);
-        writer.write_measure("RELATIVE_VELOCITY_T", &self.relative_velocity_t);
-        writer.write_measure("RELATIVE_VELOCITY_N", &self.relative_velocity_n);
+        writer.write_measure(
+            "RELATIVE_VELOCITY_R",
+            &self.relative_velocity_r.to_unit_value(),
+        );
+        writer.write_measure(
+            "RELATIVE_VELOCITY_T",
+            &self.relative_velocity_t.to_unit_value(),
+        );
+        writer.write_measure(
+            "RELATIVE_VELOCITY_N",
+            &self.relative_velocity_n.to_unit_value(),
+        );
     }
 }
 
@@ -263,6 +323,13 @@ impl ToKvn for CdmSegment {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         self.metadata.write_kvn(writer);
         self.data.write_kvn(writer);
+    }
+}
+
+impl CdmSegment {
+    pub fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        Ok(())
     }
 }
 
@@ -396,6 +463,12 @@ impl ToKvn for CdmMetadata {
     }
 }
 
+impl CdmMetadata {
+    pub fn validate(&self) -> Result<()> {
+        Ok(())
+    }
+}
+
 //----------------------------------------------------------------------
 // Data
 //----------------------------------------------------------------------
@@ -481,16 +554,16 @@ impl ToKvn for CdmData {
                 writer.write_measure("MASS", &v.to_unit_value());
             }
             if let Some(v) = &ap.cd_area_over_mass {
-                writer.write_measure("CD_AREA_OVER_MASS", v);
+                writer.write_measure("CD_AREA_OVER_MASS", &v.to_unit_value());
             }
             if let Some(v) = &ap.cr_area_over_mass {
-                writer.write_measure("CR_AREA_OVER_MASS", v);
+                writer.write_measure("CR_AREA_OVER_MASS", &v.to_unit_value());
             }
             if let Some(v) = &ap.thrust_acceleration {
-                writer.write_measure("THRUST_ACCELERATION", v);
+                writer.write_measure("THRUST_ACCELERATION", &v.to_unit_value());
             }
             if let Some(v) = &ap.sedr {
-                writer.write_measure("SEDR", v);
+                writer.write_measure("SEDR", &v.to_unit_value());
             }
         }
         // State Vector
@@ -549,7 +622,7 @@ pub struct AdditionalParameters {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cd_area_over_mass: Option<M2kg>,
+    pub cd_area_over_mass: Option<M2kgRequired>,
 
     /// The object's CR•A/m used to propagate the state vector and covariance to TCA. (See
     /// annex E for definition.)
@@ -558,7 +631,7 @@ pub struct AdditionalParameters {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cr_area_over_mass: Option<M2kg>,
+    pub cr_area_over_mass: Option<M2kgRequired>,
 
     /// The object's acceleration due to in-track thrust used to propagate the state vector and
     /// covariance to TCA. (See annex E for definition.)
@@ -838,102 +911,102 @@ impl ToKvn for CdmCovarianceMatrix {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         // Required
-        writer.write_measure("CR_R", &self.cr_r);
-        writer.write_measure("CT_R", &self.ct_r);
-        writer.write_measure("CT_T", &self.ct_t);
-        writer.write_measure("CN_R", &self.cn_r);
-        writer.write_measure("CN_T", &self.cn_t);
-        writer.write_measure("CN_N", &self.cn_n);
-        writer.write_measure("CRDOT_R", &self.crdot_r);
-        writer.write_measure("CRDOT_T", &self.crdot_t);
-        writer.write_measure("CRDOT_N", &self.crdot_n);
-        writer.write_measure("CRDOT_RDOT", &self.crdot_rdot);
-        writer.write_measure("CTDOT_R", &self.ctdot_r);
-        writer.write_measure("CTDOT_T", &self.ctdot_t);
-        writer.write_measure("CTDOT_N", &self.ctdot_n);
-        writer.write_measure("CTDOT_RDOT", &self.ctdot_rdot);
-        writer.write_measure("CTDOT_TDOT", &self.ctdot_tdot);
-        writer.write_measure("CNDOT_R", &self.cndot_r);
-        writer.write_measure("CNDOT_T", &self.cndot_t);
-        writer.write_measure("CNDOT_N", &self.cndot_n);
-        writer.write_measure("CNDOT_RDOT", &self.cndot_rdot);
-        writer.write_measure("CNDOT_TDOT", &self.cndot_tdot);
-        writer.write_measure("CNDOT_NDOT", &self.cndot_ndot);
+        writer.write_measure("CR_R", &self.cr_r.to_unit_value());
+        writer.write_measure("CT_R", &self.ct_r.to_unit_value());
+        writer.write_measure("CT_T", &self.ct_t.to_unit_value());
+        writer.write_measure("CN_R", &self.cn_r.to_unit_value());
+        writer.write_measure("CN_T", &self.cn_t.to_unit_value());
+        writer.write_measure("CN_N", &self.cn_n.to_unit_value());
+        writer.write_measure("CRDOT_R", &self.crdot_r.to_unit_value());
+        writer.write_measure("CRDOT_T", &self.crdot_t.to_unit_value());
+        writer.write_measure("CRDOT_N", &self.crdot_n.to_unit_value());
+        writer.write_measure("CRDOT_RDOT", &self.crdot_rdot.to_unit_value());
+        writer.write_measure("CTDOT_R", &self.ctdot_r.to_unit_value());
+        writer.write_measure("CTDOT_T", &self.ctdot_t.to_unit_value());
+        writer.write_measure("CTDOT_N", &self.ctdot_n.to_unit_value());
+        writer.write_measure("CTDOT_RDOT", &self.ctdot_rdot.to_unit_value());
+        writer.write_measure("CTDOT_TDOT", &self.ctdot_tdot.to_unit_value());
+        writer.write_measure("CNDOT_R", &self.cndot_r.to_unit_value());
+        writer.write_measure("CNDOT_T", &self.cndot_t.to_unit_value());
+        writer.write_measure("CNDOT_N", &self.cndot_n.to_unit_value());
+        writer.write_measure("CNDOT_RDOT", &self.cndot_rdot.to_unit_value());
+        writer.write_measure("CNDOT_TDOT", &self.cndot_tdot.to_unit_value());
+        writer.write_measure("CNDOT_NDOT", &self.cndot_ndot.to_unit_value());
 
         // Optionals
         if let Some(v) = &self.cdrg_r {
-            writer.write_measure("CDRG_R", v);
+            writer.write_measure("CDRG_R", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_t {
-            writer.write_measure("CDRG_T", v);
+            writer.write_measure("CDRG_T", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_n {
-            writer.write_measure("CDRG_N", v);
+            writer.write_measure("CDRG_N", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_rdot {
-            writer.write_measure("CDRG_RDOT", v);
+            writer.write_measure("CDRG_RDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_tdot {
-            writer.write_measure("CDRG_TDOT", v);
+            writer.write_measure("CDRG_TDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_ndot {
-            writer.write_measure("CDRG_NDOT", v);
+            writer.write_measure("CDRG_NDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_drg {
-            writer.write_measure("CDRG_DRG", v);
+            writer.write_measure("CDRG_DRG", &v.to_unit_value());
         }
 
         if let Some(v) = &self.csrp_r {
-            writer.write_measure("CSRP_R", v);
+            writer.write_measure("CSRP_R", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_t {
-            writer.write_measure("CSRP_T", v);
+            writer.write_measure("CSRP_T", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_n {
-            writer.write_measure("CSRP_N", v);
+            writer.write_measure("CSRP_N", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_rdot {
-            writer.write_measure("CSRP_RDOT", v);
+            writer.write_measure("CSRP_RDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_tdot {
-            writer.write_measure("CSRP_TDOT", v);
+            writer.write_measure("CSRP_TDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_ndot {
-            writer.write_measure("CSRP_NDOT", v);
+            writer.write_measure("CSRP_NDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_drg {
-            writer.write_measure("CSRP_DRG", v);
+            writer.write_measure("CSRP_DRG", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_srp {
-            writer.write_measure("CSRP_SRP", v);
+            writer.write_measure("CSRP_SRP", &v.to_unit_value());
         }
 
         if let Some(v) = &self.cthr_r {
-            writer.write_measure("CTHR_R", v);
+            writer.write_measure("CTHR_R", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_t {
-            writer.write_measure("CTHR_T", v);
+            writer.write_measure("CTHR_T", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_n {
-            writer.write_measure("CTHR_N", v);
+            writer.write_measure("CTHR_N", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_rdot {
-            writer.write_measure("CTHR_RDOT", v);
+            writer.write_measure("CTHR_RDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_tdot {
-            writer.write_measure("CTHR_TDOT", v);
+            writer.write_measure("CTHR_TDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_ndot {
-            writer.write_measure("CTHR_NDOT", v);
+            writer.write_measure("CTHR_NDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_drg {
-            writer.write_measure("CTHR_DRG", v);
+            writer.write_measure("CTHR_DRG", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_srp {
-            writer.write_measure("CTHR_SRP", v);
+            writer.write_measure("CTHR_SRP", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_thr {
-            writer.write_measure("CTHR_THR", v);
+            writer.write_measure("CTHR_THR", &v.to_unit_value());
         }
     }
 }
@@ -952,6 +1025,7 @@ mod tests {
 CCSDS_CDM_VERS = 1.0
 CREATION_DATE = 2025-01-01T00:00:00
 ORIGINATOR = TEST
+MESSAGE_FOR = OPERATOR
 MESSAGE_ID = MSG-001
 
 TCA = 2025-01-02T12:00:00
@@ -974,6 +1048,7 @@ OBJECT_DESIGNATOR = 00001
 CATALOG_NAME = CAT
 OBJECT_NAME = OBJ1
 INTERNATIONAL_DESIGNATOR = 1998-067A
+OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH1
 COVARIANCE_METHOD = CALCULATED
 MANEUVERABLE = YES
@@ -1013,6 +1088,7 @@ OBJECT_DESIGNATOR = 00002
 CATALOG_NAME = CAT
 OBJECT_NAME = OBJ2
 INTERNATIONAL_DESIGNATOR = 1998-067B
+OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH2
 COVARIANCE_METHOD = DEFAULT
 MANEUVERABLE = NO
@@ -1078,6 +1154,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 CCSDS_CDM_VERS = 1.0
 COMMENT Header comment
 CREATION_DATE = 2025-01-01T00:00:00
+
 ORIGINATOR = TEST
 MESSAGE_FOR = RECIPIENT
 MESSAGE_ID = MSG-001
@@ -1120,7 +1197,7 @@ MANEUVERABLE = YES
 ORBIT_CENTER = EARTH
 REF_FRAME = EME2000
 GRAVITY_MODEL = EGM-96
-ATMOSPHERIC_MODEL = JACCHIA
+ATMOSPHERIC_MODEL = JACCHIA 70 DCA
 N_BODY_PERTURBATIONS = MOON,SUN
 SOLAR_RAD_PRESSURE = YES
 EARTH_TIDES = YES
@@ -1204,6 +1281,7 @@ OBJECT_DESIGNATOR = 00002
 CATALOG_NAME = CAT
 OBJECT_NAME = OBJ2
 INTERNATIONAL_DESIGNATOR = 1998-067B
+OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH2
 COVARIANCE_METHOD = DEFAULT
 MANEUVERABLE = NO

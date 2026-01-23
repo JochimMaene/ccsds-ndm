@@ -373,14 +373,15 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
 
 /// Parses all covariance matrices within a COVARIANCE block.
 fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix>> {
-    let mut matrices = Vec::new();
+    let mut matrices: Vec<OemCovarianceMatrix> = Vec::new();
 
     loop {
         comment_line.parse_next(input).ok(); // Consume any comments
         if at_block_end("COVARIANCE", input) {
             break;
         }
-        matrices.push(parse_covariance_matrix.parse_next(input)?);
+        let matrix = parse_covariance_matrix.parse_next(input)?;
+        matrices.push(matrix);
     }
 
     Ok(matrices)
@@ -456,6 +457,8 @@ pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
         covariance_matrix: Vec::new(),
     };
 
+    let mut covariance_started = false;
+
     loop {
         let _ = ws.parse_next(input);
         if input.is_empty() || at_block_start("META", input) {
@@ -466,13 +469,33 @@ pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
         match oem_data_item.parse_next(input) {
             Ok(item) => match item {
                 OemDataItem::Comment(c) => data.comment.extend(c),
-                OemDataItem::StateVec(sv) => data.state_vector.push(sv),
+                OemDataItem::StateVec(sv) => {
+                    if covariance_started {
+                        input.reset(&checkpoint);
+                        return Err(cut_err(
+                            input,
+                            "State vectors cannot appear after covariance matrix block",
+                        ));
+                    }
+                    data.state_vector.push(sv);
+                }
                 OemDataItem::StateVecWithComments(sv, c) => {
+                    if covariance_started {
+                        input.reset(&checkpoint);
+                        return Err(cut_err(
+                            input,
+                            "State vectors cannot appear after covariance matrix block",
+                        ));
+                    }
                     data.comment.extend(c);
                     data.state_vector.push(sv);
                 }
-                OemDataItem::Cov(covs) => data.covariance_matrix.extend(covs),
+                OemDataItem::Cov(covs) => {
+                    covariance_started = true;
+                    data.covariance_matrix.extend(covs);
+                }
                 OemDataItem::CovWithComments(covs, c) => {
+                    covariance_started = true;
                     data.comment.extend(c);
                     data.covariance_matrix.extend(covs);
                 }
@@ -885,6 +908,25 @@ COVARIANCE_STOP
         let mut input = kvn;
         let data = oem_data.parse_next(&mut input).unwrap();
         assert_eq!(data.state_vector.len(), 1);
+    }
+
+    #[test]
+    fn test_oem_data_interleaved_error() {
+        // State vectors cannot appear after covariance block
+        let kvn = r#"2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+1.0
+0.1 1.0
+0.1 0.1 1.0
+0.01 0.01 0.01 1.0
+0.01 0.01 0.01 0.1 1.0
+0.01 0.01 0.01 0.1 0.1 1.0
+COVARIANCE_STOP
+2023-01-01T00:01:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let mut input = kvn;
+        assert!(oem_data.parse_next(&mut input).is_err());
     }
 
     #[test]

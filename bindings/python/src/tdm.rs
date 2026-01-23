@@ -5,10 +5,12 @@
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::tdm as core_tdm;
 use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
+use std::str::FromStr;
 
 // ============================================================================
 // TDM - Tracking Data Message
@@ -604,6 +606,12 @@ impl TdmMetadata {
         ephemeris_name_5: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
+        use ccsds_ndm::types::{
+            TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath, TdmRangeMode,
+            TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
+        };
+        use std::str::FromStr;
+
         Ok(Self {
             inner: core_tdm::TdmMetadata {
                 comment: comment.unwrap_or_default(),
@@ -617,28 +625,66 @@ impl TdmMetadata {
                 participant_3,
                 participant_4,
                 participant_5,
-                mode,
-                path,
-                path_1,
-                path_2,
+                mode: mode
+                    .map(|s| TdmMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
+                path: path
+                    .map(|s| TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
+                path_1: path_1
+                    .map(|s| TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
+                path_2: path_2
+                    .map(|s| TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
                 transmit_band,
                 receive_band,
                 turnaround_numerator,
                 turnaround_denominator,
-                timetag_ref,
+                timetag_ref: timetag_ref
+                    .map(|s| {
+                        TdmTimetagRef::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
                 integration_interval,
-                integration_ref,
+                integration_ref: integration_ref
+                    .map(|s| {
+                        TdmIntegrationRef::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
                 freq_offset,
-                range_mode,
+                range_mode: range_mode
+                    .map(|s| {
+                        TdmRangeMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
                 range_modulus,
-                range_units,
-                angle_type,
-                reference_frame,
+                range_units: range_units
+                    .map(|s| {
+                        TdmRangeUnits::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                angle_type: angle_type
+                    .map(|s| {
+                        TdmAngleType::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                reference_frame: reference_frame
+                    .map(|s| {
+                        TdmReferenceFrame::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
                 interpolation,
                 interpolation_degree,
                 doppler_count_bias,
                 doppler_count_scale,
-                doppler_count_rollover,
+                doppler_count_rollover: doppler_count_rollover
+                    .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
                 transmit_delay_1,
                 transmit_delay_2,
                 transmit_delay_3,
@@ -649,7 +695,12 @@ impl TdmMetadata {
                 receive_delay_3,
                 receive_delay_4,
                 receive_delay_5,
-                data_quality,
+                data_quality: data_quality
+                    .map(|s| {
+                        TdmDataQuality::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
                 correction_angle_1,
                 correction_angle_2,
                 correction_doppler,
@@ -660,7 +711,9 @@ impl TdmMetadata {
                 correction_transmit,
                 correction_aberration_yearly,
                 correction_aberration_diurnal,
-                corrections_applied,
+                corrections_applied: corrections_applied
+                    .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
                 ephemeris_name_1,
                 ephemeris_name_2,
                 ephemeris_name_3,
@@ -841,11 +894,16 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_mode(&self) -> Option<String> {
-        self.inner.mode.clone()
+        self.inner.mode.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_mode(&mut self, value: Option<String>) {
-        self.inner.mode = value;
+    fn set_mode(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmMode;
+        use std::str::FromStr;
+        self.inner.mode = value
+            .map(|s| TdmMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .transpose()?;
+        Ok(())
     }
 
     /// The signal path by listing the index of each participant in order, separated by commas.
@@ -855,11 +913,16 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_path(&self) -> Option<String> {
-        self.inner.path.clone()
+        self.inner.path.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_path(&mut self, value: Option<String>) {
-        self.inner.path = value;
+    fn set_path(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmPath;
+        use std::str::FromStr;
+        self.inner.path = value
+            .map(|s| TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .transpose()?;
+        Ok(())
     }
 
     /// The first signal path where the MODE is 'SINGLE_DIFF'.
@@ -869,11 +932,16 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_path_1(&self) -> Option<String> {
-        self.inner.path_1.clone()
+        self.inner.path_1.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_path_1(&mut self, value: Option<String>) {
-        self.inner.path_1 = value;
+    fn set_path_1(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmPath;
+        use std::str::FromStr;
+        self.inner.path_1 = value
+            .map(|s| TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .transpose()?;
+        Ok(())
     }
 
     /// The second signal path where the MODE is 'SINGLE_DIFF'.
@@ -883,11 +951,16 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_path_2(&self) -> Option<String> {
-        self.inner.path_2.clone()
+        self.inner.path_2.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_path_2(&mut self, value: Option<String>) {
-        self.inner.path_2 = value;
+    fn set_path_2(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmPath;
+        use std::str::FromStr;
+        self.inner.path_2 = value
+            .map(|s| TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .transpose()?;
+        Ok(())
     }
 
     /// Unique name of the external ephemeris file used for participant 1.
@@ -1023,11 +1096,16 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_timetag_ref(&self) -> Option<String> {
-        self.inner.timetag_ref.clone()
+        self.inner.timetag_ref.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_timetag_ref(&mut self, value: Option<String>) {
-        self.inner.timetag_ref = value;
+    fn set_timetag_ref(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmTimetagRef;
+        use std::str::FromStr;
+        self.inner.timetag_ref = value
+            .map(|s| TdmTimetagRef::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .transpose()?;
+        Ok(())
     }
 
     /// The Doppler count time in seconds for Doppler data.
@@ -1053,11 +1131,18 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_integration_ref(&self) -> Option<String> {
-        self.inner.integration_ref.clone()
+        self.inner.integration_ref.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_integration_ref(&mut self, value: Option<String>) {
-        self.inner.integration_ref = value;
+    fn set_integration_ref(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmIntegrationRef;
+        use std::str::FromStr;
+        self.inner.integration_ref = value
+            .map(|s| {
+                TdmIntegrationRef::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
     }
 
     /// A frequency in Hz that must be added to every RECEIVE_FREQ to reconstruct it.
@@ -1081,11 +1166,18 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_range_mode(&self) -> Option<String> {
-        self.inner.range_mode.clone()
+        self.inner.range_mode.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_range_mode(&mut self, value: Option<String>) {
-        self.inner.range_mode = value;
+    fn set_range_mode(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmRangeMode;
+        use std::str::FromStr;
+        self.inner.range_mode = value
+            .map(|s| {
+                TdmRangeMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
     }
 
     /// The modulus of the range observable.
@@ -1109,11 +1201,18 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_range_units(&self) -> Option<String> {
-        self.inner.range_units.clone()
+        self.inner.range_units.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_range_units(&mut self, value: Option<String>) {
-        self.inner.range_units = value;
+    fn set_range_units(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmRangeUnits;
+        use std::str::FromStr;
+        self.inner.range_units = value
+            .map(|s| {
+                TdmRangeUnits::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
     }
 
     /// The type of antenna geometry represented in the angle data.
@@ -1123,11 +1222,18 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_angle_type(&self) -> Option<String> {
-        self.inner.angle_type.clone()
+        self.inner.angle_type.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_angle_type(&mut self, value: Option<String>) {
-        self.inner.angle_type = value;
+    fn set_angle_type(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmAngleType;
+        use std::str::FromStr;
+        self.inner.angle_type = value
+            .map(|s| {
+                TdmAngleType::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
     }
 
     /// The inertial reference frame to which the antenna frame is referenced.
@@ -1137,11 +1243,18 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_reference_frame(&self) -> Option<String> {
-        self.inner.reference_frame.clone()
+        self.inner.reference_frame.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_reference_frame(&mut self, value: Option<String>) {
-        self.inner.reference_frame = value;
+    fn set_reference_frame(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmReferenceFrame;
+        use std::str::FromStr;
+        self.inner.reference_frame = value
+            .map(|s| {
+                TdmReferenceFrame::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
     }
 
     /// The interpolation method to be used to calculate a transmit phase count.
@@ -1209,12 +1322,21 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_doppler_count_rollover(&self) -> Option<String> {
-        self.inner.doppler_count_rollover.clone()
+        self.inner
+            .doppler_count_rollover
+            .as_ref()
+            .map(|v| v.to_string())
     }
     #[setter]
-    fn set_doppler_count_rollover(&mut self, value: Option<String>) {
-        self.inner.doppler_count_rollover = value;
+    fn set_doppler_count_rollover(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::YesNo;
+        use std::str::FromStr;
+        self.inner.doppler_count_rollover = value
+            .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .transpose()?;
+        Ok(())
     }
+
 
     /// A fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 1.
@@ -1393,11 +1515,18 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_data_quality(&self) -> Option<String> {
-        self.inner.data_quality.clone()
+        self.inner.data_quality.as_ref().map(|v| v.to_string())
     }
     #[setter]
-    fn set_data_quality(&mut self, value: Option<String>) {
-        self.inner.data_quality = value;
+    fn set_data_quality(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::TdmDataQuality;
+        use std::str::FromStr;
+        self.inner.data_quality = value
+            .map(|s| {
+                TdmDataQuality::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
     }
 
     /// A correction value to be added to the ANGLE_1 data.
@@ -1547,11 +1676,19 @@ impl TdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_corrections_applied(&self) -> Option<String> {
-        self.inner.corrections_applied.clone()
+        self.inner
+            .corrections_applied
+            .as_ref()
+            .map(|v| v.to_string())
     }
     #[setter]
-    fn set_corrections_applied(&mut self, value: Option<String>) {
-        self.inner.corrections_applied = value;
+    fn set_corrections_applied(&mut self, value: Option<String>) -> PyResult<()> {
+        use ccsds_ndm::types::YesNo;
+        use std::str::FromStr;
+        self.inner.corrections_applied = value
+            .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .transpose()?;
+        Ok(())
     }
 }
 
@@ -1698,16 +1835,16 @@ impl TdmObservation {
             "MAG" => TdmObservationData::Mag(value),
             "RCS" => TdmObservationData::Rcs(value),
             "DOR" => TdmObservationData::Dor(value),
-            "RECEIVE_PHASE_CT_1" => TdmObservationData::ReceivePhaseCt1(value.to_string()),
-            "RECEIVE_PHASE_CT_2" => TdmObservationData::ReceivePhaseCt2(value.to_string()),
-            "RECEIVE_PHASE_CT_3" => TdmObservationData::ReceivePhaseCt3(value.to_string()),
-            "RECEIVE_PHASE_CT_4" => TdmObservationData::ReceivePhaseCt4(value.to_string()),
-            "RECEIVE_PHASE_CT_5" => TdmObservationData::ReceivePhaseCt5(value.to_string()),
-            "TRANSMIT_PHASE_CT_1" => TdmObservationData::TransmitPhaseCt1(value.to_string()),
-            "TRANSMIT_PHASE_CT_2" => TdmObservationData::TransmitPhaseCt2(value.to_string()),
-            "TRANSMIT_PHASE_CT_3" => TdmObservationData::TransmitPhaseCt3(value.to_string()),
-            "TRANSMIT_PHASE_CT_4" => TdmObservationData::TransmitPhaseCt4(value.to_string()),
-            "TRANSMIT_PHASE_CT_5" => TdmObservationData::TransmitPhaseCt5(value.to_string()),
+            "RECEIVE_PHASE_CT_1" => TdmObservationData::ReceivePhaseCt1(value),
+            "RECEIVE_PHASE_CT_2" => TdmObservationData::ReceivePhaseCt2(value),
+            "RECEIVE_PHASE_CT_3" => TdmObservationData::ReceivePhaseCt3(value),
+            "RECEIVE_PHASE_CT_4" => TdmObservationData::ReceivePhaseCt4(value),
+            "RECEIVE_PHASE_CT_5" => TdmObservationData::ReceivePhaseCt5(value),
+            "TRANSMIT_PHASE_CT_1" => TdmObservationData::TransmitPhaseCt1(value),
+            "TRANSMIT_PHASE_CT_2" => TdmObservationData::TransmitPhaseCt2(value),
+            "TRANSMIT_PHASE_CT_3" => TdmObservationData::TransmitPhaseCt3(value),
+            "TRANSMIT_PHASE_CT_4" => TdmObservationData::TransmitPhaseCt4(value),
+            "TRANSMIT_PHASE_CT_5" => TdmObservationData::TransmitPhaseCt5(value),
             _ => {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                     "Unknown observation keyword: {}",

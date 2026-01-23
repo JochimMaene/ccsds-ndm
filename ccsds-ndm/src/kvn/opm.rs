@@ -118,7 +118,7 @@ pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElement
 
     parse_block!(input, comment, {
         "SEMI_MAJOR_AXIS" => semi_major_axis: kv_from_kvn,
-        "ECCENTRICITY" => eccentricity: kv_float,
+        "ECCENTRICITY" => val: kv_float => { eccentricity = Some(val.into()); },
         "INCLINATION" => inclination: kv_from_kvn,
         "RA_OF_ASC_NODE" => ra_of_asc_node: kv_from_kvn,
         "ARG_OF_PERICENTER" => arg_of_pericenter: kv_from_kvn,
@@ -137,6 +137,20 @@ pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElement
         && gm.is_none()
     {
         return Ok(None);
+    }
+
+    if true_anomaly.is_some() && mean_anomaly.is_some() {
+        return Err(cut_err(
+            input,
+            "Cannot have both TRUE_ANOMALY and MEAN_ANOMALY",
+        ));
+    }
+
+    if true_anomaly.is_none() && mean_anomaly.is_none() {
+        return Err(cut_err(
+            input,
+            "Either TRUE_ANOMALY or MEAN_ANOMALY must be present in Keplerian Elements",
+        ));
     }
 
     Ok(Some(KeplerianElements {
@@ -234,6 +248,19 @@ pub fn opm_data(input: &mut &str) -> KvnResult<OpmData> {
     let covariance_matrix = covariance_matrix.parse_next(input)?;
     let maneuver_parameters = all_maneuvers.parse_next(input)?;
     let user_defined_parameters = user_defined_parameters.parse_next(input)?;
+
+    if !maneuver_parameters.is_empty() {
+        let has_mass = spacecraft_parameters
+            .as_ref()
+            .and_then(|sp| sp.mass.as_ref())
+            .is_some();
+        if !has_mass {
+            return Err(cut_err(
+                input,
+                "MASS must be provided if maneuvers are specified",
+            ));
+        }
+    }
 
     Ok(OpmData {
         comment: sv_comment,
@@ -416,7 +443,7 @@ DRAG_COEFF = 2.5
             .as_ref()
             .expect("Should have spacecraft params");
         assert_eq!(sc.mass.as_ref().unwrap().value, 3000.0);
-        assert_eq!(*sc.drag_coeff.as_ref().unwrap(), 2.5);
+        assert_eq!(sc.drag_coeff.as_ref().unwrap(), &2.5.into());
     }
 
     #[test]
@@ -436,6 +463,40 @@ DRAG_COEFF = 2.5
         // Keplerian errors
         let mut kvn_kep_err = "SEMI_MAJOR_AXIS = 7000.0\n"; // Missing others
         assert!(keplerian_elements.parse_next(&mut kvn_kep_err).is_err());
+
+        // Keplerian: both TRUE_ANOMALY and MEAN_ANOMALY
+        let mut kvn_kep_both = "SEMI_MAJOR_AXIS = 7000.0\nECCENTRICITY = 0.0\nINCLINATION = 0.0\nRA_OF_ASC_NODE = 0.0\nARG_OF_PERICENTER = 0.0\nTRUE_ANOMALY = 0.0\nMEAN_ANOMALY = 0.0\nGM = 398600.44\n";
+        assert!(keplerian_elements.parse_next(&mut kvn_kep_both).is_err());
+
+        // Keplerian: neither TRUE_ANOMALY nor MEAN_ANOMALY
+        let mut kvn_kep_none = "SEMI_MAJOR_AXIS = 7000.0\nECCENTRICITY = 0.0\nINCLINATION = 0.0\nRA_OF_ASC_NODE = 0.0\nARG_OF_PERICENTER = 0.0\nGM = 398600.44\n";
+        assert!(keplerian_elements.parse_next(&mut kvn_kep_none).is_err());
+
+        // Maneuver without MASS
+        let kvn_man_no_mass = r#"CCSDS_OPM_VERS = 3.0
+CREATION_DATE = 2022-11-06T09:23:57
+ORIGINATOR = JAXA
+OBJECT_NAME = SAT
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+EPOCH = 2022-12-18T14:28:15.1172
+X = 6503.514
+Y = 1239.647
+Z = -717.490
+X_DOT = -0.873160
+Y_DOT = 8.740420
+Z_DOT = -4.191076
+MAN_EPOCH_IGNITION = 2023-01-01T00:00:00
+MAN_DURATION = 10.0
+MAN_DELTA_MASS = -1.0
+MAN_REF_FRAME = RSW
+MAN_DV_1 = 0.1
+MAN_DV_2 = 0.0
+MAN_DV_3 = 0.0
+"#;
+        assert!(Opm::from_kvn_str(kvn_man_no_mass).is_err());
 
         let mut input = "SEMI_MAJOR_AXIS = BAD\n";
         assert!(keplerian_elements.parse_next(&mut input).is_err());
@@ -557,6 +618,7 @@ Z = 3000
 X_DOT = 1
 Y_DOT = 2
 Z_DOT = 3
+MASS = 1000
 MAN_EPOCH_IGNITION = 2023-01-01T01:00:00
 MAN_DURATION = 10
 MAN_DELTA_MASS = -1

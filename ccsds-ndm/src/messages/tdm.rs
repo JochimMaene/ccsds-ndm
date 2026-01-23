@@ -2,14 +2,18 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::error::{CcsdsNdmError, Result};
+use crate::error::{CcsdsNdmError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
-use crate::types::{Epoch, Percentage};
+use crate::types::{
+    Epoch, Percentage, TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath,
+    TdmRangeMode, TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
+};
 use fast_float;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::fmt;
 
 //----------------------------------------------------------------------
@@ -40,15 +44,26 @@ impl Ndm for Tdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        Self::from_kvn_str(kvn)
+        let tdm = Self::from_kvn_str(kvn)?;
+        tdm.validate()?;
+        Ok(tdm)
     }
 
     fn to_xml(&self) -> Result<String> {
+        self.validate()?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str_with_context(xml, "TDM")
+        let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
+        tdm.validate()?;
+        Ok(tdm)
+    }
+}
+
+impl Tdm {
+    pub fn validate(&self) -> Result<()> {
+        self.body.validate()
     }
 }
 
@@ -107,12 +122,27 @@ impl ToKvn for TdmBody {
     }
 }
 
+impl TdmBody {
+    pub fn validate(&self) -> Result<()> {
+        for segment in &self.segments {
+            segment.validate()?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TdmSegment {
     /// Metadata section for this TDM segment.
     pub metadata: TdmMetadata,
     /// Data section for this TDM segment.
     pub data: TdmData,
+}
+
+impl TdmSegment {
+    pub fn validate(&self) -> Result<()> {
+        self.metadata.validate()
+    }
 }
 
 impl ToKvn for TdmSegment {
@@ -184,22 +214,22 @@ pub struct TdmMetadata {
     ///
     /// Examples: SEQUENTIAL, SINGLE_DIFF
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mode: Option<String>,
+    pub mode: Option<TdmMode>,
     /// The signal path by listing the index of each participant in order, separated by commas.
     ///
     /// Examples: 1,2,1
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
+    pub path: Option<TdmPath>,
     /// The first signal path where the MODE is 'SINGLE_DIFF'.
     ///
     /// Examples: 1,2,1
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub path_1: Option<String>,
+    pub path_1: Option<TdmPath>,
     /// The second signal path where the MODE is 'SINGLE_DIFF'.
     ///
     /// Examples: 3,1
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub path_2: Option<String>,
+    pub path_2: Option<TdmPath>,
     /// The frequency band for transmitted frequencies.
     ///
     /// Examples: S, X, Ka, L, UHF, GREEN
@@ -224,7 +254,7 @@ pub struct TdmMetadata {
     ///
     /// Examples: TRANSMIT, RECEIVE
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub timetag_ref: Option<String>,
+    pub timetag_ref: Option<TdmTimetagRef>,
     /// The Doppler count time in seconds for Doppler data.
     ///
     /// Units: s
@@ -236,7 +266,7 @@ pub struct TdmMetadata {
     ///
     /// Examples: START, MIDDLE, END
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub integration_ref: Option<String>,
+    pub integration_ref: Option<TdmIntegrationRef>,
     /// A frequency in Hz that must be added to every RECEIVE_FREQ to reconstruct it.
     ///
     /// Examples: 0.0, 8415000000.0
@@ -246,7 +276,7 @@ pub struct TdmMetadata {
     ///
     /// Examples: COHERENT, CONSTANT, ONE_WAY
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub range_mode: Option<String>,
+    pub range_mode: Option<TdmRangeMode>,
     /// The modulus of the range observable.
     ///
     /// Examples: 32768.0, 2.0e+23, 0.0, 161.6484
@@ -256,17 +286,17 @@ pub struct TdmMetadata {
     ///
     /// Examples: km, s, RU
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub range_units: Option<String>,
+    pub range_units: Option<TdmRangeUnits>,
     /// The type of antenna geometry represented in the angle data.
     ///
     /// Examples: AZEL, RADEC, XEYN, XSYE
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub angle_type: Option<String>,
+    pub angle_type: Option<TdmAngleType>,
     /// The inertial reference frame to which the antenna frame is referenced.
     ///
     /// Examples: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reference_frame: Option<String>,
+    pub reference_frame: Option<TdmReferenceFrame>,
     /// The interpolation method to be used to calculate a transmit phase count.
     ///
     /// Examples: HERMITE, LAGRANGE, LINEAR
@@ -293,7 +323,7 @@ pub struct TdmMetadata {
     ///
     /// Examples: YES, NO
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub doppler_count_rollover: Option<String>,
+    pub doppler_count_rollover: Option<YesNo>,
     /// A fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 1.
     ///
@@ -378,7 +408,7 @@ pub struct TdmMetadata {
     ///
     /// Examples: RAW, VALIDATED, DEGRADED
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub data_quality: Option<String>,
+    pub data_quality: Option<TdmDataQuality>,
     /// A correction value to be added to the ANGLE_1 data.
     ///
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
@@ -433,7 +463,7 @@ pub struct TdmMetadata {
     ///
     /// Examples: YES, NO
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub corrections_applied: Option<String>,
+    pub corrections_applied: Option<YesNo>,
     /// Unique name of the external ephemeris file used for participant 1.
     ///
     /// Examples: SATELLITE_A_EPHEM27
@@ -459,6 +489,31 @@ pub struct TdmMetadata {
     /// Examples: SATELLITE_A_EPHEMERIS
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ephemeris_name_5: Option<String>,
+}
+
+impl TdmMetadata {
+    pub fn validate(&self) -> Result<()> {
+        // XSD Choice between PATH and (PATH_1, PATH_2)
+        if self.path.is_some() && (self.path_1.is_some() || self.path_2.is_some()) {
+            return Err(ValidationError::Generic {
+                message: Cow::Borrowed("TDM Metadata cannot have both PATH and PATH_1/PATH_2"),
+                line: None,
+            }
+            .into());
+        }
+        if (self.path_1.is_some() && self.path_2.is_none())
+            || (self.path_1.is_none() && self.path_2.is_some())
+        {
+            return Err(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "TDM Metadata must have both PATH_1 and PATH_2 if one is present",
+                ),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
 }
 
 impl ToKvn for TdmMetadata {
@@ -492,16 +547,16 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("PARTICIPANT_5", v);
         }
         if let Some(v) = &self.mode {
-            writer.write_pair("MODE", v);
+            writer.write_pair("MODE", format!("{:?}", v).to_uppercase());
         }
         if let Some(v) = &self.path {
-            writer.write_pair("PATH", v);
+            writer.write_pair("PATH", v.0.as_str());
         }
         if let Some(v) = &self.path_1 {
-            writer.write_pair("PATH_1", v);
+            writer.write_pair("PATH_1", v.0.as_str());
         }
         if let Some(v) = &self.path_2 {
-            writer.write_pair("PATH_2", v);
+            writer.write_pair("PATH_2", v.0.as_str());
         }
         if let Some(v) = &self.ephemeris_name_1 {
             writer.write_pair("EPHEMERIS_NAME_1", v);
@@ -531,31 +586,38 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("TURNAROUND_DENOMINATOR", v);
         }
         if let Some(v) = &self.timetag_ref {
-            writer.write_pair("TIMETAG_REF", v);
+            writer.write_pair("TIMETAG_REF", format!("{:?}", v).to_uppercase());
         }
         if let Some(v) = self.integration_interval {
             writer.write_pair("INTEGRATION_INTERVAL", v);
         }
         if let Some(v) = &self.integration_ref {
-            writer.write_pair("INTEGRATION_REF", v);
+            writer.write_pair("INTEGRATION_REF", format!("{:?}", v).to_uppercase());
         }
         if let Some(v) = self.freq_offset {
             writer.write_pair("FREQ_OFFSET", v);
         }
         if let Some(v) = &self.range_mode {
-            writer.write_pair("RANGE_MODE", v);
+            writer.write_pair("RANGE_MODE", format!("{:?}", v).to_uppercase());
         }
         if let Some(v) = self.range_modulus {
             writer.write_pair("RANGE_MODULUS", v);
         }
         if let Some(v) = &self.range_units {
-            writer.write_pair("RANGE_UNITS", v);
+            writer.write_pair(
+                "RANGE_UNITS",
+                match v {
+                    TdmRangeUnits::Km => "km",
+                    TdmRangeUnits::Seconds => "s",
+                    TdmRangeUnits::Ru => "ru",
+                },
+            );
         }
         if let Some(v) = &self.angle_type {
-            writer.write_pair("ANGLE_TYPE", v);
+            writer.write_pair("ANGLE_TYPE", format!("{:?}", v).to_uppercase());
         }
         if let Some(v) = &self.reference_frame {
-            writer.write_pair("REFERENCE_FRAME", v);
+            writer.write_pair("REFERENCE_FRAME", format!("{:?}", v).to_uppercase());
         }
         if let Some(v) = &self.interpolation {
             writer.write_pair("INTERPOLATION", v);
@@ -570,7 +632,7 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("DOPPLER_COUNT_SCALE", v);
         }
         if let Some(v) = &self.doppler_count_rollover {
-            writer.write_pair("DOPPLER_COUNT_ROLLOVER", v);
+            writer.write_pair("DOPPLER_COUNT_ROLLOVER", format!("{}", v));
         }
         if let Some(v) = self.transmit_delay_1 {
             writer.write_pair("TRANSMIT_DELAY_1", v);
@@ -603,7 +665,7 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("RECEIVE_DELAY_5", v);
         }
         if let Some(v) = &self.data_quality {
-            writer.write_pair("DATA_QUALITY", v);
+            writer.write_pair("DATA_QUALITY", format!("{:?}", v).to_uppercase());
         }
         if let Some(v) = self.correction_angle_1 {
             writer.write_pair("CORRECTION_ANGLE_1", v);
@@ -636,7 +698,7 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("CORRECTION_ABERRATION_DIURNAL", v);
         }
         if let Some(v) = &self.corrections_applied {
-            writer.write_pair("CORRECTIONS_APPLIED", v);
+            writer.write_pair("CORRECTIONS_APPLIED", format!("{}", v));
         }
         writer.write_section("META_STOP");
     }
@@ -973,19 +1035,19 @@ pub enum TdmObservationData {
     ReceiveFreq5(f64),
     /// Received phase count for channel 1.
     #[serde(rename = "RECEIVE_PHASE_CT_1")]
-    ReceivePhaseCt1(String),
+    ReceivePhaseCt1(f64),
     /// Received phase count for channel 2.
     #[serde(rename = "RECEIVE_PHASE_CT_2")]
-    ReceivePhaseCt2(String),
+    ReceivePhaseCt2(f64),
     /// Received phase count for channel 3.
     #[serde(rename = "RECEIVE_PHASE_CT_3")]
-    ReceivePhaseCt3(String),
+    ReceivePhaseCt3(f64),
     /// Received phase count for channel 4.
     #[serde(rename = "RECEIVE_PHASE_CT_4")]
-    ReceivePhaseCt4(String),
+    ReceivePhaseCt4(f64),
     /// Received phase count for channel 5.
     #[serde(rename = "RECEIVE_PHASE_CT_5")]
-    ReceivePhaseCt5(String),
+    ReceivePhaseCt5(f64),
     /// Relative humidity observable.
     ///
     /// Units: %
@@ -1050,19 +1112,19 @@ pub enum TdmObservationData {
     TransmitFreqRate5(f64),
     /// Transmitted phase count for channel 1.
     #[serde(rename = "TRANSMIT_PHASE_CT_1")]
-    TransmitPhaseCt1(String),
+    TransmitPhaseCt1(f64),
     /// Transmitted phase count for channel 2.
     #[serde(rename = "TRANSMIT_PHASE_CT_2")]
-    TransmitPhaseCt2(String),
+    TransmitPhaseCt2(f64),
     /// Transmitted phase count for channel 3.
     #[serde(rename = "TRANSMIT_PHASE_CT_3")]
-    TransmitPhaseCt3(String),
+    TransmitPhaseCt3(f64),
     /// Transmitted phase count for channel 4.
     #[serde(rename = "TRANSMIT_PHASE_CT_4")]
-    TransmitPhaseCt4(String),
+    TransmitPhaseCt4(f64),
     /// Transmitted phase count for channel 5.
     #[serde(rename = "TRANSMIT_PHASE_CT_5")]
-    TransmitPhaseCt5(String),
+    TransmitPhaseCt5(f64),
     /// Dry zenith delay through the troposphere.
     ///
     /// Units: m
@@ -1132,16 +1194,6 @@ impl TdmObservationData {
 
     pub fn value_to_string(&self) -> String {
         match self {
-            Self::ReceivePhaseCt1(s)
-            | Self::ReceivePhaseCt2(s)
-            | Self::ReceivePhaseCt3(s)
-            | Self::ReceivePhaseCt4(s)
-            | Self::ReceivePhaseCt5(s)
-            | Self::TransmitPhaseCt1(s)
-            | Self::TransmitPhaseCt2(s)
-            | Self::TransmitPhaseCt3(s)
-            | Self::TransmitPhaseCt4(s)
-            | Self::TransmitPhaseCt5(s) => s.clone(),
             Self::Rhumidity(v) => v.value.to_string(),
             Self::Angle1(v)
             | Self::Angle2(v)
@@ -1164,6 +1216,11 @@ impl TdmObservationData {
             | Self::ReceiveFreq3(v)
             | Self::ReceiveFreq4(v)
             | Self::ReceiveFreq5(v)
+            | Self::ReceivePhaseCt1(v)
+            | Self::ReceivePhaseCt2(v)
+            | Self::ReceivePhaseCt3(v)
+            | Self::ReceivePhaseCt4(v)
+            | Self::ReceivePhaseCt5(v)
             | Self::Stec(v)
             | Self::Temperature(v)
             | Self::TransmitFreq1(v)
@@ -1176,6 +1233,11 @@ impl TdmObservationData {
             | Self::TransmitFreqRate3(v)
             | Self::TransmitFreqRate4(v)
             | Self::TransmitFreqRate5(v)
+            | Self::TransmitPhaseCt1(v)
+            | Self::TransmitPhaseCt2(v)
+            | Self::TransmitPhaseCt3(v)
+            | Self::TransmitPhaseCt4(v)
+            | Self::TransmitPhaseCt5(v)
             | Self::TropoDry(v)
             | Self::TropoWet(v)
             | Self::VlbiDelay(v) => v.to_string(),
@@ -1213,11 +1275,11 @@ impl TdmObservationData {
             "RECEIVE_FREQ_3" => Ok(Self::ReceiveFreq3(pf(val)?)),
             "RECEIVE_FREQ_4" => Ok(Self::ReceiveFreq4(pf(val)?)),
             "RECEIVE_FREQ_5" => Ok(Self::ReceiveFreq5(pf(val)?)),
-            "RECEIVE_PHASE_CT_1" => Ok(Self::ReceivePhaseCt1(val.to_string())),
-            "RECEIVE_PHASE_CT_2" => Ok(Self::ReceivePhaseCt2(val.to_string())),
-            "RECEIVE_PHASE_CT_3" => Ok(Self::ReceivePhaseCt3(val.to_string())),
-            "RECEIVE_PHASE_CT_4" => Ok(Self::ReceivePhaseCt4(val.to_string())),
-            "RECEIVE_PHASE_CT_5" => Ok(Self::ReceivePhaseCt5(val.to_string())),
+            "RECEIVE_PHASE_CT_1" => Ok(Self::ReceivePhaseCt1(pf(val)?)),
+            "RECEIVE_PHASE_CT_2" => Ok(Self::ReceivePhaseCt2(pf(val)?)),
+            "RECEIVE_PHASE_CT_3" => Ok(Self::ReceivePhaseCt3(pf(val)?)),
+            "RECEIVE_PHASE_CT_4" => Ok(Self::ReceivePhaseCt4(pf(val)?)),
+            "RECEIVE_PHASE_CT_5" => Ok(Self::ReceivePhaseCt5(pf(val)?)),
             "RHUMIDITY" => Ok(Self::Rhumidity(Percentage::new(pf(val)?, None)?)),
             "STEC" => Ok(Self::Stec(pf(val)?)),
             "TEMPERATURE" => Ok(Self::Temperature(pf(val)?)),
@@ -1231,11 +1293,11 @@ impl TdmObservationData {
             "TRANSMIT_FREQ_RATE_3" => Ok(Self::TransmitFreqRate3(pf(val)?)),
             "TRANSMIT_FREQ_RATE_4" => Ok(Self::TransmitFreqRate4(pf(val)?)),
             "TRANSMIT_FREQ_RATE_5" => Ok(Self::TransmitFreqRate5(pf(val)?)),
-            "TRANSMIT_PHASE_CT_1" => Ok(Self::TransmitPhaseCt1(val.to_string())),
-            "TRANSMIT_PHASE_CT_2" => Ok(Self::TransmitPhaseCt2(val.to_string())),
-            "TRANSMIT_PHASE_CT_3" => Ok(Self::TransmitPhaseCt3(val.to_string())),
-            "TRANSMIT_PHASE_CT_4" => Ok(Self::TransmitPhaseCt4(val.to_string())),
-            "TRANSMIT_PHASE_CT_5" => Ok(Self::TransmitPhaseCt5(val.to_string())),
+            "TRANSMIT_PHASE_CT_1" => Ok(Self::TransmitPhaseCt1(pf(val)?)),
+            "TRANSMIT_PHASE_CT_2" => Ok(Self::TransmitPhaseCt2(pf(val)?)),
+            "TRANSMIT_PHASE_CT_3" => Ok(Self::TransmitPhaseCt3(pf(val)?)),
+            "TRANSMIT_PHASE_CT_4" => Ok(Self::TransmitPhaseCt4(pf(val)?)),
+            "TRANSMIT_PHASE_CT_5" => Ok(Self::TransmitPhaseCt5(pf(val)?)),
             "TROPO_DRY" => Ok(Self::TropoDry(pf(val)?)),
             "TROPO_WET" => Ok(Self::TropoWet(pf(val)?)),
             "VLBI_DELAY" => Ok(Self::VlbiDelay(pf(val)?)),

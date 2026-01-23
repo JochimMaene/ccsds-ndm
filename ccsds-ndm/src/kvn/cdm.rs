@@ -36,6 +36,7 @@ pub fn cdm_version(input: &mut &str) -> KvnResult<String> {
 pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
     let mut comment = Vec::new();
     let mut creation_date = None;
+
     let mut originator = None;
     let mut message_for = None;
     let mut message_id = None;
@@ -175,6 +176,7 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
         stop_screen_period,
         screen_volume_frame,
         screen_volume_shape,
+
         screen_volume_x,
         screen_volume_y,
         screen_volume_z,
@@ -427,12 +429,12 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
         "TIME_LASTOB_END" => val: kv_epoch => { od_params.time_lastob_end = Some(val); has_od_params = true; },
         "RECOMMENDED_OD_SPAN" => val: kv_from_kvn => { od_params.recommended_od_span = Some(val); has_od_params = true; },
         "ACTUAL_OD_SPAN" => val: kv_from_kvn => { od_params.actual_od_span = Some(val); has_od_params = true; },
-        "OBS_AVAILABLE" => val: kv_u32 => { od_params.obs_available = Some(val); has_od_params = true; },
-        "OBS_USED" => val: kv_u32 => { od_params.obs_used = Some(val); has_od_params = true; },
-        "TRACKS_AVAILABLE" => val: kv_u32 => { od_params.tracks_available = Some(val); has_od_params = true; },
-        "TRACKS_USED" => val: kv_u32 => { od_params.tracks_used = Some(val); has_od_params = true; },
+        "OBS_AVAILABLE" => val: kv_u32 => { od_params.obs_available = Some(val.into()); has_od_params = true; },
+        "OBS_USED" => val: kv_u32 => { od_params.obs_used = Some(val.into()); has_od_params = true; },
+        "TRACKS_AVAILABLE" => val: kv_u32 => { od_params.tracks_available = Some(val.into()); has_od_params = true; },
+        "TRACKS_USED" => val: kv_u32 => { od_params.tracks_used = Some(val.into()); has_od_params = true; },
         "RESIDUALS_ACCEPTED" => val: kv_from_kvn => { od_params.residuals_accepted = Some(val); has_od_params = true; },
-        "WEIGHTED_RMS" => val: kv_float => { od_params.weighted_rms = Some(val); has_od_params = true; },
+        "WEIGHTED_RMS" => val: kv_float => { od_params.weighted_rms = Some(val.into()); has_od_params = true; },
 
         "AREA_PC" => val: kv_from_kvn => { add_params.area_pc = Some(val); has_add_params = true; },
         "AREA_DRG" => val: kv_from_kvn => { add_params.area_drg = Some(val); has_add_params = true; },
@@ -681,12 +683,14 @@ RELATIVE_POSITION_N = 30.0 [m]
 RELATIVE_VELOCITY_R = 0.1 [m/s]
 RELATIVE_VELOCITY_T = 0.2 [m/s]
 RELATIVE_VELOCITY_N = 0.3 [m/s]
+SCREEN_VOLUME_SHAPE = ELLIPSOID
 
 OBJECT = OBJECT1
 OBJECT_DESIGNATOR = 12345
 CATALOG_NAME = SATCAT
 OBJECT_NAME = SAT A
 INTERNATIONAL_DESIGNATOR = 1998-067A
+OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH1
 COVARIANCE_METHOD = CALCULATED
 MANEUVERABLE = YES
@@ -724,6 +728,7 @@ OBJECT_DESIGNATOR = 67890
 CATALOG_NAME = SATCAT
 OBJECT_NAME = SAT B
 INTERNATIONAL_DESIGNATOR = 2000-001A
+OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH1
 COVARIANCE_METHOD = CALCULATED
 MANEUVERABLE = NO
@@ -761,6 +766,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         let kvn = r###"CCSDS_CDM_VERS = 1.0
 CREATION_DATE = 2025-01-01T00:00:00
 ORIGINATOR = TEST
+MESSAGE_FOR = OPERATOR
 MESSAGE_ID = MSG-001
 
 TCA = 2025-01-02T12:00:00
@@ -783,6 +789,7 @@ OBJECT_DESIGNATOR = 00001
 CATALOG_NAME = CAT
 OBJECT_NAME = OBJ1
 INTERNATIONAL_DESIGNATOR = 1998-067A
+OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH1
 COVARIANCE_METHOD = CALCULATED
 MANEUVERABLE = YES
@@ -822,6 +829,7 @@ OBJECT_DESIGNATOR = 00002
 CATALOG_NAME = CAT
 OBJECT_NAME = OBJ2
 INTERNATIONAL_DESIGNATOR = 1998-067B
+OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH2
 COVARIANCE_METHOD = DEFAULT
 MANEUVERABLE = NO
@@ -899,6 +907,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
     fn header_missing_fields_error() {
         let kvn = r###"CCSDS_CDM_VERS = 1.0
 ORIGINATOR = TEST
+MESSAGE_FOR = SAT
 MESSAGE_ID = MSG-001
 "###;
         let err = Cdm::from_kvn(kvn).unwrap_err();
@@ -919,15 +928,18 @@ MESSAGE_ID = MSG-001
         let kvn = r###"CCSDS_CDM_VERS = 1.0
 CREATION_DATE = 2025-01-01T00:00:00
 ORIGINATOR = TEST
+MESSAGE_FOR = TEST_SAT
 MESSAGE_ID = MSG-ONE
 
 TCA = 2025-01-02T12:00:00
 MISS_DISTANCE = 100.0 [m]
+SCREEN_VOLUME_SHAPE = BOX
 OBJECT = OBJECT1
 OBJECT_DESIGNATOR = 00001
 CATALOG_NAME = CAT
 OBJECT_NAME = OBJ1
 INTERNATIONAL_DESIGNATOR = 1998-067A
+OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH1
 COVARIANCE_METHOD = CALCULATED
 MANEUVERABLE = YES
@@ -973,10 +985,12 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         let kvn = r###"CCSDS_CDM_VERS = 1.0
 CREATION_DATE = 2025-01-01T00:00:00
 ORIGINATOR = TEST
+MESSAGE_FOR = SAT
 MESSAGE_ID = MSG-001
 
 TCA = 2025-01-02T12:00:00
 MISS_DISTANCE = 100.0 [m]
+SCREEN_VOLUME_SHAPE = BOX
 RELATIVE_POSITION_R = 10.0 [m]
 RELATIVE_POSITION_T = -20.0 [m]
 RELATIVE_POSITION_N = 5.0 [m]
@@ -988,6 +1002,7 @@ OBJECT_DESIGNATOR = 1
 CATALOG_NAME = CAT
 OBJECT_NAME = O1
 INTERNATIONAL_DESIGNATOR = 1998-067A
+OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH1
 COVARIANCE_METHOD = CALCULATED
 MANEUVERABLE = YES
@@ -1024,6 +1039,7 @@ OBJECT_DESIGNATOR = 2
 CATALOG_NAME = CAT
 OBJECT_NAME = O2
 INTERNATIONAL_DESIGNATOR = 1998-067B
+OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH2
 COVARIANCE_METHOD = DEFAULT
 MANEUVERABLE = NO
@@ -1150,94 +1166,10 @@ ORIGINATOR = TEST
 
     #[test]
     fn header_with_message_for() {
-        let kvn = r###"CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_FOR = OPERATOR
-MESSAGE_ID = MSG-001
-
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 00001
-CATALOG_NAME = CAT
-OBJECT_NAME = OBJ1
-INTERNATIONAL_DESIGNATOR = 1998-067A
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = EME2000
-
-X = 1.0 [km]
-Y = 2.0 [km]
-Z = 3.0 [km]
-X_DOT = 0.1 [km/s]
-Y_DOT = 0.2 [km/s]
-Z_DOT = 0.3 [km/s]
-
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-
-OBJECT = OBJECT2
-OBJECT_DESIGNATOR = 00002
-CATALOG_NAME = CAT
-OBJECT_NAME = OBJ2
-INTERNATIONAL_DESIGNATOR = 1998-067B
-EPHEMERIS_NAME = EPH2
-COVARIANCE_METHOD = DEFAULT
-MANEUVERABLE = NO
-REF_FRAME = EME2000
-
-X = -1.0 [km]
-Y = -2.0 [km]
-Z = -3.0 [km]
-X_DOT = -0.1 [km/s]
-Y_DOT = -0.2 [km/s]
-Z_DOT = -0.3 [km/s]
-
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-"###;
-        let cdm = Cdm::from_kvn(kvn).expect("should parse with MESSAGE_FOR");
-        assert_eq!(cdm.header.message_for, Some("OPERATOR".to_string()));
+        let mut kvn = sample_cdm_kvn();
+        kvn = kvn.replace("MESSAGE_FOR = OPERATOR", "MESSAGE_FOR = NEW_OPERATOR");
+        let cdm = Cdm::from_kvn(&kvn).expect("should parse with MESSAGE_FOR");
+        assert_eq!(cdm.header.message_for, Some("NEW_OPERATOR".to_string()));
     }
 
     #[test]
@@ -1312,7 +1244,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         // Add optional metadata fields
         kvn = kvn.replace(
             "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = PAYLOAD\nOPERATOR_CONTACT_POSITION = Flight Director\nOPERATOR_ORGANIZATION = NASA\nOPERATOR_PHONE = +1-555-1234\nOPERATOR_EMAIL = contact@nasa.gov\nORBIT_CENTER = EARTH\nGRAVITY_MODEL = EGM-96\nATMOSPHERIC_MODEL = JACCHIA 70\nN_BODY_PERTURBATIONS = MOON, SUN\nSOLAR_RAD_PRESSURE = YES\nEARTH_TIDES = YES\nINTRACK_THRUST = YES",
+            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOPERATOR_CONTACT_POSITION = Flight Director\nOPERATOR_ORGANIZATION = NASA\nOPERATOR_PHONE = +1-555-1234\nOPERATOR_EMAIL = contact@nasa.gov\nORBIT_CENTER = EARTH\nGRAVITY_MODEL = EGM-96\nATMOSPHERIC_MODEL = JACCHIA 70 DCA\nN_BODY_PERTURBATIONS = MOON, SUN\nSOLAR_RAD_PRESSURE = YES\nEARTH_TIDES = YES\nINTRACK_THRUST = YES",
         );
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with optional metadata");
@@ -1338,7 +1270,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         assert_eq!(seg1.metadata.gravity_model, Some("EGM-96".to_string()));
         assert_eq!(
             seg1.metadata.atmospheric_model,
-            Some("JACCHIA 70".to_string())
+            Some("JACCHIA 70 DCA".to_string())
         );
         assert_eq!(
             seg1.metadata.n_body_perturbations,
@@ -1353,10 +1285,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
     fn metadata_object_types() {
         // Test ROCKET BODY
         let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = ROCKET BODY",
-        );
+        kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = ROCKET BODY");
         let cdm = Cdm::from_kvn(&kvn).expect("parse");
         assert_eq!(
             cdm.body.segments[0].metadata.object_type,
@@ -1365,10 +1294,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         // Test DEBRIS
         let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = DEBRIS",
-        );
+        kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = DEBRIS");
         let cdm = Cdm::from_kvn(&kvn).expect("parse");
         assert_eq!(
             cdm.body.segments[0].metadata.object_type,
@@ -1377,10 +1303,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         // Test UNKNOWN
         let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = UNKNOWN",
-        );
+        kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = UNKNOWN");
         let cdm = Cdm::from_kvn(&kvn).expect("parse");
         assert_eq!(
             cdm.body.segments[0].metadata.object_type,
@@ -1389,10 +1312,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         // Test OTHER
         let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = OTHER",
-        );
+        kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = OTHER");
         let cdm = Cdm::from_kvn(&kvn).expect("parse");
         assert_eq!(
             cdm.body.segments[0].metadata.object_type,
@@ -1401,10 +1321,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 
         // Test fallback to OTHER for unknown values
         let mut kvn = sample_cdm_kvn();
-        kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOBJECT_TYPE = SATELLITE",
-        );
+        kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = SATELLITE");
         let cdm = Cdm::from_kvn(&kvn).expect("parse");
         assert_eq!(
             cdm.body.segments[0].metadata.object_type,

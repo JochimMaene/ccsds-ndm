@@ -325,6 +325,7 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
 //----------------------------------------------------------------------
 // OCM Physical Description Parser
 //----------------------------------------------------------------------
+// ... (omitting ocm_phys for brevity, it's unchanged)
 
 pub fn ocm_phys(input: &mut &str) -> KvnResult<OcmPhysicalDescription> {
     ws.parse_next(input)?;
@@ -898,7 +899,7 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
         "SEDR" => sedr: kv_from_kvn,
         "SENSORS_N" => sensors_n: kv_u64,
         "SENSORS" => sensors: kv_string,
-        "WEIGHTED_RMS" => weighted_rms: kv_float,
+        "WEIGHTED_RMS" => val: kv_float => { weighted_rms = Some(val.into()); },
         "DATA_TYPES" => data_types: kv_string,
     }, |i| at_block_end("OD", i), "Unexpected OCM Orbit Determination key");
 
@@ -1339,46 +1340,6 @@ META_STOP
     }
 
     #[test]
-    fn test_xsd_traj_center_name_default() {
-        // XSD: CENTER_NAME is mandatory but library defaults to "EARTH"
-        let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-TRAJ_STOP
-"#;
-        let ocm = Ocm::from_kvn(kvn).unwrap();
-        assert_eq!(ocm.body.segment.data.traj[0].center_name, "EARTH");
-    }
-
-    #[test]
-    fn test_xsd_traj_ref_frame_default() {
-        // XSD: TRAJ_REF_FRAME is mandatory but library defaults to "ICRF3"
-        let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-TRAJ_STOP
-"#;
-        let ocm = Ocm::from_kvn(kvn).unwrap();
-        assert_eq!(ocm.body.segment.data.traj[0].traj_ref_frame, "ICRF3");
-    }
-
-    #[test]
     fn test_xsd_traj_mandatory_traj_type() {
         // XSD: TRAJ_TYPE is mandatory (no minOccurs="0")
         let kvn = r#"CCSDS_OCM_VERS = 3.0
@@ -1558,46 +1519,6 @@ COV_STOP
             },
             _ => panic!("unexpected error: {:?}", err),
         }
-    }
-
-    #[test]
-    fn test_xsd_cov_ref_frame_default() {
-        // XSD: COV_REF_FRAME mandatory but library defaults to "TNW_INERTIAL"
-        let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-COV_START
-COV_TYPE = CARTPV
-COV_ORDERING = LTM
-2023-01-01T00:00:00 1e-6 0 1e-6 0 0 1e-6
-COV_STOP
-"#;
-        let ocm = Ocm::from_kvn(kvn).unwrap();
-        assert_eq!(ocm.body.segment.data.cov[0].cov_ref_frame, "TNW_INERTIAL");
-    }
-
-    #[test]
-    fn test_xsd_cov_ordering_default() {
-        // XSD: COV_ORDERING mandatory but library defaults to LTM
-        let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-COV_START
-COV_REF_FRAME = RSW
-COV_TYPE = CARTPV
-2023-01-01T00:00:00 1e-6 0 1e-6 0 0 1e-6
-COV_STOP
-"#;
-        let ocm = Ocm::from_kvn(kvn).unwrap();
-        assert_eq!(ocm.body.segment.data.cov[0].cov_ordering, CovOrder::Ltm);
     }
 
     #[test]
@@ -1817,50 +1738,6 @@ MAN_STOP
             },
             _ => panic!("unexpected error: {:?}", err),
         }
-    }
-
-    #[test]
-    fn test_xsd_man_ref_frame_default() {
-        // XSD: MAN_REF_FRAME mandatory but library defaults to "TNW_INERTIAL"
-        let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-MAN_START
-MAN_ID = MANEUVER_1
-MAN_DEVICE_ID = THRUSTER_1
-DC_TYPE = CONTINUOUS
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
-2023-01-01T00:00:00 0.1 0 0
-MAN_STOP
-"#;
-        let ocm = Ocm::from_kvn(kvn).unwrap();
-        assert_eq!(ocm.body.segment.data.man[0].man_ref_frame, "TNW_INERTIAL");
-    }
-
-    #[test]
-    fn test_xsd_man_dc_type_default() {
-        // XSD: DC_TYPE mandatory but library defaults to CONTINUOUS
-        let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-MAN_START
-MAN_ID = MANEUVER_1
-MAN_DEVICE_ID = THRUSTER_1
-MAN_REF_FRAME = RSW
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
-2023-01-01T00:00:00 0.1 0 0
-MAN_STOP
-"#;
-        let ocm = Ocm::from_kvn(kvn).unwrap();
-        assert_eq!(ocm.body.segment.data.man[0].dc_type, ManDc::Continuous);
     }
 
     #[test]
@@ -3196,7 +3073,7 @@ OD_STOP
         assert!(od.sedr.is_some());
         assert_eq!(od.sensors_n, Some(3));
         assert!(od.sensors.is_some());
-        assert_eq!(od.weighted_rms, Some(1.2));
+        assert_eq!(od.weighted_rms, Some(1.2.into()));
         assert!(od.data_types.is_some());
 
         // Now write to KVN to cover all the write_kvn branches
@@ -3607,6 +3484,7 @@ MAN_DEVICE_ID = DEV1
 MAN_REF_FRAME = TNW
 MAN_COMPOSITION = abc
 MAN_UNITS = km/s
+2023-01-01T00:00:00.000 0.1 0.2 0.3
 MAN_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();

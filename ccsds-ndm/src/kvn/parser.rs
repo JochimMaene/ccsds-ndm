@@ -999,9 +999,9 @@ pub fn spacecraft_parameters(input: &mut &str) -> KvnResult<Option<SpacecraftPar
     parse_block!(input, comment, {
         "MASS" => mass: kv_from_kvn,
         "SOLAR_RAD_AREA" => solar_rad_area: kv_from_kvn,
-        "SOLAR_RAD_COEFF" => solar_rad_coeff: kv_float,
+        "SOLAR_RAD_COEFF" => val: kv_float => { solar_rad_coeff = Some(val.into()); },
         "DRAG_AREA" => drag_area: kv_from_kvn,
-        "DRAG_COEFF" => drag_coeff: kv_float,
+        "DRAG_COEFF" => val: kv_float => { drag_coeff = Some(val.into()); },
     }, |_| false);
 
     // If we have any spacecraft data, build the struct

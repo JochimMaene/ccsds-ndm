@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::OdmHeader;
-use crate::error::Result;
+use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use fast_float;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 //----------------------------------------------------------------------
 // Root OCM Structure
@@ -44,15 +45,131 @@ impl Ndm for Ocm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        Self::from_kvn_str(kvn)
+        let ocm = Self::from_kvn_str(kvn)?;
+        ocm.validate()?;
+        Ok(ocm)
     }
 
     fn to_xml(&self) -> Result<String> {
+        self.validate()?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str_with_context(xml, "OCM")
+        let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
+        ocm.validate()?;
+        Ok(ocm)
+    }
+}
+
+impl Ocm {
+    pub fn validate(&self) -> Result<()> {
+        self.body.segment.validate(&self.header)
+    }
+}
+
+impl OcmSegment {
+    pub fn validate(&self, _header: &OdmHeader) -> Result<()> {
+        self.data.validate(&self.metadata)
+    }
+}
+
+impl OcmData {
+    pub fn validate(&self, _metadata: &OcmMetadata) -> Result<()> {
+        for traj in &self.traj {
+            traj.validate()?;
+        }
+        if let Some(phys) = &self.phys {
+            phys.validate()?;
+        }
+        for cov in &self.cov {
+            cov.validate()?;
+        }
+        for man in &self.man {
+            man.validate()?;
+        }
+        if let Some(pert) = &self.pert {
+            pert.validate()?;
+        }
+        if let Some(od) = &self.od {
+            od.validate()?;
+        }
+        OcmTrajState::validate_all(&self.traj)?;
+        Ok(())
+    }
+}
+
+impl OcmPhysicalDescription {
+    fn validate(&self) -> Result<()> {
+        if let Some(v) = self.drag_coeff_nom {
+            if v <= 0.0 {
+                return Err(ValidationError::OutOfRange {
+                    name: "DRAG_COEFF_NOM".into(),
+                    value: v.to_string(),
+                    expected: "> 0".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl OcmTrajState {
+    fn validate(&self) -> Result<()> {
+        if self.traj_lines.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("TRAJ"),
+                field: Cow::Borrowed("trajLine"),
+                line: None,
+            }
+            .into());
+        }
+        if let Some(rev) = self.orb_revnum {
+            if rev < 0.0 {
+                return Err(ValidationError::Generic {
+                    message: Cow::Borrowed("ORB_REVNUM must be non-negative"),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+
+    // Example of cross-block validation (not strictly required by spec but good practice)
+    fn validate_all(_trajs: &[OcmTrajState]) -> Result<()> {
+        // Could check for overlapping time spans or duplicate IDs
+        Ok(())
+    }
+}
+
+impl OcmCovarianceMatrix {
+    fn validate(&self) -> Result<()> {
+        if self.cov_lines.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("COV"),
+                field: Cow::Borrowed("covLine"),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl OcmManeuverParameters {
+    fn validate(&self) -> Result<()> {
+        if self.man_lines.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("MAN"),
+                field: Cow::Borrowed("manLine"),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
     }
 }
 
@@ -2724,7 +2841,7 @@ pub struct OcmOdParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub weighted_rms: Option<f64>,
+    pub weighted_rms: Option<NonNegativeDouble>,
     /// Comma-separated list of observation data types utilized in this orbit determination.
     ///
     /// **Examples**: RANGE, DOPPLER
@@ -2805,7 +2922,7 @@ impl ToKvn for OcmOdParameters {
             writer.write_pair("CONSIDER_PARAMS", v);
         }
         if let Some(v) = &self.sedr {
-            writer.write_measure("SEDR", v);
+            writer.write_measure("SEDR", &v.to_unit_value());
         }
         if let Some(v) = &self.sensors_n {
             writer.write_pair("SENSORS_N", v);
@@ -2823,11 +2940,116 @@ impl ToKvn for OcmOdParameters {
     }
 }
 
+impl OcmPerturbations {
+    fn validate(&self) -> Result<()> {
+        if let Some(v) = self.oblate_flattening {
+            if v <= 0.0 {
+                return Err(ValidationError::OutOfRange {
+                    name: "OBLATE_FLATTENING".into(),
+                    value: v.to_string(),
+                    expected: "> 0".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        if let Some(v) = self.albedo_grid_size {
+            if v == 0 {
+                return Err(ValidationError::OutOfRange {
+                    name: "ALBEDO_GRID_SIZE".into(),
+                    value: v.to_string(),
+                    expected: ">= 1".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl OcmOdParameters {
+    fn validate(&self) -> Result<()> {
+        for (name, val) in [
+            ("OBS_AVAILABLE", self.obs_available),
+            ("OBS_USED", self.obs_used),
+            ("TRACKS_AVAILABLE", self.tracks_available),
+            ("TRACKS_USED", self.tracks_used),
+            ("SOLVE_N", self.solve_n),
+            ("CONSIDER_N", self.consider_n),
+            ("SENSORS_N", self.sensors_n),
+        ] {
+            if let Some(v) = val {
+                if v == 0 {
+                    return Err(ValidationError::OutOfRange {
+                        name: name.into(),
+                        value: v.to_string(),
+                        expected: ">= 1".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+
+        for (name, val) in [
+            ("GDOP", self.gdop),
+            ("WEIGHTED_RMS", self.weighted_rms.map(|v| v.value)),
+        ] {
+            if let Some(v) = val {
+                if v < 0.0 {
+                    return Err(ValidationError::OutOfRange {
+                        name: name.into(),
+                        value: v.to_string(),
+                        expected: ">= 0".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use crate::traits::Ndm;
+
+    #[test]
+    fn test_ocm_validation_traj_lines() {
+        let mut ocm = Ocm::default();
+        // Only 1 mandatory segment
+
+        let traj = OcmTrajState::default();
+        // Missing lines
+        ocm.body.segment.data.traj.push(traj);
+        assert!(ocm.validate().is_err());
+
+        // Fix it
+        ocm.body.segment.data.traj[0].traj_lines.push(TrajLine {
+            epoch: "2000-01-01T00:00:00".to_string(),
+            values: vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        });
+        assert!(ocm.validate().is_ok());
+    }
+
+    #[test]
+    fn test_ocm_validation_orb_revnum() {
+        let mut traj = OcmTrajState::default();
+        traj.traj_lines.push(TrajLine {
+            epoch: "2000-01-01T00:00:00".to_string(),
+            values: vec![1.0],
+        });
+        traj.orb_revnum = Some(-1.0);
+
+        assert!(traj.validate().is_err());
+
+        traj.orb_revnum = Some(0.0);
+        assert!(traj.validate().is_ok());
+    }
 
     #[test]
     fn parse_simple_ocm() {

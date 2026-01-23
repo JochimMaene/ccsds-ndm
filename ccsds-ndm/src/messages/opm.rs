@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
-use crate::error::Result;
+use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 //----------------------------------------------------------------------
 // Root OPM Structure
@@ -47,16 +48,26 @@ impl Ndm for Opm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        // Use the new winnow-based parser
-        Self::from_kvn_str(kvn)
+        let omm = Self::from_kvn_str(kvn)?;
+        omm.validate()?;
+        Ok(omm)
     }
 
     fn to_xml(&self) -> Result<String> {
+        self.validate()?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str_with_context(xml, "OPM")
+        let omm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
+        omm.validate()?;
+        Ok(omm)
+    }
+}
+
+impl Opm {
+    pub fn validate(&self) -> Result<()> {
+        self.body.segment.data.validate()
     }
 }
 
@@ -235,6 +246,15 @@ pub struct OpmData {
     pub user_defined_parameters: Option<UserDefined>,
 }
 
+impl OpmData {
+    pub fn validate(&self) -> Result<()> {
+        if let Some(ke) = &self.keplerian_elements {
+            ke.validate()?;
+        }
+        Ok(())
+    }
+}
+
 impl ToKvn for OpmData {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -315,7 +335,7 @@ pub struct KeplerianElements {
     /// **Examples**: 0.001
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    pub eccentricity: f64,
+    pub eccentricity: NonNegativeDouble,
     /// Inclination.
     ///
     /// **Examples**: 51.6
@@ -368,6 +388,21 @@ pub struct KeplerianElements {
     pub gm: Gm,
 }
 
+impl KeplerianElements {
+    pub fn validate(&self) -> Result<()> {
+        match (self.true_anomaly.is_some(), self.mean_anomaly.is_some()) {
+            (true, false) | (false, true) => Ok(()),
+            _ => Err(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "Keplerian Elements must have exactly one of TRUE_ANOMALY or MEAN_ANOMALY",
+                ),
+                line: None,
+            }
+            .into()),
+        }
+    }
+}
+
 impl ToKvn for KeplerianElements {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -412,12 +447,15 @@ pub struct ManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub man_duration: Duration,
-    /// Mass change during maneuver (value is < 0).
+    /// Mass change during maneuver.
     ///
     /// **Units**: kg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    pub man_delta_mass: DeltaMassZ, // Must be <= 0
+    ///
+    /// **Note**: The CCSDS standard requires this value to be strictly negative (`< 0`).
+    /// However, this implementation allows non-negative values to support non-standard use cases.
+    pub man_delta_mass: DeltaMassZ,
     /// Reference frame in which the velocity increment vector data are given. The user must select
     /// from the accepted set of values indicated in 3.2.4.11.
     ///
@@ -923,7 +961,7 @@ GM = 398600.4 [km**3/s**2]
 "#;
         let opm = Opm::from_kvn(kvn).unwrap();
         let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
-        assert_eq!(kep.eccentricity, 0.0);
+        assert_eq!(kep.eccentricity, 0.0.into());
     }
 
     #[test]
@@ -1135,9 +1173,9 @@ DRAG_COEFF = 2.2
             .unwrap();
         assert_eq!(sp.mass.as_ref().unwrap().value, 500.0);
         assert_eq!(sp.solar_rad_area.as_ref().unwrap().value, 10.0);
-        assert_eq!(sp.solar_rad_coeff.as_ref().unwrap(), &1.2);
+        assert_eq!(sp.solar_rad_coeff.as_ref().unwrap(), &1.2.into());
         assert_eq!(sp.drag_area.as_ref().unwrap().value, 8.0);
-        assert_eq!(sp.drag_coeff.as_ref().unwrap(), &2.2);
+        assert_eq!(sp.drag_coeff.as_ref().unwrap(), &2.2.into());
     }
 
     #[test]
@@ -1170,8 +1208,8 @@ DRAG_COEFF = 0.0
             .spacecraft_parameters
             .as_ref()
             .unwrap();
-        assert_eq!(sp.solar_rad_coeff.as_ref().unwrap(), &0.0);
-        assert_eq!(sp.drag_coeff.as_ref().unwrap(), &0.0);
+        assert_eq!(sp.solar_rad_coeff.as_ref().unwrap(), &0.0.into());
+        assert_eq!(sp.drag_coeff.as_ref().unwrap(), &0.0.into());
     }
 
     #[test]

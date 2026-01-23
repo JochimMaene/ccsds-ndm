@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters};
-use crate::error::{EnumParseError, Result};
+use crate::error::{EnumParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::str::FromStr;
 
 //----------------------------------------------------------------------
@@ -176,15 +177,27 @@ impl Ndm for Omm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        Self::from_kvn_str(kvn)
+        let omm = Self::from_kvn_str(kvn)?;
+        omm.validate()?;
+        Ok(omm)
     }
 
     fn to_xml(&self) -> Result<String> {
+        self.validate()?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str_with_context(xml, "OMM")
+        let omm: Self = crate::xml::from_str_with_context(xml, "OMM")?;
+        omm.validate()?;
+        Ok(omm)
+    }
+}
+
+impl Omm {
+    /// Validates the OMM against CCSDS constraints that cannot be checked during parsing.
+    pub fn validate(&self) -> Result<()> {
+        self.body.segment.validate()
     }
 }
 
@@ -214,6 +227,12 @@ impl ToKvn for OmmSegment {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         self.metadata.write_kvn(writer);
         self.data.write_kvn(writer);
+    }
+}
+
+impl OmmSegment {
+    pub fn validate(&self) -> Result<()> {
+        self.data.validate(&self.metadata)
     }
 }
 
@@ -406,6 +425,45 @@ impl ToKvn for OmmData {
     }
 }
 
+impl OmmData {
+    pub fn validate(&self, metadata: &OmmMetadata) -> Result<()> {
+        let theory = metadata.mean_element_theory.as_str();
+
+        self.mean_elements.validate()?;
+
+        // 1. Validate TLE Parameters presence based on theory
+        match theory {
+            "SGP" | "SGP4" | "PPT3" | "SGP4-XP" => {
+                let tle =
+                    self.tle_parameters
+                        .as_ref()
+                        .ok_or(ValidationError::MissingRequiredField {
+                            block: Cow::Borrowed("OMM Data"),
+                            field: Cow::Borrowed("TLE_PARAMETERS"),
+                            line: None,
+                        })?;
+                tle.validate(theory)?;
+            }
+            _ => {
+                // Not strictly required for other theories
+            }
+        }
+
+        // 2. Validate Mean Motion vs Semi Major Axis
+        // If SGP/SGP4, MEAN_MOTION is preferred/required.
+        if matches!(theory, "SGP" | "SGP4") && self.mean_elements.mean_motion.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("Mean Elements"),
+                field: Cow::Borrowed("MEAN_MOTION"),
+                line: None,
+            }
+            .into());
+        }
+
+        Ok(())
+    }
+}
+
 //----------------------------------------------------------------------
 // Mean Elements
 //----------------------------------------------------------------------
@@ -450,7 +508,7 @@ pub struct MeanElements {
     /// **Examples**: 0.7303
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    pub eccentricity: f64,
+    pub eccentricity: NonNegativeDouble,
     /// Inclination.
     ///
     /// **Examples**: 63.4
@@ -492,6 +550,21 @@ pub struct MeanElements {
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gm: Option<Gm>,
+}
+
+impl MeanElements {
+    pub fn validate(&self) -> Result<()> {
+        match (self.semi_major_axis.is_some(), self.mean_motion.is_some()) {
+            (true, false) | (false, true) => Ok(()),
+            _ => Err(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "Mean Elements must have exactly one of SEMI_MAJOR_AXIS or MEAN_MOTION",
+                ),
+                line: None,
+            }
+            .into()),
+        }
+    }
 }
 
 impl ToKvn for MeanElements {
@@ -573,7 +646,7 @@ pub struct TleParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub element_set_no: Option<u32>,
+    pub element_set_no: Option<ElementSetNo>,
     /// Number of revolutions at epoch.
     ///
     /// **Examples**: 120
@@ -611,8 +684,7 @@ pub struct TleParameters {
     /// **Units**: rev/day²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mean_motion_dot: Option<MeanMotionDot>,
+    pub mean_motion_dot: MeanMotionDot,
     /// MEAN_ELEMENT_THEORY= SGP or PPT3: Second Time Derivative of Mean Motion (i.e., a drag term).
     /// (See 4.2.4.7 for important details).
     ///
@@ -660,15 +732,60 @@ impl ToKvn for TleParameters {
         if let Some(v) = &self.bterm {
             writer.write_measure("BTERM", v);
         }
-        if let Some(v) = &self.mean_motion_dot {
-            writer.write_measure("MEAN_MOTION_DOT", v);
-        }
+        writer.write_measure("MEAN_MOTION_DOT", &self.mean_motion_dot);
         if let Some(v) = &self.mean_motion_ddot {
             writer.write_measure("MEAN_MOTION_DDOT", v);
         }
         if let Some(v) = &self.agom {
             writer.write_measure("AGOM", v);
         }
+    }
+}
+
+impl TleParameters {
+    pub fn validate(&self, theory: &str) -> Result<()> {
+        match theory {
+            "SGP" | "PPT3" => {
+                if self.mean_motion_ddot.is_none() {
+                    return Err(ValidationError::MissingRequiredField {
+                        block: Cow::Borrowed("TLE Parameters"),
+                        field: Cow::Borrowed("MEAN_MOTION_DDOT"),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+            "SGP4" => {
+                if self.bstar.is_none() {
+                    return Err(ValidationError::MissingRequiredField {
+                        block: Cow::Borrowed("TLE Parameters"),
+                        field: Cow::Borrowed("BSTAR"),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+            "SGP4-XP" => {
+                if self.bterm.is_none() {
+                    return Err(ValidationError::MissingRequiredField {
+                        block: Cow::Borrowed("TLE Parameters"),
+                        field: Cow::Borrowed("BTERM"),
+                        line: None,
+                    }
+                    .into());
+                }
+                if self.agom.is_none() {
+                    return Err(ValidationError::MissingRequiredField {
+                        block: Cow::Borrowed("TLE Parameters"),
+                        field: Cow::Borrowed("AGOM"),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+            _ => {}
+        }
+        Ok(())
     }
 }
 

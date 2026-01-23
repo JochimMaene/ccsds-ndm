@@ -10,7 +10,10 @@ use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
-use crate::types::{ControlledType, Epoch, ObjectDescription, PositionRequired, YesNo};
+use crate::types::{
+    ControlledType, DisintegrationType, Distance, Epoch, ImpactUncertaintyType, ObjectDescription,
+    ReentryUncertaintyMethodType, UserDefined, YesNo,
+};
 use serde::{Deserialize, Serialize};
 
 //----------------------------------------------------------------------
@@ -56,7 +59,6 @@ impl Ndm for Rdm {
 // Header
 //----------------------------------------------------------------------
 
-/// The RDM Header provides information about the message.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmHeader {
@@ -238,22 +240,16 @@ pub struct RdmMetadata {
     ///
     /// Examples: 200.0 [km]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub drag_parameters_altitude: Option<PositionRequired>,
-    /// The method used to compute re-entry uncertainty.
-    ///
-    /// Examples: MONTE-CARLO, ANALYTICAL
+    pub drag_parameters_altitude: Option<Distance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reentry_uncertainty_method: Option<String>,
-    /// The method used to model the object’s disintegration.
-    ///
-    /// Examples: MASS-LOSS, BREAK-UP, NONE
+    pub reentry_uncertainty_method: Option<ReentryUncertaintyMethodType>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reentry_disintegration: Option<String>,
+    pub reentry_disintegration: Option<DisintegrationType>,
     /// The method used to compute impact uncertainty.
     ///
     /// Examples: MONTE-CARLO, ANALYTICAL
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub impact_uncertainty_method: Option<String>,
+    pub impact_uncertainty_method: Option<ImpactUncertaintyType>,
     /// The ID of the previous message for this object.
     ///
     /// Examples: ESA/20180421-007
@@ -282,8 +278,8 @@ impl ToKvn for RdmMetadata {
         if let Some(v) = &self.object_designator {
             writer.write_pair("OBJECT_DESIGNATOR", v);
         }
-        if let Some(v) = &self.object_type {
-            writer.write_pair("OBJECT_TYPE", v);
+        if let Some(ref v) = self.object_type {
+            writer.write_pair("OBJECT_TYPE", format!("{:?}", v).to_uppercase());
         }
         if let Some(v) = &self.object_owner {
             writer.write_pair("OBJECT_OWNER", v);
@@ -291,7 +287,7 @@ impl ToKvn for RdmMetadata {
         if let Some(v) = &self.object_operator {
             writer.write_pair("OBJECT_OPERATOR", v);
         }
-        writer.write_pair("CONTROLLED_REENTRY", &self.controlled_reentry);
+        writer.write_pair("CONTROLLED_REENTRY", format!("{}", self.controlled_reentry));
         writer.write_pair("CENTER_NAME", &self.center_name);
         writer.write_pair("TIME_SYSTEM", &self.time_system);
         writer.write_pair("EPOCH_TZERO", self.epoch_tzero);
@@ -323,7 +319,7 @@ impl ToKvn for RdmMetadata {
             writer.write_pair("EARTH_TIDES", v);
         }
         if let Some(v) = &self.intrack_thrust {
-            writer.write_pair("INTRACK_THRUST", v);
+            writer.write_pair("INTRACK_THRUST", format!("{}", v));
         }
         if let Some(v) = &self.drag_parameters_source {
             writer.write_pair("DRAG_PARAMETERS_SOURCE", v);
@@ -332,13 +328,19 @@ impl ToKvn for RdmMetadata {
             writer.write_pair("DRAG_PARAMETERS_ALTITUDE", v);
         }
         if let Some(v) = &self.reentry_uncertainty_method {
-            writer.write_pair("REENTRY_UNCERTAINTY_METHOD", v);
+            writer.write_pair(
+                "REENTRY_UNCERTAINTY_METHOD",
+                format!("{:?}", v).to_uppercase(),
+            );
         }
         if let Some(v) = &self.reentry_disintegration {
-            writer.write_pair("REENTRY_DISINTEGRATION", v);
+            writer.write_pair("REENTRY_DISINTEGRATION", format!("{}", v));
         }
         if let Some(v) = &self.impact_uncertainty_method {
-            writer.write_pair("IMPACT_UNCERTAINTY_METHOD", v);
+            writer.write_pair(
+                "IMPACT_UNCERTAINTY_METHOD",
+                format!("{:?}", v).to_uppercase(),
+            );
         }
         if let Some(v) = &self.previous_message_id {
             writer.write_pair("PREVIOUS_MESSAGE_ID", v);
@@ -402,8 +404,12 @@ pub struct RdmData {
     )]
     pub od_parameters: Option<OdParameters>,
     /// User defined parameters.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub user_defined_parameters: Vec<(String, String)>,
+    #[serde(
+        rename = "userDefinedParameters",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub user_defined_parameters: Option<UserDefined>,
 }
 
 impl ToKvn for RdmData {
@@ -600,8 +606,11 @@ impl ToKvn for RdmData {
             }
         }
 
-        for (k, v) in &self.user_defined_parameters {
-            writer.write_pair(k, v);
+        if let Some(ud) = &self.user_defined_parameters {
+            writer.write_comments(&ud.comment);
+            for p in &ud.user_defined {
+                writer.write_pair(&p.parameter, &p.value);
+            }
         }
     }
 }

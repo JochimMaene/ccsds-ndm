@@ -142,9 +142,9 @@ pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
         "INTRACK_THRUST" => intrack_thrust: kv_yes_no,
         "DRAG_PARAMETERS_SOURCE" => drag_parameters_source: kv_string,
         "DRAG_PARAMETERS_ALTITUDE" => drag_parameters_altitude: kv_from_kvn,
-        "REENTRY_UNCERTAINTY_METHOD" => reentry_uncertainty_method: kv_string,
-        "REENTRY_DISINTEGRATION" => reentry_disintegration: kv_string,
-        "IMPACT_UNCERTAINTY_METHOD" => impact_uncertainty_method: kv_string,
+        "REENTRY_UNCERTAINTY_METHOD" => reentry_uncertainty_method: kv_enum,
+        "REENTRY_DISINTEGRATION" => reentry_disintegration: kv_enum,
+        "IMPACT_UNCERTAINTY_METHOD" => impact_uncertainty_method: kv_enum,
         "PREVIOUS_MESSAGE_ID" => previous_message_id: kv_string,
         "PREVIOUS_MESSAGE_EPOCH" => previous_message_epoch: kv_epoch,
         "NEXT_MESSAGE_EPOCH" => next_message_epoch: kv_epoch,
@@ -254,7 +254,7 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
     let mut od_params = OdParameters::default();
     let mut have_od = false;
 
-    let mut user_defined_parameters = Vec::new();
+    let mut user_defined = UserDefined::default();
 
     parse_block!(input, comment, {
         "ORBIT_LIFETIME" => val: kv_from_kvn => { orbit_lifetime = Some(val); },
@@ -332,9 +332,9 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "DRY_MASS" => val: kv_from_kvn => { spacecraft_params.dry_mass = Some(val); have_sp = true; },
         "HAZARDOUS_SUBSTANCES" => val: kv_string => { spacecraft_params.hazardous_substances = Some(val); have_sp = true; },
         "SOLAR_RAD_AREA" => val: kv_from_kvn => { spacecraft_params.solar_rad_area = Some(val); have_sp = true; },
-        "SOLAR_RAD_COEFF" => val: kv_float => { spacecraft_params.solar_rad_coeff = Some(val); have_sp = true; },
+        "SOLAR_RAD_COEFF" => val: kv_float => { spacecraft_params.solar_rad_coeff = Some(val.into()); have_sp = true; },
         "DRAG_AREA" => val: kv_from_kvn => { spacecraft_params.drag_area = Some(val); have_sp = true; },
-        "DRAG_COEFF" => val: kv_float => { spacecraft_params.drag_coeff = Some(val); have_sp = true; },
+        "DRAG_COEFF" => val: kv_float => { spacecraft_params.drag_coeff = Some(val.into()); have_sp = true; },
         "RCS" => val: kv_from_kvn => { spacecraft_params.rcs = Some(val); have_sp = true; },
         "BALLISTIC_COEFF" => val: kv_from_kvn => { spacecraft_params.ballistic_coeff = Some(val); have_sp = true; },
         "THRUST_ACCELERATION" => val: kv_from_kvn => { spacecraft_params.thrust_acceleration = Some(val); have_sp = true; },
@@ -343,12 +343,12 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "TIME_LASTOB_END" => val: kv_epoch => { od_params.time_lastob_end = Some(val); have_od = true; },
         "RECOMMENDED_OD_SPAN" => val: kv_from_kvn => { od_params.recommended_od_span = Some(val); have_od = true; },
         "ACTUAL_OD_SPAN" => val: kv_from_kvn => { od_params.actual_od_span = Some(val); have_od = true; },
-        "OBS_AVAILABLE" => val: kv_u32 => { od_params.obs_available = Some(val); have_od = true; },
-        "OBS_USED" => val: kv_u32 => { od_params.obs_used = Some(val); have_od = true; },
-        "TRACKS_AVAILABLE" => val: kv_u32 => { od_params.tracks_available = Some(val); have_od = true; },
-        "TRACKS_USED" => val: kv_u32 => { od_params.tracks_used = Some(val); have_od = true; },
+        "OBS_AVAILABLE" => val: kv_u32 => { od_params.obs_available = Some(val.into()); have_od = true; },
+        "OBS_USED" => val: kv_u32 => { od_params.obs_used = Some(val.into()); have_od = true; },
+        "TRACKS_AVAILABLE" => val: kv_u32 => { od_params.tracks_available = Some(val.into()); have_od = true; },
+        "TRACKS_USED" => val: kv_u32 => { od_params.tracks_used = Some(val.into()); have_od = true; },
         "RESIDUALS_ACCEPTED" => val: kv_from_kvn => { od_params.residuals_accepted = Some(val); have_od = true; },
-        "WEIGHTED_RMS" => val: kv_float => { od_params.weighted_rms = Some(val); have_od = true; },
+        "WEIGHTED_RMS" => val: kv_float => { od_params.weighted_rms = Some(val.into()); have_od = true; },
     }, |i: &mut &str| {
         let checkpoint = i.checkpoint();
         let _ = collect_comments.parse_next(i);
@@ -368,9 +368,12 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
                 break;
             }
         };
-        comment.extend(loop_comments);
+        user_defined.comment.extend(loop_comments);
         let v = kv_string.parse_next(input)?;
-        user_defined_parameters.push((key.to_string(), v));
+        user_defined.user_defined.push(UserDefinedParameter {
+            parameter: key.to_string(),
+            value: v,
+        });
     }
 
     let atmospheric_reentry_parameters = AtmosphericReentryParameters {
@@ -407,7 +410,11 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
             None
         },
         od_parameters: if have_od { Some(od_params) } else { None },
-        user_defined_parameters,
+        user_defined_parameters: if user_defined.user_defined.is_empty() {
+            None
+        } else {
+            Some(user_defined)
+        },
     })
 }
 
@@ -1092,8 +1099,8 @@ DRAG_COEFF = 0.0
             .spacecraft_parameters
             .as_ref()
             .unwrap();
-        assert!((sp.solar_rad_coeff.unwrap() - 0.0).abs() < 1e-9);
-        assert!((sp.drag_coeff.unwrap() - 0.0).abs() < 1e-9);
+        assert!((sp.solar_rad_coeff.unwrap().value - 0.0).abs() < 1e-9);
+        assert!((sp.drag_coeff.unwrap().value - 0.0).abs() < 1e-9);
     }
 
     #[test]
@@ -1125,10 +1132,10 @@ WEIGHTED_RMS = 1.234
         let od = rdm.body.segment.data.od_parameters.as_ref().unwrap();
         assert!(od.time_lastob_start.is_some());
         assert!(od.time_lastob_end.is_some());
-        assert_eq!(od.obs_available, Some(100));
-        assert_eq!(od.obs_used, Some(95));
-        assert_eq!(od.tracks_available, Some(20));
-        assert_eq!(od.tracks_used, Some(18));
+        assert_eq!(od.obs_available, Some(100.into()));
+        assert_eq!(od.obs_used, Some(95.into()));
+        assert_eq!(od.tracks_available, Some(20.into()));
+        assert_eq!(od.tracks_used, Some(18.into()));
     }
 
     #[test]

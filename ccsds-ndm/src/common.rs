@@ -148,7 +148,7 @@ pub struct SpacecraftParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub solar_rad_coeff: Option<f64>,
+    pub solar_rad_coeff: Option<NonNegativeDouble>,
     /// Drag Area (AD).
     ///
     /// **Examples**: 14, 20.0
@@ -164,7 +164,7 @@ pub struct SpacecraftParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub drag_coeff: Option<f64>,
+    pub drag_coeff: Option<NonNegativeDouble>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
@@ -173,6 +173,7 @@ pub struct OdParameters {
     /// Comments (see 6.3.4 for formatting rules).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
 
     /// The start of a time interval (UTC) that contains the time of the last accepted
@@ -211,22 +212,26 @@ pub struct OdParameters {
     /// The total number of observations available for orbit determination.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
-    pub obs_available: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub obs_available: Option<PositiveInteger>,
 
     /// The number of observations used in the orbit determination.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
-    pub obs_used: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub obs_used: Option<PositiveInteger>,
 
     /// The total number of tracks available for orbit determination.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
-    pub tracks_available: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tracks_available: Option<PositiveInteger>,
 
     /// The number of tracks used in the orbit determination.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
-    pub tracks_used: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tracks_used: Option<PositiveInteger>,
 
     /// The percentage of residuals accepted during orbit determination.
     ///
@@ -236,7 +241,7 @@ pub struct OdParameters {
     /// The weighted root mean square (RMS) of the residuals.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
-    pub weighted_rms: Option<f64>,
+    pub weighted_rms: Option<NonNegativeDouble>,
 }
 
 /// Represents the `stateVectorType` and `stateVectorAccType` from the XSD.
@@ -877,15 +882,15 @@ pub struct RdmSpacecraftParameters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_area: Option<Area>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub solar_rad_coeff: Option<f64>,
+    pub solar_rad_coeff: Option<NonNegativeDouble>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_area: Option<Area>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub drag_coeff: Option<f64>,
+    pub drag_coeff: Option<NonNegativeDouble>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rcs: Option<Area>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ballistic_coeff: Option<BallisticCoeffRequired>,
+    pub ballistic_coeff: Option<BallisticCoeff>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thrust_acceleration: Option<Ms2Required>,
+    pub thrust_acceleration: Option<Ms2>,
 }

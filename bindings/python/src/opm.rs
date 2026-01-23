@@ -1431,9 +1431,13 @@ impl ManeuverParameters {
         self.inner.man_duration.value = value;
     }
 
-    /// Mass change during maneuver (value is < 0).
+    /// Mass change during maneuver.
     ///
     /// Units: kg
+    ///
+    ///
+    /// **Note**: The CCSDS standard requires this value to be strictly negative (`< 0`).
+    /// However, this implementation allows non-negative values to support non-standard use cases.
     ///
     /// :type: float
     #[getter]

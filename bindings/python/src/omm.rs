@@ -871,11 +871,12 @@ pub struct TleParameters {
 impl TleParameters {
     #[new]
     #[pyo3(
-        signature = (*, ephemeris_type=None, classification_type=None, norad_cat_id=None, element_set_no=None, rev_at_epoch=None, bstar=None, bterm=None, mean_motion_dot=None, mean_motion_ddot=None, agom=None),
-        text_signature = "(ephemeris_type: Optional[int] = None, classification_type: Optional[str] = None, norad_cat_id: Optional[int] = None, element_set_no: Optional[int] = None, rev_at_epoch: Optional[int] = None, bstar: Optional[float] = None, bterm: Optional[float] = None, mean_motion_dot: Optional[float] = None, mean_motion_ddot: Optional[float] = None, agom: Optional[float] = None)"
+        signature = (*, mean_motion_dot, ephemeris_type=None, classification_type=None, norad_cat_id=None, element_set_no=None, rev_at_epoch=None, bstar=None, bterm=None, mean_motion_ddot=None, agom=None),
+        text_signature = "(mean_motion_dot: float, ephemeris_type: Optional[int] = None, classification_type: Optional[str] = None, norad_cat_id: Optional[int] = None, element_set_no: Optional[int] = None, rev_at_epoch: Optional[int] = None, bstar: Optional[float] = None, bterm: Optional[float] = None, mean_motion_ddot: Optional[float] = None, agom: Optional[float] = None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
+        mean_motion_dot: f64,
         ephemeris_type: Option<i32>,
         classification_type: Option<String>,
         norad_cat_id: Option<u32>,
@@ -883,7 +884,6 @@ impl TleParameters {
         rev_at_epoch: Option<u32>,
         bstar: Option<f64>,
         bterm: Option<f64>,
-        mean_motion_dot: Option<f64>,
         mean_motion_ddot: Option<f64>,
         agom: Option<f64>,
     ) -> PyResult<Self> {
@@ -900,7 +900,7 @@ impl TleParameters {
                 rev_at_epoch,
                 bstar: bstar.map(|v| BStar::new(v, Default::default())),
                 bterm: bterm.map(|v| M2kg::new(v, Default::default())),
-                mean_motion_dot: mean_motion_dot.map(|v| MeanMotionDot::new(v, Default::default())),
+                mean_motion_dot: MeanMotionDot::new(mean_motion_dot, Default::default()),
                 mean_motion_ddot: mean_motion_ddot
                     .map(|v| MeanMotionDDot::new(v, Default::default())),
                 agom: agom.map(|v| M2kg::new(v, Default::default())),
@@ -1059,16 +1059,16 @@ impl TleParameters {
     ///
     /// Units: rev/day²
     ///
-    /// :type: Optional[float]
+    /// :type: float
     #[getter]
-    fn get_mean_motion_dot(&self) -> Option<f64> {
-        self.inner.mean_motion_dot.as_ref().map(|v| v.value)
+    fn get_mean_motion_dot(&self) -> f64 {
+        self.inner.mean_motion_dot.value
     }
 
     #[setter]
-    fn set_mean_motion_dot(&mut self, value: Option<f64>) {
+    fn set_mean_motion_dot(&mut self, value: f64) {
         use ccsds_ndm::messages::omm::MeanMotionDot;
-        self.inner.mean_motion_dot = value.map(|v| MeanMotionDot::new(v, Default::default()));
+        self.inner.mean_motion_dot = MeanMotionDot::new(value, Default::default());
     }
 
     /// MEAN_ELEMENT_THEORY= SGP or PPT3: Second Time Derivative of Mean Motion (i.e., a drag term).

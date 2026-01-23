@@ -6,16 +6,14 @@ use crate::types::parse_epoch;
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::messages::rdm as core_rdm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::types::{
-    ControlledType, DayIntervalRequired, ObjectDescription,
-    PercentageRequired, PositionRequired, YesNo,
-};
+use ccsds_ndm::types::{self as core_types, *};
 use crate::common::{GroundImpactParameters, OdParameters, StateVector};
 use crate::opm::OpmCovarianceMatrix;
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
+use std::str::FromStr;
 
 // ============================================================================
 // RDM - Re-entry Data Message
@@ -498,15 +496,56 @@ impl RdmMetadata {
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
         let object_type_enum = match object_type {
-            Some(s) => Some(
-                ObjectDescription::from_str(&s)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            ),
+            Some(s) => {
+                let desc = ObjectDescription::from_str(&s)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?;
+                Some(match desc {
+                    ObjectDescription::Payload | ObjectDescription::PayloadLower => {
+                        core_types::ObjectDescription::Payload
+                    }
+                    ObjectDescription::RocketBody | ObjectDescription::RocketBodyLower => {
+                        core_types::ObjectDescription::RocketBody
+                    }
+                    ObjectDescription::Debris | ObjectDescription::DebrisLower => {
+                        core_types::ObjectDescription::Debris
+                    }
+                    ObjectDescription::Unknown | ObjectDescription::UnknownLower => {
+                        core_types::ObjectDescription::Unknown
+                    }
+                    ObjectDescription::Other | ObjectDescription::OtherLower => {
+                        core_types::ObjectDescription::Other
+                    }
+                })
+            }
             None => None,
         };
 
         let intrack_thrust_enum = match intrack_thrust {
             Some(s) => Some(YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))?),
+            None => None,
+        };
+
+        let reentry_uncertainty_method_enum = match reentry_uncertainty_method {
+            Some(s) => Some(
+                core_types::ReentryUncertaintyMethodType::from_str(&s)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            ),
+            None => None,
+        };
+
+        let reentry_disintegration_enum = match reentry_disintegration {
+            Some(s) => Some(
+                core_types::DisintegrationType::from_str(&s)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            ),
+            None => None,
+        };
+
+        let impact_uncertainty_method_enum = match impact_uncertainty_method {
+            Some(s) => Some(
+                core_types::ImpactUncertaintyType::from_str(&s)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            ),
             None => None,
         };
 
@@ -536,9 +575,9 @@ impl RdmMetadata {
                 intrack_thrust: intrack_thrust_enum,
                 drag_parameters_source,
                 drag_parameters_altitude: drag_parameters_altitude.map(PositionRequired::new),
-                reentry_uncertainty_method,
-                reentry_disintegration,
-                impact_uncertainty_method,
+                reentry_uncertainty_method: reentry_uncertainty_method_enum,
+                reentry_disintegration: reentry_disintegration_enum,
+                impact_uncertainty_method: impact_uncertainty_method_enum,
                 previous_message_id,
                 previous_message_epoch: previous_message_epoch
                     .map(|s| parse_epoch(&s))
@@ -907,11 +946,22 @@ impl RdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_reentry_uncertainty_method(&self) -> Option<String> {
-        self.inner.reentry_uncertainty_method.clone()
+        self.inner
+            .reentry_uncertainty_method
+            .as_ref()
+            .map(|v| v.to_string())
     }
     #[setter]
-    fn set_reentry_uncertainty_method(&mut self, v: Option<String>) {
-        self.inner.reentry_uncertainty_method = v;
+    fn set_reentry_uncertainty_method(&mut self, v: Option<String>) -> PyResult<()> {
+        use std::str::FromStr;
+        self.inner.reentry_uncertainty_method = match v {
+            Some(s) => Some(
+                core_types::ReentryUncertaintyMethodType::from_str(&s)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            ),
+            None => None,
+        };
+        Ok(())
     }
 
     /// The method used to model the object’s disintegration.
@@ -921,11 +971,22 @@ impl RdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_reentry_disintegration(&self) -> Option<String> {
-        self.inner.reentry_disintegration.clone()
+        self.inner
+            .reentry_disintegration
+            .as_ref()
+            .map(|v| v.to_string())
     }
     #[setter]
-    fn set_reentry_disintegration(&mut self, v: Option<String>) {
-        self.inner.reentry_disintegration = v;
+    fn set_reentry_disintegration(&mut self, v: Option<String>) -> PyResult<()> {
+        use std::str::FromStr;
+        self.inner.reentry_disintegration = match v {
+            Some(s) => Some(
+                core_types::DisintegrationType::from_str(&s)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            ),
+            None => None,
+        };
+        Ok(())
     }
 
     /// The method used to compute impact uncertainty.
@@ -935,11 +996,22 @@ impl RdmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_impact_uncertainty_method(&self) -> Option<String> {
-        self.inner.impact_uncertainty_method.clone()
+        self.inner
+            .impact_uncertainty_method
+            .as_ref()
+            .map(|v| v.to_string())
     }
     #[setter]
-    fn set_impact_uncertainty_method(&mut self, v: Option<String>) {
-        self.inner.impact_uncertainty_method = v;
+    fn set_impact_uncertainty_method(&mut self, v: Option<String>) -> PyResult<()> {
+        use std::str::FromStr;
+        self.inner.impact_uncertainty_method = match v {
+            Some(s) => Some(
+                core_types::ImpactUncertaintyType::from_str(&s)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            ),
+            None => None,
+        };
+        Ok(())
     }
 
     /// The ID of the previous message for this object.
@@ -1060,6 +1132,17 @@ impl RdmData {
         user_defined_parameters: Option<Vec<(String, String)>>,
         comment: Option<Vec<String>>,
     ) -> Self {
+        let user_defined = user_defined_parameters.map(|params| core_types::UserDefined {
+            comment: vec![],
+            user_defined: params
+                .into_iter()
+                .map(|(k, v)| core_types::UserDefinedParameter {
+                    parameter: k,
+                    value: v,
+                })
+                .collect(),
+        });
+
         Self {
             inner: core_rdm::RdmData {
                 comment: comment.unwrap_or_default(),
@@ -1069,7 +1152,7 @@ impl RdmData {
                 covariance_matrix: covariance_matrix.map(|cm| cm.inner),
                 spacecraft_parameters: spacecraft_parameters.map(|sp| sp.inner),
                 od_parameters: od_parameters.map(|op| op.inner),
-                user_defined_parameters: user_defined_parameters.unwrap_or_default(),
+                user_defined_parameters: user_defined,
             },
         }
     }
@@ -1178,11 +1261,33 @@ impl RdmData {
     /// :type: list[tuple[str, str]]
     #[getter]
     fn get_user_defined_parameters(&self) -> Vec<(String, String)> {
-        self.inner.user_defined_parameters.clone()
+        self.inner
+            .user_defined_parameters
+            .as_ref()
+            .map(|ud| {
+                ud.user_defined
+                    .iter()
+                    .map(|p| (p.parameter.clone(), p.value.clone()))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
     #[setter]
     fn set_user_defined_parameters(&mut self, v: Vec<(String, String)>) {
-        self.inner.user_defined_parameters = v;
+        if v.is_empty() {
+            self.inner.user_defined_parameters = None;
+        } else {
+            self.inner.user_defined_parameters = Some(core_types::UserDefined {
+                comment: vec![],
+                user_defined: v
+                    .into_iter()
+                    .map(|(k, v)| core_types::UserDefinedParameter {
+                        parameter: k,
+                        value: v,
+                    })
+                    .collect(),
+            });
+        }
     }
 
     /// Comments.

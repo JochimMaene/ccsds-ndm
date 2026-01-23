@@ -298,7 +298,7 @@ macro_rules! define_unit_type {
 /// define_required_type!(PositionRequired, PositionUnits, Km);
 macro_rules! define_required_type {
     ($name:ident, $unit_enum:ident, $default_unit:ident) => {
-        #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
         pub struct $name {
             #[serde(rename = "$value")]
             pub value: f64,
@@ -353,6 +353,14 @@ macro_rules! define_unit_enum {
                 }) }
             }
         }
+    };
+}
+
+/// Defines a unit enum and a required wrapper struct in one go.
+macro_rules! define_required_unit_type {
+    ($name:ident, $unit_enum:ident, $default_variant:ident, { $($variant:ident => $str_rep:expr),+ $(,)? }) => {
+        define_unit_enum!($unit_enum, $default_variant, { $($variant => $str_rep),+ });
+        define_required_type!($name, $unit_enum, $default_variant);
     };
 }
 
@@ -659,46 +667,7 @@ impl std::fmt::Display for AltitudeRequired {
 
 // --- Power/Mass Ratio ---
 
-define_unit_enum!(WkgUnits, WPerKg, { WPerKg => "W/kg" });
-
-pub type Wkg = UnitValue<f64, WkgUnits>;
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct WkgRequired {
-    #[serde(rename = "$value")]
-    pub value: f64,
-    #[serde(rename = "@units")]
-    pub units: WkgUnits,
-}
-impl WkgRequired {
-    /// wkgType: nonNegativeDouble, units required
-    pub fn new(value: f64) -> Result<Self> {
-        if value < 0.0 {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "W/kg".into(),
-                value: value.to_string(),
-                expected: ">= 0".into(),
-                line: None,
-            }
-            .into());
-        }
-        Ok(Self {
-            value,
-            units: WkgUnits::WPerKg,
-        })
-    }
-    pub fn to_unit_value(&self) -> UnitValue<f64, WkgUnits> {
-        UnitValue {
-            value: self.value,
-            units: Some(self.units.clone()),
-        }
-    }
-}
-impl FromKvnFloat for WkgRequired {
-    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
-        Self::new(value)
-    }
-}
+define_required_unit_type!(Wkg, WkgUnits, WPerKg, { WPerKg => "W/kg" });
 
 // --- Mass ---
 
@@ -787,11 +756,9 @@ impl std::fmt::Display for Area {
         write!(f, "{}", self.value)
     }
 }
-define_unit_type!(Ms2, Ms2Units, MPerS2, { MPerS2 => "m/s**2" });
+define_required_unit_type!(Ms2, Ms2Units, MPerS2, { MPerS2 => "m/s**2" });
 
-define_required_type!(Ms2Required, Ms2Units, MPerS2);
-
-impl std::str::FromStr for Ms2Required {
+impl std::str::FromStr for Ms2 {
     type Err = std::num::ParseFloatError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let v: f64 = s.parse()?;
@@ -826,54 +793,7 @@ define_unit_type!(
 // --- Moment --- (restore)
 define_unit_type!(Moment, MomentUnits, KgM2, { KgM2 => "kg*m**2" });
 
-define_unit_enum!(BallisticCoeffUnits, KgPerM2, { KgPerM2 => "kg/m**2" });
-
-pub type BallisticCoeff = UnitValue<f64, BallisticCoeffUnits>;
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct BallisticCoeffRequired {
-    #[serde(rename = "$value")]
-    pub value: f64,
-    #[serde(rename = "@units")]
-    pub units: BallisticCoeffUnits,
-}
-impl BallisticCoeffRequired {
-    /// ballisticCoeffType: nonNegativeDouble, units required
-    pub fn new(value: f64) -> Result<Self> {
-        if value < 0.0 {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "Ballistic Coeff".into(),
-                value: value.to_string(),
-                expected: ">= 0".into(),
-                line: None,
-            }
-            .into());
-        }
-        Ok(Self {
-            value,
-            units: BallisticCoeffUnits::KgPerM2,
-        })
-    }
-}
-impl std::fmt::Display for BallisticCoeffRequired {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
-    }
-}
-
-impl std::str::FromStr for BallisticCoeffRequired {
-    type Err = CcsdsNdmError;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let v: f64 = s.parse().map_err(CcsdsNdmError::from)?;
-        Self::new(v)
-    }
-}
-
-impl FromKvnFloat for BallisticCoeffRequired {
-    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
-        Self::new(value)
-    }
-}
+define_unit_type!(BallisticCoeff, BallisticCoeffUnits, KgPerM2, { KgPerM2 => "kg/m**2" });
 
 define_unit_enum!(PercentageUnits, Percent, { Percent => "%" });
 
@@ -988,6 +908,138 @@ impl std::fmt::Display for Probability {
 impl FromKvnFloat for Probability {
     fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
         Self::new(value)
+    }
+}
+
+/// XSD nonNegativeDouble - value must be >= 0
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
+pub struct NonNegativeDouble {
+    #[serde(rename = "$value")]
+    pub value: f64,
+}
+
+impl NonNegativeDouble {
+    pub fn new(value: f64) -> Result<Self> {
+        if value < 0.0 {
+            return Err(crate::error::ValidationError::OutOfRange {
+                name: "NonNegativeDouble".into(),
+                value: value.to_string(),
+                expected: ">= 0".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(Self { value })
+    }
+}
+
+impl std::str::FromStr for NonNegativeDouble {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let v: f64 = s.parse().map_err(CcsdsNdmError::from)?;
+        Self::new(v)
+    }
+}
+
+impl std::fmt::Display for NonNegativeDouble {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl FromKvnFloat for NonNegativeDouble {
+    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
+impl From<f64> for NonNegativeDouble {
+    fn from(value: f64) -> Self {
+        Self { value }
+    }
+}
+
+/// XSD positiveInteger - value must be > 0
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
+pub struct PositiveInteger {
+    #[serde(rename = "$value")]
+    pub value: u32,
+}
+
+impl PositiveInteger {
+    pub fn new(value: u32) -> Result<Self> {
+        if value == 0 {
+            return Err(crate::error::ValidationError::OutOfRange {
+                name: "PositiveInteger".into(),
+                value: value.to_string(),
+                expected: "> 0".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(Self { value })
+    }
+}
+
+impl std::str::FromStr for PositiveInteger {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let v: u32 = s.parse().map_err(CcsdsNdmError::from)?;
+        Self::new(v)
+    }
+}
+
+impl std::fmt::Display for PositiveInteger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl From<u32> for PositiveInteger {
+    fn from(value: u32) -> Self {
+        Self { value }
+    }
+}
+
+/// XSD elementSetNoType - value must be between 0 and 9999
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
+pub struct ElementSetNo {
+    #[serde(rename = "$value")]
+    pub value: u32,
+}
+
+impl ElementSetNo {
+    pub fn new(value: u32) -> Result<Self> {
+        if value > 9999 {
+            return Err(crate::error::ValidationError::OutOfRange {
+                name: "ElementSetNo".into(),
+                value: value.to_string(),
+                expected: "[0, 9999]".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(Self { value })
+    }
+}
+
+impl std::str::FromStr for ElementSetNo {
+    type Err = CcsdsNdmError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let v: u32 = s.parse().map_err(CcsdsNdmError::from)?;
+        Self::new(v)
+    }
+}
+
+impl std::fmt::Display for ElementSetNo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl From<u32> for ElementSetNo {
+    fn from(value: u32) -> Self {
+        Self { value }
     }
 }
 
@@ -1840,8 +1892,36 @@ pub enum DisintegrationType {
     MassLoss,
     #[serde(rename = "BREAK-UP")]
     BreakUp,
-    #[serde(rename = "MASS-LOSS + BREAK-UP")]
+    #[serde(rename = "MASS-LOSS + BREAK-UP", alias = "MASS-LOSS + BREAKUP")]
     MassLossAndBreakUp,
+}
+
+impl std::str::FromStr for DisintegrationType {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "NONE" => Ok(Self::None),
+            "MASS-LOSS" => Ok(Self::MassLoss),
+            "BREAK-UP" => Ok(Self::BreakUp),
+            "MASS-LOSS + BREAK-UP" | "MASS-LOSS + BREAKUP" => Ok(Self::MassLossAndBreakUp),
+            _ => Err(crate::error::EnumParseError {
+                field: "REENTRY_DISINTEGRATION",
+                value: s.to_string(),
+                expected: "NONE, MASS-LOSS, BREAK-UP, or MASS-LOSS + BREAK-UP",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for DisintegrationType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "NONE"),
+            Self::MassLoss => write!(f, "MASS-LOSS"),
+            Self::BreakUp => write!(f, "BREAK-UP"),
+            Self::MassLossAndBreakUp => write!(f, "MASS-LOSS + BREAK-UP"),
+        }
+    }
 }
 
 // ImpactUncertaintyType per XSD
@@ -1855,6 +1935,42 @@ pub enum ImpactUncertaintyType {
     Stochastic,
     #[serde(rename = "EMPIRICAL")]
     Empirical,
+    #[serde(rename = "COVARIANCE")]
+    Covariance,
+    #[serde(rename = "STATISTICAL")]
+    Statistical,
+}
+
+impl std::str::FromStr for ImpactUncertaintyType {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "NONE" => Ok(Self::None),
+            "ANALYTICAL" => Ok(Self::Analytical),
+            "STOCHASTIC" => Ok(Self::Stochastic),
+            "EMPIRICAL" => Ok(Self::Empirical),
+            "COVARIANCE" => Ok(Self::Covariance),
+            "STATISTICAL" => Ok(Self::Statistical),
+            _ => Err(crate::error::EnumParseError {
+                field: "IMPACT_UNCERTAINTY_METHOD",
+                value: s.to_string(),
+                expected: "NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL, COVARIANCE, or STATISTICAL",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for ImpactUncertaintyType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "NONE"),
+            Self::Analytical => write!(f, "ANALYTICAL"),
+            Self::Stochastic => write!(f, "STOCHASTIC"),
+            Self::Empirical => write!(f, "EMPIRICAL"),
+            Self::Covariance => write!(f, "COVARIANCE"),
+            Self::Statistical => write!(f, "STATISTICAL"),
+        }
+    }
 }
 
 // ReentryUncertaintyMethodType per XSD
@@ -1868,6 +1984,42 @@ pub enum ReentryUncertaintyMethodType {
     Stochastic,
     #[serde(rename = "EMPIRICAL")]
     Empirical,
+    #[serde(rename = "COVARIANCE")]
+    Covariance,
+    #[serde(rename = "STATISTICAL")]
+    Statistical,
+}
+
+impl std::str::FromStr for ReentryUncertaintyMethodType {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "NONE" => Ok(Self::None),
+            "ANALYTICAL" => Ok(Self::Analytical),
+            "STOCHASTIC" => Ok(Self::Stochastic),
+            "EMPIRICAL" => Ok(Self::Empirical),
+            "COVARIANCE" => Ok(Self::Covariance),
+            "STATISTICAL" => Ok(Self::Statistical),
+            _ => Err(crate::error::EnumParseError {
+                field: "REENTRY_UNCERTAINTY_METHOD",
+                value: s.to_string(),
+                expected: "NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL, COVARIANCE, or STATISTICAL",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for ReentryUncertaintyMethodType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "NONE"),
+            Self::Analytical => write!(f, "ANALYTICAL"),
+            Self::Stochastic => write!(f, "STOCHASTIC"),
+            Self::Empirical => write!(f, "EMPIRICAL"),
+            Self::Covariance => write!(f, "COVARIANCE"),
+            Self::Statistical => write!(f, "STATISTICAL"),
+        }
+    }
 }
 
 // TimeSystemType: XSD has empty restriction; represent as a string newtype.
@@ -1919,38 +2071,38 @@ pub struct UserDefinedParameter {
 // -------------------- CDM TYPES --------------------
 
 // Velocity delta-v units (m/s) and type (`dvType`)
-define_unit_enum!(DvUnits, MPerS, { MPerS => "m/s" });
-pub type Dv = UnitValue<f64, DvUnits>;
+define_required_unit_type!(Dv, DvUnits, MPerS, { MPerS => "m/s" });
 
 // m**2 units and type (`m2Type`)
-define_unit_type!(M2, M2Units, M2, { M2 => "m**2" });
+define_required_unit_type!(M2, M2Units, M2, { M2 => "m**2" });
 
 // m**2/s units and type (`m2sType`)
-define_unit_type!(M2s, M2sUnits, M2PerS, { M2PerS => "m**2/s" });
+define_required_unit_type!(M2s, M2sUnits, M2PerS, { M2PerS => "m**2/s" });
 
 // m**2/s**2 units and type (`m2s2Type`)
-define_unit_type!(M2s2, M2s2Units, M2PerS2, { M2PerS2 => "m**2/s**2" });
+define_required_unit_type!(M2s2, M2s2Units, M2PerS2, { M2PerS2 => "m**2/s**2" });
 
 // m**3/kg units and type (`m3kgType`)
-define_unit_type!(M3kg, M3kgUnits, M3PerKg, { M3PerKg => "m**3/kg" });
+define_required_unit_type!(M3kg, M3kgUnits, M3PerKg, { M3PerKg => "m**3/kg" });
 
 // m**3/(kg*s) units and type (`m3kgsType`)
-define_unit_type!(M3kgs, M3kgsUnits, M3PerKgS, { M3PerKgS => "m**3/(kg*s)" });
+define_required_unit_type!(M3kgs, M3kgsUnits, M3PerKgS, { M3PerKgS => "m**3/(kg*s)" });
 
 // m**4/kg**2 units and type (`m4kg2Type`)
-define_unit_type!(M4kg2, M4kg2Units, M4PerKg2, { M4PerKg2 => "m**4/kg**2" });
+define_required_unit_type!(M4kg2, M4kg2Units, M4PerKg2, { M4PerKg2 => "m**4/kg**2" });
 
 // m**2/s**3 units and type (`m2s3Type`)
-define_unit_type!(M2s3, M2s3Units, M2PerS3, { M2PerS3 => "m**2/s**3" });
+define_required_unit_type!(M2s3, M2s3Units, M2PerS3, { M2PerS3 => "m**2/s**3" });
 
 // m**3/(kg*s**2) units and type (`m3kgs2Type`)
-define_unit_type!(M3kgs2, M3kgs2Units, M3PerKgS2, { M3PerKgS2 => "m**3/(kg*s**2)" });
+define_required_unit_type!(M3kgs2, M3kgs2Units, M3PerKgS2, { M3PerKgS2 => "m**3/(kg*s**2)" });
 
 // m**2/s**4 units and type (`m2s4Type`)
-define_unit_type!(M2s4, M2s4Units, M2PerS4, { M2PerS4 => "m**2/s**4" });
+define_required_unit_type!(M2s4, M2s4Units, M2PerS4, { M2PerS4 => "m**2/s**4" });
 
 // m**2/kg units and type (`m2kgType`)
 define_unit_type!(M2kg, M2kgUnits, M2PerKg, { M2PerKg => "m**2/kg" });
+define_required_type!(M2kgRequired, M2kgUnits, M2PerKg);
 
 // CDM categorical simple types
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -2179,5 +2331,366 @@ impl FromKvnValue for Vec3Double {
 impl std::fmt::Display for Vec3Double {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {} {}", self.x, self.y, self.z)
+    }
+}
+
+// -------------------- TDM TYPES --------------------
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum TdmAngleType {
+    #[serde(rename = "AZEL")]
+    Azel,
+    #[serde(rename = "RADEC")]
+    Radec,
+    #[serde(rename = "XEYN")]
+    Xeyn,
+    #[serde(rename = "XSYE")]
+    Xsye,
+}
+
+impl std::str::FromStr for TdmAngleType {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "AZEL" => Ok(Self::Azel),
+            "RADEC" => Ok(Self::Radec),
+            "XEYN" => Ok(Self::Xeyn),
+            "XSYE" => Ok(Self::Xsye),
+            _ => Err(crate::error::EnumParseError {
+                field: "ANGLE_TYPE",
+                value: s.to_string(),
+                expected: "AZEL, RADEC, XEYN, or XSYE",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for TdmAngleType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Azel => write!(f, "AZEL"),
+            Self::Radec => write!(f, "RADEC"),
+            Self::Xeyn => write!(f, "XEYN"),
+            Self::Xsye => write!(f, "XSYE"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum TdmDataQuality {
+    #[serde(rename = "RAW")]
+    Raw,
+    #[serde(rename = "VALIDATED")]
+    Validated,
+    #[serde(rename = "DEGRADED")]
+    Degraded,
+}
+
+impl std::str::FromStr for TdmDataQuality {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "RAW" => Ok(Self::Raw),
+            "VALIDATED" => Ok(Self::Validated),
+            "DEGRADED" => Ok(Self::Degraded),
+            _ => Err(crate::error::EnumParseError {
+                field: "DATA_QUALITY",
+                value: s.to_string(),
+                expected: "RAW, VALIDATED, or DEGRADED",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for TdmDataQuality {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Raw => write!(f, "RAW"),
+            Self::Validated => write!(f, "VALIDATED"),
+            Self::Degraded => write!(f, "DEGRADED"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum TdmIntegrationRef {
+    #[serde(rename = "START")]
+    Start,
+    #[serde(rename = "MIDDLE")]
+    Middle,
+    #[serde(rename = "END")]
+    End,
+}
+
+impl std::str::FromStr for TdmIntegrationRef {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "START" => Ok(Self::Start),
+            "MIDDLE" => Ok(Self::Middle),
+            "END" => Ok(Self::End),
+            _ => Err(crate::error::EnumParseError {
+                field: "INTEGRATION_REF",
+                value: s.to_string(),
+                expected: "START, MIDDLE, or END",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for TdmIntegrationRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Start => write!(f, "START"),
+            Self::Middle => write!(f, "MIDDLE"),
+            Self::End => write!(f, "END"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum TdmMode {
+    #[serde(rename = "SEQUENTIAL")]
+    Sequential,
+    #[serde(rename = "SINGLE_DIFF")]
+    SingleDiff,
+}
+
+impl std::str::FromStr for TdmMode {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "SEQUENTIAL" => Ok(Self::Sequential),
+            "SINGLE_DIFF" => Ok(Self::SingleDiff),
+            _ => Err(crate::error::EnumParseError {
+                field: "MODE",
+                value: s.to_string(),
+                expected: "SEQUENTIAL or SINGLE_DIFF",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for TdmMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Sequential => write!(f, "SEQUENTIAL"),
+            Self::SingleDiff => write!(f, "SINGLE_DIFF"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum TdmRangeMode {
+    #[serde(rename = "COHERENT")]
+    Coherent,
+    #[serde(rename = "CONSTANT")]
+    Constant,
+    #[serde(rename = "ONE_WAY")]
+    OneWay,
+}
+
+impl std::str::FromStr for TdmRangeMode {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "COHERENT" => Ok(Self::Coherent),
+            "CONSTANT" => Ok(Self::Constant),
+            "ONE_WAY" => Ok(Self::OneWay),
+            _ => Err(crate::error::EnumParseError {
+                field: "RANGE_MODE",
+                value: s.to_string(),
+                expected: "COHERENT, CONSTANT, or ONE_WAY",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for TdmRangeMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Coherent => write!(f, "COHERENT"),
+            Self::Constant => write!(f, "CONSTANT"),
+            Self::OneWay => write!(f, "ONE_WAY"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum TdmRangeUnits {
+    #[serde(rename = "km")]
+    Km,
+    #[serde(rename = "s")]
+    Seconds,
+    #[serde(rename = "ru")]
+    Ru,
+}
+
+impl std::str::FromStr for TdmRangeUnits {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "km" => Ok(Self::Km),
+            "s" => Ok(Self::Seconds),
+            "ru" => Ok(Self::Ru),
+            _ => Err(crate::error::EnumParseError {
+                field: "RANGE_UNITS",
+                value: s.to_string(),
+                expected: "km, s, or ru",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for TdmRangeUnits {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Km => write!(f, "km"),
+            Self::Seconds => write!(f, "s"),
+            Self::Ru => write!(f, "ru"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum TdmReferenceFrame {
+    #[serde(rename = "EME2000")]
+    Eme2000,
+    #[serde(rename = "ICRF")]
+    Icrf,
+    #[serde(rename = "ITRF2000")]
+    Itrf2000,
+    #[serde(rename = "ITRF-93")]
+    Itrf93,
+    #[serde(rename = "ITRF-97")]
+    Itrf97,
+    #[serde(rename = "TOD")]
+    Tod,
+}
+
+impl std::str::FromStr for TdmReferenceFrame {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "EME2000" => Ok(Self::Eme2000),
+            "ICRF" => Ok(Self::Icrf),
+            "ITRF2000" => Ok(Self::Itrf2000),
+            "ITRF-93" => Ok(Self::Itrf93),
+            "ITRF-97" => Ok(Self::Itrf97),
+            "TOD" => Ok(Self::Tod),
+            _ => Err(crate::error::EnumParseError {
+                field: "REFERENCE_FRAME",
+                value: s.to_string(),
+                expected: "EME2000, ICRF, ITRF2000, ITRF-93, ITRF-97, or TOD",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for TdmReferenceFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Eme2000 => write!(f, "EME2000"),
+            Self::Icrf => write!(f, "ICRF"),
+            Self::Itrf2000 => write!(f, "ITRF2000"),
+            Self::Itrf93 => write!(f, "ITRF-93"),
+            Self::Itrf97 => write!(f, "ITRF-97"),
+            Self::Tod => write!(f, "TOD"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum TdmTimetagRef {
+    #[serde(rename = "TRANSMIT")]
+    Transmit,
+    #[serde(rename = "RECEIVE")]
+    Receive,
+}
+
+impl std::str::FromStr for TdmTimetagRef {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "TRANSMIT" => Ok(Self::Transmit),
+            "RECEIVE" => Ok(Self::Receive),
+            _ => Err(crate::error::EnumParseError {
+                field: "TIMETAG_REF",
+                value: s.to_string(),
+                expected: "TRANSMIT or RECEIVE",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for TdmTimetagRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Transmit => write!(f, "TRANSMIT"),
+            Self::Receive => write!(f, "RECEIVE"),
+        }
+    }
+}
+
+/// Represents the signal path in a TDM (e.g., "1,2,1").
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct TdmPath(pub String);
+
+impl std::str::FromStr for TdmPath {
+    type Err = crate::error::ValidationError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        // Simple regex-like validation: \d{1},\d{1}(,\d{1})*
+        let parts: Vec<&str> = s.split(',').collect();
+        if parts.len() < 2 {
+            return Err(crate::error::ValidationError::InvalidValue {
+                field: "PATH".into(),
+                value: s.to_string(),
+                expected: "at least two participants (e.g., 1,2)".into(),
+                line: None,
+            });
+        }
+        for part in &parts {
+            if part.len() != 1 || !part.chars().next().unwrap().is_ascii_digit() {
+                return Err(crate::error::ValidationError::InvalidValue {
+                    field: "PATH".into(),
+                    value: s.to_string(),
+                    expected: "single digit participant indices separated by commas".into(),
+                    line: None,
+                });
+            }
+        }
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl std::fmt::Display for TdmPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_non_negative_double() {
+        assert!(NonNegativeDouble::new(0.0).is_ok());
+        assert!(NonNegativeDouble::new(1.0).is_ok());
+        assert!(NonNegativeDouble::new(-0.1).is_err());
+    }
+
+    #[test]
+    fn test_positive_integer() {
+        assert!(PositiveInteger::new(1).is_ok());
+        assert!(PositiveInteger::new(100).is_ok());
+        assert!(PositiveInteger::new(0).is_err());
+    }
+
+    #[test]
+    fn test_element_set_no() {
+        assert!(ElementSetNo::new(0).is_ok());
+        assert!(ElementSetNo::new(9999).is_ok());
+        assert!(ElementSetNo::new(10000).is_err());
     }
 }
