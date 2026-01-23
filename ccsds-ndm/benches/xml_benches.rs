@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-//! KVN parsing and generation benchmarks for all message types.
+//! XML parsing and generation benchmarks for all message types.
 
 use ccsds_ndm::common::{OdmHeader, StateVectorAcc};
 use ccsds_ndm::messages::oem::{Oem, OemBody, OemData, OemMetadata, OemSegment};
@@ -16,6 +16,7 @@ use std::hint::black_box;
 use std::num::NonZeroU32;
 use std::str::FromStr;
 
+/// Create a test OEM with the given number of state vectors.
 fn create_test_oem(num_states: usize) -> Oem {
     let mut state_vectors = Vec::with_capacity(num_states);
     for i in 0..num_states {
@@ -88,94 +89,73 @@ fn create_test_oem(num_states: usize) -> Oem {
     }
 }
 
-// --- Core OEM benchmarks (original) ---
+fn bench_xml_parse_oem(c: &mut Criterion) {
+    let oem = create_test_oem(10000);
+    let xml_data = oem.to_xml().unwrap();
 
-fn bench_parse_kvn(c: &mut Criterion) {
-    let oem = create_test_oem(50000);
-    let kvn_data = oem.to_kvn().unwrap();
-
-    c.bench_function("kvn_parse", |b| {
-        b.iter(|| Oem::from_kvn(black_box(&kvn_data)).unwrap())
+    c.bench_function("xml_parse_oem_10k", |b| {
+        b.iter(|| Oem::from_xml(black_box(&xml_data)).unwrap())
     });
 }
 
-fn bench_generate_kvn(c: &mut Criterion) {
-    let oem = create_test_oem(50000);
+fn bench_xml_generate_oem(c: &mut Criterion) {
+    let oem = create_test_oem(10000);
 
-    c.bench_function("kvn_generate", |b| {
-        b.iter(|| black_box(&oem).to_kvn().unwrap())
+    c.bench_function("xml_generate_oem_10k", |b| {
+        b.iter(|| black_box(&oem).to_xml().unwrap())
     });
 }
 
-// --- Multi-message-type benchmarks ---
+fn bench_xml_parse_opm(c: &mut Criterion) {
+    let opm_xml = include_str!("../../data/xml/opm_g5.xml");
 
-fn bench_parse_opm(c: &mut Criterion) {
-    let opm_kvn = include_str!("../../data/kvn/opm_g1.kvn");
-
-    c.bench_function("kvn_parse_opm", |b| {
-        b.iter(|| Opm::from_kvn(black_box(opm_kvn)).unwrap())
+    c.bench_function("xml_parse_opm", |b| {
+        b.iter(|| Opm::from_xml(black_box(opm_xml)).unwrap())
     });
 }
 
-fn bench_parse_omm(c: &mut Criterion) {
-    let omm_kvn = include_str!("../../data/kvn/omm_g7.kvn");
+fn bench_xml_parse_omm(c: &mut Criterion) {
+    let omm_xml = include_str!("../../data/xml/omm_g10.xml");
 
-    c.bench_function("kvn_parse_omm", |b| {
-        b.iter(|| Omm::from_kvn(black_box(omm_kvn)).unwrap())
+    c.bench_function("xml_parse_omm", |b| {
+        b.iter(|| Omm::from_xml(black_box(omm_xml)).unwrap())
     });
 }
 
-fn bench_parse_tdm(c: &mut Criterion) {
-    let tdm_kvn = include_str!("../../data/kvn/tdm_e1.kvn");
+fn bench_xml_parse_tdm(c: &mut Criterion) {
+    let tdm_xml = include_str!("../../data/xml/tdm_e21.xml");
 
-    c.bench_function("kvn_parse_tdm", |b| {
-        b.iter(|| Tdm::from_kvn(black_box(tdm_kvn)).unwrap())
+    c.bench_function("xml_parse_tdm", |b| {
+        b.iter(|| Tdm::from_xml(black_box(tdm_xml)).unwrap())
     });
 }
 
-// --- Scaling benchmarks ---
+fn bench_xml_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("xml_scaling");
 
-fn bench_kvn_scaling(c: &mut Criterion) {
-    let mut group = c.benchmark_group("kvn_scaling");
-
-    for size in [10, 100, 1000, 10000, 50000] {
+    for size in [100, 1000, 10000] {
         let oem = create_test_oem(size);
-        let kvn_data = oem.to_kvn().unwrap();
+        let xml_data = oem.to_xml().unwrap();
 
-        group.bench_with_input(BenchmarkId::new("parse", size), &kvn_data, |b, data| {
-            b.iter(|| Oem::from_kvn(black_box(data)).unwrap())
+        group.bench_with_input(BenchmarkId::new("parse", size), &xml_data, |b, data| {
+            b.iter(|| Oem::from_xml(black_box(data)).unwrap())
         });
 
         group.bench_with_input(BenchmarkId::new("generate", size), &oem, |b, oem| {
-            b.iter(|| black_box(oem).to_kvn().unwrap())
+            b.iter(|| black_box(oem).to_xml().unwrap())
         });
     }
 
     group.finish();
 }
 
-// --- Micro-benchmarks for hot paths ---
-
-fn bench_micro(c: &mut Criterion) {
-    // Epoch parsing - used in every message
-    c.bench_function("micro_epoch_parse", |b| {
-        b.iter(|| Epoch::from_str(black_box("2023-09-26T12:00:00.123456Z")).unwrap())
-    });
-
-    // Float parsing - the core of data parsing
-    c.bench_function("micro_float_parse", |b| {
-        b.iter(|| fast_float::parse::<f64, _>(black_box("32021034790.7265")).unwrap())
-    });
-}
-
 criterion_group!(
     benches,
-    bench_parse_kvn,
-    bench_generate_kvn,
-    bench_parse_opm,
-    bench_parse_omm,
-    bench_parse_tdm,
-    bench_kvn_scaling,
-    bench_micro,
+    bench_xml_parse_oem,
+    bench_xml_generate_oem,
+    bench_xml_parse_opm,
+    bench_xml_parse_omm,
+    bench_xml_parse_tdm,
+    bench_xml_scaling,
 );
 criterion_main!(benches);

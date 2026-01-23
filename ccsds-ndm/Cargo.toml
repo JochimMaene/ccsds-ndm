@@ -27,3 +27,7 @@ tempfile = "3"
 [[bench]]
 name = "kvn_benches"
 harness = false
+
+[[bench]]
+name = "xml_benches"
+harness = false
