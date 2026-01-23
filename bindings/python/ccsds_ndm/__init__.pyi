@@ -2451,9 +2451,13 @@ class ManeuverParameters:
     @property
     def man_delta_mass(self) -> float:
         """
-        Mass change during maneuver (value is < 0).
+        Mass change during maneuver.
 
         Units: kg
+
+
+        **Note**: The CCSDS standard requires this value to be strictly negative (`< 0`).
+        However, this implementation allows non-negative values to support non-standard use cases.
         """
         ...
 
@@ -11008,6 +11012,7 @@ class TleParameters:
         Solar radiation pressure coefficient (m²/kg). Required for SGP4-XP.
     """
     def __init__(
+        mean_motion_dot: float,
         ephemeris_type: Optional[int] = None,
         classification_type: Optional[str] = None,
         norad_cat_id: Optional[int] = None,
@@ -11015,7 +11020,6 @@ class TleParameters:
         rev_at_epoch: Optional[int] = None,
         bstar: Optional[float] = None,
         bterm: Optional[float] = None,
-        mean_motion_dot: Optional[float] = None,
         mean_motion_ddot: Optional[float] = None,
         agom: Optional[float] = None,
     ) -> None: ...
@@ -11138,7 +11142,7 @@ class TleParameters:
     @mean_motion_ddot.setter
     def mean_motion_ddot(self, value: Optional[float]) -> None: ...
     @property
-    def mean_motion_dot(self) -> Optional[float]:
+    def mean_motion_dot(self) -> float:
         """
         First Time Derivative of the Mean Motion (i.e., a drag term, required when MEAN_ELEMENT_THEORY
         = SGP or PPT3). (See 4.2.4.7 for important details).
@@ -11150,7 +11154,7 @@ class TleParameters:
         ...
 
     @mean_motion_dot.setter
-    def mean_motion_dot(self, value: Optional[float]) -> None: ...
+    def mean_motion_dot(self, value: float) -> None: ...
     @property
     def norad_cat_id(self) -> Optional[int]:
         """

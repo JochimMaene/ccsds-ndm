@@ -5422,10 +5422,7 @@ impl OcmOdParameters {
     #[setter]
     fn set_sedr(&mut self, value: Option<f64>) {
         use ccsds_ndm::types::Wkg;
-        self.inner.sedr = value.map(|v| Wkg {
-            value: v,
-            units: None,
-        });
+        self.inner.sedr = value.map(Wkg::new);
     }
     /// The number of sensors used in the orbit determination.
     ///
@@ -5460,11 +5457,11 @@ impl OcmOdParameters {
     /// :type: Optional[float]
     #[getter]
     fn get_weighted_rms(&self) -> Option<f64> {
-        self.inner.weighted_rms
+        self.inner.weighted_rms.as_ref().map(|v| v.value)
     }
     #[setter]
     fn set_weighted_rms(&mut self, value: Option<f64>) {
-        self.inner.weighted_rms = value;
+        self.inner.weighted_rms = value.map(|value| ccsds_ndm::types::NonNegativeDouble { value });
     }
     /// Comma-separated list of observation data types utilized in this orbit determination.
     ///

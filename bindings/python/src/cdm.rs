@@ -511,9 +511,9 @@ impl RelativeMetadataData {
                 relative_position_r: Length::new(p[0], None),
                 relative_position_t: Length::new(p[1], None),
                 relative_position_n: Length::new(p[2], None),
-                relative_velocity_r: Dv::new(v[0], None),
-                relative_velocity_t: Dv::new(v[1], None),
-                relative_velocity_n: Dv::new(v[2], None),
+                relative_velocity_r: Dv::new(v[0]),
+                relative_velocity_t: Dv::new(v[1]),
+                relative_velocity_n: Dv::new(v[2]),
             })
         } else {
             None
@@ -534,7 +534,7 @@ impl RelativeMetadataData {
                 comment,
                 tca: parse_epoch_str(&tca)?,
                 miss_distance: Length::new(miss_distance, None),
-                relative_speed: relative_speed.map(|v| Dv::new(v, None)),
+                relative_speed: relative_speed.map(|v| Dv::new(v)),
                 relative_state_vector: rel_state,
                 start_screen_period: start_screen_period
                     .map(|s| parse_epoch_str(&s))
@@ -595,7 +595,7 @@ impl RelativeMetadataData {
     }
     #[setter]
     fn set_relative_speed(&mut self, value: Option<f64>) {
-        self.inner.relative_speed = value.map(|v| Dv::new(v, None));
+        self.inner.relative_speed = value.map(|v| Dv::new(v));
     }
 
     /// The probability that Object1 and Object2 will collide.
@@ -1696,10 +1696,10 @@ impl AdditionalParameters {
                 area_drg: area_drg.map(|v| core_types::Area::new(v, None).unwrap()),
                 area_srp: area_srp.map(|v| core_types::Area::new(v, None).unwrap()),
                 mass: mass.map(|v| core_types::Mass::new(v, None).unwrap()),
-                cd_area_over_mass: cd_area_over_mass.map(|v| core_types::M2kg::new(v, None)),
-                cr_area_over_mass: cr_area_over_mass.map(|v| core_types::M2kg::new(v, None)),
-                thrust_acceleration: thrust_acceleration.map(|v| core_types::Ms2::new(v, None)),
-                sedr: sedr.map(|v| core_types::Wkg::new(v, None)),
+                cd_area_over_mass: cd_area_over_mass.map(|v| core_types::M2kgRequired::new(v)),
+                cr_area_over_mass: cr_area_over_mass.map(|v| core_types::M2kgRequired::new(v)),
+                thrust_acceleration: thrust_acceleration.map(|v| core_types::Ms2::new(v)),
+                sedr: sedr.map(|v| core_types::Wkg::new(v)),
             },
         }
     }
@@ -1786,7 +1786,7 @@ impl AdditionalParameters {
     }
     #[setter]
     fn set_cd_area_over_mass(&mut self, v: Option<f64>) {
-        self.inner.cd_area_over_mass = v.map(|x| core_types::M2kg::new(x, None));
+        self.inner.cd_area_over_mass = v.map(|x| core_types::M2kgRequired::new(x));
     }
 
     /// The object's CR•A/m used to propagate the state vector and covariance to TCA. (See
@@ -1801,7 +1801,7 @@ impl AdditionalParameters {
     }
     #[setter]
     fn set_cr_area_over_mass(&mut self, v: Option<f64>) {
-        self.inner.cr_area_over_mass = v.map(|x| core_types::M2kg::new(x, None));
+        self.inner.cr_area_over_mass = v.map(|x| core_types::M2kgRequired::new(x));
     }
 
     /// The object's acceleration due to in-track thrust used to propagate the state vector and
@@ -1816,7 +1816,7 @@ impl AdditionalParameters {
     }
     #[setter]
     fn set_thrust_acceleration(&mut self, v: Option<f64>) {
-        self.inner.thrust_acceleration = v.map(|x| core_types::Ms2::new(x, None));
+        self.inner.thrust_acceleration = v.map(|x| core_types::Ms2::new(x));
     }
 
     /// The amount of energy being removed from the object's orbit by atmospheric drag. This
@@ -1831,7 +1831,7 @@ impl AdditionalParameters {
     }
     #[setter]
     fn set_sedr(&mut self, v: Option<f64>) {
-        self.inner.sedr = v.map(|x| core_types::Wkg::new(x, None));
+        self.inner.sedr = v.map(|x| core_types::Wkg::new(x));
     }
 }
 
@@ -1992,52 +1992,53 @@ impl CdmCovarianceMatrix {
         Self {
             inner: core_cdm::CdmCovarianceMatrix {
                 comment: comment.unwrap_or_default(),
-                cr_r: core_types::M2::new(cr_r, None),
-                ct_r: core_types::M2::new(ct_r, None),
-                ct_t: core_types::M2::new(ct_t, None),
-                cn_r: core_types::M2::new(cn_r, None),
-                cn_t: core_types::M2::new(cn_t, None),
-                cn_n: core_types::M2::new(cn_n, None),
-                crdot_r: core_types::M2s::new(crdot_r, None),
-                crdot_t: core_types::M2s::new(crdot_t, None),
-                crdot_n: core_types::M2s::new(crdot_n, None),
-                crdot_rdot: core_types::M2s2::new(crdot_rdot, None),
-                ctdot_r: core_types::M2s::new(ctdot_r, None),
-                ctdot_t: core_types::M2s::new(ctdot_t, None),
-                ctdot_n: core_types::M2s::new(ctdot_n, None),
-                ctdot_rdot: core_types::M2s2::new(ctdot_rdot, None),
-                ctdot_tdot: core_types::M2s2::new(ctdot_tdot, None),
-                cndot_r: core_types::M2s::new(cndot_r, None),
-                cndot_t: core_types::M2s::new(cndot_t, None),
-                cndot_n: core_types::M2s::new(cndot_n, None),
-                cndot_rdot: core_types::M2s2::new(cndot_rdot, None),
-                cndot_tdot: core_types::M2s2::new(cndot_tdot, None),
-                cndot_ndot: core_types::M2s2::new(cndot_ndot, None),
-                cdrg_r: cdrg_r.map(|v| core_types::M3kg::new(v, None)),
-                cdrg_t: cdrg_t.map(|v| core_types::M3kg::new(v, None)),
-                cdrg_n: cdrg_n.map(|v| core_types::M3kg::new(v, None)),
-                cdrg_rdot: cdrg_rdot.map(|v| core_types::M3kgs::new(v, None)),
-                cdrg_tdot: cdrg_tdot.map(|v| core_types::M3kgs::new(v, None)),
-                cdrg_ndot: cdrg_ndot.map(|v| core_types::M3kgs::new(v, None)),
-                cdrg_drg: cdrg_drg.map(|v| core_types::M4kg2::new(v, None)),
-                csrp_r: csrp_r.map(|v| core_types::M3kg::new(v, None)),
-                csrp_t: csrp_t.map(|v| core_types::M3kg::new(v, None)),
-                csrp_n: csrp_n.map(|v| core_types::M3kg::new(v, None)),
-                csrp_rdot: csrp_rdot.map(|v| core_types::M3kgs::new(v, None)),
-                csrp_tdot: csrp_tdot.map(|v| core_types::M3kgs::new(v, None)),
-                csrp_ndot: csrp_ndot.map(|v| core_types::M3kgs::new(v, None)),
-                csrp_drg: csrp_drg.map(|v| core_types::M4kg2::new(v, None)),
-                csrp_srp: csrp_srp.map(|v| core_types::M4kg2::new(v, None)),
-                cthr_r: cthr_r.map(|v| core_types::M2s2::new(v, None)),
-                cthr_t: cthr_t.map(|v| core_types::M2s2::new(v, None)),
-                cthr_n: cthr_n.map(|v| core_types::M2s2::new(v, None)),
-                cthr_rdot: cthr_rdot.map(|v| core_types::M2s3::new(v, None)),
-                cthr_tdot: cthr_tdot.map(|v| core_types::M2s3::new(v, None)),
-                cthr_ndot: cthr_ndot.map(|v| core_types::M2s3::new(v, None)),
-                cthr_drg: cthr_drg.map(|v| core_types::M3kgs2::new(v, None)),
-                cthr_srp: cthr_srp.map(|v| core_types::M3kgs2::new(v, None)),
-                cthr_thr: cthr_thr.map(|v| core_types::M2s4::new(v, None)),
+                cr_r: core_types::M2::new(cr_r),
+                ct_r: core_types::M2::new(ct_r),
+                ct_t: core_types::M2::new(ct_t),
+                cn_r: core_types::M2::new(cn_r),
+                cn_t: core_types::M2::new(cn_t),
+                cn_n: core_types::M2::new(cn_n),
+                crdot_r: core_types::M2s::new(crdot_r),
+                crdot_t: core_types::M2s::new(crdot_t),
+                crdot_n: core_types::M2s::new(crdot_n),
+                crdot_rdot: core_types::M2s2::new(crdot_rdot),
+                ctdot_r: core_types::M2s::new(ctdot_r),
+                ctdot_t: core_types::M2s::new(ctdot_t),
+                ctdot_n: core_types::M2s::new(ctdot_n),
+                ctdot_rdot: core_types::M2s2::new(ctdot_rdot),
+                ctdot_tdot: core_types::M2s2::new(ctdot_tdot),
+                cndot_r: core_types::M2s::new(cndot_r),
+                cndot_t: core_types::M2s::new(cndot_t),
+                cndot_n: core_types::M2s::new(cndot_n),
+                cndot_rdot: core_types::M2s2::new(cndot_rdot),
+                cndot_tdot: core_types::M2s2::new(cndot_tdot),
+                cndot_ndot: core_types::M2s2::new(cndot_ndot),
+                cdrg_r: cdrg_r.map(|v| core_types::M3kg::new(v)),
+                cdrg_t: cdrg_t.map(|v| core_types::M3kg::new(v)),
+                cdrg_n: cdrg_n.map(|v| core_types::M3kg::new(v)),
+                cdrg_rdot: cdrg_rdot.map(|v| core_types::M3kgs::new(v)),
+                cdrg_tdot: cdrg_tdot.map(|v| core_types::M3kgs::new(v)),
+                cdrg_ndot: cdrg_ndot.map(|v| core_types::M3kgs::new(v)),
+                cdrg_drg: cdrg_drg.map(|v| core_types::M4kg2::new(v)),
+                csrp_r: csrp_r.map(|v| core_types::M3kg::new(v)),
+                csrp_t: csrp_t.map(|v| core_types::M3kg::new(v)),
+                csrp_n: csrp_n.map(|v| core_types::M3kg::new(v)),
+                csrp_rdot: csrp_rdot.map(|v| core_types::M3kgs::new(v)),
+                csrp_tdot: csrp_tdot.map(|v| core_types::M3kgs::new(v)),
+                csrp_ndot: csrp_ndot.map(|v| core_types::M3kgs::new(v)),
+                csrp_drg: csrp_drg.map(|v| core_types::M4kg2::new(v)),
+                csrp_srp: csrp_srp.map(|v| core_types::M4kg2::new(v)),
+                cthr_r: cthr_r.map(|v| core_types::M2s2::new(v)),
+                cthr_t: cthr_t.map(|v| core_types::M2s2::new(v)),
+                cthr_n: cthr_n.map(|v| core_types::M2s2::new(v)),
+                cthr_rdot: cthr_rdot.map(|v| core_types::M2s3::new(v)),
+                cthr_tdot: cthr_tdot.map(|v| core_types::M2s3::new(v)),
+                cthr_ndot: cthr_ndot.map(|v| core_types::M2s3::new(v)),
+                cthr_drg: cthr_drg.map(|v| core_types::M3kgs2::new(v)),
+                cthr_srp: cthr_srp.map(|v| core_types::M3kgs2::new(v)),
+                cthr_thr: cthr_thr.map(|v| core_types::M2s4::new(v)),
             },
+
         }
     }
 
@@ -2388,7 +2389,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cdrg_r(&self) -> Option<f64> { self.inner.cdrg_r.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cdrg_r(&mut self, v: Option<f64>) { self.inner.cdrg_r = v.map(|x| core_types::M3kg::new(x, None)); }
+    fn set_cdrg_r(&mut self, v: Option<f64>) { self.inner.cdrg_r = v.map(|x| core_types::M3kg::new(x)); }
 
     /// Object covariance matrix [7,2].
     ///
@@ -2398,7 +2399,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cdrg_t(&self) -> Option<f64> { self.inner.cdrg_t.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cdrg_t(&mut self, v: Option<f64>) { self.inner.cdrg_t = v.map(|x| core_types::M3kg::new(x, None)); }
+    fn set_cdrg_t(&mut self, v: Option<f64>) { self.inner.cdrg_t = v.map(|x| core_types::M3kg::new(x)); }
 
     /// Object covariance matrix [7,3].
     ///
@@ -2408,7 +2409,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cdrg_n(&self) -> Option<f64> { self.inner.cdrg_n.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cdrg_n(&mut self, v: Option<f64>) { self.inner.cdrg_n = v.map(|x| core_types::M3kg::new(x, None)); }
+    fn set_cdrg_n(&mut self, v: Option<f64>) { self.inner.cdrg_n = v.map(|x| core_types::M3kg::new(x)); }
 
     /// Object covariance matrix [7,4].
     ///
@@ -2418,7 +2419,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cdrg_rdot(&self) -> Option<f64> { self.inner.cdrg_rdot.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cdrg_rdot(&mut self, v: Option<f64>) { self.inner.cdrg_rdot = v.map(|x| core_types::M3kgs::new(x, None)); }
+    fn set_cdrg_rdot(&mut self, v: Option<f64>) { self.inner.cdrg_rdot = v.map(|x| core_types::M3kgs::new(x)); }
 
     /// Object covariance matrix [7,5].
     ///
@@ -2428,7 +2429,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cdrg_tdot(&self) -> Option<f64> { self.inner.cdrg_tdot.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cdrg_tdot(&mut self, v: Option<f64>) { self.inner.cdrg_tdot = v.map(|x| core_types::M3kgs::new(x, None)); }
+    fn set_cdrg_tdot(&mut self, v: Option<f64>) { self.inner.cdrg_tdot = v.map(|x| core_types::M3kgs::new(x)); }
 
     /// Object covariance matrix [7,6].
     ///
@@ -2438,7 +2439,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cdrg_ndot(&self) -> Option<f64> { self.inner.cdrg_ndot.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cdrg_ndot(&mut self, v: Option<f64>) { self.inner.cdrg_ndot = v.map(|x| core_types::M3kgs::new(x, None)); }
+    fn set_cdrg_ndot(&mut self, v: Option<f64>) { self.inner.cdrg_ndot = v.map(|x| core_types::M3kgs::new(x)); }
 
     /// Object covariance matrix [7,7].
     ///
@@ -2448,7 +2449,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cdrg_drg(&self) -> Option<f64> { self.inner.cdrg_drg.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cdrg_drg(&mut self, v: Option<f64>) { self.inner.cdrg_drg = v.map(|x| core_types::M4kg2::new(x, None)); }
+    fn set_cdrg_drg(&mut self, v: Option<f64>) { self.inner.cdrg_drg = v.map(|x| core_types::M4kg2::new(x)); }
 
     /// Object covariance matrix [8,1].
     ///
@@ -2458,7 +2459,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_csrp_r(&self) -> Option<f64> { self.inner.csrp_r.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_csrp_r(&mut self, v: Option<f64>) { self.inner.csrp_r = v.map(|x| core_types::M3kg::new(x, None)); }
+    fn set_csrp_r(&mut self, v: Option<f64>) { self.inner.csrp_r = v.map(|x| core_types::M3kg::new(x)); }
 
     /// Object covariance matrix [8,2].
     ///
@@ -2468,7 +2469,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_csrp_t(&self) -> Option<f64> { self.inner.csrp_t.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_csrp_t(&mut self, v: Option<f64>) { self.inner.csrp_t = v.map(|x| core_types::M3kg::new(x, None)); }
+    fn set_csrp_t(&mut self, v: Option<f64>) { self.inner.csrp_t = v.map(|x| core_types::M3kg::new(x)); }
 
     /// Object covariance matrix [8,3].
     ///
@@ -2478,7 +2479,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_csrp_n(&self) -> Option<f64> { self.inner.csrp_n.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_csrp_n(&mut self, v: Option<f64>) { self.inner.csrp_n = v.map(|x| core_types::M3kg::new(x, None)); }
+    fn set_csrp_n(&mut self, v: Option<f64>) { self.inner.csrp_n = v.map(|x| core_types::M3kg::new(x)); }
 
     /// Object covariance matrix [8,4].
     ///
@@ -2488,7 +2489,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_csrp_rdot(&self) -> Option<f64> { self.inner.csrp_rdot.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_csrp_rdot(&mut self, v: Option<f64>) { self.inner.csrp_rdot = v.map(|x| core_types::M3kgs::new(x, None)); }
+    fn set_csrp_rdot(&mut self, v: Option<f64>) { self.inner.csrp_rdot = v.map(|x| core_types::M3kgs::new(x)); }
 
     /// Object covariance matrix [8,5].
     ///
@@ -2498,7 +2499,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_csrp_tdot(&self) -> Option<f64> { self.inner.csrp_tdot.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_csrp_tdot(&mut self, v: Option<f64>) { self.inner.csrp_tdot = v.map(|x| core_types::M3kgs::new(x, None)); }
+    fn set_csrp_tdot(&mut self, v: Option<f64>) { self.inner.csrp_tdot = v.map(|x| core_types::M3kgs::new(x)); }
 
     /// Object covariance matrix [8,6].
     ///
@@ -2508,7 +2509,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_csrp_ndot(&self) -> Option<f64> { self.inner.csrp_ndot.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_csrp_ndot(&mut self, v: Option<f64>) { self.inner.csrp_ndot = v.map(|x| core_types::M3kgs::new(x, None)); }
+    fn set_csrp_ndot(&mut self, v: Option<f64>) { self.inner.csrp_ndot = v.map(|x| core_types::M3kgs::new(x)); }
 
     /// Object covariance matrix [8,7].
     ///
@@ -2518,7 +2519,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_csrp_drg(&self) -> Option<f64> { self.inner.csrp_drg.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_csrp_drg(&mut self, v: Option<f64>) { self.inner.csrp_drg = v.map(|x| core_types::M4kg2::new(x, None)); }
+    fn set_csrp_drg(&mut self, v: Option<f64>) { self.inner.csrp_drg = v.map(|x| core_types::M4kg2::new(x)); }
 
     /// Object covariance matrix [8,8].
     ///
@@ -2528,7 +2529,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_csrp_srp(&self) -> Option<f64> { self.inner.csrp_srp.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_csrp_srp(&mut self, v: Option<f64>) { self.inner.csrp_srp = v.map(|x| core_types::M4kg2::new(x, None)); }
+    fn set_csrp_srp(&mut self, v: Option<f64>) { self.inner.csrp_srp = v.map(|x| core_types::M4kg2::new(x)); }
 
     /// Object covariance matrix [9,1].
     ///
@@ -2538,7 +2539,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cthr_r(&self) -> Option<f64> { self.inner.cthr_r.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cthr_r(&mut self, v: Option<f64>) { self.inner.cthr_r = v.map(|x| core_types::M2s2::new(x, None)); }
+    fn set_cthr_r(&mut self, v: Option<f64>) { self.inner.cthr_r = v.map(|x| core_types::M2s2::new(x)); }
 
     /// Object covariance matrix [9,2].
     ///
@@ -2548,7 +2549,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cthr_t(&self) -> Option<f64> { self.inner.cthr_t.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cthr_t(&mut self, v: Option<f64>) { self.inner.cthr_t = v.map(|x| core_types::M2s2::new(x, None)); }
+    fn set_cthr_t(&mut self, v: Option<f64>) { self.inner.cthr_t = v.map(|x| core_types::M2s2::new(x)); }
 
     /// Object covariance matrix [9,3].
     ///
@@ -2558,7 +2559,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cthr_n(&self) -> Option<f64> { self.inner.cthr_n.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cthr_n(&mut self, v: Option<f64>) { self.inner.cthr_n = v.map(|x| core_types::M2s2::new(x, None)); }
+    fn set_cthr_n(&mut self, v: Option<f64>) { self.inner.cthr_n = v.map(|x| core_types::M2s2::new(x)); }
 
     /// Object covariance matrix [9,4].
     ///
@@ -2568,7 +2569,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cthr_rdot(&self) -> Option<f64> { self.inner.cthr_rdot.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cthr_rdot(&mut self, v: Option<f64>) { self.inner.cthr_rdot = v.map(|x| core_types::M2s3::new(x, None)); }
+    fn set_cthr_rdot(&mut self, v: Option<f64>) { self.inner.cthr_rdot = v.map(|x| core_types::M2s3::new(x)); }
 
     /// Object covariance matrix [9,5].
     ///
@@ -2578,7 +2579,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cthr_tdot(&self) -> Option<f64> { self.inner.cthr_tdot.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cthr_tdot(&mut self, v: Option<f64>) { self.inner.cthr_tdot = v.map(|x| core_types::M2s3::new(x, None)); }
+    fn set_cthr_tdot(&mut self, v: Option<f64>) { self.inner.cthr_tdot = v.map(|x| core_types::M2s3::new(x)); }
 
     /// Object covariance matrix [9,6].
     ///
@@ -2588,7 +2589,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cthr_ndot(&self) -> Option<f64> { self.inner.cthr_ndot.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cthr_ndot(&mut self, v: Option<f64>) { self.inner.cthr_ndot = v.map(|x| core_types::M2s3::new(x, None)); }
+    fn set_cthr_ndot(&mut self, v: Option<f64>) { self.inner.cthr_ndot = v.map(|x| core_types::M2s3::new(x)); }
 
     /// Object covariance matrix [9,7].
     ///
@@ -2598,7 +2599,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cthr_drg(&self) -> Option<f64> { self.inner.cthr_drg.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cthr_drg(&mut self, v: Option<f64>) { self.inner.cthr_drg = v.map(|x| core_types::M3kgs2::new(x, None)); }
+    fn set_cthr_drg(&mut self, v: Option<f64>) { self.inner.cthr_drg = v.map(|x| core_types::M3kgs2::new(x)); }
 
     /// Object covariance matrix [9,8].
     ///
@@ -2608,7 +2609,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cthr_srp(&self) -> Option<f64> { self.inner.cthr_srp.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cthr_srp(&mut self, v: Option<f64>) { self.inner.cthr_srp = v.map(|x| core_types::M3kgs2::new(x, None)); }
+    fn set_cthr_srp(&mut self, v: Option<f64>) { self.inner.cthr_srp = v.map(|x| core_types::M3kgs2::new(x)); }
 
     /// Object covariance matrix [9,9].
     ///
@@ -2618,7 +2619,7 @@ impl CdmCovarianceMatrix {
     #[getter]
     fn get_cthr_thr(&self) -> Option<f64> { self.inner.cthr_thr.as_ref().map(|v| v.value) }
     #[setter]
-    fn set_cthr_thr(&mut self, v: Option<f64>) { self.inner.cthr_thr = v.map(|x| core_types::M2s4::new(x, None)); }
+    fn set_cthr_thr(&mut self, v: Option<f64>) { self.inner.cthr_thr = v.map(|x| core_types::M2s4::new(x)); }
 
 
 }

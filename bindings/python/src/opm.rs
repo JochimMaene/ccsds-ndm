@@ -512,7 +512,7 @@ impl KeplerianElements {
             inner: core_opm::KeplerianElements {
                 comment: vec![],
                 semi_major_axis: Distance::new(semi_major_axis, None),
-                eccentricity,
+                eccentricity: ccsds_ndm::types::NonNegativeDouble { value: eccentricity },
                 inclination: Inclination {
                     angle: Angle::new(inclination, None).map_err(|e| {
                         PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
@@ -580,12 +580,12 @@ impl KeplerianElements {
     /// :type: float
     #[getter]
     fn get_eccentricity(&self) -> f64 {
-        self.inner.eccentricity
+        self.inner.eccentricity.value
     }
 
     #[setter]
     fn set_eccentricity(&mut self, value: f64) {
-        self.inner.eccentricity = value;
+        self.inner.eccentricity = ccsds_ndm::types::NonNegativeDouble { value };
     }
 
     /// Inclination.

@@ -235,8 +235,8 @@ class TestTdmGettersSetters:
         metadata.participant_2 = "MGS"
         assert metadata.participant_2 == "MGS"
 
-        metadata.mode = "SIMULTANEOUS"
-        assert metadata.mode == "SIMULTANEOUS"
+        metadata.mode = "SINGLE_DIFF"
+        assert metadata.mode == "SINGLE_DIFF"
 
         metadata.transmit_band = "S"
         assert metadata.transmit_band == "S"

@@ -500,7 +500,7 @@ impl MeanElements {
             inner: core_omm::MeanElements {
                 comment: vec![],
                 epoch: parse_epoch(&epoch)?,
-                eccentricity,
+                eccentricity: ccsds_ndm::types::NonNegativeDouble { value: eccentricity },
                 inclination: Inclination {
                     angle: Angle::new(inclination, None).map_err(|e| {
                         PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
@@ -562,12 +562,12 @@ impl MeanElements {
     /// :type: float
     #[getter]
     fn get_eccentricity(&self) -> f64 {
-        self.inner.eccentricity
+        self.inner.eccentricity.value
     }
 
     #[setter]
     fn set_eccentricity(&mut self, value: f64) {
-        self.inner.eccentricity = value;
+        self.inner.eccentricity = ccsds_ndm::types::NonNegativeDouble { value };
     }
 
     /// Inclination.
@@ -896,7 +896,7 @@ impl TleParameters {
                 ephemeris_type,
                 classification_type,
                 norad_cat_id,
-                element_set_no,
+                element_set_no: element_set_no.map(|value| ccsds_ndm::types::ElementSetNo { value }),
                 rev_at_epoch,
                 bstar: bstar.map(|v| BStar::new(v, Default::default())),
                 bterm: bterm.map(|v| M2kg::new(v, Default::default())),
@@ -989,12 +989,12 @@ impl TleParameters {
     /// :type: Optional[int]
     #[getter]
     fn get_element_set_no(&self) -> Option<u32> {
-        self.inner.element_set_no
+        self.inner.element_set_no.as_ref().map(|v| v.value)
     }
 
     #[setter]
     fn set_element_set_no(&mut self, value: Option<u32>) {
-        self.inner.element_set_no = value;
+        self.inner.element_set_no = value.map(|value| ccsds_ndm::types::ElementSetNo { value });
     }
 
     /// Number of revolutions at epoch.

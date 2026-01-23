@@ -668,7 +668,7 @@ impl SpacecraftParameters {
         drag_area: Option<f64>,
         drag_coeff: Option<f64>,
     ) -> Self {
-        use ccsds_ndm::types::{Area, Mass};
+        use ccsds_ndm::types::{Area, Mass, NonNegativeDouble};
         Self {
             inner: core_common::SpacecraftParameters {
                 comment: vec![],
@@ -680,12 +680,12 @@ impl SpacecraftParameters {
                     value: v,
                     units: None,
                 }),
-                solar_rad_coeff,
+                solar_rad_coeff: solar_rad_coeff.map(|value| NonNegativeDouble { value }),
                 drag_area: drag_area.map(|v| Area {
                     value: v,
                     units: None,
                 }),
-                drag_coeff,
+                drag_coeff: drag_coeff.map(|value| NonNegativeDouble { value }),
             },
         }
     }
@@ -756,12 +756,13 @@ impl SpacecraftParameters {
     /// :type: Optional[float]
     #[getter]
     fn get_solar_rad_coeff(&self) -> Option<f64> {
-        self.inner.solar_rad_coeff
+        self.inner.solar_rad_coeff.as_ref().map(|v| v.value)
     }
 
     #[setter]
     fn set_solar_rad_coeff(&mut self, value: Option<f64>) {
-        self.inner.solar_rad_coeff = value;
+        self.inner.solar_rad_coeff =
+            value.map(|v| ccsds_ndm::types::NonNegativeDouble { value: v });
     }
 
     /// Drag Area (AD).
@@ -792,12 +793,12 @@ impl SpacecraftParameters {
     /// :type: Optional[float]
     #[getter]
     fn get_drag_coeff(&self) -> Option<f64> {
-        self.inner.drag_coeff
+        self.inner.drag_coeff.as_ref().map(|v| v.value)
     }
 
     #[setter]
     fn set_drag_coeff(&mut self, value: Option<f64>) {
-        self.inner.drag_coeff = value;
+        self.inner.drag_coeff = value.map(|v| ccsds_ndm::types::NonNegativeDouble { value: v });
     }
 }
 
@@ -850,20 +851,32 @@ impl OdParameters {
         weighted_rms: Option<f64>,
         comment: Vec<String>,
     ) -> PyResult<Self> {
-        use ccsds_ndm::types::{DayInterval, Percentage};
+        use ccsds_ndm::types::{DayInterval, NonNegativeDouble, Percentage, PositiveInteger};
         Ok(Self {
             inner: core_common::OdParameters {
                 comment,
                 time_lastob_start: time_lastob_start.map(|s| parse_epoch(&s)).transpose()?,
                 time_lastob_end: time_lastob_end.map(|s| parse_epoch(&s)).transpose()?,
-                recommended_od_span: recommended_od_span.map(|v| DayInterval::new(v, None).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                actual_od_span: actual_od_span.map(|v| DayInterval::new(v, None).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                obs_available,
-                obs_used,
-                tracks_available,
-                tracks_used,
-                residuals_accepted: residuals_accepted.map(|v| Percentage::new(v, None).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                weighted_rms,
+                recommended_od_span: recommended_od_span
+                    .map(|v| {
+                        DayInterval::new(v, None).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                actual_od_span: actual_od_span
+                    .map(|v| {
+                        DayInterval::new(v, None).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                obs_available: obs_available.map(|v| PositiveInteger { value: v }),
+                obs_used: obs_used.map(|v| PositiveInteger { value: v }),
+                tracks_available: tracks_available.map(|v| PositiveInteger { value: v }),
+                tracks_used: tracks_used.map(|v| PositiveInteger { value: v }),
+                residuals_accepted: residuals_accepted
+                    .map(|v| {
+                        Percentage::new(v, None).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                weighted_rms: weighted_rms.map(|value| NonNegativeDouble { value }),
             },
         })
     }
@@ -952,11 +965,11 @@ impl OdParameters {
     /// :type: Optional[int]
     #[getter]
     fn get_obs_available(&self) -> Option<u32> {
-        self.inner.obs_available
+        self.inner.obs_available.as_ref().map(|v| v.value)
     }
     #[setter]
     fn set_obs_available(&mut self, v: Option<u32>) {
-        self.inner.obs_available = v;
+        self.inner.obs_available = v.map(|value| ccsds_ndm::types::PositiveInteger { value });
     }
 
     /// The number of observations used in the orbit determination.
@@ -964,11 +977,11 @@ impl OdParameters {
     /// :type: Optional[int]
     #[getter]
     fn get_obs_used(&self) -> Option<u32> {
-        self.inner.obs_used
+        self.inner.obs_used.as_ref().map(|v| v.value)
     }
     #[setter]
     fn set_obs_used(&mut self, v: Option<u32>) {
-        self.inner.obs_used = v;
+        self.inner.obs_used = v.map(|value| ccsds_ndm::types::PositiveInteger { value });
     }
 
     /// The total number of tracks available for orbit determination.
@@ -976,11 +989,11 @@ impl OdParameters {
     /// :type: Optional[int]
     #[getter]
     fn get_tracks_available(&self) -> Option<u32> {
-        self.inner.tracks_available
+        self.inner.tracks_available.as_ref().map(|v| v.value)
     }
     #[setter]
     fn set_tracks_available(&mut self, v: Option<u32>) {
-        self.inner.tracks_available = v;
+        self.inner.tracks_available = v.map(|value| ccsds_ndm::types::PositiveInteger { value });
     }
 
     /// The number of tracks used in the orbit determination.
@@ -988,11 +1001,11 @@ impl OdParameters {
     /// :type: Optional[int]
     #[getter]
     fn get_tracks_used(&self) -> Option<u32> {
-        self.inner.tracks_used
+        self.inner.tracks_used.as_ref().map(|v| v.value)
     }
     #[setter]
     fn set_tracks_used(&mut self, v: Option<u32>) {
-        self.inner.tracks_used = v;
+        self.inner.tracks_used = v.map(|value| ccsds_ndm::types::PositiveInteger { value });
     }
 
     /// The percentage of residuals accepted during orbit determination.
@@ -1005,7 +1018,11 @@ impl OdParameters {
     #[setter]
     fn set_residuals_accepted(&mut self, v: Option<f64>) -> PyResult<()> {
         use ccsds_ndm::types::Percentage;
-        self.inner.residuals_accepted = v.map(|x| Percentage::new(x, None).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?;
+        self.inner.residuals_accepted = v
+            .map(|x| {
+                Percentage::new(x, None).map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
         Ok(())
     }
 
@@ -1014,11 +1031,11 @@ impl OdParameters {
     /// :type: Optional[float]
     #[getter]
     fn get_weighted_rms(&self) -> Option<f64> {
-        self.inner.weighted_rms
+        self.inner.weighted_rms.as_ref().map(|v| v.value)
     }
     #[setter]
     fn set_weighted_rms(&mut self, v: Option<f64>) {
-        self.inner.weighted_rms = v;
+        self.inner.weighted_rms = v.map(|value| ccsds_ndm::types::NonNegativeDouble { value });
     }
 }
 

@@ -574,7 +574,7 @@ impl RdmMetadata {
                 earth_tides,
                 intrack_thrust: intrack_thrust_enum,
                 drag_parameters_source,
-                drag_parameters_altitude: drag_parameters_altitude.map(PositionRequired::new),
+                drag_parameters_altitude: drag_parameters_altitude.map(|v| Position::new(v, None)),
                 reentry_uncertainty_method: reentry_uncertainty_method_enum,
                 reentry_disintegration: reentry_disintegration_enum,
                 impact_uncertainty_method: impact_uncertainty_method_enum,
@@ -936,7 +936,7 @@ impl RdmMetadata {
     }
     #[setter]
     fn set_drag_parameters_altitude(&mut self, v: Option<f64>) {
-        self.inner.drag_parameters_altitude = v.map(PositionRequired::new);
+        self.inner.drag_parameters_altitude = v.map(|value| Position::new(value, None));
     }
 
     /// The method used to compute re-entry uncertainty.
@@ -1630,11 +1630,11 @@ impl RdmSpacecraftParameters {
     /// :type: Optional[float]
     #[getter]
     fn get_solar_rad_coeff(&self) -> Option<f64> {
-        self.inner.solar_rad_coeff
+        self.inner.solar_rad_coeff.as_ref().map(|v| v.value)
     }
     #[setter]
     fn set_solar_rad_coeff(&mut self, v: Option<f64>) {
-        self.inner.solar_rad_coeff = v;
+        self.inner.solar_rad_coeff = v.map(|value| ccsds_ndm::types::NonNegativeDouble { value });
     }
 
     /// Drag area (m^2).
@@ -1657,11 +1657,11 @@ impl RdmSpacecraftParameters {
     /// :type: Optional[float]
     #[getter]
     fn get_drag_coeff(&self) -> Option<f64> {
-        self.inner.drag_coeff
+        self.inner.drag_coeff.as_ref().map(|v| v.value)
     }
     #[setter]
     fn set_drag_coeff(&mut self, v: Option<f64>) {
-        self.inner.drag_coeff = v;
+        self.inner.drag_coeff = v.map(|value| ccsds_ndm::types::NonNegativeDouble { value });
     }
 
     /// Radar cross section (m^2).
@@ -1687,12 +1687,8 @@ impl RdmSpacecraftParameters {
         self.inner.ballistic_coeff.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_ballistic_coeff(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.ballistic_coeff = v
-            .map(ccsds_ndm::types::BallisticCoeffRequired::new)
-            .transpose()
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_ballistic_coeff(&mut self, v: Option<f64>) {
+        self.inner.ballistic_coeff = v.map(|val| ccsds_ndm::types::BallisticCoeff::new(val, None));
     }
 
     /// Constant thrust acceleration (m/s^2).
@@ -1704,7 +1700,7 @@ impl RdmSpacecraftParameters {
     }
     #[setter]
     fn set_thrust_acceleration(&mut self, v: Option<f64>) {
-        self.inner.thrust_acceleration = v.map(ccsds_ndm::types::Ms2Required::new);
+        self.inner.thrust_acceleration = v.map(ccsds_ndm::types::Ms2::new);
     }
 
     /// Comments.
