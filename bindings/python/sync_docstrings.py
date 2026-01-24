@@ -702,7 +702,7 @@ def apply_docstring_changes(
         target_line_idx = None
         target_marker = "#[pyclass" if is_class_sync else "#[getter]"
 
-        for idx in range(end_line, min(end_line + 10, len(lines))):
+        for idx in range(end_line, min(end_line + 50, len(lines))):
             if target_marker in lines[idx]:
                 target_line_idx = idx
                 break

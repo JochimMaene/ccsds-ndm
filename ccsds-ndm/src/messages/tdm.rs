@@ -37,9 +37,7 @@ pub struct Tdm {
 impl Ndm for Tdm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
-        writer.write_pair("CCSDS_TDM_VERS", &self.version);
-        self.header.write_kvn(&mut writer);
-        self.body.write_kvn(&mut writer);
+        self.write_kvn(&mut writer);
         Ok(writer.finish())
     }
 
@@ -67,27 +65,50 @@ impl Tdm {
     }
 }
 
+impl ToKvn for Tdm {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_pair("CCSDS_TDM_VERS", &self.version);
+        self.header.write_kvn(writer);
+        self.body.write_kvn(writer);
+    }
+}
+
 //----------------------------------------------------------------------
 // Header
 //----------------------------------------------------------------------
 
+/// Represents the `tdmHeader` complex type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TdmHeader {
-    /// Comments.
+    /// Comments (allowed in the TDM Header only immediately after the TDM version number).
+    /// (See 4.5 for formatting rules.)
+    ///
+    /// **Examples**: This is a comment
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// Data creation date/time in UTC.
+    /// Data creation date/time in UTC. (For format specification, see 4.3.9.)
     ///
-    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23.4, 2006-001T00:00:00Z
+    /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23.4, 2006-001T00:00:00Z
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
     pub creation_date: Epoch,
-    /// Creating agency.
+    /// Creating agency. Value should be an entry from the ‘Abbreviation’ column in the SANA
+    /// Organizations Registry, https://sanaregistry.org/r/organizations/organizations.html
+    /// (reference [11]).
     ///
-    /// Examples: CNES, ESA, GSFC, DLR, JPL, JAXA
+    /// **Examples**: CNES, ESA, GSFC, DLR, JPL, JAXA
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
     pub originator: String,
-    /// ID that uniquely identifies a message from a given originator.
+    /// ID that uniquely identifies a message from a given originator. The format and content
+    /// of the message identifier value are at the discretion of the originator.
     ///
-    /// Examples: 201113719185
+    /// **Examples**: 201113719185
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message_id: Option<String>,
 }
@@ -162,306 +183,381 @@ pub struct TdmMetadata {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// Unique identifier for the tracking data in the associated data section.
+    /// The TRACK_ID keyword specifies a unique identifier for the tracking data in the
+    /// associated data section. The value may be a freely selected string of characters and
+    /// numbers, only required to be unique for each track of the corresponding sensor. For
+    /// example, the value may be constructed from the measurement date and time and a counter
+    /// to distinguish simultaneously tracked objects.
     ///
-    /// Examples: 20190918_1200135-0001
+    /// **Examples**: 20190918_1200135-0001
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub track_id: Option<String>,
-    /// Comma-separated list of data types in the Data Section.
+    /// Comma-separated list of data types in the Data Section. The elements of the list shall
+    /// be selected from the data types shown in table 3-5, with the exception of the
+    /// DATA_START, DATA_STOP, and COMMENT keywords.
     ///
-    /// Examples: RANGE, TRANSMIT_FREQ_n, RECEIVE_FREQ
+    /// **Examples**: RANGE, TRANSMIT_FREQ_n, RECEIVE_FREQ
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_types: Option<String>,
-    /// The time system used for timetags in the associated Data Section.
+    /// The TIME_SYSTEM keyword shall specify the time system used for timetags in the
+    /// associated Data Section. This should be UTC for ground-based data. The value associated
+    /// with this keyword must be selected from the full set of allowed values enumerated in
+    /// the SANA Time Systems Registry https://sanaregistry.org/r/time_systems (reference [12]).
+    /// (See annex B.)
     ///
-    /// Examples: UTC, TAI, GPS, SCLK
+    /// **Examples**: UTC, TAI, GPS, SCLK
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     pub time_system: String,
-    /// The UTC start time of the total time span covered by the tracking data.
+    /// The START_TIME keyword shall specify the UTC start time of the total time span covered
+    /// by the tracking data immediately following this Metadata Section. (For format
+    /// specification, see 4.3.9.)
     ///
-    /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
+    /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_time: Option<Epoch>,
-    /// The UTC stop time of the total time span covered by the tracking data.
+    /// The STOP_TIME keyword shall specify the UTC stop time of the total time span covered by
+    /// the tracking data immediately following this Metadata Section. (For format
+    /// specification, see 4.3.9.)
     ///
-    /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
+    /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_time: Option<Epoch>,
-    /// The first participant in a tracking data session.
+    /// The PARTICIPANT_n keyword shall represent the participants (see 1.3.4.1) in a tracking
+    /// data session. It is indexed to allow unambiguous reference to other data in the TDM
+    /// (max index is 5). At least two participants must be specified for most sessions; for
+    /// some special TDMs such as tropospheric media, only one participant need be listed.
     ///
-    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name>, 1997-061A, UNKNOWN
+    /// **Examples**: DSS-63-S400K, ROSETTA, <Quasar catalog name>, 1997-061A, UNKNOWN
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     pub participant_1: String,
     /// The second participant in a tracking data session.
-    ///
-    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participant_2: Option<String>,
     /// The third participant in a tracking data session.
-    ///
-    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participant_3: Option<String>,
     /// The fourth participant in a tracking data session.
-    ///
-    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participant_4: Option<String>,
     /// The fifth participant in a tracking data session.
-    ///
-    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participant_5: Option<String>,
-    /// The tracking mode associated with the Data Section of the segment.
+    /// The MODE keyword shall reflect the tracking mode associated with the Data Section of
+    /// the segment. The value ‘SEQUENTIAL’ applies for most sequential signal paths; the name
+    /// implies a sequential signal path between tracking participants. The value
+    /// ‘SINGLE_DIFF’ applies only for differenced data.
     ///
-    /// Examples: SEQUENTIAL, SINGLE_DIFF
+    /// **Examples**: SEQUENTIAL, SINGLE_DIFF
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<TdmMode>,
-    /// The signal path by listing the index of each participant in order, separated by commas.
+    /// The PATH keywords shall reflect the signal path by listing the index of each participant
+    /// in order, separated by commas, with no inserted white space. Correlated with the
+    /// indices of the PARTICIPANT_n keywords. The first entry in the PATH shall be the
+    /// transmit participant.
     ///
-    /// Examples: 1,2,1
+    /// **Examples**: PATH = 1,2,1, PATH_1 = 1,2,1, PATH_2 = 3,1
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<TdmPath>,
     /// The first signal path where the MODE is 'SINGLE_DIFF'.
-    ///
-    /// Examples: 1,2,1
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path_1: Option<TdmPath>,
     /// The second signal path where the MODE is 'SINGLE_DIFF'.
-    ///
-    /// Examples: 3,1
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path_2: Option<TdmPath>,
-    /// The frequency band for transmitted frequencies.
+    /// The TRANSMIT_BAND keyword shall indicate the frequency band for transmitted
+    /// frequencies. The frequency ranges associated with each band should be specified in the
+    /// ICD.
     ///
-    /// Examples: S, X, Ka, L, UHF, GREEN
+    /// **Examples**: S, X, Ka, L, UHF, GREEN
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_band: Option<String>,
-    /// The frequency band for received frequencies.
+    /// The RECEIVE_BAND keyword shall indicate the frequency band for received frequencies.
+    /// Although not required in general, the RECEIVE_BAND must be present if the MODE is
+    /// SINGLE_DIFF and differenced frequencies or differenced range are provided in order to
+    /// allow proper frequency dependent corrections to be applied.
     ///
-    /// Examples: S, X, Ka, L, UHF, GREEN
+    /// **Examples**: S, X, Ka, L, UHF, GREEN
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_band: Option<String>,
-    /// The numerator of the turnaround ratio.
+    /// The TURNAROUND_NUMERATOR keyword shall indicate the numerator of the turnaround ratio
+    /// that is necessary to calculate the coherent downlink from the uplink frequency.
     ///
-    /// Examples: 240, 880
+    /// **Examples**: 240, 880
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turnaround_numerator: Option<i32>,
-    /// The denominator of the turnaround ratio.
+    /// The TURNAROUND_DENOMINATOR keyword shall indicate the denominator of the turnaround
+    /// ratio that is necessary to calculate the coherent downlink from the uplink frequency.
     ///
-    /// Examples: 221, 749
+    /// **Examples**: 221, 749
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turnaround_denominator: Option<i32>,
-    /// A reference for time tags in the tracking data.
+    /// The TIMETAG_REF keyword shall provide a reference for time tags in the tracking data.
+    /// This keyword indicates whether the timetag associated with the data is the transmit
+    /// time or the receive time.
     ///
-    /// Examples: TRANSMIT, RECEIVE
+    /// **Examples**: TRANSMIT, RECEIVE
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timetag_ref: Option<TdmTimetagRef>,
-    /// The Doppler count time in seconds for Doppler data.
+    /// The INTEGRATION_INTERVAL keyword shall provide the Doppler count time in seconds for
+    /// Doppler data or for the creation of normal points.
     ///
-    /// Units: s
+    /// **Examples**: 60.0, 0.1, 1.0
     ///
-    /// Examples: 60.0, 0.1, 1.0
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub integration_interval: Option<f64>,
-    /// Indicates the relationship between the INTEGRATION_INTERVAL and the timetag.
+    /// Indicates the relationship between the INTEGRATION_INTERVAL and the timetag on the
+    /// data, i.e., whether the timetag represents the start, middle, or end of the integration
+    /// period.
     ///
-    /// Examples: START, MIDDLE, END
+    /// **Examples**: START, MIDDLE, END
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub integration_ref: Option<TdmIntegrationRef>,
-    /// A frequency in Hz that must be added to every RECEIVE_FREQ to reconstruct it.
+    /// The FREQ_OFFSET keyword represents a frequency in Hz that must be added to every
+    /// RECEIVE_FREQ to reconstruct it. One use is if a Doppler shift frequency observable is
+    /// transferred instead of the actual received frequency. The default shall be 0.0.
     ///
-    /// Examples: 0.0, 8415000000.0
+    /// **Examples**: 0.0, 8415000000.0
+    ///
+    /// **Units**: Hz
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub freq_offset: Option<f64>,
-    /// The range observable mode.
+    /// The value of the RANGE_MODE keyword shall be ‘COHERENT’, in which case the range tones
+    /// are coherent with the uplink carrier; ‘CONSTANT’, in which case the range tones have a
+    /// constant frequency; or ‘ONE_WAY’ (used in Delta-DOR).
     ///
-    /// Examples: COHERENT, CONSTANT, ONE_WAY
+    /// **Examples**: COHERENT, CONSTANT, ONE_WAY
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range_mode: Option<TdmRangeMode>,
-    /// The modulus of the range observable.
+    /// The value associated with the RANGE_MODULUS keyword shall be the modulus of the range
+    /// observable in the units as specified by the RANGE_UNITS keyword; that is, the actual
+    /// (unambiguous) range is an integer k times the modulus, plus the observable value. The
+    /// default value shall be 0.0.
     ///
-    /// Examples: 32768.0, 2.0e+23, 0.0, 161.6484
+    /// **Examples**: 32768.0, 2.0e+23, 0.0, 161.6484
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range_modulus: Option<f64>,
-    /// The units for the range observable.
+    /// The RANGE_UNITS keyword specifies the units for the range observable. ‘km’ shall be
+    /// used if the range is measured in kilometers. ‘s’ shall be used if the range is measured
+    /// in seconds. ‘RU’, for ‘range units’, shall be used where the transmit frequency is
+    /// changing. The default value shall be ‘km’.
     ///
-    /// Examples: km, s, RU
+    /// **Examples**: km, s, RU
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range_units: Option<TdmRangeUnits>,
-    /// The type of antenna geometry represented in the angle data.
+    /// The ANGLE_TYPE keyword shall indicate the type of antenna geometry represented in the
+    /// angle data (ANGLE_1 and ANGLE_2 keywords).
     ///
-    /// Examples: AZEL, RADEC, XEYN, XSYE
+    /// **Examples**: AZEL, RADEC, XEYN, XSYE
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub angle_type: Option<TdmAngleType>,
-    /// The inertial reference frame to which the antenna frame is referenced.
+    /// The REFERENCE_FRAME keyword shall be used in conjunction with the ‘ANGLE_TYPE=RADEC’
+    /// keyword/value combination, indicating the inertial reference frame to which the antenna
+    /// frame is referenced.
     ///
-    /// Examples: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
+    /// **Examples**: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reference_frame: Option<TdmReferenceFrame>,
-    /// The interpolation method to be used to calculate a transmit phase count.
+    /// The INTERPOLATION keyword shall specify the interpolation method to be used to calculate
+    /// a transmit phase count at an arbitrary time in tracking data where the uplink frequency
+    /// is not constant.
     ///
-    /// Examples: HERMITE, LAGRANGE, LINEAR
+    /// **Examples**: HERMITE, LAGRANGE, LINEAR
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation: Option<String>,
-    /// The recommended degree of the interpolating polynomial for phase count data.
+    /// The INTERPOLATION_DEGREE keyword shall specify the recommended degree of the
+    /// interpolating polynomial used to calculate a transmit phase count at an arbitrary time
+    /// in tracking data where the uplink frequency is not constant.
     ///
-    /// Examples: 3, 5, 7, 11
+    /// **Examples**: 3, 5, 7, 11
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation_degree: Option<u32>,
-    /// A bias that shall be subtracted from the DOPPLER_COUNT data value.
+    /// Doppler counts are generally biased so as to accommodate negative Doppler within an
+    /// accumulator. In order to reconstruct the measurement, the bias shall be subtracted from
+    /// the DOPPLER_COUNT data value.
     ///
-    /// Units: Hz
+    /// **Examples**: 2.4e6, 240000000.0
     ///
-    /// Examples: 2.4e6, 240000000.0
+    /// **Units**: Hz
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doppler_count_bias: Option<f64>,
-    /// A scale factor that the DOPPLER_COUNT data value shall be divided by.
+    /// Doppler counts are generally scaled so as to capture partial cycles in an integer
+    /// count. In order to reconstruct the measurement, the DOPPLER_COUNT data value shall be
+    /// divided by the scale factor. The default shall be 1.
     ///
-    /// Examples: 1000, 1
+    /// **Examples**: 1000, 1
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doppler_count_scale: Option<u64>,
-    /// Flag indicating whether or not a Doppler counter rollover has occurred.
+    /// Doppler counts may overflow the accumulator and roll over in cases where the track is
+    /// of long duration or very high Doppler shift. This flag indicates whether or not a
+    /// counter rollover has occurred during the track.
     ///
-    /// Examples: YES, NO
+    /// **Examples**: YES, NO
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doppler_count_rollover: Option<YesNo>,
-    /// A fixed interval of time, in seconds, required for the signal to travel from the
-    /// transmitting electronics to the transmit point for participant 1.
+    /// The TRANSMIT_DELAY_n keyword shall specify a fixed interval of time, in seconds,
+    /// required for the signal to travel from the transmitting electronics to the transmit
+    /// point. The default value shall be 0.0.
     ///
-    /// Units: s
+    /// **Examples**: 1.23, 0.0326, 0.00077
     ///
-    /// Examples: 1.23, 0.0326, 0.00077
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_delay_1: Option<f64>,
-    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 2.
     ///
-    /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00077
+    /// **Units**: s
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_delay_2: Option<f64>,
-    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 3.
     ///
-    /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00077
+    /// **Units**: s
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_delay_3: Option<f64>,
-    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 4.
     ///
-    /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00077
+    /// **Units**: s
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_delay_4: Option<f64>,
-    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 5.
     ///
-    /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00077
+    /// **Units**: s
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transmit_delay_5: Option<f64>,
-    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
-    /// point to the receiving electronics for participant 1.
+    /// The RECEIVE_DELAY_n keyword shall specify a fixed interval of time, in seconds,
+    /// required for the signal to travel from the tracking point to the receiving electronics.
+    /// The default value shall be 0.0.
     ///
-    /// Units: s
+    /// **Examples**: 1.23, 0.0326, 0.00777
     ///
-    /// Examples: 1.23, 0.0326, 0.00777
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_delay_1: Option<f64>,
-    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 2.
     ///
-    /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00777
+    /// **Units**: s
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_delay_2: Option<f64>,
-    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 3.
     ///
-    /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00777
+    /// **Units**: s
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_delay_3: Option<f64>,
-    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 4.
     ///
-    /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00777
+    /// **Units**: s
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_delay_4: Option<f64>,
-    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 5.
     ///
-    /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00777
+    /// **Units**: s
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_delay_5: Option<f64>,
-    /// An estimate of the quality of the data.
+    /// Provides an estimate of the quality of the data, based on indicators from the producers
+    /// of the data (e.g., bad time synchronization flags, marginal lock status indicators,
+    /// etc.). The default value shall be ‘RAW’.
     ///
-    /// Examples: RAW, VALIDATED, DEGRADED
+    /// **Examples**: RAW, VALIDATED, DEGRADED
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_quality: Option<TdmDataQuality>,
-    /// A correction value to be added to the ANGLE_1 data.
+    /// The set of CORRECTION_* keywords may be used to reflect the values of corrections that
+    /// have been added to the data or should be added to the data (e.g., ranging station delay
+    /// calibration, etc.).
     ///
-    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    /// **Examples**: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_angle_1: Option<f64>,
-    /// A correction value to be added to the ANGLE_2 data.
-    ///
-    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_angle_2: Option<f64>,
-    /// A correction value to be added to the Doppler data.
-    ///
-    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_doppler: Option<f64>,
-    /// A correction value to be added to the magnitude data.
-    ///
-    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_mag: Option<f64>,
-    /// A correction value to be added to the range data.
-    ///
-    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_range: Option<f64>,
-    /// A correction value to be added to the RCS data.
-    ///
-    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_rcs: Option<f64>,
-    /// A correction value to be added to the received frequency or phase count data.
-    ///
-    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_receive: Option<f64>,
-    /// A correction value to be added to the transmitted frequency or phase count data.
-    ///
-    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_transmit: Option<f64>,
-    /// A correction value for yearly aberration.
-    ///
-    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_aberration_yearly: Option<f64>,
-    /// A correction value for diurnal aberration.
-    ///
-    /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_aberration_diurnal: Option<f64>,
-    /// Indicates whether or not the correction values have been applied to the tracking data.
+    /// This keyword is used to indicate whether or not the values associated with the
+    /// CORRECTION_* keywords have been applied to the tracking data. Required if any of the
+    /// CORRECTION_* keywords is used.
     ///
-    /// Examples: YES, NO
+    /// **Examples**: YES, NO
+    ///
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub corrections_applied: Option<YesNo>,
     /// Unique name of the external ephemeris file used for participant 1.
@@ -547,7 +643,7 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("PARTICIPANT_5", v);
         }
         if let Some(v) = &self.mode {
-            writer.write_pair("MODE", format!("{:?}", v).to_uppercase());
+            writer.write_pair("MODE", v.to_string());
         }
         if let Some(v) = &self.path {
             writer.write_pair("PATH", v.0.as_str());
@@ -586,38 +682,31 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("TURNAROUND_DENOMINATOR", v);
         }
         if let Some(v) = &self.timetag_ref {
-            writer.write_pair("TIMETAG_REF", format!("{:?}", v).to_uppercase());
+            writer.write_pair("TIMETAG_REF", v.to_string());
         }
         if let Some(v) = self.integration_interval {
             writer.write_pair("INTEGRATION_INTERVAL", v);
         }
         if let Some(v) = &self.integration_ref {
-            writer.write_pair("INTEGRATION_REF", format!("{:?}", v).to_uppercase());
+            writer.write_pair("INTEGRATION_REF", v.to_string());
         }
         if let Some(v) = self.freq_offset {
             writer.write_pair("FREQ_OFFSET", v);
         }
         if let Some(v) = &self.range_mode {
-            writer.write_pair("RANGE_MODE", format!("{:?}", v).to_uppercase());
+            writer.write_pair("RANGE_MODE", v.to_string());
         }
         if let Some(v) = self.range_modulus {
             writer.write_pair("RANGE_MODULUS", v);
         }
         if let Some(v) = &self.range_units {
-            writer.write_pair(
-                "RANGE_UNITS",
-                match v {
-                    TdmRangeUnits::Km => "km",
-                    TdmRangeUnits::Seconds => "s",
-                    TdmRangeUnits::Ru => "ru",
-                },
-            );
+            writer.write_pair("RANGE_UNITS", v.to_string());
         }
         if let Some(v) = &self.angle_type {
-            writer.write_pair("ANGLE_TYPE", format!("{:?}", v).to_uppercase());
+            writer.write_pair("ANGLE_TYPE", v.to_string());
         }
         if let Some(v) = &self.reference_frame {
-            writer.write_pair("REFERENCE_FRAME", format!("{:?}", v).to_uppercase());
+            writer.write_pair("REFERENCE_FRAME", v.to_string());
         }
         if let Some(v) = &self.interpolation {
             writer.write_pair("INTERPOLATION", v);
@@ -665,7 +754,7 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("RECEIVE_DELAY_5", v);
         }
         if let Some(v) = &self.data_quality {
-            writer.write_pair("DATA_QUALITY", format!("{:?}", v).to_uppercase());
+            writer.write_pair("DATA_QUALITY", v.to_string());
         }
         if let Some(v) = self.correction_angle_1 {
             writer.write_pair("CORRECTION_ANGLE_1", v);

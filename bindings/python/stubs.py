@@ -22,7 +22,7 @@ from typing import Any
 INDENT = "    "
 GENERATED_HEADER = """\
 # Generated content DO NOT EDIT
-from typing import Optional
+from typing import Optional, Union
 import numpy
 
 """

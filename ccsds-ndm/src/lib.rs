@@ -54,6 +54,7 @@
 //! ```
 
 pub mod common;
+pub mod detect;
 pub mod error;
 pub mod kvn;
 pub mod messages;
@@ -62,8 +63,6 @@ pub mod types;
 pub mod xml;
 
 use error::{CcsdsNdmError, Result};
-use quick_xml::events::Event;
-use quick_xml::reader::Reader;
 use std::fs;
 use std::path::Path;
 
@@ -85,7 +84,7 @@ use std::path::Path;
 ///     _ => println!("Other message type"),
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum MessageType {
     /// Orbit Ephemeris Message - orbit state time series with optional covariance.
     Oem(messages::oem::Oem),
@@ -101,6 +100,8 @@ pub enum MessageType {
     Tdm(messages::tdm::Tdm),
     /// Orbit Comprehensive Message - detailed orbit data with maneuvers.
     Ocm(messages::ocm::Ocm),
+    /// Combined Instantiation NDM - container for multiple messages.
+    Ndm(messages::ndm::CombinedNdm),
 }
 
 impl MessageType {
@@ -114,6 +115,7 @@ impl MessageType {
             MessageType::Rdm(msg) => crate::traits::Ndm::to_kvn(msg),
             MessageType::Tdm(msg) => crate::traits::Ndm::to_kvn(msg),
             MessageType::Ocm(msg) => crate::traits::Ndm::to_kvn(msg),
+            MessageType::Ndm(msg) => crate::traits::Ndm::to_kvn(msg),
         }
     }
 
@@ -127,6 +129,7 @@ impl MessageType {
             MessageType::Rdm(msg) => crate::traits::Ndm::to_xml(msg),
             MessageType::Tdm(msg) => crate::traits::Ndm::to_xml(msg),
             MessageType::Ocm(msg) => crate::traits::Ndm::to_xml(msg),
+            MessageType::Ndm(msg) => crate::traits::Ndm::to_xml(msg),
         }
     }
 
@@ -167,15 +170,7 @@ impl MessageType {
 /// let ndm = from_str(kvn).unwrap();
 /// ```
 pub fn from_str(s: &str) -> Result<MessageType> {
-    let trimmed = s.trim_start();
-
-    // XML Detection
-    if trimmed.starts_with('<') {
-        return detect_and_parse_xml(s);
-    }
-
-    // KVN Detection
-    detect_and_parse_kvn(s)
+    detect::detect_message_type(s)
 }
 
 /// Parse an NDM from a file path, auto-detecting the message format (KVN or XML) and type.
@@ -201,92 +196,4 @@ pub fn from_str(s: &str) -> Result<MessageType> {
 pub fn from_file<P: AsRef<Path>>(path: P) -> Result<MessageType> {
     let content = fs::read_to_string(path).map_err(CcsdsNdmError::from)?;
     from_str(&content)
-}
-
-/// Helper to detect XML message type by sniffing the root tag.
-fn detect_and_parse_xml(s: &str) -> Result<MessageType> {
-    let mut reader = Reader::from_str(s);
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) => {
-                let name_bytes = e.name();
-                let name = String::from_utf8_lossy(name_bytes.as_ref()).to_lowercase();
-
-                return match name.as_str() {
-                    "oem" => crate::traits::Ndm::from_xml(s).map(MessageType::Oem),
-                    "cdm" => crate::traits::Ndm::from_xml(s).map(MessageType::Cdm),
-                    "opm" => crate::traits::Ndm::from_xml(s).map(MessageType::Opm),
-                    "omm" => crate::traits::Ndm::from_xml(s).map(MessageType::Omm),
-                    "rdm" => crate::traits::Ndm::from_xml(s).map(MessageType::Rdm),
-                    "tdm" => crate::traits::Ndm::from_xml(s).map(MessageType::Tdm),
-                    "ocm" => crate::traits::Ndm::from_xml(s).map(MessageType::Ocm),
-                    _ => Err(CcsdsNdmError::UnsupportedMessage(format!(
-                        "Unknown or unsupported XML root tag: <{}>",
-                        name
-                    ))),
-                };
-            }
-            Ok(Event::Decl(_)) | Ok(Event::Comment(_)) | Ok(Event::DocType(_)) => {
-                // Skip declarations and comments looking for the root tag
-                continue;
-            }
-            Ok(Event::Eof) => {
-                return Err(CcsdsNdmError::UnexpectedEof {
-                    context: "XML parsing ended prematurely without finding root tag".into(),
-                });
-            }
-            Err(e) => return Err(CcsdsNdmError::from(e)),
-            _ => continue, // Ignore other events like text/PI before root
-        }
-    }
-}
-
-/// Helper to detect KVN message type by scanning headers.
-fn detect_and_parse_kvn(s: &str) -> Result<MessageType> {
-    for line in s.lines() {
-        let trimmed_line = line.trim();
-        if trimmed_line.is_empty() || trimmed_line.starts_with("COMMENT") {
-            continue;
-        }
-
-        if trimmed_line.starts_with("CCSDS_OEM_VERS") {
-            return crate::traits::Ndm::from_kvn(s).map(MessageType::Oem);
-        }
-
-        if trimmed_line.starts_with("CCSDS_CDM_VERS") {
-            return crate::traits::Ndm::from_kvn(s).map(MessageType::Cdm);
-        }
-
-        if trimmed_line.starts_with("CCSDS_OPM_VERS") {
-            return crate::traits::Ndm::from_kvn(s).map(MessageType::Opm);
-        }
-
-        if trimmed_line.starts_with("CCSDS_OMM_VERS") {
-            return crate::traits::Ndm::from_kvn(s).map(MessageType::Omm);
-        }
-
-        if trimmed_line.starts_with("CCSDS_RDM_VERS") {
-            return crate::traits::Ndm::from_kvn(s).map(MessageType::Rdm);
-        }
-
-        if trimmed_line.starts_with("CCSDS_TDM_VERS") {
-            return crate::traits::Ndm::from_kvn(s).map(MessageType::Tdm);
-        }
-
-        if trimmed_line.starts_with("CCSDS_OCM_VERS") {
-            return crate::traits::Ndm::from_kvn(s).map(MessageType::Ocm);
-        }
-
-        return Err(CcsdsNdmError::UnsupportedMessage(format!(
-            "Could not determine NDM type from KVN header line: '{}'",
-            trimmed_line
-        )));
-    }
-
-    Err(CcsdsNdmError::UnexpectedEof {
-        context: "Empty KVN file".into(),
-    })
 }

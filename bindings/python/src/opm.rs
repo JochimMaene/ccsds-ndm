@@ -320,12 +320,13 @@ impl OpmMetadata {
     }
 
     /// Spacecraft name for which orbit state data is provided. While there is no CCSDS-based
-    /// restriction on the value for this keyword, it is recommended to use names from the UN Office
-    /// of Outer Space Affairs designator index (reference \[3\], which include Object name and
-    /// international designator of the participant). If OBJECT_NAME is not listed in reference \[3\]
-    /// or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
+    /// restriction on the value for this keyword, it is recommended to use names from the UN
+    /// Office of Outer Space Affairs designator index (reference [3], which include Object name
+    /// and international designator of the participant). If OBJECT_NAME is not listed in reference
+    /// [3] or the content is either unknown or cannot be disclosed, the value should be set to
+    /// UNKNOWN.
     ///
-    /// Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
+    /// Examples: EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -341,14 +342,14 @@ impl OpmMetadata {
     /// Object identifier of the object for which orbit state data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
     /// international spacecraft designator as published in the UN Office of Outer Space Affairs
-    /// designator index (reference \[3\]). Recommended values have the format YYYY-NNNP{PP}, where:
+    /// designator index (reference [3]). Recommended values have the format YYYY-NNNP{PP}, where:
     /// YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
     /// zeros). P{PP} = At least one capital letter for the identification of the part brought into
-    /// space by the launch. If the asset is not listed in reference \[3\], the UN Office of Outer
-    /// Space Affairs designator index format is not used, or the content is either unknown or cannot
-    /// be disclosed, the value should be set to UNKNOWN.
+    /// space by the launch. If the asset is not listed in reference [3], the UN Office of Outer
+    /// Space Affairs designator index format is not used, or the content is either unknown or
+    /// cannot be disclosed, the value should be set to UNKNOWN.
     ///
-    /// Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
+    /// Examples: 2000-052A 1996-068A 2000-053A 1996-008A UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -366,8 +367,8 @@ impl OpmMetadata {
     /// system barycenter. Natural bodies shall be selected from the accepted set of values
     /// indicated in annex B, subsection B2.
     ///
-    /// Examples: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
-    /// JUPITER BARYCENTER, STS 106, EROS
+    /// Examples: EARTH EARTH BARYCENTER MOON SOLAR SYSTEM BARYCENTER SUN JUPITER BARYCENTER
+    /// STS 106 EROS
     ///
     /// :type: str
     #[getter]
@@ -380,10 +381,10 @@ impl OpmMetadata {
         self.inner.center_name = value;
     }
 
-    /// Reference frame in which the state vector and optional Keplerian element data are given. Use
-    /// of values other than those in 3.2.3.3 should be documented in an ICD.
+    /// Reference frame in which the state vector and optional Keplerian element data are given.
+    /// Use of values other than those in 3.2.3.3 should be documented in an ICD.
     ///
-    /// Examples: ICRF, EME2000, ITRF2000, TEME
+    /// Examples: ICRF EME2000 ITRF2000 TEME
     ///
     /// :type: str
     #[getter]
@@ -415,7 +416,7 @@ impl OpmMetadata {
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
     /// 7.5.10 for formatting rules.)
     ///
-    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    /// Examples: 2001-11-06T11:17:33 2002-204T15:56:23Z
     ///
     /// :type: Optional[str]
     #[getter]
@@ -434,6 +435,8 @@ impl OpmMetadata {
 
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
+    /// Examples: This is a comment
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -446,7 +449,8 @@ impl OpmMetadata {
     }
 }
 
-/// Osculating Keplerian Elements.
+/// Osculating Keplerian Elements in the Specified Reference Frame (none or all parameters of
+/// this block must be given).
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
@@ -556,9 +560,7 @@ impl KeplerianElements {
         self.inner.comment = value;
     }
 
-    /// Semi-major axis.
-    ///
-    /// Examples: 6653.148
+    /// Semi-major axis
     ///
     /// Units: km
     ///
@@ -573,9 +575,9 @@ impl KeplerianElements {
         self.inner.semi_major_axis.value = value;
     }
 
-    /// Eccentricity.
+    /// Eccentricity
     ///
-    /// Examples: 0.001
+    /// Units: n/a
     ///
     /// :type: float
     #[getter]
@@ -588,9 +590,7 @@ impl KeplerianElements {
         self.inner.eccentricity = ccsds_ndm::types::NonNegativeDouble { value };
     }
 
-    /// Inclination.
-    ///
-    /// Examples: 51.6
+    /// Inclination
     ///
     /// Units: deg
     ///
@@ -609,9 +609,7 @@ impl KeplerianElements {
         Ok(())
     }
 
-    /// Right ascension of ascending node.
-    ///
-    /// Examples: 123.4
+    /// Right ascension of ascending node
     ///
     /// Units: deg
     ///
@@ -628,9 +626,7 @@ impl KeplerianElements {
         Ok(())
     }
 
-    /// Argument of pericenter.
-    ///
-    /// Examples: 45.6
+    /// Argument of pericenter
     ///
     /// Units: deg
     ///
@@ -647,9 +643,7 @@ impl KeplerianElements {
         Ok(())
     }
 
-    /// Gravitational Coefficient (Gravitational Constant × Central Mass).
-    ///
-    /// Examples: 398600.4418
+    /// Gravitational Coefficient (Gravitational Constant × Central Mass)
     ///
     /// Units: km³/s²
     ///
@@ -666,9 +660,7 @@ impl KeplerianElements {
         Ok(())
     }
 
-    /// True anomaly.
-    ///
-    /// Examples: 0.0
+    /// True anomaly or mean anomaly
     ///
     /// Units: deg
     ///
@@ -687,9 +679,7 @@ impl KeplerianElements {
         Ok(())
     }
 
-    /// Mean anomaly.
-    ///
-    /// Examples: 0.0
+    /// True anomaly or mean anomaly
     ///
     /// Units: deg
     ///
@@ -709,7 +699,8 @@ impl KeplerianElements {
     }
 }
 
-/// OPM covariance matrix block (opmCovarianceMatrixType).
+/// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. None or all parameters of the
+/// matrix must be given. COV_REF_FRAME may be omitted if it is the same as REF_FRAME.)
 ///
 /// Parameters
 /// ----------
@@ -863,7 +854,7 @@ impl OpmCovarianceMatrix {
         self.inner.comment = value;
     }
 
-    /// Position X covariance \[1,1\].
+    /// Covariance matrix [1,1]
     ///
     /// Units: km²
     ///
@@ -878,7 +869,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_x.value = value;
     }
 
-    /// Position Y / Position X covariance \[2,1\].
+    /// Covariance matrix [2,1]
     ///
     /// Units: km²
     ///
@@ -893,7 +884,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_x.value = value;
     }
 
-    /// Position Y covariance \[2,2\].
+    /// Covariance matrix [2,2]
     ///
     /// Units: km²
     ///
@@ -908,7 +899,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_y.value = value;
     }
 
-    /// Position Z / Position X covariance \[3,1\].
+    /// Covariance matrix [3,1]
     ///
     /// Units: km²
     ///
@@ -923,7 +914,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_x.value = value;
     }
 
-    /// Position Z / Position Y covariance \[3,2\].
+    /// Covariance matrix [3,2]
     ///
     /// Units: km²
     ///
@@ -938,7 +929,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_y.value = value;
     }
 
-    /// Position Z covariance \[3,3\].
+    /// Covariance matrix [3,3]
     ///
     /// Units: km²
     ///
@@ -953,7 +944,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_z.value = value;
     }
 
-    /// Velocity X / Position X covariance \[4,1\].
+    /// Covariance matrix [4,1]
     ///
     /// Units: km²/s
     ///
@@ -968,7 +959,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_x.value = value;
     }
 
-    /// Velocity X / Position Y covariance \[4,2\].
+    /// Covariance matrix [4,2]
     ///
     /// Units: km²/s
     ///
@@ -983,7 +974,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_y.value = value;
     }
 
-    /// Velocity X / Position Z covariance \[4,3\].
+    /// Covariance matrix [4,3]
     ///
     /// Units: km²/s
     ///
@@ -998,7 +989,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_z.value = value;
     }
 
-    /// Velocity Y / Position X covariance \[5,1\].
+    /// Covariance matrix [5,1]
     ///
     /// Units: km²/s
     ///
@@ -1013,7 +1004,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_x.value = value;
     }
 
-    /// Velocity Y / Position Y covariance \[5,2\].
+    /// Covariance matrix [5,2]
     ///
     /// Units: km²/s
     ///
@@ -1028,7 +1019,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_y.value = value;
     }
 
-    /// Velocity Y / Position Z covariance \[5,3\].
+    /// Covariance matrix [5,3]
     ///
     /// Units: km²/s
     ///
@@ -1043,7 +1034,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_z.value = value;
     }
 
-    /// Velocity Z / Position X covariance \[6,1\].
+    /// Covariance matrix [6,1]
     ///
     /// Units: km²/s
     ///
@@ -1058,7 +1049,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_x.value = value;
     }
 
-    /// Velocity Z / Position Y covariance \[6,2\].
+    /// Covariance matrix [6,2]
     ///
     /// Units: km²/s
     ///
@@ -1073,7 +1064,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_y.value = value;
     }
 
-    /// Velocity Z / Position Z covariance \[6,3\].
+    /// Covariance matrix [6,3]
     ///
     /// Units: km²/s
     ///
@@ -1088,7 +1079,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_z.value = value;
     }
 
-    /// Velocity X covariance \[4,4\].
+    /// Covariance matrix [4,4]
     ///
     /// Units: km²/s²
     ///
@@ -1103,7 +1094,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_x_dot.value = value;
     }
 
-    /// Velocity Y / Velocity X covariance \[5,4\].
+    /// Covariance matrix [5,4]
     ///
     /// Units: km²/s²
     ///
@@ -1118,7 +1109,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_x_dot.value = value;
     }
 
-    /// Velocity Y covariance \[5,5\].
+    /// Covariance matrix [5,5]
     ///
     /// Units: km²/s²
     ///
@@ -1133,7 +1124,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_y_dot.value = value;
     }
 
-    /// Velocity Z / Velocity X covariance \[6,4\].
+    /// Covariance matrix [6,4]
     ///
     /// Units: km²/s²
     ///
@@ -1148,7 +1139,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_x_dot.value = value;
     }
 
-    /// Velocity Z / Velocity Y covariance \[6,5\].
+    /// Covariance matrix [6,5]
     ///
     /// Units: km²/s²
     ///
@@ -1163,7 +1154,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_y_dot.value = value;
     }
 
-    /// Velocity Z covariance \[6,6\].
+    /// Covariance matrix [6,6]
     ///
     /// Units: km²/s²
     ///
@@ -1208,7 +1199,7 @@ impl OpmData {
         }
     }
 
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
@@ -1325,7 +1316,7 @@ impl OpmData {
     }
 }
 
-/// Maneuver Parameters.
+/// Maneuver Parameters (Repeat for each maneuver).
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
@@ -1402,7 +1393,7 @@ impl ManeuverParameters {
         self.inner.comment = value;
     }
 
-    /// Epoch of ignition (see 7.5.10 for formatting rules).
+    /// Epoch of ignition (see 7.5.10 for formatting rules)
     ///
     /// :type: str
     #[getter]
@@ -1416,7 +1407,7 @@ impl ManeuverParameters {
         Ok(())
     }
 
-    /// Maneuver duration (If = 0, impulsive maneuver).
+    /// Maneuver duration (If = 0, impulsive maneuver)
     ///
     /// Units: s
     ///
@@ -1431,7 +1422,7 @@ impl ManeuverParameters {
         self.inner.man_duration.value = value;
     }
 
-    /// Mass change during maneuver.
+    /// Mass change during maneuver (value is < 0)
     ///
     /// Units: kg
     ///
@@ -1450,8 +1441,8 @@ impl ManeuverParameters {
         self.inner.man_delta_mass.value = value;
     }
 
-    /// Reference frame in which the velocity increment vector data are given. The user must select
-    /// from the accepted set of values indicated in 3.2.4.11.
+    /// Reference frame in which the velocity increment vector data are given. The user must
+    /// select from the accepted set of values indicated in 3.2.4.11.
     ///
     /// :type: str
     #[getter]
@@ -1464,7 +1455,7 @@ impl ManeuverParameters {
         self.inner.man_ref_frame = value;
     }
 
-    /// 1st component of the velocity increment.
+    /// 1st component of the velocity increment
     ///
     /// Units: km/s
     ///
@@ -1479,7 +1470,7 @@ impl ManeuverParameters {
         self.inner.man_dv_1.value = value;
     }
 
-    /// 2nd component of the velocity increment.
+    /// 2nd component of the velocity increment
     ///
     /// Units: km/s
     ///
@@ -1494,7 +1485,7 @@ impl ManeuverParameters {
         self.inner.man_dv_2.value = value;
     }
 
-    /// 3rd component of the velocity increment.
+    /// 3rd component of the velocity increment
     ///
     /// Units: km/s
     ///

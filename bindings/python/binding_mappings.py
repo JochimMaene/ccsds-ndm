@@ -111,7 +111,7 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
 # Usually not needed as names are kept consistent.
 
 STRUCT_MAPPINGS: dict[str, str] = {
-    # "PythonClassName": "RustStructName"
+    "Ndm": "CombinedNdm",
 }
 
 # ---------------------------------------------------------------------------

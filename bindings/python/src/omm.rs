@@ -307,10 +307,11 @@ impl OmmMetadata {
     }
 
     /// Spacecraft name for which mean element orbit state data is provided. While there is no
-    /// CCSDS-based restriction on the value for this keyword, it is recommended to use names from the
-    /// UN Office of Outer Space Affairs designator index (reference \[3\], which include Object name
-    /// and international designator of the participant). If OBJECT_NAME is not listed in reference
-    /// \[3\] or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
+    /// CCSDS-based restriction on the value for this keyword, it is recommended to use names
+    /// from the UN Office of Outer Space Affairs designator index (reference [3], which include
+    /// Object name and international designator of the participant). If OBJECT_NAME is not
+    /// listed in reference [3] or the content is either unknown or cannot be disclosed, the
+    /// value should be set to UNKNOWN.
     ///
     /// Examples: Telkom 2, Spaceway 2, INMARSAT 4-F2, UNKNOWN
     ///
@@ -325,15 +326,16 @@ impl OmmMetadata {
         self.inner.object_name = value;
     }
 
-    /// Object identifier of the object for which mean element orbit state data is provided. While
-    /// there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
-    /// the international spacecraft designator as published in the UN Office of Outer Space Affairs
-    /// designator index (reference \[3\]). Recommended values have the format YYYY-NNNP{PP}, where:
-    /// YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
-    /// zeros). P{PP} = At least one capital letter for the identification of the part brought into
-    /// space by the launch. If the asset is not listed in reference \[3\], the UN Office of Outer
-    /// Space Affairs designator index format is not used, or the content is either unknown or cannot
-    /// be disclosed, the value should be set to UNKNOWN.
+    /// Object identifier of the object for which mean element orbit state data is provided.
+    /// While there is no CCSDS-based restriction on the value for this keyword, it is
+    /// recommended to use the international spacecraft designator as published in the UN Office
+    /// of Outer Space Affairs designator index (reference [3]). Recommended values have the
+    /// format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-digit serial number of
+    /// launch in year YYYY (with leading zeros). P{PP} = At least one capital letter for the
+    /// identification of the part brought into space by the launch. If the asset is not listed
+    /// in reference [3], the UN Office of Outer Space Affairs designator index format is not
+    /// used, or the content is either unknown or cannot be disclosed, the value should be set
+    /// to UNKNOWN.
     ///
     /// Examples: 2005-046A, 2005-046B, 2003-022A, UNKNOWN
     ///
@@ -366,13 +368,13 @@ impl OmmMetadata {
         self.inner.center_name = value;
     }
 
-    /// Reference frame in which the Keplerian element data are given. Use of values other than those
-    /// in 3.2.3.3 should be documented in an ICD. NOTE—NORAD Two Line Element Sets and corresponding
-    /// Simplified General Perturbations (SGP) orbit propagator ephemeris outputs are explicitly
-    /// defined to be in the True Equator Mean Equinox of Date (TEME of Date) reference frame.
-    /// Therefore, TEME of date shall be used for OMMs based on NORAD Two Line Element sets, rather
-    /// than the almost imperceptibly different TEME of Epoch (see reference \[H2\] or \[H3\] for
-    /// further details).
+    /// Reference frame in which the Keplerian element data are given. Use of values other than
+    /// those in 3.2.3.3 should be documented in an ICD. NOTE—NORAD Two Line Element Sets and
+    /// corresponding Simplified General Perturbations (SGP) orbit propagator ephemeris outputs
+    /// are explicitly defined to be in the True Equator Mean Equinox of Date (TEME of Date)
+    /// reference frame. Therefore, TEME of date shall be used for OMMs based on NORAD Two Line
+    /// Element sets, rather than the almost imperceptibly different TEME of Epoch (see
+    /// reference [H2] or [H3] for further details).
     ///
     /// Examples: ICRF, ITRF2000, EME2000, TEME
     ///
@@ -387,8 +389,8 @@ impl OmmMetadata {
         self.inner.ref_frame = value;
     }
 
-    /// Time system used for Keplerian elements and covariance data. Use of values other than those
-    /// in 3.2.3.2 should be documented in an ICD.
+    /// Time system used for Keplerian elements and covariance data. Use of values other than
+    /// those in 3.2.3.2 should be documented in an ICD.
     ///
     /// Examples: UTC
     ///
@@ -403,8 +405,8 @@ impl OmmMetadata {
         self.inner.time_system = value;
     }
 
-    /// Description of the Mean Element Theory. Indicates the proper method to employ to propagate the
-    /// state.
+    /// Description of the Mean Element Theory. Indicates the proper method to employ to
+    /// propagate the state.
     ///
     /// Examples: SGP, SGP4, SGP4-XP, DSST, USM
     ///
@@ -419,8 +421,8 @@ impl OmmMetadata {
         self.inner.mean_element_theory = value;
     }
 
-    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
-    /// 7.5.10 for formatting rules.)
+    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
+    /// (See 7.5.10 for formatting rules.)
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
@@ -440,6 +442,8 @@ impl OmmMetadata {
     }
 
     /// Comments (allowed at the beginning of the OMM Metadata). (See 7.8 for formatting rules.)
+    ///
+    /// Examples: This is a comment
     ///
     /// :type: list[str]
     #[getter]
@@ -539,7 +543,7 @@ impl MeanElements {
         self.inner.comment = value;
     }
 
-    /// Epoch of Mean Keplerian elements. (See 7.5.10 for formatting rules.)
+    /// Epoch of Mean Keplerian elements (see 7.5.10 for formatting rules)
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
@@ -555,9 +559,11 @@ impl MeanElements {
         Ok(())
     }
 
-    /// Eccentricity.
+    /// Eccentricity
     ///
     /// Examples: 0.7303
+    ///
+    /// Units: n/a
     ///
     /// :type: float
     #[getter]
@@ -570,7 +576,7 @@ impl MeanElements {
         self.inner.eccentricity = ccsds_ndm::types::NonNegativeDouble { value };
     }
 
-    /// Inclination.
+    /// Inclination
     ///
     /// Examples: 63.4
     ///
@@ -591,7 +597,7 @@ impl MeanElements {
         Ok(())
     }
 
-    /// Right ascension of ascending node.
+    /// Right ascension of ascending node
     ///
     /// Examples: 345.0
     ///
@@ -610,7 +616,7 @@ impl MeanElements {
         Ok(())
     }
 
-    /// Argument of pericenter.
+    /// Argument of pericenter
     ///
     /// Examples: 270.0
     ///
@@ -629,7 +635,7 @@ impl MeanElements {
         Ok(())
     }
 
-    /// Mean anomaly.
+    /// Mean anomaly
     ///
     /// Examples: 130.0
     ///
@@ -648,11 +654,12 @@ impl MeanElements {
         Ok(())
     }
 
-    /// Semi-major axis. Preferred over MEAN_MOTION.
+    /// Semi-major axis in kilometers (preferred), or, if MEAN_ELEMENT_THEORY = SGP/SGP4, the
+    /// Keplerian Mean motion in revolutions per day
     ///
     /// Examples: 28594.4
     ///
-    /// Units: km
+    /// Units: km or rev/day
     ///
     /// :type: Optional[float]
     #[getter]
@@ -665,13 +672,12 @@ impl MeanElements {
         self.inner.semi_major_axis = value.map(|v| Distance::new(v, None));
     }
 
-    /// Keplerian Mean motion.
-    ///
-    /// Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
+    /// Semi-major axis in kilometers (preferred), or, if MEAN_ELEMENT_THEORY = SGP/SGP4, the
+    /// Keplerian Mean motion in revolutions per day
     ///
     /// Examples: 1.491325
     ///
-    /// Units: rev/day
+    /// Units: km or rev/day
     ///
     /// :type: Optional[float]
     #[getter]
@@ -684,7 +690,7 @@ impl MeanElements {
         self.inner.mean_motion = value.map(|v| core_omm::MeanMotion::new(v, None));
     }
 
-    /// Gravitational Coefficient (Gravitational Constant × Central Mass).
+    /// Gravitational Coefficient (Gravitational Constant × Central Mass)
     ///
     /// Examples: 398600.44
     ///
@@ -835,9 +841,7 @@ impl OmmData {
     }
 }
 
-/// TLE Related Parameters.
-///
-/// This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
+/// TLE Related Parameters (This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
 ///
 /// Parameters
 /// ----------
@@ -912,7 +916,7 @@ impl TleParameters {
         "TleParameters(...)".to_string()
     }
 
-    /// Comments (see 7.8 for formatting rules.)
+    /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
@@ -925,16 +929,7 @@ impl TleParameters {
         self.inner.comment = value;
     }
 
-    /// Ephemeris type. Indicates what type of propagator was used to transform the native state to
-    /// the SGP/SGP4 ephemeris state. The default is 0. (See 4.2.4.7 for numeric definitions.)
-    ///
-    /// - 0 = SGP
-    /// - 2 = SGP4
-    /// - 3 = PPT3
-    /// - 4 = SGP4-XP
-    /// - 6 = Special Perturbations
-    ///
-    /// Examples: 0
+    /// Ephemeris type. Default value = 0. (See 4.2.4.7.)
     ///
     /// :type: Optional[int]
     #[getter]
@@ -947,10 +942,7 @@ impl TleParameters {
         self.inner.ephemeris_type = value;
     }
 
-    /// Classification Type, default value = U. Some sources suggest the following coding for
-    /// the CLASSIFICATION_TYPE keyword: U=unclassified, S=secret
-    ///
-    /// Examples: U
+    /// Classification type. Default value = U. (See 4.2.4.7.)
     ///
     /// :type: Optional[str]
     #[getter]
@@ -963,10 +955,8 @@ impl TleParameters {
         self.inner.classification_type = value;
     }
 
-    /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword is
-    /// only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
-    ///
-    /// Examples: 28893
+    /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
+    /// is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -979,12 +969,10 @@ impl TleParameters {
         self.inner.norad_cat_id = value;
     }
 
-    /// Element set number for this satellite. Normally incremented sequentially but may be out of
-    /// sync if it is generated from a backup source. Used to distinguish different TLEs, and
-    /// therefore only meaningful if TLE-based data is being exchanged (i.e., MEAN_ELEMENT_THEORY =
-    /// SGP/SGP4).
-    ///
-    /// Examples: 999
+    /// Element set number for this satellite. Normally incremented sequentially but may be out
+    /// of sync if it is generated from a backup source. Used to distinguish different TLEs,
+    /// and therefore only meaningful if TLE-based data is being exchanged (i.e.,
+    /// MEAN_ELEMENT_THEORY = SGP/SGP4).
     ///
     /// :type: Optional[int]
     #[getter]
@@ -997,9 +985,7 @@ impl TleParameters {
         self.inner.element_set_no = value.map(|value| ccsds_ndm::types::ElementSetNo { value });
     }
 
-    /// Number of revolutions at epoch.
-    ///
-    /// Examples: 120
+    /// Revolution Number
     ///
     /// :type: Optional[int]
     #[getter]
@@ -1015,9 +1001,7 @@ impl TleParameters {
     /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
     /// MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
     ///
-    /// Examples: 0.0001
-    ///
-    /// Units: 1/ER
+    /// Units: 1/[Earth radii]
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1032,11 +1016,10 @@ impl TleParameters {
     }
 
     /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
-    /// MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag coefficient,
-    /// A = average cross-sectional area, m = mass. Example values for BTERM = 0.02 (rocket body),
-    /// 0.0015 (payload); average value spanning 20,00 catalog objects = 0.0286.
-    ///
-    /// Examples: 0.02
+    /// MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag
+    /// coefficient, A = average cross-sectional area, m = mass. Example values for BTERM =
+    /// 0.02 (rocket body), 0.0015 (payload); average value spanning 20,000 catalog objects =
+    /// 0.0286.
     ///
     /// Units: m²/kg
     ///
@@ -1052,10 +1035,8 @@ impl TleParameters {
         self.inner.bterm = value.map(|v| M2kg::new(v, Default::default()));
     }
 
-    /// First Time Derivative of the Mean Motion (i.e., a drag term, required when MEAN_ELEMENT_THEORY
-    /// = SGP or PPT3). (See 4.2.4.7 for important details).
-    ///
-    /// Examples: 0.000001
+    /// First Time Derivative of the Mean Motion (i.e., a drag term, required when
+    /// MEAN_ELEMENT_THEORY = SGP or PPT3). (See 4.2.4.7 for important details).
     ///
     /// Units: rev/day²
     ///
@@ -1071,10 +1052,8 @@ impl TleParameters {
         self.inner.mean_motion_dot = MeanMotionDot::new(value, Default::default());
     }
 
-    /// MEAN_ELEMENT_THEORY= SGP or PPT3: Second Time Derivative of Mean Motion (i.e., a drag term).
-    /// (See 4.2.4.7 for important details).
-    ///
-    /// Examples: 0.0
+    /// Second Time Derivative of Mean Motion (i.e., a drag term). (See 4.2.4.7 for important
+    /// details). Required when MEAN_ELEMENT_THEORY= SGP or PPT3.
     ///
     /// Units: rev/day³
     ///
@@ -1090,11 +1069,10 @@ impl TleParameters {
         self.inner.mean_motion_ddot = value.map(|v| MeanMotionDDot::new(v, Default::default()));
     }
 
-    /// MEAN_ELEMENT_THEORY= SGP4-XP: Solar radiation pressure coefficient AY/m, where y =
-    /// reflectivity, A = average cross-sectional area, m = mass. Example values AGOM = 0.01 (rocket
-    /// body) and 0.001 (payload); average value spanning 20,00 catalog objects = 0.0143 m2/kg.
-    ///
-    /// Examples: 0.01
+    /// Solar radiation pressure coefficient AY/m, where y = reflectivity, A = average
+    /// cross-sectional area, m = mass. Example values AGOM = 0.01 (rocket body) and 0.001
+    /// (payload); average value spanning 20,000 catalog objects = 0.0143 m2/kg. Required
+    /// when MEAN_ELEMENT_THEORY= SGP4-XP.
     ///
     /// Units: m²/kg
     ///

@@ -53,9 +53,6 @@ pub struct OemSegment {
 
 /// OEM Metadata Section.
 ///
-/// This section contains descriptive information about the object and the ephemeris data,
-/// such as reference frames, time systems, and validation intervals.
-///
 /// Parameters
 /// ----------
 /// object_name : str
@@ -442,10 +439,11 @@ impl OemMetadata {
     }
 
     /// Spacecraft name for which ephemeris data is provided. While there is no CCSDS-based
-    /// restriction on the value for this keyword, it is recommended to use names from the UN Office
-    /// of Outer Space Affairs designator index (reference \[3\], which include Object name and
-    /// international designator of the participant). If OBJECT_NAME is not listed in reference \[3\]
-    /// or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
+    /// restriction on the value for this keyword, it is recommended to use names from the UN
+    /// Office of Outer Space Affairs designator index (reference [3], which include Object name
+    /// and international designator of the participant). If OBJECT_NAME is not listed in
+    /// reference [3] or the content is either unknown or cannot be disclosed, the value should
+    /// be set to UNKNOWN.
     ///
     /// Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
     ///
@@ -463,9 +461,8 @@ impl OemMetadata {
     /// Object identifier of the object for which ephemeris data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
     /// international spacecraft designator as published in the UN Office of Outer Space Affairs
-    /// designator index. Recommended values have the format YYYY-NNNP{PP}, where:
-    /// YYYY = Year of launch.
-    /// NNN = Three-digit serial number of launch in year YYYY (with leading zeros).
+    /// designator index. Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year
+    /// of launch. NNN = Three-digit serial number of launch in year YYYY (with leading zeros).
     /// P{PP} = At least one capital letter for the identification of the part brought into
     /// space by the launch. If the asset is not listed, the UN Office of Outer Space Affairs
     /// designator index format is not used, or the content is either unknown or cannot be
@@ -485,12 +482,13 @@ impl OemMetadata {
     }
 
     /// Origin of the OEM reference frame, which may be a natural solar system body (planets,
-    /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
-    /// system barycenter, or another reference frame center (such as a spacecraft, formation flying
-    /// reference ‘chief’ spacecraft, etc.). Natural bodies shall be selected from the accepted set of
-    /// values indicated in annex B, subsection B2. For spacecraft, it is recommended to use either
-    /// the OBJECT_ID or international designator of the participant as catalogued in the UN Office of
-    /// Outer Space Affairs designator index (reference \[3\]).
+    /// asteroids, comets, and natural satellites), including any planet barycenter or the
+    /// solar system barycenter, or another reference frame center (such as a spacecraft,
+    /// formation flying reference ‘chief’ spacecraft, etc.). Natural bodies shall be selected
+    /// from the accepted set of values indicated in annex B, subsection B2. For spacecraft, it
+    /// is recommended to use either the OBJECT_ID or international designator of the
+    /// participant as catalogued in the UN Office of Outer Space Affairs designator index
+    /// (reference [3]).
     ///
     /// Examples: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
     /// JUPITER BARYCENTER, STS 106, EROS
@@ -522,8 +520,8 @@ impl OemMetadata {
         self.inner.ref_frame = ref_frame;
     }
 
-    /// Time system used for ephemeris and covariance data. Use of values other than those in 3.2.3.2
-    /// should be documented in an ICD.
+    /// Time system used for ephemeris and covariance data. Use of values other than those in
+    /// 3.2.3.2 should be documented in an ICD.
     ///
     /// Examples: UTC, TAI, TT, GPS, TDB, TCB
     ///
@@ -538,8 +536,8 @@ impl OemMetadata {
         self.inner.time_system = time_system;
     }
 
-    /// Start of TOTAL time span covered by ephemeris data and covariance data immediately following
-    /// this metadata block. (For format specification, see 7.5.10.)
+    /// Start of TOTAL time span covered by ephemeris data and covariance data immediately
+    /// following this metadata block. (For format specification, see 7.5.10.)
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
@@ -555,8 +553,8 @@ impl OemMetadata {
         Ok(())
     }
 
-    /// End of TOTAL time span covered by ephemeris data and covariance data immediately following
-    /// this metadata block. (For format specification, see 7.5.10.)
+    /// End of TOTAL time span covered by ephemeris data and covariance data immediately
+    /// following this metadata block. (For format specification, see 7.5.10.)
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
@@ -572,8 +570,8 @@ impl OemMetadata {
         Ok(())
     }
 
-    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
-    /// 7.5.10 for formatting rules.)
+    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
+    /// (See 7.5.10 for formatting rules.)
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
@@ -592,12 +590,12 @@ impl OemMetadata {
         Ok(())
     }
 
-    /// Start time of USEABLE time span covered by ephemeris data immediately following this metadata
-    /// block. (For format specification, see 7.5.10.) This optional keyword allows the message
-    /// creator to introduce fictitious (but numerically smooth) data nodes prior to the actual data
-    /// time history to support interpolation methods requiring more than two nodes (e.g., pure
-    /// higher-order Lagrange interpolation methods). The use of this keyword and introduction of
-    /// fictitious node points are optional and may not be necessary.
+    /// Start time of USEABLE time span covered by ephemeris data immediately following this
+    /// metadata block. (For format specification, see 7.5.10.) This optional keyword allows the
+    /// message creator to introduce fictitious (but numerically smooth) data nodes prior to the
+    /// actual data time history to support interpolation methods requiring more than two nodes
+    /// (e.g., pure higher-order Lagrange interpolation methods). The use of this keyword and
+    /// introduction of fictitious node points are optional and may not be necessary.
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
@@ -616,12 +614,12 @@ impl OemMetadata {
         Ok(())
     }
 
-    /// Stop time of USEABLE time span covered by ephemeris data immediately following this metadata
-    /// block. (For format specification, see 7.5.10.) This optional keyword allows the message
-    /// creator to introduce fictitious (but numerically smooth) data nodes following the actual data
-    /// time history to support interpolation methods requiring more than two nodes (e.g., pure
-    /// higher-order Lagrange interpolation methods). The use of this keyword and introduction of
-    /// fictitious node points are optional and may not be necessary.
+    /// Stop time of USEABLE time span covered by ephemeris data immediately following this
+    /// metadata block. (For format specification, see 7.5.10.) This optional keyword allows the
+    /// message creator to introduce fictitious (but numerically smooth) data nodes following
+    /// the actual data time history to support interpolation methods requiring more than two
+    /// nodes (e.g., pure higher-order Lagrange interpolation methods). The use of this keyword
+    /// and introduction of fictitious node points are optional and may not be necessary.
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
@@ -640,8 +638,8 @@ impl OemMetadata {
         Ok(())
     }
 
-    /// This keyword may be used to specify the recommended interpolation method for ephemeris data in
-    /// the immediately following set of ephemeris lines.
+    /// This keyword may be used to specify the recommended interpolation method for ephemeris
+    /// data in the immediately following set of ephemeris lines.
     ///
     /// Examples: HERMITE, LINEAR, LAGRANGE
     ///
@@ -657,8 +655,8 @@ impl OemMetadata {
     }
 
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
-    /// ephemeris lines. Must be an integer value. This keyword must be used if the ‘INTERPOLATION’
-    /// keyword is used.
+    /// ephemeris lines. Must be an integer value. This keyword must be used if the
+    /// ‘INTERPOLATION’ keyword is used.
     ///
     /// Examples: 5, 8
     ///
@@ -708,7 +706,8 @@ impl OemData {
         )
     }
 
-    /// List of state vectors. Each vector contains position, velocity, and optional acceleration.
+    /// List of state vectors. Each vector contains position, velocity, and optional
+    /// acceleration.
     ///
     /// Examples: 2020-01-01T00:00:00.000 1234.567 2345.678 3456.789 1.234 2.345 3.456
     ///
@@ -1241,9 +1240,7 @@ impl OemCovarianceMatrix {
         self.inner.comment = comments;
     }
 
-    /// Position X covariance [1,1].
-    ///
-    /// Examples: 1.0
+    /// Covariance matrix [1,1]
     ///
     /// Units: km²
     ///
@@ -1258,9 +1255,7 @@ impl OemCovarianceMatrix {
         self.inner.cx_x.value = val;
     }
 
-    /// Position X-Y covariance [2,1].
-    ///
-    /// Examples: 0.1
+    /// Covariance matrix [2,1]
     ///
     /// Units: km²
     ///
@@ -1275,9 +1270,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_x.value = val;
     }
 
-    /// Position Y covariance [2,2].
-    ///
-    /// Examples: 1.0
+    /// Covariance matrix [2,2]
     ///
     /// Units: km²
     ///
@@ -1292,9 +1285,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_y.value = val;
     }
 
-    /// Position X-Z covariance [3,1].
-    ///
-    /// Examples: 0.1
+    /// Covariance matrix [3,1]
     ///
     /// Units: km²
     ///
@@ -1309,9 +1300,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_x.value = val;
     }
 
-    /// Position Y-Z covariance [3,2].
-    ///
-    /// Examples: 0.1
+    /// Covariance matrix [3,2]
     ///
     /// Units: km²
     ///
@@ -1326,9 +1315,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_y.value = val;
     }
 
-    /// Position Z covariance [3,3].
-    ///
-    /// Examples: 1.0
+    /// Covariance matrix [3,3]
     ///
     /// Units: km²
     ///
@@ -1343,9 +1330,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_z.value = val;
     }
 
-    /// Velocity X / Position X covariance [4,1].
-    ///
-    /// Examples: 0.001
+    /// Covariance matrix [4,1]
     ///
     /// Units: km²/s
     ///
@@ -1360,9 +1345,7 @@ impl OemCovarianceMatrix {
         self.inner.cx_dot_x.value = val;
     }
 
-    /// Velocity X / Position Y covariance [4,2].
-    ///
-    /// Examples: 0.0001
+    /// Covariance matrix [4,2]
     ///
     /// Units: km²/s
     ///
@@ -1377,9 +1360,7 @@ impl OemCovarianceMatrix {
         self.inner.cx_dot_y.value = val;
     }
 
-    /// Velocity X / Position Z covariance [4,3].
-    ///
-    /// Examples: 0.0001
+    /// Covariance matrix [4,3]
     ///
     /// Units: km²/s
     ///
@@ -1394,9 +1375,7 @@ impl OemCovarianceMatrix {
         self.inner.cx_dot_z.value = val;
     }
 
-    /// Velocity X covariance [4,4].
-    ///
-    /// Examples: 0.00001
+    /// Covariance matrix [4,4]
     ///
     /// Units: km²/s²
     ///
@@ -1411,9 +1390,7 @@ impl OemCovarianceMatrix {
         self.inner.cx_dot_x_dot.value = val;
     }
 
-    /// Velocity Y / Position X covariance [5,1].
-    ///
-    /// Examples: 0.0001
+    /// Covariance matrix [5,1]
     ///
     /// Units: km²/s
     ///
@@ -1428,9 +1405,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_dot_x.value = val;
     }
 
-    /// Velocity Y / Position Y covariance [5,2].
-    ///
-    /// Examples: 0.001
+    /// Covariance matrix [5,2]
     ///
     /// Units: km²/s
     ///
@@ -1445,9 +1420,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_dot_y.value = val;
     }
 
-    /// Velocity Y / Position Z covariance [5,3].
-    ///
-    /// Examples: 0.0001
+    /// Covariance matrix [5,3]
     ///
     /// Units: km²/s
     ///
@@ -1462,9 +1435,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_dot_z.value = val;
     }
 
-    /// Velocity Y / Velocity X covariance [5,4].
-    ///
-    /// Examples: 0.00001
+    /// Covariance matrix [5,4]
     ///
     /// Units: km²/s²
     ///
@@ -1479,9 +1450,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_dot_x_dot.value = val;
     }
 
-    /// Velocity Y covariance [5,5].
-    ///
-    /// Examples: 0.00001
+    /// Covariance matrix [5,5]
     ///
     /// Units: km²/s²
     ///
@@ -1496,9 +1465,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_dot_y_dot.value = val;
     }
 
-    /// Velocity Z / Position X covariance [6,1].
-    ///
-    /// Examples: 0.0001
+    /// Covariance matrix [6,1]
     ///
     /// Units: km²/s
     ///
@@ -1513,9 +1480,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_dot_x.value = val;
     }
 
-    /// Velocity Z / Position Y covariance [6,2].
-    ///
-    /// Examples: 0.0001
+    /// Covariance matrix [6,2]
     ///
     /// Units: km²/s
     ///
@@ -1530,9 +1495,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_dot_y.value = val;
     }
 
-    /// Velocity Z / Position Z covariance [6,3].
-    ///
-    /// Examples: 0.001
+    /// Covariance matrix [6,3]
     ///
     /// Units: km²/s
     ///
@@ -1547,9 +1510,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_dot_z.value = val;
     }
 
-    /// Velocity Z / Velocity X covariance [6,4].
-    ///
-    /// Examples: 0.00001
+    /// Covariance matrix [6,4]
     ///
     /// Units: km²/s²
     ///
@@ -1564,9 +1525,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_dot_x_dot.value = val;
     }
 
-    /// Velocity Z / Velocity Y covariance [6,5].
-    ///
-    /// Examples: 0.00001
+    /// Covariance matrix [6,5]
     ///
     /// Units: km²/s²
     ///
@@ -1581,9 +1540,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_dot_y_dot.value = val;
     }
 
-    /// Velocity Z covariance [6,6].
-    ///
-    /// Examples: 0.00001
+    /// Covariance matrix [6,6]
     ///
     /// Units: km²/s²
     ///

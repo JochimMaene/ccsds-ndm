@@ -38,12 +38,7 @@ pub struct Opm {
 impl Ndm for Opm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
-        // 1. Header
-        writer.write_pair("CCSDS_OPM_VERS", &self.version);
-        self.header.write_kvn(&mut writer);
-
-        // 2. Body
-        self.body.write_kvn(&mut writer);
+        self.write_kvn(&mut writer);
         Ok(writer.finish())
     }
 
@@ -68,6 +63,17 @@ impl Ndm for Opm {
 impl Opm {
     pub fn validate(&self) -> Result<()> {
         self.body.segment.data.validate()
+    }
+}
+
+impl ToKvn for Opm {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        // 1. Header
+        writer.write_pair("CCSDS_OPM_VERS", &self.version);
+        self.header.write_kvn(writer);
+
+        // 2. Body
+        self.body.write_kvn(writer);
     }
 }
 
@@ -114,30 +120,33 @@ impl ToKvn for OpmSegment {
 pub struct OpmMetadata {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
+    /// **Examples**: This is a comment
+    ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
     /// Spacecraft name for which orbit state data is provided. While there is no CCSDS-based
-    /// restriction on the value for this keyword, it is recommended to use names from the UN Office
-    /// of Outer Space Affairs designator index (reference \[3\], which include Object name and
-    /// international designator of the participant). If OBJECT_NAME is not listed in reference \[3\]
-    /// or the content is either unknown or cannot be disclosed, the value should be set to UNKNOWN.
+    /// restriction on the value for this keyword, it is recommended to use names from the UN
+    /// Office of Outer Space Affairs designator index (reference [3], which include Object name
+    /// and international designator of the participant). If OBJECT_NAME is not listed in reference
+    /// [3] or the content is either unknown or cannot be disclosed, the value should be set to
+    /// UNKNOWN.
     ///
-    /// **Examples**: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
+    /// **Examples**: EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
     pub object_name: String,
     /// Object identifier of the object for which orbit state data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
     /// international spacecraft designator as published in the UN Office of Outer Space Affairs
-    /// designator index (reference \[3\]). Recommended values have the format YYYY-NNNP{PP}, where:
+    /// designator index (reference [3]). Recommended values have the format YYYY-NNNP{PP}, where:
     /// YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
     /// zeros). P{PP} = At least one capital letter for the identification of the part brought into
-    /// space by the launch. If the asset is not listed in reference \[3\], the UN Office of Outer
-    /// Space Affairs designator index format is not used, or the content is either unknown or cannot
-    /// be disclosed, the value should be set to UNKNOWN.
+    /// space by the launch. If the asset is not listed in reference [3], the UN Office of Outer
+    /// Space Affairs designator index format is not used, or the content is either unknown or
+    /// cannot be disclosed, the value should be set to UNKNOWN.
     ///
-    /// **Examples**: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
+    /// **Examples**: 2000-052A 1996-068A 2000-053A 1996-008A UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
     pub object_id: String,
@@ -146,22 +155,22 @@ pub struct OpmMetadata {
     /// system barycenter. Natural bodies shall be selected from the accepted set of values
     /// indicated in annex B, subsection B2.
     ///
-    /// **Examples**: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
-    /// JUPITER BARYCENTER, STS 106, EROS
+    /// **Examples**: EARTH EARTH BARYCENTER MOON SOLAR SYSTEM BARYCENTER SUN JUPITER BARYCENTER
+    /// STS 106 EROS
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
     pub center_name: String,
-    /// Reference frame in which the state vector and optional Keplerian element data are given. Use
-    /// of values other than those in 3.2.3.3 should be documented in an ICD.
+    /// Reference frame in which the state vector and optional Keplerian element data are given.
+    /// Use of values other than those in 3.2.3.3 should be documented in an ICD.
     ///
-    /// **Examples**: ICRF, EME2000, ITRF2000, TEME
+    /// **Examples**: ICRF EME2000 ITRF2000 TEME
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
     pub ref_frame: String,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
     /// 7.5.10 for formatting rules.)
     ///
-    /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    /// **Examples**: 2001-11-06T11:17:33 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -197,7 +206,7 @@ impl ToKvn for OpmMetadata {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmData {
-    /// Comments.
+    /// Comments (see 7.8 for formatting rules).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
 
@@ -310,7 +319,8 @@ impl ToKvn for OpmData {
 // Keplerian Elements
 //----------------------------------------------------------------------
 
-/// Osculating Keplerian Elements.
+/// Osculating Keplerian Elements in the Specified Reference Frame (none or all parameters of
+/// this block must be given).
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
@@ -322,65 +332,51 @@ pub struct KeplerianElements {
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// Semi-major axis.
-    ///
-    /// **Examples**: 6653.148
+    /// Semi-major axis
     ///
     /// **Units**: km
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub semi_major_axis: Distance,
-    /// Eccentricity.
+    /// Eccentricity
     ///
-    /// **Examples**: 0.001
+    /// **Units**: n/a
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub eccentricity: NonNegativeDouble,
-    /// Inclination.
-    ///
-    /// **Examples**: 51.6
+    /// Inclination
     ///
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub inclination: Inclination,
-    /// Right ascension of ascending node.
-    ///
-    /// **Examples**: 123.4
+    /// Right ascension of ascending node
     ///
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub ra_of_asc_node: Angle,
-    /// Argument of pericenter.
-    ///
-    /// **Examples**: 45.6
+    /// Argument of pericenter
     ///
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub arg_of_pericenter: Angle,
-    /// True anomaly.
-    ///
-    /// **Examples**: 0.0
+    /// True anomaly or mean anomaly
     ///
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub true_anomaly: Option<Angle>,
-    /// Mean anomaly.
-    ///
-    /// **Examples**: 0.0
+    /// True anomaly or mean anomaly
     ///
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mean_anomaly: Option<Angle>,
-    /// Gravitational Coefficient (Gravitational Constant × Central Mass).
-    ///
-    /// **Examples**: 398600.4418
+    /// Gravitational Coefficient (Gravitational Constant × Central Mass)
     ///
     /// **Units**: km³/s²
     ///
@@ -425,7 +421,7 @@ impl ToKvn for KeplerianElements {
 // Maneuver Parameters
 //----------------------------------------------------------------------
 
-/// Maneuver Parameters.
+/// Maneuver Parameters (Repeat for each maneuver).
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
@@ -437,17 +433,17 @@ pub struct ManeuverParameters {
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// Epoch of ignition (see 7.5.10 for formatting rules).
+    /// Epoch of ignition (see 7.5.10 for formatting rules)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub man_epoch_ignition: Epoch,
-    /// Maneuver duration (If = 0, impulsive maneuver).
+    /// Maneuver duration (If = 0, impulsive maneuver)
     ///
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub man_duration: Duration,
-    /// Mass change during maneuver.
+    /// Mass change during maneuver (value is < 0)
     ///
     /// **Units**: kg
     ///
@@ -456,24 +452,24 @@ pub struct ManeuverParameters {
     /// **Note**: The CCSDS standard requires this value to be strictly negative (`< 0`).
     /// However, this implementation allows non-negative values to support non-standard use cases.
     pub man_delta_mass: DeltaMassZ,
-    /// Reference frame in which the velocity increment vector data are given. The user must select
-    /// from the accepted set of values indicated in 3.2.4.11.
+    /// Reference frame in which the velocity increment vector data are given. The user must
+    /// select from the accepted set of values indicated in 3.2.4.11.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub man_ref_frame: String,
-    /// 1st component of the velocity increment.
+    /// 1st component of the velocity increment
     ///
     /// **Units**: km/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub man_dv_1: Velocity,
-    /// 2nd component of the velocity increment.
+    /// 2nd component of the velocity increment
     ///
     /// **Units**: km/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub man_dv_2: Velocity,
-    /// 3rd component of the velocity increment.
+    /// 3rd component of the velocity increment
     ///
     /// **Units**: km/s
     ///

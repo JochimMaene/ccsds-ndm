@@ -230,10 +230,7 @@ impl Cdm {
     }
 }
 
-/// Header section of the CDM.
-///
-/// Contains metadata about the message itself, such as creation date,
-/// originator, and unique identifiers.
+/// Represents the `cdmHeader` complex type.
 ///
 /// Parameters
 /// ----------
@@ -275,7 +272,8 @@ impl CdmHeader {
         })
     }
 
-    /// Message creation date/time in Coordinated Universal Time (UTC).
+    /// Message creation date/time in Coordinated Universal Time (UTC). (See 6.3.2.6 for
+    /// formatting rules.)
     ///
     /// Examples: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
     ///
@@ -290,7 +288,10 @@ impl CdmHeader {
         Ok(())
     }
 
-    /// Creating agency or owner/operator.
+    /// Creating agency or owner/operator. Value should be the 'Abbreviation' value from the
+    /// SANA 'Organizations' registry (https://sanaregistry.org/r/organizations) for an
+    /// organization that has the Role of 'Conjunction Data Message Originator'. (See 5.2.9
+    /// for formatting rules.)
     ///
     /// Examples: JSPOC, ESA SST, CAESAR, JPL, SDC
     ///
@@ -304,7 +305,9 @@ impl CdmHeader {
         self.inner.originator = value;
     }
 
-    /// ID that uniquely identifies a message from a given originator.
+    /// ID that uniquely identifies a message from a given originator. The format and content
+    /// of the message identifier value are at the discretion of the originator. (See 5.2.9
+    /// for formatting rules.)
     ///
     /// Examples: 201113719185, ABC-12_34
     ///
@@ -332,7 +335,10 @@ impl CdmHeader {
         self.inner.message_for = value;
     }
 
-    /// Comments.
+    /// Comments (allowed in the CDM Header only immediately after the CDM version number).
+    /// (See 6.3.4 for formatting rules.)
+    ///
+    /// Examples: This is a comment
     ///
     /// :type: list[str]
     #[getter]
@@ -558,7 +564,7 @@ impl RelativeMetadataData {
         })
     }
 
-    /// The date and time in UTC of the closest approach.
+    /// The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)
     ///
     /// :type: str
     #[getter]
@@ -571,7 +577,8 @@ impl RelativeMetadataData {
         Ok(())
     }
 
-    /// The norm of the relative position vector.
+    /// The norm of the relative position vector. It indicates how close the two objects are at
+    /// TCA. Data type = double.
     ///
     /// Units: m
     ///
@@ -584,7 +591,8 @@ impl RelativeMetadataData {
     fn set_miss_distance(&mut self, value: f64) {
         self.inner.miss_distance = Length::new(value, None);
     }
-    /// The norm of the relative velocity vector.
+    /// The norm of the relative velocity vector. It indicates how fast the two objects are
+    /// moving relative to each other at TCA. Data type = double.
     ///
     /// Units: m/s
     ///
@@ -598,7 +606,8 @@ impl RelativeMetadataData {
         self.inner.relative_speed = value.map(|v| Dv::new(v));
     }
 
-    /// The probability that Object1 and Object2 will collide.
+    /// The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will collide.
+    /// Data type = double.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -614,7 +623,8 @@ impl RelativeMetadataData {
         Ok(())
     }
 
-    /// The method that was used to calculate the collision probability.
+    /// The method that was used to calculate the collision probability. (See annex E for
+    /// definition.)
     ///
     /// :type: Optional[str]
     #[getter]
@@ -626,7 +636,8 @@ impl RelativeMetadataData {
         self.inner.collision_probability_method = value;
     }
 
-    /// The start time in UTC of the screening period for the conjunction assessment.
+    /// The start time in UTC of the screening period for the conjunction assessment. (See
+    /// 6.3.2.6 for formatting rules.)
     ///
     /// :type: Optional[str]
     #[getter]
@@ -642,7 +653,8 @@ impl RelativeMetadataData {
         Ok(())
     }
 
-    /// The stop time in UTC of the screening period for the conjunction assessment.
+    /// The stop time in UTC of the screening period for the conjunction assessment. (See
+    /// 6.3.2.6 for formatting rules.)
     ///
     /// :type: Optional[str]
     #[getter]
@@ -658,7 +670,8 @@ impl RelativeMetadataData {
         Ok(())
     }
 
-    /// The time in UTC when Object2 enters the screening volume.
+    /// The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for formatting
+    /// rules.)
     ///
     /// :type: Optional[str]
     #[getter]
@@ -671,7 +684,8 @@ impl RelativeMetadataData {
         Ok(())
     }
 
-    /// The time in UTC when Object2 exits the screening volume.
+    /// The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
+    /// rules.)
     ///
     /// :type: Optional[str]
     #[getter]
@@ -684,7 +698,8 @@ impl RelativeMetadataData {
         Ok(())
     }
 
-    /// The R or T component size of the screening volume.
+    /// The R or T (depending on if RTN or TVN is selected) component size of the screening
+    /// volume in the SCREEN_VOLUME_FRAME. Data type = double.
     ///
     /// Units: m
     ///
@@ -694,7 +709,8 @@ impl RelativeMetadataData {
         self.inner.screen_volume_x.as_ref().map(|v| v.value)
     }
 
-    /// The T or V component size of the screening volume.
+    /// The T or V (depending on if RTN or TVN is selected) component size of the screening
+    /// volume in the SCREEN_VOLUME_FRAME. Data type = double.
     ///
     /// Units: m
     ///
@@ -704,7 +720,8 @@ impl RelativeMetadataData {
         self.inner.screen_volume_y.as_ref().map(|v| v.value)
     }
 
-    /// The N component size of the screening volume.
+    /// The N component size of the screening volume in the SCREEN_VOLUME_FRAME. Data type =
+    /// double.
     ///
     /// Units: m
     ///
@@ -714,7 +731,7 @@ impl RelativeMetadataData {
         self.inner.screen_volume_z.as_ref().map(|v| v.value)
     }
 
-    /// Comments.
+    /// Comments (see 6.3.4 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
@@ -750,14 +767,16 @@ impl RelativeMetadataData {
         ])
     }
 
-    /// Name of the Object1 centered reference frame in which the screening volume data are given.
+    /// Name of the Object1 centered reference frame in which the screening volume data are
+    /// given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
+    /// E for definition.)
     ///
     /// :type: Optional[ScreenVolumeFrameType]
     #[getter]
     fn get_screen_volume_frame(&self) -> Option<ScreenVolumeFrameType> {
         self.inner.screen_volume_frame.as_ref().map(|f| match f {
-            core_types::ScreenVolumeFrameType::Rtn | core_types::ScreenVolumeFrameType::RtnLower => ScreenVolumeFrameType::Rtn,
-            core_types::ScreenVolumeFrameType::Tvn | core_types::ScreenVolumeFrameType::TvnLower => ScreenVolumeFrameType::Tvn,
+            core_types::ScreenVolumeFrameType::Rtn => ScreenVolumeFrameType::Rtn,
+            core_types::ScreenVolumeFrameType::Tvn => ScreenVolumeFrameType::Tvn,
         })
     }
     #[setter]
@@ -768,14 +787,14 @@ impl RelativeMetadataData {
         });
     }
 
-    /// Shape of the screening volume.
+    /// Shape of the screening volume: ELLIPSOID or BOX.
     ///
     /// :type: Optional[ScreenVolumeShapeType]
     #[getter]
     fn get_screen_volume_shape(&self) -> Option<ScreenVolumeShapeType> {
         self.inner.screen_volume_shape.as_ref().map(|f| match f {
-            core_types::ScreenVolumeShapeType::Ellipsoid | core_types::ScreenVolumeShapeType::EllipsoidLower => ScreenVolumeShapeType::Ellipsoid,
-            core_types::ScreenVolumeShapeType::Box | core_types::ScreenVolumeShapeType::BoxLower => ScreenVolumeShapeType::Box,
+            core_types::ScreenVolumeShapeType::Ellipsoid => ScreenVolumeShapeType::Ellipsoid,
+            core_types::ScreenVolumeShapeType::Box => ScreenVolumeShapeType::Box,
         })
     }
     #[setter]
@@ -1019,6 +1038,8 @@ impl CdmMetadata {
 
     /// Spacecraft name for the object.
     ///
+    /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
+    ///
     /// :type: str
     #[getter]
     fn object_name(&self) -> String {
@@ -1029,7 +1050,9 @@ impl CdmMetadata {
         self.inner.object_name = value;
     }
 
-    /// The satellite catalog designator for the object.
+    /// The satellite catalog designator for the object. (See 5.2.9 for formatting rules.)
+    ///
+    /// Examples: 12345
     ///
     /// :type: str
     #[getter]
@@ -1041,7 +1064,11 @@ impl CdmMetadata {
         self.inner.object_designator = value;
     }
 
-    /// The satellite catalog used for the object.
+    /// The satellite catalog used for the object. Value should be taken from the SANA
+    /// 'Conjunction Data Message CATALOG_NAME' registry
+    /// (https://sanaregistry.org/r/cdm_catalog). (See 5.2.9 for formatting rules.)
+    ///
+    /// Examples: SATCAT
     ///
     /// :type: str
     #[getter]
@@ -1053,7 +1080,13 @@ impl CdmMetadata {
         self.inner.catalog_name = value;
     }
 
-    /// The full international designator for the object.
+    /// The full international designator for the object. Values shall have the format
+    /// YYYY-NNNP{PP}, where: YYYY = year of launch; NNN = three-digit serial number of launch
+    /// (with leading zeros); P{PP} = At least one capital letter for the identification of the
+    /// part brought into space by the launch. In cases where the object has no international
+    /// designator, the value UNKNOWN should be used. (See 5.2.9 for further formatting rules.)
+    ///
+    /// Examples: 2002-021A, UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -1065,7 +1098,12 @@ impl CdmMetadata {
         self.inner.international_designator = value;
     }
 
-    /// Unique name of the external ephemeris file used for the object or NONE.
+    /// Unique name of the external ephemeris file used for the object or NONE. This is used to
+    /// indicate whether an external (i.e., Owner/Operator [O/O] provided) ephemeris file was
+    /// used to calculate the CA. If 'NONE' is specified, then the output of the most current
+    /// Orbit Determination (OD) of the CDM originator was used in the CA.
+    ///
+    /// Examples: EPHEMERIS SATELLITE A, NONE
     ///
     /// :type: str
     #[getter]
@@ -1079,6 +1117,8 @@ impl CdmMetadata {
 
     /// Contact position of the owner/operator of the object.
     ///
+    /// Examples: ORBITAL SAFETY ANALYST (OSA), NETWORK CONTROLLER
+    ///
     /// :type: Optional[str]
     #[getter]
     fn operator_contact_position(&self) -> Option<String> {
@@ -1090,6 +1130,8 @@ impl CdmMetadata {
     }
 
     /// Contact organization of the object.
+    ///
+    /// Examples: EUMETSAT, ESA, INTELSAT, IRIDIUM
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1103,6 +1145,8 @@ impl CdmMetadata {
 
     /// Phone number of the contact position or organization for the object.
     ///
+    /// Examples: +49615130312
+    ///
     /// :type: Optional[str]
     #[getter]
     fn operator_phone(&self) -> Option<String> {
@@ -1115,6 +1159,8 @@ impl CdmMetadata {
 
     /// Email address of the contact position or organization of the object.
     ///
+    /// Examples: JOHN.DOE@SOMEWHERE.NET
+    ///
     /// :type: Optional[str]
     #[getter]
     fn operator_email(&self) -> Option<String> {
@@ -1125,7 +1171,10 @@ impl CdmMetadata {
         self.inner.operator_email = value;
     }
 
-    /// The central body about which Object1 and Object2 orbit.
+    /// The central body about which Object1 and Object2 orbit. If not specified, the center is
+    /// assumed to be Earth.
+    ///
+    /// Examples: EARTH, SUN, MOON, MARS
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1137,7 +1186,10 @@ impl CdmMetadata {
         self.inner.orbit_center = value;
     }
 
-    /// The gravity model used for the OD of the object.
+    /// The gravity model used for the OD of the object. (See annex E under GRAVITY_MODEL for
+    /// definition).
+    ///
+    /// Examples: EGM-96: 36D 360, WGS-84_GEOID: 24D 240, JGM-2: 41D 410
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1149,7 +1201,10 @@ impl CdmMetadata {
         self.inner.gravity_model = value;
     }
 
-    /// The atmospheric density model used for the OD of the object.
+    /// The atmospheric density model used for the OD of the object. If 'NONE' is specified,
+    /// then no atmospheric model was used.
+    ///
+    /// Examples: JACCHIA 70, MSIS, JACCHIA 70 DCA, NONE
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1161,7 +1216,10 @@ impl CdmMetadata {
         self.inner.atmospheric_model = value;
     }
 
-    /// The N-body gravitational perturbations used for the OD of the object.
+    /// The N-body gravitational perturbations used for the OD of the object. If 'NONE' is
+    /// specified, then no third-body gravitational perturbations were used.
+    ///
+    /// Examples: MOON, SUN, JUPITER, NONE
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1173,7 +1231,7 @@ impl CdmMetadata {
         self.inner.n_body_perturbations = value;
     }
 
-    /// Comments.
+    /// Comments (see 6.3.4 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
@@ -1185,7 +1243,7 @@ impl CdmMetadata {
         self.inner.comment = value;
     }
 
-    /// The object to which the metadata and data apply.
+    /// The object to which the metadata and data apply (Object1 or Object2).
     ///
     /// Examples: OBJECT1, OBJECT2
     ///
@@ -1193,8 +1251,8 @@ impl CdmMetadata {
     #[getter]
     fn get_object(&self) -> CdmObjectType {
         match self.inner.object {
-             core_types::CdmObjectType::Object1 | core_types::CdmObjectType::Object1Lower => CdmObjectType::Object1,
-             core_types::CdmObjectType::Object2 | core_types::CdmObjectType::Object2Lower => CdmObjectType::Object2,
+             core_types::CdmObjectType::Object1 => CdmObjectType::Object1,
+             core_types::CdmObjectType::Object2 => CdmObjectType::Object2,
         }
     }
     #[setter]
@@ -1231,14 +1289,18 @@ impl CdmMetadata {
         });
     }
 
-    /// Method used to calculate the covariance.
+    /// Method used to calculate the covariance during the OD that produced the state vector, or
+    /// whether an arbitrary, non-calculated default value was used. Caution should be used
+    /// when using the default value for calculating collision probability.
+    ///
+    /// Examples: CALCULATED, DEFAULT
     ///
     /// :type: CovarianceMethodType
     #[getter]
     fn get_covariance_method(&self) -> CovarianceMethodType {
         match self.inner.covariance_method {
-            core_types::CovarianceMethodType::Calculated | core_types::CovarianceMethodType::CalculatedLower => CovarianceMethodType::Calculated,
-            core_types::CovarianceMethodType::Default | core_types::CovarianceMethodType::DefaultLower => CovarianceMethodType::Default,
+            core_types::CovarianceMethodType::Calculated => CovarianceMethodType::Calculated,
+            core_types::CovarianceMethodType::Default => CovarianceMethodType::Default,
         }
     }
     #[setter]
@@ -1249,15 +1311,17 @@ impl CdmMetadata {
         };
     }
 
-    /// The maneuver capacity of the object.
+    /// The maneuver capacity of the object. (See 1.4.3.1 for definition of 'N/A'.)
+    ///
+    /// Examples: YES, NO, N/A
     ///
     /// :type: ManeuverableType
     #[getter]
     fn get_maneuverable(&self) -> ManeuverableType {
         match self.inner.maneuverable {
-            core_types::ManeuverableType::Yes | core_types::ManeuverableType::YesLower => ManeuverableType::Yes,
-            core_types::ManeuverableType::No | core_types::ManeuverableType::NoLower => ManeuverableType::No,
-            core_types::ManeuverableType::NA | core_types::ManeuverableType::NALower => ManeuverableType::NA,
+            core_types::ManeuverableType::Yes => ManeuverableType::Yes,
+            core_types::ManeuverableType::No => ManeuverableType::No,
+            core_types::ManeuverableType::NA => ManeuverableType::NA,
         }
     }
     #[setter]
@@ -1269,15 +1333,19 @@ impl CdmMetadata {
         };
     }
 
-    /// Name of the reference frame in which the state vector data are given.
+    /// Name of the reference frame in which the state vector data are given. Value must be
+    /// selected from the list of values to the right (see reference [F1]) and be the same for
+    /// both Object1 and Object2.
+    ///
+    /// Examples: GCRF, EME2000, ITRF
     ///
     /// :type: ReferenceFrameType
     #[getter]
     fn get_ref_frame(&self) -> ReferenceFrameType {
         match self.inner.ref_frame {
-            core_types::ReferenceFrameType::Eme2000 | core_types::ReferenceFrameType::Eme2000Lower => ReferenceFrameType::Eme2000,
-            core_types::ReferenceFrameType::Gcrf | core_types::ReferenceFrameType::GcrfLower => ReferenceFrameType::Gcrf,
-            core_types::ReferenceFrameType::Itrf | core_types::ReferenceFrameType::ItrfLower => ReferenceFrameType::Itrf,
+            core_types::ReferenceFrameType::Eme2000 => ReferenceFrameType::Eme2000,
+            core_types::ReferenceFrameType::Gcrf => ReferenceFrameType::Gcrf,
+            core_types::ReferenceFrameType::Itrf => ReferenceFrameType::Itrf,
         }
     }
     #[setter]
@@ -1289,7 +1357,10 @@ impl CdmMetadata {
         };
     }
 
-    /// Indication of whether solar radiation pressure perturbations were used.
+    /// Indication of whether solar radiation pressure perturbations were used for the OD of the
+    /// object.
+    ///
+    /// Examples: YES, NO
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1310,7 +1381,9 @@ impl CdmMetadata {
         Ok(())
     }
 
-    /// Indication of whether solid Earth and ocean tides were used.
+    /// Indication of whether solid Earth and ocean tides were used for the OD of the object.
+    ///
+    /// Examples: YES, NO
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1326,7 +1399,9 @@ impl CdmMetadata {
         Ok(())
     }
 
-    /// Indication of whether in-track thrust modeling was used.
+    /// Indication of whether in-track thrust modeling was used for the OD of the object.
+    ///
+    /// Examples: YES, NO
     ///
     /// :type: Optional[str]
     #[getter]

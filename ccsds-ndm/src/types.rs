@@ -1384,24 +1384,48 @@ impl std::str::FromStr for YesNo {
     }
 }
 
+/// Basis of the trajectory state time history data.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TrajBasis {
+    /// Basis of this trajectory state time history data is 'PREDICTED'.
     #[serde(rename = "PREDICTED")]
     Predicted,
+    /// Basis of this trajectory state time history data is 'DETERMINED' when estimated from
+    /// observation-based orbit determination, reconstruction, and/or calibration. For
+    /// definitive OD performed onboard spacecraft whose solutions have been telemetered to the
+    /// ground for inclusion in an OCM, the TRAJ_BASIS shall be DETERMINED.
     #[serde(rename = "DETERMINED")]
     Determined,
+    /// Basis of this trajectory state time history data is 'TELEMETRY' when the trajectory
+    /// states are read directly from telemetry, for example, based on inertial navigation
+    /// systems or GNSS data.
     #[serde(rename = "TELEMETRY")]
     Telemetry,
+    /// Basis of this trajectory state time history data is 'SIMULATED' for generic
+    /// simulations, future mission design studies, and optimization studies.
     #[serde(rename = "SIMULATED")]
     Simulated,
+    /// Basis of this trajectory state time history data is 'OTHER' for other bases of this data.
     #[serde(rename = "OTHER")]
     Other,
+}
+
+impl std::fmt::Display for TrajBasis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Predicted => write!(f, "PREDICTED"),
+            Self::Determined => write!(f, "DETERMINED"),
+            Self::Telemetry => write!(f, "TELEMETRY"),
+            Self::Simulated => write!(f, "SIMULATED"),
+            Self::Other => write!(f, "OTHER"),
+        }
+    }
 }
 
 impl std::str::FromStr for TrajBasis {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match s.to_uppercase().as_str() {
             "PREDICTED" => Ok(Self::Predicted),
             "DETERMINED" => Ok(Self::Determined),
             "TELEMETRY" => Ok(Self::Telemetry),
@@ -1424,6 +1448,15 @@ pub enum RevNumBasis {
     One,
 }
 
+impl std::fmt::Display for RevNumBasis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Zero => write!(f, "0"),
+            Self::One => write!(f, "1"),
+        }
+    }
+}
+
 impl std::str::FromStr for RevNumBasis {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -1439,24 +1472,48 @@ impl std::str::FromStr for RevNumBasis {
     }
 }
 
+/// Basis of the covariance time history data.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum CovBasis {
+    /// Basis of this covariance time history data is 'PREDICTED'.
     #[serde(rename = "PREDICTED")]
     Predicted,
+    /// Basis of this covariance time history data is 'DETERMINED' when estimated from
+    /// observation-based orbit determination, reconstruction and/or calibration. For
+    /// definitive OD performed onboard spacecraft whose solutions have been telemetered to the ground for
+    /// inclusion in an OCM, the COV_BASIS shall be considered to be DETERMINED.
     #[serde(rename = "DETERMINED")]
     Determined,
+    /// Basis of this covariance time history data is 'EMPIRICAL' (for empirically determined
+    /// such as overlap analyses).
     #[serde(rename = "EMPIRICAL")]
     Empirical,
+    /// Basis of this covariance time history data is 'SIMULATED' for simulation-based
+    /// (including Monte Carlo) estimations, future mission design studies, and optimization
+    /// studies.
     #[serde(rename = "SIMULATED")]
     Simulated,
+    /// Basis of this covariance time history data is 'OTHER' for other bases of this data.
     #[serde(rename = "OTHER")]
     Other,
+}
+
+impl std::fmt::Display for CovBasis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Predicted => write!(f, "PREDICTED"),
+            Self::Determined => write!(f, "DETERMINED"),
+            Self::Empirical => write!(f, "EMPIRICAL"),
+            Self::Simulated => write!(f, "SIMULATED"),
+            Self::Other => write!(f, "OTHER"),
+        }
+    }
 }
 
 impl std::str::FromStr for CovBasis {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match s.to_uppercase().as_str() {
             "PREDICTED" => Ok(Self::Predicted),
             "DETERMINED" => Ok(Self::Determined),
             "EMPIRICAL" => Ok(Self::Empirical),
@@ -1471,28 +1528,59 @@ impl std::str::FromStr for CovBasis {
     }
 }
 
+/// Basis of the maneuver time history data.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ManBasis {
+    /// Basis of this maneuver time history data is 'CANDIDATE' for a proposed operational or a
+    /// hypothetical (i.e., mission design and optimization studies) future maneuver.
     #[serde(rename = "CANDIDATE")]
     Candidate,
+    /// Basis of this maneuver time history data is 'PLANNED' for a currently planned future
+    /// maneuver.
     #[serde(rename = "PLANNED")]
     Planned,
+    /// Basis of this maneuver time history data is 'ANTICIPATED' for a non-cooperative future
+    /// maneuver that is anticipated (i.e., likely) to occur (e.g., based upon patterns-of-life
+    /// analysis).
     #[serde(rename = "ANTICIPATED")]
     Anticipated,
+    /// Basis of this maneuver time history data is 'TELEMETRY' when the maneuver is determined
+    /// directly from telemetry (e.g., based on inertial navigation systems or
+    /// accelerometers).
     #[serde(rename = "TELEMETRY")]
     Telemetry,
+    /// Basis of this maneuver time history data is 'DETERMINED' when a past maneuver is
+    /// estimated from observation-based orbit determination reconstruction and/or
+    /// calibration.
     #[serde(rename = "DETERMINED")]
     Determined,
+    /// Basis of this maneuver time history data is 'SIMULATED' for generic maneuver
+    /// simulations, future mission design studies, and optimization studies.
     #[serde(rename = "SIMULATED")]
     Simulated,
+    /// Basis of this maneuver time history data is 'OTHER' for other bases of this data.
     #[serde(rename = "OTHER")]
     Other,
+}
+
+impl std::fmt::Display for ManBasis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Candidate => write!(f, "CANDIDATE"),
+            Self::Planned => write!(f, "PLANNED"),
+            Self::Anticipated => write!(f, "ANTICIPATED"),
+            Self::Telemetry => write!(f, "TELEMETRY"),
+            Self::Determined => write!(f, "DETERMINED"),
+            Self::Simulated => write!(f, "SIMULATED"),
+            Self::Other => write!(f, "OTHER"),
+        }
+    }
 }
 
 impl std::str::FromStr for ManBasis {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match s.to_uppercase().as_str() {
             "CANDIDATE" => Ok(Self::Candidate),
             "PLANNED" => Ok(Self::Planned),
             "ANTICIPATED" => Ok(Self::Anticipated),
@@ -1513,19 +1601,34 @@ impl std::str::FromStr for ManBasis {
 /// Maneuver duty cycle type per XSD dcTypeType.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum ManDc {
+    /// Duty cycle type 'CONTINUOUS' denotes full/continuous thrust.
     #[default]
     #[serde(rename = "CONTINUOUS")]
     Continuous,
+    /// Duty cycle type 'TIME' denotes a time-based duty cycle driven by time past a reference
+    /// time and the duty cycle ON and OFF durations.
     #[serde(rename = "TIME")]
     Time,
+    /// Duty cycle type 'TIME_AND_ANGLE' denotes a duty cycle driven by the phasing/clocking of
+    /// a space object body frame 'trigger' direction past a reference direction.
     #[serde(rename = "TIME_AND_ANGLE")]
     TimeAndAngle,
+}
+
+impl std::fmt::Display for ManDc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Continuous => write!(f, "CONTINUOUS"),
+            Self::Time => write!(f, "TIME"),
+            Self::TimeAndAngle => write!(f, "TIME_AND_ANGLE"),
+        }
+    }
 }
 
 impl std::str::FromStr for ManDc {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match s.to_uppercase().as_str() {
             "CONTINUOUS" => Ok(Self::Continuous),
             "TIME" => Ok(Self::Time),
             "TIME_AND_ANGLE" => Ok(Self::TimeAndAngle),
@@ -1538,25 +1641,45 @@ impl std::str::FromStr for ManDc {
     }
 }
 
+/// Covariance ordering.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum CovOrder {
+    /// Covariance ordering is Lower Triangular Matrix (LTM).
     #[default]
     #[serde(rename = "LTM")]
     Ltm,
+    /// Covariance ordering is Upper Triangular Matrix (UTM).
     #[serde(rename = "UTM")]
     Utm,
+    /// Covariance ordering is Full covariance matrix.
     #[serde(rename = "FULL")]
     Full,
+    /// Covariance ordering is LTM covariance with cross-correlation information provided in
+    /// upper triangle off-diagonal terms (LTMWCC).
     #[serde(rename = "LTMWCC")]
     LtmWcc,
+    /// Covariance ordering is UTM covariance with cross-correlation information provided in
+    /// lower triangle off-diagonal terms (UTMWCC).
     #[serde(rename = "UTMWCC")]
     UtmWcc,
+}
+
+impl std::fmt::Display for CovOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ltm => write!(f, "LTM"),
+            Self::Utm => write!(f, "UTM"),
+            Self::Full => write!(f, "FULL"),
+            Self::LtmWcc => write!(f, "LTMWCC"),
+            Self::UtmWcc => write!(f, "UTMWCC"),
+        }
+    }
 }
 
 impl std::str::FromStr for CovOrder {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match s.to_uppercase().as_str() {
             "LTM" => Ok(Self::Ltm),
             "UTM" => Ok(Self::Utm),
             "FULL" => Ok(Self::Full),
@@ -1883,15 +2006,19 @@ pub struct SensorNoise {
     pub units: Option<AngleUnits>,
 }
 
-// DisintegrationType
+/// Re-entry disintegration type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum DisintegrationType {
+    /// No disintegration considered.
     #[serde(rename = "NONE")]
     None,
+    /// Mass loss considered.
     #[serde(rename = "MASS-LOSS")]
     MassLoss,
+    /// Break-up considered.
     #[serde(rename = "BREAK-UP")]
     BreakUp,
+    /// Both mass loss and break-up considered.
     #[serde(rename = "MASS-LOSS + BREAK-UP", alias = "MASS-LOSS + BREAKUP")]
     MassLossAndBreakUp,
 }
@@ -1924,19 +2051,25 @@ impl std::fmt::Display for DisintegrationType {
     }
 }
 
-// ImpactUncertaintyType per XSD
+/// Impact uncertainty method.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ImpactUncertaintyType {
+    /// No uncertainty method.
     #[serde(rename = "NONE")]
     None,
+    /// Analytical uncertainty method.
     #[serde(rename = "ANALYTICAL")]
     Analytical,
+    /// Stochastic uncertainty method.
     #[serde(rename = "STOCHASTIC")]
     Stochastic,
+    /// Empirical uncertainty method.
     #[serde(rename = "EMPIRICAL")]
     Empirical,
+    /// Covariance uncertainty method.
     #[serde(rename = "COVARIANCE")]
     Covariance,
+    /// Statistical uncertainty method.
     #[serde(rename = "STATISTICAL")]
     Statistical,
 }
@@ -1973,19 +2106,25 @@ impl std::fmt::Display for ImpactUncertaintyType {
     }
 }
 
-// ReentryUncertaintyMethodType per XSD
+/// Re-entry uncertainty method.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ReentryUncertaintyMethodType {
+    /// No uncertainty method.
     #[serde(rename = "NONE")]
     None,
+    /// Analytical uncertainty method.
     #[serde(rename = "ANALYTICAL")]
     Analytical,
+    /// Stochastic uncertainty method.
     #[serde(rename = "STOCHASTIC")]
     Stochastic,
+    /// Empirical uncertainty method.
     #[serde(rename = "EMPIRICAL")]
     Empirical,
+    /// Covariance uncertainty method.
     #[serde(rename = "COVARIANCE")]
     Covariance,
+    /// Statistical uncertainty method.
     #[serde(rename = "STATISTICAL")]
     Statistical,
 }
@@ -2105,16 +2244,15 @@ define_unit_type!(M2kg, M2kgUnits, M2PerKg, { M2PerKg => "m**2/kg" });
 define_required_type!(M2kgRequired, M2kgUnits, M2PerKg);
 
 // CDM categorical simple types
+/// CDM Object type (OBJECT1 or OBJECT2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum CdmObjectType {
+    /// The object to which the metadata and data apply is OBJECT1.
     #[serde(rename = "OBJECT1")]
     Object1,
-    #[serde(rename = "object1")]
-    Object1Lower,
+    /// The object to which the metadata and data apply is OBJECT2.
     #[serde(rename = "OBJECT2")]
     Object2,
-    #[serde(rename = "object2")]
-    Object2Lower,
 }
 
 impl std::str::FromStr for CdmObjectType {
@@ -2132,16 +2270,24 @@ impl std::str::FromStr for CdmObjectType {
     }
 }
 
+/// Screening volume frame type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ScreenVolumeFrameType {
+    /// Radial, Transverse, and Normal (RTN) coordinate frame.
     #[serde(rename = "RTN")]
     Rtn,
-    #[serde(rename = "rtn")]
-    RtnLower,
+    /// Transverse, Velocity, and Normal (TVN) coordinate frame.
     #[serde(rename = "TVN")]
     Tvn,
-    #[serde(rename = "tvn")]
-    TvnLower,
+}
+
+impl std::fmt::Display for ScreenVolumeFrameType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Rtn => write!(f, "RTN"),
+            Self::Tvn => write!(f, "TVN"),
+        }
+    }
 }
 
 impl std::str::FromStr for ScreenVolumeFrameType {
@@ -2159,16 +2305,24 @@ impl std::str::FromStr for ScreenVolumeFrameType {
     }
 }
 
+/// Screening volume shape type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ScreenVolumeShapeType {
+    /// Ellipsoid screening volume.
     #[serde(rename = "ELLIPSOID")]
     Ellipsoid,
-    #[serde(rename = "ellipsoid")]
-    EllipsoidLower,
+    /// Box screening volume.
     #[serde(rename = "BOX")]
     Box,
-    #[serde(rename = "box")]
-    BoxLower,
+}
+
+impl std::fmt::Display for ScreenVolumeShapeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ellipsoid => write!(f, "ELLIPSOID"),
+            Self::Box => write!(f, "BOX"),
+        }
+    }
 }
 
 impl std::str::FromStr for ScreenVolumeShapeType {
@@ -2186,48 +2340,64 @@ impl std::str::FromStr for ScreenVolumeShapeType {
     }
 }
 
+/// CDM reference frame type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ReferenceFrameType {
-    #[serde(rename = "EME2000")]
-    Eme2000,
-    #[serde(rename = "eme2000")]
-    Eme2000Lower,
+    /// Geocentric Celestial Reference Frame.
     #[serde(rename = "GCRF")]
     Gcrf,
-    #[serde(rename = "gcrf")]
-    GcrfLower,
+    /// Earth Mean Equinox and Equator of J2000.
+    #[serde(rename = "EME2000")]
+    Eme2000,
+    /// International Terrestrial Reference Frame.
     #[serde(rename = "ITRF")]
     Itrf,
-    #[serde(rename = "itrf")]
-    ItrfLower,
+}
+
+impl std::fmt::Display for ReferenceFrameType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Gcrf => write!(f, "GCRF"),
+            Self::Eme2000 => write!(f, "EME2000"),
+            Self::Itrf => write!(f, "ITRF"),
+        }
+    }
 }
 
 impl std::str::FromStr for ReferenceFrameType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
-            "EME2000" => Ok(Self::Eme2000),
             "GCRF" => Ok(Self::Gcrf),
+            "EME2000" => Ok(Self::Eme2000),
             "ITRF" => Ok(Self::Itrf),
             _ => Err(crate::error::EnumParseError {
                 field: "REF_FRAME",
                 value: s.to_string(),
-                expected: "EME2000, GCRF, or ITRF",
+                expected: "GCRF, EME2000, or ITRF",
             }),
         }
     }
 }
 
+/// Covariance method type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum CovarianceMethodType {
+    /// Covariance was calculated during the OD.
     #[serde(rename = "CALCULATED")]
     Calculated,
-    #[serde(rename = "calculated")]
-    CalculatedLower,
+    /// An arbitrary, non-calculated default value was used.
     #[serde(rename = "DEFAULT")]
     Default,
-    #[serde(rename = "default")]
-    DefaultLower,
+}
+
+impl std::fmt::Display for CovarianceMethodType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Calculated => write!(f, "CALCULATED"),
+            Self::Default => write!(f, "DEFAULT"),
+        }
+    }
 }
 
 impl std::str::FromStr for CovarianceMethodType {
@@ -2245,20 +2415,28 @@ impl std::str::FromStr for CovarianceMethodType {
     }
 }
 
+/// Maneuverable type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ManeuverableType {
+    /// Object is maneuverable.
     #[serde(rename = "YES")]
     Yes,
-    #[serde(rename = "yes")]
-    YesLower,
+    /// Object is not maneuverable.
     #[serde(rename = "NO")]
     No,
-    #[serde(rename = "no")]
-    NoLower,
+    /// Maneuverability is not applicable or unknown.
     #[serde(rename = "N/A")]
     NA,
-    #[serde(rename = "n/a")]
-    NALower,
+}
+
+impl std::fmt::Display for ManeuverableType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Yes => write!(f, "YES"),
+            Self::No => write!(f, "NO"),
+            Self::NA => write!(f, "N/A"),
+        }
+    }
 }
 
 impl std::str::FromStr for ManeuverableType {
@@ -2336,14 +2514,20 @@ impl std::fmt::Display for Vec3Double {
 
 // -------------------- TDM TYPES --------------------
 
+/// TDM angle type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmAngleType {
+    /// Azimuth, elevation (local horizontal).
     #[serde(rename = "AZEL")]
     Azel,
+    /// Right ascension, declination or hour angle, declination (must be referenced to an
+    /// inertial frame).
     #[serde(rename = "RADEC")]
     Radec,
+    /// x-east, y-north.
     #[serde(rename = "XEYN")]
     Xeyn,
+    /// x-south, y-east.
     #[serde(rename = "XSYE")]
     Xsye,
 }
@@ -2376,12 +2560,16 @@ impl std::fmt::Display for TdmAngleType {
     }
 }
 
+/// TDM data quality.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmDataQuality {
+    /// No quality check of the data has occurred.
     #[serde(rename = "RAW")]
     Raw,
+    /// Data quality has been checked, and passed tests.
     #[serde(rename = "VALIDATED")]
     Validated,
+    /// Data quality has been checked and quality issues exist.
     #[serde(rename = "DEGRADED")]
     Degraded,
 }
@@ -2412,12 +2600,16 @@ impl std::fmt::Display for TdmDataQuality {
     }
 }
 
+/// Indicates the relationship between the INTEGRATION_INTERVAL and the timetag.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmIntegrationRef {
+    /// Timetag represents the start of the integration period.
     #[serde(rename = "START")]
     Start,
+    /// Timetag represents the middle of the integration period.
     #[serde(rename = "MIDDLE")]
     Middle,
+    /// Timetag represents the end of the integration period.
     #[serde(rename = "END")]
     End,
 }
@@ -2448,10 +2640,16 @@ impl std::fmt::Display for TdmIntegrationRef {
     }
 }
 
+/// TDM tracking mode.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmMode {
+    /// The value ‘SEQUENTIAL’ applies for frequencies, phase, range, Doppler, carrier power,
+    /// carrier-power-to-noise spectral density, ranging-power-to-noise spectral density,
+    /// optical, angles, and line-of-sight ionosphere calibrations; the name implies a
+    /// sequential signal path between tracking participants.
     #[serde(rename = "SEQUENTIAL")]
     Sequential,
+    /// The value ‘SINGLE_DIFF’ applies only for differenced data.
     #[serde(rename = "SINGLE_DIFF")]
     SingleDiff,
 }
@@ -2480,12 +2678,16 @@ impl std::fmt::Display for TdmMode {
     }
 }
 
+/// TDM range mode.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmRangeMode {
+    /// Range tones are coherent with the uplink carrier.
     #[serde(rename = "COHERENT")]
     Coherent,
+    /// Range tones have a constant frequency.
     #[serde(rename = "CONSTANT")]
     Constant,
+    /// Used in Delta-DOR.
     #[serde(rename = "ONE_WAY")]
     OneWay,
 }
@@ -2516,13 +2718,17 @@ impl std::fmt::Display for TdmRangeMode {
     }
 }
 
+/// TDM range units.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmRangeUnits {
+    /// Range is measured in kilometers.
     #[serde(rename = "km")]
     Km,
+    /// Range is measured in seconds.
     #[serde(rename = "s")]
     Seconds,
-    #[serde(rename = "ru")]
+    /// Range units where the transmit frequency is changing.
+    #[serde(rename = "RU")]
     Ru,
 }
 
@@ -2600,10 +2806,13 @@ impl std::fmt::Display for TdmReferenceFrame {
     }
 }
 
+/// Reference for time tags in the tracking data.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmTimetagRef {
+    /// Timetag is the transmit time.
     #[serde(rename = "TRANSMIT")]
     Transmit,
+    /// Timetag is the receive time.
     #[serde(rename = "RECEIVE")]
     Receive,
 }

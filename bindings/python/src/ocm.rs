@@ -590,9 +590,13 @@ impl OcmMetadata {
         )
     }
 
-    /// Time system used for all absolute time stamps in the message (e.g., UTC, TAI).
+    /// Time system for all absolute time stamps in this OCM including EPOCH_TZERO. Select from
+    /// the accepted set of values indicated in annex B, subsection B3. This field is used by
+    /// all OCM data blocks. If the SCLK timescale is selected, then 'EPOCH_TZERO' shall be
+    /// interpreted as the spacecraft clock epoch and both SCLK_OFFSET_AT_EPOCH and
+    /// SCLK_SEC_PER_SI_SEC shall be supplied.
     ///
-    /// Examples: UTC, TAI
+    /// Examples: UTC
     ///
     /// :type: str
     #[getter]
@@ -604,10 +608,13 @@ impl OcmMetadata {
         self.inner.time_system = value;
     }
 
-    /// Epoch to which all relative times in the message are referenced. (For format specification,
-    /// see 7.5.10.)
+    /// Default epoch to which all relative times are referenced in data blocks (for format
+    /// specification, see 7.5.10). The time scale of EPOCH_TZERO is controlled via the
+    /// ‘TIME_SYSTEM' keyword, with the exception that for the SCLK timescale, EPOCH_TZERO
+    /// shall be interpreted as being in the UTC timescale. This field is used by all OCM data
+    /// blocks.
     ///
-    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    /// Examples: 2001-11-06T11:17:33
     ///
     /// :type: str
     #[getter]
@@ -620,17 +627,18 @@ impl OcmMetadata {
         Ok(())
     }
 
-/// Spacecraft name for which OCM data is provided. While there is no CCSDS-based restriction on
-/// the value for this keyword, it is recommended to use names from either the UN Office of Outer
-/// Space Affairs designator index (reference \[3\]), the spacecraft operator, or a State Actor or
-/// commercial Space Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space
-/// catalog. If OBJECT_NAME is not listed in reference \[3\] or the content is either unknown
-/// (uncorrelated) or cannot be disclosed, the value should be set to UNKNOWN (or this keyword
-/// omitted).
-///
-/// Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
-///
-/// :type: Optional[str]
+    /// Free-text field containing the name of the object. While there is no CCSDS-based
+    /// restriction on the value for this keyword, it is recommended to use names from either
+    /// the UN Office of Outer Space Affairs designator index (reference [3], which include
+    /// Object name and international designator of the participant), the spacecraft operator,
+    /// or a State Actor or commercial Space Situational Awareness (SSA) provider maintaining
+    /// the ‘CATALOG_NAME’ space catalog. If OBJECT_NAME is not listed in reference [3] or the
+    /// content is either unknown (uncorrelated) or cannot be disclosed, the value should be
+    /// set to UNKNOWN (or this keyword omitted).
+    ///
+    /// Examples: SPOT-7, ENVISAT, IRIDIUM NEXT-8, INTELSAT G-15, UNKNOWN
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_object_name(&self) -> Option<String> {
         self.inner.object_name.clone()
@@ -640,16 +648,19 @@ impl OcmMetadata {
         self.inner.object_name = value;
     }
 
-/// COSPAR international designator for the object. Such designator values shall have the
-/// following COSPAR format: YYYY-NNNP{PP}, where: YYYY = Year of launch; NNN = Three-digit serial
-/// number of launch in year YYYY (with leading zeros); P{PP} = At least one capital letter for
-/// the identification of the part brought into space by the launch. If the object has no
-/// international designator or the content is either unknown (uncorrelated) or cannot be
-/// disclosed, the value should be set to UNKNOWN (or this keyword omitted).
-///
-/// Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
-///
-/// :type: Optional[str]
+    /// Free-text field containing an international designator for the object as assigned by
+    /// the UN Committee on Space Research (COSPAR). Such designator values shall have the
+    /// following COSPAR format: YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-digit
+    /// serial number of launch in year YYYY (with leading zeros). P{PP} = At least one capital
+    /// letter for the identification of the part brought into space by the launch. If the
+    /// object has no international designator or the content is either unknown (uncorrelated)
+    /// or cannot be disclosed, the value should be set to UNKNOWN (or this keyword omitted).
+    /// NOTE—The international designator was typically specified by 'OBJECT_ID' in the OPM,
+    /// OMM, and OEM.
+    ///
+    /// Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_international_designator(&self) -> Option<String> {
         self.inner.international_designator.clone()
@@ -659,10 +670,14 @@ impl OcmMetadata {
         self.inner.international_designator = value;
     }
 
-    /// Satellite catalog source (or source agency or operator, value to be drawn from the SANA
-    /// registry list of Space Object Catalogs at <https://sanaregistry.org/r/space_object_catalog>).
+    /// Free-text field containing the satellite catalog source (or source agency or operator,
+    /// value to be drawn from the SANA registry list of Space Object Catalogs at
+    /// https://sanaregistry.org/r/space_object_catalog, or alternatively, from the list of
+    /// organizations listed in the 'Abbreviation' column of the SANA Organizations registry at
+    /// https://www.sanaregistry.org/r/organizations) from which 'OBJECT_DESIGNATOR' was
+    /// obtained.
     ///
-    /// Examples: NORAD, SATCAT
+    /// Examples: CSPOC, RFSA, ESA, COMSPOC
     ///
     /// :type: Optional[str]
     #[getter]
@@ -674,11 +689,12 @@ impl OcmMetadata {
         self.inner.catalog_name = value;
     }
 
-    /// Unique satellite identification designator for the object, as reflected in the catalog whose
-    /// name is ‘CATALOG_NAME’. If the ID is not known (uncorrelated object) or cannot be disclosed,
-    /// ‘UNKNOWN’ may be used (or this keyword omitted).
+    /// Free-text field specification of the unique satellite identification designator for the
+    /// object, as reflected in the catalog whose name is 'CATALOG_NAME'. If the ID is not known
+    /// (uncorrelated object) or cannot be disclosed, 'UNKNOWN' may be used (or this keyword
+    /// omitted).
     ///
-    /// Examples: 28893
+    /// Examples: 22444, 18SPCS 18571, 2147483648_04ae[...]d84c, UNKNOWN
     ///
     /// :type: Optional[str]
     #[getter]
@@ -690,10 +706,11 @@ impl OcmMetadata {
         self.inner.object_designator = value;
     }
 
-    /// Alternate name(s) of this space object, including assigned names used by spacecraft operator,
-    /// State Actors, commercial SSA providers, and/or media.
+    /// Free-text comma-delimited field containing alternate name(s) of this space object,
+    /// including assigned names used by spacecraft operator, State Actors, commercial SSA
+    /// providers, and/or media.
     ///
-    /// Examples: CALIPSO, 2006-016B
+    /// Examples: SV08, IN8
     ///
     /// :type: Optional[str]
     #[getter]
@@ -705,9 +722,9 @@ impl OcmMetadata {
         self.inner.alternate_names = value;
     }
 
-    /// Point-of-Contact (PoC) for OCM.
+    /// Free-text field containing originator or programmatic Point-of-Contact (POC) for OCM.
     ///
-    /// Examples: John Doe
+    /// Examples: Mr. Rodgers
     ///
     /// :type: Optional[str]
     #[getter]
@@ -719,9 +736,9 @@ impl OcmMetadata {
         self.inner.originator_poc = value;
     }
 
-    /// Contact position of the originator PoC.
+    /// Free-text field containing contact position of the originator PoC.
     ///
-    /// Examples: Analyst
+    /// Examples: Flight Dynamics, Mission Design Lead
     ///
     /// :type: Optional[str]
     #[getter]
@@ -733,9 +750,9 @@ impl OcmMetadata {
         self.inner.originator_position = value;
     }
 
-    /// Originator PoC phone number.
+    /// Free-text field containing originator PoC phone number.
     ///
-    /// Examples: +1 123-456-7890
+    /// Examples: +12345678901
     ///
     /// :type: Optional[str]
     #[getter]
@@ -747,9 +764,9 @@ impl OcmMetadata {
         self.inner.originator_phone = value;
     }
 
-    /// Originator PoC email address.
+    /// Free-text field containing originator PoC email address.
     ///
-    /// Examples: john.doe@example.com
+    /// Examples: JOHN.DOE@SOMEWHERE.ORG
     ///
     /// :type: Optional[str]
     #[getter]
@@ -761,9 +778,10 @@ impl OcmMetadata {
         self.inner.originator_email = value;
     }
 
-    /// Originator’s physical address.
+    /// Free-text field containing originator's physical address information for OCM creator
+    /// (suggest comma-delimited address lines).
     ///
-    /// Examples: 123 Main St, Anytown, USA
+    /// Examples: 5040 Spaceflight Ave., Cocoa Beach, FL, USA, 12345
     ///
     /// :type: Optional[str]
     #[getter]
@@ -775,8 +793,9 @@ impl OcmMetadata {
         self.inner.originator_address = value;
     }
 
-    /// Creating agency or operator (value should be drawn from the ‘Abbreviation’ column of the SANA
-    /// Organizations registry at <https://www.sanaregistry.org/r/organizations>).
+    /// Free-text field containing the creating agency or operator (value should be drawn from
+    /// the 'Abbreviation' column of the SANA Organizations registry at
+    /// https://www.sanaregistry.org/r/organizations).
     ///
     /// Examples: NASA, ESA, JAXA
     ///
@@ -790,9 +809,9 @@ impl OcmMetadata {
         self.inner.tech_org = value;
     }
 
-    /// Technical PoC for OCM.
+    /// Free-text field containing technical PoC for OCM.
     ///
-    /// Examples: Jane Smith
+    /// Examples: Maxwell Smart
     ///
     /// :type: Optional[str]
     #[getter]
@@ -804,9 +823,9 @@ impl OcmMetadata {
         self.inner.tech_poc = value;
     }
 
-    /// Contact position of the technical PoC.
+    /// Free-text field containing contact position of the technical PoC.
     ///
-    /// Examples: Engineer
+    /// Examples: Flight Dynamics, Mission Design Lead
     ///
     /// :type: Optional[str]
     #[getter]
@@ -818,9 +837,9 @@ impl OcmMetadata {
         self.inner.tech_position = value;
     }
 
-    /// Technical PoC phone number.
+    /// Free-text field containing technical PoC phone number.
     ///
-    /// Examples: +1 987-654-3210
+    /// Examples: +49615130312
     ///
     /// :type: Optional[str]
     #[getter]
@@ -832,9 +851,9 @@ impl OcmMetadata {
         self.inner.tech_phone = value;
     }
 
-    /// Technical PoC email address.
+    /// Free-text field containing technical PoC email address.
     ///
-    /// Examples: jane.smith@example.com
+    /// Examples: JOHN.DOE@SOMEWHERE.ORG
     ///
     /// :type: Optional[str]
     #[getter]
@@ -846,9 +865,10 @@ impl OcmMetadata {
         self.inner.tech_email = value;
     }
 
-    /// Physical address information for OCM creator.
+    /// Free-text field containing technical PoC physical address information for OCM creator
+    /// (suggest comma-delimited address lines).
     ///
-    /// Examples: 456 Tech Park, Sometown, USA
+    /// Examples: 5040 Spaceflight Ave., Cocoa Beach, FL, USA, 12345
     ///
     /// :type: Optional[str]
     #[getter]
@@ -860,7 +880,8 @@ impl OcmMetadata {
         self.inner.tech_address = value;
     }
 
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
+    /// Metadata section; see 7.8 for comment formatting rules).
     ///
     /// :type: list[str]
     #[getter]
@@ -874,9 +895,13 @@ impl OcmMetadata {
     }
 
     // === Message Linking Fields ===
-    /// Message ID of the previous message from this message originator for this space object.
+    /// Free-text field containing an ID that uniquely identifies the previous message from
+    /// this message originator for this space object. The format and content of the message
+    /// identifier value are at the discretion of the originator. NOTE—One may provide the
+    /// previous message ID without supplying the 'PREVIOUS_MESSAGE_EPOCH' keyword, and vice
+    /// versa.
     ///
-    /// Examples: MSG-12344
+    /// Examples: OCM 201113719184, ABC-12_33
     ///
     /// :type: Optional[str]
     #[getter]
@@ -888,9 +913,12 @@ impl OcmMetadata {
         self.inner.previous_message_id = value;
     }
 
-    /// Message ID of the next message from this message originator for this space object.
+    /// Free-text field containing an ID that uniquely identifies the next message from this
+    /// message originator for this space object. The format and content of the message
+    /// identifier value are at the discretion of the originator. NOTE—One may provide the next
+    /// message ID without supplying the ‘NEXT_MESSAGE_EPOCH' keyword, and vice versa.
     ///
-    /// Examples: MSG-12346
+    /// Examples: OCM 201113719186, ABC-12_35
     ///
     /// :type: Optional[str]
     #[getter]
@@ -902,9 +930,10 @@ impl OcmMetadata {
         self.inner.next_message_id = value;
     }
 
-    /// Link(s) to relevant Attitude Data Message(s).
+    /// Free-text field containing a unique identifier of Attitude Data Message (ADM)
+    /// (reference [10]) that are linked (relevant) to this Orbit Data Message.
     ///
-    /// Examples: ADM-2023-001
+    /// Examples: ADM_MSG_35132.txt, ADM_ID_0572
     ///
     /// :type: Optional[str]
     #[getter]
@@ -916,9 +945,10 @@ impl OcmMetadata {
         self.inner.adm_msg_link = value;
     }
 
-    /// Link(s) to relevant Conjunction Data Message(s).
+    /// Free-text field containing a unique identifier of Conjunction Data Message (CDM)
+    /// (reference [14]) that are linked (relevant) to this Orbit Data Message.
     ///
-    /// Examples: CDM-2023-042
+    /// Examples: CDM_MSG_35132.txt, CDM_ID_8257
     ///
     /// :type: Optional[str]
     #[getter]
@@ -930,9 +960,10 @@ impl OcmMetadata {
         self.inner.cdm_msg_link = value;
     }
 
-    /// Link(s) to relevant Pointing Request Message(s).
+    /// Free-text field containing a unique identifier of Pointing Request Message (PRM)
+    /// (reference [13]) that are linked (relevant) to this Orbit Data Message.
     ///
-    /// Examples: PRM-2023-005
+    /// Examples: PRM_MSG_35132.txt, PRM_ID_6897
     ///
     /// :type: Optional[str]
     #[getter]
@@ -944,9 +975,10 @@ impl OcmMetadata {
         self.inner.prm_msg_link = value;
     }
 
-    /// Link(s) to relevant Reentry Data Message(s).
+    /// Free-text field containing a unique identifier of Reentry Data Message (RDM)
+    /// (reference [12]) that are linked (relevant) to this Orbit Data Message.
     ///
-    /// Examples: RDM-2023-010
+    /// Examples: RDM_MSG_35132.txt, RDM_ID_1839
     ///
     /// :type: Optional[str]
     #[getter]
@@ -958,9 +990,11 @@ impl OcmMetadata {
         self.inner.rdm_msg_link = value;
     }
 
-    /// Link(s) to relevant Tracking Data Message(s).
+    /// Free-text string containing a comma-separated list of file name(s) and/or associated
+    /// identification number(s) of Tracking Data Message (TDM) (reference [9]) observations
+    /// upon which this OD is based.
     ///
-    /// Examples: TDM-2023-111
+    /// Examples: TDM_MSG_37.txt, TDM_835, TDM_836
     ///
     /// :type: Optional[str]
     #[getter]
@@ -973,9 +1007,9 @@ impl OcmMetadata {
     }
 
     // === Object Information Fields ===
-    /// Spacecraft operator of the space object.
+    /// Free-text field containing the operator of the space object.
     ///
-    /// Examples: SES, INTELSAT
+    /// Examples: INTELSAT
     ///
     /// :type: Optional[str]
     #[getter]
@@ -987,9 +1021,9 @@ impl OcmMetadata {
         self.inner.operator = value;
     }
 
-    /// Owner of the space object.
+    /// Free-text field containing the owner of the space object.
     ///
-    /// Examples: Government of France
+    /// Examples: SIRIUS
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1001,9 +1035,10 @@ impl OcmMetadata {
         self.inner.owner = value;
     }
 
-    /// Country or country code where the owner is based.
+    /// Free-text field containing the name of the country, country code, or country
+    /// abbreviation where the space object owner is based.
     ///
-    /// Examples: FR, USA, JP
+    /// Examples: US, SPAIN
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1015,9 +1050,10 @@ impl OcmMetadata {
         self.inner.country = value;
     }
 
-    /// Constellation to which this space object belongs.
+    /// Free-text field containing the name of the constellation to which this space object
+    /// belongs.
     ///
-    /// Examples: GALILEO, STARLINK
+    /// Examples: SPIRE
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1029,10 +1065,10 @@ impl OcmMetadata {
         self.inner.constellation = value;
     }
 
-    /// Type of object (value to be drawn from the SANA registry list of Object Descriptions at
-    /// <https://sanaregistry.org/r/object_types>).
+    /// Specification of the type of object. Select from the accepted set of values indicated
+    /// in annex B, subsection B11.
     ///
-    /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, OTHER
+    /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1048,10 +1084,10 @@ impl OcmMetadata {
         Ok(())
     }
 
-    /// Operational status of the space object (value to be drawn from the SANA registry list of
-    /// Operational Status at <https://sanaregistry.org/r/operational_status>).
+    /// Specification of the operational status of the space object. Select from the accepted
+    /// set of values indicated in annex B, subsection B12.
     ///
-    /// Examples: OPERATIONAL, NON-OPERATIONAL
+    /// Examples: OPERATIONAL
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1063,8 +1099,8 @@ impl OcmMetadata {
         self.inner.ops_status = value;
     }
 
-    /// Orbit category of the space object (value to be drawn from the SANA registry list of Orbit
-    /// Categories at <https://sanaregistry.org/r/orbit_categories>).
+    /// Specification of the type of orbit. Select from the accepted set of values indicated in
+    /// annex B, subsection B14.
     ///
     /// Examples: GEO, LEO
     ///
@@ -1078,9 +1114,13 @@ impl OcmMetadata {
         self.inner.orbit_category = value;
     }
 
-    /// List of data elements included in the OCM message.
+    /// Comma-delimited list of elements of information data blocks included in this message.
+    /// The order shall be the same as the order of the data blocks in the message. Values shall
+    /// be confined to the following list: ORB, PHYS, COV, MAN, PERT, OD, and USER. If the OCM
+    /// contains multiple ORB, COV, or MAN data blocks (as allowed by table 6-1), the
+    /// corresponding ORB, COV, or MAN entry shall be duplicated to match.
     ///
-    /// Examples: TRAJ, PHYS, COV, MAN, PERT, OD, USER
+    /// Examples: ORB, ORB, PHYS, COV, MAN, MAN, PERT, OD, USER
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1093,9 +1133,8 @@ impl OcmMetadata {
     }
 
     // === Time-Related Fields ===
-    /// Spacecraft clock offset at EPOCH_TZERO.
-    ///
-    /// Examples: 0.0
+    /// Defines the number of spacecraft clock counts existing at EPOCH_TZERO. This is only
+    /// used if the SCLK timescale is employed by the user.
     ///
     /// Units: s
     ///
@@ -1112,11 +1151,11 @@ impl OcmMetadata {
             units: None,
         });
     }
-    /// Spacecraft clock scale factor.
+    /// Defines the current number of clock seconds occurring during one SI second. It should be
+    /// noted that this clock rate may vary with time and is the current approximate value.
+    /// This is only used if the SCLK timescale is employed by the user.
     ///
-    /// Examples: 1.0
-    ///
-    /// Units: s/SI-s
+    /// Units: s
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1130,9 +1169,11 @@ impl OcmMetadata {
             units: None,
         });
     }
-    /// Epoch of the previous message. (See 7.5.10 for formatting rules.)
+    /// Creation epoch of the previous message from this originator for this space object. (For
+    /// format specification, see 7.5.10.) NOTE—One may provide the previous message epoch
+    /// without supplying the PREVIOUS_MESSAGE_ID, and vice versa.
     ///
-    /// Examples: 2001-11-06T11:17:33
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1147,9 +1188,11 @@ impl OcmMetadata {
         self.inner.previous_message_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
-    /// Anticipated epoch of the next message. (See 7.5.10 for formatting rules.)
+    /// Anticipated (or actual) epoch of the next message from this originator for this space
+    /// object. (For format specification, see 7.5.10.) NOTE—One may provide the next message
+    /// epoch without supplying the NEXT_MESSAGE_ID, and vice versa.
     ///
-    /// Examples: 2001-11-06T11:17:33
+    /// Examples: 2001-11-07T11:17:33
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1164,9 +1207,10 @@ impl OcmMetadata {
         self.inner.next_message_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
-    /// Time of the earliest data in the message. (See 7.5.10 for formatting rules.)
+    /// Time of the earliest data contained in the OCM, specified as either a relative or
+    /// absolute time tag.
     ///
-    /// Examples: 2001-11-06T11:17:33
+    /// Examples: 2001-11-06T00:00:00
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1181,9 +1225,10 @@ impl OcmMetadata {
         self.inner.start_time = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
-    /// Time of the latest data in the message. (See 7.5.10 for formatting rules.)
+    /// Time of the latest data contained in the OCM, specified as either a relative or absolute
+    /// time tag.
     ///
-    /// Examples: 2001-11-06T11:17:33
+    /// Examples: 2001-11-08T00:00:00
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1198,9 +1243,9 @@ impl OcmMetadata {
         self.inner.stop_time = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
-    /// Approximate time span covered by the data in the message.
-    ///
-    /// Examples: 0.1
+    /// Span of time that the OCM covers, measured in days. TIME_SPAN is defined as
+    /// (STOP_TIME-START_TIME), measured in days, irrespective of whether START_TIME or
+    /// STOP_TIME are provided by the message creator.
     ///
     /// Units: d
     ///
@@ -1217,9 +1262,8 @@ impl OcmMetadata {
             units: None,
         });
     }
-    /// TAI minus UTC difference at EPOCH_TZERO.
-    ///
-    /// Examples: 37.0
+    /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since
+    /// 1958) as modeled by the message originator at epoch 'EPOCH_TZERO'.
     ///
     /// Units: s
     ///
@@ -1236,9 +1280,9 @@ impl OcmMetadata {
             units: None,
         });
     }
-    /// Epoch of the next leap second. (See 7.5.10 for formatting rules.)
+    /// Epoch of next leap second, specified as an absolute time tag.
     ///
-    /// Examples: 2001-11-06T11:17:33
+    /// Examples: 2016-12-31T23:59:60
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1253,9 +1297,9 @@ impl OcmMetadata {
         self.inner.next_leap_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
-    /// TAI minus UTC difference at NEXT_LEAP_EPOCH.
-    ///
-    /// Examples: 38.0
+    /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since
+    /// 1958) incorporated by the message originator at epoch 'NEXT_LEAP_EPOCH'. This keyword
+    /// should be provided if NEXT_LEAP_EPOCH is supplied.
     ///
     /// Units: s
     ///
@@ -1273,9 +1317,7 @@ impl OcmMetadata {
         });
     }
 
-    /// UT1 minus UTC difference at EPOCH_TZERO.
-    ///
-    /// Examples: 0.3
+    /// Difference (UT1 – UTC) in seconds, as modeled by the originator at epoch 'EPOCH_TZERO'.
     ///
     /// Units: s
     ///
@@ -1292,9 +1334,11 @@ impl OcmMetadata {
             units: None,
         });
     }
-    /// Source of Earth Orientation Parameters.
+    /// Free-text field specifying the source and version of the message originator's Earth
+    /// Orientation Parameters (EOP) used in the creation of this message, including leap
+    /// seconds, TAI – UT1, etc.
     ///
-    /// Examples: IERS_A
+    /// Examples: CELESTRAK_20201028
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1306,9 +1350,9 @@ impl OcmMetadata {
         self.inner.eop_source = value;
     }
 
-    /// Interpolation method for EOP data.
+    /// Free-text field specifying the method used to select or interpolate sequential EOP data.
     ///
-    /// Examples: HERMITE, LINEAR
+    /// Examples: PRECEDING_VALUE, NEAREST_NEIGHBOR, LINEAR, LAGRANGE_ORDER_5
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1320,9 +1364,10 @@ impl OcmMetadata {
         self.inner.interp_method_eop = value;
     }
 
-    /// Source of celestial body ephemerides.
+    /// Free-text field specifying the source and version of the message originator's celestial
+    /// body (e.g., Sun/Earth/Planetary) ephemeris data used in the creation of this message.
     ///
-    /// Examples: JPL_DE430
+    /// Examples: JPL_DE_FILES
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1476,9 +1521,6 @@ impl OcmData {
 
 /// A block of trajectory state data, which can be a time history of states.
 ///
-/// References:
-/// - CCSDS 502.0-B-3, Section 4.5.2 (OCM Trajectory State Section)
-///
 /// Parameters
 /// ----------
 /// center_name : str
@@ -1616,10 +1658,18 @@ impl OcmTrajState {
         )
     }
 
-    /// Name of the central body (value to be drawn from the SANA registry list of Common Central Body
-    /// Names at <https://sanaregistry.org/r/central_body_name>).
+    /// Origin of the orbit reference frame, which may be a natural solar system body (planets,
+    /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
+    /// system barycenter, or another reference frame center (such as a spacecraft, formation
+    /// flying reference 'chief' spacecraft, etc.). Natural bodies shall be selected from the
+    /// accepted set of values indicated in annex B, subsection B2. For spacecraft, it is
+    /// recommended to use either the 'OBJECT_NAME' or 'INTERNATIONAL_DESIGNATOR' of the
+    /// participant as catalogued in the UN Office of Outer Space Affairs designator index
+    /// (reference [3]). Alternately, the 'OBJECT_DESIGNATOR' may be used. For other reference
+    /// frame origins, this field is a free-text descriptor which may draw upon other naming
+    /// conventions and sources.
     ///
-    /// Examples: EARTH, MOON
+    /// Examples: EARTH, MOON, ISS, EROS
     ///
     /// :type: str
     #[getter]
@@ -1631,10 +1681,10 @@ impl OcmTrajState {
         self.inner.center_name = value;
     }
 
-    /// Orbit reference frame (value to be drawn from the SANA registry list of Reference Frames at
-    /// <https://sanaregistry.org/r/orbit_relative_reference_frames>).
+    /// Reference frame of the trajectory state time history. Select from the accepted set of
+    /// values indicated in annex B, subsection B4.
     ///
-    /// Examples: ICRF, EME2000
+    /// Examples: ICRF3, J2000
     ///
     /// :type: str
     #[getter]
@@ -1646,10 +1696,9 @@ impl OcmTrajState {
         self.inner.traj_ref_frame = value;
     }
 
-    /// Specification of the trajectory state element set type (value to be drawn from the SANA
-    /// registry list of Trajectory State Types at <https://sanaregistry.org/r/orbital_elements>).
+    /// Specifies the trajectory state type; selected per annex B, subsection B7.
     ///
-    /// Examples: CARTESIAN
+    /// Examples: CARTP, CARTPV
     ///
     /// :type: str
     #[getter]
@@ -1677,7 +1726,9 @@ impl OcmTrajState {
         self.inner.traj_lines = value.into_iter().map(|t| t.inner).collect();
     }
 
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (a contiguous set of one or more comment lines may be provided in the
+    /// Trajectory State Time History section only immediately after the TRAJ_START keyword;
+    /// see 7.8 for comment formatting rules).
     ///
     /// :type: list[str]
     #[getter]
@@ -1690,9 +1741,10 @@ impl OcmTrajState {
     }
 
     // === Trajectory ID Fields ===
-    /// Identification number for this trajectory state time history block.
+    /// Free-text field containing the identification number for this trajectory state time
+    /// history block.
     ///
-    /// Examples: 1
+    /// Examples: TRAJ_20160402_XYZ
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1704,9 +1756,13 @@ impl OcmTrajState {
         self.inner.traj_id = value;
     }
 
-    /// Identification number for the previous trajectory state time history.
+    /// Free-text field containing the identification number for the previous trajectory state
+    /// time history, contained either within this message or presented in a previous OCM.
+    /// NOTE—If this message is not part of a sequence of orbit time histories or if this
+    /// trajectory state time history is the first in a sequence of orbit time histories, then
+    /// TRAJ_PREV_ID should be excluded from this message.
     ///
-    /// Examples: 0
+    /// Examples: ORB20160305A
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1718,9 +1774,13 @@ impl OcmTrajState {
         self.inner.traj_prev_id = value;
     }
 
-    /// Identification number for the next trajectory state time history.
+    /// Free-text field containing the identification number for the next trajectory state
+    /// time history, contained either within this message, or presented in a future OCM.
+    /// NOTE—If this message is not part of a sequence of orbit time histories or if this
+    /// trajectory state time history is the last in a sequence of orbit time histories, then
+    /// TRAJ_NEXT_ID should be excluded from this message.
     ///
-    /// Examples: 2
+    /// Examples: ORB20160305C
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1732,7 +1792,14 @@ impl OcmTrajState {
         self.inner.traj_next_id = value;
     }
 
-    /// Basis of this trajectory state time history data (e.g., PREDICTED, DETERMINED, SIMULATED).
+    /// The basis of this trajectory state time history data. This is a free-text field with the
+    /// following suggested values: a) 'PREDICTED'. b) 'DETERMINED' when estimated from
+    /// observation-based orbit determination, reconstruction, and/or calibration. For
+    /// definitive OD performed onboard spacecraft whose solutions have been telemetered to the
+    /// ground for inclusion in an OCM, the TRAJ_BASIS shall be DETERMINED. c) 'TELEMETRY' when
+    /// the trajectory states are read directly from telemetry, for example, based on inertial
+    /// navigation systems or GNSS data. d) 'SIMULATED' for generic simulations, future mission
+    /// design studies, and optimization studies. e) 'OTHER' for other bases of this data.
     ///
     /// Examples: PREDICTED
     ///
@@ -1750,10 +1817,13 @@ impl OcmTrajState {
         Ok(())
     }
 
-    /// Identification number for the telemetry dataset, orbit determination, or simulation upon
-    /// which the TRAJ_BASIS is based.
+    /// Free-text field containing the identification number for the telemetry dataset, orbit
+    /// determination, navigation solution, or simulation upon which this trajectory state time
+    /// history block is based. When a matching orbit determination block accompanies this
+    /// trajectory state time history, the TRAJ_BASIS_ID should match the corresponding OD_ID
+    /// (see table 6-11).
     ///
-    /// Examples: OD-123
+    /// Examples: OD_5910
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1766,10 +1836,12 @@ impl OcmTrajState {
     }
 
     // === Interpolation/Propagation Fields ===
-    /// Recommended interpolation method for the state elements (value to be drawn from the SANA
-    /// registry list of Interpolation Methods at <https://sanaregistry.org/r/interpolation_methods>).
+    /// This keyword may be used to specify the recommended interpolation method for ephemeris
+    /// data in the immediately following set of ephemeris lines. PROPAGATE indicates that orbit
+    /// propagation is the preferred method to obtain states at intermediate times, via either
+    /// a midpoint-switching or endpoint switching approach.
     ///
-    /// Examples: HERMITE, LINEAR
+    /// Examples: HERMITE, LINEAR, LAGRANGE, PROPAGATE
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1781,9 +1853,11 @@ impl OcmTrajState {
         self.inner.interpolation = value;
     }
 
-    /// Recommended interpolation degree for the state elements.
+    /// Recommended interpolation degree for ephemeris data in the immediately following set of
+    /// ephemeris lines. Must be an integer value. This keyword must be provided if the
+    /// 'INTERPOLATION' keyword is used and set to anything other than PROPAGATE.
     ///
-    /// Examples: 5
+    /// Examples: 5, 1
     ///
     /// :type: Optional[int]
     #[getter]
@@ -1795,9 +1869,10 @@ impl OcmTrajState {
         self.inner.interpolation_degree = value;
     }
 
-    /// Name of the propagator used in the creation of the trajectory state data.
+    /// Free-text field containing the name of the orbit propagator used to create this
+    /// trajectory state time history.
     ///
-    /// Examples: GMAT, STK
+    /// Examples: HPOP, SP, SGP4
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1810,10 +1885,10 @@ impl OcmTrajState {
     }
 
     // === Frame/Time Fields ===
-    /// Epoch of the orbit reference frame, if TRAJ_REF_FRAME is provided and its epoch is not
-    /// intrinsic to the definition of the reference frame.
+    /// Epoch of the orbit data reference frame, if not intrinsic to the definition of the
+    /// reference frame. (See 7.5.10 for formatting rules.)
     ///
-    /// Examples: 2000-01-01T12:00:00Z
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1829,9 +1904,15 @@ impl OcmTrajState {
         Ok(())
     }
 
-    /// Start time of the useable time span covered by the ephemeris data.
+    /// Start time of USEABLE time span covered by ephemeris data immediately following this
+    /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
+    /// allows the message creator to introduce fictitious (but numerically smooth) data nodes
+    /// following the actual data time history to support interpolation methods requiring more
+    /// than two nodes (e.g., pure higher-order Lagrange interpolation methods). The use of this
+    /// keyword and introduction of fictitious node points are optional and may not be necessary.
+    /// 2. If this keyword is not supplied, then all data shall be assumed to be valid.
     ///
-    /// Examples: 2000-01-01T12:00:00Z
+    /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1847,9 +1928,15 @@ impl OcmTrajState {
         Ok(())
     }
 
-    /// Stop time of the useable time span covered by the ephemeris data.
+    /// Stop time of USEABLE time span covered by ephemeris data immediately following this
+    /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
+    /// allows the message creator to introduce fictitious (but numerically smooth) data nodes
+    /// following the actual data time history to support interpolation methods requiring more
+    /// than two nodes (e.g., pure higher-order Lagrange interpolation methods). The use of this
+    /// keyword and introduction of fictitious node points are optional and may not be necessary.
+    /// 2. If this keyword is not supplied, then all data shall be assumed to be valid.
     ///
-    /// Examples: 2000-01-02T12:00:00Z
+    /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1866,9 +1953,12 @@ impl OcmTrajState {
     }
 
     // === Orbit Revolution Fields ===
-    /// Integer orbit revolution number at the epoch of the first trajectory data line.
+    /// The integer orbit revolution number associated with the first trajectory state in this
+    /// trajectory state time history block. NOTE—The first ascending node crossing that occurs
+    /// AFTER launch or deployment is designated to be the beginning of orbit revolution number
+    /// = one ('1').
     ///
-    /// Examples: 1234.0
+    /// Examples: 1500, 30007
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1880,9 +1970,16 @@ impl OcmTrajState {
         self.inner.orb_revnum = value;
     }
 
-    /// Basis for the orbit revolution counter (0 or 1).
+    /// Specifies the message creator's basis for their orbit revolution counter, with '0',
+    /// designating that the first launch or deployment trajectory state corresponds to a
+    /// revolution number of 0.XXXX, where XXXX represents the fraction of an orbit revolution
+    /// measured from the equatorial plane, and orbit revolution 1.0 begins at the very next
+    /// (subsequent) ascending node passage; '1', designating that the first launch or
+    /// deployment trajectory state corresponds to a revolution number of 1.XXXX, and orbit
+    /// revolution 2.0 begins at the very next ascending node passage. This keyword shall be
+    /// provided if ORB_REVNUM is specified.
     ///
-    /// Examples: 1
+    /// Examples: 0, 1
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1900,10 +1997,18 @@ impl OcmTrajState {
             .map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
-    /// Method used for orbit averaging if TRAJ_TYPE is not osculating (value to be drawn from the SANA
-    /// registry list of Orbit Averaging Methods at <https://sanaregistry.org/r/orbit_averaging>).
+    /// If orbital elements are provided, specifies whether those elements are osculating
+    /// elements or mean elements, and if mean elements, which mean element definition is
+    /// employed. The intent of this field is to allow the user to correctly interpret how to
+    /// use the provided orbit elements and know how to use them operationally. This field is
+    /// not required if one of the orbital element types selected by the "TRAJ_TYPE" keyword is
+    /// Cartesian (e.g., CARTP, CARTPV, or CARTPVA) or spherical elements (e.g., LDBARV, ADBARV,
+    /// or GEODETIC). Values should be selected from the accepted set indicated in annex B,
+    /// subsection B13. If an alternate single- or double-averaging formulation other than that
+    /// provided is used, the user may name it as mutually agreed upon by message exchange
+    /// participants.
     ///
-    /// Examples: BROUWER-LYDDANE
+    /// Examples: OSCULATING, BROUWER, KOZAI
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1915,9 +2020,15 @@ impl OcmTrajState {
         self.inner.orb_averaging = value;
     }
 
-    /// SI unit designations for the state elements.
+    /// A comma-delimited set of SI unit designations for each element of the trajectory state
+    /// time history following the trajectory state time tag solely for informational purposes,
+    /// provided as a free-text field enclosed in square brackets. When provided, each
+    /// trajectory state element shall have a corresponding units entry, with non-dimensional
+    /// values (such as orbit eccentricity) denoted by 'n/a'. NOTE—The listing of units via the
+    /// TRAJ_UNITS keyword does not override the mandatory units specified for the selected
+    /// TRAJ_TYPE (links to the relevant SANA registries provided in annex B, subsection B7).
     ///
-    /// Examples: km, km/s
+    /// Examples: [km,km,km,km/s,km/s,km/s], [km,n/a,deg, deg, deg, deg]
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2285,9 +2396,9 @@ impl OcmPhysicalDescription {
         )
     }
 
-    /// Free-text field containing the satellite manufacturer’s name.
+    /// Free-text field containing the satellite manufacturer's name.
     ///
-    /// Examples: Boeing, Lockheed Martin
+    /// Examples: BOEING
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2299,7 +2410,9 @@ impl OcmPhysicalDescription {
         self.inner.manufacturer = value;
     }
 
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (a contiguous set of one or more comment lines may be provided in the OCM Space
+    /// Object Physical Characteristics only immediately after the PHYS_START keyword; see 7.8
+    /// for comment formatting rules).
     ///
     /// :type: list[str]
     #[getter]
@@ -2313,9 +2426,9 @@ impl OcmPhysicalDescription {
     }
 
     // === Bus Information ===
-    /// Free-text field containing the satellite manufacturer’s spacecraft bus model name.
+    /// Free-text field containing the satellite manufacturer's spacecraft bus model name.
     ///
-    /// Examples: LS-1300, A2100
+    /// Examples: 702
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2327,10 +2440,10 @@ impl OcmPhysicalDescription {
         self.inner.bus_model = value;
     }
 
-    /// Free-text field containing a comma-separated list of other space objects that this object is
-    /// docked to.
+    /// Free-text field containing a comma-separated list of other space objects that this
+    /// object is docked to.
     ///
-    /// Examples: 2021-098A, 2021-098B
+    /// Examples: ISS
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2343,10 +2456,10 @@ impl OcmPhysicalDescription {
     }
 
     // === Drag Properties (Area in m**2) ===
-    /// Attitude-independent drag cross-sectional area (AD) facing the relative wind vector, not
-    /// already incorporated into the attitude-dependent ‘AREA_ALONG_OEB’ parameters.
+    /// Attitude-independent drag cross-sectional area (AD) facing the relative wind vector,
+    /// not already incorporated into the attitude-dependent 'AREA_ALONG_OEB' parameters.
     ///
-    /// Examples: 2.0
+    /// Examples: 2.5
     ///
     /// Units: m²
     ///
@@ -2364,8 +2477,8 @@ impl OcmPhysicalDescription {
         });
     }
 
-    /// Nominal drag Coefficient (CD NOM). If the atmospheric drag coefficient, CD, is set to zero, no
-    /// atmospheric drag shall be considered.
+    /// Nominal drag Coefficient (CD Nom). If the atmospheric drag coefficient, CD, is set to
+    /// zero, no atmospheric drag shall be considered.
     ///
     /// Examples: 2.2
     ///
@@ -2380,11 +2493,11 @@ impl OcmPhysicalDescription {
     }
 
     /// Drag coefficient one sigma (1σ) percent uncertainty, where the actual range of drag
-    /// coefficients to within 1σ shall be obtained from \[1.0 ± 0.01*DRAG_UNCERTAINTY\] (CD NOM). This
-    /// factor is intended to allow operators to supply the nominal ballistic coefficient components
-    /// while accommodating ballistic coefficient uncertainties.
+    /// coefficients to within 1σ shall be obtained from [1.0 ± DRAG_UNCERTAINTY/100.0] * (CD
+    /// Nom). This factor is intended to allow operators to supply the nominal ballistic
+    /// coefficient components while accommodating ballistic coefficient uncertainties.
     ///
-    /// Examples: 5.0
+    /// Examples: 10.0
     ///
     /// Units: %
     ///
@@ -2403,10 +2516,8 @@ impl OcmPhysicalDescription {
     }
 
     // === SRP Properties ===
-    /// Attitude-independent solar radiation pressure cross-sectional area (AR) facing the Sun, not
-    /// already incorporated into the attitude-dependent ‘AREA_ALONG_OEB’ parameters.
-    ///
-    /// Examples: 5.0
+    /// Attitude-independent solar radiation pressure cross-sectional area (AR) facing the Sun,
+    /// not already incorporated into the attitude-dependent ‘AREA_ALONG_OEB’ parameters.
     ///
     /// Units: m²
     ///
@@ -2424,10 +2535,8 @@ impl OcmPhysicalDescription {
         });
     }
 
-    /// Nominal Solar Radiation Pressure Coefficient (CR NOM). If the solar radiation coefficient, CR,
-    /// is set to zero, no solar radiation pressure shall be considered.
-    ///
-    /// Examples: 1.2
+    /// Nominal Solar Radiation Pressure Coefficient (CR NOM). If the solar radiation
+    /// coefficient, CR, is set to zero, no solar radiation pressure shall be considered.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2439,12 +2548,10 @@ impl OcmPhysicalDescription {
         self.inner.solar_rad_coeff = value;
     }
 
-    /// SRP one sigma (1σ) percent uncertainty, where the actual range of SRP coefficients to within
-    /// 1σ shall be obtained from \[1.0 ± 0.01*SRP_UNCERTAINTY\] (CR NOM). This factor is intended to
-    /// allow operators to supply the nominal ballistic coefficient components while accommodating
-    /// ballistic coefficient uncertainties.
-    ///
-    /// Examples: 10.0
+    /// SRP one sigma (1σ) percent uncertainty, where the actual range of SRP coefficients to
+    /// within 1σ shall be obtained from [1.0 ± 0.01*SRP_UNCERTAINTY] (CR NOM). This factor is
+    /// intended to allow operators to supply the nominal ballistic coefficient components
+    /// while accommodating ballistic coefficient uncertainties.
     ///
     /// Units: %
     ///
@@ -2465,7 +2572,7 @@ impl OcmPhysicalDescription {
     // === Mass Properties (kg) ===
     /// Space object total mass at beginning of life.
     ///
-    /// Examples: 1000.0
+    /// Examples: 500
     ///
     /// Units: kg
     ///
@@ -2482,10 +2589,10 @@ impl OcmPhysicalDescription {
             units: None,
         });
     }
-    /// Space object total mass (including propellant, i.e., ‘wet mass’) at the current reference epoch
-    /// ‘EPOCH_TZERO’.
+    /// Space object total mass (including propellant, i.e., 'wet mass') at the current
+    /// reference epoch 'EPOCH_TZERO'.
     ///
-    /// Examples: 950.0
+    /// Examples: 472.3
     ///
     /// Units: kg
     ///
@@ -2504,7 +2611,7 @@ impl OcmPhysicalDescription {
     }
     /// Space object dry mass (without propellant).
     ///
-    /// Examples: 500.0
+    /// Examples: 300
     ///
     /// Units: kg
     ///
@@ -2523,11 +2630,12 @@ impl OcmPhysicalDescription {
     }
 
     // === OEB (Optimally Enclosing Box) Fields ===
-    /// Parent reference frame that maps to the OEB frame via the quaternion-based transformation
-    /// defined in annex F, subsection F1. Select from the accepted set of values indicated in annex
-    /// B, subsections B4 and B5. This keyword shall be provided if OEB_Q1,2,3,qc are specified.
+    /// Parent reference frame that maps to the OEB frame via the quaternion-based
+    /// transformation defined in annex F, subsection F1. Select from the accepted set of
+    /// values indicated in B, subsections B4 and B5. This keyword shall be provided if
+    /// OEB_Q1,2,3,4 are specified.
     ///
-    /// Examples: ICRF, EME2000
+    /// Examples: ITRF1997
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2538,10 +2646,10 @@ impl OcmPhysicalDescription {
     fn set_oeb_parent_frame(&mut self, value: Option<String>) {
         self.inner.oeb_parent_frame = value;
     }
-    /// Epoch of the OEB parent frame, if OEB_PARENT_FRAME is provided and its epoch is not intrinsic
-    /// to the definition of the reference frame.
+    /// Epoch of the OEB parent frame, if OEB_PARENT_FRAME is provided and its epoch is not
+    /// intrinsic to the definition of the reference frame. (See 7.5.10 for formatting rules.)
     ///
-    /// Examples: 2000-01-01T12:00:00Z
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2556,12 +2664,12 @@ impl OcmPhysicalDescription {
         self.inner.oeb_parent_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
-    /// q1 = e1 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e1 = 1st component
-    /// of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to
-    /// the frame aligned with the OEB (defined in annex F, subsection F1). A value of ‘-999’ denotes
-    /// a tumbling space object.
+    /// q1 = e1 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e1 = 1st
+    /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
+    /// (defined above) to the frame aligned with the OEB (defined in annex F, subsection F1).
+    /// A value of '-999' denotes a tumbling space object.
     ///
-    /// Examples: 0.0
+    /// Examples: -0.575131822
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2572,12 +2680,12 @@ impl OcmPhysicalDescription {
     fn set_oeb_q1(&mut self, value: Option<f64>) {
         self.inner.oeb_q1 = value;
     }
-    /// q2 = e2 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e2 = 2nd component
-    /// of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to
-    /// the frame aligned with the Optimally Encompassing Box (defined in annex F, subsection F1). A
-    /// value of ‘-999’ denotes a tumbling space object.
+    /// q2 = e2 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e2 = 2nd
+    /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
+    /// (defined above) to the frame aligned with the Optimally Encompassing Box (defined in
+    /// annex F, subsection F1). A value of '-999' denotes a tumbling space object.
     ///
-    /// Examples: 0.0
+    /// Examples: -0.280510532
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2588,12 +2696,12 @@ impl OcmPhysicalDescription {
     fn set_oeb_q2(&mut self, value: Option<f64>) {
         self.inner.oeb_q2 = value;
     }
-    /// q3 = e3 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e3 = 3rd component
-    /// of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME (defined above) to
-    /// the frame aligned with the Optimally Encompassing Box (defined in annex F, subsection F1). A
-    /// value of ‘-999’ denotes a tumbling space object.
+    /// q3 = e3 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e3 = 3rd
+    /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
+    /// (defined above) to the frame aligned with the Optimally Encompassing Box (defined in
+    /// annex F, subsection F1). A value of '-999' denotes a tumbling space object.
     ///
-    /// Examples: 0.0
+    /// Examples: -0.195634856
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2604,12 +2712,12 @@ impl OcmPhysicalDescription {
     fn set_oeb_q3(&mut self, value: Option<f64>) {
         self.inner.oeb_q3 = value;
     }
-    /// qc = cos(φ/2), where per reference [H1], φ = the Euler rotation angle for the rotation that
-    /// maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the Optimally
-    /// Encompassing Box (annex F, subsection F1). qc shall be made non-negative by convention. A
-    /// value of ‘-999’ denotes a tumbling space object.
+    /// qc = cos(φ/2), where per reference [H1], φ = the Euler rotation angle for the rotation
+    /// that maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the
+    /// Optimally Encompassing Box (annex F, subsection F1). qc shall be made non-negative by
+    /// convention. A value of '-999' denotes a tumbling space object.
     ///
-    /// Examples: 1.0
+    /// Examples: 0.743144825
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2622,7 +2730,7 @@ impl OcmPhysicalDescription {
     }
     /// Maximum physical dimension (along Xoeb) of the OEB.
     ///
-    /// Examples: 10.0
+    /// Examples: 1
     ///
     /// Units: m
     ///
@@ -2641,7 +2749,7 @@ impl OcmPhysicalDescription {
     }
     /// Intermediate physical dimension (along Ŷoeb) of OEB normal to OEB_MAX direction.
     ///
-    /// Examples: 5.0
+    /// Examples: 0.5
     ///
     /// Units: m
     ///
@@ -2658,10 +2766,10 @@ impl OcmPhysicalDescription {
             units: None,
         });
     }
-    /// Minimum physical dimension (along Ẑoeb) of OEB in direction normal to both OEB_MAX and OEB_INT
-    /// directions.
+    /// Minimum physical dimension (along Ẑoeb) of OEB in direction normal to both OEB_MAX and
+    /// OEB_INT directions.
     ///
-    /// Examples: 2.0
+    /// Examples: 0.3
     ///
     /// Units: m
     ///
@@ -2679,10 +2787,10 @@ impl OcmPhysicalDescription {
         });
     }
     /// Attitude-dependent cross-sectional area of space object (not already included in
-    /// DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along max OEB (Xoeb) direction as defined in
-    /// annex F.
+    /// DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along max OEB (Xoeb) direction as
+    /// defined in annex F.
     ///
-    /// Examples: 10.0
+    /// Examples: 0.15
     ///
     /// Units: m²
     ///
@@ -2700,10 +2808,10 @@ impl OcmPhysicalDescription {
         });
     }
     /// Attitude-dependent cross-sectional area of space object (not already included in
-    /// DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along intermediate OEB (Ŷoeb) direction as
-    /// defined in annex F.
+    /// DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along intermediate OEB (Ŷoeb) direction
+    /// as defined in annex F.
     ///
-    /// Examples: 20.0
+    /// Examples: 0.3
     ///
     /// Units: m²
     ///
@@ -2721,10 +2829,10 @@ impl OcmPhysicalDescription {
         });
     }
     /// Attitude-dependent cross-sectional area of space object (not already included in
-    /// DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along minimum OEB (Ẑoeb) direction as defined
-    /// in annex F.
+    /// DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along minimum OEB (Ẑoeb) direction as
+    /// defined in annex F.
     ///
-    /// Examples: 50.0
+    /// Examples: 0.5
     ///
     /// Units: m²
     ///
@@ -2745,7 +2853,7 @@ impl OcmPhysicalDescription {
     // === Collision Properties ===
     /// Minimum cross-sectional area for collision probability estimation purposes.
     ///
-    /// Examples: 5.0
+    /// Examples: 1.0
     ///
     /// Units: m²
     ///
@@ -2764,7 +2872,7 @@ impl OcmPhysicalDescription {
     }
     /// Maximum cross-sectional area for collision probability estimation purposes.
     ///
-    /// Examples: 50.0
+    /// Examples: 1.0
     ///
     /// Units: m²
     ///
@@ -2781,10 +2889,8 @@ impl OcmPhysicalDescription {
             units: None,
         });
     }
-    /// Typical (50th percentile) cross-sectional area sampled over all space object orientations for
-    /// collision probability estimation purposes.
-    ///
-    /// Examples: 15.0
+    /// Typical (50th percentile) cross-sectional area sampled over all space object
+    /// orientations for collision probability estimation purposes.
     ///
     /// Units: m²
     ///
@@ -2802,10 +2908,8 @@ impl OcmPhysicalDescription {
         });
     }
 
-    /// Typical (50th percentile) effective Radar Cross Section of the space object sampled over all
-    /// possible viewing angles.
-    ///
-    /// Examples: 10.0
+    /// Typical (50th percentile) effective Radar Cross Section of the space object sampled
+    /// over all possible viewing angles.
     ///
     /// Units: m²
     ///
@@ -2824,8 +2928,6 @@ impl OcmPhysicalDescription {
     }
     /// Minimum Radar Cross Section observed for this object.
     ///
-    /// Examples: 1.0
-    ///
     /// Units: m²
     ///
     /// :type: Optional[float]
@@ -2842,8 +2944,6 @@ impl OcmPhysicalDescription {
         });
     }
     /// Maximum Radar Cross Section observed for this object.
-    ///
-    /// Examples: 100.0
     ///
     /// Units: m²
     ///
@@ -2862,11 +2962,13 @@ impl OcmPhysicalDescription {
     }
 
     // === Visual Magnitude ===
-    /// Typical (50th percentile) absolute Visual Magnitude of the space object sampled over all
-    /// possible viewing angles and ‘normalized’ as specified in informative annex F, subsection F2 to
-    /// a 1 AU Sun-to-target distance, a phase angle of 0°, and a 40,000 km target-to-sensor distance.
+    /// Typical (50th percentile) Visual Magnitude of the space object sampled over all
+    /// possible viewing angles and sampled over all possible viewing angles and ‘normalized’
+    /// as specified in informative annex F, subsection F2 to a 1 AU Sun-to-target distance,
+    /// a phase angle of 0°, and a 40,000 km target-to-sensor distance (equivalent of GEO
+    /// satellite tracked at 15.6° above local horizon).
     ///
-    /// Examples: 4.5
+    /// Examples: 15.0
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2880,7 +2982,7 @@ impl OcmPhysicalDescription {
 
     /// Typical (50th percentile) apparent Visual Magnitude observed for this space object.
     ///
-    /// Examples: 12.0
+    /// Examples: 15.0
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2892,10 +2994,9 @@ impl OcmPhysicalDescription {
         self.inner.vm_apparent = value;
     }
 
-    /// Minimum apparent Visual Magnitude observed for this space object. The ‘MIN’ value represents
-    /// the brightest observation, which associates with a lower Vmag.
+    /// Minimum apparent Visual Magnitude observed for this space object.
     ///
-    /// Examples: 3.0
+    /// Examples: 19.0
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2907,10 +3008,10 @@ impl OcmPhysicalDescription {
         self.inner.vm_apparent_min = value;
     }
 
-    /// Maximum apparent Visual Magnitude observed for this space object. The ‘MAX’ value represents
-    /// the dimmest observation, which associates with a higher Vmag.
+    /// Maximum apparent Visual Magnitude observed for this space object. NOTE—The 'MAX' value
+    /// represents the brightest observation, which associates with a lower Vmag.
     ///
-    /// Examples: 18.0
+    /// Examples: 16.0
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2922,10 +3023,10 @@ impl OcmPhysicalDescription {
         self.inner.vm_apparent_max = value;
     }
 
-    /// Typical (50th percentile) coefficient of REFLECTANCE of the space object over all possible
-    /// viewing angles, ranging from 0 (none) to 1 (perfect reflectance).
+    /// Typical (50th percentile) coefficient of REFLECTANCE of the space object over all
+    /// possible viewing angles, ranging from 0 (none) to 1 (perfect reflectance).
     ///
-    /// Examples: 0.2
+    /// Examples: 0.7
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2940,8 +3041,9 @@ impl OcmPhysicalDescription {
 
     // === Attitude Control ===
     /// Free-text specification of primary mode of attitude control for the space object.
+    /// Suggested examples include: THREE_AXIS, SPIN, DUAL_SPIN, TUMBLING, GRAVITY_GRADIENT
     ///
-    /// Examples: THREE_AXIS, SPIN, DUAL_SPIN, TUMBLING, GRAVITY_GRADIENT
+    /// Examples: SPIN
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2953,10 +3055,11 @@ impl OcmPhysicalDescription {
         self.inner.att_control_mode = value;
     }
 
-    /// Free-text specification of type of actuator for attitude control.
-    ///
-    /// Examples: ATT_THRUSTERS, ACTIVE_MAG_TORQUE, PASSIVE_MAG_TORQUE, REACTION_WHEELS,
+    /// Free-text specification of type of actuator for attitude control. Suggested examples
+    /// include: ATT_THRUSTERS, ACTIVE_MAG_TORQUE, PASSIVE_MAG_TORQUE, REACTION_WHEELS,
     /// MOMENTUM_WHEELS, CONTROL_MOMENT_GYROSCOPE, NONE, OTHER
+    ///
+    /// Examples: ATT_THRUSTERS
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2970,7 +3073,7 @@ impl OcmPhysicalDescription {
 
     /// Accuracy of attitude knowledge.
     ///
-    /// Examples: 0.01
+    /// Examples: 0.3
     ///
     /// Units: deg
     ///
@@ -2988,10 +3091,10 @@ impl OcmPhysicalDescription {
         });
     }
 
-    /// Accuracy of attitude control system (ACS) to maintain attitude, assuming attitude knowledge
-    /// was perfect (i.e., deadbands).
+    /// Accuracy of attitude control system (ACS) to maintain attitude, assuming attitude
+    /// knowledge was perfect (i.e., deadbands).
     ///
-    /// Examples: 0.1
+    /// Examples: 2.0
     ///
     /// Units: deg
     ///
@@ -3009,10 +3112,10 @@ impl OcmPhysicalDescription {
         });
     }
 
-    /// Overall accuracy of spacecraft to maintain attitude, including attitude knowledge errors and
-    /// ACS operation.
+    /// Overall accuracy of spacecraft to maintain attitude, including attitude knowledge
+    /// errors and ACS operation.
     ///
-    /// Examples: 0.5
+    /// Examples: 2.3
     ///
     /// Units: deg
     ///
@@ -3031,10 +3134,10 @@ impl OcmPhysicalDescription {
     }
 
     // === Maneuver Capabilities ===
-    /// Average maneuver frequency, measured in the number of orbit- or attitude-adjust maneuvers per
-    /// year.
+    /// Average maneuver frequency, measured in the number of orbit- or attitude-adjust
+    /// maneuvers per year.
     ///
-    /// Examples: 52.0
+    /// Examples: 20.0
     ///
     /// Units: #/yr
     ///
@@ -3051,9 +3154,10 @@ impl OcmPhysicalDescription {
             units: None,
         });
     }
-    /// Maximum composite thrust the spacecraft can accomplish in any single body-fixed direction.
+    /// Maximum composite thrust the spacecraft can accomplish in any single body-fixed
+    /// direction.
     ///
-    /// Examples: 100.0
+    /// Examples: 1.0
     ///
     /// Units: N
     ///
@@ -3072,7 +3176,7 @@ impl OcmPhysicalDescription {
     }
     /// Total ΔV capability of the spacecraft at beginning of life.
     ///
-    /// Examples: 2.0
+    /// Examples: 1.0
     ///
     /// Units: km/s
     ///
@@ -3091,7 +3195,7 @@ impl OcmPhysicalDescription {
     }
     /// Total ΔV remaining for the spacecraft.
     ///
-    /// Examples: 1.5
+    /// Examples: 0.2
     ///
     /// Units: km/s
     ///
@@ -3110,9 +3214,10 @@ impl OcmPhysicalDescription {
     }
 
     // === Moments of Inertia ===
-    /// Moment of Inertia about the X-axis of the space object’s primary body frame.
+    /// Moment of Inertia about the X-axis of the space object's primary body frame (e.g.,
+    /// SC_Body_1) (see reference [H1]).
     ///
-    /// Examples: 100.0
+    /// Examples: 1000.0
     ///
     /// Units: kg·m²
     ///
@@ -3132,7 +3237,7 @@ impl OcmPhysicalDescription {
 
     /// Moment of Inertia about the Y-axis.
     ///
-    /// Examples: 200.0
+    /// Examples: 800.0
     ///
     /// Units: kg·m²
     ///
@@ -3152,7 +3257,7 @@ impl OcmPhysicalDescription {
 
     /// Moment of Inertia about the Z-axis.
     ///
-    /// Examples: 300.0
+    /// Examples: 400.0
     ///
     /// Units: kg·m²
     ///
@@ -3172,7 +3277,7 @@ impl OcmPhysicalDescription {
 
     /// Inertia Cross Product of the X & Y axes.
     ///
-    /// Examples: 1.0
+    /// Examples: 20.0
     ///
     /// Units: kg·m²
     ///
@@ -3192,7 +3297,7 @@ impl OcmPhysicalDescription {
 
     /// Inertia Cross Product of the X & Z axes.
     ///
-    /// Examples: 2.0
+    /// Examples: 40.0
     ///
     /// Units: kg·m²
     ///
@@ -3212,7 +3317,7 @@ impl OcmPhysicalDescription {
 
     /// Inertia Cross Product of the Y & Z axes.
     ///
-    /// Examples: 3.0
+    /// Examples: 60.0
     ///
     /// Units: kg·m²
     ///
@@ -3343,9 +3448,10 @@ impl OcmCovarianceMatrix {
         )
     }
 
-    /// Identification number for this covariance time history block.
+    /// Free-text field containing the identification number for this covariance time history
+    /// block.
     ///
-    /// Examples: 1
+    /// Examples: COV_20160402_XYZ
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3357,9 +3463,13 @@ impl OcmCovarianceMatrix {
         self.inner.cov_id = value;
     }
 
-    /// Identification number for the previous covariance time history.
+    /// Free-text field containing the identification number for the previous covariance time
+    /// history, contained either within this message or presented in a previous OCM. NOTE—If
+    /// this message is not part of a sequence of covariance time histories or if this
+    /// covariance time history is the first in a sequence of covariance time histories, then
+    /// COV_PREV_ID should be excluded from this message.
     ///
-    /// Examples: 0
+    /// Examples: COV_20160305a
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3371,9 +3481,13 @@ impl OcmCovarianceMatrix {
         self.inner.cov_prev_id = value;
     }
 
-    /// Identification number for the next covariance time history.
+    /// Free-text field containing the identification number for the next covariance time
+    /// history, contained either within this message, or presented in a future OCM. NOTE—If
+    /// this message is not part of a sequence of covariance time histories or if this
+    /// covariance time history is the last in a sequence of covariance time histories, then
+    /// COV_NEXT_ID should be excluded from this message.
     ///
-    /// Examples: 2
+    /// Examples: COV_20160305C
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3384,19 +3498,28 @@ impl OcmCovarianceMatrix {
     fn set_cov_next_id(&mut self, value: Option<String>) {
         self.inner.cov_next_id = value;
     }
-    /// Basis of this covariance time history data (e.g., PREDICTED, DETERMINED).
+    /// Basis of this covariance time history data. This is free-text field with the following
+    /// suggested values: a) 'PREDICTED'. b) 'DETERMINED' when estimated from observation-based
+    /// orbit determination, reconstruction and/or calibration. For definitive OD performed
+    /// onboard whose solutions have been telemetered to the ground for inclusion in an OCM,
+    /// the COV_BASIS shall be considered to be DETERMINED. c) EMPIRICAL (for empirically
+    /// determined such as overlap analyses). d) SIMULATED for simulation-based (including
+    /// Monte Carlo) estimations, future mission design studies, and optimization studies. e)
+    /// 'OTHER' for other bases of this data.
     ///
-    /// Examples: PREDICTED
+    /// Examples: PREDICTED, EMPIRICAL, DETERMINED, SIMULATED, OTHER
     ///
     /// :type: Optional[str]
     #[getter]
     fn get_cov_basis(&self) -> Option<String> {
         self.inner.cov_basis.as_ref().map(|b| format!("{:?}", b))
     }
-    /// Identification number for the telemetry dataset, orbit determination, or simulation upon
-    /// which the COV_BASIS is based.
+    /// Free-text field containing the identification number for the orbit determination,
+    /// navigation solution, or simulation upon which this covariance time history block is
+    /// based. When a matching orbit determination block accompanies this covariance time
+    /// history, the COV_BASIS_ID should match the corresponding OD_ID (see table 6-11).
     ///
-    /// Examples: OD-123
+    /// Examples: OD_5910
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3407,11 +3530,10 @@ impl OcmCovarianceMatrix {
     fn set_cov_basis_id(&mut self, value: Option<String>) {
         self.inner.cov_basis_id = value;
     }
-    /// Reference frame of the covariance time history (value to be drawn from the SANA registry list
-    /// of Reference Frames at <https://sanaregistry.org/r/celestial_body_reference_frames> or
-    /// <https://sanaregistry.org/r/orbit_relative_reference_frames>).
+    /// Reference frame of the covariance time history. Select from the accepted set of values
+    /// indicated in annex B, subsection B4 and B5.
     ///
-    /// Examples: ICRF, EME2000
+    /// Examples: TNW_INERTIA, J2000
     ///
     /// :type: str
     #[getter]
@@ -3423,9 +3545,10 @@ impl OcmCovarianceMatrix {
         self.inner.cov_ref_frame = value;
     }
 
-    /// Epoch of the covariance data reference frame, if not intrinsic to its definition.
+    /// Epoch of the covariance data reference frame, if not intrinsic to the definition of the
+    /// reference frame. (See 7.5.10 for formatting rules.)
     ///
-    /// Examples: 2000-01-01T12:00:00Z
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3443,7 +3566,7 @@ impl OcmCovarianceMatrix {
 
     /// Minimum scale factor to apply to this covariance data to achieve realism.
     ///
-    /// Examples: 0.9
+    /// Examples: 0.5
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3457,7 +3580,7 @@ impl OcmCovarianceMatrix {
 
     /// Maximum scale factor to apply to this covariance data to achieve realism.
     ///
-    /// Examples: 1.1
+    /// Examples: 5.0
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3469,9 +3592,11 @@ impl OcmCovarianceMatrix {
         self.inner.cov_scale_max = value;
     }
 
-    /// A measure of the confidence in the covariance errors matching reality.
+    /// A measure of the confidence in the covariance errors matching reality, as characterized
+    /// via a Wald test, a Chi-squared test, the log of likelihood, or a numerical
+    /// representation per mutual agreement.
     ///
-    /// Examples: 95.0
+    /// Examples: 50
     ///
     /// Units: %
     ///
@@ -3480,10 +3605,9 @@ impl OcmCovarianceMatrix {
     fn get_cov_confidence(&self) -> Option<f64> {
         self.inner.cov_confidence.as_ref().map(|p| p.value)
     }
-    /// Specification of the covariance element set type (value to be drawn from the SANA registry
-    /// list of Covariance Types at <https://sanaregistry.org/r/orbital_covariance_matrix_types>).
+    /// Indicates covariance composition. Select from annex B, subsections B7 and B8.
     ///
-    /// Examples: CARTESIAN
+    /// Examples: CARTP, CARTPV, ADBARV
     ///
     /// :type: str
     #[getter]
@@ -3495,9 +3619,12 @@ impl OcmCovarianceMatrix {
         self.inner.cov_type = value;
     }
 
-    /// Indicates covariance ordering (LTM or UTM).
+    /// Indicates covariance ordering as being either LTM, UTM, Full covariance, LTM covariance
+    /// with cross-correlation information provided in upper triangle off-diagonal terms
+    /// (LTMWCC), or UTM covariance with cross-correlation information provided in lower
+    /// triangle off-diagonal terms (UTMWCC).
     ///
-    /// Examples: LTM
+    /// Examples: LTM, UTM, FULL, LTMWCC, UTMWCC
     ///
     /// :type: str
     #[getter]
@@ -3505,9 +3632,18 @@ impl OcmCovarianceMatrix {
         format!("{:?}", self.inner.cov_ordering)
     }
 
-    /// SI unit designations for the covariance elements.
+    /// A comma-delimited set of SI unit designations for each element of the covariance time
+    /// history following the covariance time tag, solely for informational purposes, provided
+    /// as a free-text field enclosed in square brackets. When provided, these units
+    /// designations shall correspond to the units of the standard deviations (or square roots)
+    /// of each of the covariance matrix diagonal elements (or variances), respectively, and
+    /// all diagonal elements shall have a corresponding units entry, with non-dimensional
+    /// values (such as dispersion in orbit eccentricity) denoted by 'n/a'. NOTE—The listing of
+    /// units via the COV_UNITS keyword does not override the mandatory units specified for the
+    /// selected COV_TYPE (links to the relevant SANA registries provided in annex B,
+    /// subsections B7 and B8).
     ///
-    /// Examples: km**2, km**2/s
+    /// Examples: [km,km,km,km/s,km/s,km/s]
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3535,7 +3671,9 @@ impl OcmCovarianceMatrix {
         self.inner.cov_lines = value.into_iter().map(|c| c.inner).collect();
     }
 
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
+    /// covariance time history section only immediately after the COV_START keyword; see 7.8
+    /// for comment formatting rules).
     ///
     /// :type: list[str]
     #[getter]
@@ -3611,9 +3749,6 @@ impl CovLine {
 // ============================================================================
 
 /// OCM Maneuver Parameters.
-///
-/// References:
-/// - CCSDS 502.0-B-3, Section 4.5.5 (OCM Maneuver Section)
 ///
 /// Parameters
 /// ----------
@@ -3830,9 +3965,10 @@ impl OcmManeuverParameters {
         )
     }
 
-    /// Unique maneuver identification number for this maneuver block.
-    ///
-    /// Examples: 1
+    /// Free-text field containing the unique maneuver identification number for this maneuver.
+    /// All supplied maneuver 'constituents' within the same MAN_BASIS and MAN_REF_FRAME
+    /// categories shall be added together to represent the total composite maneuver
+    /// description.
     ///
     /// :type: str
     #[getter]
@@ -3844,9 +3980,11 @@ impl OcmManeuverParameters {
         self.inner.man_id = value;
     }
 
-    /// Identification number for the previous maneuver.
-    ///
-    /// Examples: 0
+    /// Free-text field containing the identification number of the previous maneuver for this
+    /// MAN_BASIS, contained either within this message, or presented in a previous OCM. If
+    /// this message is not part of a sequence of maneuver messages or if this maneuver is the
+    /// first in a sequence of maneuvers, then MAN_PREV_ID should be excluded from this
+    /// message.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3858,9 +3996,10 @@ impl OcmManeuverParameters {
         self.inner.man_prev_id = value;
     }
 
-    /// Identification number for the next maneuver.
-    ///
-    /// Examples: 2
+    /// Free-text field containing the identification number of the next maneuver for this
+    /// MAN_BASIS, contained either within this message, or presented in a future OCM. If this
+    /// message is not part of a sequence of maneuver messages or if this maneuver is the last
+    /// in a sequence of maneuvers, then MAN_NEXT_ID should be excluded from this message.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3872,9 +4011,16 @@ impl OcmManeuverParameters {
         self.inner.man_next_id = value;
     }
 
-    /// Basis of this maneuver data (e.g., PREDICTED, DETERMINED, SIMULATED).
-    ///
-    /// Examples: PREDICTED
+    /// Basis of this maneuver time history data, which shall be selected from one of the
+    /// following values: 'CANDIDATE' for a proposed operational or a hypothetical (i.e.,
+    /// mission design and optimization studies) future maneuver, 'PLANNED' for a currently
+    /// planned future maneuver, 'ANTICIPATED' for a non-cooperative future maneuver that is
+    /// anticipated (i.e., likely) to occur (e.g., based upon patterns-of-life analysis),
+    /// 'TELEMETRY' when the maneuver is determined directly from telemetry (e.g., based on
+    /// inertial navigation systems or accelerometers), 'DETERMINED' when a past maneuver is
+    /// estimated from observation-based orbit determination reconstruction and/or
+    /// calibration, 'SIMULATED' for generic maneuver simulations, future mission design
+    /// studies, and optimization studies, 'OTHER' for other bases of this data.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3882,10 +4028,10 @@ impl OcmManeuverParameters {
         self.inner.man_basis.as_ref().map(|b| format!("{:?}", b))
     }
 
-    /// Identification number for the telemetry dataset, orbit determination, or simulation upon
-    /// which the MAN_BASIS is based.
-    ///
-    /// Examples: OD-123
+    /// Free-text field containing the identification number for the orbit determination,
+    /// navigation solution, or simulation upon which this maneuver time history block is
+    /// based. Where a matching orbit determination block accompanies this maneuver time
+    /// history, the MAN_BASIS_ID should match the corresponding OD_ID (see table 6-11).
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3897,9 +4043,9 @@ impl OcmManeuverParameters {
         self.inner.man_basis_id = value;
     }
 
-    /// Identification name of the maneuver device (e.g., ‘THRUSTER-1’).
-    ///
-    /// Examples: THRUSTER-1
+    /// Free-text field containing the maneuver device identifier used for this maneuver. 'ALL'
+    /// indicates that this maneuver represents the summed acceleration, velocity increment,
+    /// or thrust imparted by any/all thrusters utilized in the maneuver.
     ///
     /// :type: str
     #[getter]
@@ -3910,9 +4056,7 @@ impl OcmManeuverParameters {
     fn set_man_device_id(&mut self, value: String) {
         self.inner.man_device_id = value;
     }
-    /// Completion time of the previous maneuver for this MAN_BASIS.
-    ///
-    /// Examples: 2000-01-01T12:00:00Z
+    /// Identifies the completion time of the previous maneuver for this MAN_BASIS.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3928,9 +4072,7 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// Start time of the next maneuver for this MAN_BASIS.
-    ///
-    /// Examples: 2000-01-02T12:00:00Z
+    /// Identifies the start time of the next maneuver for this MAN_BASIS.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3946,9 +4088,8 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// Purpose of the maneuver (e.g., ‘WHEEL-DESAT’, ‘STATION-KEEPING’).
-    ///
-    /// Examples: STATION-KEEPING
+    /// A free-text field used to specify the intention(s) of the maneuver. Multiple maneuver
+    /// purposes can be provided as a comma-delimited list.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3960,10 +4101,10 @@ impl OcmManeuverParameters {
         self.inner.man_purpose = value;
     }
 
-    /// Identification (e.g., message or file) of the predicted maneuver parameters upon which this
-    /// maneuver is based.
-    ///
-    /// Examples: MAN-PRED-456
+    /// For future maneuvers, specifies the source of the orbit and/or attitude state(s) upon
+    /// which the maneuver is based. While there is no CCSDS-based restriction on the value for
+    /// this free-text keyword, it is suggested to consider using TRAJ_ID and OD_ID keywords
+    /// as described in tables 6-4 and 6-11, respectively, or a combination thereof.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3974,10 +4115,10 @@ impl OcmManeuverParameters {
     fn set_man_pred_source(&mut self, value: Option<String>) {
         self.inner.man_pred_source = value;
     }
-    /// Reference frame for the maneuver thrust vector (value to be drawn from the SANA registry list
-    /// of Reference Frames at <https://sanaregistry.org/r/orbit_relative_reference_frames>).
-    ///
-    /// Examples: TNW, RSW
+    /// Reference frame in which all maneuver vector direction data is provided in this
+    /// maneuver data block. Select from the accepted set of values indicated in annex B,
+    /// subsections B4 and B5. The reference frame must be the same for all data elements
+    /// within a given maneuver time history block.
     ///
     /// :type: str
     #[getter]
@@ -3989,9 +4130,8 @@ impl OcmManeuverParameters {
         self.inner.man_ref_frame = value;
     }
 
-    /// Epoch of the maneuver reference frame, if not intrinsic to its definition.
-    ///
-    /// Examples: 2000-01-01T12:00:00Z
+    /// Epoch of the maneuver data reference frame, if not intrinsic to the definition of the
+    /// reference frame. (See 7.5.10 for formatting rules.)
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4007,11 +4147,10 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// Identification of a gravitational body that would be used for an assist maneuver (value to be
-    /// drawn from the SANA registry list of Common Central Body Names at
-    /// <https://sanaregistry.org/r/central_body_name>).
-    ///
-    /// Examples: EARTH, JUPITER
+    /// Origin of maneuver gravitational assist body, which may be a natural solar system body
+    /// (planets, asteroids, comets, and natural satellites), including any planet barycenter
+    /// or the solar system barycenter. (See annex B, subsection B2, for acceptable
+    /// GRAV_ASSIST_NAME values and the procedure to propose new values.)
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4023,9 +4162,11 @@ impl OcmManeuverParameters {
         self.inner.grav_assist_name = value;
     }
 
-    /// Duty cycle type to use for this maneuver time history section.
-    ///
-    /// Examples: LUSTRE
+    /// Duty cycle type to use for this maneuver time history section: CONTINUOUS denotes
+    /// full/continuous thrust <default>; TIME denotes a time-based duty cycle driven by time
+    /// past a reference time and the duty cycle ON and OFF durations; TIME_AND_ANGLE denotes a
+    /// duty cycle driven by the phasing/clocking of a space object body frame 'trigger'
+    /// direction past a reference direction.
     ///
     /// :type: str
     #[getter]
@@ -4040,9 +4181,10 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// Start time of the duty cycle-based maneuver window.
-    ///
-    /// Examples: 2000-01-01T12:00:00Z
+    /// Start time of the duty cycle-based maneuver window that occurs on or prior to the
+    /// actual maneuver execution start time. For example, this may identify the time at which
+    /// the satellite is first placed into a special duty-cycle-based maneuver mode. This
+    /// keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4058,9 +4200,10 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// End time of the duty cycle-based maneuver window.
-    ///
-    /// Examples: 2000-01-01T13:00:00Z
+    /// End time of the duty cycle-based maneuver window that occurs on or after the actual
+    /// maneuver execution end time. For example, this may identify the time at which the
+    /// satellite is taken out of a special duty-cycle-based maneuver mode. This keyword shall
+    /// be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4076,9 +4219,8 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// Minimum number of ‘ON’ duty cycles.
-    ///
-    /// Examples: 1
+    /// Minimum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional
+    /// even if DC_TYPE = 'CONTINUOUS'.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -4090,9 +4232,8 @@ impl OcmManeuverParameters {
         self.inner.dc_min_cycles = value;
     }
 
-    /// Maximum number of ‘ON’ duty cycles.
-    ///
-    /// Examples: 10
+    /// Maximum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional
+    /// even if DC_TYPE = 'CONTINUOUS'.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -4104,9 +4245,10 @@ impl OcmManeuverParameters {
         self.inner.dc_max_cycles = value;
     }
 
-    /// Start time of the initial duty cycle-based maneuver sequence execution.
-    ///
-    /// Examples: 2000-01-01T12:05:00Z
+    /// Start time of the initial duty cycle-based maneuver sequence execution. DC_EXEC_START
+    /// is defined to occur on or prior to the first maneuver 'ON' portion within the duty
+    /// cycle sequence. DC_EXEC_START must be scheduled to occur coincident with or after
+    /// DC_WIN_OPEN. This keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4122,9 +4264,10 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// End time of the final duty cycle-based maneuver sequence execution.
-    ///
-    /// Examples: 2000-01-01T12:55:00Z
+    /// End time of the final duty cycle-based maneuver sequence execution. DC_EXEC_STOP
+    /// typically occurs on or after the end of the final maneuver 'ON' portion within the duty
+    /// cycle sequence. DC_EXEC_STOP must be scheduled to occur coincident with or prior to
+    /// DC_WIN_CLOSE. This keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4140,9 +4283,10 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// Reference time for the THRUST duty cycle.
-    ///
-    /// Examples: 2000-01-01T12:00:00Z
+    /// Reference time for the THRUST duty cycle, specified as either time in seconds (relative
+    /// to EPOCH_TZERO), or as an absolute '<epoch>' (see 7.5.10 for formatting rules).
+    /// NOTE—Depending upon EPOCH_TZERO, DC_REF_TIME relative times may be negative. This
+    /// keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4158,9 +4302,9 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// Thruster pulse ‘ON’ duration.
-    ///
-    /// Examples: 10.0
+    /// Thruster pulse 'ON' duration, initiated at first satisfaction of the burn 'ON' time
+    /// constraint or upon completion of the previous DC_TIME_PULSE_PERIOD cycle. This keyword
+    /// shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// Units: s
     ///
@@ -4178,9 +4322,9 @@ impl OcmManeuverParameters {
         });
     }
 
-    /// Elapsed time between the start of one pulse and the start of the next.
-    ///
-    /// Examples: 100.0
+    /// Elapsed time between the start of one pulse and the start of the next. Must be greater
+    /// than or equal to DC_TIME_PULSE_DURATION. This keyword shall be set if DC_TYPE ≠
+    /// 'CONTINUOUS'.
     ///
     /// Units: s
     ///
@@ -4198,9 +4342,12 @@ impl OcmManeuverParameters {
         });
     }
 
-    /// Reference vector direction in the body frame for angle-initiated thruster duty cycles.
-    ///
-    /// Examples: 1.0 0.0 0.0
+    /// For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the reference
+    /// vector direction in the 'MAN_REF_FRAME' reference frame at which, when mapped into the
+    /// space object's spin plane (normal to the spin axis), the duty cycle is triggered (see
+    /// DC_PA_START_ANGLE for phasing). This (tripartite, or three-element vector) value shall
+    /// be provided if DC_TYPE = 'TIME_AND_ANGLE'. This reference direction does not represent
+    /// the duty cycle midpoint.
     ///
     /// :type: Optional[list[float]]
     #[getter]
@@ -4227,9 +4374,10 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// Body reference frame in which DC_BODY_TRIGGER will be specified.
-    ///
-    /// Examples: SC_BODY
+    /// For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the body
+    /// reference frame in which DC_BODY_TRIGGER will be specified. Select from the accepted
+    /// set of values indicated in annex B, subsection B6. This keyword shall be set if
+    /// DC_TYPE = 'TIME_AND_ANGLE'.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4241,9 +4389,11 @@ impl OcmManeuverParameters {
         self.inner.dc_body_frame = value;
     }
 
-    /// Body frame reference vector direction for angle-based duty cycle initiation.
-    ///
-    /// Examples: 0.0 1.0 0.0
+    /// For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the body frame
+    /// reference vector direction in the 'DC_BODY_FRAME' reference frame at which, when its
+    /// projection onto the spin plane crosses the corresponding projection of DC_REF_DIR onto
+    /// the spin plane, this angle-based duty cycle is initiated (see DC_PA_START_ANGLE for
+    /// phasing). This tripartite value shall be provided if DC_TYPE = 'TIME_AND_ANGLE'.
     ///
     /// :type: Optional[list[float]]
     #[getter]
@@ -4273,9 +4423,14 @@ impl OcmManeuverParameters {
         Ok(())
     }
 
-    /// Phase angle offset of thruster pulse start.
-    ///
-    /// Examples: 10.0
+    /// For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the phase angle
+    /// offset of thruster pulse start, measured with respect to the occurrence of a
+    /// DC_BODY_TRIGGER crossing of the DC_REF_DIR direction when both are projected into the
+    /// spin plane (normal to the body spin axis). This phase angle offset can be positive or
+    /// negative to allow the duty cycle to begin prior to the next crossing of the
+    /// DC_REF_DIR. As this angular direction is to be used in a modulo sense, there is no
+    /// requirement for the magnitude of the phase angle offset to be less than 360 degrees.
+    /// This keyword shall be set if DC_TYPE = 'TIME_AND_ANGLE'.
     ///
     /// Units: deg
     ///
@@ -4293,9 +4448,13 @@ impl OcmManeuverParameters {
         });
     }
 
-    /// Phase angle of thruster pulse stop.
-    ///
-    /// Examples: 20.0
+    /// For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the phase angle
+    /// of thruster pulse stop, measured with respect to the DC_BODY_TRIGGER crossing of the
+    /// DC_REF_DIR direction when both are projected into the spin plane. This phase angle
+    /// offset can be positive or negative to allow the duty cycle to end after to the next
+    /// crossing of the DC_REF_DIR. As this angular direction is to be used in a modulo sense,
+    /// there is no requirement for the magnitude of the phase angle offset to be less than
+    /// 360 degrees. This keyword shall be set if DC_TYPE = 'TIME_AND_ANGLE'.
     ///
     /// Units: deg
     ///
@@ -4313,10 +4472,10 @@ impl OcmManeuverParameters {
         });
     }
 
-    /// Specification of the maneuver element set type (value to be drawn from the SANA registry list
-    /// of Maneuver Types at https://sanaregistry.org/r/maneuver_type).
-    ///
-    /// Examples: ΔV_CARTESIAN, ΔV_SPHERICAL, THRUST_CARTESIAN
+    /// The comma-delimited ordered set of maneuver elements of information contained on every
+    /// maneuver time history line, with values selected from table 6-8. Within this maneuver
+    /// data section, the maneuver composition shall include only one TIME specification
+    /// (TIME_ABSOLUTE or TIME_RELATIVE).
     ///
     /// :type: str
     #[getter]
@@ -4327,9 +4486,14 @@ impl OcmManeuverParameters {
     fn set_man_composition(&mut self, value: String) {
         self.inner.man_composition = value;
     }
-    /// SI unit designations for the maneuver parameters.
-    ///
-    /// Examples: km/s, N
+    /// A comma-delimited set of SI unit designations for each and every element of the
+    /// maneuver time history following the maneuver time tag(s), solely for informational
+    /// purposes, provided as a free-text field enclosed in square brackets. When MAN_UNITS is
+    /// provided, all elements of MAN_COMPOSITION AFTER the maneuver time tag(s) must have a
+    /// corresponding units entry; percentages shall be denoted by '%', and control switches,
+    /// non-dimensional values, and text strings shall be labelled as 'n/a'. NOTE—The listing
+    /// of units via the MAN_UNITS keyword does not override the mandatory units for the
+    /// selected MAN_COMPOSITION, as specified in table 6-8 or table 6-9.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4356,7 +4520,9 @@ impl OcmManeuverParameters {
         self.inner.man_lines = value.into_iter().map(|l| l.inner).collect();
     }
 
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
+    /// Maneuver Specification only immediately after the MAN_START keyword; see 7.8 for
+    /// comment formatting rules).
     ///
     /// :type: list[str]
     #[getter]
@@ -4461,7 +4627,9 @@ impl OcmPerturbations {
         )
     }
 
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
+    /// Perturbations Specification only immediately after the PERT_START keyword; see 7.8 for
+    /// comment formatting rules).
     ///
     /// :type: list[str]
     #[getter]
@@ -4472,10 +4640,10 @@ impl OcmPerturbations {
     fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
-    /// Name of the atmospheric model (value to be drawn from the SANA registry list of Atmospheric
-    /// Models at https://sanaregistry.org/r/atmospheric_model).
+    /// Name of atmosphere model, which shall be selected from the accepted set of values
+    /// indicated in annex B, subsection B9.
     ///
-    /// Examples: JB2008, MSISE00
+    /// Examples: MSISE90, NRLMSIS00, J70, J71, JROBERTS, DTM, JB2008
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4486,10 +4654,12 @@ impl OcmPerturbations {
     fn set_atmospheric_model(&mut self, value: Option<String>) {
         self.inner.atmospheric_model = value;
     }
-    /// Name of the gravity model (value to be drawn from the SANA registry list of Gravitational
-    /// Models at https://sanaregistry.org/r/gravity_model).
+    /// The gravity model (selected from the accepted set of gravity model names indicated in
+    /// annex B, subsection B10), followed by the degree (D) and order (O) of the applied
+    /// spherical harmonic coefficients used in the simulation. NOTE—Specifying a zero value
+    /// for 'order' (e.g., 2D 0O) denotes zonals (J2 ... JD).
     ///
-    /// Examples: EGM96, EGM2008
+    /// Examples: EGM-96: 36D 36O, WGS-84: 8D 0O, GGM-01: 36D 36O, TEG-4: 36D 36O
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4500,11 +4670,10 @@ impl OcmPerturbations {
     fn set_gravity_model(&mut self, value: Option<String>) {
         self.inner.gravity_model = value;
     }
-    /// Equatorial radius of the central body.
+    /// Oblate spheroid equatorial radius of the central body used in the message, if
+    /// different from the gravity model.
     ///
-    /// Examples: 6378137.0
-    ///
-    /// Units: m
+    /// Units: km
     ///
     /// :type: Optional[float]
     #[getter]
@@ -4519,9 +4688,8 @@ impl OcmPerturbations {
             units: None,
         });
     }
-    /// Gravitational coefficient of the central body.
-    ///
-    /// Examples: 398600.4418
+    /// Gravitational coefficient of attracting body (Gravitational Constant × Central Mass),
+    /// if different from the gravity model.
     ///
     /// Units: km³/s²
     ///
@@ -4535,10 +4703,12 @@ impl OcmPerturbations {
         use ccsds_ndm::types::Gm;
         self.inner.gm = value.map(|v| Gm::new(v, None).unwrap());
     }
-    /// List of N-body perturbations included (value(s) to be drawn from the SANA registry list of
-    /// Common Central Body Names at https://sanaregistry.org/r/central_body_name).
+    /// One OR MORE (N-body) gravitational perturbations bodies used. Values, listed serially
+    /// in comma-delimited fashion, denote a natural solar or extra-solar system body (stars,
+    /// planets, asteroids, comets, and natural satellites). NOTE—Only those entries specified
+    /// under CENTER_NAME in annex B, subsection B2 are acceptable values.
     ///
-    /// Examples: MOON, SUN
+    /// Examples: MOON, SUN, JUPITER
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4549,9 +4719,10 @@ impl OcmPerturbations {
     fn set_n_body_perturbations(&mut self, value: Option<String>) {
         self.inner.n_body_perturbations = value;
     }
-    /// Central body angular rotation rate.
-    ///
-    /// Examples: 0.00417807462
+    /// Central body angular rotation rate, measured about the major principal axis of the
+    /// inertia tensor of the central body, relating inertial, and central-body-fixed
+    /// reference frames. NOTE—The rotation axis may be slightly offset from the inertial
+    /// frame Z-axis definition.
     ///
     /// Units: deg/s
     ///
@@ -4568,9 +4739,8 @@ impl OcmPerturbations {
             units: None,
         });
     }
-    /// Oblate flattening of the central body.
-    ///
-    /// Examples: 0.00335281
+    /// Central body's oblate spheroid oblateness for the polar-symmetric oblate central body
+    /// model (e.g., for the Earth, it is approximately 1.0/298.257223563).
     ///
     /// :type: Optional[float]
     #[getter]
@@ -4581,10 +4751,11 @@ impl OcmPerturbations {
     fn set_oblate_flattening(&mut self, value: Option<f64>) {
         self.inner.oblate_flattening = value;
     }
-    /// Name of the ocean tides model (value to be drawn from the SANA registry list of Ocean Tides
-    /// Models at https://sanaregistry.org/r/ocean_tides_model).
+    /// Name of ocean tides model (optionally specify order or constituent effects, diurnal,
+    /// semi-diurnal, etc.). This is a free-text field, so if the examples on the right are
+    /// insufficient, others may be used.
     ///
-    /// Examples: FES2004
+    /// Examples: DIURNAL, SEMI-DIURNAL
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4609,10 +4780,11 @@ impl OcmPerturbations {
     fn set_solid_tides_model(&mut self, value: Option<String>) {
         self.inner.solid_tides_model = value;
     }
-    /// Specification of the reduction theory used for precession and nutation modeling. This is a
-    /// free-text field, so if the examples on the right are insufficient, others may be used.
+    /// Specification of the reduction theory used for precession and nutation modeling. This
+    /// is a free-text field, so if the examples on the right are insufficient, others may be
+    /// used.
     ///
-    /// Examples: IAU1976/FK5, IAU2010
+    /// Examples: IAU1976/FK5, IAU2010, IERS1996
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4625,8 +4797,6 @@ impl OcmPerturbations {
     }
     /// Name of the albedo model.
     ///
-    /// Examples: EARTH_ALBEDO
-    ///
     /// :type: Optional[str]
     #[getter]
     fn get_albedo_model(&self) -> Option<String> {
@@ -4638,8 +4808,6 @@ impl OcmPerturbations {
     }
     /// Size of the albedo grid.
     ///
-    /// Examples: 10
-    ///
     /// :type: Optional[int]
     #[getter]
     fn get_albedo_grid_size(&self) -> Option<u64> {
@@ -4649,7 +4817,11 @@ impl OcmPerturbations {
     fn set_albedo_grid_size(&mut self, value: Option<u64>) {
         self.inner.albedo_grid_size = value;
     }
-    /// Examples: NONE, CONE, DUAL_CONE, CYLINDRICAL
+    /// Shadow model used for Solar Radiation Pressure; dual cone uses both umbra/penumbra
+    /// regions. Selected option should be one of ‘NONE’, ‘CYLINDRICAL’, ‘CONE’, or
+    /// ‘DUAL_CONE’.
+    ///
+    /// Examples: NONE, CYLINDRICAL, CONE, DUAL_CONE
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4660,8 +4832,8 @@ impl OcmPerturbations {
     fn set_shadow_model(&mut self, value: Option<String>) {
         self.inner.shadow_model = value;
     }
-    /// List of bodies included in shadow calculations (value(s) to be drawn from the SANA registry
-    /// list of Orbit Centers at <https://sanaregistry.org/r/orbit_centers>).
+    /// List of bodies included in shadow calculations (value(s) to be drawn from the SANA
+    /// registry list of Orbit Centers at https://sanaregistry.org/r/orbit_centers).
     ///
     /// Examples: EARTH, MOON
     ///
@@ -4702,8 +4874,6 @@ impl OcmPerturbations {
     }
     /// Epoch of the space weather data.
     ///
-    /// Examples: 2000-01-01T12:00:00Z
-    ///
     /// :type: Optional[str]
     #[getter]
     fn get_sw_data_epoch(&self) -> Option<String> {
@@ -4717,10 +4887,10 @@ impl OcmPerturbations {
         self.inner.sw_data_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
-    /// Free-text field specifying the method used to select or interpolate any and all sequential
-    /// space weather data (Kp, ap, Dst, F10.7, M10.7, S10.7, Y10.7, etc.). While not constrained to
-    /// specific entries, it is anticipated that the utilized method would match methods detailed in
-    /// numerical analysis textbooks.
+    /// Free-text field specifying the method used to select or interpolate any and all
+    /// sequential space weather data (Kp, ap, Dst, F10.7, M10.7, S10.7, Y10.7, etc.). While
+    /// not constrained to specific entries, it is anticipated that the utilized method would
+    /// match methods detailed in numerical analysis textbooks.
     ///
     /// Examples: PRECEDING_VALUE, NEAREST_NEIGHBOR, LINEAR, LAGRANGE_ORDER_5
     ///
@@ -4734,8 +4904,6 @@ impl OcmPerturbations {
         self.inner.sw_interp_method = value;
     }
     /// Fixed geomagnetic Kp index.
-    ///
-    /// Examples: 3.0
     ///
     /// :type: Optional[float]
     #[getter]
@@ -4752,8 +4920,6 @@ impl OcmPerturbations {
     }
     /// Fixed geomagnetic Ap index.
     ///
-    /// Examples: 15.0
-    ///
     /// :type: Optional[float]
     #[getter]
     fn get_fixed_geomag_ap(&self) -> Option<f64> {
@@ -4769,8 +4935,6 @@ impl OcmPerturbations {
     }
     /// Fixed geomagnetic Dst index.
     ///
-    /// Examples: -20.0
-    ///
     /// :type: Optional[float]
     #[getter]
     fn get_fixed_geomag_dst(&self) -> Option<f64> {
@@ -4785,8 +4949,6 @@ impl OcmPerturbations {
         });
     }
     /// Fixed F10.7 solar flux.
-    ///
-    /// Examples: 150.0
     ///
     /// Units: SFU
     ///
@@ -4805,8 +4967,6 @@ impl OcmPerturbations {
     }
     /// Fixed 81-day average F10.7 solar flux.
     ///
-    /// Examples: 140.0
-    ///
     /// Units: SFU
     ///
     /// :type: Optional[float]
@@ -4823,8 +4983,6 @@ impl OcmPerturbations {
         });
     }
     /// Fixed M10.7 solar flux.
-    ///
-    /// Examples: 130.0
     ///
     /// Units: SFU
     ///
@@ -4843,8 +5001,6 @@ impl OcmPerturbations {
     }
     /// Fixed 81-day average M10.7 solar flux.
     ///
-    /// Examples: 120.0
-    ///
     /// Units: SFU
     ///
     /// :type: Optional[float]
@@ -4861,8 +5017,6 @@ impl OcmPerturbations {
         });
     }
     /// Fixed S10.7 solar flux.
-    ///
-    /// Examples: 110.0
     ///
     /// Units: SFU
     ///
@@ -4881,8 +5035,6 @@ impl OcmPerturbations {
     }
     /// Fixed 81-day average S10.7 solar flux.
     ///
-    /// Examples: 100.0
-    ///
     /// Units: SFU
     ///
     /// :type: Optional[float]
@@ -4900,8 +5052,6 @@ impl OcmPerturbations {
     }
     /// Fixed Y10.7 solar flux.
     ///
-    /// Examples: 90.0
-    ///
     /// Units: SFU
     ///
     /// :type: Optional[float]
@@ -4918,8 +5068,6 @@ impl OcmPerturbations {
         });
     }
     /// Fixed 81-day average Y10.7 solar flux.
-    ///
-    /// Examples: 85.0
     ///
     /// Units: SFU
     ///
@@ -5095,14 +5243,18 @@ impl OcmOdParameters {
     ///
     /// Units: d
     ///
+    /// Days elapsed between first accepted observation and OD_EPOCH. NOTE—May be positive or
+    /// negative.
+    ///
+    /// Units: d
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_days_since_first_obs(&self) -> Option<f64> {
         self.inner.days_since_first_obs.as_ref().map(|d| d.value)
     }
-    /// Days elapsed between last accepted observation and OD_EPOCH.
-    ///
-    /// Examples: 0.1
+    /// Days elapsed between last accepted observation and OD_EPOCH. NOTE—May be positive or
+    /// negative.
     ///
     /// Units: d
     ///
@@ -5111,10 +5263,8 @@ impl OcmOdParameters {
     fn get_days_since_last_obs(&self) -> Option<f64> {
         self.inner.days_since_last_obs.as_ref().map(|d| d.value)
     }
-    /// Number of days of observations recommended for the OD of the object (useful only for Batch OD
-    /// systems).
-    ///
-    /// Examples: 5.0
+    /// Number of days of observations recommended for the OD of the object (useful only for
+    /// Batch OD systems).
     ///
     /// Units: d
     ///
@@ -5131,9 +5281,8 @@ impl OcmOdParameters {
             units: Some(DayIntervalUnits::D),
         });
     }
-    /// Actual time span in days used for the OD of the object.
-    ///
-    /// Examples: 4.8
+    /// Actual time span in days used for the OD of the object. NOTE—Should equal
+    /// (DAYS_SINCE_FIRST_OBS - DAYS_SINCE_LAST_OBS).
     ///
     /// Units: d
     ///
@@ -5152,8 +5301,6 @@ impl OcmOdParameters {
     }
     /// The number of observations available within the actual OD time span.
     ///
-    /// Examples: 100
-    ///
     /// :type: Optional[int]
     #[getter]
     fn get_obs_available(&self) -> Option<u64> {
@@ -5165,8 +5312,6 @@ impl OcmOdParameters {
     }
     /// The number of observations accepted within the actual OD time span.
     ///
-    /// Examples: 95
-    ///
     /// :type: Optional[int]
     #[getter]
     fn get_obs_used(&self) -> Option<u64> {
@@ -5176,10 +5321,8 @@ impl OcmOdParameters {
     fn set_obs_used(&mut self, value: Option<u64>) {
         self.inner.obs_used = value;
     }
-    /// The number of sensor tracks available for the OD within the actual time span (see definition
-    /// of ‘tracks’, 1.5.2).
-    ///
-    /// Examples: 10
+    /// The number of sensor tracks available for the OD within the actual time span (see
+    /// definition of 'tracks', 1.5.2).
     ///
     /// :type: Optional[int]
     #[getter]
@@ -5190,10 +5333,8 @@ impl OcmOdParameters {
     fn set_tracks_available(&mut self, value: Option<u64>) {
         self.inner.tracks_available = value;
     }
-    /// The number of sensor tracks accepted for the OD within the actual time span (see definition of
-    /// ‘tracks’, 1.5.2).
-    ///
-    /// Examples: 9
+    /// The number of sensor tracks accepted for the OD within the actual time span (see
+    /// definition of 'tracks', 1.5.2).
     ///
     /// :type: Optional[int]
     #[getter]
@@ -5205,8 +5346,6 @@ impl OcmOdParameters {
         self.inner.tracks_used = value;
     }
     /// The maximum time between observations in the OD of the object.
-    ///
-    /// Examples: 0.5
     ///
     /// Units: d
     ///
@@ -5223,9 +5362,7 @@ impl OcmOdParameters {
             units: Some(DayIntervalUnits::D),
         });
     }
-    /// Positional error ellipsoid 1 sigma (1σ) major eigenvalue at the epoch of the OD.
-    ///
-    /// Examples: 100.0
+    /// Positional error ellipsoid 1σ major eigenvalue at the epoch of the OD.
     ///
     /// Units: m
     ///
@@ -5244,8 +5381,6 @@ impl OcmOdParameters {
     }
     /// Positional error ellipsoid 1σ intermediate eigenvalue at the epoch of the OD.
     ///
-    /// Examples: 50.0
-    ///
     /// Units: m
     ///
     /// :type: Optional[float]
@@ -5263,8 +5398,6 @@ impl OcmOdParameters {
     }
     /// Positional error ellipsoid 1σ minor eigenvalue at the epoch of the OD.
     ///
-    /// Examples: 20.0
-    ///
     /// Units: m
     ///
     /// :type: Optional[float]
@@ -5280,10 +5413,8 @@ impl OcmOdParameters {
             units: None,
         });
     }
-    /// The resulting maximum predicted major eigenvalue of the 1σ positional error ellipsoid over
-    /// the entire TIME_SPAN of the OCM, stemming from this OD.
-    ///
-    /// Examples: 500.0
+    /// The resulting maximum predicted major eigenvalue of the 1σ positional error ellipsoid
+    /// over the entire TIME_SPAN of the OCM, stemming from this OD.
     ///
     /// Units: m
     ///
@@ -5301,10 +5432,8 @@ impl OcmOdParameters {
         });
     }
 
-    /// The resulting minimum predicted minor eigenvalue of the 1σ positional error ellipsoid over
-    /// the entire TIME_SPAN of the OCM, stemming from this OD.
-    ///
-    /// Examples: 10.0
+    /// The resulting minimum predicted minor eigenvalue of the 1σ positional error ellipsoid
+    /// over the entire TIME_SPAN of the OCM, stemming from this OD.
     ///
     /// Units: m
     ///
@@ -5322,8 +5451,8 @@ impl OcmOdParameters {
         });
     }
     /// OD confidence metric, which spans 0 to 100% (useful only for Filter-based OD systems).
-    ///
-    /// Examples: 99.0
+    /// The OD confidence metric shall be as mutually defined by message exchange
+    /// participants.
     ///
     /// Units: %
     ///
@@ -5340,9 +5469,11 @@ impl OcmOdParameters {
             units: None,
         });
     }
-    /// Generalized Dilution Of Precision for this orbit determination.
-    ///
-    /// Examples: 1.5
+    /// Generalized Dilution Of Precision for this orbit determination, based on the
+    /// observability grammian as defined in references [H15] and [H16] and expressed in
+    /// informative annex F, subsection F4. GDOP provides a rating metric of the observability
+    /// of the element set from the OD. Alternate GDOP formations may be used as mutually
+    /// defined by message exchange participants.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5354,8 +5485,6 @@ impl OcmOdParameters {
         self.inner.gdop = value;
     }
     /// The number of solve-for states in the orbit determination.
-    ///
-    /// Examples: 6
     ///
     /// :type: Optional[int]
     #[getter]
@@ -5369,8 +5498,6 @@ impl OcmOdParameters {
     /// Free-text comma-delimited description of the state elements solved for in the orbit
     /// determination.
     ///
-    /// Examples: X, Y, Z, X_DOT, Y_DOT, Z_DOT
-    ///
     /// :type: Optional[str]
     #[getter]
     fn get_solve_states(&self) -> Option<String> {
@@ -5381,8 +5508,6 @@ impl OcmOdParameters {
         self.inner.solve_states = value;
     }
     /// The number of consider parameters used in the orbit determination.
-    ///
-    /// Examples: 3
     ///
     /// :type: Optional[int]
     #[getter]
@@ -5396,8 +5521,6 @@ impl OcmOdParameters {
     /// Free-text comma-delimited description of the consider parameters used in the orbit
     /// determination.
     ///
-    /// Examples: DRAG_COEFF, SRP_COEFF
-    ///
     /// :type: Optional[str]
     #[getter]
     fn get_consider_params(&self) -> Option<String> {
@@ -5407,10 +5530,9 @@ impl OcmOdParameters {
     fn set_consider_params(&mut self, value: Option<String>) {
         self.inner.consider_params = value;
     }
-    /// The Specific Energy Dissipation Rate, which is the amount of energy being removed from the
-    /// object's orbit by the non-conservative forces.
-    ///
-    /// Examples: 1.25e-7
+    /// The Specific Energy Dissipation Rate, which is the amount of energy being removed from
+    /// the object's orbit by the non-conservative forces. This value is an average
+    /// calculated during the OD. (See annex F, subsection F7 for definition.)
     ///
     /// Units: W/kg
     ///
@@ -5426,8 +5548,6 @@ impl OcmOdParameters {
     }
     /// The number of sensors used in the orbit determination.
     ///
-    /// Examples: 5
-    ///
     /// :type: Optional[int]
     #[getter]
     fn get_sensors_n(&self) -> Option<u64> {
@@ -5439,8 +5559,6 @@ impl OcmOdParameters {
     }
     /// Free-text comma-delimited description of the sensors used in the orbit determination.
     ///
-    /// Examples: SENSOR1, SENSOR2
-    ///
     /// :type: Optional[str]
     #[getter]
     fn get_sensors(&self) -> Option<String> {
@@ -5450,9 +5568,13 @@ impl OcmOdParameters {
     fn set_sensors(&mut self, value: Option<String>) {
         self.inner.sensors = value;
     }
-    /// (Useful/valid only for Batch OD systems.) The weighted RMS residual ratio.
-    ///
-    /// Examples: 0.95
+    /// (Useful/valid only for Batch OD systems.) The weighted RMS residual ratio, defined as:
+    /// .. math:: \text{Weighted RMS} = \sqrt{\frac{\sum_{i=1}^{N} w_i(y_i - \hat{y}_i)^2}{N}}
+    /// Where yi is the ith observation measurement, ŷi is the current estimate of yi, wi =
+    /// 1/σi² is the weight (sigma) associated with the measurement at the ith time and N is
+    /// the number of observations. This is a value that can generally identify the quality of
+    /// the most recent vector update and is used by the analyst in evaluating the OD process.
+    /// A value of 1.00 is ideal.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5464,8 +5586,12 @@ impl OcmOdParameters {
         self.inner.weighted_rms = value.map(|value| ccsds_ndm::types::NonNegativeDouble { value });
     }
     /// Comma-separated list of observation data types utilized in this orbit determination.
-    ///
-    /// Examples: RANGE, DOPPLER
+    /// Although this is a free-text field, it is recommended at a minimum to use data type
+    /// descriptor(s) as provided in table 3-5 of the TDM standard (reference [9]) (excluding
+    /// the DATA_START, DATA_STOP, and COMMENT keywords). Additional descriptors/detail is
+    /// encouraged if the descriptors of table 3-5 are not sufficiently clear; for example, one
+    /// could replace ANGLE_1 and ANGLE_2 with RADEC (e.g., from a telescope), AZEL (e.g., from
+    /// a ground radar), RANGE (whether from radar or laser ranging), etc.
     ///
     /// :type: Optional[str]
     #[getter]

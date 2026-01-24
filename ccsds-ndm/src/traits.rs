@@ -27,7 +27,7 @@ use crate::kvn::ser::KvnWriter;
 /// // Serialize to XML
 /// let xml = opm.to_xml().unwrap();
 /// ```
-pub trait Ndm: Sized + serde::Serialize + serde::de::DeserializeOwned {
+pub trait Ndm: Sized + serde::Serialize {
     /// Serialize the message to KVN (Key-Value Notation) format.
     ///
     /// # Returns
