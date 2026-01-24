@@ -795,7 +795,7 @@ pub struct OcmData {
     #[serde(rename = "traj", default)]
     pub traj: Vec<OcmTrajState>,
     /// Space object physical characteristics.
-    #[serde(rename = "phys", default)]
+    #[serde(rename = "phys", default, skip_serializing_if = "Option::is_none")]
     pub phys: Option<OcmPhysicalDescription>,
     /// List of covariance time history blocks.
     #[serde(rename = "cov", default)]
@@ -804,13 +804,13 @@ pub struct OcmData {
     #[serde(rename = "man", default)]
     pub man: Vec<OcmManeuverParameters>,
     /// Perturbation parameters.
-    #[serde(rename = "pert", default)]
+    #[serde(rename = "pert", default, skip_serializing_if = "Option::is_none")]
     pub pert: Option<OcmPerturbations>,
     /// Orbit determination data.
-    #[serde(rename = "od", default)]
+    #[serde(rename = "od", default, skip_serializing_if = "Option::is_none")]
     pub od: Option<OcmOdParameters>,
     /// User-defined parameters.
-    #[serde(rename = "user", default)]
+    #[serde(rename = "user", default, skip_serializing_if = "Option::is_none")]
     pub user: Option<UserDefined>,
 }
 

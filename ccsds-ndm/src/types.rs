@@ -537,7 +537,7 @@ define_unit_enum!(FrequencyUnits, Hz, { Hz => "Hz" });
 pub struct Frequency {
     #[serde(rename = "$value")]
     pub value: f64,
-    #[serde(rename = "@units")]
+    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<FrequencyUnits>,
 }
 impl Frequency {
@@ -583,7 +583,7 @@ define_unit_enum!(GmUnits, Km3PerS2, { Km3PerS2 => "km**3/s**2", KM3PerS2 => "KM
 pub struct Gm {
     #[serde(rename = "$value")]
     pub value: f64,
-    #[serde(rename = "@units")]
+    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<GmUnits>,
 }
 impl Gm {
@@ -677,7 +677,7 @@ define_unit_enum!(MassUnits, Kg, { Kg => "kg" });
 pub struct Mass {
     #[serde(rename = "$value")]
     pub value: f64,
-    #[serde(rename = "@units")]
+    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<MassUnits>,
 }
 impl Mass {
@@ -720,7 +720,7 @@ define_unit_enum!(AreaUnits, M2, { M2 => "m**2" });
 pub struct Area {
     #[serde(rename = "$value")]
     pub value: f64,
-    #[serde(rename = "@units")]
+    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<AreaUnits>,
 }
 
@@ -2051,7 +2051,7 @@ pub type SigmaV = UnitValue<f64, SigmaVUnits>;
 // Sensor noise (string with optional angle units)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SensorNoise {
-    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
+    #[serde(rename = "$value", default, with = "crate::utils::vec_f64_space_sep")]
     pub values: Vec<f64>,
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<AngleUnits>,

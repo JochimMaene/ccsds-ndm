@@ -63,7 +63,7 @@ fn cdm_xml() -> PathBuf {
 
 // ===== Standard API Tests (Macro) =====
 macro_rules! test_message_api {
-    ($type:ident, $kvn_path:ident, $xml_path:ident, $vers_key:expr, $xml_tag:expr) => {
+    ($type:ident, $kvn_path:ident, $xml_path:ident, $vers_key:expr, $xml_tag:expr, $xml_tag_upper:expr) => {
         paste::paste! {
             #[test]
             fn [<test_message_type_ $type:lower _to_kvn>]() {
@@ -80,19 +80,19 @@ macro_rules! test_message_api {
                 let msg = from_str(&content).unwrap();
                 assert!(matches!(msg, MessageType::$type(_)));
                 let xml = msg.to_xml().unwrap();
-                assert!(xml.contains(concat!("<", $xml_tag)) || xml.contains(concat!("<", $xml_tag:upper)));
+                assert!(xml.contains(concat!("<", $xml_tag)) || xml.contains(concat!("<", $xml_tag_upper)));
             }
         }
     };
 }
 
-test_message_api!(Opm, opm_kvn, opm_xml, "CCSDS_OPM_VERS", "opm");
-test_message_api!(Omm, omm_kvn, omm_xml, "CCSDS_OMM_VERS", "omm");
-test_message_api!(Oem, oem_kvn, oem_xml, "CCSDS_OEM_VERS", "oem");
-test_message_api!(Ocm, ocm_kvn, ocm_xml, "CCSDS_OCM_VERS", "ocm");
-test_message_api!(Tdm, tdm_kvn, tdm_xml, "CCSDS_TDM_VERS", "tdm");
-test_message_api!(Rdm, rdm_kvn, rdm_xml, "CCSDS_RDM_VERS", "rdm");
-test_message_api!(Cdm, cdm_kvn, cdm_xml, "CCSDS_CDM_VERS", "cdm");
+test_message_api!(Opm, opm_kvn, opm_xml, "CCSDS_OPM_VERS", "opm", "OPM");
+test_message_api!(Omm, omm_kvn, omm_xml, "CCSDS_OMM_VERS", "omm", "OMM");
+test_message_api!(Oem, oem_kvn, oem_xml, "CCSDS_OEM_VERS", "oem", "OEM");
+test_message_api!(Ocm, ocm_kvn, ocm_xml, "CCSDS_OCM_VERS", "ocm", "OCM");
+test_message_api!(Tdm, tdm_kvn, tdm_xml, "CCSDS_TDM_VERS", "tdm", "TDM");
+test_message_api!(Rdm, rdm_kvn, rdm_xml, "CCSDS_RDM_VERS", "rdm", "RDM");
+test_message_api!(Cdm, cdm_kvn, cdm_xml, "CCSDS_CDM_VERS", "cdm", "CDM");
 
 // ===== to_kvn_file and to_xml_file tests =====
 

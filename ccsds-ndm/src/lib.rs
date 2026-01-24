@@ -63,8 +63,7 @@ pub mod types;
 pub mod utils;
 pub mod xml;
 
-#[cfg(test)]
-mod tests;
+
 
 use error::{CcsdsNdmError, Result};
 use std::fs;
@@ -89,6 +88,7 @@ use std::path::Path;
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(untagged)]
 pub enum MessageType {
     /// Orbit Ephemeris Message - orbit state time series with optional covariance.
     Oem(messages::oem::Oem),

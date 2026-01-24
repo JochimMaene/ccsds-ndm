@@ -94,7 +94,7 @@ id="CCSDS_CDM_VERS" version="1.0">
 <Z_DOT units="km/s">-3.526774282</Z_DOT>
 </stateVector>
 <covarianceMatrix>
-COMMENT>Object1 Covariance in the RTN Coordinate Frame </COMMENT>
+<COMMENT>Object1 Covariance in the RTN Coordinate Frame </COMMENT>
 <CR_R units="m**2">4.142E+01</CR_R>
 <CT_R units="m**2">-8.579E+00</CT_R>
 <CT_T units="m**2">2.533E+03</CT_T>
