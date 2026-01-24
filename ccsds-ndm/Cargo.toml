@@ -22,6 +22,7 @@ fast-float = "0.2"
 
 [dev-dependencies]
 criterion = { version = "4.2.1", package = "codspeed-criterion-compat" }
+paste = "1.0.15"
 tempfile = "3"
 
 [[bench]]
