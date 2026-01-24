@@ -47,9 +47,12 @@ fn test_parse_all_samples() {
                             MessageType::Acm(_) => fname.starts_with("acm"),
                             MessageType::Ndm(_) => fname.starts_with("ndm"),
                         };
-                        
+
                         if !is_match {
-                             failures.push(format!("{} parsed but type mismatch (got {:?})", fname, msg));
+                            failures.push(format!(
+                                "{} parsed but type mismatch (got {:?})",
+                                fname, msg
+                            ));
                         }
 
                         // Round-trip verification: Serialize -> Parse again
@@ -57,10 +60,14 @@ fn test_parse_all_samples() {
                             Ok(kvn_out) => {
                                 // Try to parse the output again
                                 if let Err(e) = from_str(&kvn_out) {
-                                     failures.push(format!("{} KVN round-trip failed to parse: {}", fname, e));
+                                    failures.push(format!(
+                                        "{} KVN round-trip failed to parse: {}",
+                                        fname, e
+                                    ));
                                 }
-                            },
-                            Err(e) => failures.push(format!("{} failed to serialize to KVN: {}", fname, e)),
+                            }
+                            Err(e) => failures
+                                .push(format!("{} failed to serialize to KVN: {}", fname, e)),
                         }
                     }
                     Err(e) => {
@@ -86,11 +93,11 @@ fn test_parse_all_samples() {
                 } else {
                     println!("Parsing XML: {:?}", fname);
                 }
-                
+
                 let content = fs::read_to_string(&path).unwrap();
                 match from_str(&content) {
                     Ok(msg) => {
-                         // Check type match
+                        // Check type match
                         let is_match = match &msg {
                             MessageType::Opm(_) => fname.starts_with("opm"),
                             MessageType::Omm(_) => fname.starts_with("omm"),
@@ -106,18 +113,25 @@ fn test_parse_all_samples() {
                         };
 
                         if !is_match {
-                            failures.push(format!("{} parsed but type mismatch (got {:?})", fname, msg));
+                            failures.push(format!(
+                                "{} parsed but type mismatch (got {:?})",
+                                fname, msg
+                            ));
                         }
-                        
+
                         // Round-trip verification: Serialize -> Parse again
                         match msg.to_xml() {
                             Ok(xml_out) => {
                                 // Try to parse the output again
                                 if let Err(e) = from_str(&xml_out) {
-                                     failures.push(format!("{} XML round-trip failed to parse: {}\nContent:\n{}", fname, e, xml_out));
+                                    failures.push(format!(
+                                        "{} XML round-trip failed to parse: {}\nContent:\n{}",
+                                        fname, e, xml_out
+                                    ));
                                 }
-                            },
-                            Err(e) => failures.push(format!("{} failed to serialize to XML: {}", fname, e)),
+                            }
+                            Err(e) => failures
+                                .push(format!("{} failed to serialize to XML: {}", fname, e)),
                         }
                     }
                     Err(e) => {
