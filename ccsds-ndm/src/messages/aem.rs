@@ -311,7 +311,80 @@ pub struct AemData {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.4.
     #[serde(rename = "attitudeState")]
-    pub attitude_states: Vec<crate::common::AemAttitudeState>,
+    pub attitude_states: Vec<AemAttitudeStateWrapper>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct AemAttitudeStateWrapper {
+    #[serde(rename = "quaternionEphemeris", skip_serializing_if = "Option::is_none")]
+    pub quaternion_ephemeris: Option<crate::common::QuaternionEphemeris>,
+    #[serde(rename = "quaternionDerivative", skip_serializing_if = "Option::is_none")]
+    pub quaternion_derivative: Option<crate::common::QuaternionDerivative>,
+    #[serde(rename = "quaternionAngVel", skip_serializing_if = "Option::is_none")]
+    pub quaternion_ang_vel: Option<crate::common::QuaternionAngVel>,
+    #[serde(rename = "eulerAngle", skip_serializing_if = "Option::is_none")]
+    pub euler_angle: Option<crate::common::EulerAngle>,
+    #[serde(rename = "eulerAngleDerivative", skip_serializing_if = "Option::is_none")]
+    pub euler_angle_derivative: Option<crate::common::EulerAngleDerivative>,
+    #[serde(rename = "eulerAngleAngVel", skip_serializing_if = "Option::is_none")]
+    pub euler_angle_ang_vel: Option<crate::common::EulerAngleAngVel>,
+    #[serde(rename = "spin", skip_serializing_if = "Option::is_none")]
+    pub spin: Option<crate::common::Spin>,
+    #[serde(rename = "spinNutation", skip_serializing_if = "Option::is_none")]
+    pub spin_nutation: Option<crate::common::SpinNutation>,
+    #[serde(rename = "spinNutationMom", skip_serializing_if = "Option::is_none")]
+    pub spin_nutation_mom: Option<crate::common::SpinNutationMom>,
+}
+
+impl From<crate::common::AemAttitudeState> for AemAttitudeStateWrapper {
+    fn from(state: crate::common::AemAttitudeState) -> Self {
+        let mut wrapper = AemAttitudeStateWrapper {
+            quaternion_ephemeris: None,
+            quaternion_derivative: None,
+            quaternion_ang_vel: None,
+            euler_angle: None,
+            euler_angle_derivative: None,
+            euler_angle_ang_vel: None,
+            spin: None,
+            spin_nutation: None,
+            spin_nutation_mom: None,
+        };
+        match state {
+            crate::common::AemAttitudeState::QuaternionEphemeris(v) => wrapper.quaternion_ephemeris = Some(v),
+            crate::common::AemAttitudeState::QuaternionDerivative(v) => wrapper.quaternion_derivative = Some(v),
+            crate::common::AemAttitudeState::QuaternionAngVel(v) => wrapper.quaternion_ang_vel = Some(v),
+            crate::common::AemAttitudeState::EulerAngle(v) => wrapper.euler_angle = Some(v),
+            crate::common::AemAttitudeState::EulerAngleDerivative(v) => wrapper.euler_angle_derivative = Some(v),
+            crate::common::AemAttitudeState::EulerAngleAngVel(v) => wrapper.euler_angle_ang_vel = Some(v),
+            crate::common::AemAttitudeState::Spin(v) => wrapper.spin = Some(v),
+            crate::common::AemAttitudeState::SpinNutation(v) => wrapper.spin_nutation = Some(v),
+            crate::common::AemAttitudeState::SpinNutationMom(v) => wrapper.spin_nutation_mom = Some(v),
+        }
+        wrapper
+    }
+}
+
+impl AemAttitudeStateWrapper {
+    pub fn content(&self) -> Option<crate::common::AemAttitudeState> {
+        if let Some(v) = &self.quaternion_ephemeris { return Some(crate::common::AemAttitudeState::QuaternionEphemeris(v.clone())); }
+        if let Some(v) = &self.quaternion_derivative { return Some(crate::common::AemAttitudeState::QuaternionDerivative(v.clone())); }
+        if let Some(v) = &self.quaternion_ang_vel { return Some(crate::common::AemAttitudeState::QuaternionAngVel(v.clone())); }
+        if let Some(v) = &self.euler_angle { return Some(crate::common::AemAttitudeState::EulerAngle(v.clone())); }
+        if let Some(v) = &self.euler_angle_derivative { return Some(crate::common::AemAttitudeState::EulerAngleDerivative(v.clone())); }
+        if let Some(v) = &self.euler_angle_ang_vel { return Some(crate::common::AemAttitudeState::EulerAngleAngVel(v.clone())); }
+        if let Some(v) = &self.spin { return Some(crate::common::AemAttitudeState::Spin(v.clone())); }
+        if let Some(v) = &self.spin_nutation { return Some(crate::common::AemAttitudeState::SpinNutation(v.clone())); }
+        if let Some(v) = &self.spin_nutation_mom { return Some(crate::common::AemAttitudeState::SpinNutationMom(v.clone())); }
+        None
+    }
+}
+
+impl crate::traits::ToKvn for AemAttitudeStateWrapper {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        if let Some(content) = self.content() {
+            content.write_kvn(writer);
+        }
+    }
 }
 
 impl ToKvn for AemData {

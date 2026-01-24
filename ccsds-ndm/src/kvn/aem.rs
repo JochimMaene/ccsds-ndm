@@ -168,9 +168,66 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 angle_3: Angle::new(values[2], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
             }))
         },
-        // TODO: Implement other types (EULER_ANGLE/DERIVATIVE, EULER_ANGLE/RATE, SPIN, etc.)
-        // For verify test minimal "QUATERNION" is enough.
-        // Fallback for others to avoid error? Better to fail if not supported or create a catch-all?
+        "EULER_ANGLE/DERIVATIVE" => {
+            if values.len() != 6 { return Err(ErrMode::Cut(InternalParserError::from_input(input))); }
+            Ok(AemAttitudeState::EulerAngleDerivative(crate::common::EulerAngleDerivative {
+                epoch,
+                angle_1: Angle::new(values[0], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                angle_2: Angle::new(values[1], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                angle_3: Angle::new(values[2], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                angle_1_dot: crate::types::AngleRate::new(values[3], None),
+                angle_2_dot: crate::types::AngleRate::new(values[4], None),
+                angle_3_dot: crate::types::AngleRate::new(values[5], None),
+            }))
+        },
+        "EULER_ANGLE/RATE" => {
+            if values.len() != 6 { return Err(ErrMode::Cut(InternalParserError::from_input(input))); }
+            Ok(AemAttitudeState::EulerAngleAngVel(crate::common::EulerAngleAngVel {
+                epoch,
+                angle_1: Angle::new(values[0], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                angle_2: Angle::new(values[1], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                angle_3: Angle::new(values[2], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                angvel_x: crate::types::AngleRate::new(values[3], None),
+                angvel_y: crate::types::AngleRate::new(values[4], None),
+                angvel_z: crate::types::AngleRate::new(values[5], None),
+            }))
+        },
+        "SPIN" => {
+            if values.len() != 4 { return Err(ErrMode::Cut(InternalParserError::from_input(input))); }
+            Ok(AemAttitudeState::Spin(crate::common::Spin {
+                epoch,
+                spin_alpha: Angle::new(values[0], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                spin_delta: Angle::new(values[1], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                spin_angle: Angle::new(values[2], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                spin_angle_vel: crate::types::AngleRate::new(values[3], None),
+            }))
+        },
+        "SPIN/NUTATION" => {
+            if values.len() != 7 { return Err(ErrMode::Cut(InternalParserError::from_input(input))); }
+            Ok(AemAttitudeState::SpinNutation(crate::common::SpinNutation {
+                epoch,
+                spin_alpha: Angle::new(values[0], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                spin_delta: Angle::new(values[1], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                spin_angle: Angle::new(values[2], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                spin_angle_vel: crate::types::AngleRate::new(values[3], None),
+                nutation: Angle::new(values[4], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                nutation_per: crate::types::Duration::new(values[5], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                nutation_phase: Angle::new(values[6], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+            }))
+        },
+        "SPIN/NUTATION_MOM" => {
+            if values.len() != 7 { return Err(ErrMode::Cut(InternalParserError::from_input(input))); }
+            Ok(AemAttitudeState::SpinNutationMom(crate::common::SpinNutationMom {
+                epoch,
+                spin_alpha: Angle::new(values[0], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                spin_delta: Angle::new(values[1], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                spin_angle: Angle::new(values[2], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                spin_angle_vel: crate::types::AngleRate::new(values[3], None),
+                momentum_alpha: Angle::new(values[4], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                momentum_delta: Angle::new(values[5], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                nutation_vel: crate::types::AngleRate::new(values[6], None),
+            }))
+        },
         _ => Err(ErrMode::Cut(InternalParserError::from_input(input))) // Unexpected type
     }
 }
@@ -194,7 +251,7 @@ pub fn aem_data(input: &mut &str, attitude_type: &str) -> KvnResult<AemData> {
         }
 
         let state = attitude_state_line(input, attitude_type)?;
-        attitude_states.push(state);
+        attitude_states.push(state.into());
     }
 
     expect_block_end("DATA").parse_next(input)?;
@@ -289,7 +346,7 @@ DATA_STOP
         let seg = &aem.body.segment[0];
         assert_eq!(seg.metadata.object_name, "MARS GLOBAL SURVEYOR");
         assert_eq!(seg.data.attitude_states.len(), 2);
-        match &seg.data.attitude_states[0] {
+        match &seg.data.attitude_states[0].content().unwrap() {
             AemAttitudeState::QuaternionEphemeris(q) => {
                 assert_eq!(q.quaternion.q1, 0.5);
             },

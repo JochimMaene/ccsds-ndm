@@ -10,9 +10,10 @@ use ccsds_ndm::{from_file, from_str, MessageType};
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
 
+mod common;
+
 fn data_dir() -> PathBuf {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir.parent().unwrap().join("data")
+    common::data_dir()
 }
 
 // ===== Test data file paths =====
@@ -34,6 +35,9 @@ fn tdm_kvn() -> PathBuf {
 fn rdm_kvn() -> PathBuf {
     data_dir().join("kvn/rdm_c1.kvn")
 }
+fn cdm_kvn() -> PathBuf {
+    data_dir().join("kvn/cdm_362.kvn")
+}
 
 fn opm_xml() -> PathBuf {
     data_dir().join("xml/opm_g5.xml")
@@ -53,402 +57,42 @@ fn tdm_xml() -> PathBuf {
 fn rdm_xml() -> PathBuf {
     data_dir().join("xml/rdm_c3.xml")
 }
-
-// ===== MessageType::to_kvn tests =====
-
-#[test]
-fn test_message_type_opm_to_kvn() {
-    let content = std::fs::read_to_string(opm_kvn()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Opm(_)));
-    let kvn = msg.to_kvn().unwrap();
-    assert!(kvn.contains("CCSDS_OPM_VERS"));
+fn cdm_xml() -> PathBuf {
+    data_dir().join("xml/cdm_44.xml")
 }
 
-#[test]
-fn test_message_type_omm_to_kvn() {
-    let content = std::fs::read_to_string(omm_kvn()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Omm(_)));
-    let kvn = msg.to_kvn().unwrap();
-    assert!(kvn.contains("CCSDS_OMM_VERS"));
+// ===== Standard API Tests (Macro) =====
+macro_rules! test_message_api {
+    ($type:ident, $kvn_path:ident, $xml_path:ident, $vers_key:expr, $xml_tag:expr) => {
+        paste::paste! {
+            #[test]
+            fn [<test_message_type_ $type:lower _to_kvn>]() {
+                let content = std::fs::read_to_string($kvn_path()).unwrap();
+                let msg = from_str(&content).unwrap();
+                assert!(matches!(msg, MessageType::$type(_)));
+                let kvn = msg.to_kvn().unwrap();
+                assert!(kvn.contains($vers_key));
+            }
+
+            #[test]
+            fn [<test_message_type_ $type:lower _to_xml>]() {
+                let content = std::fs::read_to_string($xml_path()).unwrap();
+                let msg = from_str(&content).unwrap();
+                assert!(matches!(msg, MessageType::$type(_)));
+                let xml = msg.to_xml().unwrap();
+                assert!(xml.contains(concat!("<", $xml_tag)) || xml.contains(concat!("<", $xml_tag:upper)));
+            }
+        }
+    };
 }
 
-#[test]
-fn test_message_type_oem_to_kvn() {
-    let content = std::fs::read_to_string(oem_kvn()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Oem(_)));
-    let kvn = msg.to_kvn().unwrap();
-    assert!(kvn.contains("CCSDS_OEM_VERS"));
-}
-
-#[test]
-fn test_message_type_ocm_to_kvn() {
-    let content = std::fs::read_to_string(ocm_kvn()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Ocm(_)));
-    let kvn = msg.to_kvn().unwrap();
-    assert!(kvn.contains("CCSDS_OCM_VERS"));
-}
-
-#[test]
-fn test_message_type_tdm_to_kvn() {
-    let content = std::fs::read_to_string(tdm_kvn()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Tdm(_)));
-    let kvn = msg.to_kvn().unwrap();
-    assert!(kvn.contains("CCSDS_TDM_VERS"));
-}
-
-#[test]
-fn test_message_type_rdm_to_kvn() {
-    let content = std::fs::read_to_string(rdm_kvn()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Rdm(_)));
-    let kvn = msg.to_kvn().unwrap();
-    assert!(kvn.contains("CCSDS_RDM_VERS"));
-}
-
-// ===== MessageType::to_xml tests =====
-
-#[test]
-fn test_message_type_opm_to_xml() {
-    let content = std::fs::read_to_string(opm_xml()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Opm(_)));
-    let xml = msg.to_xml().unwrap();
-    assert!(xml.contains("<opm") || xml.contains("<OPM"));
-}
-
-#[test]
-fn test_message_type_omm_to_xml() {
-    let content = std::fs::read_to_string(omm_xml()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Omm(_)));
-    let xml = msg.to_xml().unwrap();
-    assert!(xml.contains("<omm") || xml.contains("<OMM"));
-}
-
-#[test]
-fn test_message_type_oem_to_xml() {
-    let content = std::fs::read_to_string(oem_xml()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Oem(_)));
-    let xml = msg.to_xml().unwrap();
-    assert!(xml.contains("<oem") || xml.contains("<OEM"));
-}
-
-#[test]
-fn test_message_type_ocm_to_xml() {
-    let content = std::fs::read_to_string(ocm_xml()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Ocm(_)));
-    let xml = msg.to_xml().unwrap();
-    assert!(xml.contains("<ocm") || xml.contains("<OCM"));
-}
-
-#[test]
-fn test_message_type_tdm_to_xml() {
-    let content = std::fs::read_to_string(tdm_xml()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Tdm(_)));
-    let xml = msg.to_xml().unwrap();
-    assert!(xml.contains("<tdm") || xml.contains("<TDM"));
-}
-
-#[test]
-fn test_message_type_rdm_to_xml() {
-    let content = std::fs::read_to_string(rdm_xml()).unwrap();
-    let msg = from_str(&content).unwrap();
-    assert!(matches!(msg, MessageType::Rdm(_)));
-    let xml = msg.to_xml().unwrap();
-    assert!(xml.contains("<rdm") || xml.contains("<RDM"));
-}
-
-// ===== CDM tests (no file in data, parse from KVN string) =====
-
-#[test]
-fn test_message_type_cdm_to_kvn() {
-    // Create a minimal CDM KVN for testing
-    let cdm_kvn = r#"CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2024-01-01T00:00:00.000
-ORIGINATOR = ESA
-MESSAGE_FOR = SATELLITE_A
-MESSAGE_ID = 12345
-TCA = 2024-01-02T12:00:00.000
-MISS_DISTANCE = 100.0 [m]
-SCREEN_VOLUME_SHAPE = BOX
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 12345
-CATALOG_NAME = SATCAT
-OBJECT_NAME = SATELLITE_A
-INTERNATIONAL_DESIGNATOR = 2020-001A
-OBJECT_TYPE = PAYLOAD
-EPHEMERIS_NAME = NONE
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = ITRF
-GRAVITY_MODEL = EGM-96: 36D 36O
-ATMOSPHERIC_MODEL = NRLMSISE-00
-N_BODY_PERTURBATIONS = MOON,SUN
-SOLAR_RAD_PRESSURE = YES
-EARTH_TIDES = YES
-INTRACK_THRUST = NO
-TIME_LASTOB_START = 2024-01-01T00:00:00.000
-TIME_LASTOB_END = 2024-01-01T12:00:00.000
-RECOMMENDED_OD_SPAN = 7.0 [d]
-ACTUAL_OD_SPAN = 7.0 [d]
-OBS_AVAILABLE = 100
-OBS_USED = 95
-TRACKS_AVAILABLE = 10
-TRACKS_USED = 9
-RESIDUALS_ACCEPTED = 90.0 [%]
-WEIGHTED_RMS = 1.5
-COMMENT Object1 data
-AREA_PC = 10.0 [m**2]
-AREA_DRG = 10.0 [m**2]
-AREA_SRP = 10.0 [m**2]
-MASS = 1000.0 [kg]
-CD_AREA_OVER_MASS = 0.01 [m**2/kg]
-CR_AREA_OVER_MASS = 0.01 [m**2/kg]
-THRUST_ACCELERATION = 0.0 [m/s**2]
-SEDR = 0.001 [W/kg]
-X = 6500.0 [km]
-Y = 0.0 [km]
-Z = 0.0 [km]
-X_DOT = 0.0 [km/s]
-Y_DOT = 7.5 [km/s]
-Z_DOT = 0.0 [km/s]
-CR_R = 100.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 100.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 100.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 0.01 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 0.01 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 0.01 [m**2/s**2]
-OBJECT = OBJECT2
-OBJECT_DESIGNATOR = 67890
-CATALOG_NAME = SATCAT
-OBJECT_NAME = DEBRIS
-INTERNATIONAL_DESIGNATOR = 2019-005B
-OBJECT_TYPE = DEBRIS
-EPHEMERIS_NAME = NONE
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = NO
-REF_FRAME = ITRF
-GRAVITY_MODEL = EGM-96: 36D 36O
-ATMOSPHERIC_MODEL = NRLMSISE-00
-N_BODY_PERTURBATIONS = MOON,SUN
-SOLAR_RAD_PRESSURE = YES
-EARTH_TIDES = YES
-INTRACK_THRUST = NO
-TIME_LASTOB_START = 2024-01-01T00:00:00.000
-TIME_LASTOB_END = 2024-01-01T12:00:00.000
-RECOMMENDED_OD_SPAN = 7.0 [d]
-ACTUAL_OD_SPAN = 7.0 [d]
-OBS_AVAILABLE = 80
-OBS_USED = 75
-TRACKS_AVAILABLE = 8
-TRACKS_USED = 7
-RESIDUALS_ACCEPTED = 85.0 [%]
-WEIGHTED_RMS = 2.0
-AREA_PC = 5.0 [m**2]
-AREA_DRG = 5.0 [m**2]
-AREA_SRP = 5.0 [m**2]
-MASS = 500.0 [kg]
-CD_AREA_OVER_MASS = 0.01 [m**2/kg]
-CR_AREA_OVER_MASS = 0.01 [m**2/kg]
-THRUST_ACCELERATION = 0.0 [m/s**2]
-SEDR = 0.001 [W/kg]
-X = 6500.5 [km]
-Y = 0.1 [km]
-Z = 0.0 [km]
-X_DOT = 0.0 [km/s]
-Y_DOT = 7.5 [km/s]
-Z_DOT = 0.0 [km/s]
-CR_R = 100.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 100.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 100.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 0.01 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 0.01 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 0.01 [m**2/s**2]
-"#;
-    let msg = from_str(cdm_kvn).unwrap();
-    assert!(matches!(msg, MessageType::Cdm(_)));
-    let kvn = msg.to_kvn().unwrap();
-    assert!(kvn.contains("CCSDS_CDM_VERS"));
-}
-
-#[test]
-fn test_message_type_cdm_to_xml() {
-    // Create a minimal CDM, parse it, then convert to XML
-    let cdm_kvn = r#"CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2024-01-01T00:00:00.000
-ORIGINATOR = ESA
-MESSAGE_FOR = SATELLITE_A
-MESSAGE_ID = 12345
-TCA = 2024-01-02T12:00:00.000
-MISS_DISTANCE = 100.0 [m]
-SCREEN_VOLUME_SHAPE = BOX
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 12345
-CATALOG_NAME = SATCAT
-OBJECT_NAME = SATELLITE_A
-INTERNATIONAL_DESIGNATOR = 2020-001A
-OBJECT_TYPE = PAYLOAD
-EPHEMERIS_NAME = NONE
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = ITRF
-GRAVITY_MODEL = EGM-96: 36D 36O
-ATMOSPHERIC_MODEL = NRLMSISE-00
-N_BODY_PERTURBATIONS = MOON,SUN
-SOLAR_RAD_PRESSURE = YES
-EARTH_TIDES = YES
-INTRACK_THRUST = NO
-TIME_LASTOB_START = 2024-01-01T00:00:00.000
-TIME_LASTOB_END = 2024-01-01T12:00:00.000
-RECOMMENDED_OD_SPAN = 7.0 [d]
-ACTUAL_OD_SPAN = 7.0 [d]
-OBS_AVAILABLE = 100
-OBS_USED = 95
-TRACKS_AVAILABLE = 10
-TRACKS_USED = 9
-RESIDUALS_ACCEPTED = 90.0 [%]
-WEIGHTED_RMS = 1.5
-COMMENT Object1 data
-AREA_PC = 10.0 [m**2]
-AREA_DRG = 10.0 [m**2]
-AREA_SRP = 10.0 [m**2]
-MASS = 1000.0 [kg]
-CD_AREA_OVER_MASS = 0.01 [m**2/kg]
-CR_AREA_OVER_MASS = 0.01 [m**2/kg]
-THRUST_ACCELERATION = 0.0 [m/s**2]
-SEDR = 0.001 [W/kg]
-X = 6500.0 [km]
-Y = 0.0 [km]
-Z = 0.0 [km]
-X_DOT = 0.0 [km/s]
-Y_DOT = 7.5 [km/s]
-Z_DOT = 0.0 [km/s]
-CR_R = 100.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 100.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 100.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 0.01 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 0.01 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 0.01 [m**2/s**2]
-OBJECT = OBJECT2
-OBJECT_DESIGNATOR = 67890
-CATALOG_NAME = SATCAT
-OBJECT_NAME = DEBRIS
-INTERNATIONAL_DESIGNATOR = 2019-005B
-OBJECT_TYPE = DEBRIS
-EPHEMERIS_NAME = NONE
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = NO
-REF_FRAME = ITRF
-GRAVITY_MODEL = EGM-96: 36D 36O
-ATMOSPHERIC_MODEL = NRLMSISE-00
-N_BODY_PERTURBATIONS = MOON,SUN
-SOLAR_RAD_PRESSURE = YES
-EARTH_TIDES = YES
-INTRACK_THRUST = NO
-TIME_LASTOB_START = 2024-01-01T00:00:00.000
-TIME_LASTOB_END = 2024-01-01T12:00:00.000
-RECOMMENDED_OD_SPAN = 7.0 [d]
-ACTUAL_OD_SPAN = 7.0 [d]
-OBS_AVAILABLE = 80
-OBS_USED = 75
-TRACKS_AVAILABLE = 8
-TRACKS_USED = 7
-RESIDUALS_ACCEPTED = 85.0 [%]
-WEIGHTED_RMS = 2.0
-AREA_PC = 5.0 [m**2]
-AREA_DRG = 5.0 [m**2]
-AREA_SRP = 5.0 [m**2]
-MASS = 500.0 [kg]
-CD_AREA_OVER_MASS = 0.01 [m**2/kg]
-CR_AREA_OVER_MASS = 0.01 [m**2/kg]
-THRUST_ACCELERATION = 0.0 [m/s**2]
-SEDR = 0.001 [W/kg]
-X = 6500.5 [km]
-Y = 0.1 [km]
-Z = 0.0 [km]
-X_DOT = 0.0 [km/s]
-Y_DOT = 7.5 [km/s]
-Z_DOT = 0.0 [km/s]
-CR_R = 100.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 100.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 100.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 0.01 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 0.01 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 0.01 [m**2/s**2]
-"#;
-    let msg = from_str(cdm_kvn).unwrap();
-    assert!(matches!(msg, MessageType::Cdm(_)));
-    let xml = msg.to_xml().unwrap();
-    assert!(xml.contains("<cdm") || xml.contains("<CDM"));
-}
+test_message_api!(Opm, opm_kvn, opm_xml, "CCSDS_OPM_VERS", "opm");
+test_message_api!(Omm, omm_kvn, omm_xml, "CCSDS_OMM_VERS", "omm");
+test_message_api!(Oem, oem_kvn, oem_xml, "CCSDS_OEM_VERS", "oem");
+test_message_api!(Ocm, ocm_kvn, ocm_xml, "CCSDS_OCM_VERS", "ocm");
+test_message_api!(Tdm, tdm_kvn, tdm_xml, "CCSDS_TDM_VERS", "tdm");
+test_message_api!(Rdm, rdm_kvn, rdm_xml, "CCSDS_RDM_VERS", "rdm");
+test_message_api!(Cdm, cdm_kvn, cdm_xml, "CCSDS_CDM_VERS", "cdm");
 
 // ===== to_kvn_file and to_xml_file tests =====
 

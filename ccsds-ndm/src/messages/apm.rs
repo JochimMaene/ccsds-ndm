@@ -95,7 +95,6 @@ impl ToKvn for ApmBody {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct ApmSegment {
     pub metadata: ApmMetadata,
     pub data: ApmData,

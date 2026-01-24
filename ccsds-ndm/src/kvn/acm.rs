@@ -13,7 +13,6 @@ use winnow::combinator::terminated;
 use winnow::prelude::*;
 use winnow::error::{ErrMode, FromExternalError};
 use std::str::FromStr;
-use crate::types::{AngleUnits, SensorNoise};
 
 //----------------------------------------------------------------------
 // ACM Version Parser
@@ -120,6 +119,7 @@ fn parse_phys_block(input: &mut &str) -> KvnResult<AcmPhysicalDescription> {
         "CP_X" => val: kv_float => { block.cp.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[0] = val; },
         "CP_Y" => val: kv_float => { block.cp.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[1] = val; },
         "CP_Z" => val: kv_float => { block.cp.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[2] = val; },
+        "CP" => val: kv_vector3 => { block.cp = Some(crate::types::Vector3 { elements: val, units: None }); },
         "INERTIA_REF_FRAME" => val: kv_string => { block.inertia_ref_frame = Some(val); },
         "IXX" => val: kv_from_kvn => { block.ixx = Some(val); },
         "IYY" => val: kv_from_kvn => { block.iyy = Some(val); },
@@ -180,6 +180,7 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
         "TARGET_MOM_X" => val: kv_float => { block.target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[0] = val; },
         "TARGET_MOM_Y" => val: kv_float => { block.target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[1] = val; },
         "TARGET_MOM_Z" => val: kv_float => { block.target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[2] = val; },
+        "TARGET_MOMENTUM" => val: kv_vector3 => { block.target_momentum = Some(crate::types::TargetMomentum { elements: val, units: None }); },
         "TARGET_MOM_FRAME" => val: kv_string => { block.target_mom_frame = Some(val); },
     }, |i| at_block_end("MAN", i));
 
@@ -187,18 +188,26 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
     Ok(block)
 }
 
-fn kv_sensor_noise(input: &mut &str) -> KvnResult<SensorNoise> {
+fn kv_sensor_noise(input: &mut &str) -> KvnResult<crate::types::SensorNoise> {
     let (val_str, unit_str) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
     let values = val_str.split_whitespace()
         .map(|s| s.parse::<f64>().map_err(|_| ErrMode::Cut(InternalParserError::from_input(input))))
         .collect::<Result<Vec<_>, _>>()?;
     
     let units = if let Some(u) = unit_str {
-        Some(AngleUnits::from_str(u).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?)
+        Some(crate::types::AngleUnits::from_str(u).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?)
     } else {
         None
     };
-    Ok(SensorNoise { values, units })
+    Ok(crate::types::SensorNoise { values, units })
+}
+
+fn kv_vector3(input: &mut &str) -> KvnResult<Vec<f64>> {
+    let (val_str, _unit_str) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
+    let values = val_str.split_whitespace()
+        .map(|s| s.parse::<f64>().map_err(|_| ErrMode::Cut(InternalParserError::from_input(input))))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(values)
 }
 
 fn parse_sensor_block(input: &mut &str) -> KvnResult<AcmSensor> {
@@ -233,6 +242,8 @@ fn parse_ad_block(input: &mut &str) -> KvnResult<AcmAttitudeDetermination> {
         "RATE_STATES" => val: kv_string => { block.rate_states = Some(val); },
         "SIGMA_U" => val: kv_from_kvn => { block.sigma_u = Some(val); },
         "SIGMA_V" => val: kv_from_kvn => { block.sigma_v = Some(val); },
+        "NUMBER_STATES" => _val: kv_u32 => { /* Ignore */ },
+        "COV_TYPE" => _val: kv_string => { /* Ignore */ },
     }, |i| at_block_start("SENSOR", i) || at_block_end("AD", i));
 
     loop {

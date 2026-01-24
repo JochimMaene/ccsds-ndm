@@ -43,16 +43,17 @@ pub fn apm_metadata(input: &mut &str) -> KvnResult<ApmMetadata> {
     let mut center_name = None;
     let mut time_system = None;
 
-    expect_block_start("META").parse_next(input)?;
+    // META_START is optional in some APM examples (e.g. apm_g1.kvn)
+    let _ = winnow::combinator::opt(expect_block_start("META")).parse_next(input)?;
 
     parse_block!(input, comment, {
         "OBJECT_NAME" => object_name: kv_string,
         "OBJECT_ID" => object_id: kv_string,
         "CENTER_NAME" => center_name: kv_string,
         "TIME_SYSTEM" => time_system: kv_string,
-    }, |i: &mut &str| at_block_end("META", i));
+    }, |i: &mut &str| at_block_end("META", i) || at_block_start("QUAT", i) || at_block_start("EULER", i) || at_block_start("ANGVEL", i) || at_block_start("SPIN", i) || at_block_start("INERTIA", i) || at_block_start("MAN", i) || expect_key("EPOCH").parse_peek(i).is_ok());
 
-    expect_block_end("META").parse_next(input)?;
+    let _ = winnow::combinator::opt(expect_block_end("META")).parse_next(input)?;
 
     Ok(ApmMetadata {
         comment,
@@ -401,16 +402,6 @@ pub fn parse_apm(input: &mut &str) -> KvnResult<Apm> {
     let header = adm_header.parse_next(input)?;
 
     let _ = skip_empty_lines.parse_next(input);
-    
-    // We expect exactly ONE segment logic:
-    // "META_START" must follow
-    // But apm_segment expects META_START.
-    // So we just call apm_segment?
-    // Check if META_START is present.
-    if !at_block_start("META", input) {
-        return Err(cut_err(input, "Expected META_START for APM segment"));
-    }
-
     let segment = apm_segment.parse_next(input)?;
 
     Ok(Apm {

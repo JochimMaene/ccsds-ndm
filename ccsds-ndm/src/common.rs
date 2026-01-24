@@ -394,6 +394,7 @@ impl ToKvn for StateVectorAcc {
 
 // Quaternion (components each in [-1, 1])
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct Quaternion {
     pub q1: f64,
     pub q2: f64,
@@ -419,6 +420,7 @@ impl Quaternion {
 
 // Quaternion derivative (dot components with units 1/s)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionDot {
     pub q1_dot: QuaternionDotComponent,
     pub q2_dot: QuaternionDotComponent,
@@ -525,13 +527,14 @@ pub struct QuaternionState {
     /// **Units**: dimensionless
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[serde(rename = "quaternion")]
     pub quaternion: Quaternion,
     /// Time derivatives of quaternion components Q1, Q2, Q3, QC.
     ///
     /// **Units**: 1/s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "quaternionDot")]
     pub quaternion_dot: Option<QuaternionDot>,
 }
 
@@ -931,6 +934,7 @@ pub struct QuaternionEphemeris {
     /// Epoch of the attitude state.
     pub epoch: Epoch,
     /// Quaternion components Q1, Q2, Q3, QC.
+    #[serde(rename = "quaternion")]
     pub quaternion: Quaternion,
 }
 
@@ -950,8 +954,10 @@ pub struct QuaternionDerivative {
     /// Epoch of the attitude state.
     pub epoch: Epoch,
     /// Quaternion components Q1, Q2, Q3, QC.
+    #[serde(rename = "quaternion")]
     pub quaternion: Quaternion,
     /// Quaternion derivatives Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT.
+    #[serde(rename = "quaternionDot")]
     pub quaternion_dot: QuaternionDot,
 }
 
@@ -973,8 +979,10 @@ pub struct QuaternionAngVel {
     /// Epoch of the attitude state.
     pub epoch: Epoch,
     /// Quaternion components Q1, Q2, Q3, QC.
+    #[serde(rename = "quaternion")]
     pub quaternion: Quaternion,
     /// Angular velocity components ANGVEL_X, ANGVEL_Y, ANGVEL_Z.
+    #[serde(rename = "angVel")]
     pub ang_vel: AngVel,
 }
 
@@ -1055,8 +1063,15 @@ pub struct EulerAngleAngVel {
     pub angle_2: Angle,
     /// Angle of the third rotation.
     pub angle_3: Angle,
-    /// Angular velocity components ANGVEL_X, ANGVEL_Y, ANGVEL_Z.
-    pub ang_vel: AngVel,
+    /// Angular velocity component X.
+    #[serde(rename = "ANGVEL_X")]
+    pub angvel_x: AngleRate,
+    /// Angular velocity component Y.
+    #[serde(rename = "ANGVEL_Y")]
+    pub angvel_y: AngleRate,
+    /// Angular velocity component Z.
+    #[serde(rename = "ANGVEL_Z")]
+    pub angvel_z: AngleRate,
 }
 
 impl ToKvn for EulerAngleAngVel {
@@ -1065,10 +1080,12 @@ impl ToKvn for EulerAngleAngVel {
         line.push_str(&format!(" {} {} {}", 
             self.angle_1.value, self.angle_2.value, self.angle_3.value));
         line.push_str(&format!(" {} {} {}", 
-            self.ang_vel.angvel_x.value, self.ang_vel.angvel_y.value, self.ang_vel.angvel_z.value));
+            self.angvel_x.value, self.angvel_y.value, self.angvel_z.value));
         writer.write_line(&line);
     }
 }
+
+
 
 /// AEM Attitude Ephemeris Data Line: Spin.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
