@@ -4,8 +4,8 @@
 
 use crate::common::AdmHeader;
 use crate::error::Result;
-use crate::kvn::ser::KvnWriter;
 use crate::kvn::parser::ParseKvn;
+use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
@@ -261,7 +261,6 @@ pub struct AemMetadata {
     pub interpolation_degree: Option<std::num::NonZeroU32>,
 }
 
-
 impl ToKvn for AemMetadata {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -316,15 +315,24 @@ pub struct AemData {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct AemAttitudeStateWrapper {
-    #[serde(rename = "quaternionEphemeris", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "quaternionEphemeris",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub quaternion_ephemeris: Option<crate::common::QuaternionEphemeris>,
-    #[serde(rename = "quaternionDerivative", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "quaternionDerivative",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub quaternion_derivative: Option<crate::common::QuaternionDerivative>,
     #[serde(rename = "quaternionAngVel", skip_serializing_if = "Option::is_none")]
     pub quaternion_ang_vel: Option<crate::common::QuaternionAngVel>,
     #[serde(rename = "eulerAngle", skip_serializing_if = "Option::is_none")]
     pub euler_angle: Option<crate::common::EulerAngle>,
-    #[serde(rename = "eulerAngleDerivative", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "eulerAngleDerivative",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub euler_angle_derivative: Option<crate::common::EulerAngleDerivative>,
     #[serde(rename = "eulerAngleAngVel", skip_serializing_if = "Option::is_none")]
     pub euler_angle_ang_vel: Option<crate::common::EulerAngleAngVel>,
@@ -350,15 +358,27 @@ impl From<crate::common::AemAttitudeState> for AemAttitudeStateWrapper {
             spin_nutation_mom: None,
         };
         match state {
-            crate::common::AemAttitudeState::QuaternionEphemeris(v) => wrapper.quaternion_ephemeris = Some(v),
-            crate::common::AemAttitudeState::QuaternionDerivative(v) => wrapper.quaternion_derivative = Some(v),
-            crate::common::AemAttitudeState::QuaternionAngVel(v) => wrapper.quaternion_ang_vel = Some(v),
+            crate::common::AemAttitudeState::QuaternionEphemeris(v) => {
+                wrapper.quaternion_ephemeris = Some(v)
+            }
+            crate::common::AemAttitudeState::QuaternionDerivative(v) => {
+                wrapper.quaternion_derivative = Some(v)
+            }
+            crate::common::AemAttitudeState::QuaternionAngVel(v) => {
+                wrapper.quaternion_ang_vel = Some(v)
+            }
             crate::common::AemAttitudeState::EulerAngle(v) => wrapper.euler_angle = Some(v),
-            crate::common::AemAttitudeState::EulerAngleDerivative(v) => wrapper.euler_angle_derivative = Some(v),
-            crate::common::AemAttitudeState::EulerAngleAngVel(v) => wrapper.euler_angle_ang_vel = Some(v),
+            crate::common::AemAttitudeState::EulerAngleDerivative(v) => {
+                wrapper.euler_angle_derivative = Some(v)
+            }
+            crate::common::AemAttitudeState::EulerAngleAngVel(v) => {
+                wrapper.euler_angle_ang_vel = Some(v)
+            }
             crate::common::AemAttitudeState::Spin(v) => wrapper.spin = Some(v),
             crate::common::AemAttitudeState::SpinNutation(v) => wrapper.spin_nutation = Some(v),
-            crate::common::AemAttitudeState::SpinNutationMom(v) => wrapper.spin_nutation_mom = Some(v),
+            crate::common::AemAttitudeState::SpinNutationMom(v) => {
+                wrapper.spin_nutation_mom = Some(v)
+            }
         }
         wrapper
     }
@@ -366,15 +386,39 @@ impl From<crate::common::AemAttitudeState> for AemAttitudeStateWrapper {
 
 impl AemAttitudeStateWrapper {
     pub fn content(&self) -> Option<crate::common::AemAttitudeState> {
-        if let Some(v) = &self.quaternion_ephemeris { return Some(crate::common::AemAttitudeState::QuaternionEphemeris(v.clone())); }
-        if let Some(v) = &self.quaternion_derivative { return Some(crate::common::AemAttitudeState::QuaternionDerivative(v.clone())); }
-        if let Some(v) = &self.quaternion_ang_vel { return Some(crate::common::AemAttitudeState::QuaternionAngVel(v.clone())); }
-        if let Some(v) = &self.euler_angle { return Some(crate::common::AemAttitudeState::EulerAngle(v.clone())); }
-        if let Some(v) = &self.euler_angle_derivative { return Some(crate::common::AemAttitudeState::EulerAngleDerivative(v.clone())); }
-        if let Some(v) = &self.euler_angle_ang_vel { return Some(crate::common::AemAttitudeState::EulerAngleAngVel(v.clone())); }
-        if let Some(v) = &self.spin { return Some(crate::common::AemAttitudeState::Spin(v.clone())); }
-        if let Some(v) = &self.spin_nutation { return Some(crate::common::AemAttitudeState::SpinNutation(v.clone())); }
-        if let Some(v) = &self.spin_nutation_mom { return Some(crate::common::AemAttitudeState::SpinNutationMom(v.clone())); }
+        if let Some(v) = &self.quaternion_ephemeris {
+            return Some(crate::common::AemAttitudeState::QuaternionEphemeris(
+                v.clone(),
+            ));
+        }
+        if let Some(v) = &self.quaternion_derivative {
+            return Some(crate::common::AemAttitudeState::QuaternionDerivative(
+                v.clone(),
+            ));
+        }
+        if let Some(v) = &self.quaternion_ang_vel {
+            return Some(crate::common::AemAttitudeState::QuaternionAngVel(v.clone()));
+        }
+        if let Some(v) = &self.euler_angle {
+            return Some(crate::common::AemAttitudeState::EulerAngle(v.clone()));
+        }
+        if let Some(v) = &self.euler_angle_derivative {
+            return Some(crate::common::AemAttitudeState::EulerAngleDerivative(
+                v.clone(),
+            ));
+        }
+        if let Some(v) = &self.euler_angle_ang_vel {
+            return Some(crate::common::AemAttitudeState::EulerAngleAngVel(v.clone()));
+        }
+        if let Some(v) = &self.spin {
+            return Some(crate::common::AemAttitudeState::Spin(v.clone()));
+        }
+        if let Some(v) = &self.spin_nutation {
+            return Some(crate::common::AemAttitudeState::SpinNutation(v.clone()));
+        }
+        if let Some(v) = &self.spin_nutation_mom {
+            return Some(crate::common::AemAttitudeState::SpinNutationMom(v.clone()));
+        }
         None
     }
 }
@@ -393,5 +437,79 @@ impl ToKvn for AemData {
         for state in &self.attitude_states {
             state.write_kvn(writer);
         }
+    }
+}
+
+//----------------------------------------------------------------------
+// Tests
+//----------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_aem_kvn() -> String {
+        r#"CCSDS_AEM_VERS = 1.0
+CREATION_DATE = 2002-11-04T17:22:31
+ORIGINATOR = NASA/JPL
+META_START
+OBJECT_NAME = MARS GLOBAL SURVEYOR
+OBJECT_ID = 1996-062A
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
+TIME_SYSTEM = UTC
+START_TIME = 2002-12-18T12:00:00.000
+STOP_TIME = 2002-12-18T12:01:00.000
+ATTITUDE_TYPE = QUATERNION
+META_STOP
+DATA_START
+2002-12-18T12:00:00.000 0.5 0.5 0.5 0.5
+2002-12-18T12:01:00.000 0.5 0.5 0.5 0.5
+DATA_STOP
+"#
+        .to_string()
+    }
+
+    #[test]
+    fn parse_aem_success() {
+        let kvn = sample_aem_kvn();
+        let aem = Aem::from_kvn(&kvn).expect("AEM parse failed");
+
+        assert_eq!(aem.version, "1.0");
+        assert_eq!(aem.body.segment.len(), 1);
+        let seg = &aem.body.segment[0];
+        assert_eq!(seg.metadata.object_name, "MARS GLOBAL SURVEYOR");
+        assert_eq!(seg.data.attitude_states.len(), 2);
+    }
+
+    #[test]
+    fn test_aem_missing_mandatory_metadata() {
+        let kvn = r#"CCSDS_AEM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_ID = 999
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+ATTITUDE_TYPE = QUATERNION
+META_STOP
+DATA_START
+2023-01-01T00:00:00 0 0 0 1
+DATA_STOP
+"#;
+        // Missing OBJECT_NAME
+        assert!(Aem::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_aem_invalid_time_range() {
+        // Technically validation could check if STOP_TIME > START_TIME
+        // Our current validate() is empty, but we can still check parsing
+        let kvn = sample_aem_kvn();
+        let aem = Aem::from_kvn(&kvn).unwrap();
+        assert!(aem.body.segment[0].metadata.stop_time > aem.body.segment[0].metadata.start_time);
     }
 }

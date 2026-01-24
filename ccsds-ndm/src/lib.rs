@@ -16,6 +16,9 @@
 //! - **CDM** - Conjunction Data Message
 //! - **TDM** - Tracking Data Message
 //! - **RDM** - Reentry Data Message
+//! - **APM** - Attitude Parameter Message
+//! - **AEM** - Attitude Ephemeris Message
+//! - **ACM** - Attitude Comprehensive Message
 //!
 //! ## Quick Start
 //!
@@ -62,8 +65,6 @@ pub mod traits;
 pub mod types;
 pub mod utils;
 pub mod xml;
-
-
 
 use error::{CcsdsNdmError, Result};
 use std::fs;

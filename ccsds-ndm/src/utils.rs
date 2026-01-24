@@ -3,13 +3,17 @@
 // SPDX-License-Identifier: MPL-2.0
 
 pub mod vec_f64_space_sep {
-    use serde::{Deserializer, Serializer, Deserialize};
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(values: &[f64], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let s = values.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(" ");
+        let s = values
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
         serializer.serialize_str(&s)
     }
 

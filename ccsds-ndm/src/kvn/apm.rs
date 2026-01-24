@@ -5,14 +5,15 @@
 //! Winnow parsers for APM (Attitude Parameter Message).
 
 use crate::common::{
-    AngVelState, EulerAngleState, InertiaState, Quaternion, QuaternionDot, QuaternionState, SpinState,
+    AngVelState, EulerAngleState, InertiaState, Quaternion, QuaternionDot, QuaternionState,
+    SpinState,
 };
 // But QuaternionState etc are in common.
+use crate::common::AttManeuverState;
+use crate::error::InternalParserError;
 use crate::kvn::parser::*;
 use crate::messages::apm::{Apm, ApmBody, ApmData, ApmMetadata, ApmSegment};
-use crate::common::AttManeuverState;
 use crate::parse_block;
-use crate::error::InternalParserError;
 use std::str::FromStr;
 use winnow::error::{ErrMode, FromExternalError};
 use winnow::prelude::*;
@@ -57,10 +58,13 @@ pub fn apm_metadata(input: &mut &str) -> KvnResult<ApmMetadata> {
 
     Ok(ApmMetadata {
         comment,
-        object_name: object_name.ok_or_else(|| missing_field_err(input, "APM Metadata", "OBJECT_NAME"))?,
-        object_id: object_id.ok_or_else(|| missing_field_err(input, "APM Metadata", "OBJECT_ID"))?,
+        object_name: object_name
+            .ok_or_else(|| missing_field_err(input, "APM Metadata", "OBJECT_NAME"))?,
+        object_id: object_id
+            .ok_or_else(|| missing_field_err(input, "APM Metadata", "OBJECT_ID"))?,
         center_name,
-        time_system: time_system.ok_or_else(|| missing_field_err(input, "APM Metadata", "TIME_SYSTEM"))?,
+        time_system: time_system
+            .ok_or_else(|| missing_field_err(input, "APM Metadata", "TIME_SYSTEM"))?,
     })
 }
 
@@ -102,18 +106,20 @@ pub fn quaternion_state(input: &mut &str) -> KvnResult<QuaternionState> {
         q2.ok_or_else(|| missing_field_err(input, "QUAT", "Q2"))?,
         q3.ok_or_else(|| missing_field_err(input, "QUAT", "Q3"))?,
         qc.ok_or_else(|| missing_field_err(input, "QUAT", "QC"))?,
-    ).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
+    )
+    .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
 
-    let quaternion_dot = if q1_dot.is_some() || q2_dot.is_some() || q3_dot.is_some() || qc_dot.is_some() {
-        Some(QuaternionDot {
-            q1_dot: q1_dot.ok_or_else(|| missing_field_err(input, "QUAT", "Q1_DOT"))?,
-            q2_dot: q2_dot.ok_or_else(|| missing_field_err(input, "QUAT", "Q2_DOT"))?,
-            q3_dot: q3_dot.ok_or_else(|| missing_field_err(input, "QUAT", "Q3_DOT"))?,
-            qc_dot: qc_dot.ok_or_else(|| missing_field_err(input, "QUAT", "QC_DOT"))?,
-        })
-    } else {
-        None
-    };
+    let quaternion_dot =
+        if q1_dot.is_some() || q2_dot.is_some() || q3_dot.is_some() || qc_dot.is_some() {
+            Some(QuaternionDot {
+                q1_dot: q1_dot.ok_or_else(|| missing_field_err(input, "QUAT", "Q1_DOT"))?,
+                q2_dot: q2_dot.ok_or_else(|| missing_field_err(input, "QUAT", "Q2_DOT"))?,
+                q3_dot: q3_dot.ok_or_else(|| missing_field_err(input, "QUAT", "Q3_DOT"))?,
+                qc_dot: qc_dot.ok_or_else(|| missing_field_err(input, "QUAT", "QC_DOT"))?,
+            })
+        } else {
+            None
+        };
 
     Ok(QuaternionState {
         comment,
@@ -155,7 +161,8 @@ pub fn euler_angle_state(input: &mut &str) -> KvnResult<EulerAngleState> {
         comment,
         ref_frame_a: ref_frame_a.ok_or_else(|| missing_field_err(input, "EULER", "REF_FRAME_A"))?,
         ref_frame_b: ref_frame_b.ok_or_else(|| missing_field_err(input, "EULER", "REF_FRAME_B"))?,
-        euler_rot_seq: euler_rot_seq.ok_or_else(|| missing_field_err(input, "EULER", "EULER_ROT_SEQ"))?,
+        euler_rot_seq: euler_rot_seq
+            .ok_or_else(|| missing_field_err(input, "EULER", "EULER_ROT_SEQ"))?,
         angle_1: angle_1.ok_or_else(|| missing_field_err(input, "EULER", "ANGLE_1"))?,
         angle_2: angle_2.ok_or_else(|| missing_field_err(input, "EULER", "ANGLE_2"))?,
         angle_3: angle_3.ok_or_else(|| missing_field_err(input, "EULER", "ANGLE_3"))?,
@@ -199,8 +206,10 @@ pub fn ang_vel_state(input: &mut &str) -> KvnResult<AngVelState> {
 
     Ok(AngVelState {
         comment,
-        ref_frame_a: ref_frame_a.ok_or_else(|| missing_field_err(input, "ANGVEL", "REF_FRAME_A"))?,
-        ref_frame_b: ref_frame_b.ok_or_else(|| missing_field_err(input, "ANGVEL", "REF_FRAME_B"))?,
+        ref_frame_a: ref_frame_a
+            .ok_or_else(|| missing_field_err(input, "ANGVEL", "REF_FRAME_A"))?,
+        ref_frame_b: ref_frame_b
+            .ok_or_else(|| missing_field_err(input, "ANGVEL", "REF_FRAME_B"))?,
         angvel_frame: angvel_frame.unwrap_or_default(), // FIXME: handle correctly, maybe parsing as string?
         angvel_x: angvel_x.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_X"))?,
         angvel_y: angvel_y.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_Y"))?,
@@ -250,7 +259,8 @@ pub fn spin_state(input: &mut &str) -> KvnResult<SpinState> {
         spin_alpha: spin_alpha.ok_or_else(|| missing_field_err(input, "SPIN", "SPIN_ALPHA"))?,
         spin_delta: spin_delta.ok_or_else(|| missing_field_err(input, "SPIN", "SPIN_DELTA"))?,
         spin_angle: spin_angle.ok_or_else(|| missing_field_err(input, "SPIN", "SPIN_ANGLE"))?,
-        spin_angle_vel: spin_angle_vel.ok_or_else(|| missing_field_err(input, "SPIN", "SPIN_ANGLE_VEL"))?,
+        spin_angle_vel: spin_angle_vel
+            .ok_or_else(|| missing_field_err(input, "SPIN", "SPIN_ANGLE_VEL"))?,
         nutation,
         nutation_per,
         nutation_phase,
@@ -285,7 +295,8 @@ pub fn inertia_state(input: &mut &str) -> KvnResult<InertiaState> {
 
     Ok(InertiaState {
         comment,
-        inertia_ref_frame: inertia_ref_frame.ok_or_else(|| missing_field_err(input, "INERTIA", "INERTIA_REF_FRAME"))?,
+        inertia_ref_frame: inertia_ref_frame
+            .ok_or_else(|| missing_field_err(input, "INERTIA", "INERTIA_REF_FRAME"))?,
         ixx: ixx.ok_or_else(|| missing_field_err(input, "INERTIA", "IXX"))?,
         iyy: iyy.ok_or_else(|| missing_field_err(input, "INERTIA", "IYY"))?,
         izz: izz.ok_or_else(|| missing_field_err(input, "INERTIA", "IZZ"))?,
@@ -321,9 +332,12 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<AttManeuverState> {
 
     Ok(AttManeuverState {
         comment,
-        man_epoch_start: man_epoch_start.ok_or_else(|| missing_field_err(input, "MAN", "MAN_EPOCH_START"))?,
-        man_duration: man_duration.ok_or_else(|| missing_field_err(input, "MAN", "MAN_DURATION"))?,
-        man_ref_frame: man_ref_frame.ok_or_else(|| missing_field_err(input, "MAN", "MAN_REF_FRAME"))?,
+        man_epoch_start: man_epoch_start
+            .ok_or_else(|| missing_field_err(input, "MAN", "MAN_EPOCH_START"))?,
+        man_duration: man_duration
+            .ok_or_else(|| missing_field_err(input, "MAN", "MAN_DURATION"))?,
+        man_ref_frame: man_ref_frame
+            .ok_or_else(|| missing_field_err(input, "MAN", "MAN_REF_FRAME"))?,
         man_tor_x: man_tor_x.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_X"))?,
         man_tor_y: man_tor_y.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_Y"))?,
         man_tor_z: man_tor_z.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_Z"))?,
@@ -337,14 +351,15 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<AttManeuverState> {
 
 pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
     // APM Data Section parsing
-    
+
     // First, comments are allowed before EPOCH
     let mut comment = Vec::new();
     comment.extend(collect_comments.parse_next(input)?);
 
     // EPOCH is mandatory and usually the first key in data section
     let (epoch, _) = expect_key("EPOCH").parse_next(input)?;
-    let epoch = crate::types::Epoch::from_str(epoch).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
+    let epoch = crate::types::Epoch::from_str(epoch)
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
 
     let mut quaternion_state = Vec::new();
     let mut euler_angle_state = Vec::new();
@@ -356,7 +371,7 @@ pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
     // Logical blocks can appear in any order.
     loop {
         let _ = skip_empty_lines.parse_next(input);
-        
+
         // Check for recognized blocks using lookahead or just trying parsers
         // We use at_block_start to check which one it is.
         if at_block_start("QUAT", input) {
@@ -372,8 +387,8 @@ pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
         } else if at_block_start("MAN", input) {
             maneuver_parameters.push(self::maneuver_parameters.parse_next(input)?);
         } else {
-             // Unknown block or end of stream.
-             break;
+            // Unknown block or end of stream.
+            break;
         }
     }
 
@@ -447,7 +462,10 @@ QUAT_STOP
 "#;
         let apm = Apm::from_kvn(input).unwrap();
         assert_eq!(apm.version, "2.0");
-        assert_eq!(apm.body.segment.metadata.object_name, "MARS GLOBAL SURVEYOR");
+        assert_eq!(
+            apm.body.segment.metadata.object_name,
+            "MARS GLOBAL SURVEYOR"
+        );
         let q_state = &apm.body.segment.data.quaternion_state[0];
         assert_eq!(q_state.quaternion.q1, 0.5);
     }

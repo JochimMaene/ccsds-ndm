@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::{
-    AdmHeader, AngVelState, AttManeuverState, EulerAngleState, InertiaState, QuaternionState, SpinState,
+    AdmHeader, AngVelState, AttManeuverState, EulerAngleState, InertiaState, QuaternionState,
+    SpinState,
 };
 
 use crate::error::{Result, ValidationError};
-use crate::kvn::ser::KvnWriter;
 use crate::kvn::parser::ParseKvn;
+use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
@@ -212,19 +213,31 @@ pub struct ApmData {
     /// (See annex F for conventions and further detail.)
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(rename = "quaternionState", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "quaternionState",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub quaternion_state: Vec<QuaternionState>,
     /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
     /// block is present. (See annex F for conventions and further detail.)
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(rename = "eulerAngleState", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "eulerAngleState",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub euler_angle_state: Vec<EulerAngleState>,
     /// Angular velocity vector. All mandatory elements are to be provided if the block is present.
     /// (See annex F for conventions and further detail.)
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(rename = "angularVelocity", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "angularVelocity",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub angular_velocity: Vec<AngVelState>,
     /// Spin. All mandatory elements are to be provided if the block is present. (See annex F for
     /// conventions and further detail.)
@@ -242,7 +255,11 @@ pub struct ApmData {
     /// (See annex F for conventions and further detail.)
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(rename = "maneuverParameters", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "maneuverParameters",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub maneuver_parameters: Vec<AttManeuverState>,
 }
 
@@ -255,11 +272,12 @@ impl ApmData {
             && self.inertia.is_empty()
             && self.maneuver_parameters.is_empty()
         {
-             return Err(ValidationError::MissingRequiredField {
-                 block: "APM Data".into(),
-                 field: "At least one logical block".into(),
-                 line: None,
-             }.into());
+            return Err(ValidationError::MissingRequiredField {
+                block: "APM Data".into(),
+                field: "At least one logical block".into(),
+                line: None,
+            }
+            .into());
         }
         Ok(())
     }
@@ -305,5 +323,117 @@ impl ToKvn for ApmData {
             writer.write_line("MAN_STOP");
             writer.write_line("");
         }
+    }
+}
+
+//----------------------------------------------------------------------
+// Tests
+//----------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_apm_kvn() -> String {
+        r#"CCSDS_APM_VERS = 2.0
+CREATION_DATE = 2002-11-04T17:22:31
+ORIGINATOR = NASA/JPL
+META_START
+OBJECT_NAME = MARS GLOBAL SURVEYOR
+OBJECT_ID = 1996-062A
+TIME_SYSTEM = UTC
+META_STOP
+EPOCH = 2002-11-04T17:22:31
+QUAT_START
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
+Q1 = 0.5
+Q2 = 0.5
+Q3 = 0.5
+QC = 0.5
+QUAT_STOP
+"#
+        .to_string()
+    }
+
+    #[test]
+    fn parse_apm_success() {
+        let kvn = sample_apm_kvn();
+        let apm = Apm::from_kvn(&kvn).expect("APM parse failed");
+
+        assert_eq!(apm.version, "2.0");
+        assert_eq!(
+            apm.body.segment.metadata.object_name,
+            "MARS GLOBAL SURVEYOR"
+        );
+        assert_eq!(apm.body.segment.data.quaternion_state.len(), 1);
+        assert_eq!(apm.body.segment.data.quaternion_state[0].quaternion.q1, 0.5);
+    }
+
+    #[test]
+    fn test_apm_validation_empty_data() {
+        let kvn = r#"CCSDS_APM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+TIME_SYSTEM = UTC
+EPOCH = 2023-01-01T00:00:00
+"#;
+        // Should fail because there are no data blocks
+        let res = Apm::from_kvn(kvn);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_apm_missing_mandatory_metadata() {
+        let kvn = r#"CCSDS_APM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_ID = 999
+TIME_SYSTEM = UTC
+EPOCH = 2023-01-01T00:00:00
+QUAT_START
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+Q1 = 0
+Q2 = 0
+Q3 = 0
+QC = 1
+QUAT_STOP
+"#;
+        // Missing OBJECT_NAME
+        assert!(Apm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_apm_multiple_blocks() {
+        let kvn = r#"CCSDS_APM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+TIME_SYSTEM = UTC
+EPOCH = 2023-01-01T00:00:00
+QUAT_START
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+Q1 = 0
+Q2 = 0
+Q3 = 0
+QC = 1
+QUAT_STOP
+EULER_START
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+EULER_ROT_SEQ = XYZ
+ANGLE_1 = 10 [deg]
+ANGLE_2 = 20 [deg]
+ANGLE_3 = 30 [deg]
+EULER_STOP
+"#;
+        let apm = Apm::from_kvn(kvn).unwrap();
+        assert_eq!(apm.body.segment.data.quaternion_state.len(), 1);
+        assert_eq!(apm.body.segment.data.euler_angle_state.len(), 1);
     }
 }

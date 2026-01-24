@@ -4,15 +4,19 @@
 
 //! Winnow parsers for ACM (Attitude Comprehensive Message).
 
-use crate::kvn::parser::*;
-use crate::messages::acm::{Acm, AcmBody, AcmData, AcmMetadata, AcmSegment, AcmAttitudeState, AttLine, AcmPhysicalDescription, AcmCovarianceMatrix, CovLine, AcmManeuverParameters, AcmAttitudeDetermination, AcmSensor};
-use crate::parse_block;
 use crate::error::InternalParserError;
+use crate::kvn::parser::*;
+use crate::messages::acm::{
+    Acm, AcmAttitudeDetermination, AcmAttitudeState, AcmBody, AcmCovarianceMatrix, AcmData,
+    AcmManeuverParameters, AcmMetadata, AcmPhysicalDescription, AcmSegment, AcmSensor, AttLine,
+    CovLine,
+};
+use crate::parse_block;
 
-use winnow::combinator::terminated;
-use winnow::prelude::*;
-use winnow::error::{ErrMode, FromExternalError};
 use std::str::FromStr;
+use winnow::combinator::terminated;
+use winnow::error::{ErrMode, FromExternalError};
+use winnow::prelude::*;
 
 //----------------------------------------------------------------------
 // ACM Version Parser
@@ -71,8 +75,12 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
 
 fn parse_att_line(input: &mut &str) -> KvnResult<AttLine> {
     let line = terminated(raw_line, opt_line_ending).parse_next(input)?;
-    let values = line.split_whitespace()
-        .map(|s| s.parse::<f64>().map_err(|_| ErrMode::Cut(InternalParserError::from_input(input))))
+    let values = line
+        .split_whitespace()
+        .map(|s| {
+            s.parse::<f64>()
+                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))
+        })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(AttLine { values })
 }
@@ -95,7 +103,9 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
     }, |i: &mut &str| matches!(i.trim_start().chars().next(), Some('0'..='9' | '-' | '+')) || at_block_end("ATT", i));
 
     loop {
-        if at_block_end("ATT", input) { break; }
+        if at_block_end("ATT", input) {
+            break;
+        }
         if input.trim_start().starts_with("COMMENT") {
             block.comment.extend(collect_comments.parse_next(input)?);
             continue;
@@ -135,8 +145,12 @@ fn parse_phys_block(input: &mut &str) -> KvnResult<AcmPhysicalDescription> {
 
 fn parse_cov_line(input: &mut &str) -> KvnResult<CovLine> {
     let line = terminated(raw_line, opt_line_ending).parse_next(input)?;
-    let values = line.split_whitespace()
-        .map(|s| s.parse::<f64>().map_err(|_| ErrMode::Cut(InternalParserError::from_input(input))))
+    let values = line
+        .split_whitespace()
+        .map(|s| {
+            s.parse::<f64>()
+                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))
+        })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(CovLine { values })
 }
@@ -153,7 +167,9 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
     }, |i: &mut &str| matches!(i.trim_start().chars().next(), Some('0'..='9' | '-' | '+')) || at_block_end("COV", i));
 
     loop {
-        if at_block_end("COV", input) { break; }
+        if at_block_end("COV", input) {
+            break;
+        }
         if input.trim_start().starts_with("COMMENT") {
             block.comment.extend(collect_comments.parse_next(input)?);
             continue;
@@ -190,12 +206,19 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
 
 fn kv_sensor_noise(input: &mut &str) -> KvnResult<crate::types::SensorNoise> {
     let (val_str, unit_str) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
-    let values = val_str.split_whitespace()
-        .map(|s| s.parse::<f64>().map_err(|_| ErrMode::Cut(InternalParserError::from_input(input))))
+    let values = val_str
+        .split_whitespace()
+        .map(|s| {
+            s.parse::<f64>()
+                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))
+        })
         .collect::<Result<Vec<_>, _>>()?;
-    
+
     let units = if let Some(u) = unit_str {
-        Some(crate::types::AngleUnits::from_str(u).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?)
+        Some(
+            crate::types::AngleUnits::from_str(u)
+                .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+        )
     } else {
         None
     };
@@ -204,8 +227,12 @@ fn kv_sensor_noise(input: &mut &str) -> KvnResult<crate::types::SensorNoise> {
 
 fn kv_vector3(input: &mut &str) -> KvnResult<Vec<f64>> {
     let (val_str, _unit_str) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
-    let values = val_str.split_whitespace()
-        .map(|s| s.parse::<f64>().map_err(|_| ErrMode::Cut(InternalParserError::from_input(input))))
+    let values = val_str
+        .split_whitespace()
+        .map(|s| {
+            s.parse::<f64>()
+                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))
+        })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(values)
 }
@@ -247,7 +274,9 @@ fn parse_ad_block(input: &mut &str) -> KvnResult<AcmAttitudeDetermination> {
     }, |i| at_block_start("SENSOR", i) || at_block_end("AD", i));
 
     loop {
-        if at_block_end("AD", input) { break; }
+        if at_block_end("AD", input) {
+            break;
+        }
         if at_block_start("SENSOR", input) {
             block.sensors.push(parse_sensor_block.parse_next(input)?);
             continue;
@@ -268,7 +297,9 @@ pub fn acm_data(input: &mut &str) -> KvnResult<AcmData> {
 
     loop {
         let _ = skip_empty_lines.parse_next(input);
-        if input.is_empty() || at_block_start("META", input) { break; }
+        if input.is_empty() || at_block_start("META", input) {
+            break;
+        }
 
         if at_block_start("ATT", input) {
             data.att.push(parse_att_block.parse_next(input)?);
@@ -320,12 +351,13 @@ pub fn parse_acm(input: &mut &str) -> KvnResult<Acm> {
 
     Ok(Acm {
         header,
-        body: AcmBody { segment: Box::new(segment) },
+        body: AcmBody {
+            segment: Box::new(segment),
+        },
         id: Some("CCSDS_ACM_VERS".to_string()),
         version,
     })
 }
-
 
 //----------------------------------------------------------------------
 // Tests
