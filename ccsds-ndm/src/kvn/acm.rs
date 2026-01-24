@@ -8,11 +8,12 @@ use crate::kvn::parser::*;
 use crate::messages::acm::{Acm, AcmBody, AcmData, AcmMetadata, AcmSegment, AcmAttitudeState, AttLine, AcmPhysicalDescription, AcmCovarianceMatrix, CovLine, AcmManeuverParameters, AcmAttitudeDetermination, AcmSensor};
 use crate::parse_block;
 use crate::error::InternalParserError;
-use crate::traits::Ndm;
-use std::str::FromStr;
-use winnow::error::{ErrMode, ContextError, ParserError, AddContext, FromExternalError};
+
 use winnow::combinator::terminated;
 use winnow::prelude::*;
+use winnow::error::{ErrMode, FromExternalError};
+use std::str::FromStr;
+use crate::types::{AngleUnits, SensorNoise};
 
 //----------------------------------------------------------------------
 // ACM Version Parser
@@ -40,44 +41,24 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
 
     parse_block!(input, metadata.comment, {
         "OBJECT_NAME" => val: kv_string => { metadata.object_name = val; },
-        "INTERNATIONAL_DESIGNATOR" => val: kv_string => { metadata.international_designator = val; },
+        "INTERNATIONAL_DESIGNATOR" => val: kv_string => { metadata.international_designator = Some(val); },
         "CATALOG_NAME" => val: kv_string => { metadata.catalog_name = Some(val); },
         "OBJECT_DESIGNATOR" => val: kv_string => { metadata.object_designator = Some(val); },
-        "ALTERNATE_NAMES" => val: kv_string => { metadata.alternate_names = Some(val); },
         "ORIGINATOR_POC" => val: kv_string => { metadata.originator_poc = Some(val); },
         "ORIGINATOR_POSITION" => val: kv_string => { metadata.originator_position = Some(val); },
         "ORIGINATOR_PHONE" => val: kv_string => { metadata.originator_phone = Some(val); },
         "ORIGINATOR_EMAIL" => val: kv_string => { metadata.originator_email = Some(val); },
         "ORIGINATOR_ADDRESS" => val: kv_string => { metadata.originator_address = Some(val); },
-        "TECH_ORG" => val: kv_string => { metadata.tech_org = Some(val); },
-        "TECH_POC" => val: kv_string => { metadata.tech_poc = Some(val); },
-        "TECH_POSITION" => val: kv_string => { metadata.tech_position = Some(val); },
-        "TECH_PHONE" => val: kv_string => { metadata.tech_phone = Some(val); },
-        "TECH_EMAIL" => val: kv_string => { metadata.tech_email = Some(val); },
-        "TECH_ADDRESS" => val: kv_string => { metadata.tech_address = Some(val); },
-        "PREVIOUS_MESSAGE_ID" => val: kv_string => { metadata.previous_message_id = Some(val); },
-        "NEXT_MESSAGE_ID" => val: kv_string => { metadata.next_message_id = Some(val); },
-        "ADM_MSG_LINK" => val: kv_string => { metadata.adm_msg_link = Some(val); },
         "ODM_MSG_LINK" => val: kv_string => { metadata.odm_msg_link = Some(val); },
-        "CDM_MSG_LINK" => val: kv_string => { metadata.cdm_msg_link = Some(val); },
-        "PRM_MSG_LINK" => val: kv_string => { metadata.prm_msg_link = Some(val); },
-        "RDM_MSG_LINK" => val: kv_string => { metadata.rdm_msg_link = Some(val); },
-        "TDM_MSG_LINK" => val: kv_string => { metadata.tdm_msg_link = Some(val); },
-        "OPERATOR" => val: kv_string => { metadata.operator = Some(val); },
-        "OWNER" => val: kv_string => { metadata.owner = Some(val); },
-        "COUNTRY" => val: kv_string => { metadata.country = Some(val); },
-        "CONSTELLATION" => val: kv_string => { metadata.constellation = Some(val); },
-        "OBJECT_TYPE" => val: kv_string => { metadata.object_type = Some(val); },
+        "CENTER_NAME" => val: kv_string => { metadata.center_name = Some(val); },
         "TIME_SYSTEM" => val: kv_string => { metadata.time_system = val; },
         "EPOCH_TZERO" => val: kv_epoch => { metadata.epoch_tzero = val; },
         "TAIMUTC_AT_TZERO" => val: kv_from_kvn => { metadata.taimutc_at_tzero = Some(val); },
         "NEXT_LEAP_EPOCH" => val: kv_epoch => { metadata.next_leap_epoch = Some(val); },
         "NEXT_LEAP_TAIMUTC" => val: kv_from_kvn => { metadata.next_leap_taimutc = Some(val); },
-        "UT1MUTC_AT_TZERO" => val: kv_from_kvn => { metadata.ut1mutc_at_tzero = Some(val); },
-        "EOP_SOURCE" => val: kv_string => { metadata.eop_source = Some(val); },
-        "INTERP_METHOD_EOP" => val: kv_string => { metadata.interp_method_eop = Some(val); },
-        "CELESTIAL_SOURCE" => val: kv_string => { metadata.celestial_source = Some(val); },
         "ACM_DATA_ELEMENTS" => val: kv_string => { metadata.acm_data_elements = Some(val); },
+        "START_TIME" => val: kv_epoch => { metadata.start_time = Some(val); },
+        "STOP_TIME" => val: kv_epoch => { metadata.stop_time = Some(val); },
     }, |i: &mut &str| at_block_end("META", i));
 
     expect_block_end("META").parse_next(input)?;
@@ -102,9 +83,12 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
     expect_block_start("ATT").parse_next(input)?;
 
     parse_block!(input, block.comment, {
+        "ATT_ID" => val: kv_string => { block.att_id = Some(val); },
+        "ATT_PREV_ID" => val: kv_string => { block.att_prev_id = Some(val); },
+        "ATT_BASIS" => val: kv_enum => { block.att_basis = Some(val); },
+        "ATT_BASIS_ID" => val: kv_string => { block.att_basis_id = Some(val); },
         "REF_FRAME_A" => val: kv_string => { block.ref_frame_a = val; },
         "REF_FRAME_B" => val: kv_string => { block.ref_frame_b = val; },
-        "ATTITUDE_DIR" => val: kv_string => { block.attitude_dir = Some(val); },
         "NUMBER_STATES" => val: kv_u32 => { block.number_states = val; },
         "ATT_TYPE" => val: kv_string => { block.att_type = val; },
         "RATE_TYPE" => val: kv_string => { block.rate_type = Some(val); },
@@ -129,17 +113,13 @@ fn parse_phys_block(input: &mut &str) -> KvnResult<AcmPhysicalDescription> {
     expect_block_start("PHYS").parse_next(input)?;
 
     parse_block!(input, block.comment, {
+        "DRAG_COEFF" => val: kv_float => { block.drag_coeff = Some(val); },
         "WET_MASS" => val: kv_from_kvn => { block.wet_mass = Some(val); },
         "DRY_MASS" => val: kv_from_kvn => { block.dry_mass = Some(val); },
-        "CP_X" => val: kv_float => { block.center_of_pressure.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[0] = val; },
-        "CP_Y" => val: kv_float => { block.center_of_pressure.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[1] = val; },
-        "CP_Z" => val: kv_float => { block.center_of_pressure.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[2] = val; },
-        "BUS_AREA" => val: kv_from_kvn => { block.bus_area = Some(val); },
-        "BUS_RAD_COEFF" => val: kv_from_kvn => { block.bus_rad_coeff = Some(val); },
-        "BUS_DRAG_COEFF" => val: kv_from_kvn => { block.bus_drag_coeff = Some(val); },
-        "SA_AREA" => val: kv_from_kvn => { block.sa_area = Some(val); },
-        "SA_RAD_COEFF" => val: kv_from_kvn => { block.sa_rad_coeff = Some(val); },
-        "SA_DRAG_COEFF" => val: kv_from_kvn => { block.sa_drag_coeff = Some(val); },
+        "CP_REF_FRAME" => val: kv_string => { block.cp_ref_frame = Some(val); },
+        "CP_X" => val: kv_float => { block.cp.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[0] = val; },
+        "CP_Y" => val: kv_float => { block.cp.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[1] = val; },
+        "CP_Z" => val: kv_float => { block.cp.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[2] = val; },
         "INERTIA_REF_FRAME" => val: kv_string => { block.inertia_ref_frame = Some(val); },
         "IXX" => val: kv_from_kvn => { block.ixx = Some(val); },
         "IYY" => val: kv_from_kvn => { block.iyy = Some(val); },
@@ -197,19 +177,28 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
         "MAN_END_TIME" => val: kv_epoch => { block.man_end_time = Some(val); },
         "MAN_DURATION" => val: kv_from_kvn => { block.man_duration = Some(val); },
         "ACTUATOR_USED" => val: kv_string => { block.actuator_used = Some(val); },
-        "TARGET_MOM_X" => val: kv_float => { block.target_momentum.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[0] = val; },
-        "TARGET_MOM_Y" => val: kv_float => { block.target_momentum.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[1] = val; },
-        "TARGET_MOM_Z" => val: kv_float => { block.target_momentum.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[2] = val; },
+        "TARGET_MOM_X" => val: kv_float => { block.target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[0] = val; },
+        "TARGET_MOM_Y" => val: kv_float => { block.target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[1] = val; },
+        "TARGET_MOM_Z" => val: kv_float => { block.target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[2] = val; },
         "TARGET_MOM_FRAME" => val: kv_string => { block.target_mom_frame = Some(val); },
-        "MAN_TOR_X" => val: kv_float => { block.man_torque.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[0] = val; },
-        "MAN_TOR_Y" => val: kv_float => { block.man_torque.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[1] = val; },
-        "MAN_TOR_Z" => val: kv_float => { block.man_torque.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[2] = val; },
-        "MAN_TOR_FRAME" => val: kv_string => { block.man_tor_frame = Some(val); },
-        "MAN_DELTA_MASS" => val: kv_from_kvn => { block.man_delta_mass = Some(val); },
     }, |i| at_block_end("MAN", i));
 
     expect_block_end("MAN").parse_next(input)?;
     Ok(block)
+}
+
+fn kv_sensor_noise(input: &mut &str) -> KvnResult<SensorNoise> {
+    let (val_str, unit_str) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
+    let values = val_str.split_whitespace()
+        .map(|s| s.parse::<f64>().map_err(|_| ErrMode::Cut(InternalParserError::from_input(input))))
+        .collect::<Result<Vec<_>, _>>()?;
+    
+    let units = if let Some(u) = unit_str {
+        Some(AngleUnits::from_str(u).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?)
+    } else {
+        None
+    };
+    Ok(SensorNoise { values, units })
 }
 
 fn parse_sensor_block(input: &mut &str) -> KvnResult<AcmSensor> {
@@ -219,7 +208,7 @@ fn parse_sensor_block(input: &mut &str) -> KvnResult<AcmSensor> {
     parse_block!(input, block.comment, {
         "SENSOR_NUMBER" => val: kv_u32 => { block.sensor_number = val; },
         "SENSOR_USED" => val: kv_string => { block.sensor_used = Some(val); },
-        "SENSOR_NOISE_STDDEV" => val: kv_float => { block.sensor_noise_stddev = Some(val); },
+        "SENSOR_NOISE_STDDEV" => val: kv_sensor_noise => { block.sensor_noise_stddev = Some(val); },
         "SENSOR_FREQUENCY" => val: kv_float => { block.sensor_frequency = Some(val); },
     }, |i| at_block_end("SENSOR", i));
 
@@ -334,6 +323,7 @@ pub fn parse_acm(input: &mut &str) -> KvnResult<Acm> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::traits::Ndm;
 
     #[test]
     fn test_parse_acm_minimal() {

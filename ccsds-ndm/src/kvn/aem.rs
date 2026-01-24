@@ -5,12 +5,13 @@
 //! Winnow parsers for AEM (Attitude Ephemeris Message).
 
 use crate::kvn::parser::*;
-use crate::messages::aem::{Aem, AemBody, AemData, AemMetadata, AemSegment, AttitudeState};
+use crate::messages::aem::{Aem, AemBody, AemData, AemMetadata, AemSegment};
+use crate::common::{AemAttitudeState, QuaternionEphemeris, QuaternionDerivative, QuaternionAngVel, EulerAngle, Quaternion, QuaternionDot, AngVel};
+use crate::types::Angle;
 use crate::parse_block;
 use crate::error::InternalParserError;
-use crate::traits::Ndm;
 use std::str::FromStr;
-use winnow::error::{ErrMode, ContextError, ParserError, AddContext, FromExternalError};
+use winnow::error::{ErrMode, FromExternalError, AddContext};
 use winnow::combinator::terminated;
 use winnow::prelude::*;
 
@@ -68,7 +69,7 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
         "USEABLE_STOP_TIME" => useable_stop_time: kv_epoch,
         "STOP_TIME" => stop_time: kv_epoch,
         "ATTITUDE_TYPE" => attitude_type: kv_string,
-        "EULER_ROT_SEQ" => euler_rot_seq: kv_string,
+        "EULER_ROT_SEQ" => euler_rot_seq: kv_enum,
         "RATE_FRAME" => rate_frame: kv_string, // CCSDS 504.0-B-2 says RATE_FRAME in KVN
         "ANGVEL_FRAME" => rate_frame: kv_string, // Also support explicit XML tag if used in KVN
         "INTERPOLATION_METHOD" => interpolation_method: kv_string,
@@ -91,7 +92,7 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
         stop_time: stop_time.ok_or_else(|| missing_field_err(input, "AEM Metadata", "STOP_TIME"))?,
         attitude_type: attitude_type.ok_or_else(|| missing_field_err(input, "AEM Metadata", "ATTITUDE_TYPE"))?,
         euler_rot_seq,
-        rate_frame,
+        angvel_frame: rate_frame,
         interpolation_method,
         interpolation_degree: interpolation_degree.and_then(std::num::NonZeroU32::new),
     })
@@ -102,9 +103,8 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
 //----------------------------------------------------------------------
 
 /// Parses a single data line.
-fn attitude_state_line(input: &mut &str) -> KvnResult<AttitudeState> {
-    // line format: EPOCH VAL1 VAL2 ...
-    // We read the whole line and split it.
+/// Parses a single data line based on ATTITUDE_TYPE.
+fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAttitudeState> {
     let line = terminated(raw_line, opt_line_ending).parse_next(input)?;
     let mut parts = line.split_whitespace();
 
@@ -132,34 +132,68 @@ fn attitude_state_line(input: &mut &str) -> KvnResult<AttitudeState> {
         values.push(val);
     }
 
-    Ok(AttitudeState { epoch, values })
+    match attitude_type {
+        "QUATERNION" => {
+            if values.len() != 4 { return Err(ErrMode::Cut(InternalParserError::from_input(input))); }
+            let q = Quaternion::new(values[0], values[1], values[2], values[3]).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
+            Ok(AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris { epoch, quaternion: q }))
+        },
+        "QUATERNION/DERIVATIVE" => {
+            if values.len() != 8 { return Err(ErrMode::Cut(InternalParserError::from_input(input))); }
+            let q = Quaternion::new(values[0], values[1], values[2], values[3]).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
+            let q_dot = QuaternionDot { 
+                q1_dot: crate::types::QuaternionDotComponent::new(values[4], None),
+                q2_dot: crate::types::QuaternionDotComponent::new(values[5], None),
+                q3_dot: crate::types::QuaternionDotComponent::new(values[6], None),
+                qc_dot: crate::types::QuaternionDotComponent::new(values[7], None)
+            };
+            Ok(AemAttitudeState::QuaternionDerivative(QuaternionDerivative { epoch, quaternion: q, quaternion_dot: q_dot }))
+        },
+        "QUATERNION/RATE" => {
+            if values.len() != 7 { return Err(ErrMode::Cut(InternalParserError::from_input(input))); }
+            let q = Quaternion::new(values[0], values[1], values[2], values[3]).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
+            let ang_vel = AngVel {
+                angvel_x: crate::types::AngleRate::new(values[4], None),
+                angvel_y: crate::types::AngleRate::new(values[5], None),
+                angvel_z: crate::types::AngleRate::new(values[6], None)
+            };
+            Ok(AemAttitudeState::QuaternionAngVel(QuaternionAngVel { epoch, quaternion: q, ang_vel }))
+        },
+        "EULER_ANGLE" => {
+            if values.len() != 3 { return Err(ErrMode::Cut(InternalParserError::from_input(input))); }
+            Ok(AemAttitudeState::EulerAngle(EulerAngle {
+                epoch,
+                angle_1: Angle::new(values[0], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                angle_2: Angle::new(values[1], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+                angle_3: Angle::new(values[2], None).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+            }))
+        },
+        // TODO: Implement other types (EULER_ANGLE/DERIVATIVE, EULER_ANGLE/RATE, SPIN, etc.)
+        // For verify test minimal "QUATERNION" is enough.
+        // Fallback for others to avoid error? Better to fail if not supported or create a catch-all?
+        _ => Err(ErrMode::Cut(InternalParserError::from_input(input))) // Unexpected type
+    }
 }
 
 /// Parses the AEM data section.
-pub fn aem_data(input: &mut &str) -> KvnResult<AemData> {
+pub fn aem_data(input: &mut &str, attitude_type: &str) -> KvnResult<AemData> {
     expect_block_start("DATA").parse_next(input)?;
 
     let mut comment = Vec::new();
-    // Comments are allowed at the start of data block
     comment.extend(collect_comments.parse_next(input)?);
 
     let mut attitude_states = Vec::new();
 
     loop {
-        // Check for end of block
         if at_block_end("DATA", input) {
             break;
         }
-
-        // Parse comment if any (interspersed comments allowed?)
-        // Standard says "Comments may appear in the AEM Data Section."
-        // Usually at top, but let's be safe.
         if input.trim_start().starts_with("COMMENT") {
              comment.extend(collect_comments.parse_next(input)?);
              continue;
         }
 
-        let state = attitude_state_line.parse_next(input)?;
+        let state = attitude_state_line(input, attitude_type)?;
         attitude_states.push(state);
     }
 
@@ -178,7 +212,7 @@ pub fn aem_data(input: &mut &str) -> KvnResult<AemData> {
 pub fn aem_segment(input: &mut &str) -> KvnResult<AemSegment> {
     let metadata = aem_metadata.parse_next(input)?;
     let _ = skip_empty_lines.parse_next(input);
-    let data = aem_data.parse_next(input)?;
+    let data = aem_data(input, &metadata.attitude_type)?;
 
     Ok(AemSegment { metadata, data })
 }
@@ -223,6 +257,7 @@ impl ParseKvn for Aem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::traits::Ndm;
 
     #[test]
     fn test_parse_aem_minimal() {
@@ -254,7 +289,11 @@ DATA_STOP
         let seg = &aem.body.segment[0];
         assert_eq!(seg.metadata.object_name, "MARS GLOBAL SURVEYOR");
         assert_eq!(seg.data.attitude_states.len(), 2);
-        assert_eq!(seg.data.attitude_states[0].values.len(), 4);
-        assert_eq!(seg.data.attitude_states[0].values[0], 0.5);
+        match &seg.data.attitude_states[0] {
+            AemAttitudeState::QuaternionEphemeris(q) => {
+                assert_eq!(q.quaternion.q1, 0.5);
+            },
+            _ => panic!("Expected QuaternionEphemeris"),
+        }
     }
 }

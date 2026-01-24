@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::AdmHeader;
-use crate::error::{Result, ValidationError};
+use crate::error::Result;
 use crate::kvn::ser::KvnWriter;
 use crate::kvn::parser::ParseKvn;
 use crate::traits::{Ndm, ToKvn};
@@ -15,6 +15,13 @@ use serde::{Deserialize, Serialize};
 //----------------------------------------------------------------------
 
 /// Attitude Ephemeris Message (AEM).
+///
+/// An AEM specifies the attitude state of a single object at multiple epochs, contained within a
+/// specified time range. The AEM is suited to interagency exchanges that (1) involve automated
+/// interaction (e.g., computer-to-computer communication for which frequent, fast, automated time
+/// interpretation and processing are required), and (2) require higher fidelity or higher
+/// precision dynamic modeling than is possible with the APM (e.g., flexible structures, more
+/// complex attitude movement, etc.).
 ///
 /// **CCSDS Reference**: 504.0-B-2, Section 4.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -105,35 +112,151 @@ impl ToKvn for AemSegment {
     }
 }
 
-//----------------------------------------------------------------------
-// Metadata
-//----------------------------------------------------------------------
-
+/// AEM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AemMetadata {
+    /// Comments allowed only at the beginning of the Metadata section. Each comment line shall
+    /// begin with this keyword.
+    ///
+    /// **Examples**: This is a comment.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
+    /// restriction on the value for this keyword, it is recommended to use names from the UN
+    /// Office of Outer Space Affairs designator index (reference [ADM-2], which include Object
+    /// name and international designator). When OBJECT_NAME is not known or cannot be disclosed,
+    /// the value should be set to UNKNOWN.
+    ///
+    /// **Examples**: EUTELSAT W1
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     pub object_name: String,
+    /// Spacecraft identifier of the object corresponding to the attitude data to be given. While
+    /// there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+    /// international designators from the UN Office of Outer Space Affairs (reference [ADM-2]).
+    /// Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-
+    /// digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one
+    /// capital letter for the identification of the part brought into space by the launch. In
+    /// cases in which the asset is not listed in reference [ADM-2], the UN Office of Outer Space
+    /// Affairs designator index format is not used, or the content cannot be disclosed, the value
+    /// should be set to UNKNOWN.
+    ///
+    /// **Examples**: 2000-052A
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     pub object_id: String,
+    /// Celestial body orbited by the object, which may be a natural solar system body (planets,
+    /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
+    /// system barycenter. The set of allowed values is described in annex B, subsection B8.
+    ///
+    /// **Examples**: EARTH, STS-106
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub center_name: Option<String>,
+    /// Name of the reference frame that defines the starting point of the transformation. The set
+    /// of allowed values is described in annex B, subsection B3.
+    ///
+    /// **Examples**: ICRF, SC_BODY_1, INSTRUMENT_A
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     pub ref_frame_a: String,
+    /// Name of the reference frame that defines the end point of the transformation. The set of
+    /// allowed values is described in annex B, subsection B3.
+    ///
+    /// **Examples**: SC_BODY_1, INSTRUMENT_A
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     pub ref_frame_b: String,
+    /// Time system used for both attitude ephemeris data and metadata. The set of allowed values
+    /// is described in annex B, subsection B2.
+    ///
+    /// **Examples**: UTC, TAI
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     pub time_system: String,
+    /// Start of TOTAL time span covered by attitude ephemeris data immediately following this
+    /// metadata block.
+    ///
+    /// **Examples**: 1996-12-18T14:28:15.11
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     pub start_time: Epoch,
+    /// Optional start of USEABLE time span covered by attitude ephemeris data immediately
+    /// following this metadata block. To allow for proper interpolation near the beginning/end of
+    /// the attitude ephemeris data block, it may be necessary to utilize this keyword with values
+    /// within the time span covered by the attitude ephemeris data records as denoted by the
+    /// START/STOP_TIME time tags. The USEABLE_START_TIME time tag of a new block of ephemeris data
+    /// must be greater than or equal to the USEABLE_STOP_TIME time tag of the previous block.
+    ///
+    /// **Examples**: 1996-12-18T14:28:15.11
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_start_time: Option<Epoch>,
+    /// Optional stop of USEABLE time span covered by attitude ephemeris data immediately following
+    /// this metadata block. (See also USEABLE_START_TIME.)
+    ///
+    /// **Examples**: 1996-12-18T14:28:15.11
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_stop_time: Option<Epoch>,
+    /// End of TOTAL time span covered by the attitude ephemeris data immediately following this
+    /// metadata block.
+    ///
+    /// **Examples**: 1996-12-18T14:28:15.11
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     pub stop_time: Epoch,
+    /// The type of information contained in the data lines. This keyword must have a value from the
+    /// set specified at the right. (See table 4-4 for details of the data contained in each line.)
+    ///
+    /// **Examples**: QUATERNION, QUATERNION/DERIVATIVE, QUATERNION/ANGVEL, EULER_ANGLE,
+    /// EULER_ANGLE/DERIVATIVE, EULER_ANGLE/ANGVEL, SPIN, SPIN/NUTATION, SPIN/NUTATION_MOM
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     pub attitude_type: String,
+    /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
+    /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
+    /// the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
+    /// rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
+    /// rotation axis of the third rotation. This keyword is applicable only if ATTITUDE_TYPE
+    /// specifies the use of Euler angles.
+    ///
+    /// **Examples**: ZXZ, XYZ
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub euler_rot_seq: Option<String>,
+    pub euler_rot_seq: Option<RotSeq>,
+    /// The frame of reference in which angular velocity data are specified. The set of allowed
+    /// values is described in annex B, subsection B3. This keyword is applicable only if
+    /// ATTITUDE_TYPE specifies the use of angular velocities in conjunction with either
+    /// quaternions or Euler angles.
+    ///
+    /// **Examples**: ICRF, SC_BODY_1
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rate_frame: Option<String>, // XSD says ANGVEL_FRAME but in KVN it might be RATE_FRAME? Book says RATE_FRAME is allowed. Check XSD/Book.
+    pub angvel_frame: Option<String>,
+    /// Recommended interpolation method for attitude ephemeris data in the block immediately
+    /// following this metadata block.
+    ///
+    /// **Examples**: LINEAR, HERMITE, LAGRANGE
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation_method: Option<String>,
+    /// Recommended interpolation degree for attitude ephemeris data in the block immediately
+    /// following this metadata block. It must be an integer value. This keyword must be used if
+    /// the ‘INTERPOLATION_METHOD’ keyword is used.
+    ///
+    /// **Examples**: 1, 5
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation_degree: Option<std::num::NonZeroU32>,
 }
@@ -162,8 +285,8 @@ impl ToKvn for AemMetadata {
         if let Some(v) = &self.euler_rot_seq {
             writer.write_pair("EULER_ROT_SEQ", v);
         }
-        if let Some(v) = &self.rate_frame {
-            writer.write_pair("RATE_FRAME", v); // Need to verify if it is RATE_FRAME or ANGVEL_FRAME in KVN
+        if let Some(v) = &self.angvel_frame {
+            writer.write_pair("ANGVEL_FRAME", v);
         }
         if let Some(v) = &self.interpolation_method {
             writer.write_pair("INTERPOLATION_METHOD", v);
@@ -174,17 +297,21 @@ impl ToKvn for AemMetadata {
     }
 }
 
-//----------------------------------------------------------------------
-// Data
-//----------------------------------------------------------------------
-
+/// AEM Data Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AemData {
+    /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
+    /// with this keyword.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Attitude ephemeris data lines.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 4.2.4.
     #[serde(rename = "attitudeState")]
-    pub attitude_states: Vec<AttitudeState>,
+    pub attitude_states: Vec<crate::common::AemAttitudeState>,
 }
 
 impl ToKvn for AemData {
@@ -193,22 +320,5 @@ impl ToKvn for AemData {
         for state in &self.attitude_states {
             state.write_kvn(writer);
         }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct AttitudeState {
-    pub epoch: Epoch,
-    pub values: Vec<f64>, // Generic storage for now, easier for parsed data lines
-}
-
-impl ToKvn for AttitudeState {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        // Manual formatting of data line
-        let mut line = self.epoch.to_string();
-        for val in &self.values {
-            line.push_str(&format!(" {}", val));
-        }
-        writer.write_line(&line);
     }
 }

@@ -1093,6 +1093,13 @@ impl DeltaMassZ {
         }
         Ok(Self { value, units })
     }
+    
+    pub fn to_unit_value(&self) -> UnitValue<f64, MassUnits> {
+        UnitValue {
+            value: self.value,
+            units: self.units.clone(),
+        }
+    }
 }
 
 impl FromKvnFloat for DeltaMassZ {
@@ -2044,8 +2051,8 @@ pub type SigmaV = UnitValue<f64, SigmaVUnits>;
 // Sensor noise (string with optional angle units)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SensorNoise {
-    #[serde(rename = "$value")]
-    pub value: String,
+    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
+    pub values: Vec<f64>,
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<AngleUnits>,
 }

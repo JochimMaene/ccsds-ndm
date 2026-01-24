@@ -498,93 +498,674 @@ impl ToKvn for StateVector {
     }
 }
 
-/// Represents the `quaternionStateType` logical block in APM.
+/// Attitude quaternion.
+///
+/// All mandatory elements are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionState {
+    /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Name of the reference frame that defines the starting point of the transformation. The set
+    /// of allowed values is described in annex B, subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ref_frame_a: String,
+    /// Name of the reference frame that defines the end point of the transformation. The set of
+    /// allowed values is described in annex B, subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ref_frame_b: String,
+    /// Quaternion components Q1, Q2, Q3, QC.
+    ///
+    /// **Units**: dimensionless
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub quaternion: Quaternion,
+    /// Time derivatives of quaternion components Q1, Q2, Q3, QC.
+    ///
+    /// **Units**: 1/s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quaternion_dot: Option<QuaternionDot>,
 }
 
-/// Represents the `eulerAngleStateType` logical block in APM.
+/// Euler angle elements.
+///
+/// All mandatory elements of the logical block are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleState {
+    /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Name of the reference frame that defines the starting point of the transformation. The set
+    /// of allowed values is described in annex B, subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ref_frame_a: String,
+    /// Name of the reference frame that defines the end point of the transformation. The set of
+    /// allowed values is described in annex B, subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ref_frame_b: String,
+    /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
+    /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
+    /// the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
+    /// rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
+    /// rotation axis of the third rotation.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub euler_rot_seq: RotSeq,
+    /// Angle of the first rotation.
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub angle_1: Angle,
+    /// Angle of the second rotation.
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub angle_2: Angle,
+    /// Angle of the third rotation.
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub angle_3: Angle,
+    /// Time derivative of angle of the first rotation.
+    ///
+    /// **Units**: deg/s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub angle_1_dot: Option<AngleRate>,
+    /// Time derivative of angle of the second rotation.
+    ///
+    /// **Units**: deg/s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub angle_2_dot: Option<AngleRate>,
+    /// Time derivative of angle of the third rotation.
+    ///
+    /// **Units**: deg/s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub angle_3_dot: Option<AngleRate>,
 }
 
-/// Represents the `angVelStateType` logical block in APM.
+/// Angular velocity vector.
+///
+/// All mandatory elements are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AngVelState {
+    /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Name of the reference frame that defines the starting point of the transformation. The set
+    /// of allowed values is described in annex B, subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ref_frame_a: String,
+    /// Name of the reference frame that defines the end point of the transformation. The set of
+    /// allowed values is described in annex B, subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ref_frame_b: String,
+    /// Reference frame in which the components of the angular velocity vector are given. The set
+    /// of allowed values is described in annex B, subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub angvel_frame: AngVelFrameType,
+    /// Component of the angular velocity vector on the X axis.
+    ///
+    /// **Units**: deg/s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub angvel_x: AngleRate,
+    /// Component of the angular velocity vector on the Y axis.
+    ///
+    /// **Units**: deg/s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub angvel_y: AngleRate,
+    /// Component of the angular velocity vector on the Z axis.
+    ///
+    /// **Units**: deg/s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub angvel_z: AngleRate,
 }
 
-/// Represents the `spinStateType` logical block in APM.
+/// Spin block.
+///
+/// All mandatory elements are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinState {
+    /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Name of the reference frame that defines the starting point of the transformation. The set
+    /// of allowed values is described in annex B, subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ref_frame_a: String,
+    /// Name of the reference frame that defines the end point of the transformation. The set of
+    /// allowed values is described in annex B, subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ref_frame_b: String,
+    /// Right ascension of spin axis vector in frame A.
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub spin_alpha: Angle,
+    /// Declination of the spin axis vector in frame A.
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub spin_delta: Angle,
+    /// Phase of the satellite about the spin axis.
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub spin_angle: Angle,
+    /// Angular velocity of satellite around spin axis.
+    ///
+    /// **Units**: deg/s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub spin_angle_vel: AngleRate,
-    // Choice: either nutation group or momentum group (both optional at top-level)
+    /// Nutation angle of spin axis.
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nutation: Option<Angle>,
+    /// Body nutation period of the spin axis.
+    ///
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nutation_per: Option<Duration>,
+    /// Inertial nutation phase.
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nutation_phase: Option<Angle>,
+    /// Right ascension of angular momentum vector in frame A.
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub momentum_alpha: Option<Angle>,
+    /// Declination of angular momentum vector in frame A.
+    ///
+    /// **Units**: deg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub momentum_delta: Option<Angle>,
+    /// Angular velocity of spin vector around the angular momentum vector.
+    ///
+    /// **Units**: deg/s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nutation_vel: Option<AngleRate>,
 }
 
-/// Represents the `inertiaStateType` logical block in APM.
+/// Inertia block.
+///
+/// All mandatory elements are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct InertiaState {
+    /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Coordinate system for the inertia tensor. The set of allowed values is described in annex B,
+    /// subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub inertia_ref_frame: String,
+    /// Moment of Inertia about the X-axis.
+    ///
+    /// **Units**: kg*m²
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ixx: Moment,
+    /// Moment of Inertia about the Y-axis.
+    ///
+    /// **Units**: kg*m²
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub iyy: Moment,
+    /// Moment of Inertia about the Z-axis.
+    ///
+    /// **Units**: kg*m²
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub izz: Moment,
+    /// Inertia Cross Product of the X and Y axes.
+    ///
+    /// **Units**: kg*m²
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ixy: Moment,
+    /// Inertia Cross Product of the X and Z axes.
+    ///
+    /// **Units**: kg*m²
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub ixz: Moment,
+    /// Inertia Cross Product of the Y and Z axes.
+    ///
+    /// **Units**: kg*m²
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     pub iyz: Moment,
+}
+
+/// Maneuver Parameters block.
+///
+/// All mandatory elements are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct AttManeuverState {
+    /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comment: Vec<String>,
+    /// Epoch of start of maneuver. (For format specification, see 6.8.9.)
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    pub man_epoch_start: Epoch,
+    /// Maneuver duration.
+    ///
+    /// **Units**: s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    pub man_duration: Duration,
+    /// Coordinate system for the torque vector. The set of allowed values is described in annex B,
+    /// subsection B3.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    pub man_ref_frame: String,
+    /// 1st component of the torque vector.
+    ///
+    /// **Units**: N*m
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    pub man_tor_x: Torque,
+    /// 2nd component of the torque vector.
+    ///
+    /// **Units**: N*m
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    pub man_tor_y: Torque,
+    /// 3rd component of the torque vector.
+    ///
+    /// **Units**: N*m
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    pub man_tor_z: Torque,
+    /// Mass change during maneuver (value is <= 0).
+    ///
+    /// **Units**: kg
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub man_delta_mass: Option<DeltaMassZ>,
+}
+
+impl ToKvn for AttManeuverState {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("MAN_EPOCH_START", self.man_epoch_start);
+        writer.write_measure("MAN_DURATION", &self.man_duration.to_unit_value());
+        writer.write_pair("MAN_REF_FRAME", &self.man_ref_frame);
+        writer.write_measure("MAN_TOR_X", &self.man_tor_x);
+        writer.write_measure("MAN_TOR_Y", &self.man_tor_y);
+        writer.write_measure("MAN_TOR_Z", &self.man_tor_z);
+        if let Some(m) = &self.man_delta_mass {
+            writer.write_measure("MAN_DELTA_MASS", &m.to_unit_value());
+        }
+    }
+}
+
+//----------------------------------------------------------------------
+// AEM Specific Types
+//----------------------------------------------------------------------
+
+/// Represents the `attitudeStateType` choice in AEM.
+///
+/// **CCSDS Reference**: 504.0-B-2, Section 4.2.4.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AemAttitudeState {
+    /// Epoch, Q1, Q2, Q3, QC.
+    #[serde(rename = "quaternionEphemeris")]
+    QuaternionEphemeris(QuaternionEphemeris),
+    /// Epoch, Q1, Q2, Q3, QC, Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT.
+    #[serde(rename = "quaternionDerivative")]
+    QuaternionDerivative(QuaternionDerivative),
+    /// Epoch, Q1, Q2, Q3, QC, ANGVEL_X, ANGVEL_Y, ANGVEL_Z.
+    #[serde(rename = "quaternionAngVel")]
+    QuaternionAngVel(QuaternionAngVel),
+    /// Epoch, ANGLE_1, ANGLE_2, ANGLE_3.
+    #[serde(rename = "eulerAngle")]
+    EulerAngle(EulerAngle),
+    /// Epoch, ANGLE_1, ANGLE_2, ANGLE_3, ANGLE_1_DOT, ANGLE_2_DOT, ANGLE_3_DOT.
+    #[serde(rename = "eulerAngleDerivative")]
+    EulerAngleDerivative(EulerAngleDerivative),
+    /// Epoch, ANGLE_1, ANGLE_2, ANGLE_3, ANGVEL_X, ANGVEL_Y, ANGVEL_Z.
+    #[serde(rename = "eulerAngleAngVel")]
+    EulerAngleAngVel(EulerAngleAngVel),
+    /// Epoch, SPIN_ALPHA, SPIN_DELTA, SPIN_ANGLE, SPIN_ANGLE_VEL.
+    #[serde(rename = "spin")]
+    Spin(Spin),
+    /// Epoch, SPIN_ALPHA, SPIN_DELTA, SPIN_ANGLE, SPIN_ANGLE_VEL, NUTATION, NUTATION_PER,
+    /// NUTATION_PHASE.
+    #[serde(rename = "spinNutation")]
+    SpinNutation(SpinNutation),
+    /// Epoch, SPIN_ALPHA, SPIN_DELTA, SPIN_ANGLE, SPIN_ANGLE_VEL, MOMENTUM_ALPHA, MOMENTUM_DELTA,
+    /// NUTATION_VEL.
+    #[serde(rename = "spinNutationMom")]
+    SpinNutationMom(SpinNutationMom),
+}
+
+impl ToKvn for AemAttitudeState {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        match self {
+            Self::QuaternionEphemeris(v) => v.write_kvn(writer),
+            Self::QuaternionDerivative(v) => v.write_kvn(writer),
+            Self::QuaternionAngVel(v) => v.write_kvn(writer),
+            Self::EulerAngle(v) => v.write_kvn(writer),
+            Self::EulerAngleDerivative(v) => v.write_kvn(writer),
+            Self::EulerAngleAngVel(v) => v.write_kvn(writer),
+            Self::Spin(v) => v.write_kvn(writer),
+            Self::SpinNutation(v) => v.write_kvn(writer),
+            Self::SpinNutationMom(v) => v.write_kvn(writer),
+        }
+    }
+}
+
+/// AEM Attitude Ephemeris Data Line: Quaternion.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct QuaternionEphemeris {
+    /// Epoch of the attitude state.
+    pub epoch: Epoch,
+    /// Quaternion components Q1, Q2, Q3, QC.
+    pub quaternion: Quaternion,
+}
+
+impl ToKvn for QuaternionEphemeris {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        let mut line = self.epoch.to_string();
+        line.push_str(&format!(" {} {} {} {}", 
+            self.quaternion.q1, self.quaternion.q2, self.quaternion.q3, self.quaternion.qc));
+        writer.write_line(&line);
+    }
+}
+
+/// AEM Attitude Ephemeris Data Line: Quaternion/Derivative.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct QuaternionDerivative {
+    /// Epoch of the attitude state.
+    pub epoch: Epoch,
+    /// Quaternion components Q1, Q2, Q3, QC.
+    pub quaternion: Quaternion,
+    /// Quaternion derivatives Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT.
+    pub quaternion_dot: QuaternionDot,
+}
+
+impl ToKvn for QuaternionDerivative {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        let mut line = self.epoch.to_string();
+        line.push_str(&format!(" {} {} {} {}", 
+            self.quaternion.q1, self.quaternion.q2, self.quaternion.q3, self.quaternion.qc));
+        line.push_str(&format!(" {} {} {} {}", 
+            self.quaternion_dot.q1_dot.value, self.quaternion_dot.q2_dot.value, self.quaternion_dot.q3_dot.value, self.quaternion_dot.qc_dot.value));
+        writer.write_line(&line);
+    }
+}
+
+/// AEM Attitude Ephemeris Data Line: Quaternion/AngVel.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct QuaternionAngVel {
+    /// Epoch of the attitude state.
+    pub epoch: Epoch,
+    /// Quaternion components Q1, Q2, Q3, QC.
+    pub quaternion: Quaternion,
+    /// Angular velocity components ANGVEL_X, ANGVEL_Y, ANGVEL_Z.
+    pub ang_vel: AngVel,
+}
+
+impl ToKvn for QuaternionAngVel {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        let mut line = self.epoch.to_string();
+        line.push_str(&format!(" {} {} {} {}", 
+            self.quaternion.q1, self.quaternion.q2, self.quaternion.q3, self.quaternion.qc));
+        line.push_str(&format!(" {} {} {}", 
+            self.ang_vel.angvel_x.value, self.ang_vel.angvel_y.value, self.ang_vel.angvel_z.value));
+        writer.write_line(&line);
+    }
+}
+
+/// AEM Attitude Ephemeris Data Line: EulerAngle.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct EulerAngle {
+    /// Epoch of the attitude state.
+    pub epoch: Epoch,
+    /// Angle of the first rotation.
+    pub angle_1: Angle,
+    /// Angle of the second rotation.
+    pub angle_2: Angle,
+    /// Angle of the third rotation.
+    pub angle_3: Angle,
+}
+
+impl ToKvn for EulerAngle {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        let mut line = self.epoch.to_string();
+        line.push_str(&format!(" {} {} {}", 
+            self.angle_1.value, self.angle_2.value, self.angle_3.value));
+        writer.write_line(&line);
+    }
+}
+
+/// AEM Attitude Ephemeris Data Line: EulerAngle/Derivative.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct EulerAngleDerivative {
+    /// Epoch of the attitude state.
+    pub epoch: Epoch,
+    /// Angle of the first rotation.
+    pub angle_1: Angle,
+    /// Angle of the second rotation.
+    pub angle_2: Angle,
+    /// Angle of the third rotation.
+    pub angle_3: Angle,
+    /// Time derivative of angle of the first rotation.
+    pub angle_1_dot: AngleRate,
+    /// Time derivative of angle of the second rotation.
+    pub angle_2_dot: AngleRate,
+    /// Time derivative of angle of the third rotation.
+    pub angle_3_dot: AngleRate,
+}
+
+impl ToKvn for EulerAngleDerivative {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        let mut line = self.epoch.to_string();
+        line.push_str(&format!(" {} {} {}", 
+            self.angle_1.value, self.angle_2.value, self.angle_3.value));
+        line.push_str(&format!(" {} {} {}", 
+            self.angle_1_dot.value, self.angle_2_dot.value, self.angle_3_dot.value));
+        writer.write_line(&line);
+    }
+}
+
+/// AEM Attitude Ephemeris Data Line: EulerAngle/AngVel.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct EulerAngleAngVel {
+    /// Epoch of the attitude state.
+    pub epoch: Epoch,
+    /// Angle of the first rotation.
+    pub angle_1: Angle,
+    /// Angle of the second rotation.
+    pub angle_2: Angle,
+    /// Angle of the third rotation.
+    pub angle_3: Angle,
+    /// Angular velocity components ANGVEL_X, ANGVEL_Y, ANGVEL_Z.
+    pub ang_vel: AngVel,
+}
+
+impl ToKvn for EulerAngleAngVel {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        let mut line = self.epoch.to_string();
+        line.push_str(&format!(" {} {} {}", 
+            self.angle_1.value, self.angle_2.value, self.angle_3.value));
+        line.push_str(&format!(" {} {} {}", 
+            self.ang_vel.angvel_x.value, self.ang_vel.angvel_y.value, self.ang_vel.angvel_z.value));
+        writer.write_line(&line);
+    }
+}
+
+/// AEM Attitude Ephemeris Data Line: Spin.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct Spin {
+    /// Epoch of the attitude state.
+    pub epoch: Epoch,
+    /// Right ascension of spin axis vector in frame A.
+    pub spin_alpha: Angle,
+    /// Declination of the spin axis vector in frame A.
+    pub spin_delta: Angle,
+    /// Phase of the satellite about the spin axis.
+    pub spin_angle: Angle,
+    /// Angular velocity of satellite around spin axis.
+    pub spin_angle_vel: AngleRate,
+}
+
+impl ToKvn for Spin {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        let mut line = self.epoch.to_string();
+        line.push_str(&format!(" {} {} {} {}", 
+            self.spin_alpha.value, self.spin_delta.value, self.spin_angle.value, self.spin_angle_vel.value));
+        writer.write_line(&line);
+    }
+}
+
+/// AEM Attitude Ephemeris Data Line: Spin/Nutation.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct SpinNutation {
+    /// Epoch of the attitude state.
+    pub epoch: Epoch,
+    /// Right ascension of spin axis vector in frame A.
+    pub spin_alpha: Angle,
+    /// Declination of the spin axis vector in frame A.
+    pub spin_delta: Angle,
+    /// Phase of the satellite about the spin axis.
+    pub spin_angle: Angle,
+    /// Angular velocity of satellite around spin axis.
+    pub spin_angle_vel: AngleRate,
+    /// Nutation angle of spin axis.
+    pub nutation: Angle,
+    /// Body nutation period of the spin axis.
+    pub nutation_per: Duration,
+    /// Inertial nutation phase.
+    pub nutation_phase: Angle,
+}
+
+impl ToKvn for SpinNutation {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        let mut line = self.epoch.to_string();
+        line.push_str(&format!(" {} {} {} {} {} {} {}", 
+            self.spin_alpha.value, self.spin_delta.value, self.spin_angle.value, self.spin_angle_vel.value,
+            self.nutation.value, self.nutation_per.value, self.nutation_phase.value));
+        writer.write_line(&line);
+    }
+}
+
+/// AEM Attitude Ephemeris Data Line: Spin/Nutation_Mom.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct SpinNutationMom {
+    /// Epoch of the attitude state.
+    pub epoch: Epoch,
+    /// Right ascension of spin axis vector in frame A.
+    pub spin_alpha: Angle,
+    /// Declination of the spin axis vector in frame A.
+    pub spin_delta: Angle,
+    /// Phase of the satellite about the spin axis.
+    pub spin_angle: Angle,
+    /// Angular velocity of satellite around spin axis.
+    pub spin_angle_vel: AngleRate,
+    /// Right ascension of angular momentum vector in frame A.
+    pub momentum_alpha: Angle,
+    /// Declination of angular momentum vector in frame A.
+    pub momentum_delta: Angle,
+    /// Angular velocity of spin vector around the angular momentum vector.
+    pub nutation_vel: AngleRate,
+}
+
+impl ToKvn for SpinNutationMom {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        let mut line = self.epoch.to_string();
+        line.push_str(&format!(" {} {} {} {} {} {} {}", 
+            self.spin_alpha.value, self.spin_delta.value, self.spin_angle.value, self.spin_angle_vel.value,
+            self.momentum_alpha.value, self.momentum_delta.value, self.nutation_vel.value));
+        writer.write_line(&line);
+    }
+}
+
+/// Represents the `angVelType` from XSD.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub struct AngVel {
+    pub angvel_x: AngleRate,
+    pub angvel_y: AngleRate,
+    pub angvel_z: AngleRate,
 }
 
 impl ToKvn for QuaternionState {

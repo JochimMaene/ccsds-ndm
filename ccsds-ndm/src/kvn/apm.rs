@@ -7,16 +7,14 @@
 use crate::common::{
     AngVelState, EulerAngleState, InertiaState, Quaternion, QuaternionDot, QuaternionState, SpinState,
 };
-use crate::types::AngVelFrameType; 
 // But QuaternionState etc are in common.
 use crate::kvn::parser::*;
-use crate::messages::apm::{Apm, ApmBody, ApmData, ApmMetadata, ApmSegment, ManeuverParameters};
+use crate::messages::apm::{Apm, ApmBody, ApmData, ApmMetadata, ApmSegment};
+use crate::common::AttManeuverState;
 use crate::parse_block;
 use crate::error::InternalParserError;
-use crate::traits::Ndm;
 use std::str::FromStr;
-use winnow::error::{ErrMode, ContextError, ParserError, AddContext, FromExternalError};
-use winnow::combinator::terminated;
+use winnow::error::{ErrMode, FromExternalError};
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -180,7 +178,7 @@ pub fn ang_vel_state(input: &mut &str) -> KvnResult<AngVelState> {
         "REF_FRAME_A" => ref_frame_a: kv_string,
         "REF_FRAME_B" => ref_frame_b: kv_string,
         // KVN uses ANGVEL_FRAME
-        "ANGVEL_FRAME" => val: kv_string => { angvel_frame = Some(AngVelFrameType(val)); },
+        "ANGVEL_FRAME" => val: kv_string => { angvel_frame = Some(crate::types::AngVelFrameType(val)); },
         // Let's assume string for now if enum is problematic.
         // Wait, common.rs defined AngVelFrameType as enum?
         // Step 32 line 194: restriction base string, but empty enumeration? No, empty restriction means "no restrictions"? No, empty restriction block means nothing specified inside?
@@ -297,37 +295,37 @@ pub fn inertia_state(input: &mut &str) -> KvnResult<InertiaState> {
 }
 
 // Maneuver block
-pub fn maneuver_parameters(input: &mut &str) -> KvnResult<ManeuverParameters> {
+pub fn maneuver_parameters(input: &mut &str) -> KvnResult<AttManeuverState> {
     expect_block_start("MAN").parse_next(input)?;
     let mut comment = Vec::new();
     let mut man_epoch_start = None;
     let mut man_duration = None;
     let mut man_ref_frame = None;
-    let mut man_tor_1 = None;
-    let mut man_tor_2 = None;
-    let mut man_tor_3 = None;
+    let mut man_tor_x = None;
+    let mut man_tor_y = None;
+    let mut man_tor_z = None;
     let mut man_delta_mass = None;
 
     parse_block!(input, comment, {
         "MAN_EPOCH_START" => man_epoch_start: kv_epoch,
         "MAN_DURATION" => man_duration: kv_from_kvn,
         "MAN_REF_FRAME" => man_ref_frame: kv_string,
-        "MAN_TOR_1" => man_tor_1: kv_from_kvn,
-        "MAN_TOR_2" => man_tor_2: kv_from_kvn,
-        "MAN_TOR_3" => man_tor_3: kv_from_kvn,
+        "MAN_TOR_X" => man_tor_x: kv_from_kvn,
+        "MAN_TOR_Y" => man_tor_y: kv_from_kvn,
+        "MAN_TOR_Z" => man_tor_z: kv_from_kvn,
         "MAN_DELTA_MASS" => man_delta_mass: kv_from_kvn,
     }, |i: &mut &str| at_block_end("MAN", i));
 
     expect_block_end("MAN").parse_next(input)?;
 
-    Ok(ManeuverParameters {
+    Ok(AttManeuverState {
         comment,
         man_epoch_start: man_epoch_start.ok_or_else(|| missing_field_err(input, "MAN", "MAN_EPOCH_START"))?,
         man_duration: man_duration.ok_or_else(|| missing_field_err(input, "MAN", "MAN_DURATION"))?,
         man_ref_frame: man_ref_frame.ok_or_else(|| missing_field_err(input, "MAN", "MAN_REF_FRAME"))?,
-        man_tor_1: man_tor_1.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_1"))?,
-        man_tor_2: man_tor_2.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_2"))?,
-        man_tor_3: man_tor_3.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_3"))?,
+        man_tor_x: man_tor_x.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_X"))?,
+        man_tor_y: man_tor_y.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_Y"))?,
+        man_tor_z: man_tor_z.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_Z"))?,
         man_delta_mass,
     })
 }
@@ -337,13 +335,22 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<ManeuverParameters> {
 //----------------------------------------------------------------------
 
 pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
-    let mut quaternion_state = None;
-    let mut euler_angle_state = None;
-    let mut ang_vel_state = None;
-    let mut spin_state = None;
-    let mut inertia_state = None;
-    let mut maneuver_parameters = Vec::new();
+    // APM Data Section parsing
+    
+    // First, comments are allowed before EPOCH
     let mut comment = Vec::new();
+    comment.extend(collect_comments.parse_next(input)?);
+
+    // EPOCH is mandatory and usually the first key in data section
+    let (epoch, _) = expect_key("EPOCH").parse_next(input)?;
+    let epoch = crate::types::Epoch::from_str(epoch).map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
+
+    let mut quaternion_state = Vec::new();
+    let mut euler_angle_state = Vec::new();
+    let mut angular_velocity = Vec::new();
+    let mut spin = Vec::new();
+    let mut inertia = Vec::new();
+    let mut maneuver_parameters = Vec::new();
 
     // Logical blocks can appear in any order.
     loop {
@@ -352,15 +359,15 @@ pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
         // Check for recognized blocks using lookahead or just trying parsers
         // We use at_block_start to check which one it is.
         if at_block_start("QUAT", input) {
-            quaternion_state = Some(self::quaternion_state.parse_next(input)?);
+            quaternion_state.push(self::quaternion_state.parse_next(input)?);
         } else if at_block_start("EULER", input) {
-            euler_angle_state = Some(self::euler_angle_state.parse_next(input)?);
+            euler_angle_state.push(self::euler_angle_state.parse_next(input)?);
         } else if at_block_start("ANGVEL", input) {
-            ang_vel_state = Some(self::ang_vel_state.parse_next(input)?);
+            angular_velocity.push(self::ang_vel_state.parse_next(input)?);
         } else if at_block_start("SPIN", input) {
-            spin_state = Some(self::spin_state.parse_next(input)?);
+            spin.push(self::spin_state.parse_next(input)?);
         } else if at_block_start("INERTIA", input) {
-            inertia_state = Some(self::inertia_state.parse_next(input)?);
+            inertia.push(self::inertia_state.parse_next(input)?);
         } else if at_block_start("MAN", input) {
             maneuver_parameters.push(self::maneuver_parameters.parse_next(input)?);
         } else {
@@ -370,16 +377,13 @@ pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
     }
 
     Ok(ApmData {
-        comment, // Currently not collecting top-level data comments correctly? 
-                 // If they appear between blocks, skip_empty_lines ignores them? 
-                 // skip_empty_lines only skips empty lines.
-                 // If comments are between blocks, they are left in input.
-                 // We should probably consume them.
+        comment,
+        epoch,
         quaternion_state,
         euler_angle_state,
-        ang_vel_state,
-        spin_state,
-        inertia_state,
+        angular_velocity,
+        spin,
+        inertia,
         maneuver_parameters,
     })
 }
@@ -426,6 +430,7 @@ impl ParseKvn for Apm {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::traits::Ndm;
 
     #[test]
     fn test_parse_apm_minimal() {
@@ -438,6 +443,7 @@ OBJECT_NAME = MARS GLOBAL SURVEYOR
 OBJECT_ID = 1996-062A
 TIME_SYSTEM = UTC
 META_STOP
+EPOCH = 2002-11-04T17:22:31
 
 QUAT_START
 REF_FRAME_A = EME2000
@@ -451,7 +457,7 @@ QUAT_STOP
         let apm = Apm::from_kvn(input).unwrap();
         assert_eq!(apm.version, "2.0");
         assert_eq!(apm.body.segment.metadata.object_name, "MARS GLOBAL SURVEYOR");
-        let q_state = apm.body.segment.data.quaternion_state.unwrap();
+        let q_state = &apm.body.segment.data.quaternion_state[0];
         assert_eq!(q_state.quaternion.q1, 0.5);
     }
 }

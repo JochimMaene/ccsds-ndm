@@ -60,7 +60,11 @@ pub mod kvn;
 pub mod messages;
 pub mod traits;
 pub mod types;
+pub mod utils;
 pub mod xml;
+
+#[cfg(test)]
+mod tests;
 
 use error::{CcsdsNdmError, Result};
 use std::fs;

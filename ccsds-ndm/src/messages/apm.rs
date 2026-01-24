@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::{
-    AdmHeader, AngVelState, EulerAngleState, InertiaState, QuaternionState, SpinState,
+    AdmHeader, AngVelState, AttManeuverState, EulerAngleState, InertiaState, QuaternionState, SpinState,
 };
+
 use crate::error::{Result, ValidationError};
 use crate::kvn::ser::KvnWriter;
 use crate::kvn::parser::ParseKvn;
@@ -17,6 +18,10 @@ use serde::{Deserialize, Serialize};
 //----------------------------------------------------------------------
 
 /// Attitude Parameter Message (APM).
+///
+/// An APM specifies the attitude state of a single object at a specified epoch. This message is
+/// suited to interagency exchanges that (1) involve automated interaction and/or human
+/// interaction, and (2) do not require high-fidelity dynamic modeling.
 ///
 /// **CCSDS Reference**: 504.0-B-2, Section 3.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -125,19 +130,57 @@ impl ToKvn for ApmSegment {
     }
 }
 
-//----------------------------------------------------------------------
-// Metadata
-//----------------------------------------------------------------------
-
+/// APM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct ApmMetadata {
+    /// Comments (allowed only at the beginning of the APM Metadata before OBJECT_NAME). Each
+    /// comment line shall begin with this keyword.
+    ///
+    /// **Examples**: This is a comment.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
+    /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
+    /// restriction on the value for this keyword, it is recommended to use names from the UN
+    /// Office of Outer Space Affairs designator index (reference [ADM-2], which include object
+    /// name and international designator). When OBJECT_NAME is not known or cannot be disclosed,
+    /// the value should be set to UNKNOWN.
+    ///
+    /// **Examples**: EUTELSAT W1, MARS PATHFINDER, UNKNOWN
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
     pub object_name: String,
+    /// Spacecraft identifier of the object corresponding to the attitude data to be given. While
+    /// there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+    /// international designators from the UN Office of Outer Space Affairs (reference [ADM-2]).
+    /// Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three
+    /// digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one
+    /// letter for the identification of the part brought into space by the launch. In cases in
+    /// which the asset is not listed in reference [ADM-2], the UN Office of Outer Space Affairs
+    /// designator index format is not used, or the content cannot be disclosed, the value should
+    /// be set to UNKNOWN.
+    ///
+    /// **Examples**: 2000-052A
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
     pub object_id: String,
+    /// Celestial body orbited by the object, which may be a natural solar system body (planets,
+    /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
+    /// system barycenter. The set of allowed values is described in annex B, subsection B8.
+    ///
+    /// **Examples**: EARTH, BARYCENTER, MOON
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub center_name: Option<String>,
+    /// Time system used for attitude and maneuver data. The set of allowed values is described in
+    /// annex B, subsection B2.
+    ///
+    /// **Examples**: UTC, TAI
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
     pub time_system: String,
 }
 
@@ -153,39 +196,64 @@ impl ToKvn for ApmMetadata {
     }
 }
 
-//----------------------------------------------------------------------
-// Data
-//----------------------------------------------------------------------
-
+/// APM Data Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct ApmData {
-    // Note: Comments can be inside logical blocks, but also interspersed?
-    // Usually comments belong to a block.
-    // We model the content as optional fields for each block.
+    /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub comment: Vec<String>, // Top level comments in data section?
-    #[serde(rename = "quaternionState", default, skip_serializing_if = "Option::is_none")]
-    pub quaternion_state: Option<QuaternionState>,
-    #[serde(rename = "eulerAngleState", default, skip_serializing_if = "Option::is_none")]
-    pub euler_angle_state: Option<EulerAngleState>,
-    #[serde(rename = "angVelState", default, skip_serializing_if = "Option::is_none")]
-    pub ang_vel_state: Option<AngVelState>, // Note: renamed to standard
-    #[serde(rename = "spinState", default, skip_serializing_if = "Option::is_none")]
-    pub spin_state: Option<SpinState>,
-    #[serde(rename = "inertiaState", default, skip_serializing_if = "Option::is_none")]
-    pub inertia_state: Option<InertiaState>,
+    pub comment: Vec<String>,
+    /// Epoch of the attitude elements and optional logical blocks.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    pub epoch: Epoch,
+    /// Attitude quaternion. All mandatory elements are to be provided if the block is present.
+    /// (See annex F for conventions and further detail.)
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[serde(rename = "quaternionState", default, skip_serializing_if = "Vec::is_empty")]
+    pub quaternion_state: Vec<QuaternionState>,
+    /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
+    /// block is present. (See annex F for conventions and further detail.)
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[serde(rename = "eulerAngleState", default, skip_serializing_if = "Vec::is_empty")]
+    pub euler_angle_state: Vec<EulerAngleState>,
+    /// Angular velocity vector. All mandatory elements are to be provided if the block is present.
+    /// (See annex F for conventions and further detail.)
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[serde(rename = "angularVelocity", default, skip_serializing_if = "Vec::is_empty")]
+    pub angular_velocity: Vec<AngVelState>,
+    /// Spin. All mandatory elements are to be provided if the block is present. (See annex F for
+    /// conventions and further detail.)
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[serde(rename = "spin", default, skip_serializing_if = "Vec::is_empty")]
+    pub spin: Vec<SpinState>,
+    /// Inertia. All mandatory elements are to be provided if the block is present. (See annex F
+    /// for conventions and further detail.)
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[serde(rename = "inertia", default, skip_serializing_if = "Vec::is_empty")]
+    pub inertia: Vec<InertiaState>,
+    /// Maneuver Parameters. All mandatory elements are to be provided if the block is present.
+    /// (See annex F for conventions and further detail.)
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(rename = "maneuverParameters", default, skip_serializing_if = "Vec::is_empty")]
-    pub maneuver_parameters: Vec<ManeuverParameters>, 
+    pub maneuver_parameters: Vec<AttManeuverState>,
 }
 
 impl ApmData {
     pub fn validate(&self) -> Result<()> {
-        if self.quaternion_state.is_none()
-            && self.euler_angle_state.is_none()
-            && self.ang_vel_state.is_none()
-            && self.spin_state.is_none()
-            && self.inertia_state.is_none()
+        if self.quaternion_state.is_empty()
+            && self.euler_angle_state.is_empty()
+            && self.angular_velocity.is_empty()
+            && self.spin.is_empty()
+            && self.inertia.is_empty()
             && self.maneuver_parameters.is_empty()
         {
              return Err(ValidationError::MissingRequiredField {
@@ -201,31 +269,32 @@ impl ApmData {
 impl ToKvn for ApmData {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        if let Some(block) = &self.quaternion_state {
+        writer.write_pair("EPOCH", self.epoch);
+        for block in &self.quaternion_state {
             writer.write_line("QUAT_START");
             block.write_kvn(writer);
             writer.write_line("QUAT_STOP");
             writer.write_line("");
         }
-        if let Some(block) = &self.euler_angle_state {
+        for block in &self.euler_angle_state {
             writer.write_line("EULER_START");
             block.write_kvn(writer);
             writer.write_line("EULER_STOP");
             writer.write_line("");
         }
-        if let Some(block) = &self.ang_vel_state {
+        for block in &self.angular_velocity {
             writer.write_line("ANGVEL_START");
             block.write_kvn(writer);
             writer.write_line("ANGVEL_STOP");
             writer.write_line("");
         }
-        if let Some(block) = &self.spin_state {
+        for block in &self.spin {
             writer.write_line("SPIN_START");
             block.write_kvn(writer);
             writer.write_line("SPIN_STOP");
             writer.write_line("");
         }
-        if let Some(block) = &self.inertia_state {
+        for block in &self.inertia {
             writer.write_line("INERTIA_START");
             block.write_kvn(writer);
             writer.write_line("INERTIA_STOP");
@@ -238,35 +307,4 @@ impl ToKvn for ApmData {
             writer.write_line("");
         }
     }
-}
-
-impl ToKvn for ManeuverParameters {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_comments(&self.comment);
-        writer.write_pair("MAN_EPOCH_START", self.man_epoch_start);
-        writer.write_measure("MAN_DURATION", &self.man_duration.to_unit_value());
-        writer.write_pair("MAN_REF_FRAME", &self.man_ref_frame);
-        writer.write_measure("MAN_TOR_1", &self.man_tor_1);
-        writer.write_measure("MAN_TOR_2", &self.man_tor_2);
-        writer.write_measure("MAN_TOR_3", &self.man_tor_3);
-        if let Some(m) = &self.man_delta_mass {
-            writer.write_measure("MAN_DELTA_MASS", &m.to_unit_value());
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub struct ManeuverParameters {
-     // TODO: definitions
-     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-     pub comment: Vec<String>,
-     pub man_epoch_start: Epoch,
-     pub man_duration: Duration,
-     pub man_ref_frame: String,
-     pub man_tor_1: Torque,
-     pub man_tor_2: Torque,
-     pub man_tor_3: Torque,
-     #[serde(default, skip_serializing_if = "Option::is_none")]
-     pub man_delta_mass: Option<Mass>,
 }
