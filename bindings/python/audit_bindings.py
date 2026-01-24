@@ -316,6 +316,10 @@ def audit_bindings(
     }
 
     for class_name, py_class in python_classes.items():
+        # Check if the whole class should be skipped
+        if should_skip_rust_field(class_name, "*"):
+            continue
+
         result.stats["structs_checked"] += 1
 
         # Get corresponding Rust struct

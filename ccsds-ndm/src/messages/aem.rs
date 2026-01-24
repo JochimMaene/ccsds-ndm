@@ -510,6 +510,9 @@ DATA_STOP
         // Our current validate() is empty, but we can still check parsing
         let kvn = sample_aem_kvn();
         let aem = Aem::from_kvn(&kvn).unwrap();
-        assert!(aem.body.segment[0].metadata.stop_time > aem.body.segment[0].metadata.start_time);
+        assert!(
+            aem.body.segment[0].metadata.stop_time.as_str()
+                > aem.body.segment[0].metadata.start_time.as_str()
+        );
     }
 }

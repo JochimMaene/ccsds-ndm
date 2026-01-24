@@ -93,6 +93,8 @@ impl Aem {
     /// interpretation and processing are required), and (2) require higher fidelity or higher
     /// precision dynamic modeling than is possible with the APM (e.g., flexible structures, more
     /// complex attitude movement, etc.).
+    ///
+    /// :type: AdmHeader
     #[getter]
     fn get_header(&self) -> AdmHeader {
         AdmHeader {
@@ -100,6 +102,9 @@ impl Aem {
         }
     }
 
+    /// AEM Segments.
+    ///
+    /// :type: list[AemSegment]
     #[getter]
     fn get_segments(&self) -> Vec<AemSegment> {
         self.inner
@@ -129,6 +134,9 @@ impl AemSegment {
         }
     }
 
+    /// AEM Metadata Section.
+    ///
+    /// :type: AemMetadata
     #[getter]
     fn get_metadata(&self) -> AemMetadata {
         AemMetadata {
@@ -136,6 +144,9 @@ impl AemSegment {
         }
     }
 
+    /// AEM Data Section.
+    ///
+    /// :type: AemData
     #[getter]
     fn get_data(&self) -> AemData {
         AemData {
@@ -204,6 +215,8 @@ impl AemMetadata {
     /// the value should be set to UNKNOWN.
     ///
     /// Examples: EUTELSAT W1
+    ///
+    /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
         self.inner.object_name.clone()
@@ -220,9 +233,178 @@ impl AemMetadata {
     /// should be set to UNKNOWN.
     ///
     /// Examples: 2000-052A
+    ///
+    /// :type: str
     #[getter]
     fn get_object_id(&self) -> String {
         self.inner.object_id.clone()
+    }
+
+    /// Comments allowed only at the beginning of the Metadata section. Each comment line shall
+    /// begin with this keyword.
+    ///
+    /// Examples: This is a comment.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    /// Celestial body orbited by the object, which may be a natural solar system body (planets,
+    /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
+    /// system barycenter. The set of allowed values is described in annex B, subsection B8.
+    ///
+    /// Examples: EARTH, STS-106
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_center_name(&self) -> Option<String> {
+        self.inner.center_name.clone()
+    }
+
+    /// Name of the reference frame that defines the starting point of the transformation. The set
+    /// of allowed values is described in annex B, subsection B3.
+    ///
+    /// Examples: ICRF, SC_BODY_1, INSTRUMENT_A
+    ///
+    /// :type: str
+    #[getter]
+    fn get_ref_frame_a(&self) -> String {
+        self.inner.ref_frame_a.clone()
+    }
+
+    /// Name of the reference frame that defines the end point of the transformation. The set of
+    /// allowed values is described in annex B, subsection B3.
+    ///
+    /// Examples: SC_BODY_1, INSTRUMENT_A
+    ///
+    /// :type: str
+    #[getter]
+    fn get_ref_frame_b(&self) -> String {
+        self.inner.ref_frame_b.clone()
+    }
+
+    /// Time system used for both attitude ephemeris data and metadata. The set of allowed values
+    /// is described in annex B, subsection B2.
+    ///
+    /// Examples: UTC, TAI
+    ///
+    /// :type: str
+    #[getter]
+    fn get_time_system(&self) -> String {
+        self.inner.time_system.clone()
+    }
+
+    /// Start of TOTAL time span covered by attitude ephemeris data immediately following this
+    /// metadata block.
+    ///
+    /// Examples: 1996-12-18T14:28:15.11
+    ///
+    /// :type: str
+    #[getter]
+    fn get_start_time(&self) -> String {
+        self.inner.start_time.as_str().to_string()
+    }
+
+    /// End of TOTAL time span covered by the attitude ephemeris data immediately following this
+    /// metadata block.
+    ///
+    /// Examples: 1996-12-18T14:28:15.11
+    ///
+    /// :type: str
+    #[getter]
+    fn get_stop_time(&self) -> String {
+        self.inner.stop_time.as_str().to_string()
+    }
+
+    /// Optional start of USEABLE time span covered by attitude ephemeris data immediately
+    /// following this metadata block. To allow for proper interpolation near the beginning/end of
+    /// the attitude ephemeris data block, it may be necessary to utilize this keyword with values
+    /// within the time span covered by the attitude ephemeris data records as denoted by the
+    /// START/STOP_TIME time tags. The USEABLE_START_TIME time tag of a new block of ephemeris data
+    /// must be greater than or equal to the USEABLE_STOP_TIME time tag of the previous block.
+    ///
+    /// Examples: 1996-12-18T14:28:15.11
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_useable_start_time(&self) -> Option<String> {
+        self.inner.useable_start_time.as_ref().map(|e| e.as_str().to_string())
+    }
+
+    /// Optional stop of USEABLE time span covered by attitude ephemeris data immediately following
+    /// this metadata block. (See also USEABLE_START_TIME.)
+    ///
+    /// Examples: 1996-12-18T14:28:15.11
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_useable_stop_time(&self) -> Option<String> {
+        self.inner.useable_stop_time.as_ref().map(|e| e.as_str().to_string())
+    }
+
+    /// The type of information contained in the data lines. This keyword must have a value from the
+    /// set specified at the right. (See table 4-4 for details of the data contained in each line.)
+    ///
+    /// Examples: QUATERNION, QUATERNION/DERIVATIVE, QUATERNION/ANGVEL, EULER_ANGLE,
+    /// EULER_ANGLE/DERIVATIVE, EULER_ANGLE/ANGVEL, SPIN, SPIN/NUTATION, SPIN/NUTATION_MOM
+    ///
+    /// :type: str
+    #[getter]
+    fn get_attitude_type(&self) -> String {
+        self.inner.attitude_type.clone()
+    }
+
+    /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
+    /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
+    /// the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
+    /// rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
+    /// rotation axis of the third rotation. This keyword is applicable only if ATTITUDE_TYPE
+    /// specifies the use of Euler angles.
+    ///
+    /// Examples: ZXZ, XYZ
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_euler_rot_seq(&self) -> Option<String> {
+        self.inner.euler_rot_seq.as_ref().map(|s| s.to_string())
+    }
+
+    /// The frame of reference in which angular velocity data are specified. The set of allowed
+    /// values is described in annex B, subsection B3. This keyword is applicable only if
+    /// ATTITUDE_TYPE specifies the use of angular velocities in conjunction with either
+    /// quaternions or Euler angles.
+    ///
+    /// Examples: ICRF, SC_BODY_1
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_angvel_frame(&self) -> Option<String> {
+        self.inner.angvel_frame.clone()
+    }
+
+    /// Recommended interpolation method for attitude ephemeris data in the block immediately
+    /// following this metadata block.
+    ///
+    /// Examples: LINEAR, HERMITE, LAGRANGE
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_interpolation_method(&self) -> Option<String> {
+        self.inner.interpolation_method.clone()
+    }
+
+    /// Recommended interpolation degree for attitude ephemeris data in the block immediately
+    /// following this metadata block. It must be an integer value. This keyword must be used if
+    /// the ‘INTERPOLATION_METHOD’ keyword is used.
+    ///
+    /// Examples: 1, 5
+    ///
+    /// :type: int | None
+    #[getter]
+    fn get_interpolation_degree(&self) -> Option<u32> {
+        self.inner.interpolation_degree.map(|d| d.get())
     }
 }
 
@@ -244,7 +426,7 @@ impl AemData {
                 // to make it compile. Real mapping would need to check attitude_type.
                 attitude_states: attitude_states.into_iter().map(|s| {
                     use ccsds_ndm::common::{QuaternionEphemeris, Quaternion};
-                    ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
+                    let state = ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
                         epoch: s.epoch,
                         quaternion: Quaternion {
                             q1: s.values.get(0).copied().unwrap_or(0.0),
@@ -252,13 +434,25 @@ impl AemData {
                             q3: s.values.get(2).copied().unwrap_or(0.0),
                             qc: s.values.get(3).copied().unwrap_or(1.0),
                         },
-                    })
+                    });
+                    state.into()
                 }).collect(),
             },
         }
     }
 
+    /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
+    /// with this keyword.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
     /// Attitude ephemeris data lines.
+    ///
+    /// :type: list[AttitudeState]
     #[getter]
     fn get_attitude_states(&self) -> Vec<AttitudeState> {
         self.inner
@@ -266,8 +460,8 @@ impl AemData {
             .iter()
             .map(|s| {
                 // Simplified mapping back to generic AttitudeState
-                let (epoch, values) = match s {
-                    ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) => 
+                let (epoch, values) = match s.content() {
+                    Some(ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v)) =>
                         (v.epoch, vec![v.quaternion.q1, v.quaternion.q2, v.quaternion.q3, v.quaternion.qc]),
                     _ => (ccsds_ndm::types::Epoch::default(), vec![]), // TODO: implement other variants
                 };

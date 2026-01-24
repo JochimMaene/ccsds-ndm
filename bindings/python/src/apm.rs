@@ -86,6 +86,8 @@ impl Apm {
     /// An APM specifies the attitude state of a single object at a specified epoch. This message is
     /// suited to interagency exchanges that (1) involve automated interaction and/or human
     /// interaction, and (2) do not require high-fidelity dynamic modeling.
+    ///
+    /// :type: AdmHeader
     #[getter]
     fn get_header(&self) -> AdmHeader {
         AdmHeader {
@@ -93,6 +95,9 @@ impl Apm {
         }
     }
 
+    /// APM Segment.
+    ///
+    /// :type: ApmSegment
     #[getter]
     fn get_segment(&self) -> ApmSegment {
         ApmSegment {
@@ -119,6 +124,9 @@ impl ApmSegment {
         }
     }
 
+    /// APM Metadata Section.
+    ///
+    /// :type: ApmMetadata
     #[getter]
     fn get_metadata(&self) -> ApmMetadata {
         ApmMetadata {
@@ -126,6 +134,9 @@ impl ApmSegment {
         }
     }
 
+    /// APM Data Section.
+    ///
+    /// :type: ApmData
     #[getter]
     fn get_data(&self) -> ApmData {
         ApmData {
@@ -169,6 +180,8 @@ impl ApmMetadata {
     /// the value should be set to UNKNOWN.
     ///
     /// Examples: EUTELSAT W1, MARS PATHFINDER, UNKNOWN
+    ///
+    /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
         self.inner.object_name.clone()
@@ -185,6 +198,8 @@ impl ApmMetadata {
     /// be set to UNKNOWN.
     ///
     /// Examples: 2000-052A
+    ///
+    /// :type: str
     #[getter]
     fn get_object_id(&self) -> String {
         self.inner.object_id.clone()
@@ -252,6 +267,8 @@ impl ApmData {
 
     /// Attitude quaternion. All mandatory elements are to be provided if the block is present.
     /// (See annex F for conventions and further detail.)
+    ///
+    /// :type: list[QuaternionState]
     #[getter]
     fn get_quaternion_state(&self) -> Vec<QuaternionState> {
         self.inner
@@ -263,6 +280,8 @@ impl ApmData {
 
     /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
     /// block is present. (See annex F for conventions and further detail.)
+    ///
+    /// :type: list[EulerAngleState]
     #[getter]
     fn get_euler_angle_state(&self) -> Vec<EulerAngleState> {
         self.inner

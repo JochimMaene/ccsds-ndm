@@ -165,6 +165,9 @@ impl AdmHeader {
         )
     }
 
+    /// File creation date/time in UTC.
+    ///
+    /// :type: str
     #[getter]
     fn get_creation_date(&self) -> String {
         self.inner.creation_date.as_str().to_string()
@@ -176,6 +179,9 @@ impl AdmHeader {
         Ok(())
     }
 
+    /// Creating agency or operator.
+    ///
+    /// :type: str
     #[getter]
     fn get_originator(&self) -> String {
         self.inner.originator.clone()
@@ -186,6 +192,9 @@ impl AdmHeader {
         self.inner.originator = value;
     }
 
+    /// ID that uniquely identifies a message from a given originator.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_message_id(&self) -> Option<String> {
         self.inner.message_id.clone()
@@ -196,6 +205,9 @@ impl AdmHeader {
         self.inner.message_id = value;
     }
 
+    /// User-defined free-text message classification/caveats.
+    ///
+    /// :type: Optional[str]
     #[getter]
     fn get_classification(&self) -> Option<String> {
         self.inner.classification.clone()
@@ -206,6 +218,9 @@ impl AdmHeader {
         self.inner.classification = value;
     }
 
+    /// Comments.
+    ///
+    /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()

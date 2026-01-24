@@ -133,7 +133,7 @@ def _generate_property(obj: Any, indent: str) -> str:
     lines.extend([f"{inner_indent}...", ""])
 
     # Setter
-    value_type = prop_type or "Any"
+    value_type = prop_type or "object"
     lines.extend(
         [
             f"{indent}@{name}.setter",

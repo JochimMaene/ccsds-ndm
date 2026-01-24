@@ -60,8 +60,7 @@ impl QuaternionState {
     fn get_q3(&self) -> f64 { self.inner.quaternion.q3 }
     #[getter]
     fn get_qc(&self) -> f64 { self.inner.quaternion.qc }
-    
-    // ... other getters/setters as needed
+
 }
 
 /// Euler angle elements.

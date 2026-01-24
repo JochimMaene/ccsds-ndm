@@ -703,7 +703,7 @@ impl RelativeMetadataData {
     ///
     /// Units: m
     ///
-    /// :type: Optional[float]
+    /// :type: float
     #[getter]
     fn screen_volume_x(&self) -> Option<f64> {
         self.inner.screen_volume_x.as_ref().map(|v| v.value)
@@ -714,7 +714,7 @@ impl RelativeMetadataData {
     ///
     /// Units: m
     ///
-    /// :type: Optional[float]
+    /// :type: float
     #[getter]
     fn screen_volume_y(&self) -> Option<f64> {
         self.inner.screen_volume_y.as_ref().map(|v| v.value)
@@ -725,7 +725,7 @@ impl RelativeMetadataData {
     ///
     /// Units: m
     ///
-    /// :type: Optional[float]
+    /// :type: float
     #[getter]
     fn screen_volume_z(&self) -> Option<f64> {
         self.inner.screen_volume_z.as_ref().map(|v| v.value)

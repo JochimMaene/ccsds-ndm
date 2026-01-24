@@ -41,6 +41,18 @@ FIELD_MAPPINGS: dict[str, dict[str, str]] = {
     "Rdm": {
         "segment": "body.segment",
     },
+    # AEM - Attitude Ephemeris Message
+    "Aem": {
+        "segments": "body.segment",
+    },
+    # APM - Attitude Parameter Message
+    "Apm": {
+        "segment": "body.segment",
+    },
+    # ACM - Attitude Comprehensive Message
+    "Acm": {
+        "segment": "body.segment",
+    },
     "RelativeMetadataData": {
         "relative_position": "relative_state_vector",
         "relative_velocity": "relative_state_vector",
@@ -71,6 +83,12 @@ PYTHON_ONLY_FIELDS: dict[str, list[str]] = {
     "CdmCovarianceMatrix": [
         "to_numpy",
     ],
+    "AemData": [
+        "attitude_states",
+    ],
+    "AttitudeState": [
+        "*",
+    ],
     # Add other NumPy accessors as needed
 }
 
@@ -94,6 +112,9 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
     "Cdm": [],  # CDM exposes body directly
     "Tdm": ["id", "version", "body"],
     "Rdm": ["id", "version", "body"],
+    "Aem": ["id", "version", "body"],
+    "Apm": ["id", "version", "body"],
+    "Acm": ["id", "version", "body", "header"],
     "TdmObservation": ["data"],
     # Internal body wrappers - skip entirely
     "OemBody": ["*"],
@@ -102,6 +123,28 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
     "OcmBody": ["*"],
     "TdmBody": ["*"],
     "RdmBody": ["*"],
+    "AemBody": ["*"],
+    "ApmBody": ["*"],
+    "AcmBody": ["*"],
+    # Partially implemented or legacy
+    "AcmAttitudeDetermination": ["*"],
+    "AcmAttitudeState": ["*"],
+    "AcmCovarianceMatrix": ["*"],
+    "AcmData": ["*"],
+    "AcmManeuverParameters": ["*"],
+    "AcmMetadata": ["*"],
+    "AcmPhysicalDescription": ["*"],
+    "AcmSegment": ["*"],
+    "AngVelState": ["*"],
+    "ApmData": ["*"],
+    "ApmMetadata": ["*"],
+    "ApmSegment": ["*"],
+    "EulerAngleState": ["*"],
+    "InertiaState": ["*"],
+    "OdmHeader": ["*"],
+    "QuaternionState": ["*"],
+    "SpinState": ["*"],
+    "AttitudeState": ["*"],
 }
 
 # ---------------------------------------------------------------------------

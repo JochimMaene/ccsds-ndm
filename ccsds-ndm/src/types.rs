@@ -20,7 +20,7 @@ use winnow::Parser;
 ///
 /// This struct uses a stack-allocated buffer to avoid heap allocations
 /// during parsing of large NDM files.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Epoch {
     bytes: [u8; 64],
     len: u8,

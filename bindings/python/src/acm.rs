@@ -85,6 +85,8 @@ impl Acm {
     /// An ACM specifies the attitude state of a single object at multiple epochs, contained within a
     /// specified time range. The ACM aggregates and extends APM and AEM content in a single
     /// comprehensive hybrid message.
+    ///
+    /// :type: AdmHeader
     #[getter]
     fn get_header(&self) -> AdmHeader {
         AdmHeader {
@@ -92,6 +94,9 @@ impl Acm {
         }
     }
 
+    /// ACM Segment.
+    ///
+    /// :type: AcmSegment
     #[getter]
     fn get_segment(&self) -> AcmSegment {
         AcmSegment {
@@ -118,6 +123,9 @@ impl AcmSegment {
         }
     }
 
+    /// ACM Metadata Section.
+    ///
+    /// :type: AcmMetadata
     #[getter]
     fn get_metadata(&self) -> AcmMetadata {
         AcmMetadata {
@@ -125,6 +133,9 @@ impl AcmSegment {
         }
     }
 
+    /// ACM Data Section.
+    ///
+    /// :type: AcmData
     #[getter]
     fn get_data(&self) -> AcmData {
         AcmData {
@@ -172,6 +183,8 @@ impl AcmMetadata {
     /// omitted).
     ///
     /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
+    ///
+    /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
         self.inner.object_name.clone()
@@ -187,6 +200,8 @@ impl AcmMetadata {
     /// ‘OBJECT_ID’ in the APM and AEM.
     ///
     /// Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
+    ///
+    /// :type: str | None
     #[getter]
     fn get_international_designator(&self) -> Option<String> {
         self.inner.international_designator.clone()
@@ -225,12 +240,16 @@ impl AcmData {
 
     /// One or more optional attitude state time histories (each consisting of one or more attitude
     /// states).
+    ///
+    /// :type: list[AcmAttitudeState]
     #[getter]
     fn get_att(&self) -> Vec<AcmAttitudeState> {
         self.inner.att.iter().map(|s| AcmAttitudeState { inner: s.clone() }).collect()
     }
 
     /// A single space object physical characteristics section.
+    ///
+    /// :type: AcmPhysicalDescription | None
     #[getter]
     fn get_phys(&self) -> Option<AcmPhysicalDescription> {
         self.inner.phys.as_ref().map(|p| AcmPhysicalDescription { inner: p.clone() })
