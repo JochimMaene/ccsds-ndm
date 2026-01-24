@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 pub mod cdm;
+pub mod ndm;
 pub mod ocm;
 pub mod oem;
 pub mod omm;

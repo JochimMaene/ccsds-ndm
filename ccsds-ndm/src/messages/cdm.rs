@@ -29,12 +29,7 @@ pub struct Cdm {
 impl Ndm for Cdm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
-        // 1. Header
-        writer.write_pair("CCSDS_CDM_VERS", &self.version);
-        self.header.write_kvn(&mut writer);
-
-        // 2. Body
-        self.body.write_kvn(&mut writer);
+        self.write_kvn(&mut writer);
         Ok(writer.finish())
     }
 
@@ -59,29 +54,48 @@ impl Ndm for Cdm {
 // Header
 //----------------------------------------------------------------------
 
+/// Represents the `cdmHeader` complex type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmHeader {
-    /// Comments.
+    /// Comments (allowed in the CDM Header only immediately after the CDM version number).
+    /// (See 6.3.4 for formatting rules.)
+    ///
+    /// **Examples**: This is a comment
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// Message creation date/time in Coordinated Universal Time (UTC).
-
+    /// Message creation date/time in Coordinated Universal Time (UTC). (See 6.3.2.6 for
+    /// formatting rules.)
     ///
-    /// Examples: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
+    /// **Examples**: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     pub creation_date: Epoch,
-    /// Creating agency or owner/operator.
+    /// Creating agency or owner/operator. Value should be the 'Abbreviation' value from the
+    /// SANA 'Organizations' registry (https://sanaregistry.org/r/organizations) for an
+    /// organization that has the Role of 'Conjunction Data Message Originator'. (See 5.2.9
+    /// for formatting rules.)
     ///
-    /// Examples: JSPOC, ESA SST, CAESAR, JPL, SDC
+    /// **Examples**: JSPOC, ESA SST, CAESAR, JPL, SDC
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     pub originator: String,
     /// Spacecraft name(s) for which the CDM is provided.
     ///
-    /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
+    /// **Examples**: SPOT, ENVISAT, IRIDIUM, INTELSAT
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message_for: Option<String>,
-    /// ID that uniquely identifies a message from a given originator.
+    /// ID that uniquely identifies a message from a given originator. The format and content
+    /// of the message identifier value are at the discretion of the originator. (See 5.2.9
+    /// for formatting rules.)
     ///
-    /// Examples: 201113719185, ABC-12_34
+    /// **Examples**: 201113719185, ABC-12_34
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     pub message_id: String,
 }
 
@@ -89,6 +103,17 @@ impl Cdm {
     pub fn validate(&self) -> Result<()> {
         self.body.validate()?;
         Ok(())
+    }
+}
+
+impl ToKvn for Cdm {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        // 1. Header
+        writer.write_pair("CCSDS_CDM_VERS", &self.version);
+        self.header.write_kvn(writer);
+
+        // 2. Body
+        self.body.write_kvn(writer);
     }
 }
 
@@ -150,18 +175,28 @@ impl CdmBody {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RelativeMetadataData {
-    /// Comments.
+    /// Comments (see 6.3.4 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// The date and time in UTC of the closest approach.
+    /// The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     pub tca: Epoch,
-    /// The norm of the relative position vector.
+    /// The norm of the relative position vector. It indicates how close the two objects are at
+    /// TCA. Data type = double.
     ///
-    /// Units: m
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     pub miss_distance: Length,
-    /// The norm of the relative velocity vector.
+    /// The norm of the relative velocity vector. It indicates how fast the two objects are
+    /// moving relative to each other at TCA. Data type = double.
     ///
-    /// Units: m/s
+    /// **Units**: m/s
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub relative_speed: Option<Dv>,
     /// The relative position and velocity of Object2 with respect to Object1.
@@ -171,44 +206,77 @@ pub struct RelativeMetadataData {
         skip_serializing_if = "Option::is_none"
     )]
     pub relative_state_vector: Option<RelativeStateVector>,
-    /// The start time in UTC of the screening period for the conjunction assessment.
+    /// The start time in UTC of the screening period for the conjunction assessment. (See
+    /// 6.3.2.6 for formatting rules.)
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_screen_period: Option<Epoch>,
-    /// The stop time in UTC of the screening period for the conjunction assessment.
+    /// The stop time in UTC of the screening period for the conjunction assessment. (See
+    /// 6.3.2.6 for formatting rules.)
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_screen_period: Option<Epoch>,
-    /// Name of the Object1 centered reference frame in which the screening volume data are given.
+    /// Name of the Object1 centered reference frame in which the screening volume data are
+    /// given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
+    /// E for definition.)
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_frame: Option<ScreenVolumeFrameType>,
-    /// Shape of the screening volume.
+    /// Shape of the screening volume: ELLIPSOID or BOX.
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_shape: Option<ScreenVolumeShapeType>,
 
-    /// The R or T component size of the screening volume.
+    /// The R or T (depending on if RTN or TVN is selected) component size of the screening
+    /// volume in the SCREEN_VOLUME_FRAME. Data type = double.
     ///
-    /// Units: m
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_x: Option<Length>,
-    /// The T or V component size of the screening volume.
+    /// The T or V (depending on if RTN or TVN is selected) component size of the screening
+    /// volume in the SCREEN_VOLUME_FRAME. Data type = double.
     ///
-    /// Units: m
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_y: Option<Length>,
-    /// The N component size of the screening volume.
+    /// The N component size of the screening volume in the SCREEN_VOLUME_FRAME. Data type =
+    /// double.
     ///
-    /// Units: m
+    /// **Units**: m
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_volume_z: Option<Length>,
-    /// The time in UTC when Object2 enters the screening volume.
+    /// The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for formatting
+    /// rules.)
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_entry_time: Option<Epoch>,
-    /// The time in UTC when Object2 exits the screening volume.
+    /// The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
+    /// rules.)
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_exit_time: Option<Epoch>,
-    /// The probability that Object1 and Object2 will collide.
+    /// The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will collide.
+    /// Data type = double.
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collision_probability: Option<Probability>,
-    /// The method that was used to calculate the collision probability.
+    /// The method that was used to calculate the collision probability. (See annex E for
+    /// definition.)
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collision_probability_method: Option<String>,
 }
@@ -231,10 +299,10 @@ impl ToKvn for RelativeMetadataData {
             writer.write_pair("STOP_SCREEN_PERIOD", v);
         }
         if let Some(v) = &self.screen_volume_frame {
-            writer.write_pair("SCREEN_VOLUME_FRAME", format!("{:?}", v).to_uppercase());
+            writer.write_pair("SCREEN_VOLUME_FRAME", v.to_string());
         }
         if let Some(v) = &self.screen_volume_shape {
-            writer.write_pair("SCREEN_VOLUME_SHAPE", format!("{:?}", v).to_uppercase());
+            writer.write_pair("SCREEN_VOLUME_SHAPE", v.to_string());
         }
 
         if let Some(v) = &self.screen_volume_x {
@@ -336,65 +404,165 @@ impl CdmSegment {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmMetadata {
-    /// Comments.
+    /// Comments (see 6.3.4 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// The object to which the metadata and data apply.
+    /// The object to which the metadata and data apply (Object1 or Object2).
     ///
-    /// Examples: OBJECT1, OBJECT2
+    /// **Examples**: OBJECT1, OBJECT2
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     pub object: CdmObjectType,
-    /// The satellite catalog designator for the object.
+    /// The satellite catalog designator for the object. (See 5.2.9 for formatting rules.)
+    ///
+    /// **Examples**: 12345
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     pub object_designator: String,
-    /// The satellite catalog used for the object.
+    /// The satellite catalog used for the object. Value should be taken from the SANA
+    /// 'Conjunction Data Message CATALOG_NAME' registry
+    /// (https://sanaregistry.org/r/cdm_catalog). (See 5.2.9 for formatting rules.)
+    ///
+    /// **Examples**: SATCAT
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     pub catalog_name: String,
     /// Spacecraft name for the object.
+    ///
+    /// **Examples**: SPOT, ENVISAT, IRIDIUM, INTELSAT
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     pub object_name: String,
-    /// The full international designator for the object.
+    /// The full international designator for the object. Values shall have the format
+    /// YYYY-NNNP{PP}, where: YYYY = year of launch; NNN = three-digit serial number of launch
+    /// (with leading zeros); P{PP} = At least one capital letter for the identification of the
+    /// part brought into space by the launch. In cases where the object has no international
+    /// designator, the value UNKNOWN should be used. (See 5.2.9 for further formatting rules.)
+    ///
+    /// **Examples**: 2002-021A, UNKNOWN
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     pub international_designator: String,
     /// The object type.
     ///
-    /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
+    /// **Examples**: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_type: Option<ObjectDescription>,
     /// Contact position of the owner/operator of the object.
+    ///
+    /// **Examples**: ORBITAL SAFETY ANALYST (OSA), NETWORK CONTROLLER
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_contact_position: Option<String>,
     /// Contact organization of the object.
+    ///
+    /// **Examples**: EUMETSAT, ESA, INTELSAT, IRIDIUM
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_organization: Option<String>,
     /// Phone number of the contact position or organization for the object.
+    ///
+    /// **Examples**: +49615130312
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_phone: Option<String>,
     /// Email address of the contact position or organization of the object.
+    ///
+    /// **Examples**: JOHN.DOE@SOMEWHERE.NET
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_email: Option<String>,
-    /// Unique name of the external ephemeris file used for the object or NONE.
+    /// Unique name of the external ephemeris file used for the object or NONE. This is used to
+    /// indicate whether an external (i.e., Owner/Operator [O/O] provided) ephemeris file was
+    /// used to calculate the CA. If 'NONE' is specified, then the output of the most current
+    /// Orbit Determination (OD) of the CDM originator was used in the CA.
+    ///
+    /// **Examples**: EPHEMERIS SATELLITE A, NONE
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     pub ephemeris_name: String,
-    /// Method used to calculate the covariance.
+    /// Method used to calculate the covariance during the OD that produced the state vector, or
+    /// whether an arbitrary, non-calculated default value was used. Caution should be used
+    /// when using the default value for calculating collision probability.
+    ///
+    /// **Examples**: CALCULATED, DEFAULT
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     pub covariance_method: CovarianceMethodType,
-    /// The maneuver capacity of the object.
+    /// The maneuver capacity of the object. (See 1.4.3.1 for definition of 'N/A'.)
+    ///
+    /// **Examples**: YES, NO, N/A
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     pub maneuverable: ManeuverableType,
-    /// The central body about which Object1 and Object2 orbit.
+    /// The central body about which Object1 and Object2 orbit. If not specified, the center is
+    /// assumed to be Earth.
+    ///
+    /// **Examples**: EARTH, SUN, MOON, MARS
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orbit_center: Option<String>,
-    /// Name of the reference frame in which the state vector data are given.
+    /// Name of the reference frame in which the state vector data are given. Value must be
+    /// selected from the list of values to the right (see reference [F1]) and be the same for
+    /// both Object1 and Object2.
+    ///
+    /// **Examples**: GCRF, EME2000, ITRF
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     pub ref_frame: ReferenceFrameType,
-    /// The gravity model used for the OD of the object.
+    /// The gravity model used for the OD of the object. (See annex E under GRAVITY_MODEL for
+    /// definition).
+    ///
+    /// **Examples**: EGM-96: 36D 360, WGS-84_GEOID: 24D 240, JGM-2: 41D 410
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gravity_model: Option<String>,
-    /// The atmospheric density model used for the OD of the object.
+    /// The atmospheric density model used for the OD of the object. If 'NONE' is specified,
+    /// then no atmospheric model was used.
+    ///
+    /// **Examples**: JACCHIA 70, MSIS, JACCHIA 70 DCA, NONE
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atmospheric_model: Option<String>,
-    /// The N-body gravitational perturbations used for the OD of the object.
+    /// The N-body gravitational perturbations used for the OD of the object. If 'NONE' is
+    /// specified, then no third-body gravitational perturbations were used.
+    ///
+    /// **Examples**: MOON, SUN, JUPITER, NONE
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub n_body_perturbations: Option<String>,
-    /// Indication of whether solar radiation pressure perturbations were used.
+    /// Indication of whether solar radiation pressure perturbations were used for the OD of the
+    /// object.
+    ///
+    /// **Examples**: YES, NO
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solar_rad_pressure: Option<YesNo>,
-    /// Indication of whether solid Earth and ocean tides were used.
+    /// Indication of whether solid Earth and ocean tides were used for the OD of the object.
+    ///
+    /// **Examples**: YES, NO
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub earth_tides: Option<YesNo>,
-    /// Indication of whether in-track thrust modeling was used.
+    /// Indication of whether in-track thrust modeling was used for the OD of the object.
+    ///
+    /// **Examples**: YES, NO
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intrack_thrust: Option<YesNo>,
 }
@@ -407,7 +575,6 @@ impl ToKvn for CdmMetadata {
             match self.object {
                 CdmObjectType::Object1 => "OBJECT1",
                 CdmObjectType::Object2 => "OBJECT2",
-                _ => "OBJECT1",
             },
         );
         writer.write_pair("OBJECT_DESIGNATOR", &self.object_designator);
@@ -415,7 +582,7 @@ impl ToKvn for CdmMetadata {
         writer.write_pair("OBJECT_NAME", &self.object_name);
         writer.write_pair("INTERNATIONAL_DESIGNATOR", &self.international_designator);
         if let Some(v) = &self.object_type {
-            writer.write_pair("OBJECT_TYPE", format!("{:?}", v).to_uppercase());
+            writer.write_pair("OBJECT_TYPE", v.to_string());
         }
         if let Some(v) = &self.operator_contact_position {
             writer.write_pair("OPERATOR_CONTACT_POSITION", v);
@@ -430,18 +597,12 @@ impl ToKvn for CdmMetadata {
             writer.write_pair("OPERATOR_EMAIL", v);
         }
         writer.write_pair("EPHEMERIS_NAME", &self.ephemeris_name);
-        writer.write_pair(
-            "COVARIANCE_METHOD",
-            format!("{:?}", self.covariance_method).to_uppercase(),
-        );
-        writer.write_pair(
-            "MANEUVERABLE",
-            format!("{:?}", self.maneuverable).to_uppercase(),
-        );
+        writer.write_pair("COVARIANCE_METHOD", self.covariance_method.to_string());
+        writer.write_pair("MANEUVERABLE", self.maneuverable.to_string());
         if let Some(v) = &self.orbit_center {
             writer.write_pair("ORBIT_CENTER", v);
         }
-        writer.write_pair("REF_FRAME", format!("{:?}", self.ref_frame).to_uppercase());
+        writer.write_pair("REF_FRAME", self.ref_frame.to_string());
         if let Some(v) = &self.gravity_model {
             writer.write_pair("GRAVITY_MODEL", v);
         }
@@ -452,13 +613,13 @@ impl ToKvn for CdmMetadata {
             writer.write_pair("N_BODY_PERTURBATIONS", v);
         }
         if let Some(v) = &self.solar_rad_pressure {
-            writer.write_pair("SOLAR_RAD_PRESSURE", format!("{:?}", v).to_uppercase());
+            writer.write_pair("SOLAR_RAD_PRESSURE", v.to_string());
         }
         if let Some(v) = &self.earth_tides {
-            writer.write_pair("EARTH_TIDES", format!("{:?}", v).to_uppercase());
+            writer.write_pair("EARTH_TIDES", v.to_string());
         }
         if let Some(v) = &self.intrack_thrust {
-            writer.write_pair("INTRACK_THRUST", format!("{:?}", v).to_uppercase());
+            writer.write_pair("INTRACK_THRUST", v.to_string());
         }
     }
 }

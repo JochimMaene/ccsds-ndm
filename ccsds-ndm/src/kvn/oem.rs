@@ -77,7 +77,7 @@ pub fn oem_header(input: &mut &str) -> KvnResult<OdmHeader> {
         let checkpoint = input.checkpoint();
         comment.extend(collect_comments.parse_next(input)?);
 
-        let key = match keyword.parse_next(input) {
+        let key = match preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
             Err(_) => {
                 input.reset(&checkpoint);
