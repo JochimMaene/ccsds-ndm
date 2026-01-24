@@ -1093,7 +1093,7 @@ impl DeltaMassZ {
         }
         Ok(Self { value, units })
     }
-    
+
     pub fn to_unit_value(&self) -> UnitValue<f64, MassUnits> {
         UnitValue {
             value: self.value,
@@ -2276,7 +2276,6 @@ pub struct UserDefinedParameter {
     #[serde(rename = "@parameter")]
     pub parameter: String,
 }
-
 
 // -------------------- CDM TYPES --------------------
 
