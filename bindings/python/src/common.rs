@@ -91,8 +91,8 @@ impl OdmHeader {
         self.inner.originator = value;
     }
 
-    /// ID that uniquely identifies a message from a given originator. The format and content of the
-    /// message identifier value are at the discretion of the originator.
+    /// ID that uniquely identifies a message from a given originator. The format and content of
+    /// the message identifier value are at the discretion of the originator.
     ///
     /// Examples: OPM_201113719185, ABC-12_34
     ///
@@ -123,7 +123,10 @@ impl OdmHeader {
         self.inner.classification = value;
     }
 
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (allowed in the ODM Header only immediately after the ODM version number).
+    /// (See 7.8 for formatting rules.)
+    ///
+    /// Examples: This is a comment
     ///
     /// :type: list[str]
     #[getter]
@@ -137,7 +140,7 @@ impl OdmHeader {
     }
 }
 
-/// Represents the `stateVectorType` and `stateVectorAccType` from the XSD.
+/// State Vector Components in the Specified Coordinate System.
 ///
 /// Parameters
 /// ----------
@@ -239,9 +242,7 @@ impl StateVectorAcc {
         )
     }
 
-    /// Epoch of state vector (see 7.5.10 for formatting rules).
-    ///
-    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
     ///
     /// :type: str
     #[getter]
@@ -256,8 +257,6 @@ impl StateVectorAcc {
     }
 
     /// Position vector X-component.
-    ///
-    /// Examples: 6653.148
     ///
     /// Units: km
     ///
@@ -274,8 +273,6 @@ impl StateVectorAcc {
 
     /// Position vector Y-component.
     ///
-    /// Examples: -20.0
-    ///
     /// Units: km
     ///
     /// :type: float
@@ -290,8 +287,6 @@ impl StateVectorAcc {
     }
 
     /// Position vector Z-component.
-    ///
-    /// Examples: 0.0
     ///
     /// Units: km
     ///
@@ -308,8 +303,6 @@ impl StateVectorAcc {
 
     /// Velocity vector X-component.
     ///
-    /// Examples: 0.0
-    ///
     /// Units: km/s
     ///
     /// :type: float
@@ -324,8 +317,6 @@ impl StateVectorAcc {
     }
 
     /// Velocity vector Y-component.
-    ///
-    /// Examples: 7.7
     ///
     /// Units: km/s
     ///
@@ -342,8 +333,6 @@ impl StateVectorAcc {
 
     /// Velocity vector Z-component.
     ///
-    /// Examples: 0.0
-    ///
     /// Units: km/s
     ///
     /// :type: float
@@ -358,8 +347,6 @@ impl StateVectorAcc {
     }
 
     /// Acceleration vector X-component.
-    ///
-    /// Examples: 0.001
     ///
     /// Units: km/s²
     ///
@@ -379,8 +366,6 @@ impl StateVectorAcc {
 
     /// Acceleration vector Y-component.
     ///
-    /// Examples: 0.0
-    ///
     /// Units: km/s²
     ///
     /// :type: Optional[float]
@@ -399,8 +384,6 @@ impl StateVectorAcc {
 
     /// Acceleration vector Z-component.
     ///
-    /// Examples: 0.0
-    ///
     /// Units: km/s²
     ///
     /// :type: Optional[float]
@@ -418,9 +401,7 @@ impl StateVectorAcc {
     }
 }
 
-/// Position and velocity at a specific epoch (without acceleration).
-///
-/// Simplified version of StateVectorAcc used in OPM and other messages.
+/// State Vector Components in the Specified Coordinate System.
 ///
 /// Parameters
 /// ----------
@@ -503,7 +484,7 @@ impl StateVector {
         )
     }
 
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
     /// :type: list[str]
     #[getter]
@@ -516,9 +497,7 @@ impl StateVector {
         self.inner.comment = value;
     }
 
-    /// Epoch of state vector (see 7.5.10 for formatting rules).
-    ///
-    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
     ///
     /// :type: str
     #[getter]
@@ -533,8 +512,6 @@ impl StateVector {
     }
 
     /// Position vector X-component.
-    ///
-    /// Examples: 6653.148
     ///
     /// Units: km
     ///
@@ -551,8 +528,6 @@ impl StateVector {
 
     /// Position vector Y-component.
     ///
-    /// Examples: -20.0
-    ///
     /// Units: km
     ///
     /// :type: float
@@ -567,8 +542,6 @@ impl StateVector {
     }
 
     /// Position vector Z-component.
-    ///
-    /// Examples: 0.0
     ///
     /// Units: km
     ///
@@ -585,8 +558,6 @@ impl StateVector {
 
     /// Velocity vector X-component.
     ///
-    /// Examples: 0.0
-    ///
     /// Units: km/s
     ///
     /// :type: float
@@ -601,8 +572,6 @@ impl StateVector {
     }
 
     /// Velocity vector Y-component.
-    ///
-    /// Examples: 7.7
     ///
     /// Units: km/s
     ///
@@ -619,8 +588,6 @@ impl StateVector {
 
     /// Velocity vector Z-component.
     ///
-    /// Examples: 0.0
-    ///
     /// Units: km/s
     ///
     /// :type: float
@@ -635,7 +602,7 @@ impl StateVector {
     }
 }
 
-/// Spacecraft physical parameters (mass, area, coefficients).
+/// Spacecraft Parameters (if maneuver is specified, then mass must be provided).
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
@@ -753,6 +720,8 @@ impl SpacecraftParameters {
     ///
     /// Examples: 1, 1.34
     ///
+    /// Units: n/a
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_solar_rad_coeff(&self) -> Option<f64> {
@@ -789,6 +758,8 @@ impl SpacecraftParameters {
     /// Drag Coefficient (CD).
     ///
     /// Examples: 2, 2.1
+    ///
+    /// Units: n/a
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1010,6 +981,8 @@ impl OdParameters {
 
     /// The percentage of residuals accepted during orbit determination.
     ///
+    /// Units: %
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_residuals_accepted(&self) -> Option<f64> {
@@ -1223,7 +1196,7 @@ impl GroundImpactParameters {
     // Getters and setters omitted for brevity in this snippet but they follow the pattern.
     // Actually I must include them or audit will fail.
     // I will include them.
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (allowed only at the beginning of each RDM data logical block).
     ///
     /// :type: list[str]
     #[getter]
@@ -1232,7 +1205,7 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_comment(&mut self, v: Vec<String>) { self.inner.comment = v; }
 
-    /// Probability of impact.
+    /// Probability that any fragment will impact the Earth (either land or sea; 0 to 1).
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1241,7 +1214,8 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_probability_of_impact(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.probability_of_impact = v.map(|x| ccsds_ndm::types::Probability::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Probability of burn-up.
+    /// Probability that the entire object and any fragments will burn up during atmospheric
+    /// re-entry (0 to 1).
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1250,7 +1224,7 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_probability_of_burn_up(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.probability_of_burn_up = v.map(|x| ccsds_ndm::types::Probability::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Probability of break-up.
+    /// Probability that the object will break up during re-entry (0 to 1).
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1259,7 +1233,7 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_probability_of_break_up(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.probability_of_break_up = v.map(|x| ccsds_ndm::types::Probability::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Probability of land impact.
+    /// Probability that any fragment will impact solid ground (0 to 1).
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1268,7 +1242,8 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_probability_of_land_impact(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.probability_of_land_impact = v.map(|x| ccsds_ndm::types::Probability::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Probability of casualty.
+    /// Probability that the re-entry event will cause any casualties (severe injuries or
+    /// deaths—0 to 1).
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1277,7 +1252,7 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_probability_of_casualty(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.probability_of_casualty = v.map(|x| ccsds_ndm::types::Probability::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Nominal impact epoch.
+    /// Epoch of the predicted impact (formatting rules specified in 5.3.3.5).
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1286,7 +1261,7 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_nominal_impact_epoch(&mut self, v: Option<String>) -> PyResult<()> { self.inner.nominal_impact_epoch = v.map(|s| parse_epoch(&s)).transpose()?; Ok(()) }
 
-    /// Impact window start epoch.
+    /// Start epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1295,7 +1270,7 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_window_start(&mut self, v: Option<String>) -> PyResult<()> { self.inner.impact_window_start = v.map(|s| parse_epoch(&s)).transpose()?; Ok(()) }
 
-    /// Impact window end epoch.
+    /// End epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1304,7 +1279,10 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_window_end(&mut self, v: Option<String>) -> PyResult<()> { self.inner.impact_window_end = v.map(|s| parse_epoch(&s)).transpose()?; Ok(()) }
 
-    /// Impact reference frame.
+    /// Reference frame of the impact location data. The value should be taken from the keyword
+    /// value name column in the SANA celestial body reference frames registry, reference [11].
+    /// Only frames with the value ‘Body-Fixed’ in the Frame Type column shall be used.
+    /// Mandatory if NOMINAL_IMPACT_LON and NOMINAL_IMPACT_LAT are present.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1313,7 +1291,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_ref_frame(&mut self, v: Option<String>) { self.inner.impact_ref_frame = v; }
 
-    /// Nominal impact longitude.
+    /// Longitude of the predicted impact location with respect to the value of
+    /// IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in
+    /// 3.5.11.
     ///
     /// Units: deg
     ///
@@ -1324,7 +1304,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_nominal_impact_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.nominal_impact_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Nominal impact latitude.
+    /// Latitude of the predicted impact location with respect to the value of
+    /// IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in
+    /// 3.5.12.
     ///
     /// Units: deg
     ///
@@ -1335,9 +1317,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_nominal_impact_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.nominal_impact_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Nominal impact altitude.
+    /// Altitude of the impact location with respect to the value of IMPACT_REF_FRAME.
     ///
-    /// Units: km
+    /// Units: m
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1346,7 +1328,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_nominal_impact_alt(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.nominal_impact_alt = v.map(|x| ccsds_ndm::types::AltitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Confidence of impact prediction 1.
+    /// First (lowest) confidence interval for the impact location.
+    ///
+    /// Units: %
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1355,7 +1339,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_1_confidence(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_1_confidence = v.map(|x| ccsds_ndm::types::PercentageRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 1 start longitude.
+    /// Longitude of the start of the first confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.11.
     ///
     /// Units: deg
     ///
@@ -1366,7 +1352,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_1_start_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_1_start_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 1 start latitude.
+    /// Latitude of the start of the first confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.12.
     ///
     /// Units: deg
     ///
@@ -1377,7 +1365,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_1_start_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_1_start_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 1 stop longitude.
+    /// Longitude of the end of the first confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.11.
     ///
     /// Units: deg
     ///
@@ -1388,7 +1378,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_1_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_1_stop_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact stops latitude.
+    /// Latitude of the end of the first confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.12.
     ///
     /// Units: deg
     ///
@@ -1399,7 +1391,7 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_1_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_1_stop_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 1 cross track distance.
+    /// Cross-track size of the first confidence interval.
     ///
     /// Units: km
     ///
@@ -1410,7 +1402,10 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_1_cross_track(&mut self, v: Option<f64>) { self.inner.impact_1_cross_track = v.map(|x| ccsds_ndm::types::Position::new(x, None)); }
 
-    /// Confidence of impact prediction 2.
+    /// Second confidence interval for the impact location. The IMPACT_1_* block must be
+    /// present if IMPACT_2_* is used.
+    ///
+    /// Units: %
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1419,7 +1414,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_2_confidence(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_2_confidence = v.map(|x| ccsds_ndm::types::PercentageRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 2 start longitude.
+    /// Longitude of the start of the second confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.11.
     ///
     /// Units: deg
     ///
@@ -1430,7 +1427,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_2_start_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_2_start_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 2 start latitude.
+    /// Latitude of the start of the second confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.12.
     ///
     /// Units: deg
     ///
@@ -1441,7 +1440,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_2_start_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_2_start_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 2 stop longitude.
+    /// Longitude of the end of the second confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.11.
     ///
     /// Units: deg
     ///
@@ -1452,7 +1453,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_2_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_2_stop_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 2 stop latitude.
+    /// Latitude of the end of the second confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.12.
     ///
     /// Units: deg
     ///
@@ -1463,7 +1466,7 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_2_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_2_stop_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 2 cross track distance.
+    /// Cross-track size of the second confidence interval.
     ///
     /// Units: km
     ///
@@ -1474,7 +1477,10 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_2_cross_track(&mut self, v: Option<f64>) { self.inner.impact_2_cross_track = v.map(|x| ccsds_ndm::types::Position::new(x, None)); }
 
-    /// Confidence of impact prediction 3.
+    /// Third (highest) confidence interval for the impact location. The IMPACT_2_* block must
+    /// be present if IMPACT_3_* is used.
+    ///
+    /// Units: %
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1483,7 +1489,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_3_confidence(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_3_confidence = v.map(|x| ccsds_ndm::types::PercentageRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 3 start longitude.
+    /// Longitude of the start of the third confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.11.
     ///
     /// Units: deg
     ///
@@ -1494,7 +1502,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_3_start_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_3_start_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 3 start latitude.
+    /// Latitude of the start of the third confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.12.
     ///
     /// Units: deg
     ///
@@ -1505,7 +1515,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_3_start_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_3_start_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 3 stop longitude.
+    /// Longitude of the end of the third confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.11.
     ///
     /// Units: deg
     ///
@@ -1516,7 +1528,9 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_3_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_3_stop_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 3 stop latitude.
+    /// Latitude of the end of the third confidence interval along the ground track with
+    /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
+    /// the rules specified in 3.5.12.
     ///
     /// Units: deg
     ///
@@ -1527,7 +1541,7 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_3_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_3_stop_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
 
-    /// Impact 3 cross track distance.
+    /// Cross-track size of the third confidence interval.
     ///
     /// Units: km
     ///

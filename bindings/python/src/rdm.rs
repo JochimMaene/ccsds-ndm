@@ -591,9 +591,14 @@ impl RdmMetadata {
         format!("RdmMetadata(object_name='{}')", self.inner.object_name)
     }
 
-    /// The name of the object.
+    /// Object name for which the orbit state is provided. There is no CCSDS-based restriction
+    /// on the value for this keyword, but it is recommended to use names from the UNOOSA
+    /// registry—reference [7], which includes object name and international designator of the
+    /// participant (formatting rules specified in 5.2.3.3). For objects that are not in the
+    /// UNOOSA registry, either a descriptive name (e.g., DEBRIS, if the object is identified as
+    /// space debris) or UNKNOWN should be used.
     ///
-    /// Examples: FENGYUN 1C, UARS, Tiangong-1
+    /// Examples: SENTINEL-1A, GOCE, ENVISAT, BRIZ R/B, DEBRIS, UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -605,9 +610,14 @@ impl RdmMetadata {
         self.inner.object_name = v;
     }
 
-    /// The international designator of the object.
+    /// The full international designator (COSPAR ID) for the object. Values shall have the
+    /// format YYYY-NNNP{PP}, where: YYYY = year of launch; NNN = three-digit serial number of
+    /// launch (with leading zeros); P{PP} = at least one capital letter for the identification
+    /// of the part brought into space by the launch. In cases where the object has no
+    /// international designator, the value UNKNOWN should be used (formatting rules specified
+    /// in 5.2.3.3).
     ///
-    /// Examples: 1999-025A, 1991-063B, 2011-053A
+    /// Examples: 2010-012C, 2016-001A, 1985-067CD, UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -619,9 +629,11 @@ impl RdmMetadata {
         self.inner.international_designator = v;
     }
 
-    /// The catalog name for the object.
+    /// The satellite catalog used for the object (formatting rules specified in 5.2.3.3). The
+    /// name should be taken from the appropriate SANA registry for catalog names, reference
+    /// [8].
     ///
-    /// Examples: SATCAT, SPCS, MCN
+    /// Examples: SATCAT, ESA SST
     ///
     /// :type: Optional[str]
     #[getter]
@@ -633,9 +645,10 @@ impl RdmMetadata {
         self.inner.catalog_name = v;
     }
 
-    /// The object designator in the catalog.
+    /// The CATALOG_NAME satellite catalog designator for the object (formatting rules
+    /// specified in 5.2.3.3).
     ///
-    /// Examples: 25730, 21574, 37820
+    /// Examples: 37451, 125387U
     ///
     /// :type: Optional[str]
     #[getter]
@@ -647,9 +660,9 @@ impl RdmMetadata {
         self.inner.object_designator = v;
     }
 
-    /// The type of the object.
+    /// The object type.
     ///
-    /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
+    /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, OTHER, UNKNOWN
     ///
     /// :type: Optional[str]
     #[getter]
@@ -669,9 +682,11 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// The owner of the object.
+    /// Owner of the object (e.g., company, agency, or country owning the satellite). The value
+    /// should be taken from the abbreviation column in the SANA organizations registry,
+    /// reference [6].
     ///
-    /// Examples: China, USA, France
+    /// Examples: DLR, INTELSAT, ESA, UNKNOWN
     ///
     /// :type: Optional[str]
     #[getter]
@@ -683,9 +698,11 @@ impl RdmMetadata {
         self.inner.object_owner = v;
     }
 
-    /// The operator of the object.
+    /// Operator of the object (e.g., company, agency, or country operating the satellite).
+    /// The value should be taken from the abbreviation column in the SANA organizations
+    /// registry, reference [6].
     ///
-    /// Examples: EUMETSAT, SES
+    /// Examples: ESA, EUMETSAT
     ///
     /// :type: Optional[str]
     #[getter]
@@ -697,7 +714,7 @@ impl RdmMetadata {
         self.inner.object_operator = v;
     }
 
-    /// Whether the re-entry is controlled or not.
+    /// Specification of whether the re-entry is controlled or not.
     ///
     /// Examples: YES, NO, UNKNOWN
     ///
@@ -714,9 +731,12 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// The celestial body the object is orbiting.
+    /// Celestial body orbited by the object and origin of the reference frame, which may be a
+    /// natural solar system body (planets, asteroids, comets, and natural satellites),
+    /// including any planet barycenter or the solar system barycenter. The value should be
+    /// taken from the orbit center column in the SANA orbit centers registry, reference [9].
     ///
-    /// Examples: EARTH, MOON, MARS
+    /// Examples: EARTH, MOON, JUPITER
     ///
     /// :type: str
     #[getter]
@@ -728,9 +748,10 @@ impl RdmMetadata {
         self.inner.center_name = v;
     }
 
-    /// The time system used for the message.
+    /// Time system for all data/metadata. The value should be taken from the name column in
+    /// the SANA time systems registry, reference [10].
     ///
-    /// Examples: UTC, TAI, TDB
+    /// Examples: UTC, TAI
     ///
     /// :type: str
     #[getter]
@@ -742,9 +763,10 @@ impl RdmMetadata {
         self.inner.time_system = v;
     }
 
-    /// The reference epoch for the message.
+    /// Epoch from which the ORBIT_LIFETIME is calculated (formatting rules specified in
+    /// 5.3.3.5).
     ///
-    /// Examples: 2018-04-22T09:00:00.00
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23
     ///
     /// :type: str
     #[getter]
@@ -757,9 +779,14 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// The reference frame of the state vector and covariance matrix.
+    /// Reference frame in which the (optional) orbit information will be provided. The value
+    /// should be taken from the keyword value name column in the SANA celestial body reference
+    /// frames registry, reference [11]. The reference frame must be the same for all orbit
+    /// data elements, with the exception of the covariance matrix, for which a different
+    /// reference frame may be specified, and the ground impact data. This keyword becomes
+    /// mandatory if state vectors are provided in the data section.
     ///
-    /// Examples: EME2000, GCRF, ICRF, ITRF2000, TDR
+    /// Examples: ITRF-97, EME2000, ICRF
     ///
     /// :type: Optional[str]
     #[getter]
@@ -771,9 +798,10 @@ impl RdmMetadata {
         self.inner.ref_frame = v;
     }
 
-    /// The epoch of the reference frame.
+    /// Epoch of reference frame, if not intrinsic to the definition of the reference frame
+    /// (formatting rules specified in 5.3.3.5).
     ///
-    /// Examples: 2000-01-01T00:00:00.000
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: Optional[str]
     #[getter]
@@ -789,9 +817,9 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// The name of the ephemeris used.
+    /// Unique identifier of an external ephemeris file used or NONE.
     ///
-    /// Examples: DE430, JPLEPH.405
+    /// Examples: NONE, EPHEMERIS, INTELSAT2
     ///
     /// :type: Optional[str]
     #[getter]
@@ -803,9 +831,10 @@ impl RdmMetadata {
         self.inner.ephemeris_name = v;
     }
 
-    /// The gravity model used.
+    /// The gravity model used in the simulation. The degree (D) and order (O) of the spherical
+    /// harmonic coefficients applied should be given along with the name of the model.
     ///
-    /// Examples: EGM-96, JGM-3
+    /// Examples: EGM-96: 36D 36O, JGM-2: 41D 41O
     ///
     /// :type: Optional[str]
     #[getter]
@@ -817,9 +846,10 @@ impl RdmMetadata {
         self.inner.gravity_model = v;
     }
 
-    /// The atmospheric model used.
+    /// The atmosphere model(s) used in the simulation. If more than one model is used they
+    /// should be listed on the same line and separated by a comma.
     ///
-    /// Examples: Jacchia 70, MSIS-86
+    /// Examples: MSIS, JACCHIA 70, MSISE-90, NRLMSISE-00
     ///
     /// :type: Optional[str]
     #[getter]
@@ -831,9 +861,9 @@ impl RdmMetadata {
         self.inner.atmospheric_model = v;
     }
 
-    /// The solar flux and geomagnetic activity data used.
+    /// The method used to predict the solar flux and geomagnetic indices.
     ///
-    /// Examples: F10.7_MEAN_81_CYCLE, SCHATTEN_ADJUSTED
+    /// Examples: STOCHASTIC, PREDICTED: MLLRT
     ///
     /// :type: Optional[str]
     #[getter]
@@ -845,9 +875,11 @@ impl RdmMetadata {
         self.inner.solar_flux_prediction = v;
     }
 
-    /// The n-body perturbations used.
+    /// Comma separated list of other bodies used in the simulation. The names of the bodies
+    /// should be taken from the SANA registry for orbit centers, reference [9]. If no other
+    /// bodies are used in the simulation, the value should be NONE.
     ///
-    /// Examples: MOON, SUN, JUPITER
+    /// Examples: MOON, SUN, JUPITER, NONE
     ///
     /// :type: Optional[str]
     #[getter]
@@ -859,9 +891,10 @@ impl RdmMetadata {
         self.inner.n_body_perturbations = v;
     }
 
-    /// Whether solar radiation pressure was used.
+    /// Model used for the solar radiation pressure: either model name, or NO if solar
+    /// radiation pressure was not modelled.
     ///
-    /// Examples: YES, NO
+    /// Examples: GSPM04, NO
     ///
     /// :type: Optional[str]
     #[getter]
@@ -873,9 +906,10 @@ impl RdmMetadata {
         self.inner.solar_rad_pressure = v;
     }
 
-    /// The Earth tides model used.
+    /// Model used for solid Earth and ocean tides: either model name, or NO if tides were not
+    /// modelled.
     ///
-    /// Examples: ERS, IERS
+    /// Examples: ESR, NO
     ///
     /// :type: Optional[str]
     #[getter]
@@ -887,7 +921,7 @@ impl RdmMetadata {
         self.inner.earth_tides = v;
     }
 
-    /// Whether there was any intrack thrust.
+    /// Indicator on whether in-track thrust modeling was used in the simulation.
     ///
     /// Examples: YES, NO
     ///
@@ -906,9 +940,10 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// The source of the drag parameters.
+    /// The method used to estimate the drag parameters of the object (DRAG_AREA, DRAG_COEFF,
+    /// and/or BALLISTIC_COEFF).
     ///
-    /// Examples: OD, DATABASE, DEFAULT
+    /// Examples: DESIGN, CFD: TOOL1, CFD DMSCFOAM, OD
     ///
     /// :type: Optional[str]
     #[getter]
@@ -920,11 +955,13 @@ impl RdmMetadata {
         self.inner.drag_parameters_source = v;
     }
 
-    /// The altitude at which the drag parameters were estimated.
+    /// The altitude (in km) at which the object drag parameters (DRAG_AREA, DRAG_COEFF, and/or
+    /// BALLISTIC_COEFF) are valid. The units shall be kilometers, and the conventions
+    /// specified in 5.2.4.1 and 5.3.4 must be followed.
+    ///
+    /// Examples: 200 [km], 175 [km]
     ///
     /// Units: km
-    ///
-    /// Examples: 200.0 [km]
     ///
     /// :type: Optional[float]
     #[getter]
@@ -939,9 +976,9 @@ impl RdmMetadata {
         self.inner.drag_parameters_altitude = v.map(|value| Position::new(value, None));
     }
 
-    /// The method used to compute re-entry uncertainty.
+    /// The method used to determine the orbit lifetime uncertainty or the re-entry windows.
     ///
-    /// Examples: MONTE-CARLO, ANALYTICAL
+    /// Examples: NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL
     ///
     /// :type: Optional[str]
     #[getter]
@@ -964,9 +1001,12 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// The method used to model the object’s disintegration.
+    /// The aspects of disintegration during re-entry considered during simulations: none (the
+    /// object was treated as a point mass), mass loss, break-ups (including explosion), or
+    /// both. It is a coarse indication on whether the impact area in the data covers potential
+    /// fragments as well.
     ///
-    /// Examples: MASS-LOSS, BREAK-UP, NONE
+    /// Examples: NONE, MASS-LOSS, BREAK-UP, MASS-LOSS + BREAK-UP
     ///
     /// :type: Optional[str]
     #[getter]
@@ -989,9 +1029,9 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// The method used to compute impact uncertainty.
+    /// The method used to determine the impact location confidence interval(s).
     ///
-    /// Examples: MONTE-CARLO, ANALYTICAL
+    /// Examples: NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1014,9 +1054,9 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// The ID of the previous message for this object.
+    /// ID of the previous RDM issued for this object.
     ///
-    /// Examples: ESA/20180421-007
+    /// Examples: ESA/2015-563892348
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1028,9 +1068,10 @@ impl RdmMetadata {
         self.inner.previous_message_id = v;
     }
 
-    /// The epoch of the previous message for this object.
+    /// UTC Epoch of the previous RDM issued for this object (formatting rules specified in
+    /// 5.3.3.5).
     ///
-    /// Examples: 2018-04-21T09:00:00.00
+    /// Examples: 2001-11-06T11:17:33
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1046,9 +1087,10 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// The epoch of the next message for this object.
+    /// Scheduled UTC epoch of the next RDM for the same object (formatting rules specified in
+    /// 5.3.3.5); N/A if no other message is scheduled.
     ///
-    /// Examples: 2018-04-23T09:00:00
+    /// Examples: 2001-11-06T11:17:33, N/A
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1064,7 +1106,7 @@ impl RdmMetadata {
         Ok(())
     }
 
-    /// Comments.
+    /// Comments (allowed only at the beginning of RDM metadata).
     ///
     /// :type: list[str]
     #[getter]
@@ -1375,7 +1417,13 @@ impl AtmosphericReentryParameters {
         })
     }
 
-    /// Remaining time in orbit (days).
+    /// Time until re-entry: from the EPOCH_TZERO epoch in the metadata (days—double precision
+    /// values allowed; integer values assumed to have .0 fractional part) to permanently
+    /// crossing the altitude specified in REENTRY_ALTITUDE. If the NOMINAL_REENTRY_EPOCH
+    /// keyword is present, the ORBIT_LIFETIME and NOMINAL_REENTRY_EPOCH should resolve to the
+    /// same value.
+    ///
+    /// Units: d
     ///
     /// :type: float
     #[getter]
@@ -1387,7 +1435,11 @@ impl AtmosphericReentryParameters {
         self.inner.orbit_lifetime.value = v;
     }
 
-    /// Defined re-entry altitude (km).
+    /// Defined re-entry altitude over a spherical central body—once an object’s altitude
+    /// permanently drops below this value, it is considered to be captured by the central
+    /// body’s atmosphere.
+    ///
+    /// Units: km
     ///
     /// :type: float
     #[getter]
@@ -1399,7 +1451,12 @@ impl AtmosphericReentryParameters {
         self.inner.reentry_altitude.value = v;
     }
 
-    /// Start of the orbit lifetime window (days).
+    /// Start of the predicted orbital lifetime window from the EPOCH_TZERO epoch in the
+    /// metadata (days—double precision values allowed; integer values assumed to have .0
+    /// fractional part). To be used for long-term predictions; REENTRY_WINDOW_START and _END
+    /// should be used for accurate results.
+    ///
+    /// Units: d
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1418,7 +1475,12 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
-    /// End of the orbit lifetime window (days).
+    /// End of the predicted orbital lifetime window from the EPOCH_TZERO epoch in the metadata
+    /// (days—double precision values allowed; integer values assumed to have .0 fractional
+    /// part). To be used for long-term predictions; REENTRY_WINDOW_START and _END should be
+    /// used for accurate results.
+    ///
+    /// Units: d
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1437,9 +1499,8 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
-    /// Nominal re-entry epoch.
-    ///
-    /// Format: ISO 8601
+    /// Predicted epoch at which the object’s altitude permanently drops below
+    /// NOMINAL_REENTRY_ALTITUDE (formatting rules specified in 5.3.3.5).
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1455,9 +1516,8 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
-    /// Start of the re-entry window.
-    ///
-    /// Format: ISO 8601
+    /// Start epoch of the predicted atmospheric re-entry window (formatting rules specified in
+    /// 5.3.3.5).
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1473,9 +1533,8 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
-    /// End of the re-entry window.
-    ///
-    /// Format: ISO 8601
+    /// End epoch of the predicted atmospheric re-entry window (formatting rules specified in
+    /// 5.3.3.5).
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1491,7 +1550,11 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
-    /// Confidence level for orbit lifetime (percentage 0-100).
+    /// Confidence level of the orbit lifetime or re-entry epoch being inside the window
+    /// defined by ORBIT_LIFETIME_WINDOW_START and ORBIT_LIFETIME_WINDOW_END or
+    /// REENTRY_WINDOW_START and REENTRY_WINDOW_END.
+    ///
+    /// Units: %
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1510,7 +1573,7 @@ impl AtmosphericReentryParameters {
         Ok(())
     }
 
-    /// Comments.
+    /// Comments (allowed only at the beginning of each RDM data logical block).
     ///
     /// :type: list[str]
     #[getter]
@@ -1568,7 +1631,9 @@ impl RdmSpacecraftParameters {
         }
     }
 
-    /// Spacecraft wet mass (kg).
+    /// Total object mass at EPOCH_TZERO.
+    ///
+    /// Units: kg
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1583,7 +1648,9 @@ impl RdmSpacecraftParameters {
         });
     }
 
-    /// Spacecraft dry mass (kg).
+    /// Object dry mass (without propellant).
+    ///
+    /// Units: kg
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1598,7 +1665,7 @@ impl RdmSpacecraftParameters {
         });
     }
 
-    /// Quantity of hazardous substances (kg).
+    /// Comma separated list of hazardous substances contained by the object.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1610,7 +1677,9 @@ impl RdmSpacecraftParameters {
         self.inner.hazardous_substances = v;
     }
 
-    /// Solar radiation pressure area (m^2).
+    /// Object area exposed to Solar Radiation Pressure (SRP).
+    ///
+    /// Units: m²
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1625,7 +1694,7 @@ impl RdmSpacecraftParameters {
         });
     }
 
-    /// Solar radiation pressure coefficient.
+    /// Object solar radiation coefficient.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1637,7 +1706,9 @@ impl RdmSpacecraftParameters {
         self.inner.solar_rad_coeff = v.map(|value| ccsds_ndm::types::NonNegativeDouble { value });
     }
 
-    /// Drag area (m^2).
+    /// Object cross-sectional area.
+    ///
+    /// Units: m²
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1652,7 +1723,7 @@ impl RdmSpacecraftParameters {
         });
     }
 
-    /// Drag coefficient.
+    /// Object drag coefficient.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1664,7 +1735,9 @@ impl RdmSpacecraftParameters {
         self.inner.drag_coeff = v.map(|value| ccsds_ndm::types::NonNegativeDouble { value });
     }
 
-    /// Radar cross section (m^2).
+    /// Object radar cross section.
+    ///
+    /// Units: m²
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1679,7 +1752,9 @@ impl RdmSpacecraftParameters {
         });
     }
 
-    /// Ballistic coefficient (kg/m^2).
+    /// Object ballistic coefficient.
+    ///
+    /// Units: kg/m²
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1691,7 +1766,10 @@ impl RdmSpacecraftParameters {
         self.inner.ballistic_coeff = v.map(|val| ccsds_ndm::types::BallisticCoeff::new(val, None));
     }
 
-    /// Constant thrust acceleration (m/s^2).
+    /// The object’s acceleration due to in-track thrust used to propagate the state vector and
+    /// covariance to NOMINAL_RENTRY_EPOCH (if a controlled re-entry).
+    ///
+    /// Units: m/s²
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1703,7 +1781,7 @@ impl RdmSpacecraftParameters {
         self.inner.thrust_acceleration = v.map(ccsds_ndm::types::Ms2::new);
     }
 
-    /// Comments.
+    /// Comments (allowed only at the beginning of each RDM data logical block).
     ///
     /// :type: list[str]
     #[getter]

@@ -10,6 +10,7 @@ use std::fs;
 
 pub mod cdm;
 pub mod common;
+pub mod ndm;
 pub mod ocm;
 pub mod oem;
 pub mod omm;
@@ -20,6 +21,7 @@ pub mod types;
 
 use cdm::*;
 use common::{OdmHeader, StateVector, StateVectorAcc};
+use ndm::Ndm;
 use oem::*;
 use omm::*;
 use opm::*;
@@ -73,6 +75,10 @@ fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
         }
         MessageType::Tdm(tdm) => {
             let py_obj = Py::new(py, tdm::Tdm { inner: tdm })?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Ndm(ndm) => {
+            let py_obj = Py::new(py, Ndm { inner: ndm })?;
             Ok(py_obj.into_any())
         }
     }
@@ -169,6 +175,9 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<common::GroundImpactParameters>()?;
     m.add_class::<rdm::RdmSpacecraftParameters>()?;
     m.add_class::<common::OdParameters>()?;
+
+    // Register NDM wrapper classes
+    m.add_class::<Ndm>()?;
 
     // Register CDM wrapper classes
     // CDM Classes

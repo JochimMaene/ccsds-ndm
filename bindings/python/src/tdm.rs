@@ -219,7 +219,7 @@ impl Tdm {
 // TDM Header
 // ============================================================================
 
-/// Represents the Header of a Tracking Data Message.
+/// Represents the `tdmHeader` complex type.
 ///
 /// Parameters
 /// ----------
@@ -265,7 +265,9 @@ impl TdmHeader {
         format!("TdmHeader(originator='{}')", self.inner.originator)
     }
 
-    /// Creating agency.
+    /// Creating agency. Value should be an entry from the ‘Abbreviation’ column in the SANA
+    /// Organizations Registry, https://sanaregistry.org/r/organizations/organizations.html
+    /// (reference [11]).
     ///
     /// Examples: CNES, ESA, GSFC, DLR, JPL, JAXA
     ///
@@ -280,7 +282,7 @@ impl TdmHeader {
         self.inner.originator = value;
     }
 
-    /// Data creation date/time in UTC.
+    /// Data creation date/time in UTC. (For format specification, see 4.3.9.)
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23.4, 2006-001T00:00:00Z
     ///
@@ -296,7 +298,8 @@ impl TdmHeader {
         Ok(())
     }
 
-    /// ID that uniquely identifies a message from a given originator.
+    /// ID that uniquely identifies a message from a given originator. The format and content
+    /// of the message identifier value are at the discretion of the originator.
     ///
     /// Examples: 201113719185
     ///
@@ -311,7 +314,10 @@ impl TdmHeader {
         self.inner.message_id = value;
     }
 
-    /// Comments.
+    /// Comments (allowed in the TDM Header only immediately after the TDM version number).
+    /// (See 4.5 for formatting rules.)
+    ///
+    /// Examples: This is a comment
     ///
     /// :type: list[str]
     #[getter]
@@ -739,7 +745,11 @@ impl TdmMetadata {
         self.inner.comment = value;
     }
 
-    /// Unique identifier for the tracking data in the associated data section.
+    /// The TRACK_ID keyword specifies a unique identifier for the tracking data in the
+    /// associated data section. The value may be a freely selected string of characters and
+    /// numbers, only required to be unique for each track of the corresponding sensor. For
+    /// example, the value may be constructed from the measurement date and time and a counter
+    /// to distinguish simultaneously tracked objects.
     ///
     /// Examples: 20190918_1200135-0001
     ///
@@ -753,7 +763,9 @@ impl TdmMetadata {
         self.inner.track_id = value;
     }
 
-    /// Comma-separated list of data types in the Data Section.
+    /// Comma-separated list of data types in the Data Section. The elements of the list shall
+    /// be selected from the data types shown in table 3-5, with the exception of the
+    /// DATA_START, DATA_STOP, and COMMENT keywords.
     ///
     /// Examples: RANGE, TRANSMIT_FREQ_n, RECEIVE_FREQ
     ///
@@ -767,7 +779,11 @@ impl TdmMetadata {
         self.inner.data_types = value;
     }
 
-    /// The time system used for timetags in the associated Data Section.
+    /// The TIME_SYSTEM keyword shall specify the time system used for timetags in the
+    /// associated Data Section. This should be UTC for ground-based data. The value associated
+    /// with this keyword must be selected from the full set of allowed values enumerated in
+    /// the SANA Time Systems Registry https://sanaregistry.org/r/time_systems (reference [12]).
+    /// (See annex B.)
     ///
     /// Examples: UTC, TAI, GPS, SCLK
     ///
@@ -781,7 +797,9 @@ impl TdmMetadata {
         self.inner.time_system = value;
     }
 
-    /// The UTC start time of the total time span covered by the tracking data.
+    /// The START_TIME keyword shall specify the UTC start time of the total time span covered
+    /// by the tracking data immediately following this Metadata Section. (For format
+    /// specification, see 4.3.9.)
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
     ///
@@ -799,7 +817,9 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// The UTC stop time of the total time span covered by the tracking data.
+    /// The STOP_TIME keyword shall specify the UTC stop time of the total time span covered by
+    /// the tracking data immediately following this Metadata Section. (For format
+    /// specification, see 4.3.9.)
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
     ///
@@ -817,9 +837,12 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// The first participant in a tracking data session.
+    /// The PARTICIPANT_n keyword shall represent the participants (see 1.3.4.1) in a tracking
+    /// data session. It is indexed to allow unambiguous reference to other data in the TDM
+    /// (max index is 5). At least two participants must be specified for most sessions; for
+    /// some special TDMs such as tropospheric media, only one participant need be listed.
     ///
-    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name>, 1997-061A, UNKNOWN
+    /// Examples: DSS-63-S400K, ROSETTA, <Quasar catalog name>, 1997-061A, UNKNOWN
     ///
     /// :type: str
     #[getter]
@@ -833,8 +856,6 @@ impl TdmMetadata {
 
     /// The second participant in a tracking data session.
     ///
-    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
-    ///
     /// :type: Optional[str]
     #[getter]
     fn get_participant_2(&self) -> Option<String> {
@@ -846,8 +867,6 @@ impl TdmMetadata {
     }
 
     /// The third participant in a tracking data session.
-    ///
-    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
     ///
     /// :type: Optional[str]
     #[getter]
@@ -861,8 +880,6 @@ impl TdmMetadata {
 
     /// The fourth participant in a tracking data session.
     ///
-    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
-    ///
     /// :type: Optional[str]
     #[getter]
     fn get_participant_4(&self) -> Option<String> {
@@ -875,8 +892,6 @@ impl TdmMetadata {
 
     /// The fifth participant in a tracking data session.
     ///
-    /// Examples: DSS-63-S400K, ROSETTA, \<Quasar catalog name\>, 1997-061A, UNKNOWN
-    ///
     /// :type: Optional[str]
     #[getter]
     fn get_participant_5(&self) -> Option<String> {
@@ -887,7 +902,10 @@ impl TdmMetadata {
         self.inner.participant_5 = value;
     }
 
-    /// The tracking mode associated with the Data Section of the segment.
+    /// The MODE keyword shall reflect the tracking mode associated with the Data Section of
+    /// the segment. The value ‘SEQUENTIAL’ applies for most sequential signal paths; the name
+    /// implies a sequential signal path between tracking participants. The value
+    /// ‘SINGLE_DIFF’ applies only for differenced data.
     ///
     /// Examples: SEQUENTIAL, SINGLE_DIFF
     ///
@@ -906,9 +924,12 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// The signal path by listing the index of each participant in order, separated by commas.
+    /// The PATH keywords shall reflect the signal path by listing the index of each participant
+    /// in order, separated by commas, with no inserted white space. Correlated with the
+    /// indices of the PARTICIPANT_n keywords. The first entry in the PATH shall be the
+    /// transmit participant.
     ///
-    /// Examples: 1,2,1
+    /// Examples: PATH = 1,2,1, PATH_1 = 1,2,1, PATH_2 = 3,1
     ///
     /// :type: Optional[str]
     #[getter]
@@ -927,8 +948,6 @@ impl TdmMetadata {
 
     /// The first signal path where the MODE is 'SINGLE_DIFF'.
     ///
-    /// Examples: 1,2,1
-    ///
     /// :type: Optional[str]
     #[getter]
     fn get_path_1(&self) -> Option<String> {
@@ -945,8 +964,6 @@ impl TdmMetadata {
     }
 
     /// The second signal path where the MODE is 'SINGLE_DIFF'.
-    ///
-    /// Examples: 3,1
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1033,7 +1050,9 @@ impl TdmMetadata {
         self.inner.ephemeris_name_5 = value;
     }
 
-    /// The frequency band for transmitted frequencies.
+    /// The TRANSMIT_BAND keyword shall indicate the frequency band for transmitted
+    /// frequencies. The frequency ranges associated with each band should be specified in the
+    /// ICD.
     ///
     /// Examples: S, X, Ka, L, UHF, GREEN
     ///
@@ -1047,7 +1066,10 @@ impl TdmMetadata {
         self.inner.transmit_band = value;
     }
 
-    /// The frequency band for received frequencies.
+    /// The RECEIVE_BAND keyword shall indicate the frequency band for received frequencies.
+    /// Although not required in general, the RECEIVE_BAND must be present if the MODE is
+    /// SINGLE_DIFF and differenced frequencies or differenced range are provided in order to
+    /// allow proper frequency dependent corrections to be applied.
     ///
     /// Examples: S, X, Ka, L, UHF, GREEN
     ///
@@ -1061,7 +1083,8 @@ impl TdmMetadata {
         self.inner.receive_band = value;
     }
 
-    /// The numerator of the turnaround ratio.
+    /// The TURNAROUND_NUMERATOR keyword shall indicate the numerator of the turnaround ratio
+    /// that is necessary to calculate the coherent downlink from the uplink frequency.
     ///
     /// Examples: 240, 880
     ///
@@ -1075,7 +1098,8 @@ impl TdmMetadata {
         self.inner.turnaround_numerator = value;
     }
 
-    /// The denominator of the turnaround ratio.
+    /// The TURNAROUND_DENOMINATOR keyword shall indicate the denominator of the turnaround
+    /// ratio that is necessary to calculate the coherent downlink from the uplink frequency.
     ///
     /// Examples: 221, 749
     ///
@@ -1089,7 +1113,9 @@ impl TdmMetadata {
         self.inner.turnaround_denominator = value;
     }
 
-    /// A reference for time tags in the tracking data.
+    /// The TIMETAG_REF keyword shall provide a reference for time tags in the tracking data.
+    /// This keyword indicates whether the timetag associated with the data is the transmit
+    /// time or the receive time.
     ///
     /// Examples: TRANSMIT, RECEIVE
     ///
@@ -1108,11 +1134,12 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// The Doppler count time in seconds for Doppler data.
-    ///
-    /// Units: s
+    /// The INTEGRATION_INTERVAL keyword shall provide the Doppler count time in seconds for
+    /// Doppler data or for the creation of normal points.
     ///
     /// Examples: 60.0, 0.1, 1.0
+    ///
+    /// Units: s
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1124,7 +1151,9 @@ impl TdmMetadata {
         self.inner.integration_interval = value;
     }
 
-    /// Indicates the relationship between the INTEGRATION_INTERVAL and the timetag.
+    /// Indicates the relationship between the INTEGRATION_INTERVAL and the timetag on the
+    /// data, i.e., whether the timetag represents the start, middle, or end of the integration
+    /// period.
     ///
     /// Examples: START, MIDDLE, END
     ///
@@ -1145,9 +1174,13 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// A frequency in Hz that must be added to every RECEIVE_FREQ to reconstruct it.
+    /// The FREQ_OFFSET keyword represents a frequency in Hz that must be added to every
+    /// RECEIVE_FREQ to reconstruct it. One use is if a Doppler shift frequency observable is
+    /// transferred instead of the actual received frequency. The default shall be 0.0.
     ///
     /// Examples: 0.0, 8415000000.0
+    ///
+    /// Units: Hz
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1159,7 +1192,9 @@ impl TdmMetadata {
         self.inner.freq_offset = value;
     }
 
-    /// The range observable mode.
+    /// The value of the RANGE_MODE keyword shall be ‘COHERENT’, in which case the range tones
+    /// are coherent with the uplink carrier; ‘CONSTANT’, in which case the range tones have a
+    /// constant frequency; or ‘ONE_WAY’ (used in Delta-DOR).
     ///
     /// Examples: COHERENT, CONSTANT, ONE_WAY
     ///
@@ -1180,7 +1215,10 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// The modulus of the range observable.
+    /// The value associated with the RANGE_MODULUS keyword shall be the modulus of the range
+    /// observable in the units as specified by the RANGE_UNITS keyword; that is, the actual
+    /// (unambiguous) range is an integer k times the modulus, plus the observable value. The
+    /// default value shall be 0.0.
     ///
     /// Examples: 32768.0, 2.0e+23, 0.0, 161.6484
     ///
@@ -1194,7 +1232,10 @@ impl TdmMetadata {
         self.inner.range_modulus = value;
     }
 
-    /// The units for the range observable.
+    /// The RANGE_UNITS keyword specifies the units for the range observable. ‘km’ shall be
+    /// used if the range is measured in kilometers. ‘s’ shall be used if the range is measured
+    /// in seconds. ‘RU’, for ‘range units’, shall be used where the transmit frequency is
+    /// changing. The default value shall be ‘km’.
     ///
     /// Examples: km, s, RU
     ///
@@ -1215,7 +1256,8 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// The type of antenna geometry represented in the angle data.
+    /// The ANGLE_TYPE keyword shall indicate the type of antenna geometry represented in the
+    /// angle data (ANGLE_1 and ANGLE_2 keywords).
     ///
     /// Examples: AZEL, RADEC, XEYN, XSYE
     ///
@@ -1236,7 +1278,9 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// The inertial reference frame to which the antenna frame is referenced.
+    /// The REFERENCE_FRAME keyword shall be used in conjunction with the ‘ANGLE_TYPE=RADEC’
+    /// keyword/value combination, indicating the inertial reference frame to which the antenna
+    /// frame is referenced.
     ///
     /// Examples: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
     ///
@@ -1257,7 +1301,9 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// The interpolation method to be used to calculate a transmit phase count.
+    /// The INTERPOLATION keyword shall specify the interpolation method to be used to calculate
+    /// a transmit phase count at an arbitrary time in tracking data where the uplink frequency
+    /// is not constant.
     ///
     /// Examples: HERMITE, LAGRANGE, LINEAR
     ///
@@ -1271,7 +1317,9 @@ impl TdmMetadata {
         self.inner.interpolation = value;
     }
 
-    /// The recommended degree of the interpolating polynomial for phase count data.
+    /// The INTERPOLATION_DEGREE keyword shall specify the recommended degree of the
+    /// interpolating polynomial used to calculate a transmit phase count at an arbitrary time
+    /// in tracking data where the uplink frequency is not constant.
     ///
     /// Examples: 3, 5, 7, 11
     ///
@@ -1285,11 +1333,13 @@ impl TdmMetadata {
         self.inner.interpolation_degree = value;
     }
 
-    /// A bias that shall be subtracted from the DOPPLER_COUNT data value.
-    ///
-    /// Units: Hz
+    /// Doppler counts are generally biased so as to accommodate negative Doppler within an
+    /// accumulator. In order to reconstruct the measurement, the bias shall be subtracted from
+    /// the DOPPLER_COUNT data value.
     ///
     /// Examples: 2.4e6, 240000000.0
+    ///
+    /// Units: Hz
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1301,7 +1351,9 @@ impl TdmMetadata {
         self.inner.doppler_count_bias = value;
     }
 
-    /// A scale factor that the DOPPLER_COUNT data value shall be divided by.
+    /// Doppler counts are generally scaled so as to capture partial cycles in an integer
+    /// count. In order to reconstruct the measurement, the DOPPLER_COUNT data value shall be
+    /// divided by the scale factor. The default shall be 1.
     ///
     /// Examples: 1000, 1
     ///
@@ -1315,7 +1367,9 @@ impl TdmMetadata {
         self.inner.doppler_count_scale = value;
     }
 
-    /// Flag indicating whether or not a Doppler counter rollover has occurred.
+    /// Doppler counts may overflow the accumulator and roll over in cases where the track is
+    /// of long duration or very high Doppler shift. This flag indicates whether or not a
+    /// counter rollover has occurred during the track.
     ///
     /// Examples: YES, NO
     ///
@@ -1338,12 +1392,13 @@ impl TdmMetadata {
     }
 
 
-    /// A fixed interval of time, in seconds, required for the signal to travel from the
-    /// transmitting electronics to the transmit point for participant 1.
-    ///
-    /// Units: s
+    /// The TRANSMIT_DELAY_n keyword shall specify a fixed interval of time, in seconds,
+    /// required for the signal to travel from the transmitting electronics to the transmit
+    /// point. The default value shall be 0.0.
     ///
     /// Examples: 1.23, 0.0326, 0.00077
+    ///
+    /// Units: s
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1355,12 +1410,10 @@ impl TdmMetadata {
         self.inner.transmit_delay_1 = value;
     }
 
-    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 2.
     ///
     /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00077
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1372,12 +1425,10 @@ impl TdmMetadata {
         self.inner.transmit_delay_2 = value;
     }
 
-    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 3.
     ///
     /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00077
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1389,12 +1440,10 @@ impl TdmMetadata {
         self.inner.transmit_delay_3 = value;
     }
 
-    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 4.
     ///
     /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00077
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1406,12 +1455,10 @@ impl TdmMetadata {
         self.inner.transmit_delay_4 = value;
     }
 
-    /// A fixed interval of time, in seconds, required for the signal to travel from the
+    /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 5.
     ///
     /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00077
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1423,12 +1470,13 @@ impl TdmMetadata {
         self.inner.transmit_delay_5 = value;
     }
 
-    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
-    /// point to the receiving electronics for participant 1.
-    ///
-    /// Units: s
+    /// The RECEIVE_DELAY_n keyword shall specify a fixed interval of time, in seconds,
+    /// required for the signal to travel from the tracking point to the receiving electronics.
+    /// The default value shall be 0.0.
     ///
     /// Examples: 1.23, 0.0326, 0.00777
+    ///
+    /// Units: s
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1440,12 +1488,10 @@ impl TdmMetadata {
         self.inner.receive_delay_1 = value;
     }
 
-    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 2.
     ///
     /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00777
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1457,12 +1503,10 @@ impl TdmMetadata {
         self.inner.receive_delay_2 = value;
     }
 
-    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 3.
     ///
     /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00777
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1474,12 +1518,10 @@ impl TdmMetadata {
         self.inner.receive_delay_3 = value;
     }
 
-    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 4.
     ///
     /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00777
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1491,12 +1533,10 @@ impl TdmMetadata {
         self.inner.receive_delay_4 = value;
     }
 
-    /// A fixed interval of time, in seconds, required for the signal to travel from the tracking
+    /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 5.
     ///
     /// Units: s
-    ///
-    /// Examples: 1.23, 0.0326, 0.00777
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1508,7 +1548,9 @@ impl TdmMetadata {
         self.inner.receive_delay_5 = value;
     }
 
-    /// An estimate of the quality of the data.
+    /// Provides an estimate of the quality of the data, based on indicators from the producers
+    /// of the data (e.g., bad time synchronization flags, marginal lock status indicators,
+    /// etc.). The default value shall be ‘RAW’.
     ///
     /// Examples: RAW, VALIDATED, DEGRADED
     ///
@@ -1529,7 +1571,9 @@ impl TdmMetadata {
         Ok(())
     }
 
-    /// A correction value to be added to the ANGLE_1 data.
+    /// The set of CORRECTION_* keywords may be used to reflect the values of corrections that
+    /// have been added to the data or should be added to the data (e.g., ranging station delay
+    /// calibration, etc.).
     ///
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
@@ -1669,7 +1713,9 @@ impl TdmMetadata {
         self.inner.correction_aberration_diurnal = value;
     }
 
-    /// Indicates whether or not the correction values have been applied to the tracking data.
+    /// This keyword is used to indicate whether or not the values associated with the
+    /// CORRECTION_* keywords have been applied to the tracking data. Required if any of the
+    /// CORRECTION_* keywords is used.
     ///
     /// Examples: YES, NO
     ///

@@ -7,20 +7,20 @@ use ccsds_ndm::{from_str, MessageType};
 #[test]
 fn test_kvn_detect_messy_preamble() {
     let input = r#"
-    
+
     COMMENT This file starts with blank lines
     COMMENT And multiple comments
-       
+
     CCSDS_OPM_VERS = 2.0
     CREATION_DATE = 2021-01-01T12:00:00.000
     ORIGINATOR    = NASA
-    
+
     OBJECT_NAME          = SATELLITE
     OBJECT_ID            = 2020-001A
     CENTER_NAME          = EARTH
     REF_FRAME            = GCRF
     TIME_SYSTEM          = UTC
-    
+
     EPOCH = 2021-01-01T12:00:00.000
     X     = 6500.0 [km]
     Y     = 0.0 [km]
@@ -45,7 +45,7 @@ fn test_xml_detect_messy_preamble() {
     let input = r#"
     <?xml version="1.0" encoding="UTF-8"?>
     <!-- A comment before the root element -->
-    
+
       <opm id="1.0" version="2.0">
         <header>
           <COMMENT>This is a comment</COMMENT>
