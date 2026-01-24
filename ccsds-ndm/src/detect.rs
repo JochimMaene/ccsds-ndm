@@ -37,9 +37,12 @@ enum NdmKind {
     Omm,
     Oem,
     Ocm,
+    Acm,
     Cdm,
     Tdm,
     Rdm,
+    Aem,
+    Apm,
 }
 
 /// Winnow parser to identify the KVN message type from the header
@@ -61,9 +64,12 @@ fn parse_kvn_kind(input: &mut &str) -> PResult<NdmKind> {
         "CCSDS_OMM_VERS".value(NdmKind::Omm),
         "CCSDS_OEM_VERS".value(NdmKind::Oem),
         "CCSDS_OCM_VERS".value(NdmKind::Ocm),
+        "CCSDS_ACM_VERS".value(NdmKind::Acm),
         "CCSDS_CDM_VERS".value(NdmKind::Cdm),
         "CCSDS_TDM_VERS".value(NdmKind::Tdm),
         "CCSDS_RDM_VERS".value(NdmKind::Rdm),
+        "CCSDS_AEM_VERS".value(NdmKind::Aem),
+        "CCSDS_APM_VERS".value(NdmKind::Apm),
     ))
     .parse_next(input)
 }
@@ -82,9 +88,12 @@ fn detect_kvn_type(s: &str) -> Result<MessageType> {
         "CCSDS_OMM_VERS",
         "CCSDS_OEM_VERS",
         "CCSDS_OCM_VERS",
+        "CCSDS_ACM_VERS",
         "CCSDS_CDM_VERS",
         "CCSDS_TDM_VERS",
         "CCSDS_RDM_VERS",
+        "CCSDS_AEM_VERS",
+        "CCSDS_APM_VERS",
     ];
 
     let mut count = 0;
@@ -101,9 +110,12 @@ fn detect_kvn_type(s: &str) -> Result<MessageType> {
         NdmKind::Omm => crate::traits::Ndm::from_kvn(s).map(MessageType::Omm),
         NdmKind::Oem => crate::traits::Ndm::from_kvn(s).map(MessageType::Oem),
         NdmKind::Ocm => crate::traits::Ndm::from_kvn(s).map(MessageType::Ocm),
+        NdmKind::Acm => crate::traits::Ndm::from_kvn(s).map(MessageType::Acm),
         NdmKind::Cdm => crate::traits::Ndm::from_kvn(s).map(MessageType::Cdm),
         NdmKind::Tdm => crate::traits::Ndm::from_kvn(s).map(MessageType::Tdm),
         NdmKind::Rdm => crate::traits::Ndm::from_kvn(s).map(MessageType::Rdm),
+        NdmKind::Aem => crate::traits::Ndm::from_kvn(s).map(MessageType::Aem),
+        NdmKind::Apm => crate::traits::Ndm::from_kvn(s).map(MessageType::Apm),
     }
 }
 
@@ -130,6 +142,9 @@ fn detect_xml_type(s: &str) -> Result<MessageType> {
                     "rdm" => crate::traits::Ndm::from_xml(s).map(MessageType::Rdm),
                     "tdm" => crate::traits::Ndm::from_xml(s).map(MessageType::Tdm),
                     "ocm" => crate::traits::Ndm::from_xml(s).map(MessageType::Ocm),
+                    "acm" => crate::traits::Ndm::from_xml(s).map(MessageType::Acm),
+                    "aem" => crate::traits::Ndm::from_xml(s).map(MessageType::Aem),
+                    "apm" => crate::traits::Ndm::from_xml(s).map(MessageType::Apm),
                     "ndm" => crate::traits::Ndm::from_xml(s).map(MessageType::Ndm),
                     _ => Err(CcsdsNdmError::UnsupportedMessage(format!(
                         "Unknown or unsupported XML root tag: <{}>",

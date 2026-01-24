@@ -100,6 +100,12 @@ pub enum MessageType {
     Tdm(messages::tdm::Tdm),
     /// Orbit Comprehensive Message - detailed orbit data with maneuvers.
     Ocm(messages::ocm::Ocm),
+    /// Attitude Comprehensive Message - detailed attitude data with maneuvers.
+    Acm(messages::acm::Acm),
+    /// Attitude Ephemeris Message - attitude state time series.
+    Aem(messages::aem::Aem),
+    /// Attitude Parameter Message - attitude state and parameter data.
+    Apm(messages::apm::Apm),
     /// Combined Instantiation NDM - container for multiple messages.
     Ndm(messages::ndm::CombinedNdm),
 }
@@ -115,6 +121,9 @@ impl MessageType {
             MessageType::Rdm(msg) => crate::traits::Ndm::to_kvn(msg),
             MessageType::Tdm(msg) => crate::traits::Ndm::to_kvn(msg),
             MessageType::Ocm(msg) => crate::traits::Ndm::to_kvn(msg),
+            MessageType::Acm(msg) => crate::traits::Ndm::to_kvn(msg),
+            MessageType::Aem(msg) => crate::traits::Ndm::to_kvn(msg),
+            MessageType::Apm(msg) => crate::traits::Ndm::to_kvn(msg),
             MessageType::Ndm(msg) => crate::traits::Ndm::to_kvn(msg),
         }
     }
@@ -129,6 +138,9 @@ impl MessageType {
             MessageType::Rdm(msg) => crate::traits::Ndm::to_xml(msg),
             MessageType::Tdm(msg) => crate::traits::Ndm::to_xml(msg),
             MessageType::Ocm(msg) => crate::traits::Ndm::to_xml(msg),
+            MessageType::Acm(msg) => crate::traits::Ndm::to_xml(msg),
+            MessageType::Aem(msg) => crate::traits::Ndm::to_xml(msg),
+            MessageType::Apm(msg) => crate::traits::Ndm::to_xml(msg),
             MessageType::Ndm(msg) => crate::traits::Ndm::to_xml(msg),
         }
     }

@@ -44,7 +44,7 @@ impl ToKvn for NdmHeader {
 }
 
 /// Represents the `admHeader` complex type from the XSD.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdmHeader {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -585,6 +585,87 @@ pub struct InertiaState {
     pub ixy: Moment,
     pub ixz: Moment,
     pub iyz: Moment,
+}
+
+impl ToKvn for QuaternionState {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
+        writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
+        writer.write_pair("Q1", self.quaternion.q1);
+        writer.write_pair("Q2", self.quaternion.q2);
+        writer.write_pair("Q3", self.quaternion.q3);
+        writer.write_pair("QC", self.quaternion.qc);
+        if let Some(dot) = &self.quaternion_dot {
+             writer.write_pair("Q1_DOT", dot.q1_dot.value);
+             writer.write_pair("Q2_DOT", dot.q2_dot.value);
+             writer.write_pair("Q3_DOT", dot.q3_dot.value);
+             writer.write_pair("QC_DOT", dot.qc_dot.value);
+        }
+    }
+}
+
+impl ToKvn for EulerAngleState {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
+        writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
+        writer.write_pair("EULER_ROT_SEQ", &self.euler_rot_seq); 
+        writer.write_measure("ANGLE_1", &UnitValue { value: self.angle_1.value, units: self.angle_1.units.clone() });
+        writer.write_measure("ANGLE_2", &UnitValue { value: self.angle_2.value, units: self.angle_2.units.clone() });
+        writer.write_measure("ANGLE_3", &UnitValue { value: self.angle_3.value, units: self.angle_3.units.clone() });
+        if let Some(v) = &self.angle_1_dot { writer.write_measure("ANGLE_1_DOT", &UnitValue { value: v.value, units: v.units.clone() }); }
+        if let Some(v) = &self.angle_2_dot { writer.write_measure("ANGLE_2_DOT", &UnitValue { value: v.value, units: v.units.clone() }); }
+        if let Some(v) = &self.angle_3_dot { writer.write_measure("ANGLE_3_DOT", &UnitValue { value: v.value, units: v.units.clone() }); }
+    }
+}
+
+impl ToKvn for AngVelState {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+         writer.write_comments(&self.comment);
+         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
+         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
+         writer.write_pair("ANGVEL_FRAME", &self.angvel_frame.0);
+         // XSD says angVelFrameType is restriction of string. Check struct definition.
+         writer.write_measure("ANGVEL_X", &self.angvel_x);
+         writer.write_measure("ANGVEL_Y", &self.angvel_y);
+         writer.write_measure("ANGVEL_Z", &self.angvel_z);
+    }
+}
+// I need `AngVelFrameType` implies Display? Or ToKvn?
+// It is empty restriction in XSD shown in view_file Step 32 line 194?
+// Ah, common.rs defines `AngVelFrameType`. I need to check its definition.
+
+impl ToKvn for SpinState {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
+        writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
+        writer.write_measure("SPIN_ALPHA", &UnitValue { value: self.spin_alpha.value, units: self.spin_alpha.units.clone() });
+        writer.write_measure("SPIN_DELTA", &UnitValue { value: self.spin_delta.value, units: self.spin_delta.units.clone() });
+        writer.write_measure("SPIN_ANGLE", &UnitValue { value: self.spin_angle.value, units: self.spin_angle.units.clone() });
+        writer.write_measure("SPIN_ANGLE_VEL", &UnitValue { value: self.spin_angle_vel.value, units: self.spin_angle_vel.units.clone() });
+        
+        if let Some(v) = &self.nutation { writer.write_measure("NUTATION", &UnitValue { value: v.value, units: v.units.clone() }); }
+        if let Some(v) = &self.nutation_per { writer.write_measure("NUTATION_PER", &UnitValue { value: v.value, units: v.units.clone() }); }
+        if let Some(v) = &self.nutation_phase { writer.write_measure("NUTATION_PHASE", &UnitValue { value: v.value, units: v.units.clone() }); }
+        if let Some(v) = &self.momentum_alpha { writer.write_measure("MOMENTUM_ALPHA", &UnitValue { value: v.value, units: v.units.clone() }); }
+        if let Some(v) = &self.momentum_delta { writer.write_measure("MOMENTUM_DELTA", &UnitValue { value: v.value, units: v.units.clone() }); }
+        if let Some(v) = &self.nutation_vel { writer.write_measure("NUTATION_VEL", &UnitValue { value: v.value, units: v.units.clone() }); }
+    }
+}
+
+impl ToKvn for InertiaState {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("INERTIA_REF_FRAME", &self.inertia_ref_frame);
+        writer.write_measure("IXX", &self.ixx);
+        writer.write_measure("IYY", &self.iyy);
+        writer.write_measure("IZZ", &self.izz);
+        writer.write_measure("IXY", &self.ixy);
+        writer.write_measure("IXZ", &self.ixz);
+        writer.write_measure("IYZ", &self.iyz);
+    }
 }
 
 /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. None or all parameters of the

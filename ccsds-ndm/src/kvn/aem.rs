@@ -1,0 +1,260 @@
+// SPDX-FileCopyrightText: 2025 Jochim Maene <16223990+JochimMaene@users.noreply.github.com>
+//
+// SPDX-License-Identifier: MPL-2.0
+
+//! Winnow parsers for AEM (Attitude Ephemeris Message).
+
+use crate::kvn::parser::*;
+use crate::messages::aem::{Aem, AemBody, AemData, AemMetadata, AemSegment, AttitudeState};
+use crate::parse_block;
+use crate::error::InternalParserError;
+use crate::traits::Ndm;
+use std::str::FromStr;
+use winnow::error::{ErrMode, ContextError, ParserError, AddContext, FromExternalError};
+use winnow::combinator::terminated;
+use winnow::prelude::*;
+
+//----------------------------------------------------------------------
+// AEM Version Parser
+//----------------------------------------------------------------------
+
+/// Parses the AEM version line: `CCSDS_AEM_VERS = 2.0`
+pub fn aem_version(input: &mut &str) -> KvnResult<String> {
+    ws.parse_next(input)?;
+    // Skip any leading comments/empty lines
+    let _ = collect_comments.parse_next(input)?;
+
+    let (value, _) = expect_key("CCSDS_AEM_VERS").parse_next(input)?;
+    if value != "1.0" && value != "2.0" {
+        return Err(cut_err(input, "1.0 or 2.0"));
+    }
+    Ok(value.to_string())
+}
+
+//----------------------------------------------------------------------
+// AEM Metadata Parser
+//----------------------------------------------------------------------
+
+/// Parses the AEM metadata section.
+pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
+    let mut comment = Vec::new();
+    let mut object_name = None;
+    let mut object_id = None;
+    let mut center_name = None;
+    let mut ref_frame_a = None;
+    let mut ref_frame_b = None;
+    let mut time_system = None;
+    let mut start_time = None;
+    let mut useable_start_time = None;
+    let mut useable_stop_time = None;
+    let mut stop_time = None;
+    let mut attitude_type = None;
+    let mut euler_rot_seq = None;
+    let mut rate_frame = None;
+    let mut interpolation_method = None;
+    let mut interpolation_degree = None;
+
+    expect_block_start("META").parse_next(input)?;
+
+    parse_block!(input, comment, {
+        "OBJECT_NAME" => object_name: kv_string,
+        "OBJECT_ID" => object_id: kv_string,
+        "CENTER_NAME" => center_name: kv_string,
+        "REF_FRAME_A" => ref_frame_a: kv_string,
+        "REF_FRAME_B" => ref_frame_b: kv_string,
+        "TIME_SYSTEM" => time_system: kv_string,
+        "START_TIME" => start_time: kv_epoch,
+        "USEABLE_START_TIME" => useable_start_time: kv_epoch,
+        "USEABLE_STOP_TIME" => useable_stop_time: kv_epoch,
+        "STOP_TIME" => stop_time: kv_epoch,
+        "ATTITUDE_TYPE" => attitude_type: kv_string,
+        "EULER_ROT_SEQ" => euler_rot_seq: kv_string,
+        "RATE_FRAME" => rate_frame: kv_string, // CCSDS 504.0-B-2 says RATE_FRAME in KVN
+        "ANGVEL_FRAME" => rate_frame: kv_string, // Also support explicit XML tag if used in KVN
+        "INTERPOLATION_METHOD" => interpolation_method: kv_string,
+        "INTERPOLATION_DEGREE" => interpolation_degree: kv_u32,
+    }, |i: &mut &str| at_block_end("META", i));
+
+    expect_block_end("META").parse_next(input)?;
+
+    Ok(AemMetadata {
+        comment,
+        object_name: object_name.ok_or_else(|| missing_field_err(input, "AEM Metadata", "OBJECT_NAME"))?,
+        object_id: object_id.ok_or_else(|| missing_field_err(input, "AEM Metadata", "OBJECT_ID"))?,
+        center_name,
+        ref_frame_a: ref_frame_a.ok_or_else(|| missing_field_err(input, "AEM Metadata", "REF_FRAME_A"))?,
+        ref_frame_b: ref_frame_b.ok_or_else(|| missing_field_err(input, "AEM Metadata", "REF_FRAME_B"))?,
+        time_system: time_system.ok_or_else(|| missing_field_err(input, "AEM Metadata", "TIME_SYSTEM"))?,
+        start_time: start_time.ok_or_else(|| missing_field_err(input, "AEM Metadata", "START_TIME"))?,
+        useable_start_time,
+        useable_stop_time,
+        stop_time: stop_time.ok_or_else(|| missing_field_err(input, "AEM Metadata", "STOP_TIME"))?,
+        attitude_type: attitude_type.ok_or_else(|| missing_field_err(input, "AEM Metadata", "ATTITUDE_TYPE"))?,
+        euler_rot_seq,
+        rate_frame,
+        interpolation_method,
+        interpolation_degree: interpolation_degree.and_then(std::num::NonZeroU32::new),
+    })
+}
+
+//----------------------------------------------------------------------
+// AEM Data Parser
+//----------------------------------------------------------------------
+
+/// Parses a single data line.
+fn attitude_state_line(input: &mut &str) -> KvnResult<AttitudeState> {
+    // line format: EPOCH VAL1 VAL2 ...
+    // We read the whole line and split it.
+    let line = terminated(raw_line, opt_line_ending).parse_next(input)?;
+    let mut parts = line.split_whitespace();
+
+    let epoch_str = parts.next().ok_or_else(|| {
+        ErrMode::Cut(InternalParserError::from_input(input).add_context(
+            input,
+            &input.checkpoint(),
+            winnow::error::StrContext::Label("Epoch in data line"),
+        ))
+    })?;
+
+    let epoch = crate::types::Epoch::from_str(epoch_str).map_err(|e| {
+        ErrMode::Cut(InternalParserError::from_external_error(input, e))
+    })?;
+
+    let mut values = Vec::new();
+    for s in parts {
+        let val = s.parse::<f64>().map_err(|_| {
+            ErrMode::Cut(InternalParserError::from_input(input).add_context(
+                input,
+                &input.checkpoint(),
+                winnow::error::StrContext::Label("Float value in data line"),
+            ))
+        })?;
+        values.push(val);
+    }
+
+    Ok(AttitudeState { epoch, values })
+}
+
+/// Parses the AEM data section.
+pub fn aem_data(input: &mut &str) -> KvnResult<AemData> {
+    expect_block_start("DATA").parse_next(input)?;
+
+    let mut comment = Vec::new();
+    // Comments are allowed at the start of data block
+    comment.extend(collect_comments.parse_next(input)?);
+
+    let mut attitude_states = Vec::new();
+
+    loop {
+        // Check for end of block
+        if at_block_end("DATA", input) {
+            break;
+        }
+
+        // Parse comment if any (interspersed comments allowed?)
+        // Standard says "Comments may appear in the AEM Data Section."
+        // Usually at top, but let's be safe.
+        if input.trim_start().starts_with("COMMENT") {
+             comment.extend(collect_comments.parse_next(input)?);
+             continue;
+        }
+
+        let state = attitude_state_line.parse_next(input)?;
+        attitude_states.push(state);
+    }
+
+    expect_block_end("DATA").parse_next(input)?;
+
+    Ok(AemData {
+        comment,
+        attitude_states,
+    })
+}
+
+//----------------------------------------------------------------------
+// AEM Segment Parser
+//----------------------------------------------------------------------
+
+pub fn aem_segment(input: &mut &str) -> KvnResult<AemSegment> {
+    let metadata = aem_metadata.parse_next(input)?;
+    let _ = skip_empty_lines.parse_next(input);
+    let data = aem_data.parse_next(input)?;
+
+    Ok(AemSegment { metadata, data })
+}
+
+//----------------------------------------------------------------------
+// Complete AEM Parser
+//----------------------------------------------------------------------
+
+pub fn parse_aem(input: &mut &str) -> KvnResult<Aem> {
+    let version = aem_version.parse_next(input)?;
+    let header = adm_header.parse_next(input)?;
+
+    let mut segments = Vec::new();
+    loop {
+        let _ = skip_empty_lines.parse_next(input);
+        // If we see META_START, it's a new segment
+        if at_block_start("META", input) {
+            segments.push(aem_segment.parse_next(input)?);
+        } else {
+            break;
+        }
+    }
+
+    if segments.is_empty() {
+        return Err(cut_err(input, "At least one segment required"));
+    }
+
+    Ok(Aem {
+        header,
+        body: AemBody { segment: segments },
+        id: Some("CCSDS_AEM_VERS".to_string()),
+        version,
+    })
+}
+
+impl ParseKvn for Aem {
+    fn parse_kvn(input: &mut &str) -> KvnResult<Self> {
+        parse_aem.parse_next(input)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_aem_minimal() {
+        let input = r#"CCSDS_AEM_VERS = 2.0
+CREATION_DATE = 2002-11-04T17:22:31
+ORIGINATOR = NASA/JPL
+
+META_START
+OBJECT_NAME = MARS GLOBAL SURVEYOR
+OBJECT_ID = 1996-062A
+CENTER_NAME = MARS BARYCENTER
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
+TIME_SYSTEM = UTC
+START_TIME = 2002-11-04T17:22:31
+STOP_TIME = 2002-11-04T17:25:31
+ATTITUDE_TYPE = QUATERNION
+META_STOP
+
+DATA_START
+2002-11-04T17:22:31 0.5 0.5 0.5 0.5
+2002-11-04T17:23:31 0.6 0.4 0.4 0.6
+DATA_STOP
+"#;
+        let aem = Aem::from_kvn(input).unwrap();
+        assert_eq!(aem.version, "2.0");
+        assert_eq!(aem.header.originator, "NASA/JPL");
+        assert_eq!(aem.body.segment.len(), 1);
+        let seg = &aem.body.segment[0];
+        assert_eq!(seg.metadata.object_name, "MARS GLOBAL SURVEYOR");
+        assert_eq!(seg.data.attitude_states.len(), 2);
+        assert_eq!(seg.data.attitude_states[0].values.len(), 4);
+        assert_eq!(seg.data.attitude_states[0].values[0], 0.5);
+    }
+}

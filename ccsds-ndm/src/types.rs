@@ -1317,6 +1317,50 @@ pub enum RotSeq {
     ZYZ,
 }
 
+impl std::str::FromStr for RotSeq {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "XYX" => Ok(Self::XYX),
+            "XYZ" => Ok(Self::XYZ),
+            "XZX" => Ok(Self::XZX),
+            "XZY" => Ok(Self::XZY),
+            "YXY" => Ok(Self::YXY),
+            "YXZ" => Ok(Self::YXZ),
+            "YZX" => Ok(Self::YZX),
+            "YZY" => Ok(Self::YZY),
+            "ZXY" => Ok(Self::ZXY),
+            "ZXZ" => Ok(Self::ZXZ),
+            "ZYX" => Ok(Self::ZYX),
+            "ZYZ" => Ok(Self::ZYZ),
+            _ => Err(crate::error::EnumParseError {
+                field: "EULER_ROT_SEQ",
+                value: s.to_string(),
+                expected: "XYX, XYZ, XZX, XZY, YXY, YXZ, YZX, YZY, ZXY, ZXZ, ZYX, or ZYZ",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for RotSeq {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::XYX => write!(f, "XYX"),
+            Self::XYZ => write!(f, "XYZ"),
+            Self::XZX => write!(f, "XZX"),
+            Self::XZY => write!(f, "XZY"),
+            Self::YXY => write!(f, "YXY"),
+            Self::YXZ => write!(f, "YXZ"),
+            Self::YZX => write!(f, "YZX"),
+            Self::YZY => write!(f, "YZY"),
+            Self::ZXY => write!(f, "ZXY"),
+            Self::ZXZ => write!(f, "ZXZ"),
+            Self::ZYX => write!(f, "ZYX"),
+            Self::ZYZ => write!(f, "ZYZ"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AdMethod {
     #[serde(rename = "EKF")]
@@ -2166,10 +2210,29 @@ impl std::fmt::Display for ReentryUncertaintyMethodType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TimeSystemType(pub String);
 
+impl std::fmt::Display for TimeSystemType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 // AngVelFrameType: XSD empty restriction (free-form string), used in APM angVelStateType.
 /// Angular velocity frame identifier (schema leaves unrestricted).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct AngVelFrameType(pub String);
+
+impl std::str::FromStr for AngVelFrameType {
+    type Err = std::convert::Infallible;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl std::fmt::Display for AngVelFrameType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// USER DEFINED PARAMETERS block (`userDefinedType`).
 /// User-defined parameters.
@@ -2206,6 +2269,7 @@ pub struct UserDefinedParameter {
     #[serde(rename = "@parameter")]
     pub parameter: String,
 }
+
 
 // -------------------- CDM TYPES --------------------
 

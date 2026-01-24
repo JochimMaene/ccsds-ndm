@@ -51,8 +51,12 @@ impl Ndm {
                 core_messages.push(MessageType::Ocm(ocm.inner));
             } else if let Ok(rdm) = msg.extract::<Rdm>(py) {
                 core_messages.push(MessageType::Rdm(rdm.inner));
-            } else if let Ok(tdm) = msg.extract::<Tdm>(py) {
-                core_messages.push(MessageType::Tdm(tdm.inner));
+            } else if let Ok(aem) = msg.extract::<crate::aem::Aem>(py) {
+                core_messages.push(MessageType::Aem(aem.inner));
+            } else if let Ok(apm) = msg.extract::<crate::apm::Apm>(py) {
+                core_messages.push(MessageType::Apm(apm.inner));
+            } else if let Ok(acm) = msg.extract::<crate::acm::Acm>(py) {
+                core_messages.push(MessageType::Acm(acm.inner));
             } else if let Ok(ndm) = msg.extract::<Ndm>(py) {
                 core_messages.push(MessageType::Ndm(ndm.inner));
             } else {
@@ -145,6 +149,9 @@ impl Ndm {
                 MessageType::Rdm(m) => Py::new(py, Rdm { inner: m.clone() })?.into_any(),
                 MessageType::Tdm(m) => Py::new(py, Tdm { inner: m.clone() })?.into_any(),
                 MessageType::Ndm(m) => Py::new(py, Ndm { inner: m.clone() })?.into_any(),
+                MessageType::Aem(m) => Py::new(py, crate::aem::Aem { inner: m.clone() })?.into_any(),
+                MessageType::Apm(m) => Py::new(py, crate::apm::Apm { inner: m.clone() })?.into_any(),
+                MessageType::Acm(m) => Py::new(py, crate::acm::Acm { inner: m.clone() })?.into_any(),
             };
             py_messages.push(py_msg);
         }
