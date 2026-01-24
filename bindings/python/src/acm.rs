@@ -12,6 +12,10 @@ use pyo3::prelude::*;
 use std::fs;
 
 /// Attitude Comprehensive Message (ACM).
+///
+/// An ACM specifies the attitude state of a single object at multiple epochs, contained within a
+/// specified time range. The ACM aggregates and extends APM and AEM content in a single
+/// comprehensive hybrid message.
 #[pyclass]
 #[derive(Clone)]
 pub struct Acm {
@@ -76,6 +80,11 @@ impl Acm {
         }
     }
 
+    /// Attitude Comprehensive Message (ACM).
+    ///
+    /// An ACM specifies the attitude state of a single object at multiple epochs, contained within a
+    /// specified time range. The ACM aggregates and extends APM and AEM content in a single
+    /// comprehensive hybrid message.
     #[getter]
     fn get_header(&self) -> AdmHeader {
         AdmHeader {
@@ -124,6 +133,7 @@ impl AcmSegment {
     }
 }
 
+/// ACM Metadata Section.
 #[pyclass]
 #[derive(Clone)]
 pub struct AcmMetadata {
@@ -136,7 +146,7 @@ impl AcmMetadata {
     #[allow(clippy::too_many_arguments)]
     fn new(
         object_name: String,
-        international_designator: String,
+        international_designator: Option<String>,
         time_system: String,
         epoch_tzero: String,
         comment: Option<Vec<String>>,
@@ -153,17 +163,37 @@ impl AcmMetadata {
         })
     }
 
+    /// Free-text field containing the name of the object. There is no CCSDS-based restriction on
+    /// the value for this keyword, but it is recommended to use names from either the UN Office of
+    /// Outer Space Affairs designator index (reference [2]), which include Object name and
+    /// international designator), the spacecraft operator, or a State Actor or commercial Space
+    /// Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space catalog. If the
+    /// object name is not known (uncorrelated object), ‘UNKNOWN’ may be used (or this keyword
+    /// omitted).
+    ///
+    /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
     #[getter]
     fn get_object_name(&self) -> String {
         self.inner.object_name.clone()
     }
 
+    /// Free text field containing an international designator for the object as assigned by the UN
+    /// Committee on Space Research (COSPAR) and the US National Space Science Data Center (NSSDC).
+    /// Such designator values have the following COSPAR format: YYYY-NNNP{PP}, where: YYYY = Year
+    /// of launch. NNN = Three-digit serial number of launch in year YYYY (with leading zeros).
+    /// P{PP} = At least one capital letter for the identification of the part brought into space
+    /// by the launch. In cases in which the object has no international designator, the value
+    /// UNKNOWN may be used. NOTE – The international designator is typically specified by
+    /// ‘OBJECT_ID’ in the APM and AEM.
+    ///
+    /// Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
     #[getter]
-    fn get_international_designator(&self) -> String {
+    fn get_international_designator(&self) -> Option<String> {
         self.inner.international_designator.clone()
     }
 }
 
+/// ACM Data Section.
 #[pyclass]
 #[derive(Clone)]
 pub struct AcmData {
@@ -193,17 +223,21 @@ impl AcmData {
         }
     }
 
+    /// One or more optional attitude state time histories (each consisting of one or more attitude
+    /// states).
     #[getter]
     fn get_att(&self) -> Vec<AcmAttitudeState> {
         self.inner.att.iter().map(|s| AcmAttitudeState { inner: s.clone() }).collect()
     }
 
+    /// A single space object physical characteristics section.
     #[getter]
     fn get_phys(&self) -> Option<AcmPhysicalDescription> {
         self.inner.phys.as_ref().map(|p| AcmPhysicalDescription { inner: p.clone() })
     }
 }
 
+/// ACM Data: Attitude State Time History Section.
 #[pyclass]
 #[derive(Clone)]
 pub struct AcmAttitudeState {
@@ -234,6 +268,7 @@ impl AcmAttitudeState {
     }
 }
 
+/// ACM Data: Space Object Physical Characteristics Section.
 #[pyclass]
 #[derive(Clone)]
 pub struct AcmPhysicalDescription {
@@ -253,6 +288,7 @@ impl AcmPhysicalDescription {
     }
 }
 
+/// ACM Data: Covariance Time History Section.
 #[pyclass]
 #[derive(Clone)]
 pub struct AcmCovarianceMatrix {
@@ -282,6 +318,7 @@ impl AcmCovarianceMatrix {
     }
 }
 
+/// ACM Data: Maneuver Specification Section.
 #[pyclass]
 #[derive(Clone)]
 pub struct AcmManeuverParameters {
@@ -302,6 +339,7 @@ impl AcmManeuverParameters {
     }
 }
 
+/// ACM Data: Attitude Determination Data Section.
 #[pyclass]
 #[derive(Clone)]
 pub struct AcmAttitudeDetermination {

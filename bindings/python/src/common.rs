@@ -129,7 +129,7 @@ impl OdmHeader {
     }
 }
 
-/// Represents the `admHeader` complex type.
+/// Represents the `admHeader` complex type from the XSD.
 #[pyclass]
 #[derive(Clone)]
 pub struct AdmHeader {

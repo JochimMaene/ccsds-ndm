@@ -6,7 +6,10 @@ use ccsds_ndm::common as core_common;
 use ccsds_ndm::types::{Angle, AngleRate, Moment, Duration};
 use pyo3::prelude::*;
 
-/// Attitude Quaternion State.
+/// Attitude quaternion.
+///
+/// All mandatory elements are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[pyclass]
 #[derive(Clone)]
 pub struct QuaternionState {
@@ -61,7 +64,10 @@ impl QuaternionState {
     // ... other getters/setters as needed
 }
 
-/// Attitude Euler Angle State.
+/// Euler angle elements.
+///
+/// All mandatory elements of the logical block are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[pyclass]
 #[derive(Clone)]
 pub struct EulerAngleState {
@@ -103,7 +109,10 @@ impl EulerAngleState {
     }
 }
 
-/// Angular Velocity State.
+/// Angular velocity vector.
+///
+/// All mandatory elements are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[pyclass]
 #[derive(Clone)]
 pub struct AngVelState {
@@ -136,7 +145,10 @@ impl AngVelState {
     }
 }
 
-/// Spin State.
+/// Spin block.
+///
+/// All mandatory elements are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[pyclass]
 #[derive(Clone)]
 pub struct SpinState {
@@ -182,7 +194,10 @@ impl SpinState {
     }
 }
 
-/// Spacecraft Inertia Parameters.
+/// Inertia block.
+///
+/// All mandatory elements are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[pyclass]
 #[derive(Clone)]
 pub struct InertiaState {

@@ -13,6 +13,10 @@ use pyo3::prelude::*;
 use std::fs;
 
 /// Attitude Parameter Message (APM).
+///
+/// An APM specifies the attitude state of a single object at a specified epoch. This message is
+/// suited to interagency exchanges that (1) involve automated interaction and/or human
+/// interaction, and (2) do not require high-fidelity dynamic modeling.
 #[pyclass]
 #[derive(Clone)]
 pub struct Apm {
@@ -77,6 +81,11 @@ impl Apm {
         }
     }
 
+    /// Attitude Parameter Message (APM).
+    ///
+    /// An APM specifies the attitude state of a single object at a specified epoch. This message is
+    /// suited to interagency exchanges that (1) involve automated interaction and/or human
+    /// interaction, and (2) do not require high-fidelity dynamic modeling.
     #[getter]
     fn get_header(&self) -> AdmHeader {
         AdmHeader {
@@ -125,6 +134,7 @@ impl ApmSegment {
     }
 }
 
+/// APM Metadata Section.
 #[pyclass]
 #[derive(Clone)]
 pub struct ApmMetadata {
@@ -152,17 +162,36 @@ impl ApmMetadata {
         }
     }
 
+    /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
+    /// restriction on the value for this keyword, it is recommended to use names from the UN
+    /// Office of Outer Space Affairs designator index (reference [ADM-2], which include object
+    /// name and international designator). When OBJECT_NAME is not known or cannot be disclosed,
+    /// the value should be set to UNKNOWN.
+    ///
+    /// Examples: EUTELSAT W1, MARS PATHFINDER, UNKNOWN
     #[getter]
     fn get_object_name(&self) -> String {
         self.inner.object_name.clone()
     }
 
+    /// Spacecraft identifier of the object corresponding to the attitude data to be given. While
+    /// there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+    /// international designators from the UN Office of Outer Space Affairs (reference [ADM-2]).
+    /// Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three
+    /// digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one
+    /// letter for the identification of the part brought into space by the launch. In cases in
+    /// which the asset is not listed in reference [ADM-2], the UN Office of Outer Space Affairs
+    /// designator index format is not used, or the content cannot be disclosed, the value should
+    /// be set to UNKNOWN.
+    ///
+    /// Examples: 2000-052A
     #[getter]
     fn get_object_id(&self) -> String {
         self.inner.object_id.clone()
     }
 }
 
+/// APM Data Section.
 #[pyclass]
 #[derive(Clone)]
 pub struct ApmData {
@@ -174,46 +203,84 @@ impl ApmData {
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        quaternion_state: Option<QuaternionState>,
-        euler_angle_state: Option<EulerAngleState>,
-        ang_vel_state: Option<AngVelState>,
-        spin_state: Option<SpinState>,
-        inertia_state: Option<InertiaState>,
+        epoch: String,
+        quaternion_state: Option<Vec<QuaternionState>>,
+        euler_angle_state: Option<Vec<EulerAngleState>>,
+        angular_velocity: Option<Vec<AngVelState>>,
+        spin: Option<Vec<SpinState>>,
+        inertia: Option<Vec<InertiaState>>,
         maneuver_parameters: Option<Vec<ManeuverParameters>>,
         comment: Option<Vec<String>>,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        Ok(Self {
             inner: core_apm::ApmData {
                 comment: comment.unwrap_or_default(),
-                quaternion_state: quaternion_state.map(|s| s.inner),
-                euler_angle_state: euler_angle_state.map(|s| s.inner),
-                ang_vel_state: ang_vel_state.map(|s| s.inner),
-                spin_state: spin_state.map(|s| s.inner),
-                inertia_state: inertia_state.map(|s| s.inner),
+                epoch: parse_epoch(&epoch)?,
+                quaternion_state: quaternion_state
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| s.inner)
+                    .collect(),
+                euler_angle_state: euler_angle_state
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| s.inner)
+                    .collect(),
+                angular_velocity: angular_velocity
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| s.inner)
+                    .collect(),
+                spin: spin
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| s.inner)
+                    .collect(),
+                inertia: inertia
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| s.inner)
+                    .collect(),
                 maneuver_parameters: maneuver_parameters
                     .unwrap_or_default()
                     .into_iter()
                     .map(|m| m.inner)
                     .collect(),
             },
-        }
+        })
     }
 
+    /// Attitude quaternion. All mandatory elements are to be provided if the block is present.
+    /// (See annex F for conventions and further detail.)
     #[getter]
-    fn get_quaternion_state(&self) -> Option<QuaternionState> {
-        self.inner.quaternion_state.as_ref().map(|s| QuaternionState { inner: s.clone() })
+    fn get_quaternion_state(&self) -> Vec<QuaternionState> {
+        self.inner
+            .quaternion_state
+            .iter()
+            .map(|s| QuaternionState { inner: s.clone() })
+            .collect()
     }
 
+    /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
+    /// block is present. (See annex F for conventions and further detail.)
     #[getter]
-    fn get_euler_angle_state(&self) -> Option<EulerAngleState> {
-        self.inner.euler_angle_state.as_ref().map(|s| EulerAngleState { inner: s.clone() })
+    fn get_euler_angle_state(&self) -> Vec<EulerAngleState> {
+        self.inner
+            .euler_angle_state
+            .iter()
+            .map(|s| EulerAngleState { inner: s.clone() })
+            .collect()
     }
 }
 
+/// Maneuver Parameters (Repeat for each maneuver).
+///
+/// References:
+/// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 #[pyclass]
 #[derive(Clone)]
 pub struct ManeuverParameters {
-    pub inner: core_apm::ManeuverParameters,
+    pub inner: ccsds_ndm::common::AttManeuverState,
 }
 
 #[pymethods]
@@ -230,17 +297,17 @@ impl ManeuverParameters {
         man_delta_mass: Option<f64>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        use ccsds_ndm::types::{Torque, Mass, Duration};
+        use ccsds_ndm::types::{Torque, Duration, DeltaMassZ};
         Ok(Self {
-            inner: core_apm::ManeuverParameters {
+            inner: ccsds_ndm::common::AttManeuverState {
                 comment: comment.unwrap_or_default(),
                 man_epoch_start: parse_epoch(&man_epoch_start)?,
                 man_duration: Duration { value: man_duration, units: None },
                 man_ref_frame,
-                man_tor_1: Torque::new(man_tor_1, None),
-                man_tor_2: Torque::new(man_tor_2, None),
-                man_tor_3: Torque::new(man_tor_3, None),
-                man_delta_mass: man_delta_mass.map(|v| Mass { value: v, units: None }),
+                man_tor_x: Torque::new(man_tor_1, None),
+                man_tor_y: Torque::new(man_tor_2, None),
+                man_tor_z: Torque::new(man_tor_3, None),
+                man_delta_mass: man_delta_mass.map(|v| DeltaMassZ { value: v, units: None }),
             },
         })
     }
