@@ -57,6 +57,32 @@ FIELD_MAPPINGS: dict[str, dict[str, str]] = {
         "relative_position": "relative_state_vector",
         "relative_velocity": "relative_state_vector",
     },
+    "ManeuverParameters": {
+        "man_epoch_start": "man_epoch_ignition",
+        "man_tor_x": "man_tor_1",
+        "man_tor_y": "man_tor_2",
+        "man_tor_z": "man_tor_3",
+    },
+    "QuaternionState": {
+        "q1": "quaternion",
+        "q2": "quaternion",
+        "q3": "quaternion",
+        "qc": "quaternion",
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Python Helper Classes
+# ---------------------------------------------------------------------------
+# Classes that exist in Python bindings but do NOT have a direct 1:1 matching
+# Rust struct in the core library. These are typically convenience wrappers,
+# projections, or merged types.
+# The audit tool will not look for a matching Rust struct for these.
+
+PYTHON_HELPER_CLASSES: set[str] = {
+    "AttitudeState",
+    "CovLine",
+    "AttLine",
 }
 
 # ---------------------------------------------------------------------------
@@ -85,9 +111,6 @@ PYTHON_ONLY_FIELDS: dict[str, list[str]] = {
     ],
     "AemData": [
         "attitude_states",
-    ],
-    "AttitudeState": [
-        "*",
     ],
     # Add other NumPy accessors as needed
 }
@@ -135,16 +158,8 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
     "AcmMetadata": ["*"],
     "AcmPhysicalDescription": ["*"],
     "AcmSegment": ["*"],
-    "AngVelState": ["*"],
-    "ApmData": ["*"],
-    "ApmMetadata": ["*"],
-    "ApmSegment": ["*"],
-    "EulerAngleState": ["*"],
-    "InertiaState": ["*"],
     "OdmHeader": ["*"],
-    "QuaternionState": ["*"],
-    "SpinState": ["*"],
-    "AttitudeState": ["*"],
+    "QuaternionState": ["quaternion_dot"],
 }
 
 # ---------------------------------------------------------------------------
@@ -193,6 +208,11 @@ def get_rust_path(python_class: str, python_field: str) -> str:
 def is_python_only(python_class: str, python_field: str) -> bool:
     """Check if a field is Python-only (no Rust equivalent expected)."""
     return python_field in PYTHON_ONLY_FIELDS.get(python_class, [])
+
+
+def is_python_helper_class(python_class: str) -> bool:
+    """Check if a class is a Python-only helper (no Rust struct equivalent)."""
+    return python_class in PYTHON_HELPER_CLASSES
 
 
 def should_skip_rust_field(rust_struct: str, rust_field: str) -> bool:

@@ -26,6 +26,7 @@ from typing import Literal
 from binding_mappings import (
     get_rust_path,
     get_rust_struct_name,
+    is_python_helper_class,
     is_python_only,
     should_skip_rust_field,
 )
@@ -316,7 +317,12 @@ def audit_bindings(
     }
 
     for class_name, py_class in python_classes.items():
-        # Check if the whole class should be skipped
+        # Check if this is a Python-only helper class (no matching Rust struct)
+        if is_python_helper_class(class_name):
+            result.stats["python_only_fields"] += 1  # Count as OK
+            continue
+
+        # Check if the whole class should be skipped (found but intentionally ignored)
         if should_skip_rust_field(class_name, "*"):
             continue
 

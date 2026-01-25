@@ -8,6 +8,7 @@ use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::MessageType;
 use ccsds_ndm::types::RotSeq;
+use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
@@ -468,6 +469,77 @@ impl AemData {
                 AttitudeState { epoch, values }
             })
             .collect()
+    }
+
+    /// Get attitude states as a tuple of epoch strings and a 2D NumPy array.
+    ///
+    /// :type: tuple[list[str], numpy.ndarray]
+    #[getter]
+    fn get_attitude_states_numpy<'py>(&self, py: Python<'py>) -> (Vec<String>, Py<PyAny>) {
+        let mut epochs = Vec::with_capacity(self.inner.attitude_states.len());
+        let mut max_cols = 0;
+
+        // First pass to find max columns and collect epochs
+        for s in &self.inner.attitude_states {
+            if let Some(content) = s.content() {
+                let values = match content {
+                    ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) =>
+                        (v.epoch, vec![v.quaternion.q1, v.quaternion.q2, v.quaternion.q3, v.quaternion.qc]),
+                    _ => (ccsds_ndm::types::Epoch::default(), vec![]),
+                };
+                epochs.push(values.0.as_str().to_string());
+                max_cols = max_cols.max(values.1.len());
+            }
+        }
+
+        let mut data = Vec::with_capacity(epochs.len() * max_cols);
+        for s in &self.inner.attitude_states {
+            if let Some(content) = s.content() {
+                let values = match content {
+                    ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) =>
+                        vec![v.quaternion.q1, v.quaternion.q2, v.quaternion.q3, v.quaternion.qc],
+                    _ => vec![],
+                };
+                let mut row = values;
+                row.resize(max_cols, f64::NAN);
+                data.extend(row);
+            }
+        }
+
+        let array = PyArray::from_vec(py, data)
+            .reshape([epochs.len(), max_cols])
+            .unwrap();
+        (epochs, array.into())
+    }
+
+    #[setter]
+    fn set_attitude_states_numpy(&mut self, value: (Vec<String>, PyReadonlyArray2<f64>)) -> PyResult<()> {
+        let (epochs, array) = value;
+        let shape = array.shape();
+        if epochs.len() != shape[0] {
+            return Err(PyValueError::new_err("Number of epochs must match number of rows in NumPy array"));
+        }
+
+        let array_view = array.as_array();
+        let mut attitude_states = Vec::with_capacity(shape[0]);
+
+        for (i, epoch_str) in epochs.iter().enumerate() {
+            let row = array_view.row(i);
+            // NOTE: Simplified to QuaternionEphemeris for now, matching other implementation
+            use ccsds_ndm::common::{QuaternionEphemeris, Quaternion};
+            let state = ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
+                epoch: parse_epoch(epoch_str)?,
+                quaternion: Quaternion {
+                    q1: row.get(0).copied().unwrap_or(0.0),
+                    q2: row.get(1).copied().unwrap_or(0.0),
+                    q3: row.get(2).copied().unwrap_or(0.0),
+                    qc: row.get(3).copied().unwrap_or(1.0),
+                },
+            });
+            attitude_states.push(state.into());
+        }
+        self.inner.attitude_states = attitude_states;
+        Ok(())
     }
 }
 

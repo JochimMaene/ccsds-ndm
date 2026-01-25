@@ -204,6 +204,40 @@ impl ApmMetadata {
     fn get_object_id(&self) -> String {
         self.inner.object_id.clone()
     }
+
+    /// Comments (allowed only at the beginning of the APM Metadata before OBJECT_NAME). Each
+    /// comment line shall begin with this keyword.
+    ///
+    /// Examples: This is a comment.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    /// Celestial body orbited by the object, which may be a natural solar system body (planets,
+    /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
+    /// system barycenter. The set of allowed values is described in annex B, subsection B8.
+    ///
+    /// Examples: EARTH, BARYCENTER, MOON
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_center_name(&self) -> Option<String> {
+        self.inner.center_name.clone()
+    }
+
+    /// Time system used for attitude and maneuver data. The set of allowed values is described in
+    /// annex B, subsection B2.
+    ///
+    /// Examples: UTC, TAI
+    ///
+    /// :type: str
+    #[getter]
+    fn get_time_system(&self) -> String {
+        self.inner.time_system.clone()
+    }
 }
 
 /// APM Data Section.
@@ -290,6 +324,72 @@ impl ApmData {
             .map(|s| EulerAngleState { inner: s.clone() })
             .collect()
     }
+
+    /// Angular velocity vector.
+    ///
+    /// :type: list[AngVelState]
+    #[getter]
+    fn get_angular_velocity(&self) -> Vec<AngVelState> {
+        self.inner
+            .angular_velocity
+            .iter()
+            .map(|s| AngVelState { inner: s.clone() })
+            .collect()
+    }
+
+    /// Spin. All mandatory elements are to be provided if the block is present. (See annex F for
+    /// conventions and further detail.)
+    ///
+    /// :type: list[SpinState]
+    #[getter]
+    fn get_spin(&self) -> Vec<SpinState> {
+        self.inner
+            .spin
+            .iter()
+            .map(|s| SpinState { inner: s.clone() })
+            .collect()
+    }
+
+    /// Inertia. All mandatory elements are to be provided if the block is present. (See annex F
+    /// for conventions and further detail.)
+    ///
+    /// :type: list[InertiaState]
+    #[getter]
+    fn get_inertia(&self) -> Vec<InertiaState> {
+        self.inner
+            .inertia
+            .iter()
+            .map(|s| InertiaState { inner: s.clone() })
+            .collect()
+    }
+
+    /// Maneuver Parameters.
+    ///
+    /// :type: list[ManeuverParameters]
+    #[getter]
+    fn get_maneuver_parameters(&self) -> Vec<ManeuverParameters> {
+        self.inner
+            .maneuver_parameters
+            .iter()
+            .map(|m| ManeuverParameters { inner: m.clone() })
+            .collect()
+    }
+
+    /// Epoch of the attitude elements and optional logical blocks.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_epoch(&self) -> String {
+        self.inner.epoch.as_str().to_string()
+    }
+
+    /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
 }
 
 /// Maneuver Parameters (Repeat for each maneuver).
@@ -329,5 +429,84 @@ impl ManeuverParameters {
                 man_delta_mass: man_delta_mass.map(|v| DeltaMassZ { value: v, units: None }),
             },
         })
+    }
+
+    /// Epoch of ignition (see 7.5.10 for formatting rules)
+    ///
+    /// :type: str
+    #[getter]
+    fn get_man_epoch_start(&self) -> String {
+        self.inner.man_epoch_start.as_str().to_string()
+    }
+
+    /// Maneuver duration (If = 0, impulsive maneuver)
+    ///
+    /// Units: s
+    ///
+    /// :type: float
+    #[getter]
+    fn get_man_duration(&self) -> f64 {
+        self.inner.man_duration.value
+    }
+
+    /// Reference frame in which the velocity increment vector data are given. The user must
+    /// select from the accepted set of values indicated in 3.2.4.11.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_man_ref_frame(&self) -> String {
+        self.inner.man_ref_frame.clone()
+    }
+
+    /// Torque X component.
+    ///
+    /// Units: N*m
+    ///
+    /// :type: float
+    #[getter]
+    fn get_man_tor_x(&self) -> f64 {
+        self.inner.man_tor_x.value
+    }
+
+    /// Torque Y component.
+    ///
+    /// Units: N*m
+    ///
+    /// :type: float
+    #[getter]
+    fn get_man_tor_y(&self) -> f64 {
+        self.inner.man_tor_y.value
+    }
+
+    /// Torque Z component.
+    ///
+    /// Units: N*m
+    ///
+    /// :type: float
+    #[getter]
+    fn get_man_tor_z(&self) -> f64 {
+        self.inner.man_tor_z.value
+    }
+
+    /// Mass change during maneuver (value is < 0)
+    ///
+    /// Units: kg
+    ///
+    ///
+    /// **Note**: The CCSDS standard requires this value to be strictly negative (`< 0`).
+    /// However, this implementation allows non-negative values to support non-standard use cases.
+    ///
+    /// :type: Optional[float]
+    #[getter]
+    fn get_man_delta_mass(&self) -> Option<f64> {
+        self.inner.man_delta_mass.as_ref().map(|v| v.value)
+    }
+
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
     }
 }
