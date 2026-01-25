@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 /// complex attitude movement, etc.).
 ///
 /// **CCSDS Reference**: 504.0-B-2, Section 4.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "aem")]
 pub struct Aem {
     pub header: AdmHeader,
@@ -79,7 +79,7 @@ impl ToKvn for Aem {
 // Body & Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AemBody {
     #[serde(rename = "segment")]
     pub segment: Vec<AemSegment>,
@@ -93,7 +93,7 @@ impl ToKvn for AemBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AemSegment {
     pub metadata: AemMetadata,
     pub data: AemData,
@@ -113,7 +113,7 @@ impl ToKvn for AemSegment {
 }
 
 /// AEM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AemMetadata {
     /// Comments allowed only at the beginning of the Metadata section. Each comment line shall
@@ -297,7 +297,7 @@ impl ToKvn for AemMetadata {
 }
 
 /// AEM Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AemData {
     /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
@@ -313,7 +313,7 @@ pub struct AemData {
     pub attitude_states: Vec<AemAttitudeStateWrapper>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AemAttitudeStateWrapper {
     #[serde(
         rename = "quaternionEphemeris",

@@ -19,7 +19,7 @@ use serde::Serialize;
 /// with the set of tracking data messages used in the orbit determination.
 ///
 /// **CCSDS Reference**: 505.0-B-3, Section 4.11.
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "ndm")]
 pub struct CombinedNdm {
     /// Message Identifier (optional).

@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 /// comprehensive hybrid message.
 ///
 /// **CCSDS Reference**: 504.0-B-2, Section 5.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename = "acm")]
 pub struct Acm {
     pub header: AdmHeader,
@@ -78,7 +78,7 @@ impl ToKvn for Acm {
 // Body & Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 pub struct AcmBody {
     #[serde(rename = "segment")]
     pub segment: Box<AcmSegment>,
@@ -90,7 +90,7 @@ impl ToKvn for AcmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 pub struct AcmSegment {
     pub metadata: AcmMetadata,
     pub data: AcmData,
@@ -111,7 +111,7 @@ impl ToKvn for AcmSegment {
 }
 
 /// ACM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmMetadata {
     /// Comments (allowed only at the beginning of the ACM Metadata). Each comment line shall begin
@@ -368,7 +368,7 @@ impl ToKvn for AcmMetadata {
 //----------------------------------------------------------------------
 
 /// ACM Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmData {
     /// One or more optional attitude state time histories (each consisting of one or more attitude
@@ -441,7 +441,7 @@ impl ToKvn for AcmData {
 //----------------------------------------------------------------------
 
 /// ACM Data: Attitude State Time History Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmAttitudeState {
     /// Comments allowed only immediately after the ATT_START keyword.
@@ -641,7 +641,7 @@ impl std::fmt::Display for AttLine {
 //----------------------------------------------------------------------
 
 /// ACM Data: Space Object Physical Characteristics Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmPhysicalDescription {
     /// Comments allowed only immediately after the PHYS_START keyword.
@@ -812,7 +812,7 @@ impl ToKvn for AcmPhysicalDescription {
 //----------------------------------------------------------------------
 
 /// ACM Data: Covariance Time History Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmCovarianceMatrix {
     /// Comments allowed only immediately after the COV_START keyword.
@@ -894,7 +894,7 @@ impl std::fmt::Display for CovLine {
 //----------------------------------------------------------------------
 
 /// ACM Data: Maneuver Specification Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmManeuverParameters {
     /// Comments allowed only immediately after the MAN_START keyword.
@@ -1017,7 +1017,7 @@ impl ToKvn for AcmManeuverParameters {
 //----------------------------------------------------------------------
 
 /// ACM Data: Attitude Determination Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmAttitudeDetermination {
     /// Comments allowed only immediately after the AD_START keyword.
@@ -1188,7 +1188,7 @@ impl ToKvn for AcmAttitudeDetermination {
 }
 
 /// ACM Data: Sensor Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmSensor {
     /// Comments allowed only immediately after the SENSOR_START keyword.

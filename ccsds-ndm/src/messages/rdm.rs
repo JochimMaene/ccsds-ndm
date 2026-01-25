@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 ///
 /// A message format for use in exchanging spacecraft re-entry information.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "rdm")]
 pub struct Rdm {
     pub header: RdmHeader,
@@ -65,7 +65,7 @@ impl ToKvn for Rdm {
 // Header
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmHeader {
     /// Comments.
@@ -99,7 +99,7 @@ impl ToKvn for RdmHeader {
 //----------------------------------------------------------------------
 
 /// The RDM Body consists of a single segment.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct RdmBody {
     pub segment: Box<RdmSegment>,
 }
@@ -110,7 +110,7 @@ impl ToKvn for RdmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct RdmSegment {
     /// The metadata for this RDM segment.
     pub metadata: RdmMetadata,
@@ -130,7 +130,7 @@ impl ToKvn for RdmSegment {
 //----------------------------------------------------------------------
 
 /// The RDM Metadata provides information about the re-entry event.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmMetadata {
     /// Comments (allowed only at the beginning of RDM metadata).
@@ -467,7 +467,7 @@ impl ToKvn for RdmMetadata {
 //----------------------------------------------------------------------
 
 /// The RDM Data section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmData {
     /// Comments.

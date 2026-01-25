@@ -153,7 +153,7 @@ pub type MeanMotionDDot = UnitValue<f64, RevPerDay3Units>;
 /// expressed in mean Keplerian elements.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 4.1.1.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "omm")]
 pub struct Omm {
     pub header: OdmHeader,
@@ -211,7 +211,7 @@ impl ToKvn for Omm {
 // Body & Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OmmBody {
     #[serde(rename = "segment")]
     pub segment: OmmSegment,
@@ -223,7 +223,7 @@ impl ToKvn for OmmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OmmSegment {
     pub metadata: OmmMetadata,
     pub data: OmmData,
@@ -247,7 +247,7 @@ impl OmmSegment {
 //----------------------------------------------------------------------
 
 /// Metadata for the OMM.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OmmMetadata {
     /// Comments (allowed at the beginning of the OMM Metadata). (See 7.8 for formatting rules.)
@@ -350,7 +350,7 @@ impl ToKvn for OmmMetadata {
 /// OMM Data section.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OmmData {
     /// Comments.
@@ -479,7 +479,7 @@ impl OmmData {
 //----------------------------------------------------------------------
 
 /// Mean Keplerian Elements in the Specified Reference Frame.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct MeanElements {
     /// Comments (see 7.8 for formatting rules).
@@ -609,7 +609,7 @@ impl ToKvn for MeanElements {
 //----------------------------------------------------------------------
 
 /// TLE Related Parameters (This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TleParameters {
     /// Comments (see 7.8 for formatting rules).

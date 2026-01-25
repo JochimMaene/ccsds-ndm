@@ -23,7 +23,7 @@ use std::fmt;
 /// Tracking Data Message (TDM).
 ///
 /// The TDM specifies a standard message format for use in exchanging tracking data.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "tdm")]
 pub struct Tdm {
     pub header: TdmHeader,
@@ -78,7 +78,7 @@ impl ToKvn for Tdm {
 //----------------------------------------------------------------------
 
 /// Represents the `tdmHeader` complex type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TdmHeader {
     /// Comments (allowed in the TDM Header only immediately after the TDM version number).
@@ -129,7 +129,7 @@ impl ToKvn for TdmHeader {
 //----------------------------------------------------------------------
 
 /// The TDM Body consists of one or more TDM Segments.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct TdmBody {
     #[serde(rename = "segment")]
     pub segments: Vec<TdmSegment>,
@@ -152,7 +152,7 @@ impl TdmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct TdmSegment {
     /// Metadata section for this TDM segment.
     pub metadata: TdmMetadata,
@@ -177,7 +177,7 @@ impl ToKvn for TdmSegment {
 // Metadata
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TdmMetadata {
     /// Comments.
@@ -798,7 +798,7 @@ impl ToKvn for TdmMetadata {
 //----------------------------------------------------------------------
 
 /// The Data Section of the TDM Segment consists of one or more Tracking Data Records.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct TdmData {
     /// Comments.
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
@@ -827,7 +827,7 @@ impl ToKvn for TdmData {
 //----------------------------------------------------------------------
 
 /// A single tracking data record consisting of a timetag and a measurement.
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct TdmObservation {
     /// Time associated with the tracking observable.
     #[serde(rename = "EPOCH")]

@@ -24,7 +24,7 @@ use std::borrow::Cow;
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 5 (OCM)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename = "ocm")]
 pub struct Ocm {
     pub header: OdmHeader,
@@ -187,7 +187,7 @@ impl OcmManeuverParameters {
 ///
 /// This struct serves as a container for the `OcmSegment`, which holds the
 /// metadata and data for the Orbit Comprehensive Message.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 pub struct OcmBody {
     #[serde(rename = "segment")]
     pub segment: Box<OcmSegment>,
@@ -202,7 +202,7 @@ impl ToKvn for OcmBody {
 /// A single segment of the OCM.
 ///
 /// Contains metadata and data sections.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 pub struct OcmSegment {
     pub metadata: OcmMetadata,
     pub data: OcmData,
@@ -220,7 +220,7 @@ impl ToKvn for OcmSegment {
 //----------------------------------------------------------------------
 
 /// OCM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmMetadata {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
@@ -788,7 +788,7 @@ impl ToKvn for OcmMetadata {
 /// This struct is the primary data container for the OCM. It holds all the
 /// different data blocks, such as trajectory, physical properties, covariance,
 /// maneuvers, and other related information.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmData {
     /// List of trajectory state time history blocks.
@@ -850,7 +850,7 @@ impl ToKvn for OcmData {
 //----------------------------------------------------------------------
 
 /// A block of trajectory state data, which can be a time history of states.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmTrajState {
     /// Comments (a contiguous set of one or more comment lines may be provided in the
@@ -1174,7 +1174,7 @@ impl ToKvn for OcmTrajState {
 //----------------------------------------------------------------------
 
 /// Space Object Physical Characteristics.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmPhysicalDescription {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM Space
@@ -1800,7 +1800,7 @@ impl ToKvn for OcmPhysicalDescription {
 //----------------------------------------------------------------------
 
 /// OCM Covariance Matrix.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmCovarianceMatrix {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
@@ -2031,7 +2031,7 @@ impl ToKvn for OcmCovarianceMatrix {
 //----------------------------------------------------------------------
 
 /// OCM Maneuver Parameters.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmManeuverParameters {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
@@ -2429,7 +2429,7 @@ impl ToKvn for OcmManeuverParameters {
 //----------------------------------------------------------------------
 
 /// OCM Perturbations Parameters.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmPerturbations {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
@@ -2754,7 +2754,7 @@ impl ToKvn for OcmPerturbations {
 //----------------------------------------------------------------------
 
 /// OCM Orbit Determination Parameters.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmOdParameters {
     /// Comments (see 7.8 for formatting rules).

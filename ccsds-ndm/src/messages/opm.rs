@@ -24,7 +24,7 @@ use std::borrow::Cow;
 /// such as mass, area, and maneuver planning data, if applicable) may be included with the message.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 3.1.1.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "opm")]
 pub struct Opm {
     pub header: OdmHeader,
@@ -82,7 +82,7 @@ impl ToKvn for Opm {
 //----------------------------------------------------------------------
 
 /// The body of the OPM, containing a single segment.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OpmBody {
     #[serde(rename = "segment")]
     pub segment: OpmSegment,
@@ -97,7 +97,7 @@ impl ToKvn for OpmBody {
 /// A single segment of the OPM.
 ///
 /// Contains metadata and data sections.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OpmSegment {
     pub metadata: OpmMetadata,
     pub data: OpmData,
@@ -115,7 +115,7 @@ impl ToKvn for OpmSegment {
 //----------------------------------------------------------------------
 
 /// OPM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmMetadata {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
@@ -203,7 +203,7 @@ impl ToKvn for OpmMetadata {
 //----------------------------------------------------------------------
 
 /// OPM Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmData {
     /// Comments (see 7.8 for formatting rules).
@@ -324,7 +324,7 @@ impl ToKvn for OpmData {
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct KeplerianElements {
     /// Comments (see 7.8 for formatting rules).
@@ -425,7 +425,7 @@ impl ToKvn for KeplerianElements {
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct ManeuverParameters {
     /// Comments (see 7.8 for formatting rules).

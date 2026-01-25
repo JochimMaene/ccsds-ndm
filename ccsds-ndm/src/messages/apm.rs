@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 /// interaction, and (2) do not require high-fidelity dynamic modeling.
 ///
 /// **CCSDS Reference**: 504.0-B-2, Section 3.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "apm")]
 pub struct Apm {
     pub header: AdmHeader,
@@ -82,7 +82,7 @@ impl ToKvn for Apm {
 // Body & Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct ApmBody {
     // XSD says minOccurs=1 maxOccurs=1 for APM segment!
     #[serde(rename = "segment")]
@@ -95,7 +95,7 @@ impl ToKvn for ApmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct ApmSegment {
     pub metadata: ApmMetadata,
     pub data: ApmData,
@@ -131,7 +131,7 @@ impl ToKvn for ApmSegment {
 }
 
 /// APM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct ApmMetadata {
     /// Comments (allowed only at the beginning of the APM Metadata before OBJECT_NAME). Each
@@ -197,7 +197,7 @@ impl ToKvn for ApmMetadata {
 }
 
 /// APM Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct ApmData {
     /// One or more comment line(s). Each comment line shall begin with this keyword.

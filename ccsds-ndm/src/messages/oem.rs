@@ -29,7 +29,7 @@ use crate::error::CcsdsNdmError;
 /// generate states in the ephemeris.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 5.1.1.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "oem")]
 pub struct Oem {
     #[serde(rename = "@id")]
@@ -81,7 +81,7 @@ impl ToKvn for Oem {
 //----------------------------------------------------------------------
 
 /// The body of the OEM, containing one or more segments.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OemBody {
     #[serde(rename = "segment")]
     pub segment: Vec<OemSegment>,
@@ -98,7 +98,7 @@ impl ToKvn for OemBody {
 /// A single segment of the OEM.
 ///
 /// Each segment contains metadata (context) and a list of ephemeris data points.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OemSegment {
     pub metadata: OemMetadata,
     pub data: OemData,
@@ -118,7 +118,7 @@ impl ToKvn for OemSegment {
 //----------------------------------------------------------------------
 
 /// OEM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OemMetadata {
     /// Comments (see 7.8 for formatting rules).
@@ -279,7 +279,7 @@ impl ToKvn for OemMetadata {
 /// OEM Data Section.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OemData {
     /// Comments (see 7.8 for formatting rules).
     ///
@@ -335,7 +335,7 @@ impl ToKvn for OemData {
 ///
 /// Represents a 6x6 symmetric covariance matrix for position and velocity at a specific epoch.
 /// The lower triangular portion is stored/transmitted.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OemCovarianceMatrix {
     /// Comments (see 7.8 for formatting rules).

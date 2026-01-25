@@ -15,7 +15,7 @@ use std::borrow::Cow;
 // Root CDM Structure
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "cdm")]
 pub struct Cdm {
     pub header: CdmHeader,
@@ -55,7 +55,7 @@ impl Ndm for Cdm {
 //----------------------------------------------------------------------
 
 /// Represents the `cdmHeader` complex type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmHeader {
     /// Comments (allowed in the CDM Header only immediately after the CDM version number).
@@ -134,7 +134,7 @@ impl ToKvn for CdmHeader {
 // Body
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct CdmBody {
     #[serde(rename = "relativeMetadataData")]
     pub relative_metadata_data: RelativeMetadataData,
@@ -172,7 +172,7 @@ impl CdmBody {
 // Relative Metadata/Data
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RelativeMetadataData {
     /// Comments (see 6.3.4 for formatting rules).
@@ -346,7 +346,7 @@ impl RelativeMetadataData {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RelativeStateVector {
     pub relative_position_r: Length,
@@ -381,7 +381,7 @@ impl ToKvn for RelativeStateVector {
 // Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct CdmSegment {
     pub metadata: CdmMetadata,
     pub data: CdmData,
@@ -401,7 +401,7 @@ impl CdmSegment {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmMetadata {
     /// Comments (see 6.3.4 for formatting rules).
@@ -634,7 +634,7 @@ impl CdmMetadata {
 // Data
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmData {
     /// Comments.
@@ -734,7 +734,7 @@ impl ToKvn for CdmData {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdditionalParameters {
     /// Comments (see 6.3.4 for formatting rules).
@@ -813,7 +813,7 @@ pub struct AdditionalParameters {
     pub sedr: Option<Wkg>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmStateVector {
     /// Object Position Vector X component.
@@ -853,7 +853,7 @@ impl ToKvn for CdmStateVector {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmCovarianceMatrix {
     /// Comments.

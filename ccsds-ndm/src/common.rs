@@ -11,7 +11,7 @@ use crate::traits::ToKvn;
 use serde::{Deserialize, Serialize};
 
 /// Represents the `ndmHeader` complex type from the XSD.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct NdmHeader {
     /// User-defined comments.
@@ -44,7 +44,7 @@ impl ToKvn for NdmHeader {
 }
 
 /// Represents the `admHeader` complex type from the XSD.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdmHeader {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -72,7 +72,7 @@ impl ToKvn for AdmHeader {
 }
 
 /// Represents the `odmHeader` complex type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdmHeader {
     /// Comments (allowed in the ODM Header only immediately after the ODM version number).
@@ -134,7 +134,7 @@ impl ToKvn for OdmHeader {
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpacecraftParameters {
     /// Comments (see 7.8 for formatting rules).
@@ -189,7 +189,7 @@ pub struct SpacecraftParameters {
     pub drag_coeff: Option<NonNegativeDouble>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdParameters {
     /// Comments (see 6.3.4 for formatting rules).
@@ -275,7 +275,7 @@ pub struct OdParameters {
 }
 
 /// State Vector Components in the Specified Coordinate System.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVectorAcc {
     /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
@@ -425,7 +425,7 @@ impl Quaternion {
 }
 
 // Quaternion derivative (dot components with units 1/s)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionDot {
     pub q1_dot: QuaternionDotComponent,
@@ -435,7 +435,7 @@ pub struct QuaternionDot {
 }
 
 // Angular velocity triple (ANGVEL_X/Y/Z)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AngularVelocity {
     pub x: AngleRate,
     pub y: AngleRate,
@@ -443,7 +443,7 @@ pub struct AngularVelocity {
 }
 
 /// State Vector Components in the Specified Coordinate System.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVector {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
@@ -510,7 +510,7 @@ impl ToKvn for StateVector {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
@@ -552,7 +552,7 @@ pub struct QuaternionState {
 ///
 /// All mandatory elements of the logical block are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
@@ -623,7 +623,7 @@ pub struct EulerAngleState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AngVelState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
@@ -670,7 +670,7 @@ pub struct AngVelState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
@@ -760,7 +760,7 @@ pub struct SpinState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct InertiaState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
@@ -815,7 +815,7 @@ pub struct InertiaState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AttManeuverState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
@@ -992,7 +992,7 @@ impl ToKvn for QuaternionDerivative {
 }
 
 /// AEM Attitude Ephemeris Data Line: Quaternion/AngVel.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionAngVel {
     /// Epoch of the attitude state.
@@ -1021,7 +1021,7 @@ impl ToKvn for QuaternionAngVel {
 }
 
 /// AEM Attitude Ephemeris Data Line: EulerAngle.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngle {
     /// Epoch of the attitude state.
@@ -1046,7 +1046,7 @@ impl ToKvn for EulerAngle {
 }
 
 /// AEM Attitude Ephemeris Data Line: EulerAngle/Derivative.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleDerivative {
     /// Epoch of the attitude state.
@@ -1081,7 +1081,7 @@ impl ToKvn for EulerAngleDerivative {
 }
 
 /// AEM Attitude Ephemeris Data Line: EulerAngle/AngVel.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleAngVel {
     /// Epoch of the attitude state.
@@ -1119,7 +1119,7 @@ impl ToKvn for EulerAngleAngVel {
 }
 
 /// AEM Attitude Ephemeris Data Line: Spin.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct Spin {
     /// Epoch of the attitude state.
@@ -1149,7 +1149,7 @@ impl ToKvn for Spin {
 }
 
 /// AEM Attitude Ephemeris Data Line: Spin/Nutation.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinNutation {
     /// Epoch of the attitude state.
@@ -1188,7 +1188,7 @@ impl ToKvn for SpinNutation {
 }
 
 /// AEM Attitude Ephemeris Data Line: Spin/Nutation_Mom.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinNutationMom {
     /// Epoch of the attitude state.
@@ -1227,7 +1227,7 @@ impl ToKvn for SpinNutationMom {
 }
 
 /// Represents the `angVelType` from XSD.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AngVel {
     pub angvel_x: AngleRate,
@@ -1432,7 +1432,7 @@ impl ToKvn for InertiaState {
 
 /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. None or all parameters of the
 /// matrix must be given. COV_REF_FRAME may be omitted if it is the same as REF_FRAME.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmCovarianceMatrix {
     /// Comments (see 7.8 for formatting rules).
@@ -1612,7 +1612,7 @@ impl ToKvn for OpmCovarianceMatrix {
 }
 
 /// Atmospheric reentry parameters (atmosphericReentryParametersType, RDM).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AtmosphericReentryParameters {
     /// Comments (allowed only at the beginning of each RDM data logical block).
@@ -1688,7 +1688,7 @@ pub struct AtmosphericReentryParameters {
 }
 
 /// Ground impact parameters (groundImpactParametersType, RDM).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct GroundImpactParameters {
     /// Comments (allowed only at the beginning of each RDM data logical block).
@@ -1926,7 +1926,7 @@ pub struct GroundImpactParameters {
 }
 
 /// RDM spacecraft parameters (rdmSpacecraftParametersType).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmSpacecraftParameters {
     /// Comments (allowed only at the beginning of each RDM data logical block).
