@@ -18,9 +18,13 @@ pub mod opm;
 pub mod rdm;
 pub mod tdm;
 pub mod types;
+pub mod aem;
+pub mod apm;
+pub mod acm;
+pub mod attitude;
 
 use cdm::*;
-use common::{OdmHeader, StateVector, StateVectorAcc};
+use common::{OdmHeader, AdmHeader, StateVector, StateVectorAcc};
 use ndm::Ndm;
 use oem::*;
 use omm::*;
@@ -81,6 +85,18 @@ fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
             let py_obj = Py::new(py, Ndm { inner: ndm })?;
             Ok(py_obj.into_any())
         }
+        MessageType::Aem(aem) => {
+            let py_obj = Py::new(py, aem::Aem { inner: aem })?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Apm(apm) => {
+            let py_obj = Py::new(py, apm::Apm { inner: apm })?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Acm(acm) => {
+            let py_obj = Py::new(py, acm::Acm { inner: acm })?;
+            Ok(py_obj.into_any())
+        }
     }
 }
 
@@ -112,6 +128,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Common types shared across message types
     m.add_class::<OdmHeader>()?;
+    m.add_class::<AdmHeader>()?;
     m.add_class::<StateVector>()?;
     m.add_class::<StateVectorAcc>()?;
 
@@ -178,6 +195,38 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Register NDM wrapper classes
     m.add_class::<Ndm>()?;
+
+    // Register AEM wrapper classes
+    m.add_class::<aem::Aem>()?;
+    m.add_class::<aem::AemSegment>()?;
+    m.add_class::<aem::AemMetadata>()?;
+    m.add_class::<aem::AemData>()?;
+    m.add_class::<aem::AttitudeState>()?;
+
+    // Register APM wrapper classes
+    m.add_class::<apm::Apm>()?;
+    m.add_class::<apm::ApmSegment>()?;
+    m.add_class::<apm::ApmMetadata>()?;
+    m.add_class::<apm::ApmData>()?;
+    m.add_class::<apm::ManeuverParameters>()?;
+
+    // Register shared attitude states
+    m.add_class::<attitude::QuaternionState>()?;
+    m.add_class::<attitude::EulerAngleState>()?;
+    m.add_class::<attitude::AngVelState>()?;
+    m.add_class::<attitude::SpinState>()?;
+    m.add_class::<attitude::InertiaState>()?;
+
+    // Register ACM wrapper classes
+    m.add_class::<acm::Acm>()?;
+    m.add_class::<acm::AcmSegment>()?;
+    m.add_class::<acm::AcmMetadata>()?;
+    m.add_class::<acm::AcmData>()?;
+    m.add_class::<acm::AcmAttitudeState>()?;
+    m.add_class::<acm::AcmPhysicalDescription>()?;
+    m.add_class::<acm::AcmCovarianceMatrix>()?;
+    m.add_class::<acm::AcmManeuverParameters>()?;
+    m.add_class::<acm::AcmAttitudeDetermination>()?;
 
     // Register CDM wrapper classes
     // CDM Classes

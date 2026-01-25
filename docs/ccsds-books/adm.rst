@@ -627,8 +627,7 @@ d) whether the item is Mandatory (M), Optional (O), or Conditional (C); ‘Condi
        originator. The format and content of the message
        identifier value are at the discretion of the originator.
      - 201113719185
-       ABC-12
-       34
+       ABC-12_34
      - O
 
 3.2.3 APM METADATA
@@ -1599,8 +1598,8 @@ authorized values maintained by a control authority; the references listed in 1.
        This keyword must be used if the
        ‘INTERPOLATION_METHOD’ keyword is
        used.
-     - 1
-       5
+     - 5
+       1
      - O
    * - META_STOP
      - The end of a metadata block within the
@@ -2077,8 +2076,8 @@ in table 5-3.
        this keyword omitted).
      - 22444
        18SPCS 18571
-       2147483648 04ae [
-       ...] d84c
+       2147483648_04ae[
+       ...]d84c
        UNKNOWN
      - O
    * - ORIGINATOR_POC
@@ -2291,7 +2290,7 @@ time histories.
    which this attitude state time history block is based. When a
    matching attitude determination block accompanies this
    attitude state time history, the ATT_BASIS_ID should
-   match the corresponding AD_ID (see table 5-8).", "n/a", "AD 1985", "O"
+   match the corresponding AD_ID (see table 5-8).", "n/a", "AD_1985", "O"
    "REF_FRAME_A", "Name of the reference frame that defines the starting point
    of the transformation. The set of allowed values is
    described in annex B, subsection B3.", "n/a", "J2000", "M"

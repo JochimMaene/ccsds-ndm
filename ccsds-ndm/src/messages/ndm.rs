@@ -48,9 +48,12 @@ impl Ndm for CombinedNdm {
             "CCSDS_OMM_VERS",
             "CCSDS_OEM_VERS",
             "CCSDS_OCM_VERS",
+            "CCSDS_ACM_VERS",
             "CCSDS_CDM_VERS",
             "CCSDS_TDM_VERS",
             "CCSDS_RDM_VERS",
+            "CCSDS_AEM_VERS",
+            "CCSDS_APM_VERS",
         ];
 
         let mut indices = Vec::new();
@@ -199,9 +202,12 @@ impl Ndm for CombinedNdm {
                                 "omm" => MessageType::Omm(Ndm::from_xml(&full_element)?),
                                 "oem" => MessageType::Oem(Ndm::from_xml(&full_element)?),
                                 "ocm" => MessageType::Ocm(Ndm::from_xml(&full_element)?),
+                                "acm" => MessageType::Acm(Ndm::from_xml(&full_element)?),
                                 "cdm" => MessageType::Cdm(Ndm::from_xml(&full_element)?),
                                 "tdm" => MessageType::Tdm(Ndm::from_xml(&full_element)?),
                                 "rdm" => MessageType::Rdm(Ndm::from_xml(&full_element)?),
+                                "aem" => MessageType::Aem(Ndm::from_xml(&full_element)?),
+                                "apm" => MessageType::Apm(Ndm::from_xml(&full_element)?),
                                 _ => unreachable!(),
                             };
                             messages.push(msg);
@@ -242,9 +248,12 @@ impl ToKvn for CombinedNdm {
                 MessageType::Omm(m) => m.write_kvn(writer),
                 MessageType::Oem(m) => m.write_kvn(writer),
                 MessageType::Ocm(m) => m.write_kvn(writer),
+                MessageType::Acm(m) => m.write_kvn(writer),
                 MessageType::Cdm(m) => m.write_kvn(writer),
                 MessageType::Tdm(m) => m.write_kvn(writer),
                 MessageType::Rdm(m) => m.write_kvn(writer),
+                MessageType::Aem(m) => m.write_kvn(writer),
+                MessageType::Apm(m) => m.write_kvn(writer),
                 MessageType::Ndm(m) => m.write_kvn(writer), // Nested NDM? Unlikely but possible in structure.
             }
             // KVN messages are typically separated by whitespace/newlines, which the writer handles or we add explicit breaks.

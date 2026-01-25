@@ -41,6 +41,219 @@ def from_str(data):
     """
     ...
 
+class Acm:
+    """
+    Attitude Comprehensive Message (ACM).
+
+    An ACM specifies the attitude state of a single object at multiple epochs, contained within a
+    specified time range. The ACM aggregates and extends APM and AEM content in a single
+    comprehensive hybrid message.
+    """
+    def __init__(header, segment) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @staticmethod
+    def from_file(path, format):
+        """ """
+        ...
+
+    @staticmethod
+    def from_str(data, format):
+        """ """
+        ...
+
+    @property
+    def header(self) -> AdmHeader:
+        """
+        Attitude Comprehensive Message (ACM).
+
+        An ACM specifies the attitude state of a single object at multiple epochs, contained within a
+        specified time range. The ACM aggregates and extends APM and AEM content in a single
+        comprehensive hybrid message.
+        """
+        ...
+
+    @header.setter
+    def header(self, value: AdmHeader) -> None: ...
+    @property
+    def segment(self) -> AcmSegment:
+        """
+        ACM Segment.
+        """
+        ...
+
+    @segment.setter
+    def segment(self, value: AcmSegment) -> None: ...
+    def to_str(self, format):
+        """ """
+        ...
+
+class AcmAttitudeDetermination:
+    """
+    ACM Data: Attitude Determination Data Section.
+    """
+    def __init__(ad_id, comment) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+class AcmAttitudeState:
+    """
+    ACM Data: Attitude State Time History Section.
+    """
+    def __init__(ref_frame_a, ref_frame_b, att_type, att_lines, comment) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+class AcmCovarianceMatrix:
+    """
+    ACM Data: Covariance Time History Section.
+    """
+    def __init__(cov_basis, cov_ref_frame, cov_type, cov_lines, comment) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+class AcmData:
+    """
+    ACM Data Section.
+    """
+    def __init__(att, phys, cov, man, ad, user_defined) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def att(self) -> list[AcmAttitudeState]:
+        """
+        One or more optional attitude state time histories (each consisting of one or more attitude
+        states).
+        """
+        ...
+
+    @att.setter
+    def att(self, value: list[AcmAttitudeState]) -> None: ...
+    @property
+    def phys(self) -> AcmPhysicalDescription:
+        """
+        A single space object physical characteristics section.
+        """
+        ...
+
+    @phys.setter
+    def phys(self, value: AcmPhysicalDescription) -> None: ...
+
+class AcmManeuverParameters:
+    """
+    ACM Data: Maneuver Specification Section.
+    """
+    def __init__(man_id, comment) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+class AcmMetadata:
+    """
+    ACM Metadata Section.
+    """
+    def __init__(
+        object_name, international_designator, time_system, epoch_tzero, comment
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def international_designator(self) -> str:
+        """
+        Free text field containing an international designator for the object as assigned by the UN
+        Committee on Space Research (COSPAR) and the US National Space Science Data Center (NSSDC).
+        Such designator values have the following COSPAR format: YYYY-NNNP{PP}, where: YYYY = Year
+        of launch. NNN = Three-digit serial number of launch in year YYYY (with leading zeros).
+        P{PP} = At least one capital letter for the identification of the part brought into space
+        by the launch. In cases in which the object has no international designator, the value
+        UNKNOWN may be used. NOTE – The international designator is typically specified by
+        ‘OBJECT_ID’ in the APM and AEM.
+
+        Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
+        """
+        ...
+
+    @international_designator.setter
+    def international_designator(self, value: str) -> None: ...
+    @property
+    def object_name(self) -> str:
+        """
+        Free-text field containing the name of the object. There is no CCSDS-based restriction on
+        the value for this keyword, but it is recommended to use names from either the UN Office of
+        Outer Space Affairs designator index (reference [2]), which include Object name and
+        international designator), the spacecraft operator, or a State Actor or commercial Space
+        Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space catalog. If the
+        object name is not known (uncorrelated object), ‘UNKNOWN’ may be used (or this keyword
+        omitted).
+
+        Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
+        """
+        ...
+
+    @object_name.setter
+    def object_name(self, value: str) -> None: ...
+
+class AcmPhysicalDescription:
+    """
+    ACM Data: Space Object Physical Characteristics Section.
+    """
+    def __init__(comment) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+class AcmSegment:
+    def __init__(metadata, data) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def data(self) -> AcmData:
+        """
+        ACM Data Section.
+        """
+        ...
+
+    @data.setter
+    def data(self, value: AcmData) -> None: ...
+    @property
+    def metadata(self) -> AcmMetadata:
+        """
+        ACM Metadata Section.
+        """
+        ...
+
+    @metadata.setter
+    def metadata(self, value: AcmMetadata) -> None: ...
+
 class AdditionalParameters:
     """
     Additional Parameters.
@@ -187,6 +400,780 @@ class AdditionalParameters:
     @thrust_acceleration.setter
     def thrust_acceleration(self, value: float) -> None: ...
 
+class AdmHeader:
+    """
+    Represents the `admHeader` complex type from the XSD.
+    """
+    def __init__(
+        creation_date, originator, classification, message_id, comment
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def classification(self) -> Optional[str]:
+        """
+        User-defined free-text message classification/caveats.
+        """
+        ...
+
+    @classification.setter
+    def classification(self, value: Optional[str]) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def creation_date(self) -> str:
+        """
+        File creation date/time in UTC.
+        """
+        ...
+
+    @creation_date.setter
+    def creation_date(self, value: str) -> None: ...
+    @property
+    def message_id(self) -> Optional[str]:
+        """
+        ID that uniquely identifies a message from a given originator.
+        """
+        ...
+
+    @message_id.setter
+    def message_id(self, value: Optional[str]) -> None: ...
+    @property
+    def originator(self) -> str:
+        """
+        Creating agency or operator.
+        """
+        ...
+
+    @originator.setter
+    def originator(self, value: str) -> None: ...
+
+class Aem:
+    """
+    Attitude Ephemeris Message (AEM).
+
+    An AEM specifies the attitude state of a single object at multiple epochs, contained within a
+    specified time range. The AEM is suited to interagency exchanges that (1) involve automated
+    interaction (e.g., computer-to-computer communication for which frequent, fast, automated time
+    interpretation and processing are required), and (2) require higher fidelity or higher
+    precision dynamic modeling than is possible with the APM (e.g., flexible structures, more
+    complex attitude movement, etc.).
+    """
+    def __init__(header, segments) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @staticmethod
+    def from_file(path, format):
+        """ """
+        ...
+
+    @staticmethod
+    def from_str(data, format):
+        """ """
+        ...
+
+    @property
+    def header(self) -> AdmHeader:
+        """
+        Attitude Ephemeris Message (AEM).
+
+        An AEM specifies the attitude state of a single object at multiple epochs, contained within a
+        specified time range. The AEM is suited to interagency exchanges that (1) involve automated
+        interaction (e.g., computer-to-computer communication for which frequent, fast, automated time
+        interpretation and processing are required), and (2) require higher fidelity or higher
+        precision dynamic modeling than is possible with the APM (e.g., flexible structures, more
+        complex attitude movement, etc.).
+        """
+        ...
+
+    @header.setter
+    def header(self, value: AdmHeader) -> None: ...
+    @property
+    def segments(self) -> list[AemSegment]:
+        """
+        AEM Segments.
+        """
+        ...
+
+    @segments.setter
+    def segments(self, value: list[AemSegment]) -> None: ...
+    def to_str(self, format):
+        """ """
+        ...
+
+class AemData:
+    """
+    AEM Data Section.
+    """
+    def __init__(attitude_states, comment) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def attitude_states(self) -> list[AttitudeState]:
+        """
+        Attitude ephemeris data lines.
+        """
+        ...
+
+    @attitude_states.setter
+    def attitude_states(self, value: list[AttitudeState]) -> None: ...
+    @property
+    def attitude_states_numpy(self) -> tuple[list[str], numpy.ndarray]:
+        """
+        Get attitude states as a tuple of epoch strings and a 2D NumPy array.
+        """
+        ...
+
+    @attitude_states_numpy.setter
+    def attitude_states_numpy(self, value: tuple[list[str], numpy.ndarray]) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments allowed only at the beginning of the Data section. Each comment line shall begin
+        with this keyword.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+
+class AemMetadata:
+    """
+    AEM Metadata Section.
+    """
+    def __init__(
+        object_name,
+        object_id,
+        ref_frame_a,
+        ref_frame_b,
+        time_system,
+        start_time,
+        stop_time,
+        attitude_type,
+        center_name,
+        useable_start_time,
+        useable_stop_time,
+        euler_rot_seq,
+        angvel_frame,
+        interpolation_method,
+        interpolation_degree,
+        comment,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def angvel_frame(self) -> str:
+        """
+        The frame of reference in which angular velocity data are specified. The set of allowed
+        values is described in annex B, subsection B3. This keyword is applicable only if
+        ATTITUDE_TYPE specifies the use of angular velocities in conjunction with either
+        quaternions or Euler angles.
+
+        Examples: ICRF, SC_BODY_1
+        """
+        ...
+
+    @angvel_frame.setter
+    def angvel_frame(self, value: str) -> None: ...
+    @property
+    def attitude_type(self) -> str:
+        """
+        The type of information contained in the data lines. This keyword must have a value from the
+        set specified at the right. (See table 4-4 for details of the data contained in each line.)
+
+        Examples: QUATERNION, QUATERNION/DERIVATIVE, QUATERNION/ANGVEL, EULER_ANGLE,
+        EULER_ANGLE/DERIVATIVE, EULER_ANGLE/ANGVEL, SPIN, SPIN/NUTATION, SPIN/NUTATION_MOM
+        """
+        ...
+
+    @attitude_type.setter
+    def attitude_type(self, value: str) -> None: ...
+    @property
+    def center_name(self) -> str:
+        """
+        Celestial body orbited by the object, which may be a natural solar system body (planets,
+        asteroids, comets, and natural satellites), including any planet barycenter or the solar
+        system barycenter. The set of allowed values is described in annex B, subsection B8.
+
+        Examples: EARTH, STS-106
+        """
+        ...
+
+    @center_name.setter
+    def center_name(self, value: str) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments allowed only at the beginning of the Metadata section. Each comment line shall
+        begin with this keyword.
+
+        Examples: This is a comment.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def euler_rot_seq(self) -> str:
+        """
+        Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
+        the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
+        the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
+        rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
+        rotation axis of the third rotation. This keyword is applicable only if ATTITUDE_TYPE
+        specifies the use of Euler angles.
+
+        Examples: ZXZ, XYZ
+        """
+        ...
+
+    @euler_rot_seq.setter
+    def euler_rot_seq(self, value: str) -> None: ...
+    @property
+    def interpolation_degree(self) -> int:
+        """
+        Recommended interpolation degree for attitude ephemeris data in the block immediately
+        following this metadata block. It must be an integer value. This keyword must be used if
+        the ‘INTERPOLATION_METHOD’ keyword is used.
+
+        Examples: 1, 5
+        """
+        ...
+
+    @interpolation_degree.setter
+    def interpolation_degree(self, value: int) -> None: ...
+    @property
+    def interpolation_method(self) -> str:
+        """
+        Recommended interpolation method for attitude ephemeris data in the block immediately
+        following this metadata block.
+
+        Examples: LINEAR, HERMITE, LAGRANGE
+        """
+        ...
+
+    @interpolation_method.setter
+    def interpolation_method(self, value: str) -> None: ...
+    @property
+    def object_id(self) -> str:
+        """
+        Spacecraft identifier of the object corresponding to the attitude data to be given. While
+        there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+        international designators from the UN Office of Outer Space Affairs (reference [ADM-2]).
+        Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-
+        digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one
+        capital letter for the identification of the part brought into space by the launch. In
+        cases in which the asset is not listed in reference [ADM-2], the UN Office of Outer Space
+        Affairs designator index format is not used, or the content cannot be disclosed, the value
+        should be set to UNKNOWN.
+
+        Examples: 2000-052A
+        """
+        ...
+
+    @object_id.setter
+    def object_id(self, value: str) -> None: ...
+    @property
+    def object_name(self) -> str:
+        """
+        Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
+        restriction on the value for this keyword, it is recommended to use names from the UN
+        Office of Outer Space Affairs designator index (reference [ADM-2], which include Object
+        name and international designator). When OBJECT_NAME is not known or cannot be disclosed,
+        the value should be set to UNKNOWN.
+
+        Examples: EUTELSAT W1
+        """
+        ...
+
+    @object_name.setter
+    def object_name(self, value: str) -> None: ...
+    @property
+    def ref_frame_a(self) -> str:
+        """
+        Name of the reference frame that defines the starting point of the transformation. The set
+        of allowed values is described in annex B, subsection B3.
+
+        Examples: ICRF, SC_BODY_1, INSTRUMENT_A
+        """
+        ...
+
+    @ref_frame_a.setter
+    def ref_frame_a(self, value: str) -> None: ...
+    @property
+    def ref_frame_b(self) -> str:
+        """
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+
+        Examples: SC_BODY_1, INSTRUMENT_A
+        """
+        ...
+
+    @ref_frame_b.setter
+    def ref_frame_b(self, value: str) -> None: ...
+    @property
+    def start_time(self) -> str:
+        """
+        Start of TOTAL time span covered by attitude ephemeris data immediately following this
+        metadata block.
+
+        Examples: 1996-12-18T14:28:15.11
+        """
+        ...
+
+    @start_time.setter
+    def start_time(self, value: str) -> None: ...
+    @property
+    def stop_time(self) -> str:
+        """
+        End of TOTAL time span covered by the attitude ephemeris data immediately following this
+        metadata block.
+
+        Examples: 1996-12-18T14:28:15.11
+        """
+        ...
+
+    @stop_time.setter
+    def stop_time(self, value: str) -> None: ...
+    @property
+    def time_system(self) -> str:
+        """
+        Time system used for both attitude ephemeris data and metadata. The set of allowed values
+        is described in annex B, subsection B2.
+
+        Examples: UTC, TAI
+        """
+        ...
+
+    @time_system.setter
+    def time_system(self, value: str) -> None: ...
+    @property
+    def useable_start_time(self) -> str:
+        """
+        Optional start of USEABLE time span covered by attitude ephemeris data immediately
+        following this metadata block. To allow for proper interpolation near the beginning/end of
+        the attitude ephemeris data block, it may be necessary to utilize this keyword with values
+        within the time span covered by the attitude ephemeris data records as denoted by the
+        START/STOP_TIME time tags. The USEABLE_START_TIME time tag of a new block of ephemeris data
+        must be greater than or equal to the USEABLE_STOP_TIME time tag of the previous block.
+
+        Examples: 1996-12-18T14:28:15.11
+        """
+        ...
+
+    @useable_start_time.setter
+    def useable_start_time(self, value: str) -> None: ...
+    @property
+    def useable_stop_time(self) -> str:
+        """
+        Optional stop of USEABLE time span covered by attitude ephemeris data immediately following
+        this metadata block. (See also USEABLE_START_TIME.)
+
+        Examples: 1996-12-18T14:28:15.11
+        """
+        ...
+
+    @useable_stop_time.setter
+    def useable_stop_time(self, value: str) -> None: ...
+
+class AemSegment:
+    def __init__(metadata, data) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def data(self) -> AemData:
+        """
+        AEM Data Section.
+        """
+        ...
+
+    @data.setter
+    def data(self, value: AemData) -> None: ...
+    @property
+    def metadata(self) -> AemMetadata:
+        """
+        AEM Metadata Section.
+        """
+        ...
+
+    @metadata.setter
+    def metadata(self, value: AemMetadata) -> None: ...
+
+class AngVelState:
+    """
+    Angular velocity vector.
+
+    All mandatory elements are to be provided if the block is present.
+    (See annex F for conventions and further detail.)
+    """
+    def __init__(
+        ref_frame_a, ref_frame_b, angvel_frame, angvel_x, angvel_y, angvel_z, comment
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def angvel_frame(self) -> str:
+        """
+        Reference frame in which the components of the angular velocity vector are given. The set
+        of allowed values is described in annex B, subsection B3.
+        """
+        ...
+
+    @angvel_frame.setter
+    def angvel_frame(self, value: str) -> None: ...
+    @property
+    def angvel_x(self) -> float:
+        """
+        Component of the angular velocity vector on the X axis.
+
+        Units: deg/s
+        """
+        ...
+
+    @angvel_x.setter
+    def angvel_x(self, value: float) -> None: ...
+    @property
+    def angvel_y(self) -> float:
+        """
+        Component of the angular velocity vector on the Y axis.
+
+        Units: deg/s
+        """
+        ...
+
+    @angvel_y.setter
+    def angvel_y(self, value: float) -> None: ...
+    @property
+    def angvel_z(self) -> float:
+        """
+        Component of the angular velocity vector on the Z axis.
+
+        Units: deg/s
+        """
+        ...
+
+    @angvel_z.setter
+    def angvel_z(self, value: float) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        One or more comment line(s). Each comment line shall begin with this keyword.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def ref_frame_a(self) -> str:
+        """
+        Name of the reference frame that defines the starting point of the transformation. The set
+        of allowed values is described in annex B, subsection B3.
+        """
+        ...
+
+    @ref_frame_a.setter
+    def ref_frame_a(self, value: str) -> None: ...
+    @property
+    def ref_frame_b(self) -> str:
+        """
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+        """
+        ...
+
+    @ref_frame_b.setter
+    def ref_frame_b(self, value: str) -> None: ...
+
+class Apm:
+    """
+    Attitude Parameter Message (APM).
+
+    An APM specifies the attitude state of a single object at a specified epoch. This message is
+    suited to interagency exchanges that (1) involve automated interaction and/or human
+    interaction, and (2) do not require high-fidelity dynamic modeling.
+    """
+    def __init__(header, segment) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @staticmethod
+    def from_file(path, format):
+        """ """
+        ...
+
+    @staticmethod
+    def from_str(data, format):
+        """ """
+        ...
+
+    @property
+    def header(self) -> AdmHeader:
+        """
+        Attitude Parameter Message (APM).
+
+        An APM specifies the attitude state of a single object at a specified epoch. This message is
+        suited to interagency exchanges that (1) involve automated interaction and/or human
+        interaction, and (2) do not require high-fidelity dynamic modeling.
+        """
+        ...
+
+    @header.setter
+    def header(self, value: AdmHeader) -> None: ...
+    @property
+    def segment(self) -> ApmSegment:
+        """
+        APM Segment.
+        """
+        ...
+
+    @segment.setter
+    def segment(self, value: ApmSegment) -> None: ...
+    def to_str(self, format):
+        """ """
+        ...
+
+class ApmData:
+    """
+    APM Data Section.
+    """
+    def __init__(
+        epoch,
+        quaternion_state,
+        euler_angle_state,
+        angular_velocity,
+        spin,
+        inertia,
+        maneuver_parameters,
+        comment,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def angular_velocity(self) -> list[AngVelState]:
+        """
+        Angular velocity vector.
+        """
+        ...
+
+    @angular_velocity.setter
+    def angular_velocity(self, value: list[AngVelState]) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        One or more comment line(s). Each comment line shall begin with this keyword.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def epoch(self) -> str:
+        """
+        Epoch of the attitude elements and optional logical blocks.
+        """
+        ...
+
+    @epoch.setter
+    def epoch(self, value: str) -> None: ...
+    @property
+    def euler_angle_state(self) -> list[EulerAngleState]:
+        """
+        Euler angle elements. All mandatory elements of the logical block are to be provided if the
+        block is present. (See annex F for conventions and further detail.)
+        """
+        ...
+
+    @euler_angle_state.setter
+    def euler_angle_state(self, value: list[EulerAngleState]) -> None: ...
+    @property
+    def inertia(self) -> list[InertiaState]:
+        """
+        Inertia. All mandatory elements are to be provided if the block is present. (See annex F
+        for conventions and further detail.)
+        """
+        ...
+
+    @inertia.setter
+    def inertia(self, value: list[InertiaState]) -> None: ...
+    @property
+    def maneuver_parameters(self) -> list[ManeuverParameters]:
+        """
+        Maneuver Parameters.
+        """
+        ...
+
+    @maneuver_parameters.setter
+    def maneuver_parameters(self, value: list[ManeuverParameters]) -> None: ...
+    @property
+    def quaternion_state(self) -> list[QuaternionState]:
+        """
+        Attitude quaternion. All mandatory elements are to be provided if the block is present.
+        (See annex F for conventions and further detail.)
+        """
+        ...
+
+    @quaternion_state.setter
+    def quaternion_state(self, value: list[QuaternionState]) -> None: ...
+    @property
+    def spin(self) -> list[SpinState]:
+        """
+        Spin. All mandatory elements are to be provided if the block is present. (See annex F for
+        conventions and further detail.)
+        """
+        ...
+
+    @spin.setter
+    def spin(self, value: list[SpinState]) -> None: ...
+
+class ApmMetadata:
+    """
+    APM Metadata Section.
+    """
+    def __init__(object_name, object_id, time_system, center_name, comment) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def center_name(self) -> str:
+        """
+        Celestial body orbited by the object, which may be a natural solar system body (planets,
+        asteroids, comets, and natural satellites), including any planet barycenter or the solar
+        system barycenter. The set of allowed values is described in annex B, subsection B8.
+
+        Examples: EARTH, BARYCENTER, MOON
+        """
+        ...
+
+    @center_name.setter
+    def center_name(self, value: str) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments (allowed only at the beginning of the APM Metadata before OBJECT_NAME). Each
+        comment line shall begin with this keyword.
+
+        Examples: This is a comment.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def object_id(self) -> str:
+        """
+        Spacecraft identifier of the object corresponding to the attitude data to be given. While
+        there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+        international designators from the UN Office of Outer Space Affairs (reference [ADM-2]).
+        Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three
+        digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one
+        letter for the identification of the part brought into space by the launch. In cases in
+        which the asset is not listed in reference [ADM-2], the UN Office of Outer Space Affairs
+        designator index format is not used, or the content cannot be disclosed, the value should
+        be set to UNKNOWN.
+
+        Examples: 2000-052A
+        """
+        ...
+
+    @object_id.setter
+    def object_id(self, value: str) -> None: ...
+    @property
+    def object_name(self) -> str:
+        """
+        Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
+        restriction on the value for this keyword, it is recommended to use names from the UN
+        Office of Outer Space Affairs designator index (reference [ADM-2], which include object
+        name and international designator). When OBJECT_NAME is not known or cannot be disclosed,
+        the value should be set to UNKNOWN.
+
+        Examples: EUTELSAT W1, MARS PATHFINDER, UNKNOWN
+        """
+        ...
+
+    @object_name.setter
+    def object_name(self, value: str) -> None: ...
+    @property
+    def time_system(self) -> str:
+        """
+        Time system used for attitude and maneuver data. The set of allowed values is described in
+        annex B, subsection B2.
+
+        Examples: UTC, TAI
+        """
+        ...
+
+    @time_system.setter
+    def time_system(self, value: str) -> None: ...
+
+class ApmSegment:
+    def __init__(metadata, data) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def data(self) -> ApmData:
+        """
+        APM Data Section.
+        """
+        ...
+
+    @data.setter
+    def data(self, value: ApmData) -> None: ...
+    @property
+    def metadata(self) -> ApmMetadata:
+        """
+        APM Metadata Section.
+        """
+        ...
+
+    @metadata.setter
+    def metadata(self, value: ApmMetadata) -> None: ...
+
 class AtmosphericReentryParameters:
     """
     Atmospheric reentry parameters (atmosphericReentryParametersType, RDM).
@@ -324,6 +1311,14 @@ class AtmosphericReentryParameters:
 
     @reentry_window_start.setter
     def reentry_window_start(self, value: Optional[str]) -> None: ...
+
+class AttitudeState:
+    def __init__(epoch, values) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
 
 class Cdm:
     """
@@ -1848,6 +2843,140 @@ class CovarianceMethodType:
         """
         ...
 
+class EulerAngleState:
+    """
+    Euler angle elements.
+
+    All mandatory elements of the logical block are to be provided if the block is present.
+    (See annex F for conventions and further detail.)
+    """
+    def __init__(
+        ref_frame_a,
+        ref_frame_b,
+        euler_rot_seq,
+        angle_1,
+        angle_2,
+        angle_3,
+        angle_1_dot,
+        angle_2_dot,
+        angle_3_dot,
+        comment,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def angle_1(self) -> float:
+        """
+        Angle of the first rotation.
+
+        Units: deg
+        """
+        ...
+
+    @angle_1.setter
+    def angle_1(self, value: float) -> None: ...
+    @property
+    def angle_1_dot(self) -> Optional[float]:
+        """
+        Time derivative of angle of the first rotation.
+
+        Units: deg/s
+        """
+        ...
+
+    @angle_1_dot.setter
+    def angle_1_dot(self, value: Optional[float]) -> None: ...
+    @property
+    def angle_2(self) -> float:
+        """
+        Angle of the second rotation.
+
+        Units: deg
+        """
+        ...
+
+    @angle_2.setter
+    def angle_2(self, value: float) -> None: ...
+    @property
+    def angle_2_dot(self) -> Optional[float]:
+        """
+        Time derivative of angle of the second rotation.
+
+        Units: deg/s
+        """
+        ...
+
+    @angle_2_dot.setter
+    def angle_2_dot(self, value: Optional[float]) -> None: ...
+    @property
+    def angle_3(self) -> float:
+        """
+        Angle of the third rotation.
+
+        Units: deg
+        """
+        ...
+
+    @angle_3.setter
+    def angle_3(self, value: float) -> None: ...
+    @property
+    def angle_3_dot(self) -> Optional[float]:
+        """
+        Time derivative of angle of the third rotation.
+
+        Units: deg/s
+        """
+        ...
+
+    @angle_3_dot.setter
+    def angle_3_dot(self, value: Optional[float]) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        One or more comment line(s). Each comment line shall begin with this keyword.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def euler_rot_seq(self) -> str:
+        """
+        Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
+        the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
+        the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
+        rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
+        rotation axis of the third rotation.
+        """
+        ...
+
+    @euler_rot_seq.setter
+    def euler_rot_seq(self, value: str) -> None: ...
+    @property
+    def ref_frame_a(self) -> str:
+        """
+        Name of the reference frame that defines the starting point of the transformation. The set
+        of allowed values is described in annex B, subsection B3.
+        """
+        ...
+
+    @ref_frame_a.setter
+    def ref_frame_a(self, value: str) -> None: ...
+    @property
+    def ref_frame_b(self) -> str:
+        """
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+        """
+        ...
+
+    @ref_frame_b.setter
+    def ref_frame_b(self, value: str) -> None: ...
+
 class GroundImpactParameters:
     """
     Ground impact parameters (groundImpactParametersType, RDM).
@@ -2314,6 +3443,106 @@ class GroundImpactParameters:
     @probability_of_land_impact.setter
     def probability_of_land_impact(self, value: Optional[float]) -> None: ...
 
+class InertiaState:
+    """
+    Inertia block.
+
+    All mandatory elements are to be provided if the block is present.
+    (See annex F for conventions and further detail.)
+    """
+    def __init__(inertia_ref_frame, ixx, iyy, izz, ixy, ixz, iyz, comment) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        One or more comment line(s). Each comment line shall begin with this keyword.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def inertia_ref_frame(self) -> str:
+        """
+        Coordinate system for the inertia tensor. The set of allowed values is described in annex B,
+        subsection B3.
+        """
+        ...
+
+    @inertia_ref_frame.setter
+    def inertia_ref_frame(self, value: str) -> None: ...
+    @property
+    def ixx(self) -> float:
+        """
+        Moment of Inertia about the X-axis.
+
+        Units: kg*m²
+        """
+        ...
+
+    @ixx.setter
+    def ixx(self, value: float) -> None: ...
+    @property
+    def ixy(self) -> float:
+        """
+        Inertia Cross Product of the X and Y axes.
+
+        Units: kg*m²
+        """
+        ...
+
+    @ixy.setter
+    def ixy(self, value: float) -> None: ...
+    @property
+    def ixz(self) -> float:
+        """
+        Inertia Cross Product of the X and Z axes.
+
+        Units: kg*m²
+        """
+        ...
+
+    @ixz.setter
+    def ixz(self, value: float) -> None: ...
+    @property
+    def iyy(self) -> float:
+        """
+        Moment of Inertia about the Y-axis.
+
+        Units: kg*m²
+        """
+        ...
+
+    @iyy.setter
+    def iyy(self, value: float) -> None: ...
+    @property
+    def iyz(self) -> float:
+        """
+        Inertia Cross Product of the Y and Z axes.
+
+        Units: kg*m²
+        """
+        ...
+
+    @iyz.setter
+    def iyz(self, value: float) -> None: ...
+    @property
+    def izz(self) -> float:
+        """
+        Moment of Inertia about the Z-axis.
+
+        Units: kg*m²
+        """
+        ...
+
+    @izz.setter
+    def izz(self, value: float) -> None: ...
+
 class KeplerianElements:
     """
     Osculating Keplerian Elements in the Specified Reference Frame (none or all parameters of
@@ -2517,32 +3746,16 @@ class ManeuverParameters:
 
     References:
     - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
-
-    Parameters
-    ----------
-    man_epoch_ignition : str
-        Epoch of ignition.
-    man_duration : float
-        Duration of maneuver (s).
-    man_delta_mass : float
-        Mass change during maneuver (kg).
-    man_ref_frame : str
-        Reference frame for velocity change.
-    man_dv_1 : float
-        Velocity change in 1st axis (km/s).
-    man_dv_2 : float
-        Velocity change in 2nd axis (km/s).
-    man_dv_3 : float
-        Velocity change in 3rd axis (km/s).
     """
     def __init__(
-        man_epoch_ignition,
+        man_epoch_start,
         man_duration,
-        man_delta_mass,
         man_ref_frame,
-        man_dv_1,
-        man_dv_2,
-        man_dv_3,
+        man_tor_1,
+        man_tor_2,
+        man_tor_3,
+        man_delta_mass,
+        comment,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -2560,7 +3773,7 @@ class ManeuverParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def man_delta_mass(self) -> float:
+    def man_delta_mass(self) -> Optional[float]:
         """
         Mass change during maneuver (value is < 0)
 
@@ -2573,7 +3786,7 @@ class ManeuverParameters:
         ...
 
     @man_delta_mass.setter
-    def man_delta_mass(self, value: float) -> None: ...
+    def man_delta_mass(self, value: Optional[float]) -> None: ...
     @property
     def man_duration(self) -> float:
         """
@@ -2586,47 +3799,14 @@ class ManeuverParameters:
     @man_duration.setter
     def man_duration(self, value: float) -> None: ...
     @property
-    def man_dv_1(self) -> float:
-        """
-        1st component of the velocity increment
-
-        Units: km/s
-        """
-        ...
-
-    @man_dv_1.setter
-    def man_dv_1(self, value: float) -> None: ...
-    @property
-    def man_dv_2(self) -> float:
-        """
-        2nd component of the velocity increment
-
-        Units: km/s
-        """
-        ...
-
-    @man_dv_2.setter
-    def man_dv_2(self, value: float) -> None: ...
-    @property
-    def man_dv_3(self) -> float:
-        """
-        3rd component of the velocity increment
-
-        Units: km/s
-        """
-        ...
-
-    @man_dv_3.setter
-    def man_dv_3(self, value: float) -> None: ...
-    @property
-    def man_epoch_ignition(self) -> str:
+    def man_epoch_start(self) -> str:
         """
         Epoch of ignition (see 7.5.10 for formatting rules)
         """
         ...
 
-    @man_epoch_ignition.setter
-    def man_epoch_ignition(self, value: str) -> None: ...
+    @man_epoch_start.setter
+    def man_epoch_start(self, value: str) -> None: ...
     @property
     def man_ref_frame(self) -> str:
         """
@@ -2637,6 +3817,39 @@ class ManeuverParameters:
 
     @man_ref_frame.setter
     def man_ref_frame(self, value: str) -> None: ...
+    @property
+    def man_tor_x(self) -> float:
+        """
+        Torque X component.
+
+        Units: N*m
+        """
+        ...
+
+    @man_tor_x.setter
+    def man_tor_x(self, value: float) -> None: ...
+    @property
+    def man_tor_y(self) -> float:
+        """
+        Torque Y component.
+
+        Units: N*m
+        """
+        ...
+
+    @man_tor_y.setter
+    def man_tor_y(self, value: float) -> None: ...
+    @property
+    def man_tor_z(self) -> float:
+        """
+        Torque Z component.
+
+        Units: N*m
+        """
+        ...
+
+    @man_tor_z.setter
+    def man_tor_z(self, value: float) -> None: ...
 
 class ManeuverableType:
     def __getstate__(self, /):
@@ -6683,17 +7896,9 @@ class OdmHeader:
     @classification.setter
     def classification(self, value: Optional[str]) -> None: ...
     @property
-    def comment(self) -> list[str]:
-        """
-        Comments (allowed in the ODM Header only immediately after the ODM version number).
-        (See 7.8 for formatting rules.)
-
-        Examples: This is a comment
-        """
-        ...
-
+    def comment(self): ...
     @comment.setter
-    def comment(self, value: list[str]) -> None: ...
+    def comment(self, value: object) -> None: ...
     @property
     def creation_date(self) -> str:
         """
@@ -8605,6 +9810,106 @@ class OpmSegment:
     @metadata.setter
     def metadata(self, value: OpmMetadata) -> None: ...
 
+class QuaternionState:
+    """
+    Attitude quaternion.
+
+    All mandatory elements are to be provided if the block is present.
+    (See annex F for conventions and further detail.)
+    """
+    def __init__(
+        ref_frame_a,
+        ref_frame_b,
+        q1,
+        q2,
+        q3,
+        qc,
+        q1_dot,
+        q2_dot,
+        q3_dot,
+        qc_dot,
+        comment,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        One or more comment line(s). Each comment line shall begin with this keyword.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def q1(self) -> float:
+        """
+        Quaternion components Q1, Q2, Q3, QC.
+
+        Units: dimensionless
+        """
+        ...
+
+    @q1.setter
+    def q1(self, value: float) -> None: ...
+    @property
+    def q2(self) -> float:
+        """
+        Quaternion components Q1, Q2, Q3, QC.
+
+        Units: dimensionless
+        """
+        ...
+
+    @q2.setter
+    def q2(self, value: float) -> None: ...
+    @property
+    def q3(self) -> float:
+        """
+        Quaternion components Q1, Q2, Q3, QC.
+
+        Units: dimensionless
+        """
+        ...
+
+    @q3.setter
+    def q3(self, value: float) -> None: ...
+    @property
+    def qc(self) -> float:
+        """
+        Quaternion components Q1, Q2, Q3, QC.
+
+        Units: dimensionless
+        """
+        ...
+
+    @qc.setter
+    def qc(self, value: float) -> None: ...
+    @property
+    def ref_frame_a(self) -> str:
+        """
+        Name of the reference frame that defines the starting point of the transformation. The set
+        of allowed values is described in annex B, subsection B3.
+        """
+        ...
+
+    @ref_frame_a.setter
+    def ref_frame_a(self, value: str) -> None: ...
+    @property
+    def ref_frame_b(self) -> str:
+        """
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+        """
+        ...
+
+    @ref_frame_b.setter
+    def ref_frame_b(self, value: str) -> None: ...
+
 class Rdm:
     """
     A message format for use in exchanging spacecraft re-entry information.
@@ -9713,7 +11018,7 @@ class RelativeMetadataData:
     @screen_volume_shape.setter
     def screen_volume_shape(self, value: Optional[ScreenVolumeShapeType]) -> None: ...
     @property
-    def screen_volume_x(self) -> Optional[float]:
+    def screen_volume_x(self) -> float:
         """
         The R or T (depending on if RTN or TVN is selected) component size of the screening
         volume in the SCREEN_VOLUME_FRAME. Data type = double.
@@ -9723,9 +11028,9 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_x.setter
-    def screen_volume_x(self, value: Optional[float]) -> None: ...
+    def screen_volume_x(self, value: float) -> None: ...
     @property
-    def screen_volume_y(self) -> Optional[float]:
+    def screen_volume_y(self) -> float:
         """
         The T or V (depending on if RTN or TVN is selected) component size of the screening
         volume in the SCREEN_VOLUME_FRAME. Data type = double.
@@ -9735,9 +11040,9 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_y.setter
-    def screen_volume_y(self, value: Optional[float]) -> None: ...
+    def screen_volume_y(self, value: float) -> None: ...
     @property
-    def screen_volume_z(self) -> Optional[float]:
+    def screen_volume_z(self) -> float:
         """
         The N component size of the screening volume in the SCREEN_VOLUME_FRAME. Data type =
         double.
@@ -9747,7 +11052,7 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_z.setter
-    def screen_volume_z(self, value: Optional[float]) -> None: ...
+    def screen_volume_z(self, value: float) -> None: ...
     @property
     def start_screen_period(self) -> Optional[str]:
         """
@@ -9895,6 +11200,174 @@ class SpacecraftParameters:
 
     @solar_rad_coeff.setter
     def solar_rad_coeff(self, value: Optional[float]) -> None: ...
+
+class SpinState:
+    """
+    Spin block.
+
+    All mandatory elements are to be provided if the block is present.
+    (See annex F for conventions and further detail.)
+    """
+    def __init__(
+        ref_frame_a,
+        ref_frame_b,
+        spin_alpha,
+        spin_delta,
+        spin_angle,
+        spin_angle_vel,
+        nutation,
+        nutation_per,
+        nutation_phase,
+        momentum_alpha,
+        momentum_delta,
+        nutation_vel,
+        comment,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        One or more comment line(s). Each comment line shall begin with this keyword.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def momentum_alpha(self) -> Optional[float]:
+        """
+        Right ascension of angular momentum vector in frame A.
+
+        Units: deg
+        """
+        ...
+
+    @momentum_alpha.setter
+    def momentum_alpha(self, value: Optional[float]) -> None: ...
+    @property
+    def momentum_delta(self) -> Optional[float]:
+        """
+        Declination of angular momentum vector in frame A.
+
+        Units: deg
+        """
+        ...
+
+    @momentum_delta.setter
+    def momentum_delta(self, value: Optional[float]) -> None: ...
+    @property
+    def nutation(self) -> Optional[float]:
+        """
+        Nutation angle of spin axis.
+
+        Units: deg
+        """
+        ...
+
+    @nutation.setter
+    def nutation(self, value: Optional[float]) -> None: ...
+    @property
+    def nutation_per(self) -> Optional[float]:
+        """
+        Body nutation period of the spin axis.
+
+        Units: s
+        """
+        ...
+
+    @nutation_per.setter
+    def nutation_per(self, value: Optional[float]) -> None: ...
+    @property
+    def nutation_phase(self) -> Optional[float]:
+        """
+        Inertial nutation phase.
+
+        Units: deg
+        """
+        ...
+
+    @nutation_phase.setter
+    def nutation_phase(self, value: Optional[float]) -> None: ...
+    @property
+    def nutation_vel(self) -> Optional[float]:
+        """
+        Angular velocity of spin vector around the angular momentum vector.
+
+        Units: deg/s
+        """
+        ...
+
+    @nutation_vel.setter
+    def nutation_vel(self, value: Optional[float]) -> None: ...
+    @property
+    def ref_frame_a(self) -> str:
+        """
+        Name of the reference frame that defines the starting point of the transformation. The set
+        of allowed values is described in annex B, subsection B3.
+        """
+        ...
+
+    @ref_frame_a.setter
+    def ref_frame_a(self, value: str) -> None: ...
+    @property
+    def ref_frame_b(self) -> str:
+        """
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+        """
+        ...
+
+    @ref_frame_b.setter
+    def ref_frame_b(self, value: str) -> None: ...
+    @property
+    def spin_alpha(self) -> float:
+        """
+        Right ascension of spin axis vector in frame A.
+
+        Units: deg
+        """
+        ...
+
+    @spin_alpha.setter
+    def spin_alpha(self, value: float) -> None: ...
+    @property
+    def spin_angle(self) -> float:
+        """
+        Phase of the satellite about the spin axis.
+
+        Units: deg
+        """
+        ...
+
+    @spin_angle.setter
+    def spin_angle(self, value: float) -> None: ...
+    @property
+    def spin_angle_vel(self) -> float:
+        """
+        Angular velocity of satellite around spin axis.
+
+        Units: deg/s
+        """
+        ...
+
+    @spin_angle_vel.setter
+    def spin_angle_vel(self, value: float) -> None: ...
+    @property
+    def spin_delta(self) -> float:
+        """
+        Declination of the spin axis vector in frame A.
+
+        Units: deg
+        """
+        ...
+
+    @spin_delta.setter
+    def spin_delta(self, value: float) -> None: ...
 
 class StateVector:
     """

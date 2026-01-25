@@ -16,6 +16,9 @@
 //! - **CDM** - Conjunction Data Message
 //! - **TDM** - Tracking Data Message
 //! - **RDM** - Reentry Data Message
+//! - **APM** - Attitude Parameter Message
+//! - **AEM** - Attitude Ephemeris Message
+//! - **ACM** - Attitude Comprehensive Message
 //!
 //! ## Quick Start
 //!
@@ -60,6 +63,7 @@ pub mod kvn;
 pub mod messages;
 pub mod traits;
 pub mod types;
+pub mod utils;
 pub mod xml;
 
 use error::{CcsdsNdmError, Result};
@@ -85,6 +89,7 @@ use std::path::Path;
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(untagged)]
 pub enum MessageType {
     /// Orbit Ephemeris Message - orbit state time series with optional covariance.
     Oem(messages::oem::Oem),
@@ -100,6 +105,12 @@ pub enum MessageType {
     Tdm(messages::tdm::Tdm),
     /// Orbit Comprehensive Message - detailed orbit data with maneuvers.
     Ocm(messages::ocm::Ocm),
+    /// Attitude Comprehensive Message - detailed attitude data with maneuvers.
+    Acm(messages::acm::Acm),
+    /// Attitude Ephemeris Message - attitude state time series.
+    Aem(messages::aem::Aem),
+    /// Attitude Parameter Message - attitude state and parameter data.
+    Apm(messages::apm::Apm),
     /// Combined Instantiation NDM - container for multiple messages.
     Ndm(messages::ndm::CombinedNdm),
 }
@@ -115,6 +126,9 @@ impl MessageType {
             MessageType::Rdm(msg) => crate::traits::Ndm::to_kvn(msg),
             MessageType::Tdm(msg) => crate::traits::Ndm::to_kvn(msg),
             MessageType::Ocm(msg) => crate::traits::Ndm::to_kvn(msg),
+            MessageType::Acm(msg) => crate::traits::Ndm::to_kvn(msg),
+            MessageType::Aem(msg) => crate::traits::Ndm::to_kvn(msg),
+            MessageType::Apm(msg) => crate::traits::Ndm::to_kvn(msg),
             MessageType::Ndm(msg) => crate::traits::Ndm::to_kvn(msg),
         }
     }
@@ -129,6 +143,9 @@ impl MessageType {
             MessageType::Rdm(msg) => crate::traits::Ndm::to_xml(msg),
             MessageType::Tdm(msg) => crate::traits::Ndm::to_xml(msg),
             MessageType::Ocm(msg) => crate::traits::Ndm::to_xml(msg),
+            MessageType::Acm(msg) => crate::traits::Ndm::to_xml(msg),
+            MessageType::Aem(msg) => crate::traits::Ndm::to_xml(msg),
+            MessageType::Apm(msg) => crate::traits::Ndm::to_xml(msg),
             MessageType::Ndm(msg) => crate::traits::Ndm::to_xml(msg),
         }
     }

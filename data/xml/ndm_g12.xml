@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_unqualified/ndmxml-
+3.0.0-master-3.0.xsd"
+xmlns:ndm="urn:ccsds:schema:ndmxml">
+<COMMENT>Example: 1 each APM, AEM, ACM in combined instantiation</COMMENT>
+<apm id="CCSDS_APM_VERS" version="2.0">
+<header>
+<CREATION_DATE>2007-11-10T15:23:57</CREATION_DATE>
+<ORIGINATOR>CNES</ORIGINATOR>
+</header>
+<body>
+<segment>
+<metadata>
+<COMMENT>APM Implementation Test</COMMENT>
+<OBJECT_NAME>TEST</OBJECT_NAME>
+<OBJECT_ID>2007-011</OBJECT_ID>
+<CENTER_NAME>EARTH</CENTER_NAME>
+<TIME_SYSTEM>UTC</TIME_SYSTEM>
+</metadata>
+<data>
+<EPOCH>2007-10-01T00:02:00.000</EPOCH>
+<eulerAngleState>
+<COMMENT>Attitude specified as Euler elements</COMMENT>
+<REF_FRAME_A>SC_BODY</REF_FRAME_A>
+<REF_FRAME_B>J2000</REF_FRAME_B>
+<EULER_ROT_SEQ>ZXZ</EULER_ROT_SEQ>
+<ANGLE_1 units="deg">90.</ANGLE_1>
+<ANGLE_2 units="deg">130.</ANGLE_2>
+<ANGLE_3 units="deg">270.</ANGLE_3>
+<ANGLE_1_DOT units="deg/s">0.</ANGLE_1_DOT>
+<ANGLE_2_DOT units="deg/s">0.</ANGLE_2_DOT>
+<ANGLE_3_DOT units="deg/s">6.</ANGLE_3_DOT>
+</eulerAngleState>
+</data>
+</segment>
+</body>
+</apm>
+<aem id="CCSDS_AEM_VERS" version="2.0">
+<header>
+<COMMENT>Note that data is NOT necessarily realistic; just shows form</COMMENT>
+<CREATION_DATE>2000-100T01:00:00</CREATION_DATE>
+<ORIGINATOR>NASA/JPL</ORIGINATOR>
+<MESSAGE_ID>AEM12345678</MESSAGE_ID>
+</header>
+<body>
+<segment>
+<metadata>
+<COMMENT>Attitude State Type = Quaternion</COMMENT>
+<OBJECT_NAME>TEST</OBJECT_NAME>
+<OBJECT_ID>2000-999Z</OBJECT_ID>
+<REF_FRAME_A>SC_BODY_1</REF_FRAME_A>
+<REF_FRAME_B>J2000</REF_FRAME_B>
+<TIME_SYSTEM>TDB</TIME_SYSTEM>
+<START_TIME>2000-100T00:00:00.000</START_TIME>
+<STOP_TIME>2000-100T00:00:00.000</STOP_TIME>
+<ATTITUDE_TYPE>QUATERNION</ATTITUDE_TYPE>
+</metadata>
+<data>
+<attitudeState>
+<quaternionEphemeris>
+<EPOCH>2000-100T00:00:00.000</EPOCH>
+<quaternion>
+<Q1>-0.005068</Q1>
+<Q2>0.906506</Q2>
+<Q3>0.002360</Q3>
+<QC>0.422157</QC>
+</quaternion>
+</quaternionEphemeris>
+</attitudeState>
+</data>
+</segment>
+</body>
+</aem>
+<acm id="CCSDS_ACM_VERS" version="2.0">
+<header>
+<CREATION_DATE>1998-11-06T09:23:57</CREATION_DATE>
+<ORIGINATOR>JAXA</ORIGINATOR>
+<MESSAGE_ID>A7015Z4</MESSAGE_ID>
+</header>
+<body>
+<segment>
+<metadata>
+<OBJECT_NAME>EUROBIRD-4A</OBJECT_NAME>
+<INTERNATIONAL_DESIGNATOR>2000-052A</INTERNATIONAL_DESIGNATOR>
+<TIME_SYSTEM>UTC</TIME_SYSTEM>
+<EPOCH_TZERO>1998-12-18T14:28:15.1172</EPOCH_TZERO>
+</metadata>
+<data>
+<att>
+<REF_FRAME_A>J2000</REF_FRAME_A>
+<REF_FRAME_B>SC_BODY</REF_FRAME_B>
+<NUMBER_STATES>4</NUMBER_STATES>
+<ATT_TYPE>QUATERNION</ATT_TYPE>
+<attLine>0.0 0.73566 -0.50547 0.41390 0.180707</attLine>
+<attLine>0.25 0.73529 -0.50531 0.41375 0.181158</attLine>
+<attLine>0.50 0.73492 -0.50515 0.41441 0.181610</attLine>
+</att>
+</data>
+</segment>
+</body>
+</acm>
+</ndm>

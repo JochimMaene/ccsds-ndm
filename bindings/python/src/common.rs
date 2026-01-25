@@ -123,10 +123,102 @@ impl OdmHeader {
         self.inner.classification = value;
     }
 
-    /// Comments (allowed in the ODM Header only immediately after the ODM version number).
-    /// (See 7.8 for formatting rules.)
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
+}
+
+/// Represents the `admHeader` complex type from the XSD.
+#[pyclass]
+#[derive(Clone)]
+pub struct AdmHeader {
+    pub inner: core_common::AdmHeader,
+}
+
+#[pymethods]
+impl AdmHeader {
+    #[new]
+    fn new(
+        creation_date: String,
+        originator: String,
+        classification: Option<String>,
+        message_id: Option<String>,
+        comment: Option<Vec<String>>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: core_common::AdmHeader {
+                creation_date: parse_epoch(&creation_date)?,
+                originator,
+                message_id,
+                classification,
+                comment: comment.unwrap_or_default(),
+            },
+        })
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "AdmHeader(originator='{}', creation_date='{}')",
+            self.inner.originator,
+            self.inner.creation_date.as_str()
+        )
+    }
+
+    /// File creation date/time in UTC.
     ///
-    /// Examples: This is a comment
+    /// :type: str
+    #[getter]
+    fn get_creation_date(&self) -> String {
+        self.inner.creation_date.as_str().to_string()
+    }
+
+    #[setter]
+    fn set_creation_date(&mut self, value: String) -> PyResult<()> {
+        self.inner.creation_date = parse_epoch(&value)?;
+        Ok(())
+    }
+
+    /// Creating agency or operator.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_originator(&self) -> String {
+        self.inner.originator.clone()
+    }
+
+    #[setter]
+    fn set_originator(&mut self, value: String) {
+        self.inner.originator = value;
+    }
+
+    /// ID that uniquely identifies a message from a given originator.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_message_id(&self) -> Option<String> {
+        self.inner.message_id.clone()
+    }
+
+    #[setter]
+    fn set_message_id(&mut self, value: Option<String>) {
+        self.inner.message_id = value;
+    }
+
+    /// User-defined free-text message classification/caveats.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_classification(&self) -> Option<String> {
+        self.inner.classification.clone()
+    }
+
+    #[setter]
+    fn set_classification(&mut self, value: Option<String>) {
+        self.inner.classification = value;
+    }
+
+    /// Comments.
     ///
     /// :type: list[str]
     #[getter]

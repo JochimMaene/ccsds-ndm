@@ -20,7 +20,7 @@ use winnow::Parser;
 ///
 /// This struct uses a stack-allocated buffer to avoid heap allocations
 /// during parsing of large NDM files.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Epoch {
     bytes: [u8; 64],
     len: u8,
@@ -537,7 +537,7 @@ define_unit_enum!(FrequencyUnits, Hz, { Hz => "Hz" });
 pub struct Frequency {
     #[serde(rename = "$value")]
     pub value: f64,
-    #[serde(rename = "@units")]
+    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<FrequencyUnits>,
 }
 impl Frequency {
@@ -583,7 +583,7 @@ define_unit_enum!(GmUnits, Km3PerS2, { Km3PerS2 => "km**3/s**2", KM3PerS2 => "KM
 pub struct Gm {
     #[serde(rename = "$value")]
     pub value: f64,
-    #[serde(rename = "@units")]
+    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<GmUnits>,
 }
 impl Gm {
@@ -677,7 +677,7 @@ define_unit_enum!(MassUnits, Kg, { Kg => "kg" });
 pub struct Mass {
     #[serde(rename = "$value")]
     pub value: f64,
-    #[serde(rename = "@units")]
+    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<MassUnits>,
 }
 impl Mass {
@@ -720,7 +720,7 @@ define_unit_enum!(AreaUnits, M2, { M2 => "m**2" });
 pub struct Area {
     #[serde(rename = "$value")]
     pub value: f64,
-    #[serde(rename = "@units")]
+    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<AreaUnits>,
 }
 
@@ -1093,6 +1093,13 @@ impl DeltaMassZ {
         }
         Ok(Self { value, units })
     }
+
+    pub fn to_unit_value(&self) -> UnitValue<f64, MassUnits> {
+        UnitValue {
+            value: self.value,
+            units: self.units.clone(),
+        }
+    }
 }
 
 impl FromKvnFloat for DeltaMassZ {
@@ -1315,6 +1322,50 @@ pub enum RotSeq {
     ZYX,
     #[serde(rename = "ZYZ")]
     ZYZ,
+}
+
+impl std::str::FromStr for RotSeq {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "XYX" => Ok(Self::XYX),
+            "XYZ" => Ok(Self::XYZ),
+            "XZX" => Ok(Self::XZX),
+            "XZY" => Ok(Self::XZY),
+            "YXY" => Ok(Self::YXY),
+            "YXZ" => Ok(Self::YXZ),
+            "YZX" => Ok(Self::YZX),
+            "YZY" => Ok(Self::YZY),
+            "ZXY" => Ok(Self::ZXY),
+            "ZXZ" => Ok(Self::ZXZ),
+            "ZYX" => Ok(Self::ZYX),
+            "ZYZ" => Ok(Self::ZYZ),
+            _ => Err(crate::error::EnumParseError {
+                field: "EULER_ROT_SEQ",
+                value: s.to_string(),
+                expected: "XYX, XYZ, XZX, XZY, YXY, YXZ, YZX, YZY, ZXY, ZXZ, ZYX, or ZYZ",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for RotSeq {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::XYX => write!(f, "XYX"),
+            Self::XYZ => write!(f, "XYZ"),
+            Self::XZX => write!(f, "XZX"),
+            Self::XZY => write!(f, "XZY"),
+            Self::YXY => write!(f, "YXY"),
+            Self::YXZ => write!(f, "YXZ"),
+            Self::YZX => write!(f, "YZX"),
+            Self::YZY => write!(f, "YZY"),
+            Self::ZXY => write!(f, "ZXY"),
+            Self::ZXZ => write!(f, "ZXZ"),
+            Self::ZYX => write!(f, "ZYX"),
+            Self::ZYZ => write!(f, "ZYZ"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -2000,8 +2051,8 @@ pub type SigmaV = UnitValue<f64, SigmaVUnits>;
 // Sensor noise (string with optional angle units)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SensorNoise {
-    #[serde(rename = "$value")]
-    pub value: String,
+    #[serde(rename = "$value", default, with = "crate::utils::vec_f64_space_sep")]
+    pub values: Vec<f64>,
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<AngleUnits>,
 }
@@ -2166,10 +2217,29 @@ impl std::fmt::Display for ReentryUncertaintyMethodType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TimeSystemType(pub String);
 
+impl std::fmt::Display for TimeSystemType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 // AngVelFrameType: XSD empty restriction (free-form string), used in APM angVelStateType.
 /// Angular velocity frame identifier (schema leaves unrestricted).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct AngVelFrameType(pub String);
+
+impl std::str::FromStr for AngVelFrameType {
+    type Err = std::convert::Infallible;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl std::fmt::Display for AngVelFrameType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// USER DEFINED PARAMETERS block (`userDefinedType`).
 /// User-defined parameters.

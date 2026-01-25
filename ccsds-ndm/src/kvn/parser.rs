@@ -18,7 +18,7 @@
 //! 1. **Line-level**: Parse individual KVN lines into structured tokens
 //! 2. **Message-level**: Compose line parsers to build complete message structures
 
-use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
+use crate::common::{AdmHeader, OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
 use crate::error::{
     CcsdsNdmError, EnumParseError, FormatError, InternalParserError, ValidationError,
 };
@@ -842,6 +842,63 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
     }
 
     Ok(OdmHeader {
+        comment,
+        classification,
+        creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,
+        originator: originator.ok_or_else(|| cut_err(input, "Expected ORIGINATOR"))?,
+        message_id,
+    })
+}
+
+/// Parses the ADM header section.
+pub fn adm_header(input: &mut &str) -> KvnResult<AdmHeader> {
+    let mut comment = Vec::new();
+    let mut classification = None;
+    let mut creation_date = None;
+    let mut originator = None;
+    let mut message_id = None;
+
+    loop {
+        let checkpoint = input.checkpoint();
+        comment.extend(collect_comments.parse_next(input)?);
+
+        let key = match preceded(ws, keyword).parse_next(input) {
+            Ok(k) => k,
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
+            }
+        };
+
+        // Stop if we encounter a metadata key
+        // AEM/APM metadata usually starts with OBJECT_NAME or META_START
+        if key == "OBJECT_NAME" || key == "META_START" {
+            input.reset(&checkpoint);
+            break;
+        }
+
+        kv_sep.parse_next(input)?;
+        match key {
+            "CLASSIFICATION" => {
+                classification = Some(kv_string.parse_next(input)?);
+            }
+            "CREATION_DATE" => {
+                creation_date = Some(kv_epoch.parse_next(input)?);
+            }
+            "ORIGINATOR" => {
+                originator = Some(kv_string.parse_next(input)?);
+            }
+            "MESSAGE_ID" => {
+                message_id = Some(kv_string.parse_next(input)?);
+            }
+            _ => {
+                input.reset(&checkpoint);
+                break;
+            }
+        }
+    }
+
+    Ok(AdmHeader {
         comment,
         classification,
         creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,

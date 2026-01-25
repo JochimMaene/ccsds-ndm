@@ -4,7 +4,7 @@ xsi:noNamespaceSchemaLocation="https://sanaregistry.org/r/ndmxml_unqualified/ndm
 3.0.0-master-3.0.xsd">
 <COMMENT>This example combines an OPM, OMM, OEM, and OCM in a single Navigation
 Data Message XML.</COMMENT>
-<COMMENT>NOTE – In this case the messages are unrelated, but show how, in
+<COMMENT>NOTE - In this case the messages are unrelated, but show how, in
 principle, related </COMMENT>
 <COMMENT>messages could be combined to satisfy a specific use case.</COMMENT>
 <opm id="CCSDS_OPM_VERS" version="3.0">
@@ -188,16 +188,11 @@ maneuver, OD, Cartesian and Keplerian ephemeris</COMMENT>
 <USEABLE_START_TIME>2022-12-18T14:28:15.1172</USEABLE_START_TIME>
 <USEABLE_STOP_TIME>2022-12-18T14:28:45.1172</USEABLE_STOP_TIME>
 <TRAJ_TYPE>CARTPVA</TRAJ_TYPE>
-<TRAJ_UNITS>[km, km, km, km/s, km/s, km/s, km/s**2, km/s**2,
-km/s**2]</TRAJ_UNITS>
-<trajLine> 0.0 2854.5 -2916.2 -5360.7 5.90 4.86 0.52 0.0037 -
-0.0038 -0.0070</trajLine>
-<trajLine>120.0 5478.6 434.3 -3862.5 2.50 5.87 4.29 0.0072
-0.0006 -0.0051</trajLine>
-<trajLine>240.0 4146.0 -1655.8 -5038.3 4.80 5.58 2.16 0.0054 -
-0.0022 -0.0066</trajLine>
-<trajLine>500.0 -1553.4 -4848.7 -4406.5 6.73 1.01 -3.53 -0.002 -
-0.0063 -0.0058</trajLine>
+<TRAJ_UNITS>[km, km, km, km/s, km/s, km/s, km/s**2, km/s**2, km/s**2]</TRAJ_UNITS>
+<trajLine> 0.0 2854.5 -2916.2 -5360.7 5.90 4.86 0.52 0.0037 -0.0038 -0.0070</trajLine>
+<trajLine>120.0 5478.6 434.3 -3862.5 2.50 5.87 4.29 0.0072 0.0006 -0.0051</trajLine>
+<trajLine>240.0 4146.0 -1655.8 -5038.3 4.80 5.58 2.16 0.0054 -0.0022 -0.0066</trajLine>
+<trajLine>500.0 -1553.4 -4848.7 -4406.5 6.73 1.01 -3.53 -0.002 -0.0063 -0.0058</trajLine>
 </traj>
 <traj>
 <TRAJ_BASIS>DETERMINED</TRAJ_BASIS>

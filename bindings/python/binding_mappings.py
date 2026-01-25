@@ -41,10 +41,48 @@ FIELD_MAPPINGS: dict[str, dict[str, str]] = {
     "Rdm": {
         "segment": "body.segment",
     },
+    # AEM - Attitude Ephemeris Message
+    "Aem": {
+        "segments": "body.segment",
+    },
+    # APM - Attitude Parameter Message
+    "Apm": {
+        "segment": "body.segment",
+    },
+    # ACM - Attitude Comprehensive Message
+    "Acm": {
+        "segment": "body.segment",
+    },
     "RelativeMetadataData": {
         "relative_position": "relative_state_vector",
         "relative_velocity": "relative_state_vector",
     },
+    "ManeuverParameters": {
+        "man_epoch_start": "man_epoch_ignition",
+        "man_tor_x": "man_tor_1",
+        "man_tor_y": "man_tor_2",
+        "man_tor_z": "man_tor_3",
+    },
+    "QuaternionState": {
+        "q1": "quaternion",
+        "q2": "quaternion",
+        "q3": "quaternion",
+        "qc": "quaternion",
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Python Helper Classes
+# ---------------------------------------------------------------------------
+# Classes that exist in Python bindings but do NOT have a direct 1:1 matching
+# Rust struct in the core library. These are typically convenience wrappers,
+# projections, or merged types.
+# The audit tool will not look for a matching Rust struct for these.
+
+PYTHON_HELPER_CLASSES: set[str] = {
+    "AttitudeState",
+    "CovLine",
+    "AttLine",
 }
 
 # ---------------------------------------------------------------------------
@@ -71,6 +109,9 @@ PYTHON_ONLY_FIELDS: dict[str, list[str]] = {
     "CdmCovarianceMatrix": [
         "to_numpy",
     ],
+    "AemData": [
+        "attitude_states",
+    ],
     # Add other NumPy accessors as needed
 }
 
@@ -94,6 +135,9 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
     "Cdm": [],  # CDM exposes body directly
     "Tdm": ["id", "version", "body"],
     "Rdm": ["id", "version", "body"],
+    "Aem": ["id", "version", "body"],
+    "Apm": ["id", "version", "body"],
+    "Acm": ["id", "version", "body", "header"],
     "TdmObservation": ["data"],
     # Internal body wrappers - skip entirely
     "OemBody": ["*"],
@@ -102,6 +146,20 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
     "OcmBody": ["*"],
     "TdmBody": ["*"],
     "RdmBody": ["*"],
+    "AemBody": ["*"],
+    "ApmBody": ["*"],
+    "AcmBody": ["*"],
+    # Partially implemented or legacy
+    "AcmAttitudeDetermination": ["*"],
+    "AcmAttitudeState": ["*"],
+    "AcmCovarianceMatrix": ["*"],
+    "AcmData": ["*"],
+    "AcmManeuverParameters": ["*"],
+    "AcmMetadata": ["*"],
+    "AcmPhysicalDescription": ["*"],
+    "AcmSegment": ["*"],
+    "OdmHeader": ["*"],
+    "QuaternionState": ["quaternion_dot"],
 }
 
 # ---------------------------------------------------------------------------
@@ -150,6 +208,11 @@ def get_rust_path(python_class: str, python_field: str) -> str:
 def is_python_only(python_class: str, python_field: str) -> bool:
     """Check if a field is Python-only (no Rust equivalent expected)."""
     return python_field in PYTHON_ONLY_FIELDS.get(python_class, [])
+
+
+def is_python_helper_class(python_class: str) -> bool:
+    """Check if a class is a Python-only helper (no Rust struct equivalent)."""
+    return python_class in PYTHON_HELPER_CLASSES
 
 
 def should_skip_rust_field(rust_struct: str, rust_field: str) -> bool:
