@@ -43,6 +43,7 @@ use crate::messages::opm::{
 use crate::parse_block;
 use winnow::combinator::peek;
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // OPM Version Parser
@@ -223,10 +224,15 @@ pub fn all_maneuvers(input: &mut &str) -> KvnResult<Vec<ManeuverParameters>> {
     let mut maneuvers = Vec::new();
 
     loop {
+        let checkpoint = input.checkpoint();
         match maneuver_parameters.parse_next(input) {
             Ok(Some(man)) => maneuvers.push(man),
             Ok(None) => break,
             Err(e) => return Err(e),
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
         }
     }
 

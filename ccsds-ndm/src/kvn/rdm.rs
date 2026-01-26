@@ -15,6 +15,7 @@ use crate::messages::rdm::{Rdm, RdmBody, RdmData, RdmHeader, RdmMetadata, RdmSeg
 use crate::parse_block;
 use crate::types::*;
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // RDM Version Parser
@@ -70,6 +71,10 @@ pub fn rdm_header(input: &mut &str) -> KvnResult<RdmHeader> {
                 input.reset(&checkpoint);
                 break;
             }
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
         }
     }
 
@@ -374,6 +379,10 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
             parameter: key.to_string(),
             value: v,
         });
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     let atmospheric_reentry_parameters = AtmosphericReentryParameters {

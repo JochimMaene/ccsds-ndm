@@ -16,6 +16,7 @@ use winnow::ascii::{space1, till_line_ending};
 use winnow::combinator::repeat;
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // OCM Version Parser
@@ -272,6 +273,7 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
     }, |i| at_block_end("TRAJ", i), "Unexpected OCM Trajectory key");
 
     loop {
+        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
         if at_block_end("TRAJ", input) {
@@ -288,6 +290,10 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         // Otherwise, skip the line (handles continuations) or break
         let _ = till_line_ending.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     if traj_lines.is_empty() {
@@ -548,6 +554,7 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
     }, |i| at_block_end("COV", i), "Unexpected OCM Covariance key");
 
     loop {
+        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
         if at_block_end("COV", input) {
@@ -562,7 +569,9 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         }
 
         // Otherwise break or handle error
-        break;
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     Ok(OcmCovarianceMatrix {
@@ -671,6 +680,7 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
     }, |i| at_block_end("MAN", i), "Unexpected OCM Maneuver key");
 
     loop {
+        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
         if at_block_end("MAN", input) {
@@ -687,6 +697,10 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         // Otherwise, skip the line (handles continuations like in G17) or break
         let _ = till_line_ending.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     Ok(OcmManeuverParameters {

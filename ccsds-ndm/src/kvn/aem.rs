@@ -10,11 +10,12 @@ use crate::common::{
 };
 use crate::error::InternalParserError;
 use crate::kvn::parser::*;
+use winnow::stream::Offset;
 use crate::messages::aem::{Aem, AemBody, AemData, AemMetadata, AemSegment};
 use crate::parse_block;
 use crate::types::Angle;
 use std::str::FromStr;
-use winnow::combinator::terminated;
+use winnow::combinator::{peek, terminated};
 use winnow::error::{AddContext, ErrMode, FromExternalError};
 use winnow::prelude::*;
 
@@ -343,13 +344,22 @@ pub fn aem_data(input: &mut &str, attitude_type: &str) -> KvnResult<AemData> {
         if at_block_end("DATA", input) {
             break;
         }
-        if input.trim_start().starts_with("COMMENT") {
+        let start = input.checkpoint();
+        if peek((ws, "COMMENT")).parse_next(input).is_ok() {
             comment.extend(collect_comments.parse_next(input)?);
+            if input.offset_from(&start) == 0 {
+                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
+            }
             continue;
         }
 
+        let checkpoint = input.checkpoint();
         let state = attitude_state_line(input, attitude_type)?;
         attitude_states.push(state.into());
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     expect_block_end("DATA").parse_next(input)?;
@@ -382,11 +392,16 @@ pub fn parse_aem(input: &mut &str) -> KvnResult<Aem> {
 
     let mut segments = Vec::new();
     loop {
+        let checkpoint = input.checkpoint();
         let _ = skip_empty_lines.parse_next(input);
         // If we see META_START, it's a new segment
         if at_block_start("META", input) {
             segments.push(aem_segment.parse_next(input)?);
         } else {
+            break;
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
             break;
         }
     }

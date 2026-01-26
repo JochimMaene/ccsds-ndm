@@ -14,9 +14,10 @@ use crate::messages::acm::{
 use crate::parse_block;
 
 use std::str::FromStr;
-use winnow::combinator::terminated;
+use winnow::combinator::{peek, terminated};
 use winnow::error::{ErrMode, FromExternalError};
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // ACM Version Parser
@@ -106,11 +107,20 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
         if at_block_end("ATT", input) {
             break;
         }
-        if input.trim_start().starts_with("COMMENT") {
+        let start = input.checkpoint();
+        if peek((ws, "COMMENT")).parse_next(input).is_ok() {
             block.comment.extend(collect_comments.parse_next(input)?);
+            if input.offset_from(&start) == 0 {
+                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
+            }
             continue;
         }
-        block.att_lines.push(parse_att_line.parse_next(input)?);
+        let checkpoint = input.checkpoint();
+        let res = parse_att_line.parse_next(input)?;
+        if input.offset_from(&checkpoint) == 0 && input.is_empty() {
+            break;
+        }
+        block.att_lines.push(res);
     }
 
     expect_block_end("ATT").parse_next(input)?;
@@ -170,11 +180,20 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
         if at_block_end("COV", input) {
             break;
         }
-        if input.trim_start().starts_with("COMMENT") {
+        let start = input.checkpoint();
+        if peek((ws, "COMMENT")).parse_next(input).is_ok() {
             block.comment.extend(collect_comments.parse_next(input)?);
+            if input.offset_from(&start) == 0 {
+                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
+            }
             continue;
         }
-        block.cov_lines.push(parse_cov_line.parse_next(input)?);
+        let checkpoint = input.checkpoint();
+        let res = parse_cov_line.parse_next(input)?;
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
+        block.cov_lines.push(res);
     }
 
     expect_block_end("COV").parse_next(input)?;

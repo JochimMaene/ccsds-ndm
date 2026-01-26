@@ -17,6 +17,7 @@ use crate::parse_block;
 use winnow::combinator::peek;
 use winnow::error::AddContext;
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // CDM Version Parser
@@ -76,6 +77,10 @@ pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
                 input.reset(&checkpoint);
                 break;
             }
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
         }
     }
 

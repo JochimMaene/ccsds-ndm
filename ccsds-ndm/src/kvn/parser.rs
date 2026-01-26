@@ -32,6 +32,7 @@ use winnow::error::{
     AddContext, ErrMode, FromExternalError, ParserError, StrContext, StrContextValue,
 };
 use winnow::prelude::*;
+use winnow::stream::Offset;
 use winnow::token::{one_of, take_till, take_while};
 
 /// A result type for winnow parsers using the library's internal lightweight error type.
@@ -839,6 +840,10 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 break;
             }
         }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     Ok(OdmHeader {
@@ -895,6 +900,10 @@ pub fn adm_header(input: &mut &str) -> KvnResult<AdmHeader> {
                 input.reset(&checkpoint);
                 break;
             }
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
         }
     }
 
@@ -1103,6 +1112,10 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
         } else {
             // Backtrack and end user defined section
             input.reset(&checkpoint);
+            break;
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
             break;
         }
     }

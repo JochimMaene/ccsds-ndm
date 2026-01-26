@@ -12,6 +12,7 @@ use crate::common::{
 use crate::common::AttManeuverState;
 use crate::error::InternalParserError;
 use crate::kvn::parser::*;
+use winnow::stream::Offset;
 use crate::messages::apm::{Apm, ApmBody, ApmData, ApmMetadata, ApmSegment};
 use crate::parse_block;
 use std::str::FromStr;
@@ -371,6 +372,7 @@ pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
 
     // Logical blocks can appear in any order.
     loop {
+        let checkpoint = input.checkpoint();
         let _ = skip_empty_lines.parse_next(input);
 
         // Check for recognized blocks using lookahead or just trying parsers
@@ -389,6 +391,10 @@ pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
             maneuver_parameters.push(self::maneuver_parameters.parse_next(input)?);
         } else {
             // Unknown block or end of stream.
+            break;
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
             break;
         }
     }

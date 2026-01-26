@@ -51,6 +51,7 @@ use winnow::ascii::space1;
 use winnow::combinator::{preceded, repeat};
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // OEM Version Parser
@@ -74,19 +75,19 @@ pub fn oem_header(input: &mut &str) -> KvnResult<OdmHeader> {
     let mut message_id = None;
 
     loop {
-        let checkpoint = input.checkpoint();
+        let checkpoint_loop = input.checkpoint();
         comment.extend(collect_comments.parse_next(input)?);
 
         let key = match preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
             Err(_) => {
-                input.reset(&checkpoint);
+                input.reset(&checkpoint_loop);
                 break;
             }
         };
 
         if key == "META_START" {
-            input.reset(&checkpoint);
+            input.reset(&checkpoint_loop);
             break;
         }
 
@@ -105,9 +106,13 @@ pub fn oem_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 message_id = Some(kv_string.parse_next(input)?);
             }
             _ => {
-                input.reset(&checkpoint);
+                input.reset(&checkpoint_loop);
                 break;
             }
+        }
+
+        if input.offset_from(&checkpoint_loop) == 0 {
+            break;
         }
     }
 
@@ -376,12 +381,17 @@ fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix
     let mut matrices: Vec<OemCovarianceMatrix> = Vec::new();
 
     loop {
+        let checkpoint = input.checkpoint();
         comment_line.parse_next(input).ok(); // Consume any comments
         if at_block_end("COVARIANCE", input) {
             break;
         }
         let matrix = parse_covariance_matrix.parse_next(input)?;
         matrices.push(matrix);
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     Ok(matrices)
@@ -501,7 +511,7 @@ pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
                 }
             },
             Err(e) => {
-                if e.is_backtrack() {
+                if e.is_backtrack() || input.offset_from(&checkpoint) == 0 {
                     input.reset(&checkpoint);
                     break;
                 } else {
@@ -560,6 +570,7 @@ pub fn oem_body(input: &mut &str) -> KvnResult<OemBody> {
 
     // Parse additional segments
     loop {
+        let checkpoint = input.checkpoint();
         // Skip comments/empty lines
         let _ = collect_comments.parse_next(input)?;
 
@@ -568,6 +579,10 @@ pub fn oem_body(input: &mut &str) -> KvnResult<OemBody> {
             let segment = oem_segment.parse_next(input)?;
             segments.push(segment);
         } else {
+            break;
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
             break;
         }
     }

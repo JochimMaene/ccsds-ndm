@@ -16,6 +16,7 @@ use crate::types::{Epoch, Percentage};
 use winnow::combinator::preceded;
 use winnow::error::{AddContext, ErrMode, StrContext};
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // TDM Version Parser
@@ -70,6 +71,10 @@ pub fn tdm_header(input: &mut &str) -> KvnResult<TdmHeader> {
                 input.reset(&checkpoint);
                 break;
             }
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
         }
     }
 
@@ -259,6 +264,7 @@ pub fn tdm_data(input: &mut &str) -> KvnResult<TdmData> {
             break;
         }
 
+        let checkpoint = input.checkpoint();
         comment.extend(collect_comments.parse_next(input)?);
 
         if at_block_end("DATA", input) {
@@ -266,6 +272,10 @@ pub fn tdm_data(input: &mut &str) -> KvnResult<TdmData> {
         }
 
         observations.push(tdm_observation.parse_next(input)?);
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     if observations.is_empty() {
@@ -300,6 +310,7 @@ pub fn tdm_body(input: &mut &str) -> KvnResult<TdmBody> {
     let mut segments = Vec::new();
 
     loop {
+        let checkpoint = input.checkpoint();
         let _ = collect_comments.parse_next(input)?;
 
         if input.is_empty() || !at_block_start("META", input) {
@@ -307,6 +318,10 @@ pub fn tdm_body(input: &mut &str) -> KvnResult<TdmBody> {
         }
 
         segments.push(tdm_segment.parse_next(input)?);
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     if segments.is_empty() {
