@@ -210,7 +210,7 @@ pub fn ang_vel_state(input: &mut &str) -> KvnResult<AngVelState> {
             .ok_or_else(|| missing_field_err(input, "ANGVEL", "REF_FRAME_A"))?,
         ref_frame_b: ref_frame_b
             .ok_or_else(|| missing_field_err(input, "ANGVEL", "REF_FRAME_B"))?,
-        angvel_frame: angvel_frame.unwrap_or_default(), // FIXME: handle correctly, maybe parsing as string?
+        angvel_frame: angvel_frame.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_FRAME"))?,
         angvel_x: angvel_x.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_X"))?,
         angvel_y: angvel_y.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_Y"))?,
         angvel_z: angvel_z.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_Z"))?,
@@ -439,7 +439,7 @@ mod tests {
     use crate::traits::Ndm;
 
     #[test]
-    fn test_parse_apm_minimal() {
+    fn test_parse_apm_angvel_missing_frame_error() {
         let input = r#"CCSDS_APM_VERS = 2.0
 CREATION_DATE = 2002-11-04T17:22:31
 ORIGINATOR = NASA/JPL
@@ -451,22 +451,45 @@ TIME_SYSTEM = UTC
 META_STOP
 EPOCH = 2002-11-04T17:22:31
 
-QUAT_START
+ANGVEL_START
 REF_FRAME_A = EME2000
 REF_FRAME_B = SC_BODY_1
-Q1 = 0.5
-Q2 = 0.5
-Q3 = 0.5
-QC = 0.5
-QUAT_STOP
+ANGVEL_X = 0.1
+ANGVEL_Y = 0.2
+ANGVEL_Z = 0.3
+ANGVEL_STOP
+"#;
+        let result = Apm::from_kvn(input);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Missing required field: ANGVEL_FRAME"));
+    }
+
+    #[test]
+    fn test_parse_apm_angvel_success() {
+        let input = r#"CCSDS_APM_VERS = 2.0
+CREATION_DATE = 2002-11-04T17:22:31
+ORIGINATOR = NASA/JPL
+
+META_START
+OBJECT_NAME = MARS GLOBAL SURVEYOR
+OBJECT_ID = 1996-062A
+TIME_SYSTEM = UTC
+META_STOP
+EPOCH = 2002-11-04T17:22:31
+
+ANGVEL_START
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
+ANGVEL_FRAME = SC_BODY_B
+ANGVEL_X = 0.1
+ANGVEL_Y = 0.2
+ANGVEL_Z = 0.3
+ANGVEL_STOP
 "#;
         let apm = Apm::from_kvn(input).unwrap();
-        assert_eq!(apm.version, "2.0");
-        assert_eq!(
-            apm.body.segment.metadata.object_name,
-            "MARS GLOBAL SURVEYOR"
-        );
-        let q_state = &apm.body.segment.data.quaternion_state[0];
-        assert_eq!(q_state.quaternion.q1, 0.5);
+        assert_eq!(apm.body.segment.data.angular_velocity.len(), 1);
+        let angvel = &apm.body.segment.data.angular_velocity[0];
+        assert_eq!(angvel.angvel_frame.0, "SC_BODY_B");
     }
 }

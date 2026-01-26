@@ -45,9 +45,9 @@ impl Ndm for Opm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let omm = Self::from_kvn_str(kvn)?;
-        omm.validate()?;
-        Ok(omm)
+        let opm = Self::from_kvn_str(kvn)?;
+        opm.validate()?;
+        Ok(opm)
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -56,9 +56,9 @@ impl Ndm for Opm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let omm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
-        omm.validate()?;
-        Ok(omm)
+        let opm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
+        opm.validate()?;
+        Ok(opm)
     }
 }
 
