@@ -18,10 +18,14 @@ use std::num::NonZeroU32;
 
 /// Orbit Ephemeris Message (OEM).
 ///
-/// Ephemeris information may be exchanged between two participants by sending a state vector (see
-/// reference \[1\]) for multiple epochs using an Orbit Ephemeris Message (OEM). The OEM also contains
-/// an optional covariance matrix that reflects the uncertainty of the orbit solution used to
-/// generate states in the ephemeris.
+/// An OEM specifies the position and velocity of a single object at multiple epochs contained
+/// within a specified time range. The message recipient must have a means of interpolating
+/// across these state vectors to obtain the state at an arbitrary time contained within the
+/// span of the ephemeris.
+///
+/// The OEM is suited to exchanges that:
+/// 1. Involve automated interaction (e.g., computer-to-computer communication).
+/// 2. Require higher fidelity or higher precision dynamic modeling than is possible with the OPM.
 ///
 /// Parameters
 /// ----------

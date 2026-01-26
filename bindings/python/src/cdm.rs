@@ -37,15 +37,17 @@ fn validate_unit<T: Default + std::fmt::Display + PartialEq>(
     Ok(())
 }
 
-/// Represents a CCSDS Conjunction Data Message (CDM).
+/// Conjunction Data Message (CDM).
 ///
-/// The CDM specifies a standard message format for use in exchanging spacecraft
-/// conjunction information between originators of Conjunction Assessments (CAs)
-/// and satellite owner/operators and other authorized parties.
+/// The CDM contains information about a single conjunction between a primary object (Object1)
+/// and a secondary object (Object2). It allows satellite operators to evaluate the risk of
+/// collision and plan avoidance maneuvers.
 ///
-/// It contains information about a single conjunction between two objects,
-/// including their positions/velocities, covariances at TCA, and relative
-/// state data.
+/// The message includes:
+/// - Positions and velocities of both objects at Time of Closest Approach (TCA).
+/// - Covariance matrices for both objects at TCA.
+/// - Relative position and velocity of Object2 with respect to Object1.
+/// - Metadata describing how the data was determined (orbit determination settings).
 #[pyclass]
 #[derive(Clone)]
 pub struct Cdm {
@@ -175,7 +177,17 @@ impl Cdm {
         }
     }
 
-    /// The message header.
+    /// Conjunction Data Message (CDM).
+    ///
+    /// The CDM contains information about a single conjunction between a primary object (Object1)
+    /// and a secondary object (Object2). It allows satellite operators to evaluate the risk of
+    /// collision and plan avoidance maneuvers.
+    ///
+    /// The message includes:
+    /// - Positions and velocities of both objects at Time of Closest Approach (TCA).
+    /// - Covariance matrices for both objects at TCA.
+    /// - Relative position and velocity of Object2 with respect to Object1.
+    /// - Metadata describing how the data was determined (orbit determination settings).
     ///
     /// :type: CdmHeader
     #[getter]

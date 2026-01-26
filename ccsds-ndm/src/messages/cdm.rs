@@ -15,6 +15,19 @@ use std::borrow::Cow;
 // Root CDM Structure
 //----------------------------------------------------------------------
 
+/// Conjunction Data Message (CDM).
+///
+/// The CDM contains information about a single conjunction between a primary object (Object1)
+/// and a secondary object (Object2). It allows satellite operators to evaluate the risk of
+/// collision and plan avoidance maneuvers.
+///
+/// The message includes:
+/// - Positions and velocities of both objects at Time of Closest Approach (TCA).
+/// - Covariance matrices for both objects at TCA.
+/// - Relative position and velocity of Object2 with respect to Object1.
+/// - Metadata describing how the data was determined (orbit determination settings).
+///
+/// **CCSDS Reference**: 508.0-B-1.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "cdm")]
 pub struct Cdm {

@@ -18,11 +18,13 @@ use serde::{Deserialize, Serialize};
 /// Attitude Ephemeris Message (AEM).
 ///
 /// An AEM specifies the attitude state of a single object at multiple epochs, contained within a
-/// specified time range. The AEM is suited to interagency exchanges that (1) involve automated
-/// interaction (e.g., computer-to-computer communication for which frequent, fast, automated time
-/// interpretation and processing are required), and (2) require higher fidelity or higher
-/// precision dynamic modeling than is possible with the APM (e.g., flexible structures, more
-/// complex attitude movement, etc.).
+/// specified time range. The AEM is suited to interagency exchanges that involve automated
+/// interaction and require higher fidelity or higher precision dynamic modeling than is
+/// possible with the APM.
+///
+/// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
+/// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
+/// the attitude state at times different from the tabular epochs.
 ///
 /// **CCSDS Reference**: 504.0-B-2, Section 4.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]

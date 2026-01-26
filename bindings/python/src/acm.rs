@@ -16,6 +16,13 @@ use std::fs;
 /// An ACM specifies the attitude state of a single object at multiple epochs, contained within a
 /// specified time range. The ACM aggregates and extends APM and AEM content in a single
 /// comprehensive hybrid message.
+///
+/// Capabilities include:
+/// - Optional rate data elements
+/// - Optional spacecraft physical properties
+/// - Optional covariance elements
+/// - Optional maneuver parameters
+/// - Optional estimator information
 #[pyclass]
 #[derive(Clone)]
 pub struct Acm {
@@ -85,6 +92,13 @@ impl Acm {
     /// An ACM specifies the attitude state of a single object at multiple epochs, contained within a
     /// specified time range. The ACM aggregates and extends APM and AEM content in a single
     /// comprehensive hybrid message.
+    ///
+    /// Capabilities include:
+    /// - Optional rate data elements
+    /// - Optional spacecraft physical properties
+    /// - Optional covariance elements
+    /// - Optional maneuver parameters
+    /// - Optional estimator information
     ///
     /// :type: AdmHeader
     #[getter]

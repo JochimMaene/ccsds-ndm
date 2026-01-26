@@ -2,6 +2,22 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+//! XML format support.
+//!
+//! This module handles parsing and generation of CCSDS messages in the XML format.
+//! It maps XML elements and attributes to Rust structs using `serde`.
+//!
+//! # Format Specifics
+//!
+//! - **Schema**: Compliant with the NDM/XML schemas (XSD) defined by CCSDS.
+//! - **Attributes**: Some metadata (like `id` and `version`) are stored as XML attributes (e.g., `<opm id="..." version="3.0">`).
+//! - **Units**: In XML, units are typically defined as attributes on the value element (e.g., `<X units="km">123.45</X>`).
+//!
+//! # Implementation Details
+//!
+//! - **Engine**: Uses [`quick-xml`](https://docs.rs/quick-xml) for efficient parsing and serialization.
+//! - **Validation**: While this parser checks for correct types, full XSD validation is not performed at runtime.
+
 use crate::error::{FormatError, Result};
 use quick_xml::de::from_str as from_xml_str;
 use quick_xml::se::to_string as to_xml_string;

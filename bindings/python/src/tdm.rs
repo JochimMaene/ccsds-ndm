@@ -18,7 +18,18 @@ use std::str::FromStr;
 
 /// Tracking Data Message (TDM).
 ///
-/// The TDM specifies a standard message format for use in exchanging tracking data.
+/// The TDM specifies a standard message format for use in exchanging spacecraft tracking data
+/// between space agencies. Such exchanges are used for distributing tracking data output from
+/// routine interagency cross-supports.
+///
+/// Tracking data includes data types such as:
+/// - Doppler
+/// - Transmit/Received frequencies
+/// - Range
+/// - Angles
+/// - Delta-DOR
+/// - Media correction (ionosphere, troposphere)
+/// - Meteorological data
 ///
 /// Parameters
 /// ----------
@@ -59,7 +70,18 @@ impl Tdm {
 
     /// Tracking Data Message (TDM).
     ///
-    /// The TDM specifies a standard message format for use in exchanging tracking data.
+    /// The TDM specifies a standard message format for use in exchanging spacecraft tracking data
+    /// between space agencies. Such exchanges are used for distributing tracking data output from
+    /// routine interagency cross-supports.
+    ///
+    /// Tracking data includes data types such as:
+    /// - Doppler
+    /// - Transmit/Received frequencies
+    /// - Range
+    /// - Angles
+    /// - Delta-DOR
+    /// - Media correction (ionosphere, troposphere)
+    /// - Meteorological data
     ///
     /// :type: TdmHeader
     #[getter]

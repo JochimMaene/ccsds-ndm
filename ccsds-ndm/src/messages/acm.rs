@@ -23,8 +23,15 @@ use serde::{Deserialize, Serialize};
 /// specified time range. The ACM aggregates and extends APM and AEM content in a single
 /// comprehensive hybrid message.
 ///
+/// Capabilities include:
+/// - Optional rate data elements
+/// - Optional spacecraft physical properties
+/// - Optional covariance elements
+/// - Optional maneuver parameters
+/// - Optional estimator information
+///
 /// **CCSDS Reference**: 504.0-B-2, Section 5.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "acm")]
 pub struct Acm {
     pub header: AdmHeader,

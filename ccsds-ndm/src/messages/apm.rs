@@ -14,15 +14,14 @@ use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 
-//----------------------------------------------------------------------
-// Root APM Structure
-//----------------------------------------------------------------------
-
 /// Attitude Parameter Message (APM).
 ///
-/// An APM specifies the attitude state of a single object at a specified epoch. This message is
-/// suited to interagency exchanges that (1) involve automated interaction and/or human
-/// interaction, and (2) do not require high-fidelity dynamic modeling.
+/// An APM specifies the attitude state of a single object at a specified epoch. This message
+/// is suited to interagency exchanges that involve automated interaction and/or human
+/// interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
+///
+/// The APM requires the use of a propagation technique to determine the attitude state at
+/// times different from the specified epoch.
 ///
 /// **CCSDS Reference**: 504.0-B-2, Section 3.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]

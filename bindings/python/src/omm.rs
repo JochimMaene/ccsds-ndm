@@ -20,6 +20,17 @@ use crate::opm::OpmCovarianceMatrix;
 /// The OMM contains the orbital characteristics of a single object at a specified epoch,
 /// expressed in mean Keplerian elements.
 ///
+/// Orbit Mean-Elements Message (OMM).
+///
+/// The OMM contains the orbital characteristics of a single object at a specified epoch,
+/// expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
+/// ascension of ascending node, argument of perigee, and mean anomaly.
+///
+/// These elements are adequate for providing the initial mean state of analytical and
+/// semi-analytical orbit models (e.g., SGP4). The OMM includes keywords and values that may
+/// be used to generate canonical NORAD Two Line Element (TLE) sets to accommodate the needs
+/// of heritage users.
+///
 /// Parameters
 /// ----------
 /// header : OdmHeader
@@ -59,6 +70,17 @@ impl Omm {
     ///
     /// The OMM contains the orbital characteristics of a single object at a specified epoch,
     /// expressed in mean Keplerian elements.
+    ///
+    /// Orbit Mean-Elements Message (OMM).
+    ///
+    /// The OMM contains the orbital characteristics of a single object at a specified epoch,
+    /// expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
+    /// ascension of ascending node, argument of perigee, and mean anomaly.
+    ///
+    /// These elements are adequate for providing the initial mean state of analytical and
+    /// semi-analytical orbit models (e.g., SGP4). The OMM includes keywords and values that may
+    /// be used to generate canonical NORAD Two Line Element (TLE) sets to accommodate the needs
+    /// of heritage users.
     ///
     /// :type: OdmHeader
     #[getter]

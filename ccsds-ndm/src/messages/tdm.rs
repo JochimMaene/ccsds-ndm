@@ -16,13 +16,22 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt;
 
-//----------------------------------------------------------------------
-// Root TDM Structure
-//----------------------------------------------------------------------
-
 /// Tracking Data Message (TDM).
 ///
-/// The TDM specifies a standard message format for use in exchanging tracking data.
+/// The TDM specifies a standard message format for use in exchanging spacecraft tracking data
+/// between space agencies. Such exchanges are used for distributing tracking data output from
+/// routine interagency cross-supports.
+///
+/// Tracking data includes data types such as:
+/// - Doppler
+/// - Transmit/Received frequencies
+/// - Range
+/// - Angles
+/// - Delta-DOR
+/// - Media correction (ionosphere, troposphere)
+/// - Meteorological data
+///
+/// **CCSDS Reference**: 503.0-B-2.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "tdm")]
 pub struct Tdm {

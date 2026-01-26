@@ -18,13 +18,19 @@ use std::borrow::Cow;
 
 /// Orbit Comprehensive Message (OCM).
 ///
-/// An OCM aggregates and extends OMM, OPM, and OEM content in a single hybrid message.
-/// It emphasizes flexibility and message conciseness by offering extensive optional
-/// standardized content while minimizing mandatory content.
+/// An OCM specifies position and velocity of either a single object or an en masse parent/child
+/// deployment scenario stemming from a single object. The OCM aggregates and extends OPM, OEM,
+/// and OMM content in a single comprehensive hybrid message.
 ///
-/// References:
-/// - CCSDS 502.0-B-3, Section 5 (OCM)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+/// Key features:
+/// - Support for single object or parent/child deployment scenarios.
+/// - Aggregation of OPM, OMM, and OEM content.
+/// - Extensive optional content including physical properties, covariance, maneuvers, and
+///   perturbations.
+/// - Well-suited for exchanges involving automated interaction and large object catalogs.
+///
+/// **CCSDS Reference**: 502.0-B-3, Section 6.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder, Default)]
 #[serde(rename = "ocm")]
 pub struct Ocm {
     pub header: OdmHeader,

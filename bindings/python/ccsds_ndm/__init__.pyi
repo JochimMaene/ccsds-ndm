@@ -48,6 +48,13 @@ class Acm:
     An ACM specifies the attitude state of a single object at multiple epochs, contained within a
     specified time range. The ACM aggregates and extends APM and AEM content in a single
     comprehensive hybrid message.
+
+    Capabilities include:
+    - Optional rate data elements
+    - Optional spacecraft physical properties
+    - Optional covariance elements
+    - Optional maneuver parameters
+    - Optional estimator information
     """
     def __init__(header, segment) -> None: ...
     def __getstate__(self, /):
@@ -74,6 +81,13 @@ class Acm:
         An ACM specifies the attitude state of a single object at multiple epochs, contained within a
         specified time range. The ACM aggregates and extends APM and AEM content in a single
         comprehensive hybrid message.
+
+        Capabilities include:
+        - Optional rate data elements
+        - Optional spacecraft physical properties
+        - Optional covariance elements
+        - Optional maneuver parameters
+        - Optional estimator information
         """
         ...
 
@@ -464,11 +478,13 @@ class Aem:
     Attitude Ephemeris Message (AEM).
 
     An AEM specifies the attitude state of a single object at multiple epochs, contained within a
-    specified time range. The AEM is suited to interagency exchanges that (1) involve automated
-    interaction (e.g., computer-to-computer communication for which frequent, fast, automated time
-    interpretation and processing are required), and (2) require higher fidelity or higher
-    precision dynamic modeling than is possible with the APM (e.g., flexible structures, more
-    complex attitude movement, etc.).
+    specified time range. The AEM is suited to interagency exchanges that involve automated
+    interaction and require higher fidelity or higher precision dynamic modeling than is
+    possible with the APM.
+
+    The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
+    torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
+    the attitude state at times different from the tabular epochs.
     """
     def __init__(header, segments) -> None: ...
     def __getstate__(self, /):
@@ -493,11 +509,13 @@ class Aem:
         Attitude Ephemeris Message (AEM).
 
         An AEM specifies the attitude state of a single object at multiple epochs, contained within a
-        specified time range. The AEM is suited to interagency exchanges that (1) involve automated
-        interaction (e.g., computer-to-computer communication for which frequent, fast, automated time
-        interpretation and processing are required), and (2) require higher fidelity or higher
-        precision dynamic modeling than is possible with the APM (e.g., flexible structures, more
-        complex attitude movement, etc.).
+        specified time range. The AEM is suited to interagency exchanges that involve automated
+        interaction and require higher fidelity or higher precision dynamic modeling than is
+        possible with the APM.
+
+        The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
+        torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
+        the attitude state at times different from the tabular epochs.
         """
         ...
 
@@ -920,9 +938,12 @@ class Apm:
     """
     Attitude Parameter Message (APM).
 
-    An APM specifies the attitude state of a single object at a specified epoch. This message is
-    suited to interagency exchanges that (1) involve automated interaction and/or human
-    interaction, and (2) do not require high-fidelity dynamic modeling.
+    An APM specifies the attitude state of a single object at a specified epoch. This message
+    is suited to interagency exchanges that involve automated interaction and/or human
+    interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
+
+    The APM requires the use of a propagation technique to determine the attitude state at
+    times different from the specified epoch.
     """
     def __init__(header, segment) -> None: ...
     def __getstate__(self, /):
@@ -946,9 +967,12 @@ class Apm:
         """
         Attitude Parameter Message (APM).
 
-        An APM specifies the attitude state of a single object at a specified epoch. This message is
-        suited to interagency exchanges that (1) involve automated interaction and/or human
-        interaction, and (2) do not require high-fidelity dynamic modeling.
+        An APM specifies the attitude state of a single object at a specified epoch. This message
+        is suited to interagency exchanges that involve automated interaction and/or human
+        interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
+
+        The APM requires the use of a propagation technique to determine the attitude state at
+        times different from the specified epoch.
         """
         ...
 
@@ -1322,15 +1346,17 @@ class AttitudeState:
 
 class Cdm:
     """
-    Represents a CCSDS Conjunction Data Message (CDM).
+    Conjunction Data Message (CDM).
 
-    The CDM specifies a standard message format for use in exchanging spacecraft
-    conjunction information between originators of Conjunction Assessments (CAs)
-    and satellite owner/operators and other authorized parties.
+    The CDM contains information about a single conjunction between a primary object (Object1)
+    and a secondary object (Object2). It allows satellite operators to evaluate the risk of
+    collision and plan avoidance maneuvers.
 
-    It contains information about a single conjunction between two objects,
-    including their positions/velocities, covariances at TCA, and relative
-    state data.
+    The message includes:
+    - Positions and velocities of both objects at Time of Closest Approach (TCA).
+    - Covariance matrices for both objects at TCA.
+    - Relative position and velocity of Object2 with respect to Object1.
+    - Metadata describing how the data was determined (orbit determination settings).
     """
     def __init__(header, body, id=None, version=...) -> None: ...
     def __getstate__(self, /):
@@ -1406,7 +1432,17 @@ class Cdm:
     @property
     def header(self) -> CdmHeader:
         """
-        The message header.
+        Conjunction Data Message (CDM).
+
+        The CDM contains information about a single conjunction between a primary object (Object1)
+        and a secondary object (Object2). It allows satellite operators to evaluate the risk of
+        collision and plan avoidance maneuvers.
+
+        The message includes:
+        - Positions and velocities of both objects at Time of Closest Approach (TCA).
+        - Covariance matrices for both objects at TCA.
+        - Relative position and velocity of Object2 with respect to Object1.
+        - Metadata describing how the data was determined (orbit determination settings).
         """
         ...
 
@@ -4106,12 +4142,16 @@ class Ocm:
     """
     Orbit Comprehensive Message (OCM).
 
-    An OCM aggregates and extends OMM, OPM, and OEM content in a single hybrid message.
-    It emphasizes flexibility and message conciseness by offering extensive optional
-    standardized content while minimizing mandatory content.
+    An OCM specifies position and velocity of either a single object or an en masse parent/child
+    deployment scenario stemming from a single object. The OCM aggregates and extends OPM, OEM,
+    and OMM content in a single comprehensive hybrid message.
 
-    References:
-    - CCSDS 502.0-B-3, Section 5 (OCM)
+    Key features:
+    - Support for single object or parent/child deployment scenarios.
+    - Aggregation of OPM, OMM, and OEM content.
+    - Extensive optional content including physical properties, covariance, maneuvers, and
+    perturbations.
+    - Well-suited for exchanges involving automated interaction and large object catalogs.
 
     Parameters
     ----------
@@ -4170,12 +4210,16 @@ class Ocm:
         """
         Orbit Comprehensive Message (OCM).
 
-        An OCM aggregates and extends OMM, OPM, and OEM content in a single hybrid message.
-        It emphasizes flexibility and message conciseness by offering extensive optional
-        standardized content while minimizing mandatory content.
+        An OCM specifies position and velocity of either a single object or an en masse parent/child
+        deployment scenario stemming from a single object. The OCM aggregates and extends OPM, OEM,
+        and OMM content in a single comprehensive hybrid message.
 
-        References:
-        - CCSDS 502.0-B-3, Section 5 (OCM)
+        Key features:
+        - Support for single object or parent/child deployment scenarios.
+        - Aggregation of OPM, OMM, and OEM content.
+        - Extensive optional content including physical properties, covariance, maneuvers, and
+        perturbations.
+        - Well-suited for exchanges involving automated interaction and large object catalogs.
         """
         ...
 
@@ -7941,10 +7985,14 @@ class Oem:
     """
     Orbit Ephemeris Message (OEM).
 
-    Ephemeris information may be exchanged between two participants by sending a state vector (see
-    reference \[1\]) for multiple epochs using an Orbit Ephemeris Message (OEM). The OEM also contains
-    an optional covariance matrix that reflects the uncertainty of the orbit solution used to
-    generate states in the ephemeris.
+    An OEM specifies the position and velocity of a single object at multiple epochs contained
+    within a specified time range. The message recipient must have a means of interpolating
+    across these state vectors to obtain the state at an arbitrary time contained within the
+    span of the ephemeris.
+
+    The OEM is suited to exchanges that:
+    1. Involve automated interaction (e.g., computer-to-computer communication).
+    2. Require higher fidelity or higher precision dynamic modeling than is possible with the OPM.
 
     Parameters
     ----------
@@ -8764,6 +8812,17 @@ class Omm:
     The OMM contains the orbital characteristics of a single object at a specified epoch,
     expressed in mean Keplerian elements.
 
+    Orbit Mean-Elements Message (OMM).
+
+    The OMM contains the orbital characteristics of a single object at a specified epoch,
+    expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
+    ascension of ascending node, argument of perigee, and mean anomaly.
+
+    These elements are adequate for providing the initial mean state of analytical and
+    semi-analytical orbit models (e.g., SGP4). The OMM includes keywords and values that may
+    be used to generate canonical NORAD Two Line Element (TLE) sets to accommodate the needs
+    of heritage users.
+
     Parameters
     ----------
     header : OdmHeader
@@ -8809,6 +8868,17 @@ class Omm:
 
         The OMM contains the orbital characteristics of a single object at a specified epoch,
         expressed in mean Keplerian elements.
+
+        Orbit Mean-Elements Message (OMM).
+
+        The OMM contains the orbital characteristics of a single object at a specified epoch,
+        expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
+        ascension of ascending node, argument of perigee, and mean anomaly.
+
+        These elements are adequate for providing the initial mean state of analytical and
+        semi-analytical orbit models (e.g., SGP4). The OMM includes keywords and values that may
+        be used to generate canonical NORAD Two Line Element (TLE) sets to accommodate the needs
+        of heritage users.
         """
         ...
 
@@ -9912,7 +9982,17 @@ class QuaternionState:
 
 class Rdm:
     """
-    A message format for use in exchanging spacecraft re-entry information.
+    Re-entry Data Message (RDM).
+
+    The RDM specifies a standard message format to be used in the exchange of spacecraft
+    re-entry information between Space Situational Awareness (SSA) or Space Surveillance and
+    Tracking (SST) data providers, satellite owners/operators, and other parties.
+
+    It includes data such as:
+    - Remaining orbital lifetime
+    - Start and end of the re-entry and impact windows
+    - Impact location and probabilities
+    - Object physical properties
 
     Parameters
     ----------
@@ -9973,7 +10053,17 @@ class Rdm:
     @property
     def header(self) -> RdmHeader:
         """
-        A message format for use in exchanging spacecraft re-entry information.
+        Re-entry Data Message (RDM).
+
+        The RDM specifies a standard message format to be used in the exchange of spacecraft
+        re-entry information between Space Situational Awareness (SSA) or Space Surveillance and
+        Tracking (SST) data providers, satellite owners/operators, and other parties.
+
+        It includes data such as:
+        - Remaining orbital lifetime
+        - Start and end of the re-entry and impact windows
+        - Impact location and probabilities
+        - Object physical properties
         """
         ...
 
@@ -11631,7 +11721,18 @@ class Tdm:
     """
     Tracking Data Message (TDM).
 
-    The TDM specifies a standard message format for use in exchanging tracking data.
+    The TDM specifies a standard message format for use in exchanging spacecraft tracking data
+    between space agencies. Such exchanges are used for distributing tracking data output from
+    routine interagency cross-supports.
+
+    Tracking data includes data types such as:
+    - Doppler
+    - Transmit/Received frequencies
+    - Range
+    - Angles
+    - Delta-DOR
+    - Media correction (ionosphere, troposphere)
+    - Meteorological data
 
     Parameters
     ----------
@@ -11703,7 +11804,18 @@ class Tdm:
         """
         Tracking Data Message (TDM).
 
-        The TDM specifies a standard message format for use in exchanging tracking data.
+        The TDM specifies a standard message format for use in exchanging spacecraft tracking data
+        between space agencies. Such exchanges are used for distributing tracking data output from
+        routine interagency cross-supports.
+
+        Tracking data includes data types such as:
+        - Doppler
+        - Transmit/Received frequencies
+        - Range
+        - Angles
+        - Delta-DOR
+        - Media correction (ionosphere, troposphere)
+        - Meteorological data
         """
         ...
 

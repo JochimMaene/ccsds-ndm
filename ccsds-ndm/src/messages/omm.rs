@@ -15,7 +15,6 @@ use std::str::FromStr;
 //----------------------------------------------------------------------
 // OMM Specific Units
 //----------------------------------------------------------------------
-// ... (omitting units for clarity in this instruction, but they will be kept in the actual replace)
 
 // 1/ER (Inverse Earth Radii) for BSTAR
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
@@ -150,9 +149,15 @@ pub type MeanMotionDDot = UnitValue<f64, RevPerDay3Units>;
 /// Orbit Mean-Elements Message (OMM).
 ///
 /// The OMM contains the orbital characteristics of a single object at a specified epoch,
-/// expressed in mean Keplerian elements.
+/// expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
+/// ascension of ascending node, argument of perigee, and mean anomaly.
 ///
-/// **CCSDS Reference**: 502.0-B-3, Section 4.1.1.
+/// These elements are adequate for providing the initial mean state of analytical and
+/// semi-analytical orbit models (e.g., SGP4). The OMM includes keywords and values that may
+/// be used to generate canonical NORAD Two Line Element (TLE) sets to accommodate the needs
+/// of heritage users.
+///
+/// **CCSDS Reference**: 502.0-B-3, Section 4.1.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "omm")]
 pub struct Omm {

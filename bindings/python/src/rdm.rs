@@ -19,7 +19,17 @@ use std::str::FromStr;
 // RDM - Re-entry Data Message
 // ============================================================================
 
-/// A message format for use in exchanging spacecraft re-entry information.
+/// Re-entry Data Message (RDM).
+///
+/// The RDM specifies a standard message format to be used in the exchange of spacecraft
+/// re-entry information between Space Situational Awareness (SSA) or Space Surveillance and
+/// Tracking (SST) data providers, satellite owners/operators, and other parties.
+///
+/// It includes data such as:
+/// - Remaining orbital lifetime
+/// - Start and end of the re-entry and impact windows
+/// - Impact location and probabilities
+/// - Object physical properties
 ///
 /// Parameters
 /// ----------
@@ -59,7 +69,17 @@ impl Rdm {
         )
     }
 
-    /// A message format for use in exchanging spacecraft re-entry information.
+    /// Re-entry Data Message (RDM).
+    ///
+    /// The RDM specifies a standard message format to be used in the exchange of spacecraft
+    /// re-entry information between Space Situational Awareness (SSA) or Space Surveillance and
+    /// Tracking (SST) data providers, satellite owners/operators, and other parties.
+    ///
+    /// It includes data such as:
+    /// - Remaining orbital lifetime
+    /// - Start and end of the re-entry and impact windows
+    /// - Impact location and probabilities
+    /// - Object physical properties
     ///
     /// :type: RdmHeader
     #[getter]
