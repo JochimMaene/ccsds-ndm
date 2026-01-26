@@ -1474,130 +1474,130 @@ pub struct OpmCovarianceMatrix {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub cov_ref_frame: Option<String>,
-    /// Covariance matrix [1,1]
+    /// Covariance matrix `[1,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_x: PositionCovariance,
-    /// Covariance matrix [2,1]
+    /// Covariance matrix `[2,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_x: PositionCovariance,
-    /// Covariance matrix [2,2]
+    /// Covariance matrix `[2,2]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_y: PositionCovariance,
-    /// Covariance matrix [3,1]
+    /// Covariance matrix `[3,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_x: PositionCovariance,
-    /// Covariance matrix [3,2]
+    /// Covariance matrix `[3,2]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_y: PositionCovariance,
-    /// Covariance matrix [3,3]
+    /// Covariance matrix `[3,3]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_z: PositionCovariance,
 
-    /// Covariance matrix [4,1]
+    /// Covariance matrix `[4,1]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_x: PositionVelocityCovariance,
-    /// Covariance matrix [4,2]
+    /// Covariance matrix `[4,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_y: PositionVelocityCovariance,
-    /// Covariance matrix [4,3]
+    /// Covariance matrix `[4,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_z: PositionVelocityCovariance,
-    /// Covariance matrix [4,4]
+    /// Covariance matrix `[4,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_x_dot: VelocityCovariance,
 
-    /// Covariance matrix [5,1]
+    /// Covariance matrix `[5,1]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_x: PositionVelocityCovariance,
-    /// Covariance matrix [5,2]
+    /// Covariance matrix `[5,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_y: PositionVelocityCovariance,
-    /// Covariance matrix [5,3]
+    /// Covariance matrix `[5,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_z: PositionVelocityCovariance,
-    /// Covariance matrix [5,4]
+    /// Covariance matrix `[5,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_x_dot: VelocityCovariance,
-    /// Covariance matrix [5,5]
+    /// Covariance matrix `[5,5]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_y_dot: VelocityCovariance,
 
-    /// Covariance matrix [6,1]
+    /// Covariance matrix `[6,1]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_x: PositionVelocityCovariance,
-    /// Covariance matrix [6,2]
+    /// Covariance matrix `[6,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_y: PositionVelocityCovariance,
-    /// Covariance matrix [6,3]
+    /// Covariance matrix `[6,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_z: PositionVelocityCovariance,
-    /// Covariance matrix [6,4]
+    /// Covariance matrix `[6,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_x_dot: VelocityCovariance,
-    /// Covariance matrix [6,5]
+    /// Covariance matrix `[6,5]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_y_dot: VelocityCovariance,
-    /// Covariance matrix [6,6]
+    /// Covariance matrix `[6,6]`
     ///
     /// **Units**: km²/s²
     ///
@@ -1767,7 +1767,7 @@ pub struct GroundImpactParameters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub impact_window_end: Option<Epoch>,
     /// Reference frame of the impact location data. The value should be taken from the keyword
-    /// value name column in the SANA celestial body reference frames registry, reference [11].
+    /// value name column in the SANA celestial body reference frames registry, reference `[11]`.
     /// Only frames with the value ‘Body-Fixed’ in the Frame Type column shall be used.
     /// Mandatory if NOMINAL_IMPACT_LON and NOMINAL_IMPACT_LAT are present.
     ///

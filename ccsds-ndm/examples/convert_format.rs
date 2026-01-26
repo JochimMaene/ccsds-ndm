@@ -31,7 +31,10 @@ Z_DOT = 0.0 [km/s]
 
     // 3. Verify round-trip (XML back to Opm)
     let opm_from_xml = Opm::from_xml(&xml_output).expect("Failed to parse generated XML");
-    
-    assert_eq!(opm.body.segment.metadata.object_name, opm_from_xml.body.segment.metadata.object_name);
+
+    assert_eq!(
+        opm.body.segment.metadata.object_name,
+        opm_from_xml.body.segment.metadata.object_name
+    );
     println!("\nRound-trip verification successful!");
 }

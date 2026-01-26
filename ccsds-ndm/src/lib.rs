@@ -75,7 +75,7 @@
 //!     .version("3.0")
 //!     .header(OdmHeader::builder()
 //!         .creation_date("2024-01-01T00:00:00".parse().unwrap())
-//!         .originator("GEMINI")
+//!         .originator("EXAMPLE")
 //!         .build())
 //!     .body(OpmBody::builder()
 //!         .segment(OpmSegment::builder()

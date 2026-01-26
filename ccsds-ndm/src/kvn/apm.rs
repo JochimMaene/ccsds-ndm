@@ -210,7 +210,8 @@ pub fn ang_vel_state(input: &mut &str) -> KvnResult<AngVelState> {
             .ok_or_else(|| missing_field_err(input, "ANGVEL", "REF_FRAME_A"))?,
         ref_frame_b: ref_frame_b
             .ok_or_else(|| missing_field_err(input, "ANGVEL", "REF_FRAME_B"))?,
-        angvel_frame: angvel_frame.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_FRAME"))?,
+        angvel_frame: angvel_frame
+            .ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_FRAME"))?,
         angvel_x: angvel_x.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_X"))?,
         angvel_y: angvel_y.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_Y"))?,
         angvel_z: angvel_z.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_Z"))?,
@@ -462,7 +463,9 @@ ANGVEL_STOP
         let result = Apm::from_kvn(input);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.to_string().contains("Missing required field: ANGVEL_FRAME"));
+        assert!(err
+            .to_string()
+            .contains("Missing required field: ANGVEL_FRAME"));
     }
 
     #[test]

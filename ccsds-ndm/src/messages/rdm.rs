@@ -153,7 +153,7 @@ pub struct RdmMetadata {
     pub comment: Vec<String>,
     /// Object name for which the orbit state is provided. There is no CCSDS-based restriction
     /// on the value for this keyword, but it is recommended to use names from the UNOOSA
-    /// registry—reference [7], which includes object name and international designator of the
+    /// registry—reference `[7]`, which includes object name and international designator of the
     /// participant (formatting rules specified in 5.2.3.3). For objects that are not in the
     /// UNOOSA registry, either a descriptive name (e.g., DEBRIS, if the object is identified as
     /// space debris) or UNKNOWN should be used.
@@ -177,7 +177,7 @@ pub struct RdmMetadata {
     pub international_designator: String,
     /// The satellite catalog used for the object (formatting rules specified in 5.2.3.3). The
     /// name should be taken from the appropriate SANA registry for catalog names, reference
-    /// [8].
+    /// `[8]`.
     ///
     /// **Examples**: SATCAT, ESA SST
     ///
@@ -203,7 +203,7 @@ pub struct RdmMetadata {
     pub object_type: Option<ObjectDescription>,
     /// Owner of the object (e.g., company, agency, or country owning the satellite). The value
     /// should be taken from the abbreviation column in the SANA organizations registry,
-    /// reference [6].
+    /// reference `[6]`.
     ///
     /// **Examples**: DLR, INTELSAT, ESA, UNKNOWN
     ///
@@ -213,7 +213,7 @@ pub struct RdmMetadata {
     pub object_owner: Option<String>,
     /// Operator of the object (e.g., company, agency, or country operating the satellite).
     /// The value should be taken from the abbreviation column in the SANA organizations
-    /// registry, reference [6].
+    /// registry, reference `[6]`.
     ///
     /// **Examples**: ESA, EUMETSAT
     ///
@@ -230,7 +230,7 @@ pub struct RdmMetadata {
     /// Celestial body orbited by the object and origin of the reference frame, which may be a
     /// natural solar system body (planets, asteroids, comets, and natural satellites),
     /// including any planet barycenter or the solar system barycenter. The value should be
-    /// taken from the orbit center column in the SANA orbit centers registry, reference [9].
+    /// taken from the orbit center column in the SANA orbit centers registry, reference `[9]`.
     ///
     /// **Examples**: EARTH, MOON, JUPITER
     ///
@@ -238,7 +238,7 @@ pub struct RdmMetadata {
     #[builder(into)]
     pub center_name: String,
     /// Time system for all data/metadata. The value should be taken from the name column in
-    /// the SANA time systems registry, reference [10].
+    /// the SANA time systems registry, reference `[10]`.
     ///
     /// **Examples**: UTC, TAI
     ///
@@ -254,7 +254,7 @@ pub struct RdmMetadata {
     pub epoch_tzero: Epoch,
     /// Reference frame in which the (optional) orbit information will be provided. The value
     /// should be taken from the keyword value name column in the SANA celestial body reference
-    /// frames registry, reference [11]. The reference frame must be the same for all orbit
+    /// frames registry, reference `[11]`. The reference frame must be the same for all orbit
     /// data elements, with the exception of the covariance matrix, for which a different
     /// reference frame may be specified, and the ground impact data. This keyword becomes
     /// mandatory if state vectors are provided in the data section.
@@ -308,7 +308,7 @@ pub struct RdmMetadata {
     #[builder(into)]
     pub solar_flux_prediction: Option<String>,
     /// Comma separated list of other bodies used in the simulation. The names of the bodies
-    /// should be taken from the SANA registry for orbit centers, reference [9]. If no other
+    /// should be taken from the SANA registry for orbit centers, reference `[9]`. If no other
     /// bodies are used in the simulation, the value should be NONE.
     ///
     /// **Examples**: MOON, SUN, JUPITER, NONE
@@ -355,7 +355,7 @@ pub struct RdmMetadata {
     /// BALLISTIC_COEFF) are valid. The units shall be kilometers, and the conventions
     /// specified in 5.2.4.1 and 5.3.4 must be followed.
     ///
-    /// **Examples**: 200 [km], 175 [km]
+    /// **Examples**: 200 `[km]`, 175 `[km]`
     ///
     /// **Units**: km
     ///
@@ -780,16 +780,16 @@ CENTER_NAME = EARTH
 TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-01-01T09:00:00
 ORBIT_LIFETIME = 5.5 [d]
-REENTRY_ALTITUDE = 80.0 [km]
+REENTRY_ALTITUDE = 80.0 `[km]`
 NOMINAL_REENTRY_EPOCH = 2023-01-06T19:45:33
 REENTRY_WINDOW_START = 2023-01-06T11:45:33
 REENTRY_WINDOW_END = 2023-01-06T22:12:56
 PROBABILITY_OF_IMPACT = 0.25
 PROBABILITY_OF_BURN_UP = 0.75
 EPOCH = 2023-01-01T09:30:12
-X = 4000.000000 [km]
-Y = 4000.000000 [km]
-Z = 4000.000000 [km]
+X = 4000.000000 `[km]`
+Y = 4000.000000 `[km]`
+Z = 4000.000000 `[km]`
 X_DOT = 7.000000 [km/s]
 Y_DOT = 7.000000 [km/s]
 Z_DOT = 7.000000 [km/s]
@@ -874,7 +874,7 @@ CENTER_NAME = EARTH
 TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-11-13T00:00:00
 ORBIT_LIFETIME = 2 [d]
-REENTRY_ALTITUDE = 80 [km]
+REENTRY_ALTITUDE = 80 `[km]`
 "#;
         let rdm = Rdm::from_kvn(kvn).unwrap();
         let xml = rdm.to_xml().unwrap();

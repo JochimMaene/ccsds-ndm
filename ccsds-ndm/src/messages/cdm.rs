@@ -90,7 +90,7 @@ pub struct CdmHeader {
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     pub creation_date: Epoch,
     /// Creating agency or owner/operator. Value should be the 'Abbreviation' value from the
-    /// SANA 'Organizations' registry (https://sanaregistry.org/r/organizations) for an
+    /// SANA 'Organizations' registry (<https://sanaregistry.org/r/organizations>) for an
     /// organization that has the Role of 'Conjunction Data Message Originator'. (See 5.2.9
     /// for formatting rules.)
     ///
@@ -446,7 +446,7 @@ pub struct CdmMetadata {
     pub object_designator: String,
     /// The satellite catalog used for the object. Value should be taken from the SANA
     /// 'Conjunction Data Message CATALOG_NAME' registry
-    /// (https://sanaregistry.org/r/cdm_catalog). (See 5.2.9 for formatting rules.)
+    /// (<https://sanaregistry.org/r/cdm_catalog>). (See 5.2.9 for formatting rules.)
     ///
     /// **Examples**: SATCAT
     ///
@@ -544,7 +544,7 @@ pub struct CdmMetadata {
     #[builder(into)]
     pub orbit_center: Option<String>,
     /// Name of the reference frame in which the state vector data are given. Value must be
-    /// selected from the list of values to the right (see reference [F1]) and be the same for
+    /// selected from the list of values to the right (see reference `[F1]`) and be the same for
     /// both Object1 and Object2.
     ///
     /// **Examples**: GCRF, EME2000, ITRF
@@ -896,209 +896,209 @@ pub struct CdmCovarianceMatrix {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// Object covariance matrix [1,1].
+    /// Object covariance matrix `[1,1]`.
     ///
     /// Units: m²
     pub cr_r: M2,
-    /// Object covariance matrix [2,1].
+    /// Object covariance matrix `[2,1]`.
     ///
     /// Units: m²
     pub ct_r: M2,
-    /// Object covariance matrix [2,2].
+    /// Object covariance matrix `[2,2]`.
     ///
     /// Units: m²
     pub ct_t: M2,
-    /// Object covariance matrix [3,1].
+    /// Object covariance matrix `[3,1]`.
     ///
     /// Units: m²
     pub cn_r: M2,
-    /// Object covariance matrix [3,2].
+    /// Object covariance matrix `[3,2]`.
     ///
     /// Units: m²
     pub cn_t: M2,
-    /// Object covariance matrix [3,3].
+    /// Object covariance matrix `[3,3]`.
     ///
     /// Units: m²
     pub cn_n: M2,
-    /// Object covariance matrix [4,1].
+    /// Object covariance matrix `[4,1]`.
     ///
     /// Units: m²/s
     pub crdot_r: M2s,
-    /// Object covariance matrix [4,2].
+    /// Object covariance matrix `[4,2]`.
     ///
     /// Units: m²/s
     pub crdot_t: M2s,
-    /// Object covariance matrix [4,3].
+    /// Object covariance matrix `[4,3]`.
     ///
     /// Units: m²/s
     pub crdot_n: M2s,
-    /// Object covariance matrix [4,4].
+    /// Object covariance matrix `[4,4]`.
     ///
     /// Units: m²/s²
     pub crdot_rdot: M2s2,
-    /// Object covariance matrix [5,1].
+    /// Object covariance matrix `[5,1]`.
     ///
     /// Units: m²/s
     pub ctdot_r: M2s,
-    /// Object covariance matrix [5,2].
+    /// Object covariance matrix `[5,2]`.
     ///
     /// Units: m²/s
     pub ctdot_t: M2s,
-    /// Object covariance matrix [5,3].
+    /// Object covariance matrix `[5,3]`.
     ///
     /// Units: m²/s
     pub ctdot_n: M2s,
-    /// Object covariance matrix [5,4].
+    /// Object covariance matrix `[5,4]`.
     ///
     /// Units: m²/s²
     pub ctdot_rdot: M2s2,
-    /// Object covariance matrix [5,5].
+    /// Object covariance matrix `[5,5]`.
     ///
     /// Units: m²/s²
     pub ctdot_tdot: M2s2,
-    /// Object covariance matrix [6,1].
+    /// Object covariance matrix `[6,1]`.
     ///
     /// Units: m²/s
     pub cndot_r: M2s,
-    /// Object covariance matrix [6,2].
+    /// Object covariance matrix `[6,2]`.
     ///
     /// Units: m²/s
     pub cndot_t: M2s,
-    /// Object covariance matrix [6,3].
+    /// Object covariance matrix `[6,3]`.
     ///
     /// Units: m²/s
     pub cndot_n: M2s,
-    /// Object covariance matrix [6,4].
+    /// Object covariance matrix `[6,4]`.
     ///
     /// Units: m²/s²
     pub cndot_rdot: M2s2,
-    /// Object covariance matrix [6,5].
+    /// Object covariance matrix `[6,5]`.
     ///
     /// Units: m²/s²
     pub cndot_tdot: M2s2,
-    /// Object covariance matrix [6,6].
+    /// Object covariance matrix `[6,6]`.
     ///
     /// Units: m²/s²
     pub cndot_ndot: M2s2,
 
-    /// Object covariance matrix [7,1].
+    /// Object covariance matrix `[7,1]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_r: Option<M3kg>,
-    /// Object covariance matrix [7,2].
+    /// Object covariance matrix `[7,2]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_t: Option<M3kg>,
-    /// Object covariance matrix [7,3].
+    /// Object covariance matrix `[7,3]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_n: Option<M3kg>,
-    /// Object covariance matrix [7,4].
+    /// Object covariance matrix `[7,4]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_rdot: Option<M3kgs>,
-    /// Object covariance matrix [7,5].
+    /// Object covariance matrix `[7,5]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_tdot: Option<M3kgs>,
-    /// Object covariance matrix [7,6].
+    /// Object covariance matrix `[7,6]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_ndot: Option<M3kgs>,
-    /// Object covariance matrix [7,7].
+    /// Object covariance matrix `[7,7]`.
     ///
     /// Units: m⁴/kg²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_drg: Option<M4kg2>,
 
-    /// Object covariance matrix [8,1].
+    /// Object covariance matrix `[8,1]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_r: Option<M3kg>,
-    /// Object covariance matrix [8,2].
+    /// Object covariance matrix `[8,2]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_t: Option<M3kg>,
-    /// Object covariance matrix [8,3].
+    /// Object covariance matrix `[8,3]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_n: Option<M3kg>,
-    /// Object covariance matrix [8,4].
+    /// Object covariance matrix `[8,4]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_rdot: Option<M3kgs>,
-    /// Object covariance matrix [8,5].
+    /// Object covariance matrix `[8,5]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_tdot: Option<M3kgs>,
-    /// Object covariance matrix [8,6].
+    /// Object covariance matrix `[8,6]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_ndot: Option<M3kgs>,
-    /// Object covariance matrix [8,7].
+    /// Object covariance matrix `[8,7]`.
     ///
     /// Units: m⁴/kg²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_drg: Option<M4kg2>,
-    /// Object covariance matrix [8,8].
+    /// Object covariance matrix `[8,8]`.
     ///
     /// Units: m⁴/kg²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_srp: Option<M4kg2>,
 
-    /// Object covariance matrix [9,1].
+    /// Object covariance matrix `[9,1]`.
     ///
     /// Units: m²/s²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_r: Option<M2s2>,
-    /// Object covariance matrix [9,2].
+    /// Object covariance matrix `[9,2]`.
     ///
     /// Units: m²/s²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_t: Option<M2s2>,
-    /// Object covariance matrix [9,3].
+    /// Object covariance matrix `[9,3]`.
     ///
     /// Units: m²/s²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_n: Option<M2s2>,
-    /// Object covariance matrix [9,4].
+    /// Object covariance matrix `[9,4]`.
     ///
     /// Units: m²/s³
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_rdot: Option<M2s3>,
-    /// Object covariance matrix [9,5].
+    /// Object covariance matrix `[9,5]`.
     ///
     /// Units: m²/s³
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_tdot: Option<M2s3>,
-    /// Object covariance matrix [9,6].
+    /// Object covariance matrix `[9,6]`.
     ///
     /// Units: m²/s³
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_ndot: Option<M2s3>,
-    /// Object covariance matrix [9,7].
+    /// Object covariance matrix `[9,7]`.
     ///
     /// Units: m³/(kg*s²)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_drg: Option<M3kgs2>,
-    /// Object covariance matrix [9,8].
+    /// Object covariance matrix `[9,8]`.
     ///
     /// Units: m³/(kg*s²)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_srp: Option<M3kgs2>,
-    /// Object covariance matrix [9,9].
+    /// Object covariance matrix `[9,9]`.
     ///
     /// Units: m²/s⁴
     #[serde(default, skip_serializing_if = "Option::is_none")]

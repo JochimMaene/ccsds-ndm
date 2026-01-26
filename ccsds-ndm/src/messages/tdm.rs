@@ -108,8 +108,8 @@ pub struct TdmHeader {
     /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
     pub creation_date: Epoch,
     /// Creating agency. Value should be an entry from the ‘Abbreviation’ column in the SANA
-    /// Organizations Registry, https://sanaregistry.org/r/organizations/organizations.html
-    /// (reference [11]).
+    /// Organizations Registry, <https://sanaregistry.org/r/organizations/organizations.html>
+    /// (reference `[11]`).
     ///
     /// **Examples**: CNES, ESA, GSFC, DLR, JPL, JAXA
     ///
@@ -224,7 +224,7 @@ pub struct TdmMetadata {
     /// The TIME_SYSTEM keyword shall specify the time system used for timetags in the
     /// associated Data Section. This should be UTC for ground-based data. The value associated
     /// with this keyword must be selected from the full set of allowed values enumerated in
-    /// the SANA Time Systems Registry https://sanaregistry.org/r/time_systems (reference [12]).
+    /// the SANA Time Systems Registry <https://sanaregistry.org/r/time_systems> (reference `[12]`).
     /// (See annex B.)
     ///
     /// **Examples**: UTC, TAI, GPS, SCLK
@@ -255,7 +255,7 @@ pub struct TdmMetadata {
     /// (max index is 5). At least two participants must be specified for most sessions; for
     /// some special TDMs such as tropospheric media, only one participant need be listed.
     ///
-    /// **Examples**: DSS-63-S400K, ROSETTA, <Quasar catalog name>, 1997-061A, UNKNOWN
+    /// **Examples**: DSS-63-S400K, ROSETTA, `<Quasar catalog name>`, 1997-061A, UNKNOWN
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[builder(into)]

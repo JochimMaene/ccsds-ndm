@@ -130,9 +130,9 @@ pub struct OpmMetadata {
     pub comment: Vec<String>,
     /// Spacecraft name for which orbit state data is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
-    /// Office of Outer Space Affairs designator index (reference [3], which include Object name
+    /// Office of Outer Space Affairs designator index (reference ``[3]``, which include Object name
     /// and international designator of the participant). If OBJECT_NAME is not listed in reference
-    /// [3] or the content is either unknown or cannot be disclosed, the value should be set to
+    /// `[3]` or the content is either unknown or cannot be disclosed, the value should be set to
     /// UNKNOWN.
     ///
     /// **Examples**: EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
@@ -143,10 +143,10 @@ pub struct OpmMetadata {
     /// Object identifier of the object for which orbit state data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
     /// international spacecraft designator as published in the UN Office of Outer Space Affairs
-    /// designator index (reference [3]). Recommended values have the format YYYY-NNNP{PP}, where:
+    /// designator index (reference ``[3]``). Recommended values have the format YYYY-NNNP{PP}, where:
     /// YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
     /// zeros). P{PP} = At least one capital letter for the identification of the part brought into
-    /// space by the launch. If the asset is not listed in reference [3], the UN Office of Outer
+    /// space by the launch. If the asset is not listed in reference ``[3]``, the UN Office of Outer
     /// Space Affairs designator index format is not used, or the content is either unknown or
     /// cannot be disclosed, the value should be set to UNKNOWN.
     ///

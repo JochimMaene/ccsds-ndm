@@ -5,11 +5,11 @@
 use crate::common::AdmHeader;
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
-use std::borrow::Cow;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 //----------------------------------------------------------------------
 // Root AEM Structure
@@ -298,27 +298,32 @@ impl AemMetadata {
         if self.interpolation_method.is_some() && self.interpolation_degree.is_none() {
             return Err(ValidationError::MissingRequiredField {
                 block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)"),
+                field: Cow::Borrowed(
+                    "INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)",
+                ),
                 line: None,
-            }.into());
+            }
+            .into());
         }
 
         // Validation Rule: EULER_ROT_SEQ is required if ATTITUDE_TYPE includes EULER_ANGLE
         if self.attitude_type.contains("EULER_ANGLE") && self.euler_rot_seq.is_none() {
-             return Err(ValidationError::MissingRequiredField {
+            return Err(ValidationError::MissingRequiredField {
                 block: Cow::Borrowed("AEM Metadata"),
                 field: Cow::Borrowed("EULER_ROT_SEQ (required for EULER_ANGLE types)"),
                 line: None,
-            }.into());
+            }
+            .into());
         }
 
-         // Validation Rule: ANGVEL_FRAME is required if ATTITUDE_TYPE includes ANGVEL
+        // Validation Rule: ANGVEL_FRAME is required if ATTITUDE_TYPE includes ANGVEL
         if self.attitude_type.contains("ANGVEL") && self.angvel_frame.is_none() {
-             return Err(ValidationError::MissingRequiredField {
+            return Err(ValidationError::MissingRequiredField {
                 block: Cow::Borrowed("AEM Metadata"),
                 field: Cow::Borrowed("ANGVEL_FRAME (required for ANGVEL types)"),
                 line: None,
-            }.into());
+            }
+            .into());
         }
 
         Ok(())
@@ -504,75 +509,111 @@ impl AemData {
                 "QUATERNION" => {
                     if state.quaternion_ephemeris.is_none() {
                         return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!("Data line {} expected QUATERNION data", idx + 1)),
-                            line: None
-                        }.into());
+                            message: Cow::Owned(format!(
+                                "Data line {} expected QUATERNION data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
                     }
-                },
+                }
                 "QUATERNION/DERIVATIVE" => {
                     if state.quaternion_derivative.is_none() {
                         return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!("Data line {} expected QUATERNION/DERIVATIVE data", idx + 1)),
-                            line: None
-                        }.into());
+                            message: Cow::Owned(format!(
+                                "Data line {} expected QUATERNION/DERIVATIVE data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
                     }
-                },
-                 "QUATERNION/ANGVEL" => {
+                }
+                "QUATERNION/ANGVEL" => {
                     if state.quaternion_ang_vel.is_none() {
                         return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!("Data line {} expected QUATERNION/ANGVEL data", idx + 1)),
-                            line: None
-                        }.into());
+                            message: Cow::Owned(format!(
+                                "Data line {} expected QUATERNION/ANGVEL data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
                     }
-                },
+                }
                 "EULER_ANGLE" => {
                     if state.euler_angle.is_none() {
                         return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!("Data line {} expected EULER_ANGLE data", idx + 1)),
-                            line: None
-                        }.into());
+                            message: Cow::Owned(format!(
+                                "Data line {} expected EULER_ANGLE data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
                     }
-                },
+                }
                 "EULER_ANGLE/DERIVATIVE" => {
                     if state.euler_angle_derivative.is_none() {
                         return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!("Data line {} expected EULER_ANGLE/DERIVATIVE data", idx + 1)),
-                            line: None
-                        }.into());
+                            message: Cow::Owned(format!(
+                                "Data line {} expected EULER_ANGLE/DERIVATIVE data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
                     }
-                },
-                 "EULER_ANGLE/ANGVEL" => {
+                }
+                "EULER_ANGLE/ANGVEL" => {
                     if state.euler_angle_ang_vel.is_none() {
                         return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!("Data line {} expected EULER_ANGLE/ANGVEL data", idx + 1)),
-                            line: None
-                        }.into());
+                            message: Cow::Owned(format!(
+                                "Data line {} expected EULER_ANGLE/ANGVEL data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
                     }
-                },
+                }
                 "SPIN" => {
                     if state.spin.is_none() {
-                         return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!("Data line {} expected SPIN data", idx + 1)),
-                            line: None
-                        }.into());
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected SPIN data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
                     }
-                },
+                }
                 "SPIN/NUTATION" => {
                     if state.spin_nutation.is_none() {
-                         return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!("Data line {} expected SPIN/NUTATION data", idx + 1)),
-                            line: None
-                        }.into());
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected SPIN/NUTATION data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
                     }
-                },
+                }
                 "SPIN/NUTATION_MOM" => {
                     if state.spin_nutation_mom.is_none() {
-                         return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!("Data line {} expected SPIN/NUTATION_MOM data", idx + 1)),
-                            line: None
-                        }.into());
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected SPIN/NUTATION_MOM data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
                     }
-                },
+                }
                 _ => {
                     // Unknown type, or maybe user defined.
                     // For now, we strictly validate against known types if possible,
@@ -580,8 +621,9 @@ impl AemData {
                     // However, XSD lists these as enumerations.
                     return Err(ValidationError::Generic {
                         message: Cow::Owned(format!("Unknown ATTITUDE_TYPE: {}", attitude_type)),
-                        line: None
-                    }.into());
+                        line: None,
+                    }
+                    .into());
                 }
             }
         }
