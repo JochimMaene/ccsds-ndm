@@ -30,8 +30,10 @@ pub struct Ocm {
     pub header: OdmHeader,
     pub body: OcmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
 
@@ -228,6 +230,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Free-text field containing the name of the object. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from either
@@ -242,6 +245,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_name: Option<String>,
     /// Free-text field containing an international designator for the object as assigned by
     /// the UN Committee on Space Research (COSPAR). Such designator values shall have the
@@ -257,6 +261,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub international_designator: Option<String>,
     /// Free-text field containing the satellite catalog source (or source agency or operator,
     /// value to be drawn from the SANA registry list of Space Object Catalogs at
@@ -269,6 +274,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub catalog_name: Option<String>,
     /// Free-text field specification of the unique satellite identification designator for the
     /// object, as reflected in the catalog whose name is 'CATALOG_NAME'. If the ID is not known
@@ -279,6 +285,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_designator: Option<String>,
     /// Free-text comma-delimited field containing alternate name(s) of this space object,
     /// including assigned names used by spacecraft operator, State Actors, commercial SSA
@@ -288,6 +295,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub alternate_names: Option<String>,
     /// Free-text field containing originator or programmatic Point-of-Contact (POC) for OCM.
     ///
@@ -295,6 +303,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_poc: Option<String>,
     /// Free-text field containing contact position of the originator PoC.
     ///
@@ -302,6 +311,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_position: Option<String>,
     /// Free-text field containing originator PoC phone number.
     ///
@@ -309,6 +319,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_phone: Option<String>,
     /// Free-text field containing originator PoC email address.
     ///
@@ -316,6 +327,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_email: Option<String>,
     /// Free-text field containing originator's physical address information for OCM creator
     /// (suggest comma-delimited address lines).
@@ -324,6 +336,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_address: Option<String>,
     /// Free-text field containing the creating agency or operator (value should be drawn from
     /// the 'Abbreviation' column of the SANA Organizations registry at
@@ -333,6 +346,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_org: Option<String>,
     /// Free-text field containing technical PoC for OCM.
     ///
@@ -340,6 +354,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_poc: Option<String>,
     /// Free-text field containing contact position of the technical PoC.
     ///
@@ -347,6 +362,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_position: Option<String>,
     /// Free-text field containing technical PoC phone number.
     ///
@@ -354,6 +370,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_phone: Option<String>,
     /// Free-text field containing technical PoC email address.
     ///
@@ -361,6 +378,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_email: Option<String>,
     /// Free-text field containing technical PoC physical address information for OCM creator
     /// (suggest comma-delimited address lines).
@@ -369,6 +387,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_address: Option<String>,
     /// Free-text field containing an ID that uniquely identifies the previous message from
     /// this message originator for this space object. The format and content of the message
@@ -380,6 +399,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub previous_message_id: Option<String>,
     /// Free-text field containing an ID that uniquely identifies the next message from this
     /// message originator for this space object. The format and content of the message
@@ -390,6 +410,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub next_message_id: Option<String>,
     /// Free-text field containing a unique identifier of Attitude Data Message (ADM)
     /// (reference [10]) that are linked (relevant) to this Orbit Data Message.
@@ -398,6 +419,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub adm_msg_link: Option<String>,
     /// Free-text field containing a unique identifier of Conjunction Data Message (CDM)
     /// (reference [14]) that are linked (relevant) to this Orbit Data Message.
@@ -406,6 +428,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cdm_msg_link: Option<String>,
     /// Free-text field containing a unique identifier of Pointing Request Message (PRM)
     /// (reference [13]) that are linked (relevant) to this Orbit Data Message.
@@ -414,6 +437,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub prm_msg_link: Option<String>,
     /// Free-text field containing a unique identifier of Reentry Data Message (RDM)
     /// (reference [12]) that are linked (relevant) to this Orbit Data Message.
@@ -422,6 +446,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub rdm_msg_link: Option<String>,
     /// Free-text string containing a comma-separated list of file name(s) and/or associated
     /// identification number(s) of Tracking Data Message (TDM) (reference [9]) observations
@@ -431,6 +456,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tdm_msg_link: Option<String>,
     /// Free-text field containing the operator of the space object.
     ///
@@ -438,6 +464,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub operator: Option<String>,
     /// Free-text field containing the owner of the space object.
     ///
@@ -445,6 +472,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub owner: Option<String>,
     /// Free-text field containing the name of the country, country code, or country
     /// abbreviation where the space object owner is based.
@@ -453,6 +481,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub country: Option<String>,
     /// Free-text field containing the name of the constellation to which this space object
     /// belongs.
@@ -461,6 +490,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub constellation: Option<String>,
     /// Specification of the type of object. Select from the accepted set of values indicated
     /// in annex B, subsection B11.
@@ -479,6 +509,7 @@ pub struct OcmMetadata {
     /// **Examples**: UTC
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
+    #[builder(into)]
     pub time_system: String,
     /// Default epoch to which all relative times are referenced in data blocks (for format
     /// specification, see 7.5.10). The time scale of EPOCH_TZERO is controlled via the
@@ -497,6 +528,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ops_status: Option<String>,
     /// Specification of the type of orbit. Select from the accepted set of values indicated in
     /// annex B, subsection B14.
@@ -505,6 +537,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub orbit_category: Option<String>,
     /// Comma-delimited list of elements of information data blocks included in this message.
     /// The order shall be the same as the order of the data blocks in the message. Values shall
@@ -516,6 +549,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ocm_data_elements: Option<String>,
     /// Defines the number of spacecraft clock counts existing at EPOCH_TZERO. This is only
     /// used if the SCLK timescale is employed by the user.
@@ -616,6 +650,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub eop_source: Option<String>,
     /// Free-text field specifying the method used to select or interpolate sequential EOP data.
     ///
@@ -623,6 +658,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub interp_method_eop: Option<String>,
     /// Free-text field specifying the source and version of the message originator's celestial
     /// body (e.g., Sun/Earth/Planetary) ephemeris data used in the creation of this message.
@@ -631,6 +667,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub celestial_source: Option<String>,
 }
 
@@ -793,15 +830,18 @@ impl ToKvn for OcmMetadata {
 pub struct OcmData {
     /// List of trajectory state time history blocks.
     #[serde(rename = "traj", default)]
+    #[builder(default)]
     pub traj: Vec<OcmTrajState>,
     /// Space object physical characteristics.
     #[serde(rename = "phys", default, skip_serializing_if = "Option::is_none")]
     pub phys: Option<OcmPhysicalDescription>,
     /// List of covariance time history blocks.
     #[serde(rename = "cov", default)]
+    #[builder(default)]
     pub cov: Vec<OcmCovarianceMatrix>,
     /// List of maneuver specifications.
     #[serde(rename = "man", default)]
+    #[builder(default)]
     pub man: Vec<OcmManeuverParameters>,
     /// Perturbation parameters.
     #[serde(rename = "pert", default, skip_serializing_if = "Option::is_none")]

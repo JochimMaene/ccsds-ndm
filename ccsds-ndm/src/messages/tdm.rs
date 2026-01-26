@@ -29,8 +29,10 @@ pub struct Tdm {
     pub header: TdmHeader,
     pub body: TdmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
 
@@ -88,6 +90,7 @@ pub struct TdmHeader {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Data creation date/time in UTC. (For format specification, see 4.3.9.)
     ///
@@ -102,6 +105,7 @@ pub struct TdmHeader {
     /// **Examples**: CNES, ESA, GSFC, DLR, JPL, JAXA
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
+    #[builder(into)]
     pub originator: String,
     /// ID that uniquely identifies a message from a given originator. The format and content
     /// of the message identifier value are at the discretion of the originator.
@@ -110,6 +114,7 @@ pub struct TdmHeader {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub message_id: Option<String>,
 }
 
@@ -132,6 +137,7 @@ impl ToKvn for TdmHeader {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct TdmBody {
     #[serde(rename = "segment")]
+    #[builder(default)]
     pub segments: Vec<TdmSegment>,
 }
 
@@ -182,6 +188,7 @@ impl ToKvn for TdmSegment {
 pub struct TdmMetadata {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// The TRACK_ID keyword specifies a unique identifier for the tracking data in the
     /// associated data section. The value may be a freely selected string of characters and
@@ -193,6 +200,7 @@ pub struct TdmMetadata {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub track_id: Option<String>,
     /// Comma-separated list of data types in the Data Section. The elements of the list shall
     /// be selected from the data types shown in table 3-5, with the exception of the
@@ -202,6 +210,7 @@ pub struct TdmMetadata {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub data_types: Option<String>,
     /// The TIME_SYSTEM keyword shall specify the time system used for timetags in the
     /// associated Data Section. This should be UTC for ground-based data. The value associated
@@ -212,6 +221,7 @@ pub struct TdmMetadata {
     /// **Examples**: UTC, TAI, GPS, SCLK
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
+    #[builder(into)]
     pub time_system: String,
     /// The START_TIME keyword shall specify the UTC start time of the total time span covered
     /// by the tracking data immediately following this Metadata Section. (For format
@@ -239,18 +249,23 @@ pub struct TdmMetadata {
     /// **Examples**: DSS-63-S400K, ROSETTA, <Quasar catalog name>, 1997-061A, UNKNOWN
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
+    #[builder(into)]
     pub participant_1: String,
     /// The second participant in a tracking data session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub participant_2: Option<String>,
     /// The third participant in a tracking data session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub participant_3: Option<String>,
     /// The fourth participant in a tracking data session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub participant_4: Option<String>,
     /// The fifth participant in a tracking data session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub participant_5: Option<String>,
     /// The MODE keyword shall reflect the tracking mode associated with the Data Section of
     /// the segment. The value ‘SEQUENTIAL’ applies for most sequential signal paths; the name
@@ -286,6 +301,7 @@ pub struct TdmMetadata {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub transmit_band: Option<String>,
     /// The RECEIVE_BAND keyword shall indicate the frequency band for received frequencies.
     /// Although not required in general, the RECEIVE_BAND must be present if the MODE is
@@ -296,6 +312,7 @@ pub struct TdmMetadata {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub receive_band: Option<String>,
     /// The TURNAROUND_NUMERATOR keyword shall indicate the numerator of the turnaround ratio
     /// that is necessary to calculate the coherent downlink from the uplink frequency.
@@ -406,6 +423,7 @@ pub struct TdmMetadata {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub interpolation: Option<String>,
     /// The INTERPOLATION_DEGREE keyword shall specify the recommended degree of the
     /// interpolating polynomial used to calculate a transmit phase count at an arbitrary time
@@ -564,26 +582,31 @@ pub struct TdmMetadata {
     ///
     /// Examples: SATELLITE_A_EPHEM27
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name_1: Option<String>,
     /// Unique name of the external ephemeris file used for participant 2.
     ///
     /// Examples: SATELLITE_A_EPHEM27
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name_2: Option<String>,
     /// Unique name of the external ephemeris file used for participant 3.
     ///
     /// Examples: SATELLITE_A_EPHEMERIS
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name_3: Option<String>,
     /// Unique name of the external ephemeris file used for participant 4.
     ///
     /// Examples: SATELLITE_A_EPHEMERIS
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name_4: Option<String>,
     /// Unique name of the external ephemeris file used for participant 5.
     ///
     /// Examples: SATELLITE_A_EPHEMERIS
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name_5: Option<String>,
 }
 
@@ -802,9 +825,11 @@ impl ToKvn for TdmMetadata {
 pub struct TdmData {
     /// Comments.
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Tracking data records.
     #[serde(rename = "observation")]
+    #[builder(default)]
     pub observations: Vec<TdmObservation>,
 }
 

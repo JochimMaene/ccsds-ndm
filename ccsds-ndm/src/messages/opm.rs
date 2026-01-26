@@ -30,8 +30,10 @@ pub struct Opm {
     pub header: OdmHeader,
     pub body: OpmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
 
@@ -124,6 +126,7 @@ pub struct OpmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft name for which orbit state data is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
@@ -135,6 +138,7 @@ pub struct OpmMetadata {
     /// **Examples**: EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
+    #[builder(into)]
     pub object_name: String,
     /// Object identifier of the object for which orbit state data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
@@ -149,6 +153,7 @@ pub struct OpmMetadata {
     /// **Examples**: 2000-052A 1996-068A 2000-053A 1996-008A UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
+    #[builder(into)]
     pub object_id: String,
     /// Origin of the OPM reference frame, which shall be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -159,6 +164,7 @@ pub struct OpmMetadata {
     /// STS 106 EROS
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
+    #[builder(into)]
     pub center_name: String,
     /// Reference frame in which the state vector and optional Keplerian element data are given.
     /// Use of values other than those in 3.2.3.3 should be documented in an ICD.
@@ -166,6 +172,7 @@ pub struct OpmMetadata {
     /// **Examples**: ICRF EME2000 ITRF2000 TEME
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
+    #[builder(into)]
     pub ref_frame: String,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
     /// 7.5.10 for formatting rules.)
@@ -181,6 +188,7 @@ pub struct OpmMetadata {
     /// **Examples**: UTC, TAI, TT, GPS, TDB, TCB
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
+    #[builder(into)]
     pub time_system: String,
 }
 
@@ -208,6 +216,7 @@ impl ToKvn for OpmMetadata {
 pub struct OpmData {
     /// Comments (see 7.8 for formatting rules).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
 
     /// State vector components (position and velocity).
@@ -244,6 +253,7 @@ pub struct OpmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub maneuver_parameters: Vec<ManeuverParameters>,
 
     /// User-defined parameters.
@@ -331,6 +341,7 @@ pub struct KeplerianElements {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Semi-major axis
     ///
@@ -432,6 +443,7 @@ pub struct ManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of ignition (see 7.5.10 for formatting rules)
     ///
@@ -456,6 +468,7 @@ pub struct ManeuverParameters {
     /// select from the accepted set of values indicated in 3.2.4.11.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
+    #[builder(into)]
     pub man_ref_frame: String,
     /// 1st component of the velocity increment
     ///

@@ -21,8 +21,10 @@ pub struct Cdm {
     pub header: CdmHeader,
     pub body: CdmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
 
@@ -65,6 +67,7 @@ pub struct CdmHeader {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Message creation date/time in Coordinated Universal Time (UTC). (See 6.3.2.6 for
     /// formatting rules.)
@@ -81,6 +84,7 @@ pub struct CdmHeader {
     /// **Examples**: JSPOC, ESA SST, CAESAR, JPL, SDC
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
+    #[builder(into)]
     pub originator: String,
     /// Spacecraft name(s) for which the CDM is provided.
     ///
@@ -88,6 +92,7 @@ pub struct CdmHeader {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub message_for: Option<String>,
     /// ID that uniquely identifies a message from a given originator. The format and content
     /// of the message identifier value are at the discretion of the originator. (See 5.2.9
@@ -96,6 +101,7 @@ pub struct CdmHeader {
     /// **Examples**: 201113719185, ABC-12_34
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
+    #[builder(into)]
     pub message_id: String,
 }
 
@@ -179,6 +185,7 @@ pub struct RelativeMetadataData {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)
     ///
@@ -278,6 +285,7 @@ pub struct RelativeMetadataData {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub collision_probability_method: Option<String>,
 }
 
@@ -408,6 +416,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// The object to which the metadata and data apply (Object1 or Object2).
     ///
@@ -420,6 +429,7 @@ pub struct CdmMetadata {
     /// **Examples**: 12345
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
+    #[builder(into)]
     pub object_designator: String,
     /// The satellite catalog used for the object. Value should be taken from the SANA
     /// 'Conjunction Data Message CATALOG_NAME' registry
@@ -428,12 +438,14 @@ pub struct CdmMetadata {
     /// **Examples**: SATCAT
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
+    #[builder(into)]
     pub catalog_name: String,
     /// Spacecraft name for the object.
     ///
     /// **Examples**: SPOT, ENVISAT, IRIDIUM, INTELSAT
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
+    #[builder(into)]
     pub object_name: String,
     /// The full international designator for the object. Values shall have the format
     /// YYYY-NNNP{PP}, where: YYYY = year of launch; NNN = three-digit serial number of launch
@@ -444,6 +456,7 @@ pub struct CdmMetadata {
     /// **Examples**: 2002-021A, UNKNOWN
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
+    #[builder(into)]
     pub international_designator: String,
     /// The object type.
     ///
@@ -458,6 +471,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub operator_contact_position: Option<String>,
     /// Contact organization of the object.
     ///
@@ -465,6 +479,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub operator_organization: Option<String>,
     /// Phone number of the contact position or organization for the object.
     ///
@@ -472,6 +487,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub operator_phone: Option<String>,
     /// Email address of the contact position or organization of the object.
     ///
@@ -479,6 +495,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub operator_email: Option<String>,
     /// Unique name of the external ephemeris file used for the object or NONE. This is used to
     /// indicate whether an external (i.e., Owner/Operator [O/O] provided) ephemeris file was
@@ -488,6 +505,7 @@ pub struct CdmMetadata {
     /// **Examples**: EPHEMERIS SATELLITE A, NONE
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
+    #[builder(into)]
     pub ephemeris_name: String,
     /// Method used to calculate the covariance during the OD that produced the state vector, or
     /// whether an arbitrary, non-calculated default value was used. Caution should be used
@@ -510,6 +528,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub orbit_center: Option<String>,
     /// Name of the reference frame in which the state vector data are given. Value must be
     /// selected from the list of values to the right (see reference [F1]) and be the same for
@@ -526,6 +545,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub gravity_model: Option<String>,
     /// The atmospheric density model used for the OD of the object. If 'NONE' is specified,
     /// then no atmospheric model was used.
@@ -534,6 +554,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub atmospheric_model: Option<String>,
     /// The N-body gravitational perturbations used for the OD of the object. If 'NONE' is
     /// specified, then no third-body gravitational perturbations were used.
@@ -542,6 +563,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub n_body_perturbations: Option<String>,
     /// Indication of whether solar radiation pressure perturbations were used for the OD of the
     /// object.
@@ -639,6 +661,7 @@ impl CdmMetadata {
 pub struct CdmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Orbit Determination Parameters.
     #[serde(
@@ -741,6 +764,7 @@ pub struct AdditionalParameters {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
 
     /// The actual area of the object. (See annex E for definition.)

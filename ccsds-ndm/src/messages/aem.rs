@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::AdmHeader;
-use crate::error::Result;
+use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
+use std::borrow::Cow;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
@@ -30,8 +31,10 @@ pub struct Aem {
     pub header: AdmHeader,
     pub body: AemBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
 
@@ -62,7 +65,23 @@ impl Ndm for Aem {
 
 impl Aem {
     pub fn validate(&self) -> Result<()> {
-        // Validation logic can be added here
+        self.body.validate()
+    }
+}
+
+impl AemBody {
+    pub fn validate(&self) -> Result<()> {
+        for segment in &self.segment {
+            segment.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl AemSegment {
+    pub fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate(&self.metadata.attitude_type)?;
         Ok(())
     }
 }
@@ -123,6 +142,7 @@ pub struct AemMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
@@ -133,6 +153,7 @@ pub struct AemMetadata {
     /// **Examples**: EUTELSAT W1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub object_name: String,
     /// Spacecraft identifier of the object corresponding to the attitude data to be given. While
     /// there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
@@ -147,6 +168,7 @@ pub struct AemMetadata {
     /// **Examples**: 2000-052A
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub object_id: String,
     /// Celestial body orbited by the object, which may be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -156,6 +178,7 @@ pub struct AemMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub center_name: Option<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
@@ -163,6 +186,7 @@ pub struct AemMetadata {
     /// **Examples**: ICRF, SC_BODY_1, INSTRUMENT_A
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
@@ -170,6 +194,7 @@ pub struct AemMetadata {
     /// **Examples**: SC_BODY_1, INSTRUMENT_A
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Time system used for both attitude ephemeris data and metadata. The set of allowed values
     /// is described in annex B, subsection B2.
@@ -177,6 +202,7 @@ pub struct AemMetadata {
     /// **Examples**: UTC, TAI
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub time_system: String,
     /// Start of TOTAL time span covered by attitude ephemeris data immediately following this
     /// metadata block.
@@ -219,6 +245,7 @@ pub struct AemMetadata {
     /// EULER_ANGLE/DERIVATIVE, EULER_ANGLE/ANGVEL, SPIN, SPIN/NUTATION, SPIN/NUTATION_MOM
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub attitude_type: String,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
     /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
@@ -241,6 +268,7 @@ pub struct AemMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub angvel_frame: Option<String>,
     /// Recommended interpolation method for attitude ephemeris data in the block immediately
     /// following this metadata block.
@@ -249,6 +277,7 @@ pub struct AemMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub interpolation_method: Option<String>,
     /// Recommended interpolation degree for attitude ephemeris data in the block immediately
     /// following this metadata block. It must be an integer value. This keyword must be used if
@@ -259,6 +288,39 @@ pub struct AemMetadata {
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation_degree: Option<std::num::NonZeroU32>,
+}
+
+impl AemMetadata {
+    pub fn validate(&self) -> Result<()> {
+        // Validation Rule: INTERPOLATION_DEGREE is required if INTERPOLATION_METHOD is used
+        if self.interpolation_method.is_some() && self.interpolation_degree.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("AEM Metadata"),
+                field: Cow::Borrowed("INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)"),
+                line: None,
+            }.into());
+        }
+
+        // Validation Rule: EULER_ROT_SEQ is required if ATTITUDE_TYPE includes EULER_ANGLE
+        if self.attitude_type.contains("EULER_ANGLE") && self.euler_rot_seq.is_none() {
+             return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("AEM Metadata"),
+                field: Cow::Borrowed("EULER_ROT_SEQ (required for EULER_ANGLE types)"),
+                line: None,
+            }.into());
+        }
+
+         // Validation Rule: ANGVEL_FRAME is required if ATTITUDE_TYPE includes ANGVEL
+        if self.attitude_type.contains("ANGVEL") && self.angvel_frame.is_none() {
+             return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("AEM Metadata"),
+                field: Cow::Borrowed("ANGVEL_FRAME (required for ANGVEL types)"),
+                line: None,
+            }.into());
+        }
+
+        Ok(())
+    }
 }
 
 impl ToKvn for AemMetadata {
@@ -305,11 +367,13 @@ pub struct AemData {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Attitude ephemeris data lines.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.4.
     #[serde(rename = "attitudeState")]
+    #[builder(default)]
     pub attitude_states: Vec<AemAttitudeStateWrapper>,
 }
 
@@ -428,6 +492,98 @@ impl crate::traits::ToKvn for AemAttitudeStateWrapper {
         if let Some(content) = self.content() {
             content.write_kvn(writer);
         }
+    }
+}
+
+impl AemData {
+    pub fn validate(&self, attitude_type: &str) -> Result<()> {
+        for (idx, state) in self.attitude_states.iter().enumerate() {
+            match attitude_type {
+                "QUATERNION" => {
+                    if state.quaternion_ephemeris.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!("Data line {} expected QUATERNION data", idx + 1)),
+                            line: None
+                        }.into());
+                    }
+                },
+                "QUATERNION/DERIVATIVE" => {
+                    if state.quaternion_derivative.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!("Data line {} expected QUATERNION/DERIVATIVE data", idx + 1)),
+                            line: None
+                        }.into());
+                    }
+                },
+                 "QUATERNION/ANGVEL" => {
+                    if state.quaternion_ang_vel.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!("Data line {} expected QUATERNION/ANGVEL data", idx + 1)),
+                            line: None
+                        }.into());
+                    }
+                },
+                "EULER_ANGLE" => {
+                    if state.euler_angle.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!("Data line {} expected EULER_ANGLE data", idx + 1)),
+                            line: None
+                        }.into());
+                    }
+                },
+                "EULER_ANGLE/DERIVATIVE" => {
+                    if state.euler_angle_derivative.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!("Data line {} expected EULER_ANGLE/DERIVATIVE data", idx + 1)),
+                            line: None
+                        }.into());
+                    }
+                },
+                 "EULER_ANGLE/ANGVEL" => {
+                    if state.euler_angle_ang_vel.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!("Data line {} expected EULER_ANGLE/ANGVEL data", idx + 1)),
+                            line: None
+                        }.into());
+                    }
+                },
+                "SPIN" => {
+                    if state.spin.is_none() {
+                         return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!("Data line {} expected SPIN data", idx + 1)),
+                            line: None
+                        }.into());
+                    }
+                },
+                "SPIN/NUTATION" => {
+                    if state.spin_nutation.is_none() {
+                         return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!("Data line {} expected SPIN/NUTATION data", idx + 1)),
+                            line: None
+                        }.into());
+                    }
+                },
+                "SPIN/NUTATION_MOM" => {
+                    if state.spin_nutation_mom.is_none() {
+                         return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!("Data line {} expected SPIN/NUTATION_MOM data", idx + 1)),
+                            line: None
+                        }.into());
+                    }
+                },
+                _ => {
+                    // Unknown type, or maybe user defined.
+                    // For now, we strictly validate against known types if possible,
+                    // but since the string is open-ended in some contexts, we might warn.
+                    // However, XSD lists these as enumerations.
+                    return Err(ValidationError::Generic {
+                        message: Cow::Owned(format!("Unknown ATTITUDE_TYPE: {}", attitude_type)),
+                        line: None
+                    }.into());
+                }
+            }
+        }
+        Ok(())
     }
 }
 

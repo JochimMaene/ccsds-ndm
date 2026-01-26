@@ -24,14 +24,17 @@ use serde::Serialize;
 pub struct CombinedNdm {
     /// Message Identifier (optional).
     #[serde(rename = "MESSAGE_ID", skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
 
     /// Comments (optional).
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comments: Vec<String>,
 
     /// List of contained navigation messages.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub messages: Vec<MessageType>,
 }
 

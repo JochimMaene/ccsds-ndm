@@ -31,8 +31,10 @@ pub struct Apm {
     pub header: AdmHeader,
     pub body: ApmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
 
@@ -141,6 +143,7 @@ pub struct ApmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
@@ -151,6 +154,7 @@ pub struct ApmMetadata {
     /// **Examples**: EUTELSAT W1, MARS PATHFINDER, UNKNOWN
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
+    #[builder(into)]
     pub object_name: String,
     /// Spacecraft identifier of the object corresponding to the attitude data to be given. While
     /// there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
@@ -165,6 +169,7 @@ pub struct ApmMetadata {
     /// **Examples**: 2000-052A
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
+    #[builder(into)]
     pub object_id: String,
     /// Celestial body orbited by the object, which may be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -174,6 +179,7 @@ pub struct ApmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub center_name: Option<String>,
     /// Time system used for attitude and maneuver data. The set of allowed values is described in
     /// annex B, subsection B2.
@@ -181,6 +187,7 @@ pub struct ApmMetadata {
     /// **Examples**: UTC, TAI
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
+    #[builder(into)]
     pub time_system: String,
 }
 
@@ -204,6 +211,7 @@ pub struct ApmData {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of the attitude elements and optional logical blocks.
     ///
@@ -218,6 +226,7 @@ pub struct ApmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub quaternion_state: Vec<QuaternionState>,
     /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
     /// block is present. (See annex F for conventions and further detail.)
@@ -228,6 +237,7 @@ pub struct ApmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub euler_angle_state: Vec<EulerAngleState>,
     /// Angular velocity vector. All mandatory elements are to be provided if the block is present.
     /// (See annex F for conventions and further detail.)
@@ -238,18 +248,21 @@ pub struct ApmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub angular_velocity: Vec<AngVelState>,
     /// Spin. All mandatory elements are to be provided if the block is present. (See annex F for
     /// conventions and further detail.)
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(rename = "spin", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub spin: Vec<SpinState>,
     /// Inertia. All mandatory elements are to be provided if the block is present. (See annex F
     /// for conventions and further detail.)
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(rename = "inertia", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub inertia: Vec<InertiaState>,
     /// Maneuver Parameters. All mandatory elements are to be provided if the block is present.
     /// (See annex F for conventions and further detail.)
@@ -260,6 +273,7 @@ pub struct ApmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub maneuver_parameters: Vec<AttManeuverState>,
 }
 

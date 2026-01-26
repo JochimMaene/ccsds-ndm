@@ -28,8 +28,10 @@ pub struct Rdm {
     pub header: RdmHeader,
     pub body: RdmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
 
@@ -70,6 +72,7 @@ impl ToKvn for Rdm {
 pub struct RdmHeader {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// File creation date and time in UTC.
     ///
@@ -78,10 +81,12 @@ pub struct RdmHeader {
     /// Creating agency or entity.
     ///
     /// Examples: DLR, ESA
+    #[builder(into)]
     pub originator: String,
     /// ID that uniquely identifies a message from a given originator.
     ///
     /// Examples: 201113719185, ESA20190101-3345
+    #[builder(into)]
     pub message_id: String,
 }
 
@@ -137,6 +142,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Object name for which the orbit state is provided. There is no CCSDS-based restriction
     /// on the value for this keyword, but it is recommended to use names from the UNOOSA
@@ -148,6 +154,7 @@ pub struct RdmMetadata {
     /// **Examples**: SENTINEL-1A, GOCE, ENVISAT, BRIZ R/B, DEBRIS, UNKNOWN
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
+    #[builder(into)]
     pub object_name: String,
     /// The full international designator (COSPAR ID) for the object. Values shall have the
     /// format YYYY-NNNP{PP}, where: YYYY = year of launch; NNN = three-digit serial number of
@@ -159,6 +166,7 @@ pub struct RdmMetadata {
     /// **Examples**: 2010-012C, 2016-001A, 1985-067CD, UNKNOWN
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
+    #[builder(into)]
     pub international_designator: String,
     /// The satellite catalog used for the object (formatting rules specified in 5.2.3.3). The
     /// name should be taken from the appropriate SANA registry for catalog names, reference
@@ -168,6 +176,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub catalog_name: Option<String>,
     /// The CATALOG_NAME satellite catalog designator for the object (formatting rules
     /// specified in 5.2.3.3).
@@ -176,6 +185,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_designator: Option<String>,
     /// The object type.
     ///
@@ -192,6 +202,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_owner: Option<String>,
     /// Operator of the object (e.g., company, agency, or country operating the satellite).
     /// The value should be taken from the abbreviation column in the SANA organizations
@@ -201,6 +212,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_operator: Option<String>,
     /// Specification of whether the re-entry is controlled or not.
     ///
@@ -216,6 +228,7 @@ pub struct RdmMetadata {
     /// **Examples**: EARTH, MOON, JUPITER
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
+    #[builder(into)]
     pub center_name: String,
     /// Time system for all data/metadata. The value should be taken from the name column in
     /// the SANA time systems registry, reference [10].
@@ -223,6 +236,7 @@ pub struct RdmMetadata {
     /// **Examples**: UTC, TAI
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
+    #[builder(into)]
     pub time_system: String,
     /// Epoch from which the ORBIT_LIFETIME is calculated (formatting rules specified in
     /// 5.3.3.5).
@@ -242,6 +256,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ref_frame: Option<String>,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame
     /// (formatting rules specified in 5.3.3.5).
@@ -257,6 +272,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name: Option<String>,
     /// The gravity model used in the simulation. The degree (D) and order (O) of the spherical
     /// harmonic coefficients applied should be given along with the name of the model.
@@ -265,6 +281,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub gravity_model: Option<String>,
     /// The atmosphere model(s) used in the simulation. If more than one model is used they
     /// should be listed on the same line and separated by a comma.
@@ -273,6 +290,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub atmospheric_model: Option<String>,
     /// The method used to predict the solar flux and geomagnetic indices.
     ///
@@ -280,6 +298,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub solar_flux_prediction: Option<String>,
     /// Comma separated list of other bodies used in the simulation. The names of the bodies
     /// should be taken from the SANA registry for orbit centers, reference [9]. If no other
@@ -289,6 +308,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub n_body_perturbations: Option<String>,
     /// Model used for the solar radiation pressure: either model name, or NO if solar
     /// radiation pressure was not modelled.
@@ -297,6 +317,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub solar_rad_pressure: Option<String>,
     /// Model used for solid Earth and ocean tides: either model name, or NO if tides were not
     /// modelled.
@@ -305,6 +326,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub earth_tides: Option<String>,
     /// Indicator on whether in-track thrust modeling was used in the simulation.
     ///
@@ -320,6 +342,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub drag_parameters_source: Option<String>,
     /// The altitude (in km) at which the object drag parameters (DRAG_AREA, DRAG_COEFF, and/or
     /// BALLISTIC_COEFF) are valid. The units shall be kilometers, and the conventions
@@ -362,6 +385,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub previous_message_id: Option<String>,
     /// UTC Epoch of the previous RDM issued for this object (formatting rules specified in
     /// 5.3.3.5).
@@ -472,6 +496,7 @@ impl ToKvn for RdmMetadata {
 pub struct RdmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Atmospheric re-entry parameters.
     #[serde(rename = "atmosphericReentryParameters")]

@@ -33,8 +33,10 @@ use crate::error::CcsdsNdmError;
 #[serde(rename = "oem")]
 pub struct Oem {
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
     pub header: OdmHeader,
     pub body: OemBody,
@@ -84,6 +86,7 @@ impl ToKvn for Oem {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OemBody {
     #[serde(rename = "segment")]
+    #[builder(default)]
     pub segment: Vec<OemSegment>,
 }
 
@@ -125,6 +128,7 @@ pub struct OemMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft name for which ephemeris data is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
@@ -136,6 +140,7 @@ pub struct OemMetadata {
     /// **Examples**: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
+    #[builder(into)]
     pub object_name: String,
     /// Object identifier of the object for which ephemeris data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
@@ -150,6 +155,7 @@ pub struct OemMetadata {
     /// **Examples**: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
+    #[builder(into)]
     pub object_id: String,
     /// Origin of the OEM reference frame, which may be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the
@@ -164,6 +170,7 @@ pub struct OemMetadata {
     /// JUPITER BARYCENTER, STS 106, EROS
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
+    #[builder(into)]
     pub center_name: String,
     /// Reference frame in which the ephemeris data are given. Use of values other than those in
     /// 3.2.3.3 should be documented in an ICD.
@@ -171,6 +178,7 @@ pub struct OemMetadata {
     /// **Examples**: ICRF, ITRF2000, EME2000, TEME
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
+    #[builder(into)]
     pub ref_frame: String,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
     /// (See 7.5.10 for formatting rules.)
@@ -186,6 +194,7 @@ pub struct OemMetadata {
     /// **Examples**: UTC, TAI, TT, GPS, TDB, TCB
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
+    #[builder(into)]
     pub time_system: String,
     /// Start of TOTAL time span covered by ephemeris data and covariance data immediately
     /// following this metadata block. (For format specification, see 7.5.10.)
@@ -232,6 +241,7 @@ pub struct OemMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub interpolation: Option<String>,
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
     /// ephemeris lines. Must be an integer value. This keyword must be used if the
@@ -285,6 +295,7 @@ pub struct OemData {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
 
     /// List of state vectors. Each vector contains position, velocity, and optional
@@ -296,6 +307,7 @@ pub struct OemData {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
     #[serde(rename = "stateVector", default)]
+    #[builder(default)]
     pub state_vector: Vec<StateVectorAcc>,
 
     /// List of covariance matrices (optional).
@@ -308,6 +320,7 @@ pub struct OemData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub covariance_matrix: Vec<OemCovarianceMatrix>,
 }
 
@@ -342,6 +355,7 @@ pub struct OemCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of covariance matrix. (See 7.5.10 for formatting rules.)
     ///
@@ -356,6 +370,7 @@ pub struct OemCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cov_ref_frame: Option<String>,
 
     /// Covariance matrix [1,1]

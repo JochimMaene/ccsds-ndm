@@ -159,8 +159,10 @@ pub struct Omm {
     pub header: OdmHeader,
     pub body: OmmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
 
@@ -256,6 +258,7 @@ pub struct OmmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft name for which mean element orbit state data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use names
@@ -267,6 +270,7 @@ pub struct OmmMetadata {
     /// **Examples**: Telkom 2, Spaceway 2, INMARSAT 4-F2, UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub object_name: String,
     /// Object identifier of the object for which mean element orbit state data is provided.
     /// While there is no CCSDS-based restriction on the value for this keyword, it is
@@ -282,6 +286,7 @@ pub struct OmmMetadata {
     /// **Examples**: 2005-046A, 2005-046B, 2003-022A, UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub object_id: String,
     /// Origin of the OMM reference frame, which shall be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -291,6 +296,7 @@ pub struct OmmMetadata {
     /// **Examples**: EARTH, MARS, MOON
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub center_name: String,
     /// Reference frame in which the Keplerian element data are given. Use of values other than
     /// those in 3.2.3.3 should be documented in an ICD. NOTE—NORAD Two Line Element Sets and
@@ -303,6 +309,7 @@ pub struct OmmMetadata {
     /// **Examples**: ICRF, ITRF2000, EME2000, TEME
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub ref_frame: String,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
     /// (See 7.5.10 for formatting rules.)
@@ -318,6 +325,7 @@ pub struct OmmMetadata {
     /// **Examples**: UTC
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub time_system: String,
     /// Description of the Mean Element Theory. Indicates the proper method to employ to
     /// propagate the state.
@@ -325,6 +333,7 @@ pub struct OmmMetadata {
     /// **Examples**: SGP, SGP4, SGP4-XP, DSST, USM
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub mean_element_theory: String,
 }
 
@@ -355,6 +364,7 @@ impl ToKvn for OmmMetadata {
 pub struct OmmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Mean Keplerian Elements in the Specified Reference Frame.
     #[serde(rename = "meanElements")]
@@ -486,6 +496,7 @@ pub struct MeanElements {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of Mean Keplerian elements (see 7.5.10 for formatting rules)
     ///
@@ -616,6 +627,7 @@ pub struct TleParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Ephemeris type. Default value = 0. (See 4.2.4.7.)
     ///
@@ -626,6 +638,7 @@ pub struct TleParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub classification_type: Option<String>,
     /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
     /// is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.

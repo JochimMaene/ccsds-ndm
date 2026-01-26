@@ -20,6 +20,7 @@ pub struct NdmHeader {
     ///
     /// **CCSDS Reference**: 505.0-B-3, Section 3.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// File creation date/time in UTC.
     ///
@@ -32,6 +33,7 @@ pub struct NdmHeader {
     /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     ///
     /// **CCSDS Reference**: 505.0-B-3, Section 3.2.
+    #[builder(into)]
     pub originator: String,
 }
 
@@ -48,12 +50,15 @@ impl ToKvn for NdmHeader {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdmHeader {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<String>,
     pub creation_date: Epoch,
+    #[builder(into)]
     pub originator: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub message_id: Option<String>,
 }
 
@@ -82,6 +87,7 @@ pub struct OdmHeader {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// User-defined free-text message classification/caveats of this ODM. It is recommended
     /// that selected values be pre-coordinated between exchanging entities by mutual agreement.
@@ -105,6 +111,7 @@ pub struct OdmHeader {
     /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
+    #[builder(into)]
     pub originator: String,
     /// ID that uniquely identifies a message from a given originator. The format and content of
     /// the message identifier value are at the discretion of the originator.
@@ -113,6 +120,7 @@ pub struct OdmHeader {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub message_id: Option<String>,
 }
 
@@ -141,6 +149,7 @@ pub struct SpacecraftParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft mass.
     ///
@@ -196,6 +205,7 @@ pub struct OdParameters {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
 
     /// The start of a time interval (UTC) that contains the time of the last accepted
@@ -450,6 +460,7 @@ pub struct StateVector {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
     ///
@@ -517,16 +528,19 @@ pub struct QuaternionState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Quaternion components Q1, Q2, Q3, QC.
     ///
@@ -559,16 +573,19 @@ pub struct EulerAngleState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
     /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
@@ -630,16 +647,19 @@ pub struct AngVelState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Reference frame in which the components of the angular velocity vector are given. The set
     /// of allowed values is described in annex B, subsection B3.
@@ -677,16 +697,19 @@ pub struct SpinState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Right ascension of spin axis vector in frame A.
     ///
@@ -767,11 +790,13 @@ pub struct InertiaState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Coordinate system for the inertia tensor. The set of allowed values is described in annex B,
     /// subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub inertia_ref_frame: String,
     /// Moment of Inertia about the X-axis.
     ///
@@ -822,6 +847,7 @@ pub struct AttManeuverState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of start of maneuver. (For format specification, see 6.8.9.)
     ///
@@ -1439,12 +1465,14 @@ pub struct OpmCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Reference frame in which the covariance data are given. Select from the accepted set of
     /// values indicated in 3.2.4.11.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cov_ref_frame: Option<String>,
     /// Covariance matrix [1,1]
     ///
