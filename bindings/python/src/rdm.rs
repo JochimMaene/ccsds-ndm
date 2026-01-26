@@ -613,7 +613,7 @@ impl RdmMetadata {
 
     /// Object name for which the orbit state is provided. There is no CCSDS-based restriction
     /// on the value for this keyword, but it is recommended to use names from the UNOOSA
-    /// registry—reference [7], which includes object name and international designator of the
+    /// registry—reference `[7]`, which includes object name and international designator of the
     /// participant (formatting rules specified in 5.2.3.3). For objects that are not in the
     /// UNOOSA registry, either a descriptive name (e.g., DEBRIS, if the object is identified as
     /// space debris) or UNKNOWN should be used.
@@ -651,7 +651,7 @@ impl RdmMetadata {
 
     /// The satellite catalog used for the object (formatting rules specified in 5.2.3.3). The
     /// name should be taken from the appropriate SANA registry for catalog names, reference
-    /// [8].
+    /// `[8]`.
     ///
     /// Examples: SATCAT, ESA SST
     ///
@@ -704,7 +704,7 @@ impl RdmMetadata {
 
     /// Owner of the object (e.g., company, agency, or country owning the satellite). The value
     /// should be taken from the abbreviation column in the SANA organizations registry,
-    /// reference [6].
+    /// reference `[6]`.
     ///
     /// Examples: DLR, INTELSAT, ESA, UNKNOWN
     ///
@@ -720,7 +720,7 @@ impl RdmMetadata {
 
     /// Operator of the object (e.g., company, agency, or country operating the satellite).
     /// The value should be taken from the abbreviation column in the SANA organizations
-    /// registry, reference [6].
+    /// registry, reference `[6]`.
     ///
     /// Examples: ESA, EUMETSAT
     ///
@@ -754,7 +754,7 @@ impl RdmMetadata {
     /// Celestial body orbited by the object and origin of the reference frame, which may be a
     /// natural solar system body (planets, asteroids, comets, and natural satellites),
     /// including any planet barycenter or the solar system barycenter. The value should be
-    /// taken from the orbit center column in the SANA orbit centers registry, reference [9].
+    /// taken from the orbit center column in the SANA orbit centers registry, reference `[9]`.
     ///
     /// Examples: EARTH, MOON, JUPITER
     ///
@@ -769,7 +769,7 @@ impl RdmMetadata {
     }
 
     /// Time system for all data/metadata. The value should be taken from the name column in
-    /// the SANA time systems registry, reference [10].
+    /// the SANA time systems registry, reference `[10]`.
     ///
     /// Examples: UTC, TAI
     ///
@@ -801,7 +801,7 @@ impl RdmMetadata {
 
     /// Reference frame in which the (optional) orbit information will be provided. The value
     /// should be taken from the keyword value name column in the SANA celestial body reference
-    /// frames registry, reference [11]. The reference frame must be the same for all orbit
+    /// frames registry, reference `[11]`. The reference frame must be the same for all orbit
     /// data elements, with the exception of the covariance matrix, for which a different
     /// reference frame may be specified, and the ground impact data. This keyword becomes
     /// mandatory if state vectors are provided in the data section.
@@ -896,7 +896,7 @@ impl RdmMetadata {
     }
 
     /// Comma separated list of other bodies used in the simulation. The names of the bodies
-    /// should be taken from the SANA registry for orbit centers, reference [9]. If no other
+    /// should be taken from the SANA registry for orbit centers, reference `[9]`. If no other
     /// bodies are used in the simulation, the value should be NONE.
     ///
     /// Examples: MOON, SUN, JUPITER, NONE
@@ -979,7 +979,7 @@ impl RdmMetadata {
     /// BALLISTIC_COEFF) are valid. The units shall be kilometers, and the conventions
     /// specified in 5.2.4.1 and 5.3.4 must be followed.
     ///
-    /// Examples: 200 [km], 175 [km]
+    /// Examples: 200 `[km]`, 175 `[km]`
     ///
     /// Units: km
     ///

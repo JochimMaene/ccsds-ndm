@@ -444,9 +444,9 @@ impl OemMetadata {
 
     /// Spacecraft name for which ephemeris data is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
-    /// Office of Outer Space Affairs designator index (reference [3], which include Object name
+    /// Office of Outer Space Affairs designator index (reference `[3]`, which include Object name
     /// and international designator of the participant). If OBJECT_NAME is not listed in
-    /// reference [3] or the content is either unknown or cannot be disclosed, the value should
+    /// reference `[3]` or the content is either unknown or cannot be disclosed, the value should
     /// be set to UNKNOWN.
     ///
     /// Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
@@ -492,7 +492,7 @@ impl OemMetadata {
     /// from the accepted set of values indicated in annex B, subsection B2. For spacecraft, it
     /// is recommended to use either the OBJECT_ID or international designator of the
     /// participant as catalogued in the UN Office of Outer Space Affairs designator index
-    /// (reference [3]).
+    /// (reference `[3]`).
     ///
     /// Examples: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
     /// JUPITER BARYCENTER, STS 106, EROS
@@ -1244,7 +1244,7 @@ impl OemCovarianceMatrix {
         self.inner.comment = comments;
     }
 
-    /// Covariance matrix [1,1]
+    /// Covariance matrix `[1,1]`
     ///
     /// Units: km²
     ///
@@ -1259,7 +1259,7 @@ impl OemCovarianceMatrix {
         self.inner.cx_x.value = val;
     }
 
-    /// Covariance matrix [2,1]
+    /// Covariance matrix `[2,1]`
     ///
     /// Units: km²
     ///
@@ -1274,7 +1274,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_x.value = val;
     }
 
-    /// Covariance matrix [2,2]
+    /// Covariance matrix `[2,2]`
     ///
     /// Units: km²
     ///
@@ -1289,7 +1289,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_y.value = val;
     }
 
-    /// Covariance matrix [3,1]
+    /// Covariance matrix `[3,1]`
     ///
     /// Units: km²
     ///
@@ -1304,7 +1304,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_x.value = val;
     }
 
-    /// Covariance matrix [3,2]
+    /// Covariance matrix `[3,2]`
     ///
     /// Units: km²
     ///
@@ -1319,7 +1319,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_y.value = val;
     }
 
-    /// Covariance matrix [3,3]
+    /// Covariance matrix `[3,3]`
     ///
     /// Units: km²
     ///
@@ -1334,7 +1334,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_z.value = val;
     }
 
-    /// Covariance matrix [4,1]
+    /// Covariance matrix `[4,1]`
     ///
     /// Units: km²/s
     ///
@@ -1349,7 +1349,7 @@ impl OemCovarianceMatrix {
         self.inner.cx_dot_x.value = val;
     }
 
-    /// Covariance matrix [4,2]
+    /// Covariance matrix `[4,2]`
     ///
     /// Units: km²/s
     ///
@@ -1364,7 +1364,7 @@ impl OemCovarianceMatrix {
         self.inner.cx_dot_y.value = val;
     }
 
-    /// Covariance matrix [4,3]
+    /// Covariance matrix `[4,3]`
     ///
     /// Units: km²/s
     ///
@@ -1379,7 +1379,7 @@ impl OemCovarianceMatrix {
         self.inner.cx_dot_z.value = val;
     }
 
-    /// Covariance matrix [4,4]
+    /// Covariance matrix `[4,4]`
     ///
     /// Units: km²/s²
     ///
@@ -1394,7 +1394,7 @@ impl OemCovarianceMatrix {
         self.inner.cx_dot_x_dot.value = val;
     }
 
-    /// Covariance matrix [5,1]
+    /// Covariance matrix `[5,1]`
     ///
     /// Units: km²/s
     ///
@@ -1409,7 +1409,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_dot_x.value = val;
     }
 
-    /// Covariance matrix [5,2]
+    /// Covariance matrix `[5,2]`
     ///
     /// Units: km²/s
     ///
@@ -1424,7 +1424,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_dot_y.value = val;
     }
 
-    /// Covariance matrix [5,3]
+    /// Covariance matrix `[5,3]`
     ///
     /// Units: km²/s
     ///
@@ -1439,7 +1439,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_dot_z.value = val;
     }
 
-    /// Covariance matrix [5,4]
+    /// Covariance matrix `[5,4]`
     ///
     /// Units: km²/s²
     ///
@@ -1454,7 +1454,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_dot_x_dot.value = val;
     }
 
-    /// Covariance matrix [5,5]
+    /// Covariance matrix `[5,5]`
     ///
     /// Units: km²/s²
     ///
@@ -1469,7 +1469,7 @@ impl OemCovarianceMatrix {
         self.inner.cy_dot_y_dot.value = val;
     }
 
-    /// Covariance matrix [6,1]
+    /// Covariance matrix `[6,1]`
     ///
     /// Units: km²/s
     ///
@@ -1484,7 +1484,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_dot_x.value = val;
     }
 
-    /// Covariance matrix [6,2]
+    /// Covariance matrix `[6,2]`
     ///
     /// Units: km²/s
     ///
@@ -1499,7 +1499,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_dot_y.value = val;
     }
 
-    /// Covariance matrix [6,3]
+    /// Covariance matrix `[6,3]`
     ///
     /// Units: km²/s
     ///
@@ -1514,7 +1514,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_dot_z.value = val;
     }
 
-    /// Covariance matrix [6,4]
+    /// Covariance matrix `[6,4]`
     ///
     /// Units: km²/s²
     ///
@@ -1529,7 +1529,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_dot_x_dot.value = val;
     }
 
-    /// Covariance matrix [6,5]
+    /// Covariance matrix `[6,5]`
     ///
     /// Units: km²/s²
     ///
@@ -1544,7 +1544,7 @@ impl OemCovarianceMatrix {
         self.inner.cz_dot_y_dot.value = val;
     }
 
-    /// Covariance matrix [6,6]
+    /// Covariance matrix `[6,6]`
     ///
     /// Units: km²/s²
     ///

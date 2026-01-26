@@ -637,10 +637,10 @@ impl OcmMetadata {
 
     /// Free-text field containing the name of the object. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from either
-    /// the UN Office of Outer Space Affairs designator index (reference [3], which include
+    /// the UN Office of Outer Space Affairs designator index (reference `[3]`, which include
     /// Object name and international designator of the participant), the spacecraft operator,
     /// or a State Actor or commercial Space Situational Awareness (SSA) provider maintaining
-    /// the ‘CATALOG_NAME’ space catalog. If OBJECT_NAME is not listed in reference [3] or the
+    /// the ‘CATALOG_NAME’ space catalog. If OBJECT_NAME is not listed in reference `[3]` or the
     /// content is either unknown (uncorrelated) or cannot be disclosed, the value should be
     /// set to UNKNOWN (or this keyword omitted).
     ///
@@ -680,9 +680,9 @@ impl OcmMetadata {
 
     /// Free-text field containing the satellite catalog source (or source agency or operator,
     /// value to be drawn from the SANA registry list of Space Object Catalogs at
-    /// https://sanaregistry.org/r/space_object_catalog, or alternatively, from the list of
+    /// <https://sanaregistry.org/r/space_object_catalog>, or alternatively, from the list of
     /// organizations listed in the 'Abbreviation' column of the SANA Organizations registry at
-    /// https://www.sanaregistry.org/r/organizations) from which 'OBJECT_DESIGNATOR' was
+    /// <https://www.sanaregistry.org/r/organizations>) from which 'OBJECT_DESIGNATOR' was
     /// obtained.
     ///
     /// Examples: CSPOC, RFSA, ESA, COMSPOC
@@ -803,7 +803,7 @@ impl OcmMetadata {
 
     /// Free-text field containing the creating agency or operator (value should be drawn from
     /// the 'Abbreviation' column of the SANA Organizations registry at
-    /// https://www.sanaregistry.org/r/organizations).
+    /// <https://www.sanaregistry.org/r/organizations>).
     ///
     /// Examples: NASA, ESA, JAXA
     ///
@@ -939,7 +939,7 @@ impl OcmMetadata {
     }
 
     /// Free-text field containing a unique identifier of Attitude Data Message (ADM)
-    /// (reference [10]) that are linked (relevant) to this Orbit Data Message.
+    /// (reference `[10]`) that are linked (relevant) to this Orbit Data Message.
     ///
     /// Examples: ADM_MSG_35132.txt, ADM_ID_0572
     ///
@@ -954,7 +954,7 @@ impl OcmMetadata {
     }
 
     /// Free-text field containing a unique identifier of Conjunction Data Message (CDM)
-    /// (reference [14]) that are linked (relevant) to this Orbit Data Message.
+    /// (reference `[14]`) that are linked (relevant) to this Orbit Data Message.
     ///
     /// Examples: CDM_MSG_35132.txt, CDM_ID_8257
     ///
@@ -969,7 +969,7 @@ impl OcmMetadata {
     }
 
     /// Free-text field containing a unique identifier of Pointing Request Message (PRM)
-    /// (reference [13]) that are linked (relevant) to this Orbit Data Message.
+    /// (reference `[13]`) that are linked (relevant) to this Orbit Data Message.
     ///
     /// Examples: PRM_MSG_35132.txt, PRM_ID_6897
     ///
@@ -984,7 +984,7 @@ impl OcmMetadata {
     }
 
     /// Free-text field containing a unique identifier of Reentry Data Message (RDM)
-    /// (reference [12]) that are linked (relevant) to this Orbit Data Message.
+    /// (reference `[12]`) that are linked (relevant) to this Orbit Data Message.
     ///
     /// Examples: RDM_MSG_35132.txt, RDM_ID_1839
     ///
@@ -999,7 +999,7 @@ impl OcmMetadata {
     }
 
     /// Free-text string containing a comma-separated list of file name(s) and/or associated
-    /// identification number(s) of Tracking Data Message (TDM) (reference [9]) observations
+    /// identification number(s) of Tracking Data Message (TDM) (reference `[9]`) observations
     /// upon which this OD is based.
     ///
     /// Examples: TDM_MSG_37.txt, TDM_835, TDM_836
@@ -1673,7 +1673,7 @@ impl OcmTrajState {
     /// accepted set of values indicated in annex B, subsection B2. For spacecraft, it is
     /// recommended to use either the 'OBJECT_NAME' or 'INTERNATIONAL_DESIGNATOR' of the
     /// participant as catalogued in the UN Office of Outer Space Affairs designator index
-    /// (reference [3]). Alternately, the 'OBJECT_DESIGNATOR' may be used. For other reference
+    /// (reference `[3]`). Alternately, the 'OBJECT_DESIGNATOR' may be used. For other reference
     /// frame origins, this field is a free-text descriptor which may draw upon other naming
     /// conventions and sources.
     ///
@@ -2672,7 +2672,7 @@ impl OcmPhysicalDescription {
         self.inner.oeb_parent_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
-    /// q1 = e1 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e1 = 1st
+    /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
     /// (defined above) to the frame aligned with the OEB (defined in annex F, subsection F1).
     /// A value of '-999' denotes a tumbling space object.
@@ -2688,7 +2688,7 @@ impl OcmPhysicalDescription {
     fn set_oeb_q1(&mut self, value: Option<f64>) {
         self.inner.oeb_q1 = value;
     }
-    /// q2 = e2 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e2 = 2nd
+    /// q2 = e2 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e2 = 2nd
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
     /// (defined above) to the frame aligned with the Optimally Encompassing Box (defined in
     /// annex F, subsection F1). A value of '-999' denotes a tumbling space object.
@@ -2704,7 +2704,7 @@ impl OcmPhysicalDescription {
     fn set_oeb_q2(&mut self, value: Option<f64>) {
         self.inner.oeb_q2 = value;
     }
-    /// q3 = e3 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e3 = 3rd
+    /// q3 = e3 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e3 = 3rd
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
     /// (defined above) to the frame aligned with the Optimally Encompassing Box (defined in
     /// annex F, subsection F1). A value of '-999' denotes a tumbling space object.
@@ -2720,7 +2720,7 @@ impl OcmPhysicalDescription {
     fn set_oeb_q3(&mut self, value: Option<f64>) {
         self.inner.oeb_q3 = value;
     }
-    /// qc = cos(φ/2), where per reference [H1], φ = the Euler rotation angle for the rotation
+    /// qc = cos(φ/2), where per reference `[H1]`, φ = the Euler rotation angle for the rotation
     /// that maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the
     /// Optimally Encompassing Box (annex F, subsection F1). qc shall be made non-negative by
     /// convention. A value of '-999' denotes a tumbling space object.
@@ -3223,7 +3223,7 @@ impl OcmPhysicalDescription {
 
     // === Moments of Inertia ===
     /// Moment of Inertia about the X-axis of the space object's primary body frame (e.g.,
-    /// SC_Body_1) (see reference [H1]).
+    /// SC_Body_1) (see reference `[H1]`).
     ///
     /// Examples: 1000.0
     ///
@@ -4171,7 +4171,7 @@ impl OcmManeuverParameters {
     }
 
     /// Duty cycle type to use for this maneuver time history section: CONTINUOUS denotes
-    /// full/continuous thrust <default>; TIME denotes a time-based duty cycle driven by time
+    /// full/continuous thrust `<default>`; TIME denotes a time-based duty cycle driven by time
     /// past a reference time and the duty cycle ON and OFF durations; TIME_AND_ANGLE denotes a
     /// duty cycle driven by the phasing/clocking of a space object body frame 'trigger'
     /// direction past a reference direction.
@@ -4292,7 +4292,7 @@ impl OcmManeuverParameters {
     }
 
     /// Reference time for the THRUST duty cycle, specified as either time in seconds (relative
-    /// to EPOCH_TZERO), or as an absolute '<epoch>' (see 7.5.10 for formatting rules).
+    /// to EPOCH_TZERO), or as an absolute '`<epoch>`' (see 7.5.10 for formatting rules).
     /// NOTE—Depending upon EPOCH_TZERO, DC_REF_TIME relative times may be negative. This
     /// keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
@@ -4841,7 +4841,7 @@ impl OcmPerturbations {
         self.inner.shadow_model = value;
     }
     /// List of bodies included in shadow calculations (value(s) to be drawn from the SANA
-    /// registry list of Orbit Centers at https://sanaregistry.org/r/orbit_centers).
+    /// registry list of Orbit Centers at <https://sanaregistry.org/r/orbit_centers>).
     ///
     /// Examples: EARTH, MOON
     ///
@@ -5478,7 +5478,7 @@ impl OcmOdParameters {
         });
     }
     /// Generalized Dilution Of Precision for this orbit determination, based on the
-    /// observability grammian as defined in references [H15] and [H16] and expressed in
+    /// observability grammian as defined in references `[H15]` and `[H16]` and expressed in
     /// informative annex F, subsection F4. GDOP provides a rating metric of the observability
     /// of the element set from the OD. Alternate GDOP formations may be used as mutually
     /// defined by message exchange participants.
@@ -5595,7 +5595,7 @@ impl OcmOdParameters {
     }
     /// Comma-separated list of observation data types utilized in this orbit determination.
     /// Although this is a free-text field, it is recommended at a minimum to use data type
-    /// descriptor(s) as provided in table 3-5 of the TDM standard (reference [9]) (excluding
+    /// descriptor(s) as provided in table 3-5 of the TDM standard (reference `[9]`) (excluding
     /// the DATA_START, DATA_STOP, and COMMENT keywords). Additional descriptors/detail is
     /// encouraged if the descriptors of table 3-5 are not sufficiently clear; for example, one
     /// could replace ANGLE_1 and ANGLE_2 with RADEC (e.g., from a telescope), AZEL (e.g., from

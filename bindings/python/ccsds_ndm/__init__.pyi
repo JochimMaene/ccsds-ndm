@@ -217,7 +217,7 @@ class AcmMetadata:
         """
         Free-text field containing the name of the object. There is no CCSDS-based restriction on
         the value for this keyword, but it is recommended to use names from either the UN Office of
-        Outer Space Affairs designator index (reference [2]), which include Object name and
+        Outer Space Affairs designator index (reference `[2]`), which include Object name and
         international designator), the spacecraft operator, or a State Actor or commercial Space
         Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space catalog. If the
         object name is not known (uncorrelated object), ‘UNKNOWN’ may be used (or this keyword
@@ -1692,7 +1692,7 @@ class CdmCovarianceMatrix:
     @property
     def cdrg_drg(self) -> float:
         """
-        Object covariance matrix [7,7].
+        Object covariance matrix `[7,7]`.
 
         Units: m⁴/kg²
         """
@@ -1703,7 +1703,7 @@ class CdmCovarianceMatrix:
     @property
     def cdrg_n(self) -> float:
         """
-        Object covariance matrix [7,3].
+        Object covariance matrix `[7,3]`.
 
         Units: m³/kg
         """
@@ -1714,7 +1714,7 @@ class CdmCovarianceMatrix:
     @property
     def cdrg_ndot(self) -> float:
         """
-        Object covariance matrix [7,6].
+        Object covariance matrix `[7,6]`.
 
         Units: m³/(kg*s)
         """
@@ -1725,7 +1725,7 @@ class CdmCovarianceMatrix:
     @property
     def cdrg_r(self) -> float:
         """
-        Object covariance matrix [7,1].
+        Object covariance matrix `[7,1]`.
 
         Units: m³/kg
         """
@@ -1736,7 +1736,7 @@ class CdmCovarianceMatrix:
     @property
     def cdrg_rdot(self) -> float:
         """
-        Object covariance matrix [7,4].
+        Object covariance matrix `[7,4]`.
 
         Units: m³/(kg*s)
         """
@@ -1747,7 +1747,7 @@ class CdmCovarianceMatrix:
     @property
     def cdrg_t(self) -> float:
         """
-        Object covariance matrix [7,2].
+        Object covariance matrix `[7,2]`.
 
         Units: m³/kg
         """
@@ -1758,7 +1758,7 @@ class CdmCovarianceMatrix:
     @property
     def cdrg_tdot(self) -> float:
         """
-        Object covariance matrix [7,5].
+        Object covariance matrix `[7,5]`.
 
         Units: m³/(kg*s)
         """
@@ -1769,7 +1769,7 @@ class CdmCovarianceMatrix:
     @property
     def cn_n(self) -> float:
         """
-        Object covariance matrix [3,3].
+        Object covariance matrix `[3,3]`.
 
         Units: m²
         """
@@ -1780,7 +1780,7 @@ class CdmCovarianceMatrix:
     @property
     def cn_r(self) -> float:
         """
-        Object covariance matrix [3,1].
+        Object covariance matrix `[3,1]`.
 
         Units: m²
         """
@@ -1791,7 +1791,7 @@ class CdmCovarianceMatrix:
     @property
     def cn_t(self) -> float:
         """
-        Object covariance matrix [3,2].
+        Object covariance matrix `[3,2]`.
 
         Units: m²
         """
@@ -1802,7 +1802,7 @@ class CdmCovarianceMatrix:
     @property
     def cndot_n(self) -> float:
         """
-        Object covariance matrix [6,3].
+        Object covariance matrix `[6,3]`.
 
         Units: m²/s
         """
@@ -1813,7 +1813,7 @@ class CdmCovarianceMatrix:
     @property
     def cndot_ndot(self) -> float:
         """
-        Object covariance matrix [6,6].
+        Object covariance matrix `[6,6]`.
 
         Units: m²/s²
         """
@@ -1824,7 +1824,7 @@ class CdmCovarianceMatrix:
     @property
     def cndot_r(self) -> float:
         """
-        Object covariance matrix [6,1].
+        Object covariance matrix `[6,1]`.
 
         Units: m²/s
         """
@@ -1835,7 +1835,7 @@ class CdmCovarianceMatrix:
     @property
     def cndot_rdot(self) -> float:
         """
-        Object covariance matrix [6,4].
+        Object covariance matrix `[6,4]`.
 
         Units: m²/s²
         """
@@ -1846,7 +1846,7 @@ class CdmCovarianceMatrix:
     @property
     def cndot_t(self) -> float:
         """
-        Object covariance matrix [6,2].
+        Object covariance matrix `[6,2]`.
 
         Units: m²/s
         """
@@ -1857,7 +1857,7 @@ class CdmCovarianceMatrix:
     @property
     def cndot_tdot(self) -> float:
         """
-        Object covariance matrix [6,5].
+        Object covariance matrix `[6,5]`.
 
         Units: m²/s²
         """
@@ -1877,7 +1877,7 @@ class CdmCovarianceMatrix:
     @property
     def cr_r(self) -> float:
         """
-        Object covariance matrix [1,1].
+        Object covariance matrix `[1,1]`.
 
         Units: m²
         """
@@ -1888,7 +1888,7 @@ class CdmCovarianceMatrix:
     @property
     def crdot_n(self) -> float:
         """
-        Object covariance matrix [4,3].
+        Object covariance matrix `[4,3]`.
 
         Units: m²/s
         """
@@ -1899,7 +1899,7 @@ class CdmCovarianceMatrix:
     @property
     def crdot_r(self) -> float:
         """
-        Object covariance matrix [4,1].
+        Object covariance matrix `[4,1]`.
 
         Units: m²/s
         """
@@ -1910,7 +1910,7 @@ class CdmCovarianceMatrix:
     @property
     def crdot_rdot(self) -> float:
         """
-        Object covariance matrix [4,4].
+        Object covariance matrix `[4,4]`.
 
         Units: m²/s²
         """
@@ -1921,7 +1921,7 @@ class CdmCovarianceMatrix:
     @property
     def crdot_t(self) -> float:
         """
-        Object covariance matrix [4,2].
+        Object covariance matrix `[4,2]`.
 
         Units: m²/s
         """
@@ -1932,7 +1932,7 @@ class CdmCovarianceMatrix:
     @property
     def csrp_drg(self) -> float:
         """
-        Object covariance matrix [8,7].
+        Object covariance matrix `[8,7]`.
 
         Units: m⁴/kg²
         """
@@ -1943,7 +1943,7 @@ class CdmCovarianceMatrix:
     @property
     def csrp_n(self) -> float:
         """
-        Object covariance matrix [8,3].
+        Object covariance matrix `[8,3]`.
 
         Units: m³/kg
         """
@@ -1954,7 +1954,7 @@ class CdmCovarianceMatrix:
     @property
     def csrp_ndot(self) -> float:
         """
-        Object covariance matrix [8,6].
+        Object covariance matrix `[8,6]`.
 
         Units: m³/(kg*s)
         """
@@ -1965,7 +1965,7 @@ class CdmCovarianceMatrix:
     @property
     def csrp_r(self) -> float:
         """
-        Object covariance matrix [8,1].
+        Object covariance matrix `[8,1]`.
 
         Units: m³/kg
         """
@@ -1976,7 +1976,7 @@ class CdmCovarianceMatrix:
     @property
     def csrp_rdot(self) -> float:
         """
-        Object covariance matrix [8,4].
+        Object covariance matrix `[8,4]`.
 
         Units: m³/(kg*s)
         """
@@ -1987,7 +1987,7 @@ class CdmCovarianceMatrix:
     @property
     def csrp_srp(self) -> float:
         """
-        Object covariance matrix [8,8].
+        Object covariance matrix `[8,8]`.
 
         Units: m⁴/kg²
         """
@@ -1998,7 +1998,7 @@ class CdmCovarianceMatrix:
     @property
     def csrp_t(self) -> float:
         """
-        Object covariance matrix [8,2].
+        Object covariance matrix `[8,2]`.
 
         Units: m³/kg
         """
@@ -2009,7 +2009,7 @@ class CdmCovarianceMatrix:
     @property
     def csrp_tdot(self) -> float:
         """
-        Object covariance matrix [8,5].
+        Object covariance matrix `[8,5]`.
 
         Units: m³/(kg*s)
         """
@@ -2020,7 +2020,7 @@ class CdmCovarianceMatrix:
     @property
     def ct_r(self) -> float:
         """
-        Object covariance matrix [2,1].
+        Object covariance matrix `[2,1]`.
 
         Units: m²
         """
@@ -2031,7 +2031,7 @@ class CdmCovarianceMatrix:
     @property
     def ct_t(self) -> float:
         """
-        Object covariance matrix [2,2].
+        Object covariance matrix `[2,2]`.
 
         Units: m²
         """
@@ -2042,7 +2042,7 @@ class CdmCovarianceMatrix:
     @property
     def ctdot_n(self) -> float:
         """
-        Object covariance matrix [5,3].
+        Object covariance matrix `[5,3]`.
 
         Units: m²/s
         """
@@ -2053,7 +2053,7 @@ class CdmCovarianceMatrix:
     @property
     def ctdot_r(self) -> float:
         """
-        Object covariance matrix [5,1].
+        Object covariance matrix `[5,1]`.
 
         Units: m²/s
         """
@@ -2064,7 +2064,7 @@ class CdmCovarianceMatrix:
     @property
     def ctdot_rdot(self) -> float:
         """
-        Object covariance matrix [5,4].
+        Object covariance matrix `[5,4]`.
 
         Units: m²/s²
         """
@@ -2075,7 +2075,7 @@ class CdmCovarianceMatrix:
     @property
     def ctdot_t(self) -> float:
         """
-        Object covariance matrix [5,2].
+        Object covariance matrix `[5,2]`.
 
         Units: m²/s
         """
@@ -2086,7 +2086,7 @@ class CdmCovarianceMatrix:
     @property
     def ctdot_tdot(self) -> float:
         """
-        Object covariance matrix [5,5].
+        Object covariance matrix `[5,5]`.
 
         Units: m²/s²
         """
@@ -2097,7 +2097,7 @@ class CdmCovarianceMatrix:
     @property
     def cthr_drg(self) -> float:
         """
-        Object covariance matrix [9,7].
+        Object covariance matrix `[9,7]`.
 
         Units: m³/(kg*s²)
         """
@@ -2108,7 +2108,7 @@ class CdmCovarianceMatrix:
     @property
     def cthr_n(self) -> float:
         """
-        Object covariance matrix [9,3].
+        Object covariance matrix `[9,3]`.
 
         Units: m²/s²
         """
@@ -2119,7 +2119,7 @@ class CdmCovarianceMatrix:
     @property
     def cthr_ndot(self) -> float:
         """
-        Object covariance matrix [9,6].
+        Object covariance matrix `[9,6]`.
 
         Units: m²/s³
         """
@@ -2130,7 +2130,7 @@ class CdmCovarianceMatrix:
     @property
     def cthr_r(self) -> float:
         """
-        Object covariance matrix [9,1].
+        Object covariance matrix `[9,1]`.
 
         Units: m²/s²
         """
@@ -2141,7 +2141,7 @@ class CdmCovarianceMatrix:
     @property
     def cthr_rdot(self) -> float:
         """
-        Object covariance matrix [9,4].
+        Object covariance matrix `[9,4]`.
 
         Units: m²/s³
         """
@@ -2152,7 +2152,7 @@ class CdmCovarianceMatrix:
     @property
     def cthr_srp(self) -> float:
         """
-        Object covariance matrix [9,8].
+        Object covariance matrix `[9,8]`.
 
         Units: m³/(kg*s²)
         """
@@ -2163,7 +2163,7 @@ class CdmCovarianceMatrix:
     @property
     def cthr_t(self) -> float:
         """
-        Object covariance matrix [9,2].
+        Object covariance matrix `[9,2]`.
 
         Units: m²/s²
         """
@@ -2174,7 +2174,7 @@ class CdmCovarianceMatrix:
     @property
     def cthr_tdot(self) -> float:
         """
-        Object covariance matrix [9,5].
+        Object covariance matrix `[9,5]`.
 
         Units: m²/s³
         """
@@ -2185,7 +2185,7 @@ class CdmCovarianceMatrix:
     @property
     def cthr_thr(self) -> float:
         """
-        Object covariance matrix [9,9].
+        Object covariance matrix `[9,9]`.
 
         Units: m²/s⁴
         """
@@ -2345,7 +2345,7 @@ class CdmHeader:
     def originator(self) -> str:
         """
         Creating agency or owner/operator. Value should be the 'Abbreviation' value from the
-        SANA 'Organizations' registry (https://sanaregistry.org/r/organizations) for an
+        SANA 'Organizations' registry (<https://sanaregistry.org/r/organizations>) for an
         organization that has the Role of 'Conjunction Data Message Originator'. (See 5.2.9
         for formatting rules.)
 
@@ -2457,7 +2457,7 @@ class CdmMetadata:
         """
         The satellite catalog used for the object. Value should be taken from the SANA
         'Conjunction Data Message CATALOG_NAME' registry
-        (https://sanaregistry.org/r/cdm_catalog). (See 5.2.9 for formatting rules.)
+        (<https://sanaregistry.org/r/cdm_catalog>). (See 5.2.9 for formatting rules.)
 
         Examples: SATCAT
         """
@@ -2677,7 +2677,7 @@ class CdmMetadata:
     def ref_frame(self) -> ReferenceFrameType:
         """
         Name of the reference frame in which the state vector data are given. Value must be
-        selected from the list of values to the right (see reference [F1]) and be the same for
+        selected from the list of values to the right (see reference `[F1]`) and be the same for
         both Object1 and Object2.
 
         Examples: GCRF, EME2000, ITRF
@@ -3359,7 +3359,7 @@ class GroundImpactParameters:
     def impact_ref_frame(self) -> Optional[str]:
         """
         Reference frame of the impact location data. The value should be taken from the keyword
-        value name column in the SANA celestial body reference frames registry, reference [11].
+        value name column in the SANA celestial body reference frames registry, reference `[11]`.
         Only frames with the value ‘Body-Fixed’ in the Frame Type column shall be used.
         Mandatory if NOMINAL_IMPACT_LON and NOMINAL_IMPACT_LAT are present.
         """
@@ -4830,7 +4830,7 @@ class OcmManeuverParameters:
     def dc_ref_time(self) -> Optional[str]:
         """
         Reference time for the THRUST duty cycle, specified as either time in seconds (relative
-        to EPOCH_TZERO), or as an absolute '<epoch>' (see 7.5.10 for formatting rules).
+        to EPOCH_TZERO), or as an absolute '`<epoch>`' (see 7.5.10 for formatting rules).
         NOTE—Depending upon EPOCH_TZERO, DC_REF_TIME relative times may be negative. This
         keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
         """
@@ -4868,7 +4868,7 @@ class OcmManeuverParameters:
     def dc_type(self) -> str:
         """
         Duty cycle type to use for this maneuver time history section: CONTINUOUS denotes
-        full/continuous thrust <default>; TIME denotes a time-based duty cycle driven by time
+        full/continuous thrust `<default>`; TIME denotes a time-based duty cycle driven by time
         past a reference time and the duty cycle ON and OFF durations; TIME_AND_ANGLE denotes a
         duty cycle driven by the phasing/clocking of a space object body frame 'trigger'
         direction past a reference direction.
@@ -5263,7 +5263,7 @@ class OcmMetadata:
     def adm_msg_link(self) -> Optional[str]:
         """
         Free-text field containing a unique identifier of Attitude Data Message (ADM)
-        (reference [10]) that are linked (relevant) to this Orbit Data Message.
+        (reference `[10]`) that are linked (relevant) to this Orbit Data Message.
 
         Examples: ADM_MSG_35132.txt, ADM_ID_0572
         """
@@ -5289,9 +5289,9 @@ class OcmMetadata:
         """
         Free-text field containing the satellite catalog source (or source agency or operator,
         value to be drawn from the SANA registry list of Space Object Catalogs at
-        https://sanaregistry.org/r/space_object_catalog, or alternatively, from the list of
+        <https://sanaregistry.org/r/space_object_catalog>, or alternatively, from the list of
         organizations listed in the 'Abbreviation' column of the SANA Organizations registry at
-        https://www.sanaregistry.org/r/organizations) from which 'OBJECT_DESIGNATOR' was
+        <https://www.sanaregistry.org/r/organizations>) from which 'OBJECT_DESIGNATOR' was
         obtained.
 
         Examples: CSPOC, RFSA, ESA, COMSPOC
@@ -5304,7 +5304,7 @@ class OcmMetadata:
     def cdm_msg_link(self) -> Optional[str]:
         """
         Free-text field containing a unique identifier of Conjunction Data Message (CDM)
-        (reference [14]) that are linked (relevant) to this Orbit Data Message.
+        (reference `[14]`) that are linked (relevant) to this Orbit Data Message.
 
         Examples: CDM_MSG_35132.txt, CDM_ID_8257
         """
@@ -5486,10 +5486,10 @@ class OcmMetadata:
         """
         Free-text field containing the name of the object. While there is no CCSDS-based
         restriction on the value for this keyword, it is recommended to use names from either
-        the UN Office of Outer Space Affairs designator index (reference [3], which include
+        the UN Office of Outer Space Affairs designator index (reference `[3]`, which include
         Object name and international designator of the participant), the spacecraft operator,
         or a State Actor or commercial Space Situational Awareness (SSA) provider maintaining
-        the ‘CATALOG_NAME’ space catalog. If OBJECT_NAME is not listed in reference [3] or the
+        the ‘CATALOG_NAME’ space catalog. If OBJECT_NAME is not listed in reference `[3]` or the
         content is either unknown (uncorrelated) or cannot be disclosed, the value should be
         set to UNKNOWN (or this keyword omitted).
 
@@ -5660,7 +5660,7 @@ class OcmMetadata:
     def prm_msg_link(self) -> Optional[str]:
         """
         Free-text field containing a unique identifier of Pointing Request Message (PRM)
-        (reference [13]) that are linked (relevant) to this Orbit Data Message.
+        (reference `[13]`) that are linked (relevant) to this Orbit Data Message.
 
         Examples: PRM_MSG_35132.txt, PRM_ID_6897
         """
@@ -5672,7 +5672,7 @@ class OcmMetadata:
     def rdm_msg_link(self) -> Optional[str]:
         """
         Free-text field containing a unique identifier of Reentry Data Message (RDM)
-        (reference [12]) that are linked (relevant) to this Orbit Data Message.
+        (reference `[12]`) that are linked (relevant) to this Orbit Data Message.
 
         Examples: RDM_MSG_35132.txt, RDM_ID_1839
         """
@@ -5745,7 +5745,7 @@ class OcmMetadata:
     def tdm_msg_link(self) -> Optional[str]:
         """
         Free-text string containing a comma-separated list of file name(s) and/or associated
-        identification number(s) of Tracking Data Message (TDM) (reference [9]) observations
+        identification number(s) of Tracking Data Message (TDM) (reference `[9]`) observations
         upon which this OD is based.
 
         Examples: TDM_MSG_37.txt, TDM_835, TDM_836
@@ -5782,7 +5782,7 @@ class OcmMetadata:
         """
         Free-text field containing the creating agency or operator (value should be drawn from
         the 'Abbreviation' column of the SANA Organizations registry at
-        https://www.sanaregistry.org/r/organizations).
+        <https://www.sanaregistry.org/r/organizations>).
 
         Examples: NASA, ESA, JAXA
         """
@@ -5939,7 +5939,7 @@ class OcmOdParameters:
         """
         Comma-separated list of observation data types utilized in this orbit determination.
         Although this is a free-text field, it is recommended at a minimum to use data type
-        descriptor(s) as provided in table 3-5 of the TDM standard (reference [9]) (excluding
+        descriptor(s) as provided in table 3-5 of the TDM standard (reference `[9]`) (excluding
         the DATA_START, DATA_STOP, and COMMENT keywords). Additional descriptors/detail is
         encouraged if the descriptors of table 3-5 are not sufficiently clear; for example, one
         could replace ANGLE_1 and ANGLE_2 with RADEC (e.g., from a telescope), AZEL (e.g., from
@@ -5983,7 +5983,7 @@ class OcmOdParameters:
     def gdop(self) -> Optional[float]:
         """
         Generalized Dilution Of Precision for this orbit determination, based on the
-        observability grammian as defined in references [H15] and [H16] and expressed in
+        observability grammian as defined in references `[H15]` and `[H16]` and expressed in
         informative annex F, subsection F4. GDOP provides a rating metric of the observability
         of the element set from the OD. Alternate GDOP formations may be used as mutually
         defined by message exchange participants.
@@ -6513,7 +6513,7 @@ class OcmPerturbations:
     def shadow_bodies(self) -> Optional[str]:
         """
         List of bodies included in shadow calculations (value(s) to be drawn from the SANA
-        registry list of Orbit Centers at https://sanaregistry.org/r/orbit_centers).
+        registry list of Orbit Centers at <https://sanaregistry.org/r/orbit_centers>).
 
         Examples: EARTH, MOON
         """
@@ -6960,7 +6960,7 @@ class OcmPhysicalDescription:
     def ixx(self) -> Optional[float]:
         """
         Moment of Inertia about the X-axis of the space object's primary body frame (e.g.,
-        SC_Body_1) (see reference [H1]).
+        SC_Body_1) (see reference `[H1]`).
 
         Examples: 1000.0
 
@@ -7129,7 +7129,7 @@ class OcmPhysicalDescription:
     @property
     def oeb_q1(self) -> Optional[float]:
         """
-        q1 = e1 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e1 = 1st
+        q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
         component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
         (defined above) to the frame aligned with the OEB (defined in annex F, subsection F1).
         A value of '-999' denotes a tumbling space object.
@@ -7143,7 +7143,7 @@ class OcmPhysicalDescription:
     @property
     def oeb_q2(self) -> Optional[float]:
         """
-        q2 = e2 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e2 = 2nd
+        q2 = e2 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e2 = 2nd
         component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
         (defined above) to the frame aligned with the Optimally Encompassing Box (defined in
         annex F, subsection F1). A value of '-999' denotes a tumbling space object.
@@ -7157,7 +7157,7 @@ class OcmPhysicalDescription:
     @property
     def oeb_q3(self) -> Optional[float]:
         """
-        q3 = e3 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e3 = 3rd
+        q3 = e3 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e3 = 3rd
         component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
         (defined above) to the frame aligned with the Optimally Encompassing Box (defined in
         annex F, subsection F1). A value of '-999' denotes a tumbling space object.
@@ -7171,7 +7171,7 @@ class OcmPhysicalDescription:
     @property
     def oeb_qc(self) -> Optional[float]:
         """
-        qc = cos(φ/2), where per reference [H1], φ = the Euler rotation angle for the rotation
+        qc = cos(φ/2), where per reference `[H1]`, φ = the Euler rotation angle for the rotation
         that maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the
         Optimally Encompassing Box (annex F, subsection F1). qc shall be made non-negative by
         convention. A value of '-999' denotes a tumbling space object.
@@ -7455,7 +7455,7 @@ class OcmTrajState:
         accepted set of values indicated in annex B, subsection B2. For spacecraft, it is
         recommended to use either the 'OBJECT_NAME' or 'INTERNATIONAL_DESIGNATOR' of the
         participant as catalogued in the UN Office of Outer Space Affairs designator index
-        (reference [3]). Alternately, the 'OBJECT_DESIGNATOR' may be used. For other reference
+        (reference `[3]`). Alternately, the 'OBJECT_DESIGNATOR' may be used. For other reference
         frame origins, this field is a free-text descriptor which may draw upon other naming
         conventions and sources.
 
@@ -8191,7 +8191,7 @@ class OemCovarianceMatrix:
     @property
     def cx_dot_x(self) -> float:
         """
-        Covariance matrix [4,1]
+        Covariance matrix `[4,1]`
 
         Units: km²/s
         """
@@ -8202,7 +8202,7 @@ class OemCovarianceMatrix:
     @property
     def cx_dot_x_dot(self) -> float:
         """
-        Covariance matrix [4,4]
+        Covariance matrix `[4,4]`
 
         Units: km²/s²
         """
@@ -8213,7 +8213,7 @@ class OemCovarianceMatrix:
     @property
     def cx_dot_y(self) -> float:
         """
-        Covariance matrix [4,2]
+        Covariance matrix `[4,2]`
 
         Units: km²/s
         """
@@ -8224,7 +8224,7 @@ class OemCovarianceMatrix:
     @property
     def cx_dot_z(self) -> float:
         """
-        Covariance matrix [4,3]
+        Covariance matrix `[4,3]`
 
         Units: km²/s
         """
@@ -8235,7 +8235,7 @@ class OemCovarianceMatrix:
     @property
     def cx_x(self) -> float:
         """
-        Covariance matrix [1,1]
+        Covariance matrix `[1,1]`
 
         Units: km²
         """
@@ -8246,7 +8246,7 @@ class OemCovarianceMatrix:
     @property
     def cy_dot_x(self) -> float:
         """
-        Covariance matrix [5,1]
+        Covariance matrix `[5,1]`
 
         Units: km²/s
         """
@@ -8257,7 +8257,7 @@ class OemCovarianceMatrix:
     @property
     def cy_dot_x_dot(self) -> float:
         """
-        Covariance matrix [5,4]
+        Covariance matrix `[5,4]`
 
         Units: km²/s²
         """
@@ -8268,7 +8268,7 @@ class OemCovarianceMatrix:
     @property
     def cy_dot_y(self) -> float:
         """
-        Covariance matrix [5,2]
+        Covariance matrix `[5,2]`
 
         Units: km²/s
         """
@@ -8279,7 +8279,7 @@ class OemCovarianceMatrix:
     @property
     def cy_dot_y_dot(self) -> float:
         """
-        Covariance matrix [5,5]
+        Covariance matrix `[5,5]`
 
         Units: km²/s²
         """
@@ -8290,7 +8290,7 @@ class OemCovarianceMatrix:
     @property
     def cy_dot_z(self) -> float:
         """
-        Covariance matrix [5,3]
+        Covariance matrix `[5,3]`
 
         Units: km²/s
         """
@@ -8301,7 +8301,7 @@ class OemCovarianceMatrix:
     @property
     def cy_x(self) -> float:
         """
-        Covariance matrix [2,1]
+        Covariance matrix `[2,1]`
 
         Units: km²
         """
@@ -8312,7 +8312,7 @@ class OemCovarianceMatrix:
     @property
     def cy_y(self) -> float:
         """
-        Covariance matrix [2,2]
+        Covariance matrix `[2,2]`
 
         Units: km²
         """
@@ -8323,7 +8323,7 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_x(self) -> float:
         """
-        Covariance matrix [6,1]
+        Covariance matrix `[6,1]`
 
         Units: km²/s
         """
@@ -8334,7 +8334,7 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_x_dot(self) -> float:
         """
-        Covariance matrix [6,4]
+        Covariance matrix `[6,4]`
 
         Units: km²/s²
         """
@@ -8345,7 +8345,7 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_y(self) -> float:
         """
-        Covariance matrix [6,2]
+        Covariance matrix `[6,2]`
 
         Units: km²/s
         """
@@ -8356,7 +8356,7 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_y_dot(self) -> float:
         """
-        Covariance matrix [6,5]
+        Covariance matrix `[6,5]`
 
         Units: km²/s²
         """
@@ -8367,7 +8367,7 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_z(self) -> float:
         """
-        Covariance matrix [6,3]
+        Covariance matrix `[6,3]`
 
         Units: km²/s
         """
@@ -8378,7 +8378,7 @@ class OemCovarianceMatrix:
     @property
     def cz_dot_z_dot(self) -> float:
         """
-        Covariance matrix [6,6]
+        Covariance matrix `[6,6]`
 
         Units: km²/s²
         """
@@ -8389,7 +8389,7 @@ class OemCovarianceMatrix:
     @property
     def cz_x(self) -> float:
         """
-        Covariance matrix [3,1]
+        Covariance matrix `[3,1]`
 
         Units: km²
         """
@@ -8400,7 +8400,7 @@ class OemCovarianceMatrix:
     @property
     def cz_y(self) -> float:
         """
-        Covariance matrix [3,2]
+        Covariance matrix `[3,2]`
 
         Units: km²
         """
@@ -8411,7 +8411,7 @@ class OemCovarianceMatrix:
     @property
     def cz_z(self) -> float:
         """
-        Covariance matrix [3,3]
+        Covariance matrix `[3,3]`
 
         Units: km²
         """
@@ -8593,7 +8593,7 @@ class OemMetadata:
         from the accepted set of values indicated in annex B, subsection B2. For spacecraft, it
         is recommended to use either the OBJECT_ID or international designator of the
         participant as catalogued in the UN Office of Outer Space Affairs designator index
-        (reference [3]).
+        (reference `[3]`).
 
         Examples: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
         JUPITER BARYCENTER, STS 106, EROS
@@ -8660,9 +8660,9 @@ class OemMetadata:
         """
         Spacecraft name for which ephemeris data is provided. While there is no CCSDS-based
         restriction on the value for this keyword, it is recommended to use names from the UN
-        Office of Outer Space Affairs designator index (reference [3], which include Object name
+        Office of Outer Space Affairs designator index (reference `[3]`, which include Object name
         and international designator of the participant). If OBJECT_NAME is not listed in
-        reference [3] or the content is either unknown or cannot be disclosed, the value should
+        reference `[3]` or the content is either unknown or cannot be disclosed, the value should
         be set to UNKNOWN.
 
         Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
@@ -8810,11 +8810,6 @@ class Omm:
     Orbit Mean-Elements Message (OMM).
 
     The OMM contains the orbital characteristics of a single object at a specified epoch,
-    expressed in mean Keplerian elements.
-
-    Orbit Mean-Elements Message (OMM).
-
-    The OMM contains the orbital characteristics of a single object at a specified epoch,
     expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
     ascension of ascending node, argument of perigee, and mean anomaly.
 
@@ -8864,11 +8859,6 @@ class Omm:
     @property
     def header(self) -> OdmHeader:
         """
-        Orbit Mean-Elements Message (OMM).
-
-        The OMM contains the orbital characteristics of a single object at a specified epoch,
-        expressed in mean Keplerian elements.
-
         Orbit Mean-Elements Message (OMM).
 
         The OMM contains the orbital characteristics of a single object at a specified epoch,
@@ -9071,11 +9061,11 @@ class OmmMetadata:
         Object identifier of the object for which mean element orbit state data is provided.
         While there is no CCSDS-based restriction on the value for this keyword, it is
         recommended to use the international spacecraft designator as published in the UN Office
-        of Outer Space Affairs designator index (reference [3]). Recommended values have the
+        of Outer Space Affairs designator index (reference `[3]`). Recommended values have the
         format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-digit serial number of
         launch in year YYYY (with leading zeros). P{PP} = At least one capital letter for the
         identification of the part brought into space by the launch. If the asset is not listed
-        in reference [3], the UN Office of Outer Space Affairs designator index format is not
+        in reference `[3]`, the UN Office of Outer Space Affairs designator index format is not
         used, or the content is either unknown or cannot be disclosed, the value should be set
         to UNKNOWN.
 
@@ -9090,9 +9080,9 @@ class OmmMetadata:
         """
         Spacecraft name for which mean element orbit state data is provided. While there is no
         CCSDS-based restriction on the value for this keyword, it is recommended to use names
-        from the UN Office of Outer Space Affairs designator index (reference [3], which include
+        from the UN Office of Outer Space Affairs designator index (reference `[3]`, which include
         Object name and international designator of the participant). If OBJECT_NAME is not
-        listed in reference [3] or the content is either unknown or cannot be disclosed, the
+        listed in reference `[3]` or the content is either unknown or cannot be disclosed, the
         value should be set to UNKNOWN.
 
         Examples: Telkom 2, Spaceway 2, INMARSAT 4-F2, UNKNOWN
@@ -9110,7 +9100,7 @@ class OmmMetadata:
         are explicitly defined to be in the True Equator Mean Equinox of Date (TEME of Date)
         reference frame. Therefore, TEME of date shall be used for OMMs based on NORAD Two Line
         Element sets, rather than the almost imperceptibly different TEME of Epoch (see
-        reference [H2] or [H3] for further details).
+        reference `[H2]` or `[H3]` for further details).
 
         Examples: ICRF, ITRF2000, EME2000, TEME
         """
@@ -9396,7 +9386,7 @@ class OpmCovarianceMatrix:
     @property
     def cx_dot_x(self) -> float:
         """
-        Covariance matrix [4,1]
+        Covariance matrix `[4,1]`
 
         Units: km²/s
         """
@@ -9407,7 +9397,7 @@ class OpmCovarianceMatrix:
     @property
     def cx_dot_x_dot(self) -> float:
         """
-        Covariance matrix [4,4]
+        Covariance matrix `[4,4]`
 
         Units: km²/s²
         """
@@ -9418,7 +9408,7 @@ class OpmCovarianceMatrix:
     @property
     def cx_dot_y(self) -> float:
         """
-        Covariance matrix [4,2]
+        Covariance matrix `[4,2]`
 
         Units: km²/s
         """
@@ -9429,7 +9419,7 @@ class OpmCovarianceMatrix:
     @property
     def cx_dot_z(self) -> float:
         """
-        Covariance matrix [4,3]
+        Covariance matrix `[4,3]`
 
         Units: km²/s
         """
@@ -9440,7 +9430,7 @@ class OpmCovarianceMatrix:
     @property
     def cx_x(self) -> float:
         """
-        Covariance matrix [1,1]
+        Covariance matrix `[1,1]`
 
         Units: km²
         """
@@ -9451,7 +9441,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_dot_x(self) -> float:
         """
-        Covariance matrix [5,1]
+        Covariance matrix `[5,1]`
 
         Units: km²/s
         """
@@ -9462,7 +9452,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_dot_x_dot(self) -> float:
         """
-        Covariance matrix [5,4]
+        Covariance matrix `[5,4]`
 
         Units: km²/s²
         """
@@ -9473,7 +9463,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_dot_y(self) -> float:
         """
-        Covariance matrix [5,2]
+        Covariance matrix `[5,2]`
 
         Units: km²/s
         """
@@ -9484,7 +9474,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_dot_y_dot(self) -> float:
         """
-        Covariance matrix [5,5]
+        Covariance matrix `[5,5]`
 
         Units: km²/s²
         """
@@ -9495,7 +9485,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_dot_z(self) -> float:
         """
-        Covariance matrix [5,3]
+        Covariance matrix `[5,3]`
 
         Units: km²/s
         """
@@ -9506,7 +9496,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_x(self) -> float:
         """
-        Covariance matrix [2,1]
+        Covariance matrix `[2,1]`
 
         Units: km²
         """
@@ -9517,7 +9507,7 @@ class OpmCovarianceMatrix:
     @property
     def cy_y(self) -> float:
         """
-        Covariance matrix [2,2]
+        Covariance matrix `[2,2]`
 
         Units: km²
         """
@@ -9528,7 +9518,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_x(self) -> float:
         """
-        Covariance matrix [6,1]
+        Covariance matrix `[6,1]`
 
         Units: km²/s
         """
@@ -9539,7 +9529,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_x_dot(self) -> float:
         """
-        Covariance matrix [6,4]
+        Covariance matrix `[6,4]`
 
         Units: km²/s²
         """
@@ -9550,7 +9540,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_y(self) -> float:
         """
-        Covariance matrix [6,2]
+        Covariance matrix `[6,2]`
 
         Units: km²/s
         """
@@ -9561,7 +9551,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_y_dot(self) -> float:
         """
-        Covariance matrix [6,5]
+        Covariance matrix `[6,5]`
 
         Units: km²/s²
         """
@@ -9572,7 +9562,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_z(self) -> float:
         """
-        Covariance matrix [6,3]
+        Covariance matrix `[6,3]`
 
         Units: km²/s
         """
@@ -9583,7 +9573,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_dot_z_dot(self) -> float:
         """
-        Covariance matrix [6,6]
+        Covariance matrix `[6,6]`
 
         Units: km²/s²
         """
@@ -9594,7 +9584,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_x(self) -> float:
         """
-        Covariance matrix [3,1]
+        Covariance matrix `[3,1]`
 
         Units: km²
         """
@@ -9605,7 +9595,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_y(self) -> float:
         """
-        Covariance matrix [3,2]
+        Covariance matrix `[3,2]`
 
         Units: km²
         """
@@ -9616,7 +9606,7 @@ class OpmCovarianceMatrix:
     @property
     def cz_z(self) -> float:
         """
-        Covariance matrix [3,3]
+        Covariance matrix `[3,3]`
 
         Units: km²
         """
@@ -9773,10 +9763,10 @@ class OpmMetadata:
         Object identifier of the object for which orbit state data is provided. While there is no
         CCSDS-based restriction on the value for this keyword, it is recommended to use the
         international spacecraft designator as published in the UN Office of Outer Space Affairs
-        designator index (reference [3]). Recommended values have the format YYYY-NNNP{PP}, where:
+        designator index (reference ``[3]``). Recommended values have the format YYYY-NNNP{PP}, where:
         YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
         zeros). P{PP} = At least one capital letter for the identification of the part brought into
-        space by the launch. If the asset is not listed in reference [3], the UN Office of Outer
+        space by the launch. If the asset is not listed in reference ``[3]``, the UN Office of Outer
         Space Affairs designator index format is not used, or the content is either unknown or
         cannot be disclosed, the value should be set to UNKNOWN.
 
@@ -9791,9 +9781,9 @@ class OpmMetadata:
         """
         Spacecraft name for which orbit state data is provided. While there is no CCSDS-based
         restriction on the value for this keyword, it is recommended to use names from the UN
-        Office of Outer Space Affairs designator index (reference [3], which include Object name
+        Office of Outer Space Affairs designator index (reference ``[3]``, which include Object name
         and international designator of the participant). If OBJECT_NAME is not listed in reference
-        [3] or the content is either unknown or cannot be disclosed, the value should be set to
+        `[3]` or the content is either unknown or cannot be disclosed, the value should be set to
         UNKNOWN.
 
         Examples: EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
@@ -10394,7 +10384,7 @@ class RdmMetadata:
         """
         The satellite catalog used for the object (formatting rules specified in 5.2.3.3). The
         name should be taken from the appropriate SANA registry for catalog names, reference
-        [8].
+        `[8]`.
 
         Examples: SATCAT, ESA SST
         """
@@ -10408,7 +10398,7 @@ class RdmMetadata:
         Celestial body orbited by the object and origin of the reference frame, which may be a
         natural solar system body (planets, asteroids, comets, and natural satellites),
         including any planet barycenter or the solar system barycenter. The value should be
-        taken from the orbit center column in the SANA orbit centers registry, reference [9].
+        taken from the orbit center column in the SANA orbit centers registry, reference `[9]`.
 
         Examples: EARTH, MOON, JUPITER
         """
@@ -10443,7 +10433,7 @@ class RdmMetadata:
         BALLISTIC_COEFF) are valid. The units shall be kilometers, and the conventions
         specified in 5.2.4.1 and 5.3.4 must be followed.
 
-        Examples: 200 [km], 175 [km]
+        Examples: 200 `[km]`, 175 `[km]`
 
         Units: km
         """
@@ -10552,7 +10542,7 @@ class RdmMetadata:
     def n_body_perturbations(self) -> Optional[str]:
         """
         Comma separated list of other bodies used in the simulation. The names of the bodies
-        should be taken from the SANA registry for orbit centers, reference [9]. If no other
+        should be taken from the SANA registry for orbit centers, reference `[9]`. If no other
         bodies are used in the simulation, the value should be NONE.
 
         Examples: MOON, SUN, JUPITER, NONE
@@ -10590,7 +10580,7 @@ class RdmMetadata:
         """
         Object name for which the orbit state is provided. There is no CCSDS-based restriction
         on the value for this keyword, but it is recommended to use names from the UNOOSA
-        registry—reference [7], which includes object name and international designator of the
+        registry—reference `[7]`, which includes object name and international designator of the
         participant (formatting rules specified in 5.2.3.3). For objects that are not in the
         UNOOSA registry, either a descriptive name (e.g., DEBRIS, if the object is identified as
         space debris) or UNKNOWN should be used.
@@ -10606,7 +10596,7 @@ class RdmMetadata:
         """
         Operator of the object (e.g., company, agency, or country operating the satellite).
         The value should be taken from the abbreviation column in the SANA organizations
-        registry, reference [6].
+        registry, reference `[6]`.
 
         Examples: ESA, EUMETSAT
         """
@@ -10619,7 +10609,7 @@ class RdmMetadata:
         """
         Owner of the object (e.g., company, agency, or country owning the satellite). The value
         should be taken from the abbreviation column in the SANA organizations registry,
-        reference [6].
+        reference `[6]`.
 
         Examples: DLR, INTELSAT, ESA, UNKNOWN
         """
@@ -10691,7 +10681,7 @@ class RdmMetadata:
         """
         Reference frame in which the (optional) orbit information will be provided. The value
         should be taken from the keyword value name column in the SANA celestial body reference
-        frames registry, reference [11]. The reference frame must be the same for all orbit
+        frames registry, reference `[11]`. The reference frame must be the same for all orbit
         data elements, with the exception of the covariance matrix, for which a different
         reference frame may be specified, and the ground impact data. This keyword becomes
         mandatory if state vectors are provided in the data section.
@@ -10741,7 +10731,7 @@ class RdmMetadata:
     def time_system(self) -> str:
         """
         Time system for all data/metadata. The value should be taken from the name column in
-        the SANA time systems registry, reference [10].
+        the SANA time systems registry, reference `[10]`.
 
         Examples: UTC, TAI
         """
@@ -11993,8 +11983,8 @@ class TdmHeader:
     def originator(self) -> str:
         """
         Creating agency. Value should be an entry from the ‘Abbreviation’ column in the SANA
-        Organizations Registry, https://sanaregistry.org/r/organizations/organizations.html
-        (reference [11]).
+        Organizations Registry, <https://sanaregistry.org/r/organizations/organizations.html>
+        (reference `[11]`).
 
         Examples: CNES, ESA, GSFC, DLR, JPL, JAXA
         """
@@ -12448,7 +12438,7 @@ class TdmMetadata:
         (max index is 5). At least two participants must be specified for most sessions; for
         some special TDMs such as tropospheric media, only one participant need be listed.
 
-        Examples: DSS-63-S400K, ROSETTA, <Quasar catalog name>, 1997-061A, UNKNOWN
+        Examples: DSS-63-S400K, ROSETTA, `<Quasar catalog name>`, 1997-061A, UNKNOWN
         """
         ...
 
@@ -12685,7 +12675,7 @@ class TdmMetadata:
         The TIME_SYSTEM keyword shall specify the time system used for timetags in the
         associated Data Section. This should be UTC for ground-based data. The value associated
         with this keyword must be selected from the full set of allowed values enumerated in
-        the SANA Time Systems Registry https://sanaregistry.org/r/time_systems (reference [12]).
+        the SANA Time Systems Registry <https://sanaregistry.org/r/time_systems> (reference `[12]`).
         (See annex B.)
 
         Examples: UTC, TAI, GPS, SCLK

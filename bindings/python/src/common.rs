@@ -1372,7 +1372,7 @@ impl GroundImpactParameters {
     #[setter] fn set_impact_window_end(&mut self, v: Option<String>) -> PyResult<()> { self.inner.impact_window_end = v.map(|s| parse_epoch(&s)).transpose()?; Ok(()) }
 
     /// Reference frame of the impact location data. The value should be taken from the keyword
-    /// value name column in the SANA celestial body reference frames registry, reference [11].
+    /// value name column in the SANA celestial body reference frames registry, reference `[11]`.
     /// Only frames with the value ‘Body-Fixed’ in the Frame Type column shall be used.
     /// Mandatory if NOMINAL_IMPACT_LON and NOMINAL_IMPACT_LAT are present.
     ///

@@ -190,7 +190,7 @@ impl AcmMetadata {
 
     /// Free-text field containing the name of the object. There is no CCSDS-based restriction on
     /// the value for this keyword, but it is recommended to use names from either the UN Office of
-    /// Outer Space Affairs designator index (reference [2]), which include Object name and
+    /// Outer Space Affairs designator index (reference `[2]`), which include Object name and
     /// international designator), the spacecraft operator, or a State Actor or commercial Space
     /// Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space catalog. If the
     /// object name is not known (uncorrelated object), ‘UNKNOWN’ may be used (or this keyword
