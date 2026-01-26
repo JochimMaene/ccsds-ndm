@@ -46,6 +46,72 @@ pub struct Oem {
     pub body: OemBody,
 }
 
+impl Oem {
+    pub fn validate(&self) -> Result<()> {
+        self.body.validate()
+    }
+}
+
+impl OemBody {
+    pub fn validate(&self) -> Result<()> {
+        for segment in &self.segment {
+            segment.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl OemSegment {
+    pub fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate()
+    }
+}
+
+impl OemMetadata {
+    pub fn validate(&self) -> Result<()> {
+        if self.interpolation.is_some() && self.interpolation_degree.is_none() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Metadata".into(),
+                field: "INTERPOLATION_DEGREE (required when INTERPOLATION is present)".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.start_time.as_str() > self.stop_time.as_str() {
+            return Err(crate::error::ValidationError::Generic {
+                message: "START_TIME must be <= STOP_TIME".into(),
+                line: None,
+            }
+            .into());
+        }
+        if let (Some(start), Some(end)) = (&self.useable_start_time, &self.useable_stop_time) {
+            if start.as_str() > end.as_str() {
+                return Err(crate::error::ValidationError::Generic {
+                    message: "USEABLE_START_TIME must be <= USEABLE_STOP_TIME".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl OemData {
+    pub fn validate(&self) -> Result<()> {
+        if self.state_vector.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Data".into(),
+                field: "stateVector (at least one required)".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 impl Ndm for Oem {
     fn to_kvn(&self) -> Result<String> {
         // Estimate capacity: header + (metadata + state vectors + covariance) for each segment
@@ -61,16 +127,20 @@ impl Ndm for Oem {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        // Use the new winnow-based parser
-        Self::from_kvn_str(kvn)
+        let oem = Self::from_kvn_str(kvn)?;
+        oem.validate()?;
+        Ok(oem)
     }
 
     fn to_xml(&self) -> Result<String> {
+        self.validate()?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str_with_context(xml, "OEM")
+        let oem: Self = crate::xml::from_str_with_context(xml, "OEM")?;
+        oem.validate()?;
+        Ok(oem)
     }
 }
 
@@ -867,5 +937,67 @@ COVARIANCE_STOP
                 .as_deref(),
             Some("EME2000")
         );
+    }
+
+    #[test]
+    fn test_oem_validation_interpolation_reqs() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+INTERPOLATION = HERMITE
+# Missing INTERPOLATION_DEGREE
+META_STOP
+2023-01-01T00:00:00 1 2 3 4 5 6
+"#;
+        assert!(Oem::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_oem_validation_time_range() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-02T00:00:00
+STOP_TIME = 2023-01-01T00:00:00
+META_STOP
+2023-01-01T00:00:00 1 2 3 4 5 6
+"#;
+        assert!(Oem::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_oem_validation_empty_state_vector() {
+        // Construct KVN without data lines?
+        // Parser logic for OEM data: it expects lines or comments until next block.
+        // If no lines, `state_vector` will be empty.
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+COMMENT No data
+"#;
+        assert!(Oem::from_kvn(kvn).is_err());
     }
 }

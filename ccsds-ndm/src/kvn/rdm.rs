@@ -332,9 +332,9 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "DRY_MASS" => val: kv_from_kvn => { spacecraft_params.dry_mass = Some(val); have_sp = true; },
         "HAZARDOUS_SUBSTANCES" => val: kv_string => { spacecraft_params.hazardous_substances = Some(val); have_sp = true; },
         "SOLAR_RAD_AREA" => val: kv_from_kvn => { spacecraft_params.solar_rad_area = Some(val); have_sp = true; },
-        "SOLAR_RAD_COEFF" => val: kv_float => { spacecraft_params.solar_rad_coeff = Some(val.into()); have_sp = true; },
+        "SOLAR_RAD_COEFF" => solar_rad_coeff: kv_from_kvn => { spacecraft_params.solar_rad_coeff = Some(solar_rad_coeff); have_sp = true; },
         "DRAG_AREA" => val: kv_from_kvn => { spacecraft_params.drag_area = Some(val); have_sp = true; },
-        "DRAG_COEFF" => val: kv_float => { spacecraft_params.drag_coeff = Some(val.into()); have_sp = true; },
+        "DRAG_COEFF" => drag_coeff: kv_from_kvn => { spacecraft_params.drag_coeff = Some(drag_coeff); have_sp = true; },
         "RCS" => val: kv_from_kvn => { spacecraft_params.rcs = Some(val); have_sp = true; },
         "BALLISTIC_COEFF" => val: kv_from_kvn => { spacecraft_params.ballistic_coeff = Some(val); have_sp = true; },
         "THRUST_ACCELERATION" => val: kv_from_kvn => { spacecraft_params.thrust_acceleration = Some(val); have_sp = true; },
@@ -348,7 +348,7 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "TRACKS_AVAILABLE" => val: kv_u32 => { od_params.tracks_available = Some(val.into()); have_od = true; },
         "TRACKS_USED" => val: kv_u32 => { od_params.tracks_used = Some(val.into()); have_od = true; },
         "RESIDUALS_ACCEPTED" => val: kv_from_kvn => { od_params.residuals_accepted = Some(val); have_od = true; },
-        "WEIGHTED_RMS" => val: kv_float => { od_params.weighted_rms = Some(val.into()); have_od = true; },
+        "WEIGHTED_RMS" => weighted_rms: kv_from_kvn => { od_params.weighted_rms = Some(weighted_rms); have_od = true; },
     }, |i: &mut &str| {
         let checkpoint = i.checkpoint();
         let _ = collect_comments.parse_next(i);

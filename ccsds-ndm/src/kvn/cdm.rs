@@ -434,7 +434,7 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
         "TRACKS_AVAILABLE" => val: kv_u32 => { od_params.tracks_available = Some(val.into()); has_od_params = true; },
         "TRACKS_USED" => val: kv_u32 => { od_params.tracks_used = Some(val.into()); has_od_params = true; },
         "RESIDUALS_ACCEPTED" => val: kv_from_kvn => { od_params.residuals_accepted = Some(val); has_od_params = true; },
-        "WEIGHTED_RMS" => val: kv_float => { od_params.weighted_rms = Some(val.into()); has_od_params = true; },
+        "WEIGHTED_RMS" => val: kv_from_kvn => { od_params.weighted_rms = Some(val); has_od_params = true; },
 
         "AREA_PC" => val: kv_from_kvn => { add_params.area_pc = Some(val); has_add_params = true; },
         "AREA_DRG" => val: kv_from_kvn => { add_params.area_drg = Some(val); has_add_params = true; },

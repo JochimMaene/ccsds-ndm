@@ -715,4 +715,74 @@ DATA_STOP
                 > aem.body.segment[0].metadata.start_time.as_str()
         );
     }
+
+    #[test]
+    fn test_aem_validation_interpolation_reqs() {
+        let kvn = r#"CCSDS_AEM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+ATTITUDE_TYPE = QUATERNION
+INTERPOLATION_METHOD = HERMITE
+# Missing INTERPOLATION_DEGREE
+META_STOP
+DATA_START
+2023-01-01T00:00:00 0 0 0 1
+DATA_STOP
+"#;
+        assert!(Aem::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_aem_validation_euler_reqs() {
+        let kvn = r#"CCSDS_AEM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+ATTITUDE_TYPE = EULER_ANGLE
+# Missing EULER_ROT_SEQ
+META_STOP
+DATA_START
+2023-01-01T00:00:00 10 20 30
+DATA_STOP
+"#;
+        assert!(Aem::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_aem_validation_angvel_reqs() {
+        let kvn = r#"CCSDS_AEM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+ATTITUDE_TYPE = QUATERNION/ANGVEL
+# Missing ANGVEL_FRAME
+META_STOP
+DATA_START
+2023-01-01T00:00:00 0 0 0 1 0.1 0.1 0.1
+DATA_STOP
+"#;
+        assert!(Aem::from_kvn(kvn).is_err());
+    }
 }

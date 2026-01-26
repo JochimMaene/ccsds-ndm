@@ -118,7 +118,7 @@ pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElement
 
     parse_block!(input, comment, {
         "SEMI_MAJOR_AXIS" => semi_major_axis: kv_from_kvn,
-        "ECCENTRICITY" => val: kv_float => { eccentricity = Some(val.into()); },
+        "ECCENTRICITY" => eccentricity: kv_from_kvn,
         "INCLINATION" => inclination: kv_from_kvn,
         "RA_OF_ASC_NODE" => ra_of_asc_node: kv_from_kvn,
         "ARG_OF_PERICENTER" => arg_of_pericenter: kv_from_kvn,
@@ -314,6 +314,7 @@ impl ParseKvn for Opm {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::NonNegativeDouble;
 
     const MINIMAL_OPM: &str = r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2022-11-06T09:23:57
@@ -443,7 +444,10 @@ DRAG_COEFF = 2.5
             .as_ref()
             .expect("Should have spacecraft params");
         assert_eq!(sc.mass.as_ref().unwrap().value, 3000.0);
-        assert_eq!(sc.drag_coeff.as_ref().unwrap(), &2.5.into());
+        assert_eq!(
+            sc.drag_coeff.as_ref().unwrap(),
+            &NonNegativeDouble::new(2.5).unwrap()
+        );
     }
 
     #[test]

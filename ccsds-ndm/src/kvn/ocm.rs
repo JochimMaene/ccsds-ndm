@@ -899,7 +899,7 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
         "SEDR" => sedr: kv_from_kvn,
         "SENSORS_N" => sensors_n: kv_u64,
         "SENSORS" => sensors: kv_string,
-        "WEIGHTED_RMS" => val: kv_float => { weighted_rms = Some(val.into()); },
+        "WEIGHTED_RMS" => weighted_rms: kv_from_kvn,
         "DATA_TYPES" => data_types: kv_string,
     }, |i| at_block_end("OD", i), "Unexpected OCM Orbit Determination key");
 
@@ -3072,9 +3072,9 @@ OD_STOP
         assert!(od.consider_params.is_some());
         assert!(od.sedr.is_some());
         assert_eq!(od.sensors_n, Some(3));
-        assert!(od.sensors.is_some());
-        assert_eq!(od.weighted_rms, Some(1.2.into()));
-        assert!(od.data_types.is_some());
+        assert_eq!(od.sensors, Some("SENSOR_A SENSOR_B SENSOR_C".to_string()));
+        assert_eq!(od.weighted_rms, Some(NonNegativeDouble::new(1.2).unwrap()));
+        assert_eq!(od.data_types, Some("RANGE DOPPLER".to_string()));
 
         // Now write to KVN to cover all the write_kvn branches
         let output = ocm.to_kvn().unwrap();

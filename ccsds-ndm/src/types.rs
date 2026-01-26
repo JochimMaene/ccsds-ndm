@@ -953,12 +953,6 @@ impl FromKvnFloat for NonNegativeDouble {
     }
 }
 
-impl From<f64> for NonNegativeDouble {
-    fn from(value: f64) -> Self {
-        Self { value }
-    }
-}
-
 /// XSD positiveInteger - value must be > 0
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
 pub struct PositiveInteger {

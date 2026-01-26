@@ -42,6 +42,75 @@ pub struct Rdm {
     pub version: String,
 }
 
+impl Rdm {
+    pub fn validate(&self) -> Result<()> {
+        self.body.segment.validate()
+    }
+}
+
+impl RdmSegment {
+    pub fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate()
+    }
+}
+
+impl RdmMetadata {
+    pub fn validate(&self) -> Result<()> {
+        if self.object_name.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Metadata".into(),
+                field: "OBJECT_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl RdmData {
+    pub fn validate(&self) -> Result<()> {
+        let arp = &self.atmospheric_reentry_parameters;
+        if let (Some(start), Some(end)) = (
+            &arp.orbit_lifetime_window_start,
+            &arp.orbit_lifetime_window_end,
+        ) {
+            if start.value > end.value {
+                return Err(crate::error::ValidationError::Generic {
+                    message: "ORBIT_LIFETIME_WINDOW_START must be <= ORBIT_LIFETIME_WINDOW_END"
+                        .into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        // Epoch comparison for reentry window
+        if let (Some(start), Some(end)) = (&arp.reentry_window_start, &arp.reentry_window_end) {
+            if start.as_str() > end.as_str() {
+                return Err(crate::error::ValidationError::Generic {
+                    message: "REENTRY_WINDOW_START must be <= REENTRY_WINDOW_END".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+
+        if let Some(gip) = &self.ground_impact_parameters {
+            if let (Some(start), Some(end)) = (&gip.impact_window_start, &gip.impact_window_end) {
+                if start.as_str() > end.as_str() {
+                    return Err(crate::error::ValidationError::Generic {
+                        message: "IMPACT_WINDOW_START must be <= IMPACT_WINDOW_END".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Ndm for Rdm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
@@ -50,15 +119,20 @@ impl Ndm for Rdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        Self::from_kvn_str(kvn)
+        let rdm = Self::from_kvn_str(kvn)?;
+        rdm.validate()?;
+        Ok(rdm)
     }
 
     fn to_xml(&self) -> Result<String> {
+        self.validate()?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str_with_context(xml, "RDM")
+        let rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
+        rdm.validate()?;
+        Ok(rdm)
     }
 }
 
@@ -780,16 +854,16 @@ CENTER_NAME = EARTH
 TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-01-01T09:00:00
 ORBIT_LIFETIME = 5.5 [d]
-REENTRY_ALTITUDE = 80.0 `[km]`
+REENTRY_ALTITUDE = 80.0 [km]
 NOMINAL_REENTRY_EPOCH = 2023-01-06T19:45:33
 REENTRY_WINDOW_START = 2023-01-06T11:45:33
 REENTRY_WINDOW_END = 2023-01-06T22:12:56
 PROBABILITY_OF_IMPACT = 0.25
 PROBABILITY_OF_BURN_UP = 0.75
 EPOCH = 2023-01-01T09:30:12
-X = 4000.000000 `[km]`
-Y = 4000.000000 `[km]`
-Z = 4000.000000 `[km]`
+X = 4000.000000 [km]
+Y = 4000.000000 [km]
+Z = 4000.000000 [km]
 X_DOT = 7.000000 [km/s]
 Y_DOT = 7.000000 [km/s]
 Z_DOT = 7.000000 [km/s]
@@ -874,7 +948,7 @@ CENTER_NAME = EARTH
 TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-11-13T00:00:00
 ORBIT_LIFETIME = 2 [d]
-REENTRY_ALTITUDE = 80 `[km]`
+REENTRY_ALTITUDE = 80 [km]
 "#;
         let rdm = Rdm::from_kvn(kvn).unwrap();
         let xml = rdm.to_xml().unwrap();
@@ -885,5 +959,70 @@ REENTRY_ALTITUDE = 80 `[km]`
             rdm.body.segment.metadata.object_name,
             rdm2.body.segment.metadata.object_name
         );
+    }
+
+    #[test]
+    fn test_rdm_validation_orbit_lifetime_window() {
+        let kvn = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+ORBIT_LIFETIME_WINDOW_START = 6.0 [d]
+ORBIT_LIFETIME_WINDOW_END = 5.0 [d]
+"#;
+        assert!(Rdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_rdm_validation_reentry_window() {
+        let kvn = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+REENTRY_WINDOW_START = 2023-01-06T00:00:00
+REENTRY_WINDOW_END = 2023-01-05T00:00:00
+"#;
+        assert!(Rdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_rdm_validation_empty_object_name() {
+        // Construct with empty OBJECT_NAME
+        // Note: parser might not allow empty value for key, but if it does (e.g. "OBJECT_NAME = \n"), validation should catch it.
+        // However, if parser treats empty value as error, then this test tests parser, which is fine.
+        // But if we construct struct manually and call validate, that's what we really want to test if parser is loose.
+        // For now, let's use KVN.
+        let kvn = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME = 
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+"#;
+        // If parser allows empty value, validate() catches it.
+        // If parser disallows, it errors anyway.
+        assert!(Rdm::from_kvn(kvn).is_err());
     }
 }

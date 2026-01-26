@@ -970,7 +970,7 @@ GM = 398600.4 [km**3/s**2]
 "#;
         let opm = Opm::from_kvn(kvn).unwrap();
         let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
-        assert_eq!(kep.eccentricity, 0.0.into());
+        assert_eq!(kep.eccentricity, NonNegativeDouble::new(0.0).unwrap());
     }
 
     #[test]
@@ -1182,9 +1182,15 @@ DRAG_COEFF = 2.2
             .unwrap();
         assert_eq!(sp.mass.as_ref().unwrap().value, 500.0);
         assert_eq!(sp.solar_rad_area.as_ref().unwrap().value, 10.0);
-        assert_eq!(sp.solar_rad_coeff.as_ref().unwrap(), &1.2.into());
+        assert_eq!(
+            sp.solar_rad_coeff.as_ref().unwrap(),
+            &NonNegativeDouble::new(1.2).unwrap()
+        );
         assert_eq!(sp.drag_area.as_ref().unwrap().value, 8.0);
-        assert_eq!(sp.drag_coeff.as_ref().unwrap(), &2.2.into());
+        assert_eq!(
+            sp.drag_coeff.as_ref().unwrap(),
+            &NonNegativeDouble::new(2.2).unwrap()
+        );
     }
 
     #[test]
@@ -1217,8 +1223,14 @@ DRAG_COEFF = 0.0
             .spacecraft_parameters
             .as_ref()
             .unwrap();
-        assert_eq!(sp.solar_rad_coeff.as_ref().unwrap(), &0.0.into());
-        assert_eq!(sp.drag_coeff.as_ref().unwrap(), &0.0.into());
+        assert_eq!(
+            sp.solar_rad_coeff.as_ref().unwrap(),
+            &NonNegativeDouble::new(0.0).unwrap()
+        );
+        assert_eq!(
+            sp.drag_coeff.as_ref().unwrap(),
+            &NonNegativeDouble::new(0.0).unwrap()
+        );
     }
 
     #[test]

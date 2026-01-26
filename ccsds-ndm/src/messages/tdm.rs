@@ -1525,4 +1525,70 @@ DATA_STOP
 
         assert_eq!(tdm.header.creation_date, tdm2.header.creation_date);
     }
+
+    #[test]
+    fn test_tdm_validation_path_exclusive() {
+        // TDM cannot have both PATH and PATH_1/PATH_2
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+PARTICIPANT_1 = P1
+PARTICIPANT_2 = P2
+MODE = SEQUENTIAL
+PATH = 1,2
+PATH_1 = 1,2
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_tdm_validation_path_pairs() {
+        // TDM must have both PATH_1 and PATH_2 if one is present
+        let kvn_p1_only = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+PARTICIPANT_1 = P1
+PARTICIPANT_2 = P2
+MODE = SINGLE_DIFF
+PATH_1 = 1,2
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn_p1_only).is_err());
+    }
+
+    #[test]
+    fn test_tdm_validation_missing_mandatory() {
+        // Missing TIME_SYSTEM
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+PARTICIPANT_1 = P1
+PARTICIPANT_2 = P2
+MODE = SEQUENTIAL
+PATH = 1,2
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+    }
 }
