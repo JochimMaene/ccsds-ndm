@@ -10,7 +10,6 @@ use crate::common::{
 };
 use crate::error::InternalParserError;
 use crate::kvn::parser::*;
-use winnow::stream::Offset;
 use crate::messages::aem::{Aem, AemBody, AemData, AemMetadata, AemSegment};
 use crate::parse_block;
 use crate::types::Angle;
@@ -18,6 +17,7 @@ use std::str::FromStr;
 use winnow::combinator::{peek, terminated};
 use winnow::error::{AddContext, ErrMode, FromExternalError};
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // AEM Version Parser
@@ -348,7 +348,7 @@ pub fn aem_data(input: &mut &str, attitude_type: &str) -> KvnResult<AemData> {
         if peek((ws, "COMMENT")).parse_next(input).is_ok() {
             comment.extend(collect_comments.parse_next(input)?);
             if input.offset_from(&start) == 0 {
-                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
+                return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
             continue;
         }

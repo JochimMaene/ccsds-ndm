@@ -111,7 +111,7 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
         if peek((ws, "COMMENT")).parse_next(input).is_ok() {
             block.comment.extend(collect_comments.parse_next(input)?);
             if input.offset_from(&start) == 0 {
-                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
+                return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
             continue;
         }
@@ -184,7 +184,7 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
         if peek((ws, "COMMENT")).parse_next(input).is_ok() {
             block.comment.extend(collect_comments.parse_next(input)?);
             if input.offset_from(&start) == 0 {
-                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
+                return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
             continue;
         }
