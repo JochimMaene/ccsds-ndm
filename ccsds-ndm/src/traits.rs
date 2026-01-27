@@ -27,7 +27,39 @@ use crate::kvn::ser::KvnWriter;
 /// // Serialize to XML
 /// let xml = opm.to_xml().unwrap();
 /// ```
-pub trait Ndm: Sized + serde::Serialize {
+/// Trait for types that provide semantic validation.
+pub trait Validate {
+    /// Perform semantic validation on the object.
+    ///
+    /// Checks for logical consistency beyond syntactic correctness.
+    /// For example: `START_TIME <= STOP_TIME`, or `MASS >= 0`.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if valid, or a `ValidationError` if invalid.
+    fn validate(&self) -> Result<()> {
+        Ok(())
+    }
+}
+
+/// Core trait for NDM message types.
+///
+/// All CCSDS message types (OPM, OEM, CDM, etc.) implement this trait,
+/// providing a uniform interface for parsing and serialization.
+///
+/// # Example
+///
+/// ```no_run
+/// use ccsds_ndm::messages::opm::Opm;
+/// use ccsds_ndm::traits::Ndm;
+///
+/// // Parse from KVN
+/// let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
+///
+/// // Serialize to XML
+/// let xml = opm.to_xml().unwrap();
+/// ```
+pub trait Ndm: Sized + serde::Serialize + Validate {
     /// Serialize the message to KVN (Key-Value Notation) format.
     ///
     /// # Returns

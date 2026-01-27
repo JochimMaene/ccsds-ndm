@@ -6,7 +6,7 @@ use crate::common::AdmHeader;
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -40,6 +40,8 @@ pub struct Aem {
     pub version: String,
 }
 
+impl crate::traits::Validate for Aem {}
+
 impl Ndm for Aem {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
@@ -67,6 +69,7 @@ impl Ndm for Aem {
 
 impl Aem {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.validate()
     }
 }

@@ -38,6 +38,8 @@ pub struct CombinedNdm {
     pub messages: Vec<MessageType>,
 }
 
+impl crate::traits::Validate for CombinedNdm {}
+
 impl Ndm for CombinedNdm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();

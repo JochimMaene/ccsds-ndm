@@ -45,6 +45,8 @@ pub struct Tdm {
     pub version: String,
 }
 
+impl crate::traits::Validate for Tdm {}
+
 impl Ndm for Tdm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
@@ -72,6 +74,7 @@ impl Ndm for Tdm {
 
 impl Tdm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.validate()
     }
 }
@@ -125,6 +128,12 @@ pub struct TdmHeader {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub message_id: Option<String>,
+}
+
+impl TdmHeader {
+    pub fn validate(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl ToKvn for TdmHeader {

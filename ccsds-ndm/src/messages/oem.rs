@@ -6,7 +6,7 @@ use crate::common::{OdmHeader, StateVectorAcc};
 use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::{Epoch, PositionCovariance, PositionVelocityCovariance, VelocityCovariance};
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
@@ -48,6 +48,7 @@ pub struct Oem {
 
 impl Oem {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.validate()
     }
 }
@@ -111,6 +112,8 @@ impl OemData {
         Ok(())
     }
 }
+
+impl crate::traits::Validate for Oem {}
 
 impl Ndm for Oem {
     fn to_kvn(&self) -> Result<String> {

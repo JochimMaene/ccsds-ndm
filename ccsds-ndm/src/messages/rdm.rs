@@ -44,6 +44,7 @@ pub struct Rdm {
 
 impl Rdm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.segment.validate()
     }
 }
@@ -111,6 +112,8 @@ impl RdmData {
     }
 }
 
+impl crate::traits::Validate for Rdm {}
+
 impl Ndm for Rdm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
@@ -169,6 +172,12 @@ pub struct RdmHeader {
     /// Examples: 201113719185, ESA20190101-3345
     #[builder(into)]
     pub message_id: String,
+}
+
+impl RdmHeader {
+    pub fn validate(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl ToKvn for RdmHeader {

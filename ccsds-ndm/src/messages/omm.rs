@@ -6,7 +6,7 @@ use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters};
 use crate::error::{EnumParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -171,6 +171,8 @@ pub struct Omm {
     pub version: String,
 }
 
+impl crate::traits::Validate for Omm {}
+
 impl Ndm for Omm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
@@ -199,6 +201,7 @@ impl Ndm for Omm {
 impl Omm {
     /// Validates the OMM against CCSDS constraints that cannot be checked during parsing.
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.segment.validate()
     }
 }

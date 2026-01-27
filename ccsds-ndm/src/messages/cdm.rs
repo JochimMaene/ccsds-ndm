@@ -41,6 +41,8 @@ pub struct Cdm {
     pub version: String,
 }
 
+impl crate::traits::Validate for Cdm {}
+
 impl Ndm for Cdm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
@@ -120,6 +122,7 @@ pub struct CdmHeader {
 
 impl Cdm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.validate()?;
         Ok(())
     }
@@ -133,6 +136,12 @@ impl ToKvn for Cdm {
 
         // 2. Body
         self.body.write_kvn(writer);
+    }
+}
+
+impl CdmHeader {
+    pub fn validate(&self) -> Result<()> {
+        Ok(())
     }
 }
 

@@ -8,7 +8,7 @@ use crate::error::{Result, ValidationError};
 use crate::kvn::parser::KvnResult;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::SensorNoise;
 use crate::types::*;
 use serde::{Deserialize, Serialize};
@@ -44,6 +44,8 @@ pub struct Acm {
     pub version: String,
 }
 
+impl crate::traits::Validate for Acm {}
+
 impl Ndm for Acm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
@@ -71,6 +73,7 @@ impl Ndm for Acm {
 
 impl Acm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.segment.validate(&self.header)
     }
 }

@@ -10,7 +10,7 @@ use crate::common::{
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +36,8 @@ pub struct Apm {
     #[builder(into)]
     pub version: String,
 }
+
+impl crate::traits::Validate for Apm {}
 
 impl Ndm for Apm {
     fn to_kvn(&self) -> Result<String> {
@@ -64,6 +66,7 @@ impl Ndm for Apm {
 
 impl Apm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         // Validation logic can be added here
         // E.g. check at least one logical block is present in segment
         self.body.segment.validate()?;

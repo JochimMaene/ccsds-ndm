@@ -6,6 +6,7 @@
 //! from `ndmxml-4.0.0-common-4.0.xsd` used by OEM.
 
 use super::types::*;
+use crate::error::Result;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::ToKvn;
 use serde::{Deserialize, Serialize};
@@ -45,6 +46,20 @@ impl ToKvn for NdmHeader {
     }
 }
 
+impl crate::traits::Validate for NdmHeader {
+    fn validate(&self) -> Result<()> {
+        if self.originator.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "NDM Header".into(),
+                field: "ORIGINATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 /// Represents the `admHeader` complex type from the XSD.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -73,6 +88,20 @@ impl ToKvn for AdmHeader {
         if let Some(ref msg_id) = self.message_id {
             writer.write_pair("MESSAGE_ID", msg_id);
         }
+    }
+}
+
+impl crate::traits::Validate for AdmHeader {
+    fn validate(&self) -> Result<()> {
+        if self.originator.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "ADM Header".into(),
+                field: "ORIGINATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
     }
 }
 
@@ -135,6 +164,20 @@ impl ToKvn for OdmHeader {
         if let Some(ref msg_id) = self.message_id {
             writer.write_pair("MESSAGE_ID", msg_id);
         }
+    }
+}
+
+impl crate::traits::Validate for OdmHeader {
+    fn validate(&self) -> Result<()> {
+        if self.originator.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "ODM Header".into(),
+                field: "ORIGINATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
     }
 }
 

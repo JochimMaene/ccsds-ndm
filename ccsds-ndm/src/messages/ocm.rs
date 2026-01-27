@@ -6,7 +6,7 @@ use crate::common::OdmHeader;
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use fast_float;
 use serde::{Deserialize, Serialize};
@@ -43,6 +43,8 @@ pub struct Ocm {
     pub version: String,
 }
 
+impl crate::traits::Validate for Ocm {}
+
 impl Ndm for Ocm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
@@ -70,6 +72,7 @@ impl Ndm for Ocm {
 
 impl Ocm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.segment.validate(&self.header)
     }
 }
@@ -3195,6 +3198,7 @@ mod tests {
 
         let traj = OcmTrajState::default();
         // Missing lines
+        ocm.header.originator = "TEST".into();
         ocm.body.segment.data.traj.push(traj);
         assert!(ocm.validate().is_err());
 

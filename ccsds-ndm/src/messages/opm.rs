@@ -6,7 +6,7 @@ use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateV
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -37,6 +37,13 @@ pub struct Opm {
     pub version: String,
 }
 
+impl crate::traits::Validate for Opm {
+    fn validate(&self) -> Result<()> {
+        self.header.validate()?;
+        self.body.validate()
+    }
+}
+
 impl Ndm for Opm {
     fn to_kvn(&self) -> Result<String> {
         let mut writer = KvnWriter::new();
@@ -63,9 +70,7 @@ impl Ndm for Opm {
 }
 
 impl Opm {
-    pub fn validate(&self) -> Result<()> {
-        self.body.segment.data.validate()
-    }
+    // No inherent validate() anymore
 }
 
 impl ToKvn for Opm {
@@ -90,6 +95,12 @@ pub struct OpmBody {
     pub segment: OpmSegment,
 }
 
+impl crate::traits::Validate for OpmBody {
+    fn validate(&self) -> Result<()> {
+        self.segment.validate()
+    }
+}
+
 impl ToKvn for OpmBody {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         self.segment.write_kvn(writer);
@@ -103,6 +114,13 @@ impl ToKvn for OpmBody {
 pub struct OpmSegment {
     pub metadata: OpmMetadata,
     pub data: OpmData,
+}
+
+impl crate::traits::Validate for OpmSegment {
+    fn validate(&self) -> Result<()> {
+        // Metadata validation could go here if needed
+        self.data.validate()
+    }
 }
 
 impl ToKvn for OpmSegment {
@@ -192,6 +210,8 @@ pub struct OpmMetadata {
     pub time_system: String,
 }
 
+impl crate::traits::Validate for OpmMetadata {}
+
 impl ToKvn for OpmMetadata {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -265,8 +285,8 @@ pub struct OpmData {
     pub user_defined_parameters: Option<UserDefined>,
 }
 
-impl OpmData {
-    pub fn validate(&self) -> Result<()> {
+impl Validate for OpmData {
+    fn validate(&self) -> Result<()> {
         if let Some(ke) = &self.keplerian_elements {
             ke.validate()?;
         }
@@ -395,8 +415,8 @@ pub struct KeplerianElements {
     pub gm: Gm,
 }
 
-impl KeplerianElements {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for KeplerianElements {
+    fn validate(&self) -> Result<()> {
         match (self.true_anomaly.is_some(), self.mean_anomaly.is_some()) {
             (true, false) | (false, true) => Ok(()),
             _ => Err(ValidationError::Generic {
