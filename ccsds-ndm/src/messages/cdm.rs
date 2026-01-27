@@ -1617,4 +1617,20 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         );
         assert!(Cdm::from_kvn(&kvn).is_err());
     }
+
+    #[test]
+    fn test_cdm_validation_segment_count_mismatch() {
+        let mut cdm = Cdm::from_kvn(&sample_cdm_kvn()).unwrap();
+        
+        // Remove one segment => 1 segment
+        cdm.body.segments.pop();
+        assert!(cdm.validate().is_err());
+        
+        // Add valid segments to check 3 segments (also invalid)
+        let seg = cdm.body.segments[0].clone();
+        cdm.body.segments.push(seg.clone());
+        cdm.body.segments.push(seg); // Now 3
+        assert_eq!(cdm.body.segments.len(), 3);
+        assert!(cdm.validate().is_err());
+    }
 }

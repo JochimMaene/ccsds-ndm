@@ -1159,4 +1159,205 @@ MEAN_ANOMALY = 10.0 [deg]
 "#;
         assert!(Omm::from_kvn(kvn).is_err());
     }
+
+    #[test]
+    fn test_omm_units_parsing() {
+        use std::str::FromStr;
+        assert!(InvErUnits::from_str("1/ER").is_ok());
+        assert!(InvErUnits::from_str("INVALID").is_err());
+
+        assert!(RevPerDayUnits::from_str("rev/day").is_ok());
+        assert!(RevPerDayUnits::from_str("REV/DAY").is_ok());
+        assert!(RevPerDayUnits::from_str("INVALID").is_err());
+
+        assert!(RevPerDay2Units::from_str("rev/day**2").is_ok());
+        assert!(RevPerDay2Units::from_str("REV/DAY**2").is_ok());
+        assert!(RevPerDay2Units::from_str("INVALID").is_err());
+
+        assert!(RevPerDay3Units::from_str("rev/day**3").is_ok());
+        assert!(RevPerDay3Units::from_str("REV/DAY**3").is_ok());
+        assert!(RevPerDay3Units::from_str("INVALID").is_err());
+    }
+
+    #[test]
+    fn test_omm_validation_theory_sgp_ppt3_reqs() {
+        // SGP/PPT3 requires MEAN_MOTION_DDOT
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP
+EPOCH = 2023-01-01T00:00:00
+MEAN_MOTION = 15.0 [rev/day]
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+TLE_PARAMETERS =
+  MEAN_MOTION_DOT = 0.0 [rev/day**2]
+  # Missing MEAN_MOTION_DDOT
+"#;
+        assert!(Omm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_omm_validation_theory_sgp4_xp_additional_reqs() {
+        // SGP4-XP requires BTERM and AGOM
+        let data = OmmData::builder()
+            .mean_elements(MeanElements::builder()
+                .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                .mean_motion(MeanMotion::new(15.0, None))
+                .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                .inclination(Inclination::new(10.0, None).unwrap())
+                .ra_of_asc_node(Angle::new(10.0, None).unwrap())
+                .arg_of_pericenter(Angle::new(10.0, None).unwrap())
+                .mean_anomaly(Angle::new(10.0, None).unwrap())
+                .build())
+            .tle_parameters(TleParameters::builder()
+                .mean_motion_dot(MeanMotionDot::new(0.0, None))
+                .build())
+            .build();
+        
+        let mut segment = OmmSegment::builder()
+            .metadata(OmmMetadata::builder()
+                .object_name("SAT")
+                .object_id("1")
+                .center_name("EARTH")
+                .ref_frame("TEME")
+                .time_system("UTC")
+                .mean_element_theory("SGP4-XP")
+                .build())
+            .data(data.clone())
+            .build();
+
+        // Missing BTERM
+        assert!(segment.validate().is_err());
+
+        segment.data.tle_parameters.as_mut().unwrap().bterm = Some(M2kg::new(0.01, None));
+        // Missing AGOM
+        assert!(segment.validate().is_err());
+
+        segment.data.tle_parameters.as_mut().unwrap().agom = Some(M2kg::new(1.0, None));
+        assert!(segment.validate().is_ok());
+    }
+
+    #[test]
+    fn test_omm_serialization_gaps() {
+        let mut tle = TleParameters::builder()
+            .mean_motion_dot(MeanMotionDot::new(0.0, None))
+            .build();
+        tle.bterm = Some(M2kg::new(0.01, None));
+        tle.agom = Some(M2kg::new(1.0, None));
+
+        let omm = Omm::builder()
+            .version("3.0")
+            .header(OdmHeader::builder()
+                .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                .originator("ME")
+                .build())
+            .body(OmmBody::builder()
+                .segment(OmmSegment::builder()
+                    .metadata(OmmMetadata::builder()
+                        .object_name("SAT")
+                        .object_id("1")
+                        .center_name("EARTH")
+                        .ref_frame("TEME")
+                        .time_system("UTC")
+                        .mean_element_theory("SGP4-XP")
+                        .build())
+                    .data(OmmData::builder()
+                        .mean_elements(MeanElements::builder()
+                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                            .mean_motion(MeanMotion::new(15.0, None))
+                            .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                            .inclination(Inclination::new(10.0, None).unwrap())
+                            .ra_of_asc_node(Angle::new(10.0, None).unwrap())
+                            .arg_of_pericenter(Angle::new(10.0, None).unwrap())
+                            .mean_anomaly(Angle::new(10.0, None).unwrap())
+                            .build())
+                        .tle_parameters(tle)
+                        .build())
+                    .build())
+                .build())
+            .build();
+
+        let kvn = omm.to_kvn().unwrap();
+        assert!(kvn.contains("BTERM"));
+        assert!(kvn.contains("0.01"));
+        assert!(kvn.contains("AGOM"));
+        assert!(kvn.contains("1"));
+    }
+
+    #[test]
+    fn test_omm_validation_theory_gaps() {
+        // SGP missing MEAN_MOTION
+        let meta = OmmMetadata::builder()
+            .object_name("SAT")
+            .object_id("1")
+            .center_name("EARTH")
+            .ref_frame("TEME")
+            .time_system("UTC")
+            .mean_element_theory("SGP")
+            .build();
+        let mut data = OmmData::builder()
+            .mean_elements(MeanElements::builder()
+                .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                .semi_major_axis(Distance::new(7000.0, None))
+                .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                .inclination(Inclination::new(10.0, None).unwrap())
+                .ra_of_asc_node(Angle::new(10.0, None).unwrap())
+                .arg_of_pericenter(Angle::new(10.0, None).unwrap())
+                .mean_anomaly(Angle::new(10.0, None).unwrap())
+                .build())
+            .tle_parameters(TleParameters::builder()
+                .mean_motion_dot(MeanMotionDot::new(0.0, None))
+                .build())
+            .build();
+        
+        let segment = OmmSegment::builder()
+            .metadata(meta)
+            .data(data.clone())
+            .build();
+        assert!(segment.validate().is_err()); // Missing MEAN_MOTION for SGP
+
+        // TleParameters SGP/PPT3 missing mean_motion_ddot
+        assert!(data.tle_parameters.as_ref().unwrap().validate("SGP").is_err());
+        assert!(data.tle_parameters.as_ref().unwrap().validate("PPT3").is_err());
+        
+        // TleParameters SGP4 missing bstar
+        assert!(data.tle_parameters.as_ref().unwrap().validate("SGP4").is_err());
+
+        // TleParameters SGP4-XP missing bterm/agom
+        assert!(data.tle_parameters.as_ref().unwrap().validate("SGP4-XP").is_err());
+        let mut tle_xp = data.tle_parameters.clone().unwrap();
+        tle_xp.bterm = Some(M2kg::new(0.01, None));
+        assert!(tle_xp.validate("SGP4-XP").is_err()); // Missing AGOM
+
+        // MeanElements both SMA and MeanMotion
+        data.mean_elements.mean_motion = Some(MeanMotion::new(15.0, None));
+        assert!(data.mean_elements.validate().is_err());
+        
+        // MeanElements neither SMA nor MeanMotion
+        data.mean_elements.semi_major_axis = None;
+        data.mean_elements.mean_motion = None;
+        assert!(data.mean_elements.validate().is_err());
+
+        // Unknown theory in TleParameters
+        let tle = TleParameters::builder()
+            .mean_motion_dot(MeanMotionDot::new(0.0, None))
+            .build();
+        assert!(tle.validate("UNKNOWN").is_ok());
+    }
+
+    #[test]
+    fn test_rev_per_day_units_display_all() {
+        assert_eq!(format!("{}", RevPerDayUnits::RevPerDayUpper), "REV/DAY");
+        assert_eq!(format!("{}", RevPerDay2Units::RevPerDay2Upper), "REV/DAY**2");
+        assert_eq!(format!("{}", RevPerDay3Units::RevPerDay3Upper), "REV/DAY**3");
+    }
 }

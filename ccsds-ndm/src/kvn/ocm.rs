@@ -3994,4 +3994,48 @@ TRAJ_STOP
         let output = ocm.to_kvn().unwrap();
         assert!(output.contains("ORB_REVNUM_BASIS"));
     }
+
+    #[test]
+    fn test_ocm_parser_backtrack_and_gaps() {
+        // 1. ocm_traj_line backtrack (starts with uppercase)
+        let mut input = "TRAJ_STOP";
+        assert!(ocm_traj_line(&mut input).is_err());
+
+        // 2. ocm_cov_line backtrack
+        let mut input = "COV_STOP";
+        assert!(ocm_cov_line(&mut input).is_err());
+
+        // 3. ocm_man_line backtrack
+        let mut input = "MAN_STOP";
+        assert!(ocm_man_line(&mut input).is_err());
+
+        // 4. ocm_data_block loop break check
+        assert!(ocm_data_block(&mut "").is_err());
+        assert!(ocm_data_block(&mut " ").is_err());
+    }
+
+    #[test]
+    fn test_ocm_data_block_backtrack() {
+        let mut input = "123.456";
+        assert!(ocm_data_block(&mut input).is_err());
+
+        let mut input = "META_START";
+        assert!(ocm_data_block(&mut input).is_err());
+    }
+
+    #[test]
+    fn test_ocm_error_branches_detailed() {
+        // Cover missing fields with Cut error verification
+        
+        // Missing MAN_ID
+        let kvn = r#"MAN_START
+MAN_DEVICE_ID = DEV
+MAN_STOP"#;
+        let mut input = kvn;
+        let err = ocm_man(&mut input).unwrap_err();
+        match err {
+            ErrMode::Cut(e) => assert!(format!("{:?}", e).contains("MAN_ID")),
+            _ => panic!("Expected Cut error"),
+        }
+    }
 }

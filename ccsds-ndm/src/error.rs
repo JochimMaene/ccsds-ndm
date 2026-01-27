@@ -716,3 +716,97 @@ impl CcsdsNdmError {
 }
 
 pub type Result<T> = std::result::Result<T, CcsdsNdmError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_kvn_parse_error_display() {
+        let err = KvnParseError {
+            line: 10,
+            column: 5,
+            message: "Test error".into(),
+            contexts: vec!["Header", "Version"],
+            offset: 100,
+        };
+        let s = format!("{}", err);
+        assert!(s.contains("line 10, column 5"));
+        assert!(s.contains("Test error"));
+        assert!(s.contains("Header > Version"));
+    }
+
+    #[test]
+    fn test_enum_parse_error_display() {
+        let err = EnumParseError {
+            field: "FIELD",
+            value: "VAL".into(),
+            expected: "A or B",
+        };
+        let s = format!("{}", err); // uses default error display because of `thiserror`
+        // We defined #[error("Invalid value '{value}' for field '{field}'; expected one of: {expected}")]
+        assert!(s.contains("Invalid value 'VAL' for field 'FIELD'"));
+        assert!(s.contains("expected one of: A or B"));
+    }
+    
+    #[test]
+    fn test_validation_error_display() {
+        let err = ValidationError::MissingRequiredField {
+            block: "BLOCK".into(),
+            field: "FIELD".into(),
+            line: Some(42),
+        };
+        let s = format!("{}", err);
+        assert!(s.contains("Missing required field: FIELD in block BLOCK"));
+    }
+
+    #[test]
+    fn test_validation_error_with_location() {
+        let mut err = ValidationError::OutOfRange {
+            name: "N".into(),
+            value: "V".into(),
+            expected: "E".into(),
+            line: None,
+        };
+        // Should set line
+        err = err.with_line(123);
+        if let ValidationError::OutOfRange { line, .. } = err {
+            assert_eq!(line, Some(123));
+        } else {
+            panic!("Wrong variant");
+        }
+        
+        // Should NOT overwrite line if already set
+        err = err.with_line(456);
+        if let ValidationError::OutOfRange { line, .. } = err {
+            assert_eq!(line, Some(123));
+        } else {
+            panic!("Wrong variant");
+        }
+    }
+
+    #[test]
+    fn test_ccsds_ndm_error_conversions() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "io");
+        let err: CcsdsNdmError = io_err.into();
+        assert!(err.as_io_error().is_some());
+        assert!(err.is_io_error());
+        
+        let val_err = ValidationError::Generic{ message: "g".into(), line: None };
+        let err: CcsdsNdmError = val_err.into();
+        assert!(err.as_validation_error().is_some());
+        assert!(err.is_validation_error());
+    }
+    
+    #[test]
+    fn test_context_stack() {
+        let mut stack = ContextStack::new();
+        stack.push("A");
+        stack.push("B");
+        stack.push("C");
+        assert_eq!(stack.last(), Some(&"C"));
+        stack.push("D"); // Ignored, capacity 3
+        assert_eq!(stack.last(), Some(&"C"));
+        assert_eq!(stack.to_vec(), vec!["A", "B", "C"]);
+    }
+}

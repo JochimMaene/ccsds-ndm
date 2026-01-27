@@ -2071,3 +2071,142 @@ pub struct RdmSpacecraftParameters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thrust_acceleration: Option<Ms2>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::traits::Validate;
+    use crate::traits::ToKvn;
+
+    #[test]
+    fn test_ndm_header_validation() {
+        let h = NdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("  ") // empty originator
+            .build();
+        assert!(h.validate().is_err());
+
+        let h2 = NdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("NASA")
+            .build();
+        assert!(h2.validate().is_ok());
+    }
+
+    #[test]
+    fn test_ndm_header_kvn() {
+         let h = NdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("NASA")
+            .comment(vec!["msg".into()])
+            .build();
+        let mut w = KvnWriter::new();
+        h.write_kvn(&mut w);
+        let s = w.finish();
+        // Check for presence of key and value separately to avoid whitespace issues
+        assert!(s.contains("COMMENT msg"));
+        assert!(s.contains("CREATION_DATE"));
+        assert!(s.contains("2000-01-01T00:00:00"));
+        assert!(s.contains("ORIGINATOR"));
+        assert!(s.contains("NASA"));
+    }
+
+    #[test]
+    fn test_adm_header_validation() {
+        let h = AdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("")
+            .build();
+        assert!(h.validate().is_err());
+        
+        // modify directly if possible or rebuild? Struct fields are public.
+        let mut h2 = h.clone();
+        h2.originator = "ESA".into();
+        assert!(h2.validate().is_ok());
+    }
+
+    #[test]
+    fn test_adm_header_kvn() {
+        let h = AdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("ESA")
+            .message_id("MSG1")
+            .classification("SECURE".to_string())
+            .build();
+        let mut w = KvnWriter::new();
+        h.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("CLASSIFICATION"));
+        assert!(s.contains("SECURE"));
+        assert!(s.contains("MESSAGE_ID"));
+        assert!(s.contains("MSG1"));
+    }
+
+    #[test]
+    fn test_odm_header_validation() {
+        let h = OdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("")
+            .build();
+        assert!(h.validate().is_err());
+    }
+    
+    #[test]
+    fn test_odm_header_kvn() {
+         let h = OdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("JAXA")
+            .build();
+        let mut w = KvnWriter::new();
+        h.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("ORIGINATOR"));
+        assert!(s.contains("JAXA"));
+    }
+
+    #[test]
+    fn test_state_vector_kvn() {
+        let sv = StateVector::builder()
+            .epoch("2000-01-01T00:00:00".parse().unwrap())
+            .x(Position::new(1.0, None))
+            .y(Position::new(2.0, None))
+            .z(Position::new(3.0, None))
+            .x_dot(Velocity::new(4.0, None))
+            .y_dot(Velocity::new(5.0, None))
+            .z_dot(Velocity::new(6.0, None))
+            .build();
+            
+        let mut w = KvnWriter::new();
+        sv.write_kvn(&mut w);
+        let s = w.finish();
+        // check output
+        assert!(s.contains("EPOCH"));
+        assert!(s.contains("2000-01-01T00:00:00"));
+        assert!(s.contains("X"));
+        assert!(s.contains("1"));
+        assert!(s.contains("Z_DOT"));
+        assert!(s.contains("6"));
+    }
+    
+    #[test]
+    fn test_state_vector_acc_kvn() {
+        let sv = StateVectorAcc::builder()
+            .epoch("2000-01-01T00:00:00".parse().unwrap())
+            .x(Position::new(1.0, None))
+            .y(Position::new(2.0, None))
+            .z(Position::new(3.0, None))
+            .x_dot(Velocity::new(4.0, None))
+            .y_dot(Velocity::new(5.0, None))
+            .z_dot(Velocity::new(6.0, None))
+            .build();
+         let mut w = KvnWriter::new();
+         // StateVectorAcc uses a custom write format in write_kvn? 
+         // Looking at the code: it writes a raw line "epoch x y z ..."
+         sv.write_kvn(&mut w);
+         let s = w.finish();
+         assert!(s.contains("2000-01-01T00:00:00"));
+         assert!(s.contains("1"));
+         assert!(s.contains("2"));
+         assert!(s.contains("3"));
+    }
+}

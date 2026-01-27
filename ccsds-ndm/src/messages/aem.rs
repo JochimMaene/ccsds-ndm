@@ -533,7 +533,7 @@ impl AemData {
                         .into());
                     }
                 }
-                "QUATERNION/ANGVEL" => {
+                "QUATERNION/ANGVEL" | "QUATERNION/RATE" => {
                     if state.quaternion_ang_vel.is_none() {
                         return Err(ValidationError::Generic {
                             message: Cow::Owned(format!(
@@ -569,7 +569,7 @@ impl AemData {
                         .into());
                     }
                 }
-                "EULER_ANGLE/ANGVEL" => {
+                "EULER_ANGLE/ANGVEL" | "EULER_ANGLE/RATE" => {
                     if state.euler_angle_ang_vel.is_none() {
                         return Err(ValidationError::Generic {
                             message: Cow::Owned(format!(
@@ -787,5 +787,54 @@ DATA_START
 DATA_STOP
 "#;
         assert!(Aem::from_kvn(kvn).is_err());
+    }
+    #[test]
+    fn test_aem_data_validation_mismatches() {
+        use crate::common::*;
+        
+        let valid_q = AemAttitudeStateWrapper::from(AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
+            quaternion: Quaternion::new(0.0, 0.0, 0.0, 1.0).unwrap(),
+        }));
+
+        let valid_euler = AemAttitudeStateWrapper::from(AemAttitudeState::EulerAngle(EulerAngle {
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
+            angle_1: Angle::new(10.0, None).unwrap(),
+            angle_2: Angle::new(20.0, None).unwrap(),
+            angle_3: Angle::new(30.0, None).unwrap(),
+        }));
+
+        // Type mismatch: Expects QUATERNION, gets EULER_ANGLE
+        let data = AemData {
+            comment: vec![],
+            attitude_states: vec![valid_euler.clone()],
+        };
+        assert!(data.validate("QUATERNION").is_err());
+
+        // Type mismatch: Expects EULER_ANGLE, gets QUATERNION
+        let data_q = AemData {
+            comment: vec![],
+            attitude_states: vec![valid_q.clone()],
+        };
+        assert!(data_q.validate("EULER_ANGLE").is_err());
+
+        // Check all other variants against a wrong type declaration
+        let cases = vec![
+            ("QUATERNION/DERIVATIVE", valid_q.clone()),
+            ("QUATERNION/ANGVEL", valid_q.clone()),
+            ("EULER_ANGLE/DERIVATIVE", valid_q.clone()),
+            ("EULER_ANGLE/ANGVEL", valid_q.clone()),
+            ("SPIN", valid_q.clone()),
+            ("SPIN/NUTATION", valid_q.clone()),
+            ("SPIN/NUTATION_MOM", valid_q.clone()),
+        ];
+
+        for (type_str, state) in cases {
+            let d = AemData {
+                comment: vec![],
+                attitude_states: vec![state],
+            };
+            assert!(d.validate(type_str).is_err(), "Expected error for type {}", type_str);
+        }
     }
 }

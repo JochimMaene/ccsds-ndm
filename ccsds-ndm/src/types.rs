@@ -2966,4 +2966,117 @@ mod tests {
         assert!(ElementSetNo::new(9999).is_ok());
         assert!(ElementSetNo::new(10000).is_err());
     }
+
+    #[test]
+    fn test_epoch_xsd_compliance() {
+        // Valid calendar/ordinal formats
+        assert!(Epoch::new("2023-11-13T12:00:00").is_ok());
+        assert!(Epoch::new("2023-11-13T12:00:00Z").is_ok());
+        assert!(Epoch::new("2023-11-13T12:00:00.123Z").is_ok());
+        assert!(Epoch::new("2023-317T12:00:00Z").is_ok()); // Ordinal day
+        assert!(Epoch::new("2023-11-13T12:00:00+05:00").is_ok());
+        assert!(Epoch::new("2023-11-13T12:00:00-05:00").is_ok());
+        assert!(Epoch::new("-2023-11-13T12:00:00Z").is_ok()); // Negative year
+
+        // Valid numeric formats
+        assert!(Epoch::new("12345.678").is_ok());
+        assert!(Epoch::new("+12345.678").is_ok());
+        assert!(Epoch::new("-12345.678").is_ok());
+        assert!(Epoch::new(".678").is_ok());
+        assert!(Epoch::new("12345.").is_ok());
+        assert!(Epoch::new("12345").is_ok());
+        assert!(Epoch::new("+").is_ok()); // Technically valid according to XSD [+-]?\d*(\.\d*)?
+        assert!(Epoch::new("-").is_ok()); // Technically valid according to XSD
+        assert!(Epoch::new(".").is_ok()); // Technically valid according to XSD
+
+        // Empty string
+        assert!(Epoch::new("").is_ok());
+        assert_eq!(Epoch::default().as_str(), "");
+
+        // Invalid formats
+        assert!(Epoch::new("2023-11-13").is_err()); // Missing time
+        assert!(Epoch::new("2023-11-13T12:00").is_err()); // Missing seconds
+        assert!(Epoch::new("2023-11-13T12:00:00Z+05:00").is_err()); // Double TZ
+        assert!(Epoch::new("not-a-date").is_err());
+    }
+
+    #[test]
+    fn test_epoch_length_limit() {
+        let long_epoch = "A".repeat(65);
+        assert!(Epoch::new(&long_epoch).is_err());
+        let _max_epoch = "A".repeat(64);
+        // "A" is not a valid epoch format, so it should fail anyway, but let's test length check
+        // We can use numeric format for long valid epoch if needed, but 64 is huge for digits.
+        let long_numeric = "1".repeat(64);
+        assert!(Epoch::new(&long_numeric).is_ok());
+        let too_long_numeric = "1".repeat(65);
+        assert!(Epoch::new(&too_long_numeric).is_err());
+    }
+}
+
+#[cfg(test)]
+mod extra_tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_vec3double_from_kvn_error() {
+        assert!(Vec3Double::from_kvn_value("1.0 2.0").is_err()); // missing 3rd
+        assert!(Vec3Double::from_kvn_value("1.0 2.0 3.0 4.0").is_err()); // extra
+        assert!(Vec3Double::from_kvn_value("1.0 foo 3.0").is_err()); // invalid float
+        assert!(Vec3Double::from_kvn_value("invalid").is_err());
+    }
+
+    #[test]
+    fn test_vec3double_display() {
+        let v = Vec3Double::new(1.1, 2.2, 3.3);
+        assert_eq!(format!("{}", v), "1.1 2.2 3.3");
+    }
+
+    macro_rules! test_enum_from_str {
+        ($type:ty, $valid:expr, $invalid:expr) => {
+            // Test valid
+            assert!($valid.parse::<$type>().is_ok());
+            // Test invalid
+            let res = $invalid.parse::<$type>();
+            assert!(res.is_err());
+            // Check error message content if possible, or just strict existence
+            let err = res.unwrap_err();
+            assert!(!err.to_string().is_empty());
+        };
+    }
+
+    #[test]
+    fn test_enum_parsing_errors() {
+        test_enum_from_str!(ReentryUncertaintyMethodType, "NONE", "INVALID");
+        test_enum_from_str!(CdmObjectType, "OBJECT1", "INVALID");
+        test_enum_from_str!(ScreenVolumeFrameType, "RTN", "INVALID");
+        test_enum_from_str!(ScreenVolumeShapeType, "BOX", "INVALID");
+        test_enum_from_str!(ReferenceFrameType, "GCRF", "INVALID");
+        test_enum_from_str!(CovarianceMethodType, "CALCULATED", "INVALID");
+        test_enum_from_str!(ManeuverableType, "YES", "INVALID");
+        test_enum_from_str!(TdmAngleType, "AZEL", "INVALID");
+        test_enum_from_str!(TdmDataQuality, "RAW", "INVALID");
+        test_enum_from_str!(TdmIntegrationRef, "START", "INVALID");
+        test_enum_from_str!(TdmMode, "SEQUENTIAL", "INVALID");
+        test_enum_from_str!(TdmRangeMode, "COHERENT", "INVALID");
+        test_enum_from_str!(TdmRangeUnits, "km", "INVALID");
+        test_enum_from_str!(TdmReferenceFrame, "EME2000", "INVALID");
+        test_enum_from_str!(TdmTimetagRef, "TRANSMIT", "INVALID");
+    }
+
+    #[test]
+    fn test_tdm_path_validation() {
+        assert!(TdmPath::from_str("1,2").is_ok());
+        assert!(TdmPath::from_str("1,2,3").is_ok());
+        assert!(TdmPath::from_str("1").is_err()); // Too short
+        assert!(TdmPath::from_str("a,b").is_err()); // Not digits
+        assert!(TdmPath::from_str("1,2,a").is_err());
+    }
+
+    #[test]
+    fn test_time_system_display() {
+        let ts = TimeSystemType("UTC".to_string());
+        assert_eq!(format!("{}", ts), "UTC");
+    }
 }

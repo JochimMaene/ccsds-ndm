@@ -1600,4 +1600,365 @@ DATA_STOP
 "#;
         assert!(Tdm::from_kvn(kvn).is_err());
     }
+
+    #[test]
+    fn test_exhaustive_observation_data() {
+        // Exercise every variant of TdmObservationData
+        use crate::types::Percentage;
+        let cases = vec![
+            ("ANGLE_1", TdmObservationData::Angle1(1.0)),
+            ("ANGLE_2", TdmObservationData::Angle2(2.0)),
+            ("CARRIER_POWER", TdmObservationData::CarrierPower(3.0)),
+            ("CLOCK_BIAS", TdmObservationData::ClockBias(4.0)),
+            ("CLOCK_DRIFT", TdmObservationData::ClockDrift(5.0)),
+            ("DOPPLER_COUNT", TdmObservationData::DopplerCount(6.0)),
+            ("DOPPLER_INSTANTANEOUS", TdmObservationData::DopplerInstantaneous(7.0)),
+            ("DOPPLER_INTEGRATED", TdmObservationData::DopplerIntegrated(8.0)),
+            ("DOR", TdmObservationData::Dor(9.0)),
+            ("MAG", TdmObservationData::Mag(10.0)),
+            ("PC_N0", TdmObservationData::PcN0(11.0)),
+            ("PR_N0", TdmObservationData::PrN0(12.0)),
+            ("PRESSURE", TdmObservationData::Pressure(13.0)),
+            ("RANGE", TdmObservationData::Range(14.0)),
+            ("RCS", TdmObservationData::Rcs(15.0)),
+            ("RECEIVE_FREQ", TdmObservationData::ReceiveFreq(16.0)),
+            ("RECEIVE_FREQ_1", TdmObservationData::ReceiveFreq1(17.0)),
+            ("RECEIVE_FREQ_2", TdmObservationData::ReceiveFreq2(18.0)),
+            ("RECEIVE_FREQ_3", TdmObservationData::ReceiveFreq3(19.0)),
+            ("RECEIVE_FREQ_4", TdmObservationData::ReceiveFreq4(20.0)),
+            ("RECEIVE_FREQ_5", TdmObservationData::ReceiveFreq5(21.0)),
+            ("RECEIVE_PHASE_CT_1", TdmObservationData::ReceivePhaseCt1(22.0)),
+            ("RECEIVE_PHASE_CT_2", TdmObservationData::ReceivePhaseCt2(23.0)),
+            ("RECEIVE_PHASE_CT_3", TdmObservationData::ReceivePhaseCt3(24.0)),
+            ("RECEIVE_PHASE_CT_4", TdmObservationData::ReceivePhaseCt4(25.0)),
+            ("RECEIVE_PHASE_CT_5", TdmObservationData::ReceivePhaseCt5(26.0)),
+            ("RHUMIDITY", TdmObservationData::Rhumidity(Percentage::new(50.0, None).unwrap())),
+            ("STEC", TdmObservationData::Stec(27.0)),
+            ("TEMPERATURE", TdmObservationData::Temperature(28.0)),
+            ("TRANSMIT_FREQ_1", TdmObservationData::TransmitFreq1(29.0)),
+            ("TRANSMIT_FREQ_2", TdmObservationData::TransmitFreq2(30.0)),
+            ("TRANSMIT_FREQ_3", TdmObservationData::TransmitFreq3(31.0)),
+            ("TRANSMIT_FREQ_4", TdmObservationData::TransmitFreq4(32.0)),
+            ("TRANSMIT_FREQ_5", TdmObservationData::TransmitFreq5(33.0)),
+            ("TRANSMIT_FREQ_RATE_1", TdmObservationData::TransmitFreqRate1(34.0)),
+            ("TRANSMIT_FREQ_RATE_2", TdmObservationData::TransmitFreqRate2(35.0)),
+            ("TRANSMIT_FREQ_RATE_3", TdmObservationData::TransmitFreqRate3(36.0)),
+            ("TRANSMIT_FREQ_RATE_4", TdmObservationData::TransmitFreqRate4(37.0)),
+            ("TRANSMIT_FREQ_RATE_5", TdmObservationData::TransmitFreqRate5(38.0)),
+            ("TRANSMIT_PHASE_CT_1", TdmObservationData::TransmitPhaseCt1(39.0)),
+            ("TRANSMIT_PHASE_CT_2", TdmObservationData::TransmitPhaseCt2(40.0)),
+            ("TRANSMIT_PHASE_CT_3", TdmObservationData::TransmitPhaseCt3(41.0)),
+            ("TRANSMIT_PHASE_CT_4", TdmObservationData::TransmitPhaseCt4(42.0)),
+            ("TRANSMIT_PHASE_CT_5", TdmObservationData::TransmitPhaseCt5(43.0)),
+            ("TROPO_DRY", TdmObservationData::TropoDry(44.0)),
+            ("TROPO_WET", TdmObservationData::TropoWet(45.0)),
+            ("VLBI_DELAY", TdmObservationData::VlbiDelay(46.0)),
+        ];
+
+        for (expected_key, data) in cases {
+            assert_eq!(data.key(), expected_key);
+            let val_str = data.value_to_string();
+            let parsed = TdmObservationData::from_key_val(expected_key, &val_str).unwrap();
+            assert_eq!(data, parsed);
+        }
+    }
+
+    #[test]
+    fn test_tdm_metadata_indexed_fields() {
+        let mut meta = TdmMetadata::default();
+        meta.time_system = "UTC".to_string();
+        meta.participant_1 = "P1".to_string();
+        meta.participant_2 = Some("P2".to_string());
+        meta.participant_3 = Some("P3".to_string());
+        meta.participant_4 = Some("P4".to_string());
+        meta.participant_5 = Some("P5".to_string());
+        meta.ephemeris_name_1 = Some("E1".to_string());
+        meta.ephemeris_name_2 = Some("E2".to_string());
+        meta.ephemeris_name_3 = Some("E3".to_string());
+        meta.ephemeris_name_4 = Some("E4".to_string());
+        meta.ephemeris_name_5 = Some("E5".to_string());
+        meta.transmit_delay_1 = Some(0.1);
+        meta.transmit_delay_2 = Some(0.2);
+        meta.transmit_delay_3 = Some(0.3);
+        meta.transmit_delay_4 = Some(0.4);
+        meta.transmit_delay_5 = Some(0.5);
+        meta.receive_delay_1 = Some(1.1);
+        meta.receive_delay_2 = Some(1.2);
+        meta.receive_delay_3 = Some(1.3);
+        meta.receive_delay_4 = Some(1.4);
+        meta.receive_delay_5 = Some(1.5);
+
+        let mut writer = KvnWriter::new();
+        meta.write_kvn(&mut writer);
+        let out = writer.finish();
+        assert!(out.contains("PARTICIPANT_5"));
+        assert!(out.contains("EPHEMERIS_NAME_5"));
+        assert!(out.contains("TRANSMIT_DELAY_5"));
+        assert!(out.contains("RECEIVE_DELAY_5"));
+    }
+
+    #[test]
+    fn test_tdm_correction_keywords() {
+        let mut meta = TdmMetadata::default();
+        meta.time_system = "UTC".to_string();
+        meta.participant_1 = "P1".to_string();
+        meta.correction_angle_1 = Some(0.1);
+        meta.correction_angle_2 = Some(0.2);
+        meta.correction_doppler = Some(0.3);
+        meta.correction_mag = Some(0.4);
+        meta.correction_range = Some(0.5);
+        meta.correction_rcs = Some(0.6);
+        meta.correction_receive = Some(0.7);
+        meta.correction_transmit = Some(0.8);
+        meta.correction_aberration_yearly = Some(0.9);
+        meta.correction_aberration_diurnal = Some(1.0);
+        meta.corrections_applied = Some(YesNo::Yes);
+
+        let mut writer = KvnWriter::new();
+        meta.write_kvn(&mut writer);
+        let out = writer.finish();
+        assert!(out.contains("CORRECTION_ANGLE_1"));
+        assert!(out.contains("CORRECTION_ABERRATION_DIURNAL"));
+        assert!(out.contains("CORRECTIONS_APPLIED"));
+    }
+
+    #[test]
+    fn test_tdm_observation_data_errors() {
+        // Invalid float
+        assert!(TdmObservationData::from_key_val("RANGE", "abc").is_err());
+        // Unknown key
+        assert!(TdmObservationData::from_key_val("UNKNOWN", "1.0").is_err());
+    }
+
+    #[test]
+    fn test_tdm_xml_exhaustive_observations() {
+        // Exercise XML deserializer for a wide range of observation types
+        let xml = r#"<tdm version="2.0">
+  <header>
+    <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
+    <ORIGINATOR>TEST</ORIGINATOR>
+  </header>
+  <body>
+    <segment>
+      <metadata>
+        <TIME_SYSTEM>UTC</TIME_SYSTEM>
+        <PARTICIPANT_1>P1</PARTICIPANT_1>
+      </metadata>
+      <data>
+        <observation>
+          <EPOCH>2023-01-01T00:00:00</EPOCH>
+          <ANGLE_1>1.0</ANGLE_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:01:00</EPOCH>
+          <ANGLE_2>2.0</ANGLE_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:02:00</EPOCH>
+          <CARRIER_POWER>3.0</CARRIER_POWER>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:03:00</EPOCH>
+          <CLOCK_BIAS>4.0</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:04:00</EPOCH>
+          <CLOCK_DRIFT>5.0</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:05:00</EPOCH>
+          <DOPPLER_COUNT>6.0</DOPPLER_COUNT>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:06:00</EPOCH>
+          <DOPPLER_INSTANTANEOUS>7.0</DOPPLER_INSTANTANEOUS>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:07:00</EPOCH>
+          <DOPPLER_INTEGRATED>8.0</DOPPLER_INTEGRATED>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:08:00</EPOCH>
+          <DOR>9.0</DOR>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:09:00</EPOCH>
+          <MAG>10.0</MAG>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:10:00</EPOCH>
+          <PC_N0>11.0</PC_N0>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:11:00</EPOCH>
+          <PR_N0>12.0</PR_N0>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:12:00</EPOCH>
+          <PRESSURE>13.0</PRESSURE>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:13:00</EPOCH>
+          <RANGE>14.0</RANGE>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:14:00</EPOCH>
+          <RCS>15.0</RCS>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:15:00</EPOCH>
+          <RECEIVE_FREQ>16.0</RECEIVE_FREQ>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:16:00</EPOCH>
+          <RECEIVE_FREQ_1>17.0</RECEIVE_FREQ_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:17:00</EPOCH>
+          <RECEIVE_FREQ_2>18.0</RECEIVE_FREQ_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:18:00</EPOCH>
+          <RECEIVE_FREQ_3>19.0</RECEIVE_FREQ_3>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:19:00</EPOCH>
+          <RECEIVE_FREQ_4>20.0</RECEIVE_FREQ_4>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:20:00</EPOCH>
+          <RECEIVE_FREQ_5>21.0</RECEIVE_FREQ_5>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:21:00</EPOCH>
+          <RECEIVE_PHASE_CT_1>22.0</RECEIVE_PHASE_CT_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:22:00</EPOCH>
+          <RECEIVE_PHASE_CT_2>23.0</RECEIVE_PHASE_CT_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:23:00</EPOCH>
+          <RECEIVE_PHASE_CT_3>24.0</RECEIVE_PHASE_CT_3>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:24:00</EPOCH>
+          <RECEIVE_PHASE_CT_4>25.0</RECEIVE_PHASE_CT_4>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:25:00</EPOCH>
+          <RECEIVE_PHASE_CT_5>26.0</RECEIVE_PHASE_CT_5>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:26:00</EPOCH>
+          <RHUMIDITY>27.0</RHUMIDITY>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:27:00</EPOCH>
+          <STEC>28.0</STEC>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:28:00</EPOCH>
+          <TEMPERATURE>29.0</TEMPERATURE>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:29:00</EPOCH>
+          <TRANSMIT_FREQ_1>30.0</TRANSMIT_FREQ_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:30:00</EPOCH>
+          <TRANSMIT_FREQ_2>31.0</TRANSMIT_FREQ_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:31:00</EPOCH>
+          <TRANSMIT_FREQ_3>32.0</TRANSMIT_FREQ_3>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:32:00</EPOCH>
+          <TRANSMIT_FREQ_4>33.0</TRANSMIT_FREQ_4>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:33:00</EPOCH>
+          <TRANSMIT_FREQ_5>34.0</TRANSMIT_FREQ_5>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:34:00</EPOCH>
+          <TRANSMIT_FREQ_RATE_1>35.0</TRANSMIT_FREQ_RATE_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:35:00</EPOCH>
+          <TRANSMIT_FREQ_RATE_2>36.0</TRANSMIT_FREQ_RATE_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:36:00</EPOCH>
+          <TRANSMIT_FREQ_RATE_3>37.0</TRANSMIT_FREQ_RATE_3>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:37:00</EPOCH>
+          <TRANSMIT_FREQ_RATE_4>38.0</TRANSMIT_FREQ_RATE_4>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:38:00</EPOCH>
+          <TRANSMIT_FREQ_RATE_5>39.0</TRANSMIT_FREQ_RATE_5>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:39:00</EPOCH>
+          <TRANSMIT_PHASE_CT_1>40.0</TRANSMIT_PHASE_CT_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:40:00</EPOCH>
+          <TRANSMIT_PHASE_CT_2>41.0</TRANSMIT_PHASE_CT_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:41:00</EPOCH>
+          <TRANSMIT_PHASE_CT_3>42.0</TRANSMIT_PHASE_CT_3>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:42:00</EPOCH>
+          <TRANSMIT_PHASE_CT_4>43.0</TRANSMIT_PHASE_CT_4>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:43:00</EPOCH>
+          <TRANSMIT_PHASE_CT_5>44.0</TRANSMIT_PHASE_CT_5>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:44:00</EPOCH>
+          <TROPO_DRY>45.0</TROPO_DRY>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:45:00</EPOCH>
+          <TROPO_WET>46.0</TROPO_WET>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:46:00</EPOCH>
+          <VLBI_DELAY>47.0</VLBI_DELAY>
+        </observation>
+      </data>
+    </segment>
+  </body>
+</tdm>"#;
+        let tdm = Tdm::from_xml(xml).expect("parse tdm xml");
+        assert_eq!(tdm.body.segments[0].data.observations.len(), 47);
+        let obs3 = &tdm.body.segments[0].data.observations[20];
+        match obs3.data {
+            TdmObservationData::ReceiveFreq5(v) => assert_eq!(v, 21.0),
+            _ => panic!("Expected ReceiveFreq5"),
+        }
+
+        // Test duplicate EPOCH error handling
+        let xml_dup = r#"<tdm version="2.0">
+  <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
+  <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
+  <data><observation><EPOCH>2023-01-01T00:00:00</EPOCH><EPOCH>2023-01-01T00:00:01</EPOCH><RANGE>1.0</RANGE></observation></data>
+  </segment></body></tdm>"#;
+        assert!(Tdm::from_xml(xml_dup).is_err());
+
+        // Test unknown attribute/field skip
+        let xml_unknown = r#"<tdm version="2.0" extra="val">
+  <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
+  <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
+  <data><observation extra="ignore"><EPOCH>2023-01-01T00:00:00</EPOCH><RANGE>1.0</RANGE></observation></data>
+  </segment></body></tdm>"#;
+        assert!(Tdm::from_xml(xml_unknown).is_ok());
+    }
 }

@@ -56,3 +56,51 @@ pub fn to_string<T: Serialize>(t: &T) -> Result<String> {
     let xml_body = to_xml_string(t)?;
     Ok(format!("{}\n{}", XML_HEADER, xml_body))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+
+    #[derive(Deserialize, Serialize, PartialEq, Debug)]
+    struct Wrapper {
+        #[serde(rename = "val")]
+        val: String,
+    }
+
+    #[test]
+    fn test_from_str_success() {
+        let xml = r#"<Wrapper><val>hello</val></Wrapper>"#;
+        let w: Wrapper = from_str(xml).unwrap();
+        assert_eq!(w.val, "hello");
+    }
+
+    #[test]
+    fn test_from_str_with_context_success() {
+        let xml = r#"<Wrapper><val>hello</val></Wrapper>"#;
+        let w: Wrapper = from_str_with_context(xml, "Wrapper").unwrap();
+        assert_eq!(w.val, "hello");
+    }
+
+    #[test]
+    fn test_from_str_with_context_error() {
+        let xml = r#"<Wrapper><val>hello</val>"#; // malformed XML
+        let res: Result<Wrapper> = from_str_with_context(xml, "Wrapper");
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("Failed to parse Wrapper from XML"));
+    }
+
+    #[test]
+    fn test_to_string() {
+        let w = Wrapper {
+            val: "world".to_string(),
+        };
+        let xml = to_string(&w).unwrap();
+        assert!(xml.starts_with(XML_HEADER));
+        assert!(xml.contains("<Wrapper>"));
+        assert!(xml.contains("<val>world</val>"));
+        assert!(xml.contains("</Wrapper>"));
+    }
+}

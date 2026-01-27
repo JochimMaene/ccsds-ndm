@@ -1659,4 +1659,179 @@ Z_DOT = -4.191076 [km/s]
         // but the structure should be valid
         let _ = opm.to_xml(); // Don't unwrap - may have unit serialization issues
     }
+
+    #[test]
+    fn test_keplerian_elements_validation() {
+        use crate::traits::Validate;
+        let mut kep = KeplerianElements::builder()
+            .semi_major_axis(Distance::new(7000.0, Some(PositionUnits::Km)))
+            .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+            .inclination(Inclination::new(45.0, Some(AngleUnits::Deg)).unwrap())
+            .ra_of_asc_node(Angle::new(90.0, Some(AngleUnits::Deg)).unwrap())
+            .arg_of_pericenter(Angle::new(180.0, Some(AngleUnits::Deg)).unwrap())
+            .gm(Gm::new(398600.44, Some(GmUnits::Km3PerS2)).unwrap())
+            .build();
+
+        // Neither anomaly
+        assert!(kep.validate().is_err());
+
+        // Both anomalies
+        kep.true_anomaly = Some(Angle::new(0.0, Some(AngleUnits::Deg)).unwrap());
+        kep.mean_anomaly = Some(Angle::new(0.0, Some(AngleUnits::Deg)).unwrap());
+        assert!(kep.validate().is_err());
+
+        // Exactly one (true)
+        kep.mean_anomaly = None;
+        assert!(kep.validate().is_ok());
+
+        // Exactly one (mean)
+        kep.true_anomaly = None;
+        kep.mean_anomaly = Some(Angle::new(0.0, Some(AngleUnits::Deg)).unwrap());
+        assert!(kep.validate().is_ok());
+    }
+
+    #[test]
+    fn test_opm_data_validation() {
+        use crate::traits::Validate;
+        let mut data = OpmData::builder()
+            .state_vector(StateVector::builder()
+                .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                .x(Distance::new(1.0, None))
+                .y(Distance::new(1.0, None))
+                .z(Distance::new(1.0, None))
+                .x_dot(Velocity::new(1.0, None))
+                .y_dot(Velocity::new(1.0, None))
+                .z_dot(Velocity::new(1.0, None))
+                .build())
+            .build();
+
+        assert!(data.validate().is_ok());
+
+        // With invalid KeplerianElements
+        data.keplerian_elements = Some(KeplerianElements::builder()
+            .semi_major_axis(Distance::new(7000.0, Some(PositionUnits::Km)))
+            .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+            .inclination(Inclination::new(45.0, Some(AngleUnits::Deg)).unwrap())
+            .ra_of_asc_node(Angle::new(90.0, Some(AngleUnits::Deg)).unwrap())
+            .arg_of_pericenter(Angle::new(180.0, Some(AngleUnits::Deg)).unwrap())
+            .gm(Gm::new(398600.44, Some(GmUnits::Km3PerS2)).unwrap())
+            .build());
+        assert!(data.validate().is_err());
+    }
+
+    #[test]
+    fn test_opm_serialization_gaps() {
+        use crate::common::OdmHeader;
+        let opm = Opm::builder()
+            .version("3.0")
+            .header(OdmHeader::builder()
+                .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                .originator("TEST")
+                .build())
+            .body(OpmBody::builder()
+                .segment(OpmSegment::builder()
+                    .metadata(OpmMetadata::builder()
+                        .object_name("SAT")
+                        .object_id("1")
+                        .center_name("EARTH")
+                        .ref_frame("GCRF")
+                        .ref_frame_epoch(Epoch::new("2000-01-01T12:00:00").unwrap())
+                        .time_system("UTC")
+                        .build())
+                    .data(OpmData::builder()
+                        .state_vector(StateVector::builder()
+                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                            .x(Distance::new(1.0, None))
+                            .y(Distance::new(1.0, None))
+                            .z(Distance::new(1.0, None))
+                            .x_dot(Velocity::new(1.0, None))
+                            .y_dot(Velocity::new(1.0, None))
+                            .z_dot(Velocity::new(1.0, None))
+                            .build())
+                        .keplerian_elements(KeplerianElements::builder()
+                            .semi_major_axis(Distance::new(7000.0, None))
+                            .eccentricity(NonNegativeDouble::new(0.0).unwrap())
+                            .inclination(Inclination::new(0.0, None).unwrap())
+                            .ra_of_asc_node(Angle::new(0.0, None).unwrap())
+                            .arg_of_pericenter(Angle::new(0.0, None).unwrap())
+                            .mean_anomaly(Angle::new(0.0, None).unwrap())
+                            .gm(Gm::new(398600.44, None).unwrap())
+                            .build())
+                        .build())
+                    .build())
+                .build())
+            .build();
+
+        let kvn = opm.to_kvn().unwrap();
+        assert!(kvn.contains("REF_FRAME_EPOCH"));
+        assert!(kvn.contains("2000-01-01T12:00:00"));
+        assert!(kvn.contains("MEAN_ANOMALY"));
+    }
+
+    #[test]
+    fn test_keplerian_elements_validation_detailed() {
+        // Invalid Anomaly Choice (Neither)
+        let mut ke = KeplerianElements::builder()
+            .semi_major_axis(Distance::new(7000.0, None))
+            .eccentricity(NonNegativeDouble::new(0.0).unwrap())
+            .inclination(Inclination::new(0.0, None).unwrap())
+            .ra_of_asc_node(Angle::new(0.0, None).unwrap())
+            .arg_of_pericenter(Angle::new(0.0, None).unwrap())
+            .gm(Gm::new(398600.0, None).unwrap())
+            .build();
+        assert!(ke.validate().is_err());
+
+        // Invalid Anomaly Choice (Both)
+        ke.true_anomaly = Some(Angle::new(0.0, None).unwrap());
+        ke.mean_anomaly = Some(Angle::new(0.0, None).unwrap());
+        assert!(ke.validate().is_err());
+
+        // Valid (True Anomaly)
+        ke.mean_anomaly = None;
+        assert!(ke.validate().is_ok());
+
+        // Valid (Mean Anomaly)
+        ke.true_anomaly = None;
+        ke.mean_anomaly = Some(Angle::new(0.0, None).unwrap());
+        assert!(ke.validate().is_ok());
+    }
+
+    #[test]
+    fn test_opm_minimal_data_gaps() {
+        use crate::common::OdmHeader;
+        // Minimal OPM without Keplerian Elements or optional Spacecraft Params
+        let opm = Opm::builder()
+            .version("3.0")
+            .header(OdmHeader::builder()
+                .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                .originator("TEST")
+                .build())
+            .body(OpmBody::builder()
+                .segment(OpmSegment::builder()
+                    .metadata(OpmMetadata::builder()
+                        .object_name("SAT")
+                        .object_id("1")
+                        .center_name("EARTH")
+                        .ref_frame("GCRF")
+                        .time_system("UTC")
+                        .build())
+                    .data(OpmData::builder()
+                        .state_vector(StateVector::builder()
+                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                            .x(Distance::new(1.0, None))
+                            .y(Distance::new(1.0, None))
+                            .z(Distance::new(1.0, None))
+                            .x_dot(Velocity::new(1.0, None))
+                            .y_dot(Velocity::new(1.0, None))
+                            .z_dot(Velocity::new(1.0, None))
+                            .build())
+                        .build())
+                    .build())
+                .build())
+            .build();
+        
+        let kvn = opm.to_kvn().unwrap();
+        assert!(!kvn.contains("SEMI_MAJOR_AXIS"));
+        assert!(opm.validate().is_ok());
+    }
 }

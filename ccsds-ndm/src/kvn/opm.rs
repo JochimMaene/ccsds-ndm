@@ -647,4 +647,52 @@ MAN_DV_3 = 0.6
         let data = opm_data.parse_next(&mut input).unwrap();
         assert_eq!(data.maneuver_parameters.len(), 2);
     }
+
+    #[test]
+    fn test_opm_covariance_matrix() {
+        let mut input = r#"EPOCH = 2023-01-01T00:00:00
+X = 1000
+Y = 2000
+Z = 3000
+X_DOT = 1
+Y_DOT = 2
+Z_DOT = 3
+CX_X = 1.0
+CY_X = 0.1
+CY_Y = 1.0
+CZ_X = 0.1
+CZ_Y = 0.1
+CZ_Z = 1.0
+CX_DOT_X = 0.1
+CX_DOT_Y = 0.1
+CX_DOT_Z = 0.1
+CX_DOT_X_DOT = 1.0
+CY_DOT_X = 0.1
+CY_DOT_Y = 0.1
+CY_DOT_Z = 0.1
+CY_DOT_X_DOT = 0.1
+CY_DOT_Y_DOT = 1.0
+CZ_DOT_X = 0.1
+CZ_DOT_Y = 0.1
+CZ_DOT_Z = 0.1
+CZ_DOT_X_DOT = 0.1
+CZ_DOT_Y_DOT = 0.1
+CZ_DOT_Z_DOT = 1.0
+"#;
+        let data = opm_data.parse_next(&mut input).unwrap();
+        assert!(data.covariance_matrix.is_some());
+        let cov = data.covariance_matrix.unwrap();
+        assert_eq!(cov.cx_x.value, 1.0);
+    }
+
+    #[test]
+    fn test_opm_metadata_missing_fields() {
+        // Missing OBJECT_NAME
+        let mut input = "OBJECT_ID = 1\nCENTER_NAME = EARTH\nREF_FRAME = GCRF\nTIME_SYSTEM = UTC\n";
+        assert!(opm_metadata.parse_next(&mut input).is_err());
+
+        // Missing TIME_SYSTEM
+        let mut input = "OBJECT_NAME = SAT\nOBJECT_ID = 1\nCENTER_NAME = EARTH\nREF_FRAME = GCRF\n";
+        assert!(opm_metadata.parse_next(&mut input).is_err());
+    }
 }

@@ -1003,4 +1003,54 @@ COMMENT No data
 "#;
         assert!(Oem::from_kvn(kvn).is_err());
     }
+
+    #[test]
+    fn test_oem_metadata_time_validation() {
+        let mut meta = OemMetadata::builder()
+            .object_name("SAT")
+            .object_id("1")
+            .center_name("EARTH")
+            .ref_frame("GCRF")
+            .time_system("UTC")
+            .start_time(Epoch::new("2023-01-01T12:00:00").unwrap())
+            .stop_time(Epoch::new("2023-01-01T11:00:00").unwrap()) // STOP < START
+            .build();
+
+        // START > STOP
+        assert!(meta.validate().is_err());
+
+        meta.stop_time = Epoch::new("2023-01-01T13:00:00").unwrap();
+        assert!(meta.validate().is_ok());
+
+        // USEABLE_START > USEABLE_STOP
+        meta.useable_start_time = Some(Epoch::new("2023-01-01T12:30:00").unwrap());
+        meta.useable_stop_time = Some(Epoch::new("2023-01-01T12:15:00").unwrap());
+        assert!(meta.validate().is_err());
+    }
+
+    #[test]
+    fn test_oem_metadata_interpolation_validation() {
+        let mut meta = OemMetadata::builder()
+            .object_name("SAT")
+            .object_id("1")
+            .center_name("EARTH")
+            .ref_frame("GCRF")
+            .time_system("UTC")
+            .start_time(Epoch::new("2023-01-01T12:00:00").unwrap())
+            .stop_time(Epoch::new("2023-01-01T13:00:00").unwrap())
+            .build();
+
+        meta.interpolation = Some("LAGRANGE".to_string());
+        // Missing degree
+        assert!(meta.validate().is_err());
+
+        meta.interpolation_degree = Some(NonZeroU32::new(5).unwrap());
+        assert!(meta.validate().is_ok());
+    }
+
+    #[test]
+    fn test_oem_data_empty_validation_internal() {
+        let data = OemData::builder().build();
+        assert!(data.validate().is_err());
+    }
 }

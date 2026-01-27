@@ -3392,4 +3392,57 @@ TRAJ_STOP
         assert_eq!(deserialized.man_line.epoch, "2023-01-01T00:00:00");
         assert_eq!(deserialized.man_line.values.len(), 3);
     }
+
+    #[test]
+    fn test_ocm_validation_gaps() {
+
+        // 1. DRAG_COEFF_NOM <= 0.0
+        let mut phys = OcmPhysicalDescription::default();
+        phys.drag_coeff_nom = Some(-1.0);
+        assert!(phys.validate().is_err());
+        phys.drag_coeff_nom = Some(0.0);
+        assert!(phys.validate().is_err());
+
+        // 2. ORB_REVNUM < 0.0
+        let mut traj = OcmTrajState::default();
+        traj.traj_type = "OSCULATING".to_string(); // Required field fix
+        traj.orb_revnum = Some(-1.0);
+        // Also needs at least one line to pass first check
+        traj.traj_lines.push(TrajLine {
+            epoch: "2023-01-01T00:00:00".to_string(),
+            values: vec![0.0],
+        });
+        assert!(traj.validate().is_err());
+
+        // 3. OcmTrajState::traj_lines empty
+        traj.traj_lines.clear();
+        assert!(traj.validate().is_err());
+
+        // 4. OcmCovarianceMatrix::cov_lines empty
+        let mut cov = OcmCovarianceMatrix::default();
+        cov.cov_type = "SYMMETRIC".to_string(); // Required field fix
+        assert!(cov.validate().is_err());
+
+        // 5. OcmManeuverParameters::man_lines empty
+        let mut man = OcmManeuverParameters::default();
+        man.man_id = "MAN1".to_string();
+        man.man_device_id = "DEV1".to_string();
+        man.man_composition = "CHEMICAL".to_string();
+        assert!(man.validate().is_err());
+
+        // 6. RevNumBasis::One coverage
+        let mut traj = OcmTrajState::default();
+        traj.orb_revnum_basis = Some(RevNumBasis::One);
+        traj.traj_type = "OSCULATING".to_string();
+        traj.traj_lines.push(TrajLine {
+            epoch: "2023-01-01T00:00:00".to_string(),
+            values: vec![0.0],
+        });
+        let mut writer = crate::kvn::ser::KvnWriter::new();
+        use crate::traits::ToKvn;
+        traj.write_kvn(&mut writer);
+        let kvn = writer.finish();
+        assert!(kvn.contains("ORB_REVNUM_BASIS"));
+        assert!(kvn.contains("= 1"));
+    }
 }

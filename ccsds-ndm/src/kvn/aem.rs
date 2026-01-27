@@ -175,7 +175,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 },
             ))
         }
-        "QUATERNION/RATE" => {
+        "QUATERNION/RATE" | "QUATERNION/ANGVEL" => {
             if values.len() != 7 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -231,7 +231,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 },
             ))
         }
-        "EULER_ANGLE/RATE" => {
+        "EULER_ANGLE/RATE" | "EULER_ANGLE/ANGVEL" => {
             if values.len() != 6 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -427,15 +427,18 @@ impl ParseKvn for Aem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::{CcsdsNdmError, FormatError, ValidationError};
     use crate::traits::Ndm;
 
-    #[test]
-    fn test_parse_aem_minimal() {
-        let input = r#"CCSDS_AEM_VERS = 2.0
+    fn sample_aem_header() -> String {
+        r#"CCSDS_AEM_VERS = 2.0
 CREATION_DATE = 2002-11-04T17:22:31
 ORIGINATOR = NASA/JPL
+"#.to_string()
+    }
 
-META_START
+    fn sample_aem_meta() -> String {
+        r#"META_START
 OBJECT_NAME = MARS GLOBAL SURVEYOR
 OBJECT_ID = 1996-062A
 CENTER_NAME = MARS BARYCENTER
@@ -446,24 +449,339 @@ START_TIME = 2002-11-04T17:22:31
 STOP_TIME = 2002-11-04T17:25:31
 ATTITUDE_TYPE = QUATERNION
 META_STOP
+"#.to_string()
+    }
 
-DATA_START
-2002-11-04T17:22:31 0.5 0.5 0.5 0.5
-2002-11-04T17:23:31 0.6 0.4 0.4 0.6
-DATA_STOP
-"#;
-        let aem = Aem::from_kvn(input).unwrap();
+    #[test]
+    fn test_parse_aem_minimal() {
+        let input = format!("{}{}\nDATA_START\n2002-11-04T17:22:31 0.5 0.5 0.5 0.5\nDATA_STOP\n", 
+            sample_aem_header(), sample_aem_meta());
+        let aem = Aem::from_kvn(&input).unwrap();
         assert_eq!(aem.version, "2.0");
         assert_eq!(aem.header.originator, "NASA/JPL");
         assert_eq!(aem.body.segment.len(), 1);
-        let seg = &aem.body.segment[0];
-        assert_eq!(seg.metadata.object_name, "MARS GLOBAL SURVEYOR");
-        assert_eq!(seg.data.attitude_states.len(), 2);
-        match &seg.data.attitude_states[0].content().unwrap() {
-            AemAttitudeState::QuaternionEphemeris(q) => {
-                assert_eq!(q.quaternion.q1, 0.5);
-            }
-            _ => panic!("Expected QuaternionEphemeris"),
+    }
+
+    #[test]
+    fn test_parse_aem_version_error() {
+        let input = "CCSDS_AEM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\n";
+        let err = Aem::from_kvn(input).unwrap_err();
+        match err {
+            CcsdsNdmError::Format(boxed_err) => match *boxed_err {
+                FormatError::Kvn(e) => {
+                    // Check debug output for context
+                    assert!(format!("{:?}", e).contains("1.0 or 2.0"));
+                }
+                _ => panic!("Expected Kvn format error, got {:?}", boxed_err),
+            },
+            _ => panic!("Expected Format error, got {:?}", err),
         }
+    }
+
+    #[test]
+    fn test_aem_missing_mandatory_metadata() {
+        // Missing OBJECT_NAME
+        let input = r#"CCSDS_AEM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_ID = SAT1
+CENTER_NAME = EARTH
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+ATTITUDE_TYPE = QUATERNION
+META_STOP
+DATA_START
+2023-01-01T00:00:00 0 0 0 1
+DATA_STOP
+"#;
+        let err = Aem::from_kvn(input).unwrap_err();
+        match err {
+            CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
+                ValidationError::MissingRequiredField { field, .. } => {
+                    assert_eq!(field, "OBJECT_NAME");
+                }
+                _ => panic!("Expected missing field error, got {:?}", boxed_err),
+            },
+            _ => panic!("Expected Validation error, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_parse_aem_quaternion_types() {
+        // QUATERNION (4 values)
+        let q_input = format!("{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4\nDATA_STOP\n", 
+            sample_aem_header(), sample_aem_meta());
+        let aem = Aem::from_kvn(&q_input).unwrap();
+        if let AemAttitudeState::QuaternionEphemeris(q) = aem.body.segment[0].data.attitude_states[0].content().unwrap() {
+            assert_eq!(q.quaternion.q1, 0.1);
+        } else {
+            panic!("Wrong type parsed");
+        }
+
+        // QUATERNION/DERIVATIVE (8 values)
+        let qd_meta = sample_aem_meta().replace("QUATERNION", "QUATERNION/DERIVATIVE");
+        let qd_input = format!("{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8\nDATA_STOP\n", 
+            sample_aem_header(), qd_meta);
+        let aem = Aem::from_kvn(&qd_input).unwrap();
+        if let AemAttitudeState::QuaternionDerivative(qd) = aem.body.segment[0].data.attitude_states[0].content().unwrap() {
+            assert_eq!(qd.quaternion_dot.qc_dot.value, 0.8);
+        } else {
+            panic!("Wrong type parsed");
+        }
+
+        // QUATERNION/RATE (7 values)
+        let qr_meta = sample_aem_meta().replace("QUATERNION", "QUATERNION/RATE");
+        let qr_input = format!("{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4 0.01 0.02 0.03\nDATA_STOP\n", 
+            sample_aem_header(), qr_meta);
+        let aem = Aem::from_kvn(&qr_input).unwrap();
+        if let AemAttitudeState::QuaternionAngVel(qa) = aem.body.segment[0].data.attitude_states[0].content().unwrap() {
+            assert_eq!(qa.ang_vel.angvel_z.value, 0.03);
+        } else {
+            panic!("Wrong type parsed");
+        }
+    }
+
+    #[test]
+    fn test_parse_aem_euler_types() {
+        let euler_meta = r#"META_START
+OBJECT_NAME = SAT
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+ATTITUDE_TYPE = EULER_ANGLE
+EULER_ROT_SEQ = ZYX
+META_STOP
+"#;
+
+        // EULER_ANGLE (3 values)
+        let input = format!("{}{}\nDATA_START\n2023-01-01T00:00:00 10.0 20.0 30.0\nDATA_STOP\n", 
+            sample_aem_header(), euler_meta);
+        let aem = Aem::from_kvn(&input).unwrap();
+        if let AemAttitudeState::EulerAngle(e) = aem.body.segment[0].data.attitude_states[0].content().unwrap() {
+            assert_eq!(e.angle_1.value, 10.0);
+        } else {
+            panic!("Wrong type parsed");
+        }
+
+        // EULER_ANGLE/DERIVATIVE (6 values)
+        let ed_meta = euler_meta.replace("EULER_ANGLE", "EULER_ANGLE/DERIVATIVE");
+        let input = format!("{}{}\nDATA_START\n2023-01-01T00:00:00 10.0 20.0 30.0 0.1 0.2 0.3\nDATA_STOP\n", 
+            sample_aem_header(), ed_meta);
+        let aem = Aem::from_kvn(&input).unwrap();
+        if let AemAttitudeState::EulerAngleDerivative(ed) = aem.body.segment[0].data.attitude_states[0].content().unwrap() {
+            assert_eq!(ed.angle_3_dot.value, 0.3);
+        } else {
+            panic!("Wrong type parsed");
+        }
+    }
+
+    #[test]
+    fn test_parse_aem_spin_types() {
+        let spin_meta = sample_aem_meta().replace("QUATERNION", "SPIN");
+        
+        // SPIN (4 values)
+        let input = format!("{}{}\nDATA_START\n2023-01-01T00:00:00 10.0 20.0 30.0 0.1\nDATA_STOP\n", 
+            sample_aem_header(), spin_meta);
+        let aem = Aem::from_kvn(&input).unwrap();
+        if let AemAttitudeState::Spin(s) = aem.body.segment[0].data.attitude_states[0].content().unwrap() {
+            assert_eq!(s.spin_alpha.value, 10.0);
+        } else {
+            panic!("Wrong type parsed");
+        }
+
+        // SPIN/NUTATION (7 values)
+        let sn_meta = sample_aem_meta().replace("QUATERNION", "SPIN/NUTATION");
+        let input = format!("{}{}\nDATA_START\n2023-01-01T00:00:00 10.0 20.0 30.0 0.1 5.0 100.0 45.0\nDATA_STOP\n", 
+            sample_aem_header(), sn_meta);
+        let aem = Aem::from_kvn(&input).unwrap();
+        if let AemAttitudeState::SpinNutation(sn) = aem.body.segment[0].data.attitude_states[0].content().unwrap() {
+            assert_eq!(sn.nutation.value, 5.0);
+        } else {
+            panic!("Wrong type parsed");
+        }
+    }
+
+    #[test]
+    fn test_parse_aem_invalid_lines() {
+        // Wrong column count for QUATERNION (needs 4, gave 3)
+        let input = format!("{}{}\nDATA_START\n2002-11-04T17:22:31 0.5 0.5 0.5\nDATA_STOP\n", 
+            sample_aem_header(), sample_aem_meta());
+        let err = Aem::from_kvn(&input).unwrap_err();
+        // Should be a parse error because the line parser fails
+        match err {
+            CcsdsNdmError::Format(boxed_err) => match *boxed_err {
+                FormatError::Kvn(_) => {},
+                _ => panic!("Expected Kvn format error, got {:?}", boxed_err),
+            },
+            _ => panic!("Expected Format error, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_parse_aem_multiple_segments() {
+        let seg1 = format!("{}{}\nDATA_START\n2002-11-04T17:22:31 0.5 0.5 0.5 0.5\nDATA_STOP\n", 
+            "", sample_aem_meta());
+        let seg2 = format!("{}\nDATA_START\n2002-11-04T18:00:00 0.6 0.6 0.6 0.6\nDATA_STOP\n", 
+            sample_aem_meta()); // Re-use meta for simplicity
+        
+        let input = format!("{}{}{}", sample_aem_header(), seg1, seg2);
+        let aem = Aem::from_kvn(&input).unwrap();
+        assert_eq!(aem.body.segment.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_aem_comments() {
+        let input = r#"CCSDS_AEM_VERS = 2.0
+COMMENT Header comment
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+
+META_START
+COMMENT Meta comment
+OBJECT_NAME = SAT
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+ATTITUDE_TYPE = QUATERNION
+META_STOP
+
+DATA_START
+COMMENT Data comment
+2023-01-01T00:00:00 0 0 0 1
+DATA_STOP
+"#;
+        let aem = Aem::from_kvn(input).unwrap();
+        assert!(aem.header.comment.contains(&"Header comment".to_string()));
+        assert!(aem.body.segment[0].metadata.comment.contains(&"Meta comment".to_string()));
+        assert!(aem.body.segment[0].data.comment.contains(&"Data comment".to_string()));
+    }
+    #[test]
+    fn test_parse_aem_euler_angvel() {
+        let meta = sample_aem_meta()
+            .replace("QUATERNION", "EULER_ANGLE/ANGVEL")
+            .replace("META_STOP", "EULER_ROT_SEQ = ZYX\nANGVEL_FRAME = SC_BODY_1\nMETA_STOP");
+        // 6 values: 3 angles + 3 rates
+        let input = format!("{}{}\nDATA_START\n2023-01-01T00:00:00 10.0 20.0 30.0 0.1 0.2 0.3\nDATA_STOP\n", 
+            sample_aem_header(), meta);
+        let aem = Aem::from_kvn(&input).unwrap();
+        if let AemAttitudeState::EulerAngleAngVel(ea) = aem.body.segment[0].data.attitude_states[0].content().unwrap() {
+            assert_eq!(ea.angvel_z.value, 0.3);
+            assert_eq!(ea.angle_1.value, 10.0);
+        } else {
+            panic!("Wrong type parsed");
+        }
+    }
+
+    #[test]
+    fn test_parse_aem_spin_momentum() {
+        let meta = sample_aem_meta().replace("QUATERNION", "SPIN/NUTATION_MOM");
+        // 7 values: 3 spin (alpha, delta, angle) + 1 spin rate + 2 momentum (alpha, delta) + 1 nutation vel ??? 
+        // Wait, SPIN/NUTATION_MOM logic says:
+        // values[0] = spin_alpha
+        // values[1] = spin_delta
+        // values[2] = spin_angle
+        // values[3] = spin_angle_vel
+        // values[4] = momentum_alpha
+        // values[5] = momentum_delta
+        // values[6] = nutation_vel
+        
+        let input = format!("{}{}\nDATA_START\n2023-01-01T00:00:00 10.0 20.0 30.0 0.1 5.0 6.0 0.05\nDATA_STOP\n", 
+            sample_aem_header(), meta);
+        let aem = Aem::from_kvn(&input).unwrap();
+        if let AemAttitudeState::SpinNutationMom(snm) = aem.body.segment[0].data.attitude_states[0].content().unwrap() {
+            assert_eq!(snm.momentum_alpha.value, 5.0);
+            assert_eq!(snm.nutation_vel.value, 0.05);
+        } else {
+            panic!("Wrong type parsed");
+        }
+    }
+
+    #[test]
+    fn test_parse_aem_rate_frame_alias() {
+        let meta = sample_aem_meta()
+            .replace("QUATERNION", "QUATERNION/RATE")
+            .replace("META_STOP", "RATE_FRAME = SC_BODY_1\nMETA_STOP");
+        
+        // QUATERNION/RATE needs 7 columns
+        let input = format!("{}{}\nDATA_START\n2023-01-01T00:00:00 0.0 0.0 0.0 1.0 0.01 0.02 0.03\nDATA_STOP\n", 
+            sample_aem_header(), meta);
+        
+        let aem = Aem::from_kvn(&input).unwrap();
+        // Check that proper parsing happened (RATE_FRAME maps to angvel_frame)
+        assert_eq!(aem.body.segment[0].metadata.angvel_frame.as_deref(), Some("SC_BODY_1"));
+    }
+
+    #[test]
+    fn test_parse_aem_incorrect_columns() {
+        // QUATERNION demands 4 columns, give 3
+        let meta = sample_aem_meta();
+        let input = format!("{}{}\nDATA_START\n2023-01-01T00:00:00 0.1 0.2 0.3\nDATA_STOP\n", 
+            sample_aem_header(), meta);
+        assert!(Aem::from_kvn(&input).is_err());
+
+        // QUATERNION/DERIVATIVE demands 8, give 4
+        let meta = sample_aem_meta().replace("QUATERNION", "QUATERNION/DERIVATIVE");
+        let input = format!("{}{}\nDATA_START\n2023-01-01T00:00:00 0.1 0.2 0.3 0.4\nDATA_STOP\n", 
+            sample_aem_header(), meta);
+        assert!(Aem::from_kvn(&input).is_err());
+        
+        // EULER_ANGLE demands 3, give 2
+        let meta = sample_aem_meta().replace("QUATERNION", "EULER_ANGLE")
+            .replace("META_STOP", "EULER_ROT_SEQ = ZYX\nMETA_STOP");
+        let input = format!("{}{}\nDATA_START\n2023-01-01T00:00:00 10.0 20.0\nDATA_STOP\n", 
+            sample_aem_header(), meta);
+        assert!(Aem::from_kvn(&input).is_err());
+    }
+
+    #[test]
+    fn test_aem_no_segments() {
+        // Valid header but no body segments
+        let input = format!("{}", sample_aem_header());
+        let err = Aem::from_kvn(&input).unwrap_err();
+        match err {
+            CcsdsNdmError::Format(boxed_err) => match *boxed_err {
+                FormatError::Kvn(e) => {
+                    assert!(format!("{:?}", e).contains("At least one segment required"));
+                }
+                _ => panic!("Expected Kvn format error, got {:?}", boxed_err),
+            },
+            _ => panic!("Expected Format error, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_aem_malformed_data_line() {
+        let meta = sample_aem_meta();
+        // Invalid epoch
+        let input_bad_epoch = format!("{}{}\nDATA_START\nNOT_A_DATE 0.1 0.2 0.3 0.4\nDATA_STOP\n", 
+            sample_aem_header(), meta);
+        assert!(Aem::from_kvn(&input_bad_epoch).is_err());
+
+        // Invalid float
+        let input_bad_float = format!("{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 NOT_A_NUMBER 0.3 0.4\nDATA_STOP\n", 
+            sample_aem_header(), meta);
+        assert!(Aem::from_kvn(&input_bad_float).is_err());
+    }
+
+    #[test]
+    fn test_aem_unexpected_end_constants() {
+        // Tests where we might have abrupt ends or cut errors
+        // E.g. DATA_START without DATA_STOP is handled by `expect_block_end`.
+        let meta = sample_aem_meta();
+        let input_no_stop = format!("{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4\n", 
+            sample_aem_header(), meta);
+        assert!(Aem::from_kvn(&input_no_stop).is_err());
     }
 }

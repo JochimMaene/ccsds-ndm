@@ -452,4 +452,39 @@ EULER_STOP
         assert_eq!(apm.body.segment.data.quaternion_state.len(), 1);
         assert_eq!(apm.body.segment.data.euler_angle_state.len(), 1);
     }
+    #[test]
+    fn test_apm_validation_single_blocks() {
+        // Test that having just one block is sufficient
+        let mut apm = Apm::from_kvn(&sample_apm_kvn()).unwrap();
+        
+        // Clear all blocks
+        apm.body.segment.data.quaternion_state.clear();
+        assert!(apm.validate().is_err()); // Now empty
+
+        // Add just Inertia
+        apm.body.segment.data.inertia.push(InertiaState {
+             comment: vec![],
+             inertia_ref_frame: "SC_BODY".to_string(),
+             ixx: crate::types::Moment::new(1.0, None),
+             iyy: crate::types::Moment::new(2.0, None),
+             izz: crate::types::Moment::new(3.0, None),
+             ixy: crate::types::Moment::new(0.0, None),
+             ixz: crate::types::Moment::new(0.0, None),
+             iyz: crate::types::Moment::new(0.0, None),
+        });
+        assert!(apm.validate().is_ok());
+
+        // Clear and add just Angular Velocity
+        apm.body.segment.data.inertia.clear();
+        apm.body.segment.data.angular_velocity.push(AngVelState {
+            comment: vec![],
+            ref_frame_a: "GCRF".to_string(),
+            ref_frame_b: "SC_BODY".to_string(),
+            angvel_frame: crate::types::AngVelFrameType("SC_BODY".to_string()),
+            angvel_x: crate::types::AngleRate::new(0.1, None),
+            angvel_y: crate::types::AngleRate::new(0.1, None),
+            angvel_z: crate::types::AngleRate::new(0.1, None),
+        });
+        assert!(apm.validate().is_ok());
+    }
 }

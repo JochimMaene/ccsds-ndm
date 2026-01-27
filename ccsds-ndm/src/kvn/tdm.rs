@@ -1384,4 +1384,84 @@ DATA_STOP
             _ => panic!("Expected error, got: {:?}", err),
         }
     }
+
+    #[test]
+    fn test_tdm_kvn_exhaustive_coverage() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+TRANSMIT_DELAY_3 = 0.3
+TRANSMIT_DELAY_4 = 0.4
+TRANSMIT_DELAY_5 = 0.5
+RECEIVE_DELAY_4 = 1.4
+RECEIVE_DELAY_5 = 1.5
+CORRECTION_DOPPLER = 0.3
+CORRECTION_MAG = 0.4
+CORRECTION_RCS = 0.5
+CORRECTION_TRANSMIT = 0.6
+CORRECTION_ABERRATION_DIURNAL = 0.7
+CORRECTIONS_APPLIED = YES
+META_STOP
+DATA_START
+RECEIVE_FREQ_2 = 2023-01-01T00:00:00 123.0
+RECEIVE_FREQ_4 = 2023-01-01T00:00:01 124.0
+RECEIVE_FREQ_5 = 2023-01-01T00:00:02 125.0
+RECEIVE_PHASE_CT_2 = 2023-01-01T00:00:03 222.0
+RECEIVE_PHASE_CT_3 = 2023-01-01T00:00:04 223.0
+RECEIVE_PHASE_CT_4 = 2023-01-01T00:00:05 224.0
+RECEIVE_PHASE_CT_5 = 2023-01-01T00:00:06 225.0
+TRANSMIT_FREQ_3 = 2023-01-01T00:00:07 323.0
+TRANSMIT_FREQ_4 = 2023-01-01T00:00:08 324.0
+TRANSMIT_FREQ_5 = 2023-01-01T00:00:09 325.0
+TRANSMIT_FREQ_RATE_2 = 2023-01-01T00:00:10 422.0
+TRANSMIT_FREQ_RATE_3 = 2023-01-01T00:00:11 423.0
+TRANSMIT_FREQ_RATE_4 = 2023-01-01T00:00:12 424.0
+TRANSMIT_FREQ_RATE_5 = 2023-01-01T00:00:13 425.0
+TRANSMIT_PHASE_CT_2 = 2023-01-01T00:00:14 522.0
+TRANSMIT_PHASE_CT_3 = 2023-01-01T00:00:15 523.0
+TRANSMIT_PHASE_CT_4 = 2023-01-01T00:00:16 524.0
+TRANSMIT_PHASE_CT_5 = 2023-01-01T00:00:17 525.0
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).expect("parse exhaustive tdm kvn");
+        let meta = &tdm.body.segments[0].metadata;
+        assert_eq!(meta.transmit_delay_5, Some(0.5));
+        assert_eq!(meta.correction_aberration_diurnal, Some(0.7));
+        assert_eq!(tdm.body.segments[0].data.observations.len(), 18);
+    }
+
+    #[test]
+    fn test_tdm_kvn_backtrack_and_errors() {
+        // Unknown key between header and body should FAIL
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+UNKNOWN_KEY = VALUE
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+
+        // Backtrack in tdm_observation (malformed key)
+        let kvn_malformed = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+META_STOP
+DATA_START
+BAD_KEY = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn_malformed).is_err());
+    }
 }
