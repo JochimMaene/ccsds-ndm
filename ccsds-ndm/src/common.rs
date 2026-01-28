@@ -530,6 +530,20 @@ impl Quaternion {
     }
 }
 
+impl crate::traits::Validate for Quaternion {
+    fn validate(&self) -> Result<()> {
+        let sum_sq = self.q1 * self.q1 + self.q2 * self.q2 + self.q3 * self.q3 + self.qc * self.qc;
+        if !(0.999..=1.001).contains(&sum_sq) {
+            return Err(crate::error::ValidationError::Generic {
+                message: format!("Quaternion not normalized: sum of squares = {}", sum_sq).into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 // Quaternion derivative (dot components with units 1/s)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -1825,6 +1839,31 @@ pub struct AtmosphericReentryParameters {
     pub orbit_lifetime_confidence_level: Option<PercentageRequired>,
 }
 
+impl ToKvn for AtmosphericReentryParameters {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_pair("ORBIT_LIFETIME", &self.orbit_lifetime);
+        writer.write_pair("REENTRY_ALTITUDE", &self.reentry_altitude);
+        if let Some(v) = &self.orbit_lifetime_window_start {
+            writer.write_pair("ORBIT_LIFETIME_WINDOW_START", v);
+        }
+        if let Some(v) = &self.orbit_lifetime_window_end {
+            writer.write_pair("ORBIT_LIFETIME_WINDOW_END", v);
+        }
+        if let Some(v) = &self.nominal_reentry_epoch {
+            writer.write_pair("NOMINAL_REENTRY_EPOCH", v);
+        }
+        if let Some(v) = &self.reentry_window_start {
+            writer.write_pair("REENTRY_WINDOW_START", v);
+        }
+        if let Some(v) = &self.reentry_window_end {
+            writer.write_pair("REENTRY_WINDOW_END", v);
+        }
+        if let Some(v) = &self.orbit_lifetime_confidence_level {
+            writer.write_pair("ORBIT_LIFETIME_CONFIDENCE_LEVEL", v);
+        }
+    }
+}
+
 /// Ground impact parameters (groundImpactParametersType, RDM).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -2063,6 +2102,105 @@ pub struct GroundImpactParameters {
     pub impact_3_cross_track: Option<Distance>,
 }
 
+impl ToKvn for GroundImpactParameters {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        if let Some(v) = &self.probability_of_impact {
+            writer.write_pair("PROBABILITY_OF_IMPACT", v.value);
+        }
+        if let Some(v) = &self.probability_of_burn_up {
+            writer.write_pair("PROBABILITY_OF_BURN_UP", v.value);
+        }
+        if let Some(v) = &self.probability_of_break_up {
+            writer.write_pair("PROBABILITY_OF_BREAK_UP", v.value);
+        }
+        if let Some(v) = &self.probability_of_land_impact {
+            writer.write_pair("PROBABILITY_OF_LAND_IMPACT", v.value);
+        }
+        if let Some(v) = &self.probability_of_casualty {
+            writer.write_pair("PROBABILITY_OF_CASUALTY", v.value);
+        }
+        if let Some(v) = &self.nominal_impact_epoch {
+            writer.write_pair("NOMINAL_IMPACT_EPOCH", v);
+        }
+        if let Some(v) = &self.impact_window_start {
+            writer.write_pair("IMPACT_WINDOW_START", v);
+        }
+        if let Some(v) = &self.impact_window_end {
+            writer.write_pair("IMPACT_WINDOW_END", v);
+        }
+        if let Some(v) = &self.impact_ref_frame {
+            writer.write_pair("IMPACT_REF_FRAME", v);
+        }
+        if let Some(v) = &self.nominal_impact_lon {
+            writer.write_pair("NOMINAL_IMPACT_LON", v);
+        }
+        if let Some(v) = &self.nominal_impact_lat {
+            writer.write_pair("NOMINAL_IMPACT_LAT", v);
+        }
+        if let Some(v) = &self.nominal_impact_alt {
+            writer.write_pair("NOMINAL_IMPACT_ALT", v);
+        }
+
+        if let Some(v) = &self.impact_1_confidence {
+            writer.write_pair("IMPACT_1_CONFIDENCE", v);
+        }
+        if let Some(v) = &self.impact_1_start_lon {
+            writer.write_pair("IMPACT_1_START_LON", v);
+        }
+        if let Some(v) = &self.impact_1_start_lat {
+            writer.write_pair("IMPACT_1_START_LAT", v);
+        }
+        if let Some(v) = &self.impact_1_stop_lon {
+            writer.write_pair("IMPACT_1_STOP_LON", v);
+        }
+        if let Some(v) = &self.impact_1_stop_lat {
+            writer.write_pair("IMPACT_1_STOP_LAT", v);
+        }
+        if let Some(v) = &self.impact_1_cross_track {
+            writer.write_pair("IMPACT_1_CROSS_TRACK", v);
+        }
+
+        if let Some(v) = &self.impact_2_confidence {
+            writer.write_pair("IMPACT_2_CONFIDENCE", v);
+        }
+        if let Some(v) = &self.impact_2_start_lon {
+            writer.write_pair("IMPACT_2_START_LON", v);
+        }
+        if let Some(v) = &self.impact_2_start_lat {
+            writer.write_pair("IMPACT_2_START_LAT", v);
+        }
+        if let Some(v) = &self.impact_2_stop_lon {
+            writer.write_pair("IMPACT_2_STOP_LON", v);
+        }
+        if let Some(v) = &self.impact_2_stop_lat {
+            writer.write_pair("IMPACT_2_STOP_LAT", v);
+        }
+        if let Some(v) = &self.impact_2_cross_track {
+            writer.write_pair("IMPACT_2_CROSS_TRACK", v);
+        }
+
+        if let Some(v) = &self.impact_3_confidence {
+            writer.write_pair("IMPACT_3_CONFIDENCE", v);
+        }
+        if let Some(v) = &self.impact_3_start_lon {
+            writer.write_pair("IMPACT_3_START_LON", v);
+        }
+        if let Some(v) = &self.impact_3_start_lat {
+            writer.write_pair("IMPACT_3_START_LAT", v);
+        }
+        if let Some(v) = &self.impact_3_stop_lon {
+            writer.write_pair("IMPACT_3_STOP_LON", v);
+        }
+        if let Some(v) = &self.impact_3_stop_lat {
+            writer.write_pair("IMPACT_3_STOP_LAT", v);
+        }
+        if let Some(v) = &self.impact_3_cross_track {
+            writer.write_pair("IMPACT_3_CROSS_TRACK", v);
+        }
+    }
+}
+
 /// RDM spacecraft parameters (rdmSpacecraftParametersType).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -2275,5 +2413,266 @@ mod tests {
         assert!(s.contains("1"));
         assert!(s.contains("2"));
         assert!(s.contains("3"));
+    }
+
+    #[test]
+    fn test_quaternion_state_kvn() {
+        let qs = QuaternionState::builder()
+            .ref_frame_a("A")
+            .ref_frame_b("B")
+            .quaternion(Quaternion { q1: 1.0, q2: 0.0, q3: 0.0, qc: 0.0 })
+            .build();
+        let mut w = KvnWriter::new();
+        qs.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("REF_FRAME_A"));
+        assert!(s.contains("A"));
+        assert!(s.contains("Q1"));
+        assert!(s.contains("1"));
+    }
+
+    #[test]
+    fn test_euler_angle_state_kvn() {
+        let es = EulerAngleState::builder()
+            .ref_frame_a("A")
+            .ref_frame_b("B")
+            .euler_rot_seq(RotSeq::XYZ)
+            .angle_1(Angle::new(10.0, None).unwrap())
+            .angle_2(Angle::new(20.0, None).unwrap())
+            .angle_3(Angle::new(30.0, None).unwrap())
+            .build();
+        let mut w = KvnWriter::new();
+        es.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("EULER_ROT_SEQ"));
+        assert!(s.contains("XYZ"));
+        assert!(s.contains("ANGLE_1"));
+        assert!(s.contains("10"));
+    }
+
+    #[test]
+    fn test_ang_vel_state_kvn() {
+        let avs = AngVelState::builder()
+            .ref_frame_a("A")
+            .ref_frame_b("B")
+            .angvel_frame(AngVelFrameType("FRAME".into()))
+            .angvel_x(AngleRate::new(0.1, None))
+            .angvel_y(AngleRate::new(0.2, None))
+            .angvel_z(AngleRate::new(0.3, None))
+            .build();
+        let mut w = KvnWriter::new();
+        avs.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("ANGVEL_FRAME"));
+        assert!(s.contains("FRAME"));
+        assert!(s.contains("ANGVEL_X"));
+        assert!(s.contains("0.1"));
+    }
+
+    #[test]
+    fn test_spin_state_kvn() {
+        let ss = SpinState::builder()
+            .ref_frame_a("A")
+            .ref_frame_b("B")
+            .spin_alpha(Angle::new(10.0, None).unwrap())
+            .spin_delta(Angle::new(20.0, None).unwrap())
+            .spin_angle(Angle::new(30.0, None).unwrap())
+            .spin_angle_vel(AngleRate::new(0.1, None))
+            .build();
+        let mut w = KvnWriter::new();
+        ss.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("SPIN_ALPHA"));
+        assert!(s.contains("10"));
+        assert!(s.contains("SPIN_ANGLE_VEL"));
+        assert!(s.contains("0.1"));
+    }
+
+    #[test]
+    fn test_inertia_state_kvn() {
+        let is = InertiaState::builder()
+            .inertia_ref_frame("FRAME")
+            .ixx(Moment::new(100.0, None))
+            .iyy(Moment::new(200.0, None))
+            .izz(Moment::new(300.0, None))
+            .ixy(Moment::new(10.0, None))
+            .ixz(Moment::new(20.0, None))
+            .iyz(Moment::new(30.0, None))
+            .build();
+        let mut w = KvnWriter::new();
+        is.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("IXX"));
+        assert!(s.contains("100"));
+        assert!(s.contains("IXY"));
+        assert!(s.contains("10"));
+    }
+
+    #[test]
+    fn test_ephemeris_kvn() {
+        let epoch = "2000-01-01T00:00:00".parse().unwrap();
+        let qe = QuaternionEphemeris {
+            epoch,
+            quaternion: Quaternion { q1: 1.0, q2: 0.0, q3: 0.0, qc: 0.0 },
+        };
+        let mut w = KvnWriter::new();
+        qe.write_kvn(&mut w);
+        assert!(w.finish().contains("2000-01-01T00:00:00 1 0 0 0"));
+
+        let qd = QuaternionDerivative {
+            epoch,
+            quaternion: Quaternion { q1: 1.0, q2: 0.0, q3: 0.0, qc: 0.0 },
+            quaternion_dot: QuaternionDot {
+                q1_dot: QuaternionDotComponent::new(0.1, None),
+                q2_dot: QuaternionDotComponent::new(0.2, None),
+                q3_dot: QuaternionDotComponent::new(0.3, None),
+                qc_dot: QuaternionDotComponent::new(0.4, None),
+            },
+        };
+        let mut w = KvnWriter::new();
+        qd.write_kvn(&mut w);
+        assert!(w.finish().contains("2000-01-01T00:00:00 1 0 0 0 0.1 0.2 0.3 0.4"));
+    }
+
+    #[test]
+    fn test_opm_covariance_kvn() {
+        let cov = OpmCovarianceMatrix::builder()
+            .cx_x(PositionCovariance::new(1.0, None))
+            .cy_x(PositionCovariance::new(2.0, None))
+            .cy_y(PositionCovariance::new(3.0, None))
+            .cz_x(PositionCovariance::new(4.0, None))
+            .cz_y(PositionCovariance::new(5.0, None))
+            .cz_z(PositionCovariance::new(6.0, None))
+            .cx_dot_x(PositionVelocityCovariance::new(7.0, None))
+            .cx_dot_y(PositionVelocityCovariance::new(8.0, None))
+            .cx_dot_z(PositionVelocityCovariance::new(9.0, None))
+            .cx_dot_x_dot(VelocityCovariance::new(10.0, None))
+            .cy_dot_x(PositionVelocityCovariance::new(11.0, None))
+            .cy_dot_y(PositionVelocityCovariance::new(12.0, None))
+            .cy_dot_z(PositionVelocityCovariance::new(13.0, None))
+            .cy_dot_x_dot(VelocityCovariance::new(14.0, None))
+            .cy_dot_y_dot(VelocityCovariance::new(15.0, None))
+            .cz_dot_x(PositionVelocityCovariance::new(16.0, None))
+            .cz_dot_y(PositionVelocityCovariance::new(17.0, None))
+            .cz_dot_z(PositionVelocityCovariance::new(18.0, None))
+            .cz_dot_x_dot(VelocityCovariance::new(19.0, None))
+            .cz_dot_y_dot(VelocityCovariance::new(20.0, None))
+            .cz_dot_z_dot(VelocityCovariance::new(21.0, None))
+            .build();
+        let mut w = KvnWriter::new();
+        cov.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("CX_X"));
+        assert!(s.contains("1"));
+        assert!(s.contains("CZ_DOT_Z_DOT"));
+        assert!(s.contains("21"));
+    }
+
+    #[test]
+    fn test_reentry_params_kvn() {
+        // AtmosphericReentryParameters
+        // GroundImpactParameters
+        let gi = GroundImpactParameters::builder()
+            .comment(vec![])
+            .probability_of_impact(Probability::new(0.5).unwrap())
+            .build();
+        let mut w = KvnWriter::new();
+        gi.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("PROBABILITY_OF_IMPACT"));
+        assert!(s.contains("0.5"));
+    }
+
+    #[test]
+    fn test_header_validation_missing_date() {
+        let h = NdmHeader::builder()
+            .creation_date(Epoch::new("").unwrap())
+            .originator("NASA")
+            .build();
+        assert!(h.validate().is_err());
+
+        let h = AdmHeader::builder()
+            .creation_date(Epoch::new("").unwrap())
+            .originator("ESA")
+            .build();
+        assert!(h.validate().is_err());
+
+        let h = OdmHeader::builder()
+            .creation_date(Epoch::new("").unwrap())
+            .originator("JAXA")
+            .build();
+        assert!(h.validate().is_err());
+    }
+
+    #[test]
+    fn test_aem_attitude_state_variants_kvn() {
+        let epoch = "2000-01-01T00:00:00".parse().unwrap();
+        
+        // QuaternionAngVel
+        let qav = QuaternionAngVel {
+            epoch,
+            quaternion: Quaternion { q1: 1.0, q2: 0.0, q3: 0.0, qc: 0.0 },
+            ang_vel: AngVel {
+                angvel_x: AngleRate::new(0.1, None),
+                angvel_y: AngleRate::new(0.2, None),
+                angvel_z: AngleRate::new(0.3, None),
+            },
+        };
+        let mut w = KvnWriter::new();
+        AemAttitudeState::QuaternionAngVel(qav).write_kvn(&mut w);
+        assert!(w.finish().contains("1 0 0 0"));
+
+        // EulerAngleDerivative
+        let ead = EulerAngleDerivative {
+            epoch,
+            angle_1: Angle::new(10.0, None).unwrap(),
+            angle_2: Angle::new(20.0, None).unwrap(),
+            angle_3: Angle::new(30.0, None).unwrap(),
+            angle_1_dot: AngleRate::new(0.1, None),
+            angle_2_dot: AngleRate::new(0.2, None),
+            angle_3_dot: AngleRate::new(0.3, None),
+        };
+        let mut w = KvnWriter::new();
+        AemAttitudeState::EulerAngleDerivative(ead).write_kvn(&mut w);
+        assert!(w.finish().contains("10 20 30"));
+
+        // SpinNutation
+        let sn = SpinNutation {
+            epoch,
+            spin_alpha: Angle::new(10.0, None).unwrap(),
+            spin_delta: Angle::new(20.0, None).unwrap(),
+            spin_angle: Angle::new(30.0, None).unwrap(),
+            spin_angle_vel: AngleRate::new(0.1, None),
+            nutation: Angle::new(5.0, None).unwrap(),
+            nutation_per: Duration::new(1.0, Some(TimeUnits::Day)).unwrap(),
+            nutation_phase: Angle::new(0.0, None).unwrap(),
+        };
+        let mut w = KvnWriter::new();
+        AemAttitudeState::SpinNutation(sn).write_kvn(&mut w);
+        let kvn = w.finish();
+        assert!(kvn.contains("10 20 30 0.1 5 1 0")); 
+
+        // SpinNutationMom
+        let snm = SpinNutationMom {
+            epoch,
+            spin_alpha: Angle::new(10.0, None).unwrap(),
+            spin_delta: Angle::new(20.0, None).unwrap(),
+            spin_angle: Angle::new(30.0, None).unwrap(),
+            spin_angle_vel: AngleRate::new(0.1, None),
+            momentum_alpha: Angle::new(5.0, None).unwrap(),
+            momentum_delta: Angle::new(5.0, None).unwrap(),
+            nutation_vel: AngleRate::new(0.01, None),
+        };
+        let mut w = KvnWriter::new();
+        AemAttitudeState::SpinNutationMom(snm).write_kvn(&mut w);
+        assert!(w.finish().contains("0.01"));
+    }
+
+    #[test]
+    fn test_quaternion_validation() {
+        let q = Quaternion { q1: 2.0, q2: 0.0, q3: 0.0, qc: 0.0 };
+        assert!(q.validate().is_err()); // Not normalized
+        let q2 = Quaternion { q1: 1.0, q2: 0.0, q3: 0.0, qc: 0.0 };
+        assert!(q2.validate().is_ok());
     }
 }

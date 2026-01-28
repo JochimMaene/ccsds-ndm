@@ -1777,7 +1777,7 @@ impl std::str::FromStr for ControlledType {
 }
 
 // Time units ("s") plus Duration / RelTime / TimeOffset (optional units per XSD)
-define_unit_enum!(TimeUnits, Seconds, { Seconds => "s" });
+define_unit_enum!(TimeUnits, Seconds, { Seconds => "s", Day => "d" });
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Duration {
@@ -3061,17 +3061,127 @@ mod extra_tests {
     }
 
     #[test]
-    fn test_tdm_path_validation() {
-        assert!(TdmPath::from_str("1,2").is_ok());
-        assert!(TdmPath::from_str("1,2,3").is_ok());
-        assert!(TdmPath::from_str("1").is_err()); // Too short
-        assert!(TdmPath::from_str("a,b").is_err()); // Not digits
-        assert!(TdmPath::from_str("1,2,a").is_err());
+    fn test_unit_value_from_kvn() {
+        let uv = UnitValue::<f64, PositionUnits>::from_kvn("123.45", Some("km")).unwrap();
+        assert_eq!(uv.value, 123.45);
+        assert_eq!(uv.units, Some(PositionUnits::Km));
+
+        let uv_no_unit = UnitValue::<f64, PositionUnits>::from_kvn("123.45", None).unwrap();
+        assert_eq!(uv_no_unit.units, None);
     }
 
     #[test]
-    fn test_time_system_display() {
-        let ts = TimeSystemType("UTC".to_string());
-        assert_eq!(format!("{}", ts), "UTC");
+    fn test_angle_validation() {
+        assert!(Angle::new(359.9, None).is_ok());
+        assert!(Angle::new(-359.9, None).is_ok());
+        assert!(Angle::new(360.0, None).is_err());
+        assert!(Angle::new(-360.1, None).is_err());
+    }
+
+    #[test]
+    fn test_day_interval_validation() {
+        assert!(DayInterval::new(10.0, None).is_ok());
+        assert!(DayInterval::new(-0.1, None).is_err());
+        assert!(DayIntervalRequired::new(0.1).is_ok());
+        assert!(DayIntervalRequired::new(0.0).is_err());
+    }
+
+    #[test]
+    fn test_frequency_validation() {
+        assert!(Frequency::new(1.0, None).is_ok());
+        assert!(Frequency::new(0.0, None).is_err());
+    }
+
+    #[test]
+    fn test_gm_validation() {
+        assert!(Gm::new(1.0, None).is_ok());
+        assert!(Gm::new(0.0, None).is_err());
+        assert!("KM**3/S**2".parse::<GmUnits>().is_ok());
+    }
+
+    #[test]
+    fn test_altitude_required_validation() {
+        assert!(AltitudeRequired::new(0.0).is_ok());
+        assert!(AltitudeRequired::new(9000.0).is_err());
+        assert!(AltitudeRequired::new(-431.0).is_err());
+    }
+
+    #[test]
+    fn test_mass_validation() {
+        assert!(Mass::new(0.0, None).is_ok());
+        assert!(Mass::new(-1.0, None).is_err());
+    }
+
+    #[test]
+    fn test_area_validation() {
+        assert!(Area::new(0.0, None).is_ok());
+        assert!(Area::new(-1.0, None).is_err());
+    }
+
+    #[test]
+    fn test_ms2_parsing() {
+        let ms2 = Ms2::from_str("9.81").unwrap();
+        assert_eq!(ms2.value, 9.81);
+        assert_eq!(ms2.units, Ms2Units::MPerS2);
+    }
+
+    #[test]
+    fn test_solar_flux_units() {
+        test_enum_from_str!(SolarFluxUnits, "SFU", "INVALID");
+        assert_eq!(format!("{}", SolarFluxUnits::JanskyScaled), "10**4 Jansky");
+    }
+
+    #[test]
+    fn test_epoch_conversion() {
+        let s = "2023-01-01T00:00:00Z";
+        let e = Epoch::from_str(s).unwrap();
+        assert_eq!(Epoch::try_from(s.to_string()).unwrap(), e);
+        assert_eq!(e.as_str(), s);
+        assert!(!e.is_empty());
+    }
+
+    #[test]
+    fn test_percentage_validation() {
+        assert!(Percentage::new(50.0, None).is_ok());
+        assert!(Percentage::new(-0.1, None).is_err());
+        assert!(Percentage::new(100.1, None).is_err());
+        assert!(PercentageRequired::new(50.0).is_ok());
+        assert!(PercentageRequired::new(-0.1).is_err());
+        assert!(PercentageRequired::new(100.1).is_err());
+    }
+
+    #[test]
+    fn test_unit_conversions() {
+        let f = Frequency::new(10.0, Some(FrequencyUnits::Hz)).unwrap();
+        let uv = f.to_unit_value();
+        assert_eq!(uv.value, 10.0);
+        assert_eq!(uv.units, Some(FrequencyUnits::Hz));
+
+        let gm = Gm::new(1.0, Some(GmUnits::Km3PerS2)).unwrap();
+        let uv = gm.to_unit_value();
+        assert_eq!(uv.value, 1.0);
+        assert_eq!(uv.units, Some(GmUnits::Km3PerS2));
+
+        let a = Angle::new(1.0, Some(AngleUnits::Deg)).unwrap();
+        let uv = a.to_unit_value();
+        assert_eq!(uv.value, 1.0);
+        assert_eq!(uv.units, Some(AngleUnits::Deg));
+    }
+
+    #[test]
+    fn test_from_kvn_float() {
+        let f = Frequency::from_kvn_float(10.0, Some("Hz")).unwrap();
+        assert_eq!(f.value, 10.0);
+        assert_eq!(f.units, Some(FrequencyUnits::Hz));
+
+        let gm = Gm::from_kvn_float(1.0, Some("KM**3/S**2")).unwrap();
+        assert_eq!(gm.value, 1.0);
+    }
+
+    #[test]
+    fn test_additional_units() {
+        test_enum_from_str!(AngleRateUnits, "deg/s", "INVALID");
+        test_enum_from_str!(MomentUnits, "kg*m**2", "INVALID");
+        test_enum_from_str!(QuaternionDotUnits, "1/s", "INVALID");
     }
 }

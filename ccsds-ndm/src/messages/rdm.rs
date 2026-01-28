@@ -640,120 +640,11 @@ impl ToKvn for RdmData {
         // No DATA_START
         writer.write_comments(&self.comment);
         // Atmospheric (mandatory)
-        let a = &self.atmospheric_reentry_parameters;
-        writer.write_pair("ORBIT_LIFETIME", &a.orbit_lifetime);
-        writer.write_pair("REENTRY_ALTITUDE", &a.reentry_altitude);
-        if let Some(v) = &a.orbit_lifetime_window_start {
-            writer.write_pair("ORBIT_LIFETIME_WINDOW_START", v);
-        }
-        if let Some(v) = &a.orbit_lifetime_window_end {
-            writer.write_pair("ORBIT_LIFETIME_WINDOW_END", v);
-        }
-        if let Some(v) = &a.nominal_reentry_epoch {
-            writer.write_pair("NOMINAL_REENTRY_EPOCH", v);
-        }
-        if let Some(v) = &a.reentry_window_start {
-            writer.write_pair("REENTRY_WINDOW_START", v);
-        }
-        if let Some(v) = &a.reentry_window_end {
-            writer.write_pair("REENTRY_WINDOW_END", v);
-        }
-        if let Some(v) = &a.orbit_lifetime_confidence_level {
-            writer.write_pair("ORBIT_LIFETIME_CONFIDENCE_LEVEL", v);
-        }
+        self.atmospheric_reentry_parameters.write_kvn(writer);
 
         // Ground impact (optional)
         if let Some(g) = &self.ground_impact_parameters {
-            if let Some(v) = &g.probability_of_impact {
-                writer.write_pair("PROBABILITY_OF_IMPACT", v);
-            }
-            if let Some(v) = &g.probability_of_burn_up {
-                writer.write_pair("PROBABILITY_OF_BURN_UP", v);
-            }
-            if let Some(v) = &g.probability_of_break_up {
-                writer.write_pair("PROBABILITY_OF_BREAK_UP", v);
-            }
-            if let Some(v) = &g.probability_of_land_impact {
-                writer.write_pair("PROBABILITY_OF_LAND_IMPACT", v);
-            }
-            if let Some(v) = &g.probability_of_casualty {
-                writer.write_pair("PROBABILITY_OF_CASUALTY", v);
-            }
-            if let Some(v) = &g.nominal_impact_epoch {
-                writer.write_pair("NOMINAL_IMPACT_EPOCH", v);
-            }
-            if let Some(v) = &g.impact_window_start {
-                writer.write_pair("IMPACT_WINDOW_START", v);
-            }
-            if let Some(v) = &g.impact_window_end {
-                writer.write_pair("IMPACT_WINDOW_END", v);
-            }
-            if let Some(v) = &g.impact_ref_frame {
-                writer.write_pair("IMPACT_REF_FRAME", v);
-            }
-            if let Some(v) = &g.nominal_impact_lon {
-                writer.write_pair("NOMINAL_IMPACT_LON", v);
-            }
-            if let Some(v) = &g.nominal_impact_lat {
-                writer.write_pair("NOMINAL_IMPACT_LAT", v);
-            }
-            if let Some(v) = &g.nominal_impact_alt {
-                writer.write_pair("NOMINAL_IMPACT_ALT", v);
-            }
-            if let Some(v) = &g.impact_1_confidence {
-                writer.write_pair("IMPACT_1_CONFIDENCE", v);
-            }
-            if let Some(v) = &g.impact_1_start_lon {
-                writer.write_pair("IMPACT_1_START_LON", v);
-            }
-            if let Some(v) = &g.impact_1_start_lat {
-                writer.write_pair("IMPACT_1_START_LAT", v);
-            }
-            if let Some(v) = &g.impact_1_stop_lon {
-                writer.write_pair("IMPACT_1_STOP_LON", v);
-            }
-            if let Some(v) = &g.impact_1_stop_lat {
-                writer.write_pair("IMPACT_1_STOP_LAT", v);
-            }
-            if let Some(v) = &g.impact_1_cross_track {
-                writer.write_pair("IMPACT_1_CROSS_TRACK", v);
-            }
-            if let Some(v) = &g.impact_2_confidence {
-                writer.write_pair("IMPACT_2_CONFIDENCE", v);
-            }
-            if let Some(v) = &g.impact_2_start_lon {
-                writer.write_pair("IMPACT_2_START_LON", v);
-            }
-            if let Some(v) = &g.impact_2_start_lat {
-                writer.write_pair("IMPACT_2_START_LAT", v);
-            }
-            if let Some(v) = &g.impact_2_stop_lon {
-                writer.write_pair("IMPACT_2_STOP_LON", v);
-            }
-            if let Some(v) = &g.impact_2_stop_lat {
-                writer.write_pair("IMPACT_2_STOP_LAT", v);
-            }
-            if let Some(v) = &g.impact_2_cross_track {
-                writer.write_pair("IMPACT_2_CROSS_TRACK", v);
-            }
-            if let Some(v) = &g.impact_3_confidence {
-                writer.write_pair("IMPACT_3_CONFIDENCE", v);
-            }
-            if let Some(v) = &g.impact_3_start_lon {
-                writer.write_pair("IMPACT_3_START_LON", v);
-            }
-            if let Some(v) = &g.impact_3_start_lat {
-                writer.write_pair("IMPACT_3_START_LAT", v);
-            }
-            if let Some(v) = &g.impact_3_stop_lon {
-                writer.write_pair("IMPACT_3_STOP_LON", v);
-            }
-            if let Some(v) = &g.impact_3_stop_lat {
-                writer.write_pair("IMPACT_3_STOP_LAT", v);
-            }
-            if let Some(v) = &g.impact_3_cross_track {
-                writer.write_pair("IMPACT_3_CROSS_TRACK", v);
-            }
+            g.write_kvn(writer);
         }
 
         // Optional blocks: write when present
@@ -1032,6 +923,26 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         // If parser allows empty value, validate() catches it.
         // If parser disallows, it errors anyway.
+        assert!(Rdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_rdm_validation_impact_window() {
+        let kvn = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+IMPACT_WINDOW_START = 2023-01-06T00:00:00
+IMPACT_WINDOW_END = 2023-01-05T00:00:00
+"#;
         assert!(Rdm::from_kvn(kvn).is_err());
     }
 }

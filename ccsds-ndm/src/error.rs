@@ -786,24 +786,94 @@ mod tests {
     }
 
     #[test]
-    fn test_ccsds_ndm_error_conversions() {
+    fn test_ccsds_ndm_error_helpers() {
         let io_err = std::io::Error::new(std::io::ErrorKind::Other, "io");
         let err: CcsdsNdmError = io_err.into();
         assert!(err.as_io_error().is_some());
         assert!(err.is_io_error());
+        assert_eq!(format!("{}", err), "I/O error: io");
 
-        let val_err = ValidationError::Generic {
-            message: "g".into(),
-            line: None,
-        };
+        let val_err = ValidationError::Generic { message: "g".into(), line: None };
         let err: CcsdsNdmError = val_err.into();
         assert!(err.as_validation_error().is_some());
         assert!(err.is_validation_error());
+
+        let fmt_err = FormatError::InvalidFormat("f".into());
+        let err: CcsdsNdmError = fmt_err.into();
+        assert!(err.as_format_error().is_some());
+        assert!(err.is_format_error());
+        assert!(!err.is_kvn_error());
+
+        let enum_err = EnumParseError { field: "F", value: "V".into(), expected: "E" };
+        let err: CcsdsNdmError = enum_err.into();
+        assert!(err.as_enum_error().is_some());
+
+        let pfe_err = "abc".parse::<f64>().unwrap_err();
+        let err: CcsdsNdmError = pfe_err.into();
+        assert!(err.as_parse_float_error().is_some());
+
+        let pie_err = "abc".parse::<i32>().unwrap_err();
+        let err: CcsdsNdmError = pie_err.into();
+        assert!(err.as_parse_int_error().is_some());
+
+        let epoch_err = EpochError::InvalidFormat("2023".into());
+        let err: CcsdsNdmError = CcsdsNdmError::Epoch(epoch_err);
+        assert!(err.as_epoch_error().is_some());
+        assert!(err.is_epoch_error());
+
+        let eof_err = CcsdsNdmError::UnexpectedEof { context: "ctx".into() };
+        assert_eq!(format!("{}", eof_err), "Unexpected end of input: ctx");
+
+        let unsupported = CcsdsNdmError::UnsupportedMessage("type".into());
+        assert_eq!(format!("{}", unsupported), "Unsupported message type: type");
+    }
+
+    #[test]
+    fn test_format_error_variants() {
+        let xml_err = quick_xml::Error::Io(std::sync::Arc::new(std::io::Error::new(std::io::ErrorKind::Other, "io")));
+        let err: CcsdsNdmError = FormatError::Xml(xml_err).into();
+        assert!(err.as_xml_error().is_some());
+
+        let fmt_err = FormatError::XmlWithContext {
+            context: "ctx".into(),
+            source: quick_xml::DeError::Custom("msg".into()),
+        };
+        assert!(format!("{}", fmt_err).contains("ctx"));
+    }
+
+    #[test]
+    fn test_with_location() {
+        let input = "LINE1\nLINE2\nLINE3";
+        let mut err = CcsdsNdmError::Validation(Box::new(ValidationError::Generic {
+            message: "msg".into(),
+            line: None,
+        }));
+        // Offset 6 is start of LINE2
+        err = err.with_location(input, 6);
+        if let CcsdsNdmError::Validation(ve) = err {
+            if let ValidationError::Generic { line, .. } = *ve {
+                assert_eq!(line, Some(2));
+            }
+        }
+
+        let kvn_err = KvnParseError {
+            line: 0,
+            column: 0,
+            message: "msg".into(),
+            contexts: vec![],
+            offset: 0,
+        };
+        let mut err = CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(kvn_err))));
+        err = err.with_location(input, 12); // start of LINE3
+        if let Some(ke) = err.as_kvn_parse_error() {
+            assert_eq!(ke.line, 3);
+        }
     }
 
     #[test]
     fn test_context_stack() {
         let mut stack = ContextStack::new();
+        assert_eq!(stack.last(), None);
         stack.push("A");
         stack.push("B");
         stack.push("C");
@@ -811,5 +881,28 @@ mod tests {
         stack.push("D"); // Ignored, capacity 3
         assert_eq!(stack.last(), Some(&"C"));
         assert_eq!(stack.to_vec(), vec!["A", "B", "C"]);
+    }
+
+    #[test]
+    fn test_internal_parser_error() {
+        use winnow::error::ParserError;
+        let input = "abc";
+        let mut err = InternalParserError::from_input(&input);
+        assert_eq!(err.message, "");
+        err.contexts.push("ctx");
+        assert_eq!(err.contexts.to_vec(), vec!["ctx"]);
+
+        // Test from_external_error for InternalParserError
+        use winnow::error::FromExternalError;
+        let enum_err = EnumParseError { field: "F", value: "V".into(), expected: "E" };
+        let err = InternalParserError::from_external_error(&input, enum_err);
+        assert!(matches!(*err.kind, ParserErrorKind::Enum(_)));
+
+        let ccsds_err = CcsdsNdmError::Validation(Box::new(ValidationError::Generic {
+            message: "m".into(),
+            line: None,
+        }));
+        let err = InternalParserError::from_external_error(&input, ccsds_err);
+        assert!(matches!(*err.kind, ParserErrorKind::Validation(_)));
     }
 }
