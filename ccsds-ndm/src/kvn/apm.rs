@@ -450,7 +450,8 @@ mod tests {
         r#"CCSDS_APM_VERS = 2.0
 CREATION_DATE = 2022-11-04T17:22:31
 ORIGINATOR = NASA/JPL
-"#.to_string()
+"#
+        .to_string()
     }
 
     fn sample_apm_meta() -> String {
@@ -459,7 +460,8 @@ OBJECT_NAME = MARS GLOBAL SURVEYOR
 OBJECT_ID = 1996-062A
 TIME_SYSTEM = UTC
 META_STOP
-"#.to_string()
+"#
+        .to_string()
     }
 
     #[test]
@@ -473,7 +475,8 @@ META_STOP
 
     #[test]
     fn test_parse_apm_version_error() {
-        let input = "CCSDS_APM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\n";
+        let input =
+            "CCSDS_APM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\n";
         let err = Apm::from_kvn(input).unwrap_err();
         match err {
             CcsdsNdmError::Format(boxed_err) => match *boxed_err {
@@ -533,7 +536,7 @@ QUAT_STOP
         let apm = Apm::from_kvn(&input).unwrap();
         let e = &apm.body.segment.data.euler_angle_state[0];
         assert_eq!(e.angle_1.value, 10.0);
-        // Note: RotSeq 321 is not valid for the enum unless we fixed it or mapped it. 
+        // Note: RotSeq 321 is not valid for the enum unless we fixed it or mapped it.
         // We learned from ACM/AEM it expects ZYX etc. But RotSeq implementation in types.rs might support digits if I checked carefully?
         // Wait, checking types.rs again. `RotSeq` impl `FromStr` matches "XYX", "XYZ" etc.
         // So "321" will fail. I should use "ZYX".
@@ -586,8 +589,11 @@ QUAT_STOP
 
     #[test]
     fn test_apm_validate_at_least_one_block() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\n", 
-            sample_apm_header(), sample_apm_meta());
+        let input = format!(
+            "{}{}\nEPOCH = 2023-01-01T00:00:00\n",
+            sample_apm_header(),
+            sample_apm_meta()
+        );
         let err = Apm::from_kvn(&input).unwrap_err();
         match err {
             CcsdsNdmError::Validation(boxed_err) => match *boxed_err {

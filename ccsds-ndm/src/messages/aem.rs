@@ -791,11 +791,13 @@ DATA_STOP
     #[test]
     fn test_aem_data_validation_mismatches() {
         use crate::common::*;
-        
-        let valid_q = AemAttitudeStateWrapper::from(AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
-            epoch: "2023-01-01T00:00:00".parse().unwrap(),
-            quaternion: Quaternion::new(0.0, 0.0, 0.0, 1.0).unwrap(),
-        }));
+
+        let valid_q = AemAttitudeStateWrapper::from(AemAttitudeState::QuaternionEphemeris(
+            QuaternionEphemeris {
+                epoch: "2023-01-01T00:00:00".parse().unwrap(),
+                quaternion: Quaternion::new(0.0, 0.0, 0.0, 1.0).unwrap(),
+            },
+        ));
 
         let valid_euler = AemAttitudeStateWrapper::from(AemAttitudeState::EulerAngle(EulerAngle {
             epoch: "2023-01-01T00:00:00".parse().unwrap(),
@@ -834,7 +836,11 @@ DATA_STOP
                 comment: vec![],
                 attitude_states: vec![state],
             };
-            assert!(d.validate(type_str).is_err(), "Expected error for type {}", type_str);
+            assert!(
+                d.validate(type_str).is_err(),
+                "Expected error for type {}",
+                type_str
+            );
         }
     }
 }

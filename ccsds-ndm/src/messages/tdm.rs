@@ -201,7 +201,7 @@ impl ToKvn for TdmSegment {
 // Metadata
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TdmMetadata {
     /// Comments.
@@ -1612,8 +1612,14 @@ DATA_STOP
             ("CLOCK_BIAS", TdmObservationData::ClockBias(4.0)),
             ("CLOCK_DRIFT", TdmObservationData::ClockDrift(5.0)),
             ("DOPPLER_COUNT", TdmObservationData::DopplerCount(6.0)),
-            ("DOPPLER_INSTANTANEOUS", TdmObservationData::DopplerInstantaneous(7.0)),
-            ("DOPPLER_INTEGRATED", TdmObservationData::DopplerIntegrated(8.0)),
+            (
+                "DOPPLER_INSTANTANEOUS",
+                TdmObservationData::DopplerInstantaneous(7.0),
+            ),
+            (
+                "DOPPLER_INTEGRATED",
+                TdmObservationData::DopplerIntegrated(8.0),
+            ),
             ("DOR", TdmObservationData::Dor(9.0)),
             ("MAG", TdmObservationData::Mag(10.0)),
             ("PC_N0", TdmObservationData::PcN0(11.0)),
@@ -1627,12 +1633,30 @@ DATA_STOP
             ("RECEIVE_FREQ_3", TdmObservationData::ReceiveFreq3(19.0)),
             ("RECEIVE_FREQ_4", TdmObservationData::ReceiveFreq4(20.0)),
             ("RECEIVE_FREQ_5", TdmObservationData::ReceiveFreq5(21.0)),
-            ("RECEIVE_PHASE_CT_1", TdmObservationData::ReceivePhaseCt1(22.0)),
-            ("RECEIVE_PHASE_CT_2", TdmObservationData::ReceivePhaseCt2(23.0)),
-            ("RECEIVE_PHASE_CT_3", TdmObservationData::ReceivePhaseCt3(24.0)),
-            ("RECEIVE_PHASE_CT_4", TdmObservationData::ReceivePhaseCt4(25.0)),
-            ("RECEIVE_PHASE_CT_5", TdmObservationData::ReceivePhaseCt5(26.0)),
-            ("RHUMIDITY", TdmObservationData::Rhumidity(Percentage::new(50.0, None).unwrap())),
+            (
+                "RECEIVE_PHASE_CT_1",
+                TdmObservationData::ReceivePhaseCt1(22.0),
+            ),
+            (
+                "RECEIVE_PHASE_CT_2",
+                TdmObservationData::ReceivePhaseCt2(23.0),
+            ),
+            (
+                "RECEIVE_PHASE_CT_3",
+                TdmObservationData::ReceivePhaseCt3(24.0),
+            ),
+            (
+                "RECEIVE_PHASE_CT_4",
+                TdmObservationData::ReceivePhaseCt4(25.0),
+            ),
+            (
+                "RECEIVE_PHASE_CT_5",
+                TdmObservationData::ReceivePhaseCt5(26.0),
+            ),
+            (
+                "RHUMIDITY",
+                TdmObservationData::Rhumidity(Percentage::new(50.0, None).unwrap()),
+            ),
             ("STEC", TdmObservationData::Stec(27.0)),
             ("TEMPERATURE", TdmObservationData::Temperature(28.0)),
             ("TRANSMIT_FREQ_1", TdmObservationData::TransmitFreq1(29.0)),
@@ -1640,16 +1664,46 @@ DATA_STOP
             ("TRANSMIT_FREQ_3", TdmObservationData::TransmitFreq3(31.0)),
             ("TRANSMIT_FREQ_4", TdmObservationData::TransmitFreq4(32.0)),
             ("TRANSMIT_FREQ_5", TdmObservationData::TransmitFreq5(33.0)),
-            ("TRANSMIT_FREQ_RATE_1", TdmObservationData::TransmitFreqRate1(34.0)),
-            ("TRANSMIT_FREQ_RATE_2", TdmObservationData::TransmitFreqRate2(35.0)),
-            ("TRANSMIT_FREQ_RATE_3", TdmObservationData::TransmitFreqRate3(36.0)),
-            ("TRANSMIT_FREQ_RATE_4", TdmObservationData::TransmitFreqRate4(37.0)),
-            ("TRANSMIT_FREQ_RATE_5", TdmObservationData::TransmitFreqRate5(38.0)),
-            ("TRANSMIT_PHASE_CT_1", TdmObservationData::TransmitPhaseCt1(39.0)),
-            ("TRANSMIT_PHASE_CT_2", TdmObservationData::TransmitPhaseCt2(40.0)),
-            ("TRANSMIT_PHASE_CT_3", TdmObservationData::TransmitPhaseCt3(41.0)),
-            ("TRANSMIT_PHASE_CT_4", TdmObservationData::TransmitPhaseCt4(42.0)),
-            ("TRANSMIT_PHASE_CT_5", TdmObservationData::TransmitPhaseCt5(43.0)),
+            (
+                "TRANSMIT_FREQ_RATE_1",
+                TdmObservationData::TransmitFreqRate1(34.0),
+            ),
+            (
+                "TRANSMIT_FREQ_RATE_2",
+                TdmObservationData::TransmitFreqRate2(35.0),
+            ),
+            (
+                "TRANSMIT_FREQ_RATE_3",
+                TdmObservationData::TransmitFreqRate3(36.0),
+            ),
+            (
+                "TRANSMIT_FREQ_RATE_4",
+                TdmObservationData::TransmitFreqRate4(37.0),
+            ),
+            (
+                "TRANSMIT_FREQ_RATE_5",
+                TdmObservationData::TransmitFreqRate5(38.0),
+            ),
+            (
+                "TRANSMIT_PHASE_CT_1",
+                TdmObservationData::TransmitPhaseCt1(39.0),
+            ),
+            (
+                "TRANSMIT_PHASE_CT_2",
+                TdmObservationData::TransmitPhaseCt2(40.0),
+            ),
+            (
+                "TRANSMIT_PHASE_CT_3",
+                TdmObservationData::TransmitPhaseCt3(41.0),
+            ),
+            (
+                "TRANSMIT_PHASE_CT_4",
+                TdmObservationData::TransmitPhaseCt4(42.0),
+            ),
+            (
+                "TRANSMIT_PHASE_CT_5",
+                TdmObservationData::TransmitPhaseCt5(43.0),
+            ),
             ("TROPO_DRY", TdmObservationData::TropoDry(44.0)),
             ("TROPO_WET", TdmObservationData::TropoWet(45.0)),
             ("VLBI_DELAY", TdmObservationData::VlbiDelay(46.0)),
@@ -1665,28 +1719,29 @@ DATA_STOP
 
     #[test]
     fn test_tdm_metadata_indexed_fields() {
-        let mut meta = TdmMetadata::default();
-        meta.time_system = "UTC".to_string();
-        meta.participant_1 = "P1".to_string();
-        meta.participant_2 = Some("P2".to_string());
-        meta.participant_3 = Some("P3".to_string());
-        meta.participant_4 = Some("P4".to_string());
-        meta.participant_5 = Some("P5".to_string());
-        meta.ephemeris_name_1 = Some("E1".to_string());
-        meta.ephemeris_name_2 = Some("E2".to_string());
-        meta.ephemeris_name_3 = Some("E3".to_string());
-        meta.ephemeris_name_4 = Some("E4".to_string());
-        meta.ephemeris_name_5 = Some("E5".to_string());
-        meta.transmit_delay_1 = Some(0.1);
-        meta.transmit_delay_2 = Some(0.2);
-        meta.transmit_delay_3 = Some(0.3);
-        meta.transmit_delay_4 = Some(0.4);
-        meta.transmit_delay_5 = Some(0.5);
-        meta.receive_delay_1 = Some(1.1);
-        meta.receive_delay_2 = Some(1.2);
-        meta.receive_delay_3 = Some(1.3);
-        meta.receive_delay_4 = Some(1.4);
-        meta.receive_delay_5 = Some(1.5);
+        let meta = TdmMetadata::builder()
+            .time_system("UTC")
+            .participant_1("P1")
+            .participant_2("P2")
+            .participant_3("P3")
+            .participant_4("P4")
+            .participant_5("P5")
+            .ephemeris_name_1("E1")
+            .ephemeris_name_2("E2")
+            .ephemeris_name_3("E3")
+            .ephemeris_name_4("E4")
+            .ephemeris_name_5("E5")
+            .transmit_delay_1(0.1)
+            .transmit_delay_2(0.2)
+            .transmit_delay_3(0.3)
+            .transmit_delay_4(0.4)
+            .transmit_delay_5(0.5)
+            .receive_delay_1(1.1)
+            .receive_delay_2(1.2)
+            .receive_delay_3(1.3)
+            .receive_delay_4(1.4)
+            .receive_delay_5(1.5)
+            .build();
 
         let mut writer = KvnWriter::new();
         meta.write_kvn(&mut writer);
@@ -1699,20 +1754,21 @@ DATA_STOP
 
     #[test]
     fn test_tdm_correction_keywords() {
-        let mut meta = TdmMetadata::default();
-        meta.time_system = "UTC".to_string();
-        meta.participant_1 = "P1".to_string();
-        meta.correction_angle_1 = Some(0.1);
-        meta.correction_angle_2 = Some(0.2);
-        meta.correction_doppler = Some(0.3);
-        meta.correction_mag = Some(0.4);
-        meta.correction_range = Some(0.5);
-        meta.correction_rcs = Some(0.6);
-        meta.correction_receive = Some(0.7);
-        meta.correction_transmit = Some(0.8);
-        meta.correction_aberration_yearly = Some(0.9);
-        meta.correction_aberration_diurnal = Some(1.0);
-        meta.corrections_applied = Some(YesNo::Yes);
+        let meta = TdmMetadata::builder()
+            .time_system("UTC")
+            .participant_1("P1")
+            .correction_angle_1(0.1)
+            .correction_angle_2(0.2)
+            .correction_doppler(0.3)
+            .correction_mag(0.4)
+            .correction_range(0.5)
+            .correction_rcs(0.6)
+            .correction_receive(0.7)
+            .correction_transmit(0.8)
+            .correction_aberration_yearly(0.9)
+            .correction_aberration_diurnal(1.0)
+            .corrections_applied(YesNo::Yes)
+            .build();
 
         let mut writer = KvnWriter::new();
         meta.write_kvn(&mut writer);

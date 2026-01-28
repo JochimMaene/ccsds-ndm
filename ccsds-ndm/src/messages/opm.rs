@@ -1694,28 +1694,32 @@ Z_DOT = -4.191076 [km/s]
     fn test_opm_data_validation() {
         use crate::traits::Validate;
         let mut data = OpmData::builder()
-            .state_vector(StateVector::builder()
-                .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
-                .x(Distance::new(1.0, None))
-                .y(Distance::new(1.0, None))
-                .z(Distance::new(1.0, None))
-                .x_dot(Velocity::new(1.0, None))
-                .y_dot(Velocity::new(1.0, None))
-                .z_dot(Velocity::new(1.0, None))
-                .build())
+            .state_vector(
+                StateVector::builder()
+                    .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .x(Distance::new(1.0, None))
+                    .y(Distance::new(1.0, None))
+                    .z(Distance::new(1.0, None))
+                    .x_dot(Velocity::new(1.0, None))
+                    .y_dot(Velocity::new(1.0, None))
+                    .z_dot(Velocity::new(1.0, None))
+                    .build(),
+            )
             .build();
 
         assert!(data.validate().is_ok());
 
         // With invalid KeplerianElements
-        data.keplerian_elements = Some(KeplerianElements::builder()
-            .semi_major_axis(Distance::new(7000.0, Some(PositionUnits::Km)))
-            .eccentricity(NonNegativeDouble::new(0.001).unwrap())
-            .inclination(Inclination::new(45.0, Some(AngleUnits::Deg)).unwrap())
-            .ra_of_asc_node(Angle::new(90.0, Some(AngleUnits::Deg)).unwrap())
-            .arg_of_pericenter(Angle::new(180.0, Some(AngleUnits::Deg)).unwrap())
-            .gm(Gm::new(398600.44, Some(GmUnits::Km3PerS2)).unwrap())
-            .build());
+        data.keplerian_elements = Some(
+            KeplerianElements::builder()
+                .semi_major_axis(Distance::new(7000.0, Some(PositionUnits::Km)))
+                .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                .inclination(Inclination::new(45.0, Some(AngleUnits::Deg)).unwrap())
+                .ra_of_asc_node(Angle::new(90.0, Some(AngleUnits::Deg)).unwrap())
+                .arg_of_pericenter(Angle::new(180.0, Some(AngleUnits::Deg)).unwrap())
+                .gm(Gm::new(398600.44, Some(GmUnits::Km3PerS2)).unwrap())
+                .build(),
+        );
         assert!(data.validate().is_err());
     }
 
@@ -1724,42 +1728,56 @@ Z_DOT = -4.191076 [km/s]
         use crate::common::OdmHeader;
         let opm = Opm::builder()
             .version("3.0")
-            .header(OdmHeader::builder()
-                .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
-                .originator("TEST")
-                .build())
-            .body(OpmBody::builder()
-                .segment(OpmSegment::builder()
-                    .metadata(OpmMetadata::builder()
-                        .object_name("SAT")
-                        .object_id("1")
-                        .center_name("EARTH")
-                        .ref_frame("GCRF")
-                        .ref_frame_epoch(Epoch::new("2000-01-01T12:00:00").unwrap())
-                        .time_system("UTC")
-                        .build())
-                    .data(OpmData::builder()
-                        .state_vector(StateVector::builder()
-                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
-                            .x(Distance::new(1.0, None))
-                            .y(Distance::new(1.0, None))
-                            .z(Distance::new(1.0, None))
-                            .x_dot(Velocity::new(1.0, None))
-                            .y_dot(Velocity::new(1.0, None))
-                            .z_dot(Velocity::new(1.0, None))
-                            .build())
-                        .keplerian_elements(KeplerianElements::builder()
-                            .semi_major_axis(Distance::new(7000.0, None))
-                            .eccentricity(NonNegativeDouble::new(0.0).unwrap())
-                            .inclination(Inclination::new(0.0, None).unwrap())
-                            .ra_of_asc_node(Angle::new(0.0, None).unwrap())
-                            .arg_of_pericenter(Angle::new(0.0, None).unwrap())
-                            .mean_anomaly(Angle::new(0.0, None).unwrap())
-                            .gm(Gm::new(398600.44, None).unwrap())
-                            .build())
-                        .build())
-                    .build())
-                .build())
+            .header(
+                OdmHeader::builder()
+                    .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .originator("TEST")
+                    .build(),
+            )
+            .body(
+                OpmBody::builder()
+                    .segment(
+                        OpmSegment::builder()
+                            .metadata(
+                                OpmMetadata::builder()
+                                    .object_name("SAT")
+                                    .object_id("1")
+                                    .center_name("EARTH")
+                                    .ref_frame("GCRF")
+                                    .ref_frame_epoch(Epoch::new("2000-01-01T12:00:00").unwrap())
+                                    .time_system("UTC")
+                                    .build(),
+                            )
+                            .data(
+                                OpmData::builder()
+                                    .state_vector(
+                                        StateVector::builder()
+                                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                                            .x(Distance::new(1.0, None))
+                                            .y(Distance::new(1.0, None))
+                                            .z(Distance::new(1.0, None))
+                                            .x_dot(Velocity::new(1.0, None))
+                                            .y_dot(Velocity::new(1.0, None))
+                                            .z_dot(Velocity::new(1.0, None))
+                                            .build(),
+                                    )
+                                    .keplerian_elements(
+                                        KeplerianElements::builder()
+                                            .semi_major_axis(Distance::new(7000.0, None))
+                                            .eccentricity(NonNegativeDouble::new(0.0).unwrap())
+                                            .inclination(Inclination::new(0.0, None).unwrap())
+                                            .ra_of_asc_node(Angle::new(0.0, None).unwrap())
+                                            .arg_of_pericenter(Angle::new(0.0, None).unwrap())
+                                            .mean_anomaly(Angle::new(0.0, None).unwrap())
+                                            .gm(Gm::new(398600.44, None).unwrap())
+                                            .build(),
+                                    )
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
             .build();
 
         let kvn = opm.to_kvn().unwrap();
@@ -1802,34 +1820,46 @@ Z_DOT = -4.191076 [km/s]
         // Minimal OPM without Keplerian Elements or optional Spacecraft Params
         let opm = Opm::builder()
             .version("3.0")
-            .header(OdmHeader::builder()
-                .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
-                .originator("TEST")
-                .build())
-            .body(OpmBody::builder()
-                .segment(OpmSegment::builder()
-                    .metadata(OpmMetadata::builder()
-                        .object_name("SAT")
-                        .object_id("1")
-                        .center_name("EARTH")
-                        .ref_frame("GCRF")
-                        .time_system("UTC")
-                        .build())
-                    .data(OpmData::builder()
-                        .state_vector(StateVector::builder()
-                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
-                            .x(Distance::new(1.0, None))
-                            .y(Distance::new(1.0, None))
-                            .z(Distance::new(1.0, None))
-                            .x_dot(Velocity::new(1.0, None))
-                            .y_dot(Velocity::new(1.0, None))
-                            .z_dot(Velocity::new(1.0, None))
-                            .build())
-                        .build())
-                    .build())
-                .build())
+            .header(
+                OdmHeader::builder()
+                    .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .originator("TEST")
+                    .build(),
+            )
+            .body(
+                OpmBody::builder()
+                    .segment(
+                        OpmSegment::builder()
+                            .metadata(
+                                OpmMetadata::builder()
+                                    .object_name("SAT")
+                                    .object_id("1")
+                                    .center_name("EARTH")
+                                    .ref_frame("GCRF")
+                                    .time_system("UTC")
+                                    .build(),
+                            )
+                            .data(
+                                OpmData::builder()
+                                    .state_vector(
+                                        StateVector::builder()
+                                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                                            .x(Distance::new(1.0, None))
+                                            .y(Distance::new(1.0, None))
+                                            .z(Distance::new(1.0, None))
+                                            .x_dot(Velocity::new(1.0, None))
+                                            .y_dot(Velocity::new(1.0, None))
+                                            .z_dot(Velocity::new(1.0, None))
+                                            .build(),
+                                    )
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
             .build();
-        
+
         let kvn = opm.to_kvn().unwrap();
         assert!(!kvn.contains("SEMI_MAJOR_AXIS"));
         assert!(opm.validate().is_ok());

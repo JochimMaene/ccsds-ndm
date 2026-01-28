@@ -45,15 +45,6 @@ impl<'de> Deserialize<'de> for Epoch {
     }
 }
 
-impl Default for Epoch {
-    fn default() -> Self {
-        Self {
-            bytes: [0u8; 64],
-            len: 0,
-        }
-    }
-}
-
 #[derive(Error, Debug, PartialEq, Clone)]
 pub enum EpochError {
     #[error("invalid epoch format: '{0}'")]
@@ -133,6 +124,11 @@ impl Epoch {
         // Bytes are validated to be ASCII/UTF-8 during creation.
         std::str::from_utf8(&self.bytes[..self.len as usize])
             .expect("Epoch bytes must be valid UTF-8")
+    }
+
+    /// Returns true if the epoch is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 }
 
@@ -2991,7 +2987,6 @@ mod tests {
 
         // Empty string
         assert!(Epoch::new("").is_ok());
-        assert_eq!(Epoch::default().as_str(), "");
 
         // Invalid formats
         assert!(Epoch::new("2023-11-13").is_err()); // Missing time

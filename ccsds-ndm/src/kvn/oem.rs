@@ -2081,7 +2081,8 @@ META_STOP
 
     #[test]
     fn test_oem_header_loops() {
-        let mut input = "COMMENT C1\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = ME\nMETA_START";
+        let mut input =
+            "COMMENT C1\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = ME\nMETA_START";
         let header = oem_header.parse_next(&mut input).unwrap();
         assert_eq!(header.comment, vec!["C1"]);
         assert_eq!(header.originator, "ME");
@@ -2156,7 +2157,8 @@ COMMENT C_TRAILING
         assert!(oem_data.parse_next(&mut input).is_err());
 
         // Unexpected key in COVARIANCE
-        let mut input = "COVARIANCE_START\nEPOCH = 2023-01-01T00:00:00\nINVALID_KEY = VAL\n1\nCOVARIANCE_STOP";
+        let mut input =
+            "COVARIANCE_START\nEPOCH = 2023-01-01T00:00:00\nINVALID_KEY = VAL\n1\nCOVARIANCE_STOP";
         assert!(oem_data.parse_next(&mut input).is_err());
 
         // State vector after covariance (triggering cut_err)

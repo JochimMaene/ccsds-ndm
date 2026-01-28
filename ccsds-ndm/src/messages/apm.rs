@@ -456,21 +456,21 @@ EULER_STOP
     fn test_apm_validation_single_blocks() {
         // Test that having just one block is sufficient
         let mut apm = Apm::from_kvn(&sample_apm_kvn()).unwrap();
-        
+
         // Clear all blocks
         apm.body.segment.data.quaternion_state.clear();
         assert!(apm.validate().is_err()); // Now empty
 
         // Add just Inertia
         apm.body.segment.data.inertia.push(InertiaState {
-             comment: vec![],
-             inertia_ref_frame: "SC_BODY".to_string(),
-             ixx: crate::types::Moment::new(1.0, None),
-             iyy: crate::types::Moment::new(2.0, None),
-             izz: crate::types::Moment::new(3.0, None),
-             ixy: crate::types::Moment::new(0.0, None),
-             ixz: crate::types::Moment::new(0.0, None),
-             iyz: crate::types::Moment::new(0.0, None),
+            comment: vec![],
+            inertia_ref_frame: "SC_BODY".to_string(),
+            ixx: crate::types::Moment::new(1.0, None),
+            iyy: crate::types::Moment::new(2.0, None),
+            izz: crate::types::Moment::new(3.0, None),
+            ixy: crate::types::Moment::new(0.0, None),
+            ixz: crate::types::Moment::new(0.0, None),
+            iyz: crate::types::Moment::new(0.0, None),
         });
         assert!(apm.validate().is_ok());
 

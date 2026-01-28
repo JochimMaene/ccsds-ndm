@@ -1632,7 +1632,7 @@ SCREEN_VOLUME_FRAME = RTN
 
     #[test]
     fn test_parse_cdm_covariance_keys() {
-        // Verify we can parse specific covariance keys like CDRG_R      
+        // Verify we can parse specific covariance keys like CDRG_R
         let cdm_no_cov = r#"CCSDS_CDM_VERS = 1.0
 CREATION_DATE = 2025-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1666,7 +1666,7 @@ Z_DOT = 3.0 [km/s]
 # No covariance keys here
 "#;
         let err = Cdm::from_kvn(cdm_no_cov).unwrap_err();
-         match err {
+        match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref e) => {
                     assert!(format!("{:?}", e).contains("Covariance Matrix keys"));

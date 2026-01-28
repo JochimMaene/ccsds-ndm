@@ -899,7 +899,7 @@ impl ToKvn for CdmStateVector {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmCovarianceMatrix {
     /// Comments.
@@ -1621,11 +1621,11 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
     #[test]
     fn test_cdm_validation_segment_count_mismatch() {
         let mut cdm = Cdm::from_kvn(&sample_cdm_kvn()).unwrap();
-        
+
         // Remove one segment => 1 segment
         cdm.body.segments.pop();
         assert!(cdm.validate().is_err());
-        
+
         // Add valid segments to check 3 segments (also invalid)
         let seg = cdm.body.segments[0].clone();
         cdm.body.segments.push(seg.clone());

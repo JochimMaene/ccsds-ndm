@@ -90,7 +90,7 @@ impl ToKvn for Acm {
 // Body & Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AcmBody {
     #[serde(rename = "segment")]
     pub segment: Box<AcmSegment>,
@@ -102,7 +102,7 @@ impl ToKvn for AcmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AcmSegment {
     pub metadata: AcmMetadata,
     pub data: AcmData,
@@ -123,7 +123,7 @@ impl ToKvn for AcmSegment {
 }
 
 /// ACM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmMetadata {
     /// Comments (allowed only at the beginning of the ACM Metadata). Each comment line shall begin
@@ -470,7 +470,7 @@ impl ToKvn for AcmData {
 //----------------------------------------------------------------------
 
 /// ACM Data: Attitude State Time History Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmAttitudeState {
     /// Comments allowed only immediately after the ATT_START keyword.
@@ -853,7 +853,7 @@ impl ToKvn for AcmPhysicalDescription {
 //----------------------------------------------------------------------
 
 /// ACM Data: Covariance Time History Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmCovarianceMatrix {
     /// Comments allowed only immediately after the COV_START keyword.
@@ -951,7 +951,9 @@ pub struct AcmManeuverParameters {
     /// **Examples**: DH2018172
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    pub man_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub man_id: Option<String>,
     /// Optional alphanumeric free-text string containing the identification number for the
     /// previous maneuver block. If the message is not part of a sequence of maneuvers or if this
     /// maneuver is the first in a sequence of maneuvers, then MAN_PREV_ID should be excluded from
@@ -1021,7 +1023,9 @@ impl ToKvn for AcmManeuverParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("MAN_START");
         writer.write_comments(&self.comment);
-        writer.write_pair("MAN_ID", &self.man_id);
+        if let Some(v) = &self.man_id {
+            writer.write_pair("MAN_ID", v);
+        }
         if let Some(v) = &self.man_prev_id {
             writer.write_pair("MAN_PREV_ID", v);
         }
@@ -1073,7 +1077,9 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: AD_20190101
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    pub ad_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub ad_id: Option<String>,
     /// Optional alphanumeric free-text string containing the identification number for the
     /// previous attitude determination block. NOTE: If the message is not part of a sequence of
     /// attitude determination blocks or if this attitude determination block is the first in a
@@ -1084,6 +1090,7 @@ pub struct AcmAttitudeDetermination {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ad_prev_id: Option<String>,
     /// Type of attitude determination method used. (For further description, see annex B,
     /// subsection B5.)
@@ -1092,6 +1099,7 @@ pub struct AcmAttitudeDetermination {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ad_method: Option<String>,
     /// Source of attitude estimate, whether from a ground based estimator or onboard estimator.
     ///
@@ -1099,6 +1107,7 @@ pub struct AcmAttitudeDetermination {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub attitude_source: Option<String>,
     /// Number of states if EKF, BATCH, or FILTER SMOOTHER is specified.
     ///
@@ -1106,7 +1115,23 @@ pub struct AcmAttitudeDetermination {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number_states: Option<u32>,
+    /// Type of attitude states if EKF, BATCH, or FILTER SMOOTHER is specified.
+    ///
+    /// **Examples**: QUATERNION
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub attitude_states: Option<String>,
+    /// Indicates covariance composition. Select from annex B, subsection B6.
+    ///
+    /// **Examples**: ANGLE, ANGLE_GYROBIAS
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub cov_type: Option<String>,
     /// Epoch of the attitude determination.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
@@ -1184,7 +1209,9 @@ impl ToKvn for AcmAttitudeDetermination {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("AD_START");
         writer.write_comments(&self.comment);
-        writer.write_pair("AD_ID", &self.ad_id);
+        if let Some(v) = &self.ad_id {
+            writer.write_pair("AD_ID", v);
+        }
         if let Some(v) = &self.ad_prev_id {
             writer.write_pair("AD_PREV_ID", v);
         }
@@ -1194,8 +1221,14 @@ impl ToKvn for AcmAttitudeDetermination {
         if let Some(v) = &self.attitude_source {
             writer.write_pair("ATTITUDE_SOURCE", v);
         }
+        if let Some(v) = &self.number_states {
+            writer.write_pair("NUMBER_STATES", v);
+        }
         if let Some(v) = &self.attitude_states {
             writer.write_pair("ATTITUDE_STATES", v);
+        }
+        if let Some(v) = &self.cov_type {
+            writer.write_pair("COV_TYPE", v);
         }
         if let Some(v) = &self.ad_epoch {
             writer.write_pair("AD_EPOCH", v);
@@ -1229,7 +1262,7 @@ impl ToKvn for AcmAttitudeDetermination {
 }
 
 /// ACM Data: Sensor Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmSensor {
     /// Comments allowed only immediately after the SENSOR_START keyword.

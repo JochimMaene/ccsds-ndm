@@ -56,22 +56,59 @@ impl crate::traits::Validate for NdmHeader {
             }
             .into());
         }
+        if self.creation_date.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "NDM Header".into(),
+                field: "CREATION_DATE".into(),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
     }
 }
 
-/// Represents the `admHeader` complex type from the XSD.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdmHeader {
+    /// User-defined comments. (See 7.8 for formatting rules.)
+    ///
+    /// **Examples**: This is a comment
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
     pub comment: Vec<String>,
+    /// User-defined free-text message classification/caveats of this ADM. It is recommended
+    /// that selected values be pre-coordinated between exchanging entities by mutual agreement.
+    ///
+    /// **Examples**: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<String>,
+    /// File creation date/time in UTC. (For format specification, see 6.8.9.)
+    ///
+    /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
     pub creation_date: Epoch,
+    /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
+    /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
+    /// Abbreviation column is not populated. If desired organization is not listed there, follow
+    /// procedures to request that originator be added to SANA registry.
+    ///
+    /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
     #[builder(into)]
     pub originator: String,
+    /// ID that uniquely identifies a message from a given originator. The format and content of
+    /// the message identifier value are at the discretion of the originator.
+    ///
+    /// **Examples**: APM_201113719185, ABC-12_34
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub message_id: Option<String>,
@@ -101,12 +138,20 @@ impl crate::traits::Validate for AdmHeader {
             }
             .into());
         }
+        if self.creation_date.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "ADM Header".into(),
+                field: "CREATION_DATE".into(),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
     }
 }
 
 /// Represents the `odmHeader` complex type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdmHeader {
     /// Comments (allowed in the ODM Header only immediately after the ODM version number).
@@ -173,6 +218,14 @@ impl crate::traits::Validate for OdmHeader {
             return Err(crate::error::ValidationError::MissingRequiredField {
                 block: "ODM Header".into(),
                 field: "ORIGINATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.creation_date.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "ODM Header".into(),
+                field: "CREATION_DATE".into(),
                 line: None,
             }
             .into());
@@ -496,7 +549,7 @@ pub struct AngularVelocity {
 }
 
 /// State Vector Components in the Specified Coordinate System.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVector {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
@@ -557,6 +610,20 @@ impl ToKvn for StateVector {
         writer.write_measure("X_DOT", &self.x_dot);
         writer.write_measure("Y_DOT", &self.y_dot);
         writer.write_measure("Z_DOT", &self.z_dot);
+    }
+}
+
+impl crate::traits::Validate for StateVector {
+    fn validate(&self) -> Result<()> {
+        if self.epoch.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "State Vector".into(),
+                field: "EPOCH".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
     }
 }
 
@@ -1501,7 +1568,7 @@ impl ToKvn for InertiaState {
 
 /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. None or all parameters of the
 /// matrix must be given. COV_REF_FRAME may be omitted if it is the same as REF_FRAME.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmCovarianceMatrix {
     /// Comments (see 7.8 for formatting rules).
@@ -2075,8 +2142,8 @@ pub struct RdmSpacecraftParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::traits::Validate;
     use crate::traits::ToKvn;
+    use crate::traits::Validate;
 
     #[test]
     fn test_ndm_header_validation() {
@@ -2095,7 +2162,7 @@ mod tests {
 
     #[test]
     fn test_ndm_header_kvn() {
-         let h = NdmHeader::builder()
+        let h = NdmHeader::builder()
             .creation_date("2000-01-01T00:00:00".parse().unwrap())
             .originator("NASA")
             .comment(vec!["msg".into()])
@@ -2118,7 +2185,7 @@ mod tests {
             .originator("")
             .build();
         assert!(h.validate().is_err());
-        
+
         // modify directly if possible or rebuild? Struct fields are public.
         let mut h2 = h.clone();
         h2.originator = "ESA".into();
@@ -2150,10 +2217,10 @@ mod tests {
             .build();
         assert!(h.validate().is_err());
     }
-    
+
     #[test]
     fn test_odm_header_kvn() {
-         let h = OdmHeader::builder()
+        let h = OdmHeader::builder()
             .creation_date("2000-01-01T00:00:00".parse().unwrap())
             .originator("JAXA")
             .build();
@@ -2175,7 +2242,7 @@ mod tests {
             .y_dot(Velocity::new(5.0, None))
             .z_dot(Velocity::new(6.0, None))
             .build();
-            
+
         let mut w = KvnWriter::new();
         sv.write_kvn(&mut w);
         let s = w.finish();
@@ -2187,7 +2254,7 @@ mod tests {
         assert!(s.contains("Z_DOT"));
         assert!(s.contains("6"));
     }
-    
+
     #[test]
     fn test_state_vector_acc_kvn() {
         let sv = StateVectorAcc::builder()
@@ -2199,14 +2266,14 @@ mod tests {
             .y_dot(Velocity::new(5.0, None))
             .z_dot(Velocity::new(6.0, None))
             .build();
-         let mut w = KvnWriter::new();
-         // StateVectorAcc uses a custom write format in write_kvn? 
-         // Looking at the code: it writes a raw line "epoch x y z ..."
-         sv.write_kvn(&mut w);
-         let s = w.finish();
-         assert!(s.contains("2000-01-01T00:00:00"));
-         assert!(s.contains("1"));
-         assert!(s.contains("2"));
-         assert!(s.contains("3"));
+        let mut w = KvnWriter::new();
+        // StateVectorAcc uses a custom write format in write_kvn?
+        // Looking at the code: it writes a raw line "epoch x y z ..."
+        sv.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("2000-01-01T00:00:00"));
+        assert!(s.contains("1"));
+        assert!(s.contains("2"));
+        assert!(s.contains("3"));
     }
 }

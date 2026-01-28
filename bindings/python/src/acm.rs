@@ -361,7 +361,7 @@ pub struct AcmManeuverParameters {
 #[pymethods]
 impl AcmManeuverParameters {
     #[new]
-    fn new(man_id: String, comment: Option<Vec<String>>) -> Self {
+    fn new(man_id: Option<String>, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_acm::AcmManeuverParameters {
                 comment: comment.unwrap_or_default(),
@@ -382,7 +382,7 @@ pub struct AcmAttitudeDetermination {
 #[pymethods]
 impl AcmAttitudeDetermination {
     #[new]
-    fn new(ad_id: String, comment: Option<Vec<String>>) -> Self {
+    fn new(ad_id: Option<String>, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_acm::AcmAttitudeDetermination {
                 comment: comment.unwrap_or_default(),

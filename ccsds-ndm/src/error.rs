@@ -744,11 +744,11 @@ mod tests {
             expected: "A or B",
         };
         let s = format!("{}", err); // uses default error display because of `thiserror`
-        // We defined #[error("Invalid value '{value}' for field '{field}'; expected one of: {expected}")]
+                                    // We defined #[error("Invalid value '{value}' for field '{field}'; expected one of: {expected}")]
         assert!(s.contains("Invalid value 'VAL' for field 'FIELD'"));
         assert!(s.contains("expected one of: A or B"));
     }
-    
+
     #[test]
     fn test_validation_error_display() {
         let err = ValidationError::MissingRequiredField {
@@ -775,7 +775,7 @@ mod tests {
         } else {
             panic!("Wrong variant");
         }
-        
+
         // Should NOT overwrite line if already set
         err = err.with_line(456);
         if let ValidationError::OutOfRange { line, .. } = err {
@@ -791,13 +791,16 @@ mod tests {
         let err: CcsdsNdmError = io_err.into();
         assert!(err.as_io_error().is_some());
         assert!(err.is_io_error());
-        
-        let val_err = ValidationError::Generic{ message: "g".into(), line: None };
+
+        let val_err = ValidationError::Generic {
+            message: "g".into(),
+            line: None,
+        };
         let err: CcsdsNdmError = val_err.into();
         assert!(err.as_validation_error().is_some());
         assert!(err.is_validation_error());
     }
-    
+
     #[test]
     fn test_context_stack() {
         let mut stack = ContextStack::new();

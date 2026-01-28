@@ -4026,7 +4026,7 @@ TRAJ_STOP
     #[test]
     fn test_ocm_error_branches_detailed() {
         // Cover missing fields with Cut error verification
-        
+
         // Missing MAN_ID
         let kvn = r#"MAN_START
 MAN_DEVICE_ID = DEV

@@ -1209,29 +1209,35 @@ TLE_PARAMETERS =
     fn test_omm_validation_theory_sgp4_xp_additional_reqs() {
         // SGP4-XP requires BTERM and AGOM
         let data = OmmData::builder()
-            .mean_elements(MeanElements::builder()
-                .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
-                .mean_motion(MeanMotion::new(15.0, None))
-                .eccentricity(NonNegativeDouble::new(0.001).unwrap())
-                .inclination(Inclination::new(10.0, None).unwrap())
-                .ra_of_asc_node(Angle::new(10.0, None).unwrap())
-                .arg_of_pericenter(Angle::new(10.0, None).unwrap())
-                .mean_anomaly(Angle::new(10.0, None).unwrap())
-                .build())
-            .tle_parameters(TleParameters::builder()
-                .mean_motion_dot(MeanMotionDot::new(0.0, None))
-                .build())
+            .mean_elements(
+                MeanElements::builder()
+                    .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .mean_motion(MeanMotion::new(15.0, None))
+                    .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                    .inclination(Inclination::new(10.0, None).unwrap())
+                    .ra_of_asc_node(Angle::new(10.0, None).unwrap())
+                    .arg_of_pericenter(Angle::new(10.0, None).unwrap())
+                    .mean_anomaly(Angle::new(10.0, None).unwrap())
+                    .build(),
+            )
+            .tle_parameters(
+                TleParameters::builder()
+                    .mean_motion_dot(MeanMotionDot::new(0.0, None))
+                    .build(),
+            )
             .build();
-        
+
         let mut segment = OmmSegment::builder()
-            .metadata(OmmMetadata::builder()
-                .object_name("SAT")
-                .object_id("1")
-                .center_name("EARTH")
-                .ref_frame("TEME")
-                .time_system("UTC")
-                .mean_element_theory("SGP4-XP")
-                .build())
+            .metadata(
+                OmmMetadata::builder()
+                    .object_name("SAT")
+                    .object_id("1")
+                    .center_name("EARTH")
+                    .ref_frame("TEME")
+                    .time_system("UTC")
+                    .mean_element_theory("SGP4-XP")
+                    .build(),
+            )
             .data(data.clone())
             .build();
 
@@ -1256,34 +1262,46 @@ TLE_PARAMETERS =
 
         let omm = Omm::builder()
             .version("3.0")
-            .header(OdmHeader::builder()
-                .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
-                .originator("ME")
-                .build())
-            .body(OmmBody::builder()
-                .segment(OmmSegment::builder()
-                    .metadata(OmmMetadata::builder()
-                        .object_name("SAT")
-                        .object_id("1")
-                        .center_name("EARTH")
-                        .ref_frame("TEME")
-                        .time_system("UTC")
-                        .mean_element_theory("SGP4-XP")
-                        .build())
-                    .data(OmmData::builder()
-                        .mean_elements(MeanElements::builder()
-                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
-                            .mean_motion(MeanMotion::new(15.0, None))
-                            .eccentricity(NonNegativeDouble::new(0.001).unwrap())
-                            .inclination(Inclination::new(10.0, None).unwrap())
-                            .ra_of_asc_node(Angle::new(10.0, None).unwrap())
-                            .arg_of_pericenter(Angle::new(10.0, None).unwrap())
-                            .mean_anomaly(Angle::new(10.0, None).unwrap())
-                            .build())
-                        .tle_parameters(tle)
-                        .build())
-                    .build())
-                .build())
+            .header(
+                OdmHeader::builder()
+                    .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .originator("ME")
+                    .build(),
+            )
+            .body(
+                OmmBody::builder()
+                    .segment(
+                        OmmSegment::builder()
+                            .metadata(
+                                OmmMetadata::builder()
+                                    .object_name("SAT")
+                                    .object_id("1")
+                                    .center_name("EARTH")
+                                    .ref_frame("TEME")
+                                    .time_system("UTC")
+                                    .mean_element_theory("SGP4-XP")
+                                    .build(),
+                            )
+                            .data(
+                                OmmData::builder()
+                                    .mean_elements(
+                                        MeanElements::builder()
+                                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                                            .mean_motion(MeanMotion::new(15.0, None))
+                                            .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                                            .inclination(Inclination::new(10.0, None).unwrap())
+                                            .ra_of_asc_node(Angle::new(10.0, None).unwrap())
+                                            .arg_of_pericenter(Angle::new(10.0, None).unwrap())
+                                            .mean_anomaly(Angle::new(10.0, None).unwrap())
+                                            .build(),
+                                    )
+                                    .tle_parameters(tle)
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
             .build();
 
         let kvn = omm.to_kvn().unwrap();
@@ -1305,20 +1323,24 @@ TLE_PARAMETERS =
             .mean_element_theory("SGP")
             .build();
         let mut data = OmmData::builder()
-            .mean_elements(MeanElements::builder()
-                .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
-                .semi_major_axis(Distance::new(7000.0, None))
-                .eccentricity(NonNegativeDouble::new(0.001).unwrap())
-                .inclination(Inclination::new(10.0, None).unwrap())
-                .ra_of_asc_node(Angle::new(10.0, None).unwrap())
-                .arg_of_pericenter(Angle::new(10.0, None).unwrap())
-                .mean_anomaly(Angle::new(10.0, None).unwrap())
-                .build())
-            .tle_parameters(TleParameters::builder()
-                .mean_motion_dot(MeanMotionDot::new(0.0, None))
-                .build())
+            .mean_elements(
+                MeanElements::builder()
+                    .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .semi_major_axis(Distance::new(7000.0, None))
+                    .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                    .inclination(Inclination::new(10.0, None).unwrap())
+                    .ra_of_asc_node(Angle::new(10.0, None).unwrap())
+                    .arg_of_pericenter(Angle::new(10.0, None).unwrap())
+                    .mean_anomaly(Angle::new(10.0, None).unwrap())
+                    .build(),
+            )
+            .tle_parameters(
+                TleParameters::builder()
+                    .mean_motion_dot(MeanMotionDot::new(0.0, None))
+                    .build(),
+            )
             .build();
-        
+
         let segment = OmmSegment::builder()
             .metadata(meta)
             .data(data.clone())
@@ -1326,14 +1348,34 @@ TLE_PARAMETERS =
         assert!(segment.validate().is_err()); // Missing MEAN_MOTION for SGP
 
         // TleParameters SGP/PPT3 missing mean_motion_ddot
-        assert!(data.tle_parameters.as_ref().unwrap().validate("SGP").is_err());
-        assert!(data.tle_parameters.as_ref().unwrap().validate("PPT3").is_err());
-        
+        assert!(data
+            .tle_parameters
+            .as_ref()
+            .unwrap()
+            .validate("SGP")
+            .is_err());
+        assert!(data
+            .tle_parameters
+            .as_ref()
+            .unwrap()
+            .validate("PPT3")
+            .is_err());
+
         // TleParameters SGP4 missing bstar
-        assert!(data.tle_parameters.as_ref().unwrap().validate("SGP4").is_err());
+        assert!(data
+            .tle_parameters
+            .as_ref()
+            .unwrap()
+            .validate("SGP4")
+            .is_err());
 
         // TleParameters SGP4-XP missing bterm/agom
-        assert!(data.tle_parameters.as_ref().unwrap().validate("SGP4-XP").is_err());
+        assert!(data
+            .tle_parameters
+            .as_ref()
+            .unwrap()
+            .validate("SGP4-XP")
+            .is_err());
         let mut tle_xp = data.tle_parameters.clone().unwrap();
         tle_xp.bterm = Some(M2kg::new(0.01, None));
         assert!(tle_xp.validate("SGP4-XP").is_err()); // Missing AGOM
@@ -1341,7 +1383,7 @@ TLE_PARAMETERS =
         // MeanElements both SMA and MeanMotion
         data.mean_elements.mean_motion = Some(MeanMotion::new(15.0, None));
         assert!(data.mean_elements.validate().is_err());
-        
+
         // MeanElements neither SMA nor MeanMotion
         data.mean_elements.semi_major_axis = None;
         data.mean_elements.mean_motion = None;
@@ -1357,7 +1399,13 @@ TLE_PARAMETERS =
     #[test]
     fn test_rev_per_day_units_display_all() {
         assert_eq!(format!("{}", RevPerDayUnits::RevPerDayUpper), "REV/DAY");
-        assert_eq!(format!("{}", RevPerDay2Units::RevPerDay2Upper), "REV/DAY**2");
-        assert_eq!(format!("{}", RevPerDay3Units::RevPerDay3Upper), "REV/DAY**3");
+        assert_eq!(
+            format!("{}", RevPerDay2Units::RevPerDay2Upper),
+            "REV/DAY**2"
+        );
+        assert_eq!(
+            format!("{}", RevPerDay3Units::RevPerDay3Upper),
+            "REV/DAY**3"
+        );
     }
 }
