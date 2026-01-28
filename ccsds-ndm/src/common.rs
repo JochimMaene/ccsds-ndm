@@ -2420,7 +2420,12 @@ mod tests {
         let qs = QuaternionState::builder()
             .ref_frame_a("A")
             .ref_frame_b("B")
-            .quaternion(Quaternion { q1: 1.0, q2: 0.0, q3: 0.0, qc: 0.0 })
+            .quaternion(Quaternion {
+                q1: 1.0,
+                q2: 0.0,
+                q3: 0.0,
+                qc: 0.0,
+            })
             .build();
         let mut w = KvnWriter::new();
         qs.write_kvn(&mut w);
@@ -2513,7 +2518,12 @@ mod tests {
         let epoch = "2000-01-01T00:00:00".parse().unwrap();
         let qe = QuaternionEphemeris {
             epoch,
-            quaternion: Quaternion { q1: 1.0, q2: 0.0, q3: 0.0, qc: 0.0 },
+            quaternion: Quaternion {
+                q1: 1.0,
+                q2: 0.0,
+                q3: 0.0,
+                qc: 0.0,
+            },
         };
         let mut w = KvnWriter::new();
         qe.write_kvn(&mut w);
@@ -2521,7 +2531,12 @@ mod tests {
 
         let qd = QuaternionDerivative {
             epoch,
-            quaternion: Quaternion { q1: 1.0, q2: 0.0, q3: 0.0, qc: 0.0 },
+            quaternion: Quaternion {
+                q1: 1.0,
+                q2: 0.0,
+                q3: 0.0,
+                qc: 0.0,
+            },
             quaternion_dot: QuaternionDot {
                 q1_dot: QuaternionDotComponent::new(0.1, None),
                 q2_dot: QuaternionDotComponent::new(0.2, None),
@@ -2531,7 +2546,9 @@ mod tests {
         };
         let mut w = KvnWriter::new();
         qd.write_kvn(&mut w);
-        assert!(w.finish().contains("2000-01-01T00:00:00 1 0 0 0 0.1 0.2 0.3 0.4"));
+        assert!(w
+            .finish()
+            .contains("2000-01-01T00:00:00 1 0 0 0 0.1 0.2 0.3 0.4"));
     }
 
     #[test]
@@ -2607,11 +2624,16 @@ mod tests {
     #[test]
     fn test_aem_attitude_state_variants_kvn() {
         let epoch = "2000-01-01T00:00:00".parse().unwrap();
-        
+
         // QuaternionAngVel
         let qav = QuaternionAngVel {
             epoch,
-            quaternion: Quaternion { q1: 1.0, q2: 0.0, q3: 0.0, qc: 0.0 },
+            quaternion: Quaternion {
+                q1: 1.0,
+                q2: 0.0,
+                q3: 0.0,
+                qc: 0.0,
+            },
             ang_vel: AngVel {
                 angvel_x: AngleRate::new(0.1, None),
                 angvel_y: AngleRate::new(0.2, None),
@@ -2650,7 +2672,7 @@ mod tests {
         let mut w = KvnWriter::new();
         AemAttitudeState::SpinNutation(sn).write_kvn(&mut w);
         let kvn = w.finish();
-        assert!(kvn.contains("10 20 30 0.1 5 1 0")); 
+        assert!(kvn.contains("10 20 30 0.1 5 1 0"));
 
         // SpinNutationMom
         let snm = SpinNutationMom {
@@ -2670,9 +2692,19 @@ mod tests {
 
     #[test]
     fn test_quaternion_validation() {
-        let q = Quaternion { q1: 2.0, q2: 0.0, q3: 0.0, qc: 0.0 };
+        let q = Quaternion {
+            q1: 2.0,
+            q2: 0.0,
+            q3: 0.0,
+            qc: 0.0,
+        };
         assert!(q.validate().is_err()); // Not normalized
-        let q2 = Quaternion { q1: 1.0, q2: 0.0, q3: 0.0, qc: 0.0 };
+        let q2 = Quaternion {
+            q1: 1.0,
+            q2: 0.0,
+            q3: 0.0,
+            qc: 0.0,
+        };
         assert!(q2.validate().is_ok());
     }
 }
