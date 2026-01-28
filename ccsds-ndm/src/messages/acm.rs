@@ -430,8 +430,8 @@ pub struct AcmData {
     /// A single user-defined Data section.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.10.
-    #[serde(rename = "user_defined", default)]
-    pub user_defined: Option<UserDefined>,
+    #[serde(rename = "user", default)]
+    pub user: Option<UserDefined>,
 }
 
 impl AcmData {
@@ -457,10 +457,13 @@ impl ToKvn for AcmData {
         if let Some(ad) = &self.ad {
             ad.write_kvn(writer);
         }
-        if let Some(user) = &self.user_defined {
+        if let Some(user) = &self.user {
+            writer.write_section("USER_START");
+            writer.write_comments(&user.comment);
             for p in &user.user_defined {
-                writer.write_pair(&p.parameter, &p.value);
+                writer.write_user_defined(&p.parameter, &p.value);
             }
+            writer.write_section("USER_STOP");
         }
     }
 }

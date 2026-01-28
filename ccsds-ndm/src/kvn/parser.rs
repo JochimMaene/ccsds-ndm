@@ -1106,7 +1106,7 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
             comment.extend(comments);
             let val = kv_string.parse_next(input)?;
             params.push(UserDefinedParameter {
-                parameter: key.to_string(),
+                parameter: key.strip_prefix("USER_DEFINED_").unwrap().to_string(),
                 value: val,
             });
         } else {

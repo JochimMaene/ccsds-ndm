@@ -983,7 +983,7 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<UserDefined> {
                 comment.extend(comments);
                 let v = kv_string.parse_next(input)?;
                 user_defined.push(UserDefinedParameter {
-                    parameter: k.to_string(),
+                    parameter: k.strip_prefix("USER_DEFINED_").unwrap_or(k).to_string(),
                     value: v,
                 });
             }
@@ -2017,13 +2017,14 @@ TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-01-01T00:00:00
 META_STOP
 USER_START
-CUSTOM_PARAM = custom_value
-ANOTHER_PARAM = another_value
+USER_DEFINED_CUSTOM_PARAM = custom_value
+USER_DEFINED_ANOTHER_PARAM = another_value
 USER_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
         let user = ocm.body.segment.data.user.as_ref().unwrap();
         assert_eq!(user.user_defined.len(), 2);
+        assert_eq!(user.user_defined[0].parameter, "CUSTOM_PARAM");
     }
 
     // =========================================================================

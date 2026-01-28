@@ -477,6 +477,35 @@ fn parse_ad_block(input: &mut &str) -> KvnResult<AcmAttitudeDetermination> {
     })
 }
 
+fn parse_user_defined_block(input: &mut &str) -> KvnResult<crate::types::UserDefined> {
+    let mut block = crate::types::UserDefined::default();
+    expect_block_start("USER").parse_next(input)?;
+
+    loop {
+        let checkpoint = input.checkpoint();
+        let _ = collect_comments.parse_next(input)?; // Consume comments but we might want to keep them?
+                                                     // acm_data loop doesn't keep comments between blocks usually, but inside a block we might.
+                                                     // The structure UserDefined has a comment field.
+                                                     // Let's re-parse comments to store them.
+        input.reset(&checkpoint);
+        let comments = collect_comments.parse_next(input)?;
+        block.comment.extend(comments);
+
+        if at_block_end("USER", input) {
+            break;
+        }
+
+        let key = key_token.parse_next(input)?;
+        let val = kv_string.parse_next(input)?;
+        block.user_defined.push(crate::types::UserDefinedParameter {
+            parameter: key.strip_prefix("USER_DEFINED_").unwrap_or(key).to_string(),
+            value: val,
+        });
+    }
+    expect_block_end("USER").parse_next(input)?;
+    Ok(block)
+}
+
 //----------------------------------------------------------------------
 // ACM Data Parser
 //----------------------------------------------------------------------
@@ -500,10 +529,9 @@ pub fn acm_data(input: &mut &str) -> KvnResult<AcmData> {
             data.man.push(parse_man_block.parse_next(input)?);
         } else if at_block_start("AD", input) {
             data.ad = Some(parse_ad_block.parse_next(input)?);
+        } else if at_block_start("USER", input) {
+            data.user = Some(parse_user_defined_block.parse_next(input)?);
         } else {
-            // Check for user defined or just comments?
-            // User defined is not explicitly START/STOP wrapped in Book?
-            // But usually it's at the end.
             break;
         }
     }

@@ -887,7 +887,7 @@ impl ToKvn for OcmData {
             writer.write_section("USER_START");
             writer.write_comments(&u.comment);
             for p in &u.user_defined {
-                writer.write_pair(&p.parameter, &p.value);
+                writer.write_user_defined(&p.parameter, &p.value);
             }
             writer.write_section("USER_STOP");
         }

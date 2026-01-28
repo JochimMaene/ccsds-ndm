@@ -615,7 +615,7 @@ MAN_DV_3 = 0.0
             .unwrap();
         assert_eq!(ud.comment, vec!["user comment"]);
         assert_eq!(ud.user_defined.len(), 2);
-        assert_eq!(ud.user_defined[0].parameter, "USER_DEFINED_FOO");
+        assert_eq!(ud.user_defined[0].parameter, "FOO");
     }
 
     #[test]

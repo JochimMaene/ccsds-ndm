@@ -339,7 +339,7 @@ impl ToKvn for OpmData {
         if let Some(ud) = &self.user_defined_parameters {
             writer.write_comments(&ud.comment);
             for p in &ud.user_defined {
-                writer.write_pair(&p.parameter, &p.value);
+                writer.write_user_defined(&p.parameter, &p.value);
             }
         }
     }

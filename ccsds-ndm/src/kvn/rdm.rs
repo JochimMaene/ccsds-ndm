@@ -198,7 +198,6 @@ pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
 //----------------------------------------------------------------------
 // RDM Data Parser
 //----------------------------------------------------------------------
-
 pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
     let mut comment = Vec::new();
 
@@ -460,7 +459,7 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         user_defined.comment.extend(loop_comments);
         let v = kv_string.parse_next(input)?;
         user_defined.user_defined.push(UserDefinedParameter {
-            parameter: key.to_string(),
+            parameter: key.strip_prefix("USER_DEFINED_").unwrap().to_string(),
             value: v,
         });
 

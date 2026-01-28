@@ -447,7 +447,7 @@ impl ToKvn for OmmData {
         if let Some(ud) = &self.user_defined_parameters {
             writer.write_comments(&ud.comment);
             for p in &ud.user_defined {
-                writer.write_pair(&p.parameter, &p.value);
+                writer.write_user_defined(&p.parameter, &p.value);
             }
         }
     }
@@ -897,7 +897,7 @@ USER_DEFINED_BAZ = QUX
             .unwrap();
         let ud = &binding.user_defined;
         assert_eq!(ud.len(), 2);
-        assert_eq!(ud[0].parameter, "USER_DEFINED_FOO");
+        assert_eq!(ud[0].parameter, "FOO");
         assert_eq!(ud[0].value, "BAR");
 
         // Roundtrip
