@@ -3234,19 +3234,27 @@ mod tests {
     #[test]
     fn test_ocm_validation_traj_lines() {
         let mut ocm = Ocm::builder()
-            .header(OdmHeader::builder()
-                .originator("TEST")
-                .creation_date("2000-01-01T00:00:00".parse().unwrap())
-                .build())
-            .body(OcmBody::builder()
-                .segment(Box::new(OcmSegment::builder()
-                    .metadata(OcmMetadata::builder()
-                        .time_system("UTC")
-                        .epoch_tzero("2000-01-01T00:00:00".parse().unwrap())
-                        .build())
-                    .data(OcmData::default())
-                    .build()))
-                .build())
+            .header(
+                OdmHeader::builder()
+                    .originator("TEST")
+                    .creation_date("2000-01-01T00:00:00".parse().unwrap())
+                    .build(),
+            )
+            .body(
+                OcmBody::builder()
+                    .segment(Box::new(
+                        OcmSegment::builder()
+                            .metadata(
+                                OcmMetadata::builder()
+                                    .time_system("UTC")
+                                    .epoch_tzero("2000-01-01T00:00:00".parse().unwrap())
+                                    .build(),
+                            )
+                            .data(OcmData::default())
+                            .build(),
+                    ))
+                    .build(),
+            )
             .version("3.0")
             .build();
 

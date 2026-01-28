@@ -466,7 +466,7 @@ META_STOP
 
     #[test]
     fn test_parse_apm_minimal() {
-        let input = format!("{}{}\nEPOCH = 2022-11-04T17:22:31\nQUAT_START\nREF_FRAME_A = EME2000\nREF_FRAME_B = SC_BODY_1\nQ1 = 0.5\nQ2 = 0.5\nQ3 = 0.5\nQC = 0.5\nQUAT_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2022-11-04T17:22:31\nQUAT_START\nREF_FRAME_A = EME2000\nREF_FRAME_B = SC_BODY_1\nQ1 = 0.5\nQ2 = 0.5\nQ3 = 0.5\nQC = 0.5\nQUAT_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         assert_eq!(apm.version, "2.0");
@@ -521,7 +521,7 @@ QUAT_STOP
 
     #[test]
     fn test_apm_quaternion_block() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nQUAT_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nQ1 = 0.1\nQ2 = 0.2\nQ3 = 0.3\nQC = 0.4\nQ1_DOT = 0.01\nQ2_DOT = 0.02\nQ3_DOT = 0.03\nQC_DOT = 0.04\nQUAT_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nQUAT_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nQ1 = 0.1\nQ2 = 0.2\nQ3 = 0.3\nQC = 0.4\nQ1_DOT = 0.01\nQ2_DOT = 0.02\nQ3_DOT = 0.03\nQC_DOT = 0.04\nQUAT_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let q = &apm.body.segment.data.quaternion_state[0];
@@ -531,7 +531,7 @@ QUAT_STOP
 
     #[test]
     fn test_apm_euler_block() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nEULER_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nEULER_ROT_SEQ = ZYX\nANGLE_1 = 10\nANGLE_2 = 20\nANGLE_3 = 30\nEULER_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nEULER_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nEULER_ROT_SEQ = ZYX\nANGLE_1 = 10\nANGLE_2 = 20\nANGLE_3 = 30\nEULER_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let e = &apm.body.segment.data.euler_angle_state[0];
@@ -544,7 +544,7 @@ QUAT_STOP
 
     #[test]
     fn test_apm_euler_block_corrected() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nEULER_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nEULER_ROT_SEQ = ZYX\nANGLE_1 = 10\nANGLE_2 = 20\nANGLE_3 = 30\nEULER_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nEULER_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nEULER_ROT_SEQ = ZYX\nANGLE_1 = 10\nANGLE_2 = 20\nANGLE_3 = 30\nEULER_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let e = &apm.body.segment.data.euler_angle_state[0];
@@ -553,7 +553,7 @@ QUAT_STOP
 
     #[test]
     fn test_apm_spin_block() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nSPIN_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nSPIN_ALPHA = 10\nSPIN_DELTA = 20\nSPIN_ANGLE = 30\nSPIN_ANGLE_VEL = 0.1\nSPIN_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nSPIN_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nSPIN_ALPHA = 10\nSPIN_DELTA = 20\nSPIN_ANGLE = 30\nSPIN_ANGLE_VEL = 0.1\nSPIN_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let s = &apm.body.segment.data.spin[0];
@@ -562,7 +562,7 @@ QUAT_STOP
 
     #[test]
     fn test_apm_inertia_block() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nINERTIA_START\nINERTIA_REF_FRAME = A\nIXX = 100\nIYY = 200\nIZZ = 300\nIXY = 10\nIXZ = 20\nIYZ = 30\nINERTIA_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nINERTIA_START\nINERTIA_REF_FRAME = A\nIXX = 100\nIYY = 200\nIZZ = 300\nIXY = 10\nIXZ = 20\nIYZ = 30\nINERTIA_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let i = &apm.body.segment.data.inertia[0];
@@ -571,7 +571,7 @@ QUAT_STOP
 
     #[test]
     fn test_apm_man_block() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nMAN_START\nMAN_EPOCH_START = 2023-01-01T01:00:00\nMAN_DURATION = 10\nMAN_REF_FRAME = A\nMAN_TOR_X = 1\nMAN_TOR_Y = 2\nMAN_TOR_Z = 3\nMAN_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nMAN_START\nMAN_EPOCH_START = 2023-01-01T01:00:00\nMAN_DURATION = 10\nMAN_REF_FRAME = A\nMAN_TOR_X = 1\nMAN_TOR_Y = 2\nMAN_TOR_Z = 3\nMAN_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let m = &apm.body.segment.data.maneuver_parameters[0];
@@ -580,7 +580,7 @@ QUAT_STOP
 
     #[test]
     fn test_apm_multiple_blocks_mixed() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nQUAT_START\nREF_FRAME_A=A\nREF_FRAME_B=B\nQ1=0\nQ2=0\nQ3=0\nQC=1\nQUAT_STOP\nINERTIA_START\nINERTIA_REF_FRAME=A\nIXX=1\nIYY=2\nIZZ=3\nIXY=0\nIXZ=0\nIYZ=0\nINERTIA_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nQUAT_START\nREF_FRAME_A=A\nREF_FRAME_B=B\nQ1=0\nQ2=0\nQ3=0\nQC=1\nQUAT_STOP\nINERTIA_START\nINERTIA_REF_FRAME=A\nIXX=1\nIYY=2\nIZZ=3\nIXY=0\nIXZ=0\nIYZ=0\nINERTIA_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         assert_eq!(apm.body.segment.data.quaternion_state.len(), 1);
@@ -607,7 +607,7 @@ QUAT_STOP
     }
     #[test]
     fn test_parse_apm_angvel_block() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nANGVEL_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nANGVEL_FRAME = B\nANGVEL_X = 1.0\nANGVEL_Y = 2.0\nANGVEL_Z = 3.0\nANGVEL_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nANGVEL_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nANGVEL_FRAME = B\nANGVEL_X = 1.0\nANGVEL_Y = 2.0\nANGVEL_Z = 3.0\nANGVEL_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let av = &apm.body.segment.data.angular_velocity[0];
@@ -617,7 +617,7 @@ QUAT_STOP
 
     #[test]
     fn test_parse_apm_spin_full() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nSPIN_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nSPIN_ALPHA = 10\nSPIN_DELTA = 20\nSPIN_ANGLE = 30\nSPIN_ANGLE_VEL = 0.1\nNUTATION = 5.0\nNUTATION_PER = 100.0\nNUTATION_PHASE = 45.0\nMOMENTUM_ALPHA = 1.0\nMOMENTUM_DELTA = 2.0\nNUTATION_VEL = 0.05\nSPIN_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nSPIN_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nSPIN_ALPHA = 10\nSPIN_DELTA = 20\nSPIN_ANGLE = 30\nSPIN_ANGLE_VEL = 0.1\nNUTATION = 5.0\nNUTATION_PER = 100.0\nNUTATION_PHASE = 45.0\nMOMENTUM_ALPHA = 1.0\nMOMENTUM_DELTA = 2.0\nNUTATION_VEL = 0.05\nSPIN_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let s = &apm.body.segment.data.spin[0];
@@ -627,7 +627,7 @@ QUAT_STOP
 
     #[test]
     fn test_parse_apm_euler_derivatives() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nEULER_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nEULER_ROT_SEQ = ZYX\nANGLE_1 = 10\nANGLE_2 = 20\nANGLE_3 = 30\nANGLE_1_DOT = 0.1\nANGLE_2_DOT = 0.2\nANGLE_3_DOT = 0.3\nEULER_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nEULER_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nEULER_ROT_SEQ = ZYX\nANGLE_1 = 10\nANGLE_2 = 20\nANGLE_3 = 30\nANGLE_1_DOT = 0.1\nANGLE_2_DOT = 0.2\nANGLE_3_DOT = 0.3\nEULER_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let e = &apm.body.segment.data.euler_angle_state[0];
@@ -636,7 +636,7 @@ QUAT_STOP
 
     #[test]
     fn test_parse_apm_maneuver_delta_mass() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nMAN_START\nMAN_EPOCH_START = 2023-01-01T01:00:00\nMAN_DURATION = 10\nMAN_REF_FRAME = A\nMAN_TOR_X = 1\nMAN_TOR_Y = 2\nMAN_TOR_Z = 3\nMAN_DELTA_MASS = -1.5\nMAN_STOP\n", 
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nMAN_START\nMAN_EPOCH_START = 2023-01-01T01:00:00\nMAN_DURATION = 10\nMAN_REF_FRAME = A\nMAN_TOR_X = 1\nMAN_TOR_Y = 2\nMAN_TOR_Z = 3\nMAN_DELTA_MASS = -1.5\nMAN_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let m = &apm.body.segment.data.maneuver_parameters[0];

@@ -165,7 +165,9 @@ impl AdmHeader {
         )
     }
 
-    /// File creation date/time in UTC.
+    /// File creation date/time in UTC. (For format specification, see 6.8.9.)
+    ///
+    /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// :type: str
     #[getter]
@@ -179,7 +181,12 @@ impl AdmHeader {
         Ok(())
     }
 
-    /// Creating agency or operator.
+    /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
+    /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
+    /// Abbreviation column is not populated. If desired organization is not listed there, follow
+    /// procedures to request that originator be added to SANA registry.
+    ///
+    /// Examples: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     ///
     /// :type: str
     #[getter]
@@ -192,7 +199,10 @@ impl AdmHeader {
         self.inner.originator = value;
     }
 
-    /// ID that uniquely identifies a message from a given originator.
+    /// ID that uniquely identifies a message from a given originator. The format and content of
+    /// the message identifier value are at the discretion of the originator.
+    ///
+    /// Examples: APM_201113719185, ABC-12_34
     ///
     /// :type: Optional[str]
     #[getter]
@@ -205,7 +215,10 @@ impl AdmHeader {
         self.inner.message_id = value;
     }
 
-    /// User-defined free-text message classification/caveats.
+    /// User-defined free-text message classification/caveats of this ADM. It is recommended
+    /// that selected values be pre-coordinated between exchanging entities by mutual agreement.
+    ///
+    /// Examples: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
     ///
     /// :type: Optional[str]
     #[getter]
@@ -218,7 +231,9 @@ impl AdmHeader {
         self.inner.classification = value;
     }
 
-    /// Comments.
+    /// User-defined comments. (See 7.8 for formatting rules.)
+    ///
+    /// Examples: This is a comment
     ///
     /// :type: list[str]
     #[getter]

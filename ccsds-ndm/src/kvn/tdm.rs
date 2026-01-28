@@ -224,10 +224,12 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
         comment,
         track_id,
         data_types,
-        time_system: time_system.ok_or_else(|| missing_field_err(input, "TDM Metadata", "TIME_SYSTEM"))?,
+        time_system: time_system
+            .ok_or_else(|| missing_field_err(input, "TDM Metadata", "TIME_SYSTEM"))?,
         start_time,
         stop_time,
-        participant_1: participant_1.ok_or_else(|| missing_field_err(input, "TDM Metadata", "PARTICIPANT_1"))?,
+        participant_1: participant_1
+            .ok_or_else(|| missing_field_err(input, "TDM Metadata", "PARTICIPANT_1"))?,
         participant_2,
         participant_3,
         participant_4,

@@ -183,7 +183,21 @@ impl AcmMetadata {
                 international_designator,
                 time_system,
                 epoch_tzero: parse_epoch(&epoch_tzero)?,
-                ..Default::default()
+                catalog_name: None,
+                object_designator: None,
+                originator_poc: None,
+                originator_position: None,
+                originator_phone: None,
+                originator_email: None,
+                originator_address: None,
+                odm_msg_link: None,
+                center_name: None,
+                acm_data_elements: None,
+                start_time: None,
+                stop_time: None,
+                taimutc_at_tzero: None,
+                next_leap_epoch: None,
+                next_leap_taimutc: None,
             },
         })
     }
@@ -295,7 +309,12 @@ impl AcmAttitudeState {
                 number_states: att_lines.len() as u32,
                 att_type,
                 att_lines: att_lines.into_iter().map(|values| core_acm::AttLine { values }).collect(),
-                ..Default::default()
+                att_id: None,
+                att_prev_id: None,
+                att_basis: None,
+                att_basis_id: None,
+                rate_type: None,
+                euler_rot_seq: None,
             },
         }
     }
@@ -315,7 +334,18 @@ impl AcmPhysicalDescription {
         Self {
             inner: core_acm::AcmPhysicalDescription {
                 comment: comment.unwrap_or_default(),
-                ..Default::default()
+                drag_coeff: None,
+                wet_mass: None,
+                dry_mass: None,
+                cp_ref_frame: None,
+                cp: None,
+                inertia_ref_frame: None,
+                ixx: None,
+                iyy: None,
+                izz: None,
+                ixy: None,
+                ixz: None,
+                iyz: None,
             },
         }
     }
@@ -345,7 +375,7 @@ impl AcmCovarianceMatrix {
                 cov_ref_frame,
                 cov_type,
                 cov_lines: cov_lines.into_iter().map(|values| core_acm::CovLine { values }).collect(),
-                ..Default::default()
+                cov_confidence: None,
             },
         }
     }
@@ -366,7 +396,14 @@ impl AcmManeuverParameters {
             inner: core_acm::AcmManeuverParameters {
                 comment: comment.unwrap_or_default(),
                 man_id,
-                ..Default::default()
+                man_prev_id: None,
+                man_purpose: None,
+                man_begin_time: None,
+                man_end_time: None,
+                man_duration: None,
+                actuator_used: None,
+                target_momentum: None,
+                target_mom_frame: None,
             },
         }
     }
@@ -387,7 +424,21 @@ impl AcmAttitudeDetermination {
             inner: core_acm::AcmAttitudeDetermination {
                 comment: comment.unwrap_or_default(),
                 ad_id,
-                ..Default::default()
+                ad_prev_id: None,
+                ad_method: None,
+                attitude_source: None,
+                number_states: None,
+                attitude_states: None,
+                cov_type: None,
+                ad_epoch: None,
+                ref_frame_a: None,
+                ref_frame_b: None,
+                attitude_type: None,
+                rate_states: None,
+                sigma_u: None,
+                sigma_v: None,
+                rate_process_noise_stddev: None,
+                sensors: vec![],
             },
         }
     }

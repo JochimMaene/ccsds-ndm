@@ -468,7 +468,7 @@ impl AemData {
                 let (epoch, values) = match s.content() {
                     Some(ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v)) =>
                         (v.epoch, vec![v.quaternion.q1, v.quaternion.q2, v.quaternion.q3, v.quaternion.qc]),
-                    _ => (ccsds_ndm::types::Epoch::default(), vec![]), // TODO: implement other variants
+                    _ => (ccsds_ndm::types::Epoch::new("1958-01-01T00:00:00").unwrap(), vec![]), // TODO: implement other variants
                 };
                 AttitudeState { epoch, values }
             })
@@ -489,7 +489,7 @@ impl AemData {
                 let values = match content {
                     ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) =>
                         (v.epoch, vec![v.quaternion.q1, v.quaternion.q2, v.quaternion.q3, v.quaternion.qc]),
-                    _ => (ccsds_ndm::types::Epoch::default(), vec![]),
+                    _ => (ccsds_ndm::types::Epoch::new("1958-01-01T00:00:00").unwrap(), vec![]),
                 };
                 epochs.push(values.0.as_str().to_string());
                 max_cols = max_cols.max(values.1.len());

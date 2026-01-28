@@ -88,7 +88,8 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
 
     Ok(AcmMetadata {
         comment,
-        object_name: object_name.ok_or_else(|| missing_field_err(input, "ACM Metadata", "OBJECT_NAME"))?,
+        object_name: object_name
+            .ok_or_else(|| missing_field_err(input, "ACM Metadata", "OBJECT_NAME"))?,
         international_designator,
         catalog_name,
         object_designator,
@@ -99,8 +100,10 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
         originator_address,
         odm_msg_link,
         center_name,
-        time_system: time_system.ok_or_else(|| missing_field_err(input, "ACM Metadata", "TIME_SYSTEM"))?,
-        epoch_tzero: epoch_tzero.ok_or_else(|| missing_field_err(input, "ACM Metadata", "EPOCH_TZERO"))?,
+        time_system: time_system
+            .ok_or_else(|| missing_field_err(input, "ACM Metadata", "TIME_SYSTEM"))?,
+        epoch_tzero: epoch_tzero
+            .ok_or_else(|| missing_field_err(input, "ACM Metadata", "EPOCH_TZERO"))?,
         taimutc_at_tzero,
         next_leap_epoch,
         next_leap_taimutc,
@@ -182,9 +185,12 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
         att_prev_id,
         att_basis,
         att_basis_id,
-        ref_frame_a: ref_frame_a.ok_or_else(|| missing_field_err(input, "ACM ATT", "REF_FRAME_A"))?,
-        ref_frame_b: ref_frame_b.ok_or_else(|| missing_field_err(input, "ACM ATT", "REF_FRAME_B"))?,
-        number_states: number_states.ok_or_else(|| missing_field_err(input, "ACM ATT", "NUMBER_STATES"))?,
+        ref_frame_a: ref_frame_a
+            .ok_or_else(|| missing_field_err(input, "ACM ATT", "REF_FRAME_A"))?,
+        ref_frame_b: ref_frame_b
+            .ok_or_else(|| missing_field_err(input, "ACM ATT", "REF_FRAME_B"))?,
+        number_states: number_states
+            .ok_or_else(|| missing_field_err(input, "ACM ATT", "NUMBER_STATES"))?,
         att_type: att_type.ok_or_else(|| missing_field_err(input, "ACM ATT", "ATT_TYPE"))?,
         rate_type,
         euler_rot_seq,
@@ -263,7 +269,8 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
     Ok(AcmCovarianceMatrix {
         comment,
         cov_basis: cov_basis.ok_or_else(|| missing_field_err(input, "ACM COV", "COV_BASIS"))?,
-        cov_ref_frame: cov_ref_frame.ok_or_else(|| missing_field_err(input, "ACM COV", "COV_REF_FRAME"))?,
+        cov_ref_frame: cov_ref_frame
+            .ok_or_else(|| missing_field_err(input, "ACM COV", "COV_REF_FRAME"))?,
         cov_type: cov_type.ok_or_else(|| missing_field_err(input, "ACM COV", "COV_TYPE"))?,
         cov_confidence,
         cov_lines,
@@ -390,7 +397,8 @@ fn parse_sensor_block(input: &mut &str) -> KvnResult<AcmSensor> {
     expect_block_end("SENSOR").parse_next(input)?;
     Ok(AcmSensor {
         comment,
-        sensor_number: sensor_number.ok_or_else(|| missing_field_err(input, "ACM Sensor", "SENSOR_NUMBER"))?,
+        sensor_number: sensor_number
+            .ok_or_else(|| missing_field_err(input, "ACM Sensor", "SENSOR_NUMBER"))?,
         sensor_used,
         sensor_noise_stddev,
         sensor_frequency,
@@ -570,7 +578,7 @@ META_STOP
 
     #[test]
     fn test_parse_acm_minimal() {
-        let input = format!("{}{}\nATT_START\nREF_FRAME_A = EME2000\nREF_FRAME_B = SC_BODY_1\nATT_TYPE = QUATERNION\nNUMBER_STATES = 4\n0.0 0.5 0.5 0.5 0.5\nATT_STOP\n", 
+        let input = format!("{}{}\nATT_START\nREF_FRAME_A = EME2000\nREF_FRAME_B = SC_BODY_1\nATT_TYPE = QUATERNION\nNUMBER_STATES = 4\n0.0 0.5 0.5 0.5 0.5\nATT_STOP\n",
             sample_acm_header(), sample_acm_meta());
         let acm = Acm::from_kvn(&input).unwrap();
         assert_eq!(acm.version, "2.0");
