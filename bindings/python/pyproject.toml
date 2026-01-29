@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Jochim Maene <16223990+JochimMaene@users.noreply.github.com>
+# SPDX-FileCopyrightText: 2025 Jochim Maene <jochim.maene+github@gmail.com>
 #
 # SPDX-License-Identifier: MPL-2.0
 
@@ -8,7 +8,7 @@ description = "Parse and generate CCSDS Navigation Data Messages (NDM) in KVN an
 requires-python = ">=3.9"
 license = "MPL-2.0"
 authors = [
-    { name = "Jochim Maene", email = "16223990+JochimMaene@users.noreply.github.com" }
+    { name = "Jochim Maene", email = "jochim.maene+github@gmail.com" }
 ]
 keywords = ["ccsds", "ndm", "space", "orbit", "astrodynamics", "ephemeris"]
 classifiers = [

@@ -1,11 +1,11 @@
-# SPDX-FileCopyrightText: 2025 Jochim Maene <16223990+JochimMaene@users.noreply.github.com>
+# SPDX-FileCopyrightText: 2025 Jochim Maene <jochim.maene+github@gmail.com>
 #
 # SPDX-License-Identifier: MPL-2.0
 
 [package]
 name = "ccsds-ndm-py"
 version = "0.0.1"
-authors = ["Jochim Maene <16223990+JochimMaene@users.noreply.github.com>"]
+authors = ["Jochim Maene <jochim.maene+github@gmail.com>"]
 edition = "2021"
 description = "Python bindings for ccsds-ndm"
 license = "MPL-2.0"

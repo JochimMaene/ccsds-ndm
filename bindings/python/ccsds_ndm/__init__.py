@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Jochim Maene <16223990+JochimMaene@users.noreply.github.com>
+# SPDX-FileCopyrightText: 2025 Jochim Maene <jochim.maene+github@gmail.com>
 #
 # SPDX-License-Identifier: MPL-2.0
 
