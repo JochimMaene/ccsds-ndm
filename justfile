@@ -147,6 +147,12 @@ docs:
 docs-serve:
     uv run sphinx-autobuild docs docs/_build/html
 
+# Run fuzz testing
+fuzz-all duration="30":
+    cd {{rust_dir}} && cargo +nightly fuzz run fuzz_from_str -- -max_total_time={{duration}}
+    cd {{rust_dir}} && cargo +nightly fuzz run fuzz_kvn -- -max_total_time={{duration}}
+    cd {{rust_dir}} && cargo +nightly fuzz run fuzz_xml -- -max_total_time={{duration}}
+
 # --- Clean ------------------------------------------------------------------
 
 # Remove build artifacts

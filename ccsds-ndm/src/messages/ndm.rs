@@ -6,7 +6,7 @@ use crate::error::Result;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::MessageType;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Combined Instantiation Navigation Data Message (NDM).
 ///
@@ -19,21 +19,26 @@ use serde::Serialize;
 /// with the set of tracking data messages used in the orbit determination.
 ///
 /// **CCSDS Reference**: 505.0-B-3, Section 4.11.
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "ndm")]
 pub struct CombinedNdm {
     /// Message Identifier (optional).
     #[serde(rename = "MESSAGE_ID", skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
 
     /// Comments (optional).
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comments: Vec<String>,
 
     /// List of contained navigation messages.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(rename = "$value", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub messages: Vec<MessageType>,
 }
+
+impl crate::traits::Validate for CombinedNdm {}
 
 impl Ndm for CombinedNdm {
     fn to_kvn(&self) -> Result<String> {
@@ -146,16 +151,9 @@ impl Ndm for CombinedNdm {
                             let val = reader.read_text(name_bytes)?;
                             comments.push(val.to_string());
                         }
-                        // For messages, we need to extract the sub-XML.
-                        // Ideally we'd use `read_to_end` relative to the current depth, but `quick-xml` 0.31+
-                        // makes getting the raw span trickier without `GenericReader::read_text` for elements.
-                        //
-                        // Alternative: Delegate to standard deserializers by reconstructing a mini-document
-                        // or using `from_reader` if we can align the cursor.
-                        //
-                        // Better approach for robust nesting:
                         // Extract the outer XML of the current element.
-                        "opm" | "omm" | "oem" | "ocm" | "cdm" | "tdm" | "rdm" => {
+                        "opm" | "omm" | "oem" | "ocm" | "cdm" | "tdm" | "rdm" | "acm" | "aem"
+                        | "apm" => {
                             // Capture the start position of this element in the original string.
                             // `reader.buffer_position()` is the byte offset after the last read event.
                             // The start tag `e` is what we just read.
@@ -237,9 +235,6 @@ impl ToKvn for CombinedNdm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         // For KVN, there is no top-level "NDM" header or structure.
         // We just write out the messages sequentially.
-        // Comments and ID at the NDM level are not standard in KVN (based on current understanding),
-        // but if they were to exist, they would likely be comments at the top.
-        // For now, we'll write comments if present, but ignore ID as it has no standard KVN key here.
         writer.write_comments(&self.comments);
 
         for msg in &self.messages {
@@ -259,5 +254,58 @@ impl ToKvn for CombinedNdm {
             // KVN messages are typically separated by whitespace/newlines, which the writer handles or we add explicit breaks.
             // The writer adds newlines after each pair/block.
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_combined_ndm_kvn() {
+        let kvn = "CCSDS_OPM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = NASA\nOBJECT_NAME = SAT\nCENTER_NAME = EARTH\nOBJECT_ID = 1\nREF_FRAME = GCRF\nTIME_SYSTEM = UTC\nEPOCH = 2023-01-01T00:00:00\nX = 1000.0\nY = 2000.0\nZ = 3000.0\nX_DOT = 1.0\nY_DOT = 2.0\nZ_DOT = 3.0\nCCSDS_OMM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = NASA\nOBJECT_NAME = SAT2\nOBJECT_ID = 2\nCENTER_NAME = EARTH\nREF_FRAME = GCRF\nTIME_SYSTEM = UTC\nMEAN_ELEMENT_THEORY = SGP4\nEPOCH = 2023-01-01T00:00:00\nMEAN_MOTION = 15.0\nECCENTRICITY = 0.001\nINCLINATION = 51.6\nRA_OF_ASC_NODE = 0.0\nARG_OF_PERICENTER = 0.0\nMEAN_ANOMALY = 0.0\nEPHEMERIS_TYPE = 0\nCLASSIFICATION_TYPE = U\nNORAD_CAT_ID = 12345\nELEMENT_SET_NO = 999\nREV_AT_EPOCH = 100\nBSTAR = 0.0001\nMEAN_MOTION_DOT = 0.000001\nMEAN_MOTION_DDOT = 0.0";
+        let combined = CombinedNdm::from_kvn(kvn).unwrap();
+        assert_eq!(combined.messages.len(), 2);
+    }
+
+    #[test]
+    fn test_combined_ndm_xml() {
+        let xml = r#"<ndm>
+            <message_id>test-id</message_id>
+            <comment>NDM Level Comment</comment>
+            <opm id="CCSDS_OPM_VERS" version="3.0">
+                <header>
+                    <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
+                    <ORIGINATOR>NASA</ORIGINATOR>
+                </header>
+                <body>
+                    <segment>
+                        <metadata>
+                            <OBJECT_NAME>SAT</OBJECT_NAME>
+                            <OBJECT_ID>12345</OBJECT_ID>
+                            <CENTER_NAME>EARTH</CENTER_NAME>
+                            <REF_FRAME>GCRF</REF_FRAME>
+                            <TIME_SYSTEM>UTC</TIME_SYSTEM>
+                        </metadata>
+                        <data>
+                            <stateVector>
+                                <EPOCH>2023-01-01T00:00:00</EPOCH>
+                                <X>1000</X><Y>2000</Y><Z>3000</Z>
+                                <X_DOT>1</X_DOT><Y_DOT>2</Y_DOT><Z_DOT>3</Z_DOT>
+                            </stateVector>
+                        </data>
+                    </segment>
+                </body>
+            </opm>
+        </ndm>"#;
+        let combined = CombinedNdm::from_xml(xml).unwrap();
+        assert_eq!(combined.id, Some("test-id".into()));
+        assert_eq!(combined.comments, vec!["NDM Level Comment".to_string()]);
+        assert_eq!(combined.messages.len(), 1);
+    }
+
+    #[test]
+    fn test_combined_ndm_empty_kvn() {
+        assert!(CombinedNdm::from_kvn("").is_err());
     }
 }

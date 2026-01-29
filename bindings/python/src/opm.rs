@@ -321,9 +321,9 @@ impl OpmMetadata {
 
     /// Spacecraft name for which orbit state data is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
-    /// Office of Outer Space Affairs designator index (reference [3], which include Object name
+    /// Office of Outer Space Affairs designator index (reference ``[3]``, which include Object name
     /// and international designator of the participant). If OBJECT_NAME is not listed in reference
-    /// [3] or the content is either unknown or cannot be disclosed, the value should be set to
+    /// `[3]` or the content is either unknown or cannot be disclosed, the value should be set to
     /// UNKNOWN.
     ///
     /// Examples: EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
@@ -342,10 +342,10 @@ impl OpmMetadata {
     /// Object identifier of the object for which orbit state data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
     /// international spacecraft designator as published in the UN Office of Outer Space Affairs
-    /// designator index (reference [3]). Recommended values have the format YYYY-NNNP{PP}, where:
+    /// designator index (reference ``[3]``). Recommended values have the format YYYY-NNNP{PP}, where:
     /// YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
     /// zeros). P{PP} = At least one capital letter for the identification of the part brought into
-    /// space by the launch. If the asset is not listed in reference [3], the UN Office of Outer
+    /// space by the launch. If the asset is not listed in reference ``[3]``, the UN Office of Outer
     /// Space Affairs designator index format is not used, or the content is either unknown or
     /// cannot be disclosed, the value should be set to UNKNOWN.
     ///
@@ -854,7 +854,7 @@ impl OpmCovarianceMatrix {
         self.inner.comment = value;
     }
 
-    /// Covariance matrix [1,1]
+    /// Covariance matrix `[1,1]`
     ///
     /// Units: km²
     ///
@@ -869,7 +869,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_x.value = value;
     }
 
-    /// Covariance matrix [2,1]
+    /// Covariance matrix `[2,1]`
     ///
     /// Units: km²
     ///
@@ -884,7 +884,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_x.value = value;
     }
 
-    /// Covariance matrix [2,2]
+    /// Covariance matrix `[2,2]`
     ///
     /// Units: km²
     ///
@@ -899,7 +899,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_y.value = value;
     }
 
-    /// Covariance matrix [3,1]
+    /// Covariance matrix `[3,1]`
     ///
     /// Units: km²
     ///
@@ -914,7 +914,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_x.value = value;
     }
 
-    /// Covariance matrix [3,2]
+    /// Covariance matrix `[3,2]`
     ///
     /// Units: km²
     ///
@@ -929,7 +929,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_y.value = value;
     }
 
-    /// Covariance matrix [3,3]
+    /// Covariance matrix `[3,3]`
     ///
     /// Units: km²
     ///
@@ -944,7 +944,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_z.value = value;
     }
 
-    /// Covariance matrix [4,1]
+    /// Covariance matrix `[4,1]`
     ///
     /// Units: km²/s
     ///
@@ -959,7 +959,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_x.value = value;
     }
 
-    /// Covariance matrix [4,2]
+    /// Covariance matrix `[4,2]`
     ///
     /// Units: km²/s
     ///
@@ -974,7 +974,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_y.value = value;
     }
 
-    /// Covariance matrix [4,3]
+    /// Covariance matrix `[4,3]`
     ///
     /// Units: km²/s
     ///
@@ -989,7 +989,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_z.value = value;
     }
 
-    /// Covariance matrix [5,1]
+    /// Covariance matrix `[5,1]`
     ///
     /// Units: km²/s
     ///
@@ -1004,7 +1004,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_x.value = value;
     }
 
-    /// Covariance matrix [5,2]
+    /// Covariance matrix `[5,2]`
     ///
     /// Units: km²/s
     ///
@@ -1019,7 +1019,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_y.value = value;
     }
 
-    /// Covariance matrix [5,3]
+    /// Covariance matrix `[5,3]`
     ///
     /// Units: km²/s
     ///
@@ -1034,7 +1034,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_z.value = value;
     }
 
-    /// Covariance matrix [6,1]
+    /// Covariance matrix `[6,1]`
     ///
     /// Units: km²/s
     ///
@@ -1049,7 +1049,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_x.value = value;
     }
 
-    /// Covariance matrix [6,2]
+    /// Covariance matrix `[6,2]`
     ///
     /// Units: km²/s
     ///
@@ -1064,7 +1064,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_y.value = value;
     }
 
-    /// Covariance matrix [6,3]
+    /// Covariance matrix `[6,3]`
     ///
     /// Units: km²/s
     ///
@@ -1079,7 +1079,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_z.value = value;
     }
 
-    /// Covariance matrix [4,4]
+    /// Covariance matrix `[4,4]`
     ///
     /// Units: km²/s²
     ///
@@ -1094,7 +1094,7 @@ impl OpmCovarianceMatrix {
         self.inner.cx_dot_x_dot.value = value;
     }
 
-    /// Covariance matrix [5,4]
+    /// Covariance matrix `[5,4]`
     ///
     /// Units: km²/s²
     ///
@@ -1109,7 +1109,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_x_dot.value = value;
     }
 
-    /// Covariance matrix [5,5]
+    /// Covariance matrix `[5,5]`
     ///
     /// Units: km²/s²
     ///
@@ -1124,7 +1124,7 @@ impl OpmCovarianceMatrix {
         self.inner.cy_dot_y_dot.value = value;
     }
 
-    /// Covariance matrix [6,4]
+    /// Covariance matrix `[6,4]`
     ///
     /// Units: km²/s²
     ///
@@ -1139,7 +1139,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_x_dot.value = value;
     }
 
-    /// Covariance matrix [6,5]
+    /// Covariance matrix `[6,5]`
     ///
     /// Units: km²/s²
     ///
@@ -1154,7 +1154,7 @@ impl OpmCovarianceMatrix {
         self.inner.cz_dot_y_dot.value = value;
     }
 
-    /// Covariance matrix [6,6]
+    /// Covariance matrix `[6,6]`
     ///
     /// Units: km²/s²
     ///
@@ -1301,17 +1301,17 @@ impl OpmData {
 
     /// User defined parameters.
     ///
-    /// :type: Optional[UserDefined]
+    /// :type: UserDefined | None
     #[getter]
-    fn get_user_defined_parameters(&self) -> Option<UserDefined> {
+    fn get_user_defined_parameters(&self) -> Option<crate::types::UserDefined> {
         self.inner
             .user_defined_parameters
             .as_ref()
-            .map(|u| UserDefined { inner: u.clone() })
+            .map(|u| crate::types::UserDefined { inner: u.clone() })
     }
 
     #[setter]
-    fn set_user_defined_parameters(&mut self, value: Option<UserDefined>) {
+    fn set_user_defined_parameters(&mut self, value: Option<crate::types::UserDefined>) {
         self.inner.user_defined_parameters = value.map(|u| u.inner);
     }
 }
@@ -1498,80 +1498,5 @@ impl ManeuverParameters {
     #[setter]
     fn set_man_dv_3(&mut self, value: f64) {
         self.inner.man_dv_3.value = value;
-    }
-}
-
-/// USER DEFINED PARAMETERS block (`userDefinedType`).
-/// User-defined parameters.
-///
-/// Allow for the exchange of any desired orbital data not already provided in the message.
-///
-/// Parameters
-/// ----------
-///     parameters : dict
-///     Dictionary of user defined parameters. Keys should generally start with 'USER_DEFINED_'.
-#[pyclass]
-#[derive(Clone)]
-pub struct UserDefined {
-    pub inner: CoreUserDefined,
-}
-
-#[pymethods]
-impl UserDefined {
-    #[new]
-    fn new(parameters: std::collections::HashMap<String, String>) -> Self {
-        let user_defined = parameters
-            .into_iter()
-            .map(|(k, v)| UserDefinedParameter {
-                parameter: k,
-                value: v,
-            })
-            .collect();
-        Self {
-            inner: CoreUserDefined {
-                comment: vec![],
-                user_defined,
-            },
-        }
-    }
-
-    fn __repr__(&self) -> String {
-        format!("UserDefined(count={})", self.inner.user_defined.len())
-    }
-
-    /// Comments (see 7.8 for formatting rules).
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
-    }
-
-    /// User defined parameters as a dictionary.
-    ///
-    /// :type: Dict[str, str]
-    #[getter]
-    fn get_user_defined(&self) -> std::collections::HashMap<String, String> {
-        self.inner
-            .user_defined
-            .iter()
-            .map(|p| (p.parameter.clone(), p.value.clone()))
-            .collect()
-    }
-
-    #[setter]
-    fn set_user_defined(&mut self, value: std::collections::HashMap<String, String>) {
-        self.inner.user_defined = value
-            .into_iter()
-            .map(|(k, v)| UserDefinedParameter {
-                parameter: k,
-                value: v,
-            })
-            .collect();
     }
 }

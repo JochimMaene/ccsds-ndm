@@ -18,7 +18,13 @@ use crate::opm::OpmCovarianceMatrix;
 /// Orbit Mean-Elements Message (OMM).
 ///
 /// The OMM contains the orbital characteristics of a single object at a specified epoch,
-/// expressed in mean Keplerian elements.
+/// expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
+/// ascension of ascending node, argument of perigee, and mean anomaly.
+///
+/// These elements are adequate for providing the initial mean state of analytical and
+/// semi-analytical orbit models (e.g., SGP4). The OMM includes keywords and values that may
+/// be used to generate canonical NORAD Two Line Element (TLE) sets to accommodate the needs
+/// of heritage users.
 ///
 /// Parameters
 /// ----------
@@ -58,7 +64,13 @@ impl Omm {
     /// Orbit Mean-Elements Message (OMM).
     ///
     /// The OMM contains the orbital characteristics of a single object at a specified epoch,
-    /// expressed in mean Keplerian elements.
+    /// expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
+    /// ascension of ascending node, argument of perigee, and mean anomaly.
+    ///
+    /// These elements are adequate for providing the initial mean state of analytical and
+    /// semi-analytical orbit models (e.g., SGP4). The OMM includes keywords and values that may
+    /// be used to generate canonical NORAD Two Line Element (TLE) sets to accommodate the needs
+    /// of heritage users.
     ///
     /// :type: OdmHeader
     #[getter]
@@ -308,9 +320,9 @@ impl OmmMetadata {
 
     /// Spacecraft name for which mean element orbit state data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use names
-    /// from the UN Office of Outer Space Affairs designator index (reference [3], which include
+    /// from the UN Office of Outer Space Affairs designator index (reference `[3]`, which include
     /// Object name and international designator of the participant). If OBJECT_NAME is not
-    /// listed in reference [3] or the content is either unknown or cannot be disclosed, the
+    /// listed in reference `[3]` or the content is either unknown or cannot be disclosed, the
     /// value should be set to UNKNOWN.
     ///
     /// Examples: Telkom 2, Spaceway 2, INMARSAT 4-F2, UNKNOWN
@@ -329,11 +341,11 @@ impl OmmMetadata {
     /// Object identifier of the object for which mean element orbit state data is provided.
     /// While there is no CCSDS-based restriction on the value for this keyword, it is
     /// recommended to use the international spacecraft designator as published in the UN Office
-    /// of Outer Space Affairs designator index (reference [3]). Recommended values have the
+    /// of Outer Space Affairs designator index (reference `[3]`). Recommended values have the
     /// format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-digit serial number of
     /// launch in year YYYY (with leading zeros). P{PP} = At least one capital letter for the
     /// identification of the part brought into space by the launch. If the asset is not listed
-    /// in reference [3], the UN Office of Outer Space Affairs designator index format is not
+    /// in reference `[3]`, the UN Office of Outer Space Affairs designator index format is not
     /// used, or the content is either unknown or cannot be disclosed, the value should be set
     /// to UNKNOWN.
     ///
@@ -374,7 +386,7 @@ impl OmmMetadata {
     /// are explicitly defined to be in the True Equator Mean Equinox of Date (TEME of Date)
     /// reference frame. Therefore, TEME of date shall be used for OMMs based on NORAD Two Line
     /// Element sets, rather than the almost imperceptibly different TEME of Epoch (see
-    /// reference [H2] or [H3] for further details).
+    /// reference `[H2]` or `[H3]` for further details).
     ///
     /// Examples: ICRF, ITRF2000, EME2000, TEME
     ///
@@ -826,17 +838,17 @@ impl OmmData {
 
     /// User-Defined Parameters.
     ///
-    /// :type: Optional[UserDefined]
+    /// :type: UserDefined | None
     #[getter]
-    fn get_user_defined_parameters(&self) -> Option<UserDefined> {
+    fn get_user_defined_parameters(&self) -> Option<crate::types::UserDefined> {
         self.inner
             .user_defined_parameters
             .as_ref()
-            .map(|u| UserDefined { inner: u.clone() })
+            .map(|u| crate::types::UserDefined { inner: u.clone() })
     }
 
     #[setter]
-    fn set_user_defined_parameters(&mut self, value: Option<UserDefined>) {
+    fn set_user_defined_parameters(&mut self, value: Option<crate::types::UserDefined>) {
         self.inner.user_defined_parameters = value.map(|u| u.inner);
     }
 }
@@ -1086,81 +1098,5 @@ impl TleParameters {
     fn set_agom(&mut self, value: Option<f64>) {
         use ccsds_ndm::types::M2kg;
         self.inner.agom = value.map(|v| M2kg::new(v, Default::default()));
-    }
-}
-
-/// USER DEFINED PARAMETERS block (`userDefinedType`).
-/// User-defined parameters.
-///
-/// Allow for the exchange of any desired orbital data not already provided in the message.
-///
-/// Parameters
-/// ----------
-///     parameters : dict
-///     Dictionary of user defined parameters.
-#[pyclass]
-#[derive(Clone)]
-pub struct UserDefined {
-    pub inner: ccsds_ndm::types::UserDefined,
-}
-
-#[pymethods]
-impl UserDefined {
-    #[new]
-    #[pyo3(text_signature = "(parameters: Dict[str, str])")]
-    fn new(parameters: std::collections::HashMap<String, String>) -> Self {
-        let user_defined = parameters
-            .into_iter()
-            .map(|(k, v)| ccsds_ndm::types::UserDefinedParameter {
-                parameter: k,
-                value: v,
-            })
-            .collect();
-        Self {
-            inner: ccsds_ndm::types::UserDefined {
-                comment: vec![],
-                user_defined,
-            },
-        }
-    }
-
-    fn __repr__(&self) -> String {
-        format!("UserDefined(count={})", self.inner.user_defined.len())
-    }
-
-    /// Comments (see 7.8 for formatting rules).
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
-    }
-
-    /// User defined parameters as a dictionary.
-    ///
-    /// :type: Dict[str, str]
-    #[getter]
-    fn get_user_defined(&self) -> std::collections::HashMap<String, String> {
-        self.inner
-            .user_defined
-            .iter()
-            .map(|p| (p.parameter.clone(), p.value.clone()))
-            .collect()
-    }
-
-    #[setter]
-    fn set_user_defined(&mut self, value: std::collections::HashMap<String, String>) {
-        self.inner.user_defined = value
-            .into_iter()
-            .map(|(k, v)| ccsds_ndm::types::UserDefinedParameter {
-                parameter: k,
-                value: v,
-            })
-            .collect();
     }
 }

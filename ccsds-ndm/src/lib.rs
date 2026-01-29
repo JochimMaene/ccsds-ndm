@@ -4,25 +4,34 @@
 
 //! # CCSDS NDM
 //!
-//! A library for parsing and generating CCSDS Navigation Data Messages (NDM)
+//! A high-performance, type-safe library for parsing and generating CCSDS Navigation Data Messages (NDM)
 //! in both KVN (Key-Value Notation) and XML formats.
 //!
-//! ## Supported Message Types
+//! This crate is designed for mission-critical space applications where correctness, performance,
+//! and adherence to standards are paramount.
 //!
-//! - **OPM** - Orbit Parameter Message
-//! - **OMM** - Orbit Mean-Elements Message
-//! - **OEM** - Orbit Ephemeris Message
-//! - **OCM** - Orbit Comprehensive Message
-//! - **CDM** - Conjunction Data Message
-//! - **TDM** - Tracking Data Message
-//! - **RDM** - Reentry Data Message
-//! - **APM** - Attitude Parameter Message
-//! - **AEM** - Attitude Ephemeris Message
-//! - **ACM** - Attitude Comprehensive Message
+//! ## Key Features
+//!
+//! - **Comprehensive Support**: Full support for OPM, OMM, OEM, OCM, CDM, TDM, RDM, AEM, APM, and ACM messages.
+//! - **Format Agnostic**: Seamlessly convert between KVN and XML formats.
+//! - **Type Safety**: Strictly typed units (e.g., `km`, `deg`, `s`) prevent physical unit errors.
+//! - **High Performance Parsing**: Utilizes `winnow` and `quick-xml` for efficient, low-allocation parsing.
+//! - **Ergonomic Construction**: Uses the builder pattern (via the [`bon`](https://docs.rs/bon) crate) for safe and easy message creation.
+//! - **Standard Compliant**: Validates messages against CCSDS 502.0-B-3 and related standards.
+//!
+//! ## Architecture
+//!
+//! The library is organized around a few core concepts:
+//!
+//! - **[`Ndm`](traits::Ndm) Trait**: The unifying interface for all message types. It defines the standard `to_kvn`, `from_kvn`, `to_xml`, and `from_xml` methods.
+//! - **[`MessageType`] Enum**: A container that holds any valid NDM. This is the primary return type when parsing files with unknown contents (auto-detection).
+//! - **Strong Typing**: All physical quantities (Distance, Velocity, Mass, etc.) are wrapped in the [`UnitValue`](types::UnitValue) struct, ensuring that units are always tracked and validated.
 //!
 //! ## Quick Start
 //!
-//! ### Parse any NDM file (auto-detection)
+//! ### 1. Parse any NDM file (auto-detection)
+//!
+//! The library automatically detects whether the input is KVN or XML and what message type it contains.
 //!
 //! ```no_run
 //! use ccsds_ndm::{from_file, MessageType};
@@ -33,28 +42,90 @@
 //!     MessageType::Opm(opm) => {
 //!         println!("Object: {}", opm.body.segment.metadata.object_name);
 //!     }
-//!     _ => {}
+//!     MessageType::Oem(oem) => {
+//!         println!("Ephemeris points: {}", oem.body.segment[0].data.state_vector.len());
+//!     }
+//!     _ => println!("Other message type"),
 //! }
 //! ```
 //!
-//! ### Parse a specific message type
+//! ### 2. Parse a specific message type
+//!
+//! If you know the message type in advance, you can parse it directly:
 //!
 //! ```no_run
 //! use ccsds_ndm::messages::opm::Opm;
 //! use ccsds_ndm::traits::Ndm;
 //!
+//! // Parses strict KVN for OPM
 //! let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
 //! ```
 //!
-//! ### Serialize to KVN or XML
+//! ### 3. Generate a message using the Builder Pattern
+//!
+//! Creating messages from scratch is safe and verbose-free using the `builder()` methods.
+//!
+//! ```no_run
+//! use ccsds_ndm::messages::opm::{Opm, OpmBody, OpmSegment, OpmMetadata, OpmData};
+//! use ccsds_ndm::common::{OdmHeader, StateVector};
+//! use ccsds_ndm::types::{Epoch, Position, Velocity};
+//! use ccsds_ndm::traits::Ndm;
+//!
+//! let opm = Opm::builder()
+//!     .version("3.0")
+//!     .header(OdmHeader::builder()
+//!         .creation_date("2024-01-01T00:00:00".parse().unwrap())
+//!         .originator("EXAMPLE")
+//!         .build())
+//!     .body(OpmBody::builder()
+//!         .segment(OpmSegment::builder()
+//!             .metadata(OpmMetadata::builder()
+//!                 .object_name("SATELLITE")
+//!                 .object_id("2024-001A")
+//!                 .center_name("EARTH")
+//!                 .ref_frame("GCRF")
+//!                 .time_system("UTC")
+//!                 .build())
+//!             .data(OpmData::builder()
+//!                 .state_vector(StateVector::builder()
+//!                     .epoch("2024-01-01T12:00:00".parse().unwrap())
+//!                     .x(Position::new(7000.0, None))
+//!                     .y(Position::new(0.0, None))
+//!                     .z(Position::new(0.0, None))
+//!                     .x_dot(Velocity::new(0.0, None))
+//!                     .y_dot(Velocity::new(7.5, None))
+//!                     .z_dot(Velocity::new(0.0, None))
+//!                     .build())
+//!                 .build())
+//!             .build())
+//!         .build())
+//!     .build();
+//!
+//! // Convert to KVN string
+//! println!("{}", opm.to_kvn().unwrap());
+//! ```
+//!
+//! ### 4. Serialize to KVN or XML
 //!
 //! ```no_run
 //! use ccsds_ndm::{from_file, MessageType};
 //!
 //! let ndm = from_file("example.opm").unwrap();
+//!
+//! // Serialize to string
 //! let kvn_string = ndm.to_kvn().unwrap();
 //! let xml_string = ndm.to_xml().unwrap();
+//!
+//! // Write to file
+//! ndm.to_xml_file("output.xml").unwrap();
 //! ```
+//!
+//! ## Modules
+//!
+//! - [`messages`]: Supported NDM message types (OPM, OEM, TDM, etc.).
+//! - [`traits`]: Core traits like `Ndm` and `UnitValue` handling.
+//! - [`types`]: Physical types (Distance, Velocity, Epoch, etc.) and CCSDS enumerations.
+//! - [`kvn`] & [`xml`]: Format-specific parsing and serialization logic.
 
 pub mod common;
 pub mod detect;
@@ -88,30 +159,40 @@ use std::path::Path;
 ///     _ => println!("Other message type"),
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum MessageType {
     /// Orbit Ephemeris Message - orbit state time series with optional covariance.
+    #[serde(rename = "oem")]
     Oem(messages::oem::Oem),
     /// Conjunction Data Message - collision assessment data between two objects.
+    #[serde(rename = "cdm")]
     Cdm(messages::cdm::Cdm),
     /// Orbit Parameter Message - single state vector and orbital parameters.
+    #[serde(rename = "opm")]
     Opm(messages::opm::Opm),
     /// Orbit Mean-Elements Message - mean orbital elements (e.g., TLE-like).
+    #[serde(rename = "omm")]
     Omm(messages::omm::Omm),
     /// Reentry Data Message - reentry prediction information.
+    #[serde(rename = "rdm")]
     Rdm(messages::rdm::Rdm),
     /// Tracking Data Message - ground station tracking measurements.
+    #[serde(rename = "tdm")]
     Tdm(messages::tdm::Tdm),
     /// Orbit Comprehensive Message - detailed orbit data with maneuvers.
+    #[serde(rename = "ocm")]
     Ocm(messages::ocm::Ocm),
     /// Attitude Comprehensive Message - detailed attitude data with maneuvers.
+    #[serde(rename = "acm")]
     Acm(messages::acm::Acm),
     /// Attitude Ephemeris Message - attitude state time series.
+    #[serde(rename = "aem")]
     Aem(messages::aem::Aem),
     /// Attitude Parameter Message - attitude state and parameter data.
+    #[serde(rename = "apm")]
     Apm(messages::apm::Apm),
     /// Combined Instantiation NDM - container for multiple messages.
+    #[serde(rename = "ndm")]
     Ndm(messages::ndm::CombinedNdm),
 }
 

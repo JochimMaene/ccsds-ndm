@@ -1,0 +1,33 @@
+[package]
+name = "ccsds-ndm-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+ccsds-ndm = { path = ".." }
+
+[[bin]]
+name = "fuzz_from_str"
+path = "fuzz_targets/fuzz_from_str.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_kvn"
+path = "fuzz_targets/fuzz_kvn.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_xml"
+path = "fuzz_targets/fuzz_xml.rs"
+test = false
+doc = false
+bench = false

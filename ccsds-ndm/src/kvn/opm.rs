@@ -43,6 +43,7 @@ use crate::messages::opm::{
 use crate::parse_block;
 use winnow::combinator::peek;
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // OPM Version Parser
@@ -118,7 +119,7 @@ pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElement
 
     parse_block!(input, comment, {
         "SEMI_MAJOR_AXIS" => semi_major_axis: kv_from_kvn,
-        "ECCENTRICITY" => val: kv_float => { eccentricity = Some(val.into()); },
+        "ECCENTRICITY" => eccentricity: kv_from_kvn,
         "INCLINATION" => inclination: kv_from_kvn,
         "RA_OF_ASC_NODE" => ra_of_asc_node: kv_from_kvn,
         "ARG_OF_PERICENTER" => arg_of_pericenter: kv_from_kvn,
@@ -223,10 +224,15 @@ pub fn all_maneuvers(input: &mut &str) -> KvnResult<Vec<ManeuverParameters>> {
     let mut maneuvers = Vec::new();
 
     loop {
+        let checkpoint = input.checkpoint();
         match maneuver_parameters.parse_next(input) {
             Ok(Some(man)) => maneuvers.push(man),
             Ok(None) => break,
             Err(e) => return Err(e),
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
         }
     }
 
@@ -314,6 +320,7 @@ impl ParseKvn for Opm {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::NonNegativeDouble;
 
     const MINIMAL_OPM: &str = r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2022-11-06T09:23:57
@@ -443,7 +450,10 @@ DRAG_COEFF = 2.5
             .as_ref()
             .expect("Should have spacecraft params");
         assert_eq!(sc.mass.as_ref().unwrap().value, 3000.0);
-        assert_eq!(sc.drag_coeff.as_ref().unwrap(), &2.5.into());
+        assert_eq!(
+            sc.drag_coeff.as_ref().unwrap(),
+            &NonNegativeDouble::new(2.5).unwrap()
+        );
     }
 
     #[test]
@@ -605,7 +615,7 @@ MAN_DV_3 = 0.0
             .unwrap();
         assert_eq!(ud.comment, vec!["user comment"]);
         assert_eq!(ud.user_defined.len(), 2);
-        assert_eq!(ud.user_defined[0].parameter, "USER_DEFINED_FOO");
+        assert_eq!(ud.user_defined[0].parameter, "FOO");
     }
 
     #[test]
@@ -636,5 +646,53 @@ MAN_DV_3 = 0.6
 "#;
         let data = opm_data.parse_next(&mut input).unwrap();
         assert_eq!(data.maneuver_parameters.len(), 2);
+    }
+
+    #[test]
+    fn test_opm_covariance_matrix() {
+        let mut input = r#"EPOCH = 2023-01-01T00:00:00
+X = 1000
+Y = 2000
+Z = 3000
+X_DOT = 1
+Y_DOT = 2
+Z_DOT = 3
+CX_X = 1.0
+CY_X = 0.1
+CY_Y = 1.0
+CZ_X = 0.1
+CZ_Y = 0.1
+CZ_Z = 1.0
+CX_DOT_X = 0.1
+CX_DOT_Y = 0.1
+CX_DOT_Z = 0.1
+CX_DOT_X_DOT = 1.0
+CY_DOT_X = 0.1
+CY_DOT_Y = 0.1
+CY_DOT_Z = 0.1
+CY_DOT_X_DOT = 0.1
+CY_DOT_Y_DOT = 1.0
+CZ_DOT_X = 0.1
+CZ_DOT_Y = 0.1
+CZ_DOT_Z = 0.1
+CZ_DOT_X_DOT = 0.1
+CZ_DOT_Y_DOT = 0.1
+CZ_DOT_Z_DOT = 1.0
+"#;
+        let data = opm_data.parse_next(&mut input).unwrap();
+        assert!(data.covariance_matrix.is_some());
+        let cov = data.covariance_matrix.unwrap();
+        assert_eq!(cov.cx_x.value, 1.0);
+    }
+
+    #[test]
+    fn test_opm_metadata_missing_fields() {
+        // Missing OBJECT_NAME
+        let mut input = "OBJECT_ID = 1\nCENTER_NAME = EARTH\nREF_FRAME = GCRF\nTIME_SYSTEM = UTC\n";
+        assert!(opm_metadata.parse_next(&mut input).is_err());
+
+        // Missing TIME_SYSTEM
+        let mut input = "OBJECT_NAME = SAT\nOBJECT_ID = 1\nCENTER_NAME = EARTH\nREF_FRAME = GCRF\n";
+        assert!(opm_metadata.parse_next(&mut input).is_err());
     }
 }

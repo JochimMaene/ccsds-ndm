@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::AdmHeader;
-use crate::error::Result;
+use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 //----------------------------------------------------------------------
 // Root AEM Structure
@@ -17,23 +18,29 @@ use serde::{Deserialize, Serialize};
 /// Attitude Ephemeris Message (AEM).
 ///
 /// An AEM specifies the attitude state of a single object at multiple epochs, contained within a
-/// specified time range. The AEM is suited to interagency exchanges that (1) involve automated
-/// interaction (e.g., computer-to-computer communication for which frequent, fast, automated time
-/// interpretation and processing are required), and (2) require higher fidelity or higher
-/// precision dynamic modeling than is possible with the APM (e.g., flexible structures, more
-/// complex attitude movement, etc.).
+/// specified time range. The AEM is suited to interagency exchanges that involve automated
+/// interaction and require higher fidelity or higher precision dynamic modeling than is
+/// possible with the APM.
+///
+/// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
+/// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
+/// the attitude state at times different from the tabular epochs.
 ///
 /// **CCSDS Reference**: 504.0-B-2, Section 4.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "aem")]
 pub struct Aem {
     pub header: AdmHeader,
     pub body: AemBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
+
+impl crate::traits::Validate for Aem {}
 
 impl Ndm for Aem {
     fn to_kvn(&self) -> Result<String> {
@@ -62,7 +69,24 @@ impl Ndm for Aem {
 
 impl Aem {
     pub fn validate(&self) -> Result<()> {
-        // Validation logic can be added here
+        self.header.validate()?;
+        self.body.validate()
+    }
+}
+
+impl AemBody {
+    pub fn validate(&self) -> Result<()> {
+        for segment in &self.segment {
+            segment.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl AemSegment {
+    pub fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate(&self.metadata.attitude_type)?;
         Ok(())
     }
 }
@@ -79,7 +103,7 @@ impl ToKvn for Aem {
 // Body & Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AemBody {
     #[serde(rename = "segment")]
     pub segment: Vec<AemSegment>,
@@ -93,7 +117,7 @@ impl ToKvn for AemBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AemSegment {
     pub metadata: AemMetadata,
     pub data: AemData,
@@ -113,7 +137,7 @@ impl ToKvn for AemSegment {
 }
 
 /// AEM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AemMetadata {
     /// Comments allowed only at the beginning of the Metadata section. Each comment line shall
@@ -123,6 +147,7 @@ pub struct AemMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
@@ -133,6 +158,7 @@ pub struct AemMetadata {
     /// **Examples**: EUTELSAT W1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub object_name: String,
     /// Spacecraft identifier of the object corresponding to the attitude data to be given. While
     /// there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
@@ -147,6 +173,7 @@ pub struct AemMetadata {
     /// **Examples**: 2000-052A
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub object_id: String,
     /// Celestial body orbited by the object, which may be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -156,6 +183,7 @@ pub struct AemMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub center_name: Option<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
@@ -163,6 +191,7 @@ pub struct AemMetadata {
     /// **Examples**: ICRF, SC_BODY_1, INSTRUMENT_A
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
@@ -170,6 +199,7 @@ pub struct AemMetadata {
     /// **Examples**: SC_BODY_1, INSTRUMENT_A
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Time system used for both attitude ephemeris data and metadata. The set of allowed values
     /// is described in annex B, subsection B2.
@@ -177,6 +207,7 @@ pub struct AemMetadata {
     /// **Examples**: UTC, TAI
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub time_system: String,
     /// Start of TOTAL time span covered by attitude ephemeris data immediately following this
     /// metadata block.
@@ -219,6 +250,7 @@ pub struct AemMetadata {
     /// EULER_ANGLE/DERIVATIVE, EULER_ANGLE/ANGVEL, SPIN, SPIN/NUTATION, SPIN/NUTATION_MOM
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
+    #[builder(into)]
     pub attitude_type: String,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
     /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
@@ -241,6 +273,7 @@ pub struct AemMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub angvel_frame: Option<String>,
     /// Recommended interpolation method for attitude ephemeris data in the block immediately
     /// following this metadata block.
@@ -249,6 +282,7 @@ pub struct AemMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub interpolation_method: Option<String>,
     /// Recommended interpolation degree for attitude ephemeris data in the block immediately
     /// following this metadata block. It must be an integer value. This keyword must be used if
@@ -259,6 +293,44 @@ pub struct AemMetadata {
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation_degree: Option<std::num::NonZeroU32>,
+}
+
+impl AemMetadata {
+    pub fn validate(&self) -> Result<()> {
+        // Validation Rule: INTERPOLATION_DEGREE is required if INTERPOLATION_METHOD is used
+        if self.interpolation_method.is_some() && self.interpolation_degree.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("AEM Metadata"),
+                field: Cow::Borrowed(
+                    "INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)",
+                ),
+                line: None,
+            }
+            .into());
+        }
+
+        // Validation Rule: EULER_ROT_SEQ is required if ATTITUDE_TYPE includes EULER_ANGLE
+        if self.attitude_type.contains("EULER_ANGLE") && self.euler_rot_seq.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("AEM Metadata"),
+                field: Cow::Borrowed("EULER_ROT_SEQ (required for EULER_ANGLE types)"),
+                line: None,
+            }
+            .into());
+        }
+
+        // Validation Rule: ANGVEL_FRAME is required if ATTITUDE_TYPE includes ANGVEL
+        if self.attitude_type.contains("ANGVEL") && self.angvel_frame.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("AEM Metadata"),
+                field: Cow::Borrowed("ANGVEL_FRAME (required for ANGVEL types)"),
+                line: None,
+            }
+            .into());
+        }
+
+        Ok(())
+    }
 }
 
 impl ToKvn for AemMetadata {
@@ -297,7 +369,7 @@ impl ToKvn for AemMetadata {
 }
 
 /// AEM Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AemData {
     /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
@@ -305,15 +377,17 @@ pub struct AemData {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Attitude ephemeris data lines.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.4.
     #[serde(rename = "attitudeState")]
+    #[builder(default)]
     pub attitude_states: Vec<AemAttitudeStateWrapper>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AemAttitudeStateWrapper {
     #[serde(
         rename = "quaternionEphemeris",
@@ -431,6 +505,135 @@ impl crate::traits::ToKvn for AemAttitudeStateWrapper {
     }
 }
 
+impl AemData {
+    pub fn validate(&self, attitude_type: &str) -> Result<()> {
+        for (idx, state) in self.attitude_states.iter().enumerate() {
+            match attitude_type {
+                "QUATERNION" => {
+                    if state.quaternion_ephemeris.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected QUATERNION data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+                "QUATERNION/DERIVATIVE" => {
+                    if state.quaternion_derivative.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected QUATERNION/DERIVATIVE data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+                "QUATERNION/ANGVEL" | "QUATERNION/RATE" => {
+                    if state.quaternion_ang_vel.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected QUATERNION/ANGVEL data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+                "EULER_ANGLE" => {
+                    if state.euler_angle.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected EULER_ANGLE data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+                "EULER_ANGLE/DERIVATIVE" => {
+                    if state.euler_angle_derivative.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected EULER_ANGLE/DERIVATIVE data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+                "EULER_ANGLE/ANGVEL" | "EULER_ANGLE/RATE" => {
+                    if state.euler_angle_ang_vel.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected EULER_ANGLE/ANGVEL data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+                "SPIN" => {
+                    if state.spin.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected SPIN data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+                "SPIN/NUTATION" => {
+                    if state.spin_nutation.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected SPIN/NUTATION data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+                "SPIN/NUTATION_MOM" => {
+                    if state.spin_nutation_mom.is_none() {
+                        return Err(ValidationError::Generic {
+                            message: Cow::Owned(format!(
+                                "Data line {} expected SPIN/NUTATION_MOM data",
+                                idx + 1
+                            )),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+                _ => {
+                    // Unknown type, or maybe user defined.
+                    // For now, we strictly validate against known types if possible,
+                    // but since the string is open-ended in some contexts, we might warn.
+                    // However, XSD lists these as enumerations.
+                    return Err(ValidationError::Generic {
+                        message: Cow::Owned(format!("Unknown ATTITUDE_TYPE: {}", attitude_type)),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl ToKvn for AemData {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -514,5 +717,130 @@ DATA_STOP
             aem.body.segment[0].metadata.stop_time.as_str()
                 > aem.body.segment[0].metadata.start_time.as_str()
         );
+    }
+
+    #[test]
+    fn test_aem_validation_interpolation_reqs() {
+        let kvn = r#"CCSDS_AEM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+ATTITUDE_TYPE = QUATERNION
+INTERPOLATION_METHOD = HERMITE
+# Missing INTERPOLATION_DEGREE
+META_STOP
+DATA_START
+2023-01-01T00:00:00 0 0 0 1
+DATA_STOP
+"#;
+        assert!(Aem::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_aem_validation_euler_reqs() {
+        let kvn = r#"CCSDS_AEM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+ATTITUDE_TYPE = EULER_ANGLE
+# Missing EULER_ROT_SEQ
+META_STOP
+DATA_START
+2023-01-01T00:00:00 10 20 30
+DATA_STOP
+"#;
+        assert!(Aem::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_aem_validation_angvel_reqs() {
+        let kvn = r#"CCSDS_AEM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+ATTITUDE_TYPE = QUATERNION/ANGVEL
+# Missing ANGVEL_FRAME
+META_STOP
+DATA_START
+2023-01-01T00:00:00 0 0 0 1 0.1 0.1 0.1
+DATA_STOP
+"#;
+        assert!(Aem::from_kvn(kvn).is_err());
+    }
+    #[test]
+    fn test_aem_data_validation_mismatches() {
+        use crate::common::*;
+
+        let valid_q = AemAttitudeStateWrapper::from(AemAttitudeState::QuaternionEphemeris(
+            QuaternionEphemeris {
+                epoch: "2023-01-01T00:00:00".parse().unwrap(),
+                quaternion: Quaternion::new(0.0, 0.0, 0.0, 1.0).unwrap(),
+            },
+        ));
+
+        let valid_euler = AemAttitudeStateWrapper::from(AemAttitudeState::EulerAngle(EulerAngle {
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
+            angle_1: Angle::new(10.0, None).unwrap(),
+            angle_2: Angle::new(20.0, None).unwrap(),
+            angle_3: Angle::new(30.0, None).unwrap(),
+        }));
+
+        // Type mismatch: Expects QUATERNION, gets EULER_ANGLE
+        let data = AemData {
+            comment: vec![],
+            attitude_states: vec![valid_euler.clone()],
+        };
+        assert!(data.validate("QUATERNION").is_err());
+
+        // Type mismatch: Expects EULER_ANGLE, gets QUATERNION
+        let data_q = AemData {
+            comment: vec![],
+            attitude_states: vec![valid_q.clone()],
+        };
+        assert!(data_q.validate("EULER_ANGLE").is_err());
+
+        // Check all other variants against a wrong type declaration
+        let cases = vec![
+            ("QUATERNION/DERIVATIVE", valid_q.clone()),
+            ("QUATERNION/ANGVEL", valid_q.clone()),
+            ("EULER_ANGLE/DERIVATIVE", valid_q.clone()),
+            ("EULER_ANGLE/ANGVEL", valid_q.clone()),
+            ("SPIN", valid_q.clone()),
+            ("SPIN/NUTATION", valid_q.clone()),
+            ("SPIN/NUTATION_MOM", valid_q.clone()),
+        ];
+
+        for (type_str, state) in cases {
+            let d = AemData {
+                comment: vec![],
+                attitude_states: vec![state],
+            };
+            assert!(
+                d.validate(type_str).is_err(),
+                "Expected error for type {}",
+                type_str
+            );
+        }
     }
 }

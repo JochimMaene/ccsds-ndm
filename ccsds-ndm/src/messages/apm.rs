@@ -10,31 +10,34 @@ use crate::common::{
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 
-//----------------------------------------------------------------------
-// Root APM Structure
-//----------------------------------------------------------------------
-
 /// Attitude Parameter Message (APM).
 ///
-/// An APM specifies the attitude state of a single object at a specified epoch. This message is
-/// suited to interagency exchanges that (1) involve automated interaction and/or human
-/// interaction, and (2) do not require high-fidelity dynamic modeling.
+/// An APM specifies the attitude state of a single object at a specified epoch. This message
+/// is suited to interagency exchanges that involve automated interaction and/or human
+/// interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
+///
+/// The APM requires the use of a propagation technique to determine the attitude state at
+/// times different from the specified epoch.
 ///
 /// **CCSDS Reference**: 504.0-B-2, Section 3.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "apm")]
 pub struct Apm {
     pub header: AdmHeader,
     pub body: ApmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
+
+impl crate::traits::Validate for Apm {}
 
 impl Ndm for Apm {
     fn to_kvn(&self) -> Result<String> {
@@ -63,6 +66,7 @@ impl Ndm for Apm {
 
 impl Apm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         // Validation logic can be added here
         // E.g. check at least one logical block is present in segment
         self.body.segment.validate()?;
@@ -82,7 +86,7 @@ impl ToKvn for Apm {
 // Body & Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct ApmBody {
     // XSD says minOccurs=1 maxOccurs=1 for APM segment!
     #[serde(rename = "segment")]
@@ -95,7 +99,7 @@ impl ToKvn for ApmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct ApmSegment {
     pub metadata: ApmMetadata,
     pub data: ApmData,
@@ -131,7 +135,7 @@ impl ToKvn for ApmSegment {
 }
 
 /// APM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct ApmMetadata {
     /// Comments (allowed only at the beginning of the APM Metadata before OBJECT_NAME). Each
@@ -141,6 +145,7 @@ pub struct ApmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
@@ -151,6 +156,7 @@ pub struct ApmMetadata {
     /// **Examples**: EUTELSAT W1, MARS PATHFINDER, UNKNOWN
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
+    #[builder(into)]
     pub object_name: String,
     /// Spacecraft identifier of the object corresponding to the attitude data to be given. While
     /// there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
@@ -165,6 +171,7 @@ pub struct ApmMetadata {
     /// **Examples**: 2000-052A
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
+    #[builder(into)]
     pub object_id: String,
     /// Celestial body orbited by the object, which may be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -174,6 +181,7 @@ pub struct ApmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub center_name: Option<String>,
     /// Time system used for attitude and maneuver data. The set of allowed values is described in
     /// annex B, subsection B2.
@@ -181,6 +189,7 @@ pub struct ApmMetadata {
     /// **Examples**: UTC, TAI
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
+    #[builder(into)]
     pub time_system: String,
 }
 
@@ -197,13 +206,14 @@ impl ToKvn for ApmMetadata {
 }
 
 /// APM Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct ApmData {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of the attitude elements and optional logical blocks.
     ///
@@ -218,6 +228,7 @@ pub struct ApmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub quaternion_state: Vec<QuaternionState>,
     /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
     /// block is present. (See annex F for conventions and further detail.)
@@ -228,6 +239,7 @@ pub struct ApmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub euler_angle_state: Vec<EulerAngleState>,
     /// Angular velocity vector. All mandatory elements are to be provided if the block is present.
     /// (See annex F for conventions and further detail.)
@@ -238,18 +250,21 @@ pub struct ApmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub angular_velocity: Vec<AngVelState>,
     /// Spin. All mandatory elements are to be provided if the block is present. (See annex F for
     /// conventions and further detail.)
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(rename = "spin", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub spin: Vec<SpinState>,
     /// Inertia. All mandatory elements are to be provided if the block is present. (See annex F
     /// for conventions and further detail.)
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(rename = "inertia", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub inertia: Vec<InertiaState>,
     /// Maneuver Parameters. All mandatory elements are to be provided if the block is present.
     /// (See annex F for conventions and further detail.)
@@ -260,6 +275,7 @@ pub struct ApmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub maneuver_parameters: Vec<AttManeuverState>,
 }
 
@@ -435,5 +451,40 @@ EULER_STOP
         let apm = Apm::from_kvn(kvn).unwrap();
         assert_eq!(apm.body.segment.data.quaternion_state.len(), 1);
         assert_eq!(apm.body.segment.data.euler_angle_state.len(), 1);
+    }
+    #[test]
+    fn test_apm_validation_single_blocks() {
+        // Test that having just one block is sufficient
+        let mut apm = Apm::from_kvn(&sample_apm_kvn()).unwrap();
+
+        // Clear all blocks
+        apm.body.segment.data.quaternion_state.clear();
+        assert!(apm.validate().is_err()); // Now empty
+
+        // Add just Inertia
+        apm.body.segment.data.inertia.push(InertiaState {
+            comment: vec![],
+            inertia_ref_frame: "SC_BODY".to_string(),
+            ixx: crate::types::Moment::new(1.0, None),
+            iyy: crate::types::Moment::new(2.0, None),
+            izz: crate::types::Moment::new(3.0, None),
+            ixy: crate::types::Moment::new(0.0, None),
+            ixz: crate::types::Moment::new(0.0, None),
+            iyz: crate::types::Moment::new(0.0, None),
+        });
+        assert!(apm.validate().is_ok());
+
+        // Clear and add just Angular Velocity
+        apm.body.segment.data.inertia.clear();
+        apm.body.segment.data.angular_velocity.push(AngVelState {
+            comment: vec![],
+            ref_frame_a: "GCRF".to_string(),
+            ref_frame_b: "SC_BODY".to_string(),
+            angvel_frame: crate::types::AngVelFrameType("SC_BODY".to_string()),
+            angvel_x: crate::types::AngleRate::new(0.1, None),
+            angvel_y: crate::types::AngleRate::new(0.1, None),
+            angvel_z: crate::types::AngleRate::new(0.1, None),
+        });
+        assert!(apm.validate().is_ok());
     }
 }

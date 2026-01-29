@@ -17,11 +17,13 @@ use std::str::FromStr;
 /// Attitude Ephemeris Message (AEM).
 ///
 /// An AEM specifies the attitude state of a single object at multiple epochs, contained within a
-/// specified time range. The AEM is suited to interagency exchanges that (1) involve automated
-/// interaction (e.g., computer-to-computer communication for which frequent, fast, automated time
-/// interpretation and processing are required), and (2) require higher fidelity or higher
-/// precision dynamic modeling than is possible with the APM (e.g., flexible structures, more
-/// complex attitude movement, etc.).
+/// specified time range. The AEM is suited to interagency exchanges that involve automated
+/// interaction and require higher fidelity or higher precision dynamic modeling than is
+/// possible with the APM.
+///
+/// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
+/// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
+/// the attitude state at times different from the tabular epochs.
 #[pyclass]
 #[derive(Clone)]
 pub struct Aem {
@@ -89,11 +91,13 @@ impl Aem {
     /// Attitude Ephemeris Message (AEM).
     ///
     /// An AEM specifies the attitude state of a single object at multiple epochs, contained within a
-    /// specified time range. The AEM is suited to interagency exchanges that (1) involve automated
-    /// interaction (e.g., computer-to-computer communication for which frequent, fast, automated time
-    /// interpretation and processing are required), and (2) require higher fidelity or higher
-    /// precision dynamic modeling than is possible with the APM (e.g., flexible structures, more
-    /// complex attitude movement, etc.).
+    /// specified time range. The AEM is suited to interagency exchanges that involve automated
+    /// interaction and require higher fidelity or higher precision dynamic modeling than is
+    /// possible with the APM.
+    ///
+    /// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
+    /// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
+    /// the attitude state at times different from the tabular epochs.
     ///
     /// :type: AdmHeader
     #[getter]
@@ -464,7 +468,7 @@ impl AemData {
                 let (epoch, values) = match s.content() {
                     Some(ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v)) =>
                         (v.epoch, vec![v.quaternion.q1, v.quaternion.q2, v.quaternion.q3, v.quaternion.qc]),
-                    _ => (ccsds_ndm::types::Epoch::default(), vec![]), // TODO: implement other variants
+                    _ => (ccsds_ndm::types::Epoch::new("1958-01-01T00:00:00").unwrap(), vec![]), // TODO: implement other variants
                 };
                 AttitudeState { epoch, values }
             })
@@ -485,7 +489,7 @@ impl AemData {
                 let values = match content {
                     ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) =>
                         (v.epoch, vec![v.quaternion.q1, v.quaternion.q2, v.quaternion.q3, v.quaternion.qc]),
-                    _ => (ccsds_ndm::types::Epoch::default(), vec![]),
+                    _ => (ccsds_ndm::types::Epoch::new("1958-01-01T00:00:00").unwrap(), vec![]),
                 };
                 epochs.push(values.0.as_str().to_string());
                 max_cols = max_cols.max(values.1.len());

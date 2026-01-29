@@ -32,6 +32,7 @@ use winnow::error::{
     AddContext, ErrMode, FromExternalError, ParserError, StrContext, StrContextValue,
 };
 use winnow::prelude::*;
+use winnow::stream::Offset;
 use winnow::token::{one_of, take_till, take_while};
 
 /// A result type for winnow parsers using the library's internal lightweight error type.
@@ -839,6 +840,10 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 break;
             }
         }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     Ok(OdmHeader {
@@ -895,6 +900,10 @@ pub fn adm_header(input: &mut &str) -> KvnResult<AdmHeader> {
                 input.reset(&checkpoint);
                 break;
             }
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
         }
     }
 
@@ -1056,9 +1065,9 @@ pub fn spacecraft_parameters(input: &mut &str) -> KvnResult<Option<SpacecraftPar
     parse_block!(input, comment, {
         "MASS" => mass: kv_from_kvn,
         "SOLAR_RAD_AREA" => solar_rad_area: kv_from_kvn,
-        "SOLAR_RAD_COEFF" => val: kv_float => { solar_rad_coeff = Some(val.into()); },
+        "SOLAR_RAD_COEFF" => solar_rad_coeff: kv_from_kvn,
         "DRAG_AREA" => drag_area: kv_from_kvn,
-        "DRAG_COEFF" => val: kv_float => { drag_coeff = Some(val.into()); },
+        "DRAG_COEFF" => drag_coeff: kv_from_kvn,
     }, |_| false);
 
     // If we have any spacecraft data, build the struct
@@ -1097,12 +1106,16 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
             comment.extend(comments);
             let val = kv_string.parse_next(input)?;
             params.push(UserDefinedParameter {
-                parameter: key.to_string(),
+                parameter: key.strip_prefix("USER_DEFINED_").unwrap().to_string(),
                 value: val,
             });
         } else {
             // Backtrack and end user defined section
             input.reset(&checkpoint);
+            break;
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
             break;
         }
     }
@@ -1221,5 +1234,34 @@ mod tests {
         let mut input = "2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0\n";
         let content = raw_line.parse_next(&mut input).unwrap();
         assert_eq!(content, "2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0");
+    }
+
+    #[test]
+    fn test_malformed_key_value() {
+        // Missing equals
+        let mut input = "KEY value\n";
+        assert!(key_value_line.parse_next(&mut input).is_err());
+
+        // Missing value (valid in some contexts? No, value parser expects something)
+        // Actually, empty values might be allowed if line ends?
+        // kvn_value parses `take_till(...)`
+        let mut input_empty = "KEY =\n";
+        let (_, val, _) = key_value_line.parse_next(&mut input_empty).unwrap();
+        assert_eq!(val, ""); // It allows empty values currently
+    }
+
+    #[test]
+    fn test_whitespace_variations() {
+        let mut input = "  KEY  =  value  [unit]  \n";
+        let (key, val, unit) = key_value_line.parse_next(&mut input).unwrap();
+        assert_eq!(key, "KEY");
+        assert_eq!(val, "value");
+        assert_eq!(unit, Some("unit"));
+    }
+
+    #[test]
+    fn test_broken_unit() {
+        let mut input = "KEY = value [unit\n"; // Missing closing bracket
+        assert!(key_value_line.parse_next(&mut input).is_err());
     }
 }

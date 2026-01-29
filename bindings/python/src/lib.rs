@@ -171,7 +171,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ocm::ManLine>()?;
     m.add_class::<ocm::OcmPerturbations>()?;
     m.add_class::<ocm::OcmOdParameters>()?;
-    m.add_class::<ocm::UserDefined>()?;
+    m.add_class::<types::UserDefined>()?;
 
     // Register TDM wrapper classes
     m.add_class::<tdm::Tdm>()?;

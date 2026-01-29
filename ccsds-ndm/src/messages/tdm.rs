@@ -16,23 +16,36 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt;
 
-//----------------------------------------------------------------------
-// Root TDM Structure
-//----------------------------------------------------------------------
-
 /// Tracking Data Message (TDM).
 ///
-/// The TDM specifies a standard message format for use in exchanging tracking data.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// The TDM specifies a standard message format for use in exchanging spacecraft tracking data
+/// between space agencies. Such exchanges are used for distributing tracking data output from
+/// routine interagency cross-supports.
+///
+/// Tracking data includes data types such as:
+/// - Doppler
+/// - Transmit/Received frequencies
+/// - Range
+/// - Angles
+/// - Delta-DOR
+/// - Media correction (ionosphere, troposphere)
+/// - Meteorological data
+///
+/// **CCSDS Reference**: 503.0-B-2.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "tdm")]
 pub struct Tdm {
     pub header: TdmHeader,
     pub body: TdmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
+
+impl crate::traits::Validate for Tdm {}
 
 impl Ndm for Tdm {
     fn to_kvn(&self) -> Result<String> {
@@ -61,6 +74,7 @@ impl Ndm for Tdm {
 
 impl Tdm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.validate()
     }
 }
@@ -78,7 +92,7 @@ impl ToKvn for Tdm {
 //----------------------------------------------------------------------
 
 /// Represents the `tdmHeader` complex type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TdmHeader {
     /// Comments (allowed in the TDM Header only immediately after the TDM version number).
@@ -88,6 +102,7 @@ pub struct TdmHeader {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Data creation date/time in UTC. (For format specification, see 4.3.9.)
     ///
@@ -96,12 +111,13 @@ pub struct TdmHeader {
     /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
     pub creation_date: Epoch,
     /// Creating agency. Value should be an entry from the ‘Abbreviation’ column in the SANA
-    /// Organizations Registry, https://sanaregistry.org/r/organizations/organizations.html
-    /// (reference [11]).
+    /// Organizations Registry, <https://sanaregistry.org/r/organizations/organizations.html>
+    /// (reference `[11]`).
     ///
     /// **Examples**: CNES, ESA, GSFC, DLR, JPL, JAXA
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
+    #[builder(into)]
     pub originator: String,
     /// ID that uniquely identifies a message from a given originator. The format and content
     /// of the message identifier value are at the discretion of the originator.
@@ -110,7 +126,14 @@ pub struct TdmHeader {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub message_id: Option<String>,
+}
+
+impl TdmHeader {
+    pub fn validate(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl ToKvn for TdmHeader {
@@ -129,9 +152,10 @@ impl ToKvn for TdmHeader {
 //----------------------------------------------------------------------
 
 /// The TDM Body consists of one or more TDM Segments.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct TdmBody {
     #[serde(rename = "segment")]
+    #[builder(default)]
     pub segments: Vec<TdmSegment>,
 }
 
@@ -152,7 +176,7 @@ impl TdmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct TdmSegment {
     /// Metadata section for this TDM segment.
     pub metadata: TdmMetadata,
@@ -177,11 +201,12 @@ impl ToKvn for TdmSegment {
 // Metadata
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TdmMetadata {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// The TRACK_ID keyword specifies a unique identifier for the tracking data in the
     /// associated data section. The value may be a freely selected string of characters and
@@ -193,6 +218,7 @@ pub struct TdmMetadata {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub track_id: Option<String>,
     /// Comma-separated list of data types in the Data Section. The elements of the list shall
     /// be selected from the data types shown in table 3-5, with the exception of the
@@ -202,16 +228,18 @@ pub struct TdmMetadata {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub data_types: Option<String>,
     /// The TIME_SYSTEM keyword shall specify the time system used for timetags in the
     /// associated Data Section. This should be UTC for ground-based data. The value associated
     /// with this keyword must be selected from the full set of allowed values enumerated in
-    /// the SANA Time Systems Registry https://sanaregistry.org/r/time_systems (reference [12]).
+    /// the SANA Time Systems Registry <https://sanaregistry.org/r/time_systems> (reference `[12]`).
     /// (See annex B.)
     ///
     /// **Examples**: UTC, TAI, GPS, SCLK
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
+    #[builder(into)]
     pub time_system: String,
     /// The START_TIME keyword shall specify the UTC start time of the total time span covered
     /// by the tracking data immediately following this Metadata Section. (For format
@@ -236,21 +264,26 @@ pub struct TdmMetadata {
     /// (max index is 5). At least two participants must be specified for most sessions; for
     /// some special TDMs such as tropospheric media, only one participant need be listed.
     ///
-    /// **Examples**: DSS-63-S400K, ROSETTA, <Quasar catalog name>, 1997-061A, UNKNOWN
+    /// **Examples**: DSS-63-S400K, ROSETTA, `<Quasar catalog name>`, 1997-061A, UNKNOWN
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
+    #[builder(into)]
     pub participant_1: String,
     /// The second participant in a tracking data session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub participant_2: Option<String>,
     /// The third participant in a tracking data session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub participant_3: Option<String>,
     /// The fourth participant in a tracking data session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub participant_4: Option<String>,
     /// The fifth participant in a tracking data session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub participant_5: Option<String>,
     /// The MODE keyword shall reflect the tracking mode associated with the Data Section of
     /// the segment. The value ‘SEQUENTIAL’ applies for most sequential signal paths; the name
@@ -286,6 +319,7 @@ pub struct TdmMetadata {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub transmit_band: Option<String>,
     /// The RECEIVE_BAND keyword shall indicate the frequency band for received frequencies.
     /// Although not required in general, the RECEIVE_BAND must be present if the MODE is
@@ -296,6 +330,7 @@ pub struct TdmMetadata {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub receive_band: Option<String>,
     /// The TURNAROUND_NUMERATOR keyword shall indicate the numerator of the turnaround ratio
     /// that is necessary to calculate the coherent downlink from the uplink frequency.
@@ -406,6 +441,7 @@ pub struct TdmMetadata {
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub interpolation: Option<String>,
     /// The INTERPOLATION_DEGREE keyword shall specify the recommended degree of the
     /// interpolating polynomial used to calculate a transmit phase count at an arbitrary time
@@ -564,26 +600,31 @@ pub struct TdmMetadata {
     ///
     /// Examples: SATELLITE_A_EPHEM27
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name_1: Option<String>,
     /// Unique name of the external ephemeris file used for participant 2.
     ///
     /// Examples: SATELLITE_A_EPHEM27
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name_2: Option<String>,
     /// Unique name of the external ephemeris file used for participant 3.
     ///
     /// Examples: SATELLITE_A_EPHEMERIS
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name_3: Option<String>,
     /// Unique name of the external ephemeris file used for participant 4.
     ///
     /// Examples: SATELLITE_A_EPHEMERIS
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name_4: Option<String>,
     /// Unique name of the external ephemeris file used for participant 5.
     ///
     /// Examples: SATELLITE_A_EPHEMERIS
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name_5: Option<String>,
 }
 
@@ -798,13 +839,15 @@ impl ToKvn for TdmMetadata {
 //----------------------------------------------------------------------
 
 /// The Data Section of the TDM Segment consists of one or more Tracking Data Records.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct TdmData {
     /// Comments.
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Tracking data records.
     #[serde(rename = "observation")]
+    #[builder(default)]
     pub observations: Vec<TdmObservation>,
 }
 
@@ -827,7 +870,7 @@ impl ToKvn for TdmData {
 //----------------------------------------------------------------------
 
 /// A single tracking data record consisting of a timetag and a measurement.
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct TdmObservation {
     /// Time associated with the tracking observable.
     #[serde(rename = "EPOCH")]
@@ -1490,5 +1533,488 @@ DATA_STOP
         let tdm2 = Tdm::from_kvn(&generated_kvn).expect("parse generated kvn");
 
         assert_eq!(tdm.header.creation_date, tdm2.header.creation_date);
+    }
+
+    #[test]
+    fn test_tdm_validation_path_exclusive() {
+        // TDM cannot have both PATH and PATH_1/PATH_2
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+PARTICIPANT_1 = P1
+PARTICIPANT_2 = P2
+MODE = SEQUENTIAL
+PATH = 1,2
+PATH_1 = 1,2
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_tdm_validation_path_pairs() {
+        // TDM must have both PATH_1 and PATH_2 if one is present
+        let kvn_p1_only = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+PARTICIPANT_1 = P1
+PARTICIPANT_2 = P2
+MODE = SINGLE_DIFF
+PATH_1 = 1,2
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn_p1_only).is_err());
+    }
+
+    #[test]
+    fn test_tdm_validation_missing_mandatory() {
+        // Missing TIME_SYSTEM
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+PARTICIPANT_1 = P1
+PARTICIPANT_2 = P2
+MODE = SEQUENTIAL
+PATH = 1,2
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_exhaustive_observation_data() {
+        // Exercise every variant of TdmObservationData
+        use crate::types::Percentage;
+        let cases = vec![
+            ("ANGLE_1", TdmObservationData::Angle1(1.0)),
+            ("ANGLE_2", TdmObservationData::Angle2(2.0)),
+            ("CARRIER_POWER", TdmObservationData::CarrierPower(3.0)),
+            ("CLOCK_BIAS", TdmObservationData::ClockBias(4.0)),
+            ("CLOCK_DRIFT", TdmObservationData::ClockDrift(5.0)),
+            ("DOPPLER_COUNT", TdmObservationData::DopplerCount(6.0)),
+            (
+                "DOPPLER_INSTANTANEOUS",
+                TdmObservationData::DopplerInstantaneous(7.0),
+            ),
+            (
+                "DOPPLER_INTEGRATED",
+                TdmObservationData::DopplerIntegrated(8.0),
+            ),
+            ("DOR", TdmObservationData::Dor(9.0)),
+            ("MAG", TdmObservationData::Mag(10.0)),
+            ("PC_N0", TdmObservationData::PcN0(11.0)),
+            ("PR_N0", TdmObservationData::PrN0(12.0)),
+            ("PRESSURE", TdmObservationData::Pressure(13.0)),
+            ("RANGE", TdmObservationData::Range(14.0)),
+            ("RCS", TdmObservationData::Rcs(15.0)),
+            ("RECEIVE_FREQ", TdmObservationData::ReceiveFreq(16.0)),
+            ("RECEIVE_FREQ_1", TdmObservationData::ReceiveFreq1(17.0)),
+            ("RECEIVE_FREQ_2", TdmObservationData::ReceiveFreq2(18.0)),
+            ("RECEIVE_FREQ_3", TdmObservationData::ReceiveFreq3(19.0)),
+            ("RECEIVE_FREQ_4", TdmObservationData::ReceiveFreq4(20.0)),
+            ("RECEIVE_FREQ_5", TdmObservationData::ReceiveFreq5(21.0)),
+            (
+                "RECEIVE_PHASE_CT_1",
+                TdmObservationData::ReceivePhaseCt1(22.0),
+            ),
+            (
+                "RECEIVE_PHASE_CT_2",
+                TdmObservationData::ReceivePhaseCt2(23.0),
+            ),
+            (
+                "RECEIVE_PHASE_CT_3",
+                TdmObservationData::ReceivePhaseCt3(24.0),
+            ),
+            (
+                "RECEIVE_PHASE_CT_4",
+                TdmObservationData::ReceivePhaseCt4(25.0),
+            ),
+            (
+                "RECEIVE_PHASE_CT_5",
+                TdmObservationData::ReceivePhaseCt5(26.0),
+            ),
+            (
+                "RHUMIDITY",
+                TdmObservationData::Rhumidity(Percentage::new(50.0, None).unwrap()),
+            ),
+            ("STEC", TdmObservationData::Stec(27.0)),
+            ("TEMPERATURE", TdmObservationData::Temperature(28.0)),
+            ("TRANSMIT_FREQ_1", TdmObservationData::TransmitFreq1(29.0)),
+            ("TRANSMIT_FREQ_2", TdmObservationData::TransmitFreq2(30.0)),
+            ("TRANSMIT_FREQ_3", TdmObservationData::TransmitFreq3(31.0)),
+            ("TRANSMIT_FREQ_4", TdmObservationData::TransmitFreq4(32.0)),
+            ("TRANSMIT_FREQ_5", TdmObservationData::TransmitFreq5(33.0)),
+            (
+                "TRANSMIT_FREQ_RATE_1",
+                TdmObservationData::TransmitFreqRate1(34.0),
+            ),
+            (
+                "TRANSMIT_FREQ_RATE_2",
+                TdmObservationData::TransmitFreqRate2(35.0),
+            ),
+            (
+                "TRANSMIT_FREQ_RATE_3",
+                TdmObservationData::TransmitFreqRate3(36.0),
+            ),
+            (
+                "TRANSMIT_FREQ_RATE_4",
+                TdmObservationData::TransmitFreqRate4(37.0),
+            ),
+            (
+                "TRANSMIT_FREQ_RATE_5",
+                TdmObservationData::TransmitFreqRate5(38.0),
+            ),
+            (
+                "TRANSMIT_PHASE_CT_1",
+                TdmObservationData::TransmitPhaseCt1(39.0),
+            ),
+            (
+                "TRANSMIT_PHASE_CT_2",
+                TdmObservationData::TransmitPhaseCt2(40.0),
+            ),
+            (
+                "TRANSMIT_PHASE_CT_3",
+                TdmObservationData::TransmitPhaseCt3(41.0),
+            ),
+            (
+                "TRANSMIT_PHASE_CT_4",
+                TdmObservationData::TransmitPhaseCt4(42.0),
+            ),
+            (
+                "TRANSMIT_PHASE_CT_5",
+                TdmObservationData::TransmitPhaseCt5(43.0),
+            ),
+            ("TROPO_DRY", TdmObservationData::TropoDry(44.0)),
+            ("TROPO_WET", TdmObservationData::TropoWet(45.0)),
+            ("VLBI_DELAY", TdmObservationData::VlbiDelay(46.0)),
+        ];
+
+        for (expected_key, data) in cases {
+            assert_eq!(data.key(), expected_key);
+            let val_str = data.value_to_string();
+            let parsed = TdmObservationData::from_key_val(expected_key, &val_str).unwrap();
+            assert_eq!(data, parsed);
+        }
+    }
+
+    #[test]
+    fn test_tdm_metadata_indexed_fields() {
+        let meta = TdmMetadata::builder()
+            .time_system("UTC")
+            .participant_1("P1")
+            .participant_2("P2")
+            .participant_3("P3")
+            .participant_4("P4")
+            .participant_5("P5")
+            .ephemeris_name_1("E1")
+            .ephemeris_name_2("E2")
+            .ephemeris_name_3("E3")
+            .ephemeris_name_4("E4")
+            .ephemeris_name_5("E5")
+            .transmit_delay_1(0.1)
+            .transmit_delay_2(0.2)
+            .transmit_delay_3(0.3)
+            .transmit_delay_4(0.4)
+            .transmit_delay_5(0.5)
+            .receive_delay_1(1.1)
+            .receive_delay_2(1.2)
+            .receive_delay_3(1.3)
+            .receive_delay_4(1.4)
+            .receive_delay_5(1.5)
+            .build();
+
+        let mut writer = KvnWriter::new();
+        meta.write_kvn(&mut writer);
+        let out = writer.finish();
+        assert!(out.contains("PARTICIPANT_5"));
+        assert!(out.contains("EPHEMERIS_NAME_5"));
+        assert!(out.contains("TRANSMIT_DELAY_5"));
+        assert!(out.contains("RECEIVE_DELAY_5"));
+    }
+
+    #[test]
+    fn test_tdm_correction_keywords() {
+        let meta = TdmMetadata::builder()
+            .time_system("UTC")
+            .participant_1("P1")
+            .correction_angle_1(0.1)
+            .correction_angle_2(0.2)
+            .correction_doppler(0.3)
+            .correction_mag(0.4)
+            .correction_range(0.5)
+            .correction_rcs(0.6)
+            .correction_receive(0.7)
+            .correction_transmit(0.8)
+            .correction_aberration_yearly(0.9)
+            .correction_aberration_diurnal(1.0)
+            .corrections_applied(YesNo::Yes)
+            .build();
+
+        let mut writer = KvnWriter::new();
+        meta.write_kvn(&mut writer);
+        let out = writer.finish();
+        assert!(out.contains("CORRECTION_ANGLE_1"));
+        assert!(out.contains("CORRECTION_ABERRATION_DIURNAL"));
+        assert!(out.contains("CORRECTIONS_APPLIED"));
+    }
+
+    #[test]
+    fn test_tdm_observation_data_errors() {
+        // Invalid float
+        assert!(TdmObservationData::from_key_val("RANGE", "abc").is_err());
+        // Unknown key
+        assert!(TdmObservationData::from_key_val("UNKNOWN", "1.0").is_err());
+    }
+
+    #[test]
+    fn test_tdm_xml_exhaustive_observations() {
+        // Exercise XML deserializer for a wide range of observation types
+        let xml = r#"<tdm version="2.0">
+  <header>
+    <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
+    <ORIGINATOR>TEST</ORIGINATOR>
+  </header>
+  <body>
+    <segment>
+      <metadata>
+        <TIME_SYSTEM>UTC</TIME_SYSTEM>
+        <PARTICIPANT_1>P1</PARTICIPANT_1>
+      </metadata>
+      <data>
+        <observation>
+          <EPOCH>2023-01-01T00:00:00</EPOCH>
+          <ANGLE_1>1.0</ANGLE_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:01:00</EPOCH>
+          <ANGLE_2>2.0</ANGLE_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:02:00</EPOCH>
+          <CARRIER_POWER>3.0</CARRIER_POWER>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:03:00</EPOCH>
+          <CLOCK_BIAS>4.0</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:04:00</EPOCH>
+          <CLOCK_DRIFT>5.0</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:05:00</EPOCH>
+          <DOPPLER_COUNT>6.0</DOPPLER_COUNT>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:06:00</EPOCH>
+          <DOPPLER_INSTANTANEOUS>7.0</DOPPLER_INSTANTANEOUS>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:07:00</EPOCH>
+          <DOPPLER_INTEGRATED>8.0</DOPPLER_INTEGRATED>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:08:00</EPOCH>
+          <DOR>9.0</DOR>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:09:00</EPOCH>
+          <MAG>10.0</MAG>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:10:00</EPOCH>
+          <PC_N0>11.0</PC_N0>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:11:00</EPOCH>
+          <PR_N0>12.0</PR_N0>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:12:00</EPOCH>
+          <PRESSURE>13.0</PRESSURE>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:13:00</EPOCH>
+          <RANGE>14.0</RANGE>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:14:00</EPOCH>
+          <RCS>15.0</RCS>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:15:00</EPOCH>
+          <RECEIVE_FREQ>16.0</RECEIVE_FREQ>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:16:00</EPOCH>
+          <RECEIVE_FREQ_1>17.0</RECEIVE_FREQ_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:17:00</EPOCH>
+          <RECEIVE_FREQ_2>18.0</RECEIVE_FREQ_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:18:00</EPOCH>
+          <RECEIVE_FREQ_3>19.0</RECEIVE_FREQ_3>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:19:00</EPOCH>
+          <RECEIVE_FREQ_4>20.0</RECEIVE_FREQ_4>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:20:00</EPOCH>
+          <RECEIVE_FREQ_5>21.0</RECEIVE_FREQ_5>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:21:00</EPOCH>
+          <RECEIVE_PHASE_CT_1>22.0</RECEIVE_PHASE_CT_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:22:00</EPOCH>
+          <RECEIVE_PHASE_CT_2>23.0</RECEIVE_PHASE_CT_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:23:00</EPOCH>
+          <RECEIVE_PHASE_CT_3>24.0</RECEIVE_PHASE_CT_3>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:24:00</EPOCH>
+          <RECEIVE_PHASE_CT_4>25.0</RECEIVE_PHASE_CT_4>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:25:00</EPOCH>
+          <RECEIVE_PHASE_CT_5>26.0</RECEIVE_PHASE_CT_5>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:26:00</EPOCH>
+          <RHUMIDITY>27.0</RHUMIDITY>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:27:00</EPOCH>
+          <STEC>28.0</STEC>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:28:00</EPOCH>
+          <TEMPERATURE>29.0</TEMPERATURE>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:29:00</EPOCH>
+          <TRANSMIT_FREQ_1>30.0</TRANSMIT_FREQ_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:30:00</EPOCH>
+          <TRANSMIT_FREQ_2>31.0</TRANSMIT_FREQ_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:31:00</EPOCH>
+          <TRANSMIT_FREQ_3>32.0</TRANSMIT_FREQ_3>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:32:00</EPOCH>
+          <TRANSMIT_FREQ_4>33.0</TRANSMIT_FREQ_4>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:33:00</EPOCH>
+          <TRANSMIT_FREQ_5>34.0</TRANSMIT_FREQ_5>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:34:00</EPOCH>
+          <TRANSMIT_FREQ_RATE_1>35.0</TRANSMIT_FREQ_RATE_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:35:00</EPOCH>
+          <TRANSMIT_FREQ_RATE_2>36.0</TRANSMIT_FREQ_RATE_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:36:00</EPOCH>
+          <TRANSMIT_FREQ_RATE_3>37.0</TRANSMIT_FREQ_RATE_3>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:37:00</EPOCH>
+          <TRANSMIT_FREQ_RATE_4>38.0</TRANSMIT_FREQ_RATE_4>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:38:00</EPOCH>
+          <TRANSMIT_FREQ_RATE_5>39.0</TRANSMIT_FREQ_RATE_5>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:39:00</EPOCH>
+          <TRANSMIT_PHASE_CT_1>40.0</TRANSMIT_PHASE_CT_1>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:40:00</EPOCH>
+          <TRANSMIT_PHASE_CT_2>41.0</TRANSMIT_PHASE_CT_2>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:41:00</EPOCH>
+          <TRANSMIT_PHASE_CT_3>42.0</TRANSMIT_PHASE_CT_3>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:42:00</EPOCH>
+          <TRANSMIT_PHASE_CT_4>43.0</TRANSMIT_PHASE_CT_4>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:43:00</EPOCH>
+          <TRANSMIT_PHASE_CT_5>44.0</TRANSMIT_PHASE_CT_5>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:44:00</EPOCH>
+          <TROPO_DRY>45.0</TROPO_DRY>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:45:00</EPOCH>
+          <TROPO_WET>46.0</TROPO_WET>
+        </observation>
+        <observation>
+          <EPOCH>2023-01-01T00:46:00</EPOCH>
+          <VLBI_DELAY>47.0</VLBI_DELAY>
+        </observation>
+      </data>
+    </segment>
+  </body>
+</tdm>"#;
+        let tdm = Tdm::from_xml(xml).expect("parse tdm xml");
+        assert_eq!(tdm.body.segments[0].data.observations.len(), 47);
+        let obs3 = &tdm.body.segments[0].data.observations[20];
+        match obs3.data {
+            TdmObservationData::ReceiveFreq5(v) => assert_eq!(v, 21.0),
+            _ => panic!("Expected ReceiveFreq5"),
+        }
+
+        // Test duplicate EPOCH error handling
+        let xml_dup = r#"<tdm version="2.0">
+  <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
+  <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
+  <data><observation><EPOCH>2023-01-01T00:00:00</EPOCH><EPOCH>2023-01-01T00:00:01</EPOCH><RANGE>1.0</RANGE></observation></data>
+  </segment></body></tdm>"#;
+        assert!(Tdm::from_xml(xml_dup).is_err());
+
+        // Test unknown attribute/field skip
+        let xml_unknown = r#"<tdm version="2.0" extra="val">
+  <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
+  <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
+  <data><observation extra="ignore"><EPOCH>2023-01-01T00:00:00</EPOCH><RANGE>1.0</RANGE></observation></data>
+  </segment></body></tdm>"#;
+        assert!(Tdm::from_xml(xml_unknown).is_ok());
     }
 }

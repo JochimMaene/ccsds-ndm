@@ -14,9 +14,12 @@ use std::fs;
 
 /// Attitude Parameter Message (APM).
 ///
-/// An APM specifies the attitude state of a single object at a specified epoch. This message is
-/// suited to interagency exchanges that (1) involve automated interaction and/or human
-/// interaction, and (2) do not require high-fidelity dynamic modeling.
+/// An APM specifies the attitude state of a single object at a specified epoch. This message
+/// is suited to interagency exchanges that involve automated interaction and/or human
+/// interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
+///
+/// The APM requires the use of a propagation technique to determine the attitude state at
+/// times different from the specified epoch.
 #[pyclass]
 #[derive(Clone)]
 pub struct Apm {
@@ -83,9 +86,12 @@ impl Apm {
 
     /// Attitude Parameter Message (APM).
     ///
-    /// An APM specifies the attitude state of a single object at a specified epoch. This message is
-    /// suited to interagency exchanges that (1) involve automated interaction and/or human
-    /// interaction, and (2) do not require high-fidelity dynamic modeling.
+    /// An APM specifies the attitude state of a single object at a specified epoch. This message
+    /// is suited to interagency exchanges that involve automated interaction and/or human
+    /// interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
+    ///
+    /// The APM requires the use of a propagation technique to determine the attitude state at
+    /// times different from the specified epoch.
     ///
     /// :type: AdmHeader
     #[getter]

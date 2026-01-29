@@ -37,15 +37,17 @@ fn validate_unit<T: Default + std::fmt::Display + PartialEq>(
     Ok(())
 }
 
-/// Represents a CCSDS Conjunction Data Message (CDM).
+/// Conjunction Data Message (CDM).
 ///
-/// The CDM specifies a standard message format for use in exchanging spacecraft
-/// conjunction information between originators of Conjunction Assessments (CAs)
-/// and satellite owner/operators and other authorized parties.
+/// The CDM contains information about a single conjunction between a primary object (Object1)
+/// and a secondary object (Object2). It allows satellite operators to evaluate the risk of
+/// collision and plan avoidance maneuvers.
 ///
-/// It contains information about a single conjunction between two objects,
-/// including their positions/velocities, covariances at TCA, and relative
-/// state data.
+/// The message includes:
+/// - Positions and velocities of both objects at Time of Closest Approach (TCA).
+/// - Covariance matrices for both objects at TCA.
+/// - Relative position and velocity of Object2 with respect to Object1.
+/// - Metadata describing how the data was determined (orbit determination settings).
 #[pyclass]
 #[derive(Clone)]
 pub struct Cdm {
@@ -175,7 +177,17 @@ impl Cdm {
         }
     }
 
-    /// The message header.
+    /// Conjunction Data Message (CDM).
+    ///
+    /// The CDM contains information about a single conjunction between a primary object (Object1)
+    /// and a secondary object (Object2). It allows satellite operators to evaluate the risk of
+    /// collision and plan avoidance maneuvers.
+    ///
+    /// The message includes:
+    /// - Positions and velocities of both objects at Time of Closest Approach (TCA).
+    /// - Covariance matrices for both objects at TCA.
+    /// - Relative position and velocity of Object2 with respect to Object1.
+    /// - Metadata describing how the data was determined (orbit determination settings).
     ///
     /// :type: CdmHeader
     #[getter]
@@ -289,7 +301,7 @@ impl CdmHeader {
     }
 
     /// Creating agency or owner/operator. Value should be the 'Abbreviation' value from the
-    /// SANA 'Organizations' registry (https://sanaregistry.org/r/organizations) for an
+    /// SANA 'Organizations' registry (<https://sanaregistry.org/r/organizations>) for an
     /// organization that has the Role of 'Conjunction Data Message Originator'. (See 5.2.9
     /// for formatting rules.)
     ///
@@ -1066,7 +1078,7 @@ impl CdmMetadata {
 
     /// The satellite catalog used for the object. Value should be taken from the SANA
     /// 'Conjunction Data Message CATALOG_NAME' registry
-    /// (https://sanaregistry.org/r/cdm_catalog). (See 5.2.9 for formatting rules.)
+    /// (<https://sanaregistry.org/r/cdm_catalog>). (See 5.2.9 for formatting rules.)
     ///
     /// Examples: SATCAT
     ///
@@ -1334,7 +1346,7 @@ impl CdmMetadata {
     }
 
     /// Name of the reference frame in which the state vector data are given. Value must be
-    /// selected from the list of values to the right (see reference [F1]) and be the same for
+    /// selected from the list of values to the right (see reference `[F1]`) and be the same for
     /// both Object1 and Object2.
     ///
     /// Examples: GCRF, EME2000, ITRF
@@ -2246,7 +2258,7 @@ impl CdmCovarianceMatrix {
         Ok(numpy_arr)
     }
 
-    /// Object covariance matrix [1,1].
+    /// Object covariance matrix `[1,1]`.
     ///
     /// Units: m²
     ///
@@ -2256,7 +2268,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cr_r(&mut self, v: f64) { self.inner.cr_r.value = v; }
 
-    /// Object covariance matrix [2,1].
+    /// Object covariance matrix `[2,1]`.
     ///
     /// Units: m²
     ///
@@ -2266,7 +2278,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_ct_r(&mut self, v: f64) { self.inner.ct_r.value = v; }
 
-    /// Object covariance matrix [2,2].
+    /// Object covariance matrix `[2,2]`.
     ///
     /// Units: m²
     ///
@@ -2276,7 +2288,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_ct_t(&mut self, v: f64) { self.inner.ct_t.value = v; }
 
-    /// Object covariance matrix [3,1].
+    /// Object covariance matrix `[3,1]`.
     ///
     /// Units: m²
     ///
@@ -2286,7 +2298,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cn_r(&mut self, v: f64) { self.inner.cn_r.value = v; }
 
-    /// Object covariance matrix [3,2].
+    /// Object covariance matrix `[3,2]`.
     ///
     /// Units: m²
     ///
@@ -2296,7 +2308,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cn_t(&mut self, v: f64) { self.inner.cn_t.value = v; }
 
-    /// Object covariance matrix [3,3].
+    /// Object covariance matrix `[3,3]`.
     ///
     /// Units: m²
     ///
@@ -2306,7 +2318,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cn_n(&mut self, v: f64) { self.inner.cn_n.value = v; }
 
-    /// Object covariance matrix [4,1].
+    /// Object covariance matrix `[4,1]`.
     ///
     /// Units: m²/s
     ///
@@ -2316,7 +2328,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_crdot_r(&mut self, v: f64) { self.inner.crdot_r.value = v; }
 
-    /// Object covariance matrix [4,2].
+    /// Object covariance matrix `[4,2]`.
     ///
     /// Units: m²/s
     ///
@@ -2326,7 +2338,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_crdot_t(&mut self, v: f64) { self.inner.crdot_t.value = v; }
 
-    /// Object covariance matrix [4,3].
+    /// Object covariance matrix `[4,3]`.
     ///
     /// Units: m²/s
     ///
@@ -2336,7 +2348,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_crdot_n(&mut self, v: f64) { self.inner.crdot_n.value = v; }
 
-    /// Object covariance matrix [4,4].
+    /// Object covariance matrix `[4,4]`.
     ///
     /// Units: m²/s²
     ///
@@ -2346,7 +2358,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_crdot_rdot(&mut self, v: f64) { self.inner.crdot_rdot.value = v; }
 
-    /// Object covariance matrix [5,1].
+    /// Object covariance matrix `[5,1]`.
     ///
     /// Units: m²/s
     ///
@@ -2356,7 +2368,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_ctdot_r(&mut self, v: f64) { self.inner.ctdot_r.value = v; }
 
-    /// Object covariance matrix [5,2].
+    /// Object covariance matrix `[5,2]`.
     ///
     /// Units: m²/s
     ///
@@ -2366,7 +2378,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_ctdot_t(&mut self, v: f64) { self.inner.ctdot_t.value = v; }
 
-    /// Object covariance matrix [5,3].
+    /// Object covariance matrix `[5,3]`.
     ///
     /// Units: m²/s
     ///
@@ -2376,7 +2388,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_ctdot_n(&mut self, v: f64) { self.inner.ctdot_n.value = v; }
 
-    /// Object covariance matrix [5,4].
+    /// Object covariance matrix `[5,4]`.
     ///
     /// Units: m²/s²
     ///
@@ -2386,7 +2398,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_ctdot_rdot(&mut self, v: f64) { self.inner.ctdot_rdot.value = v; }
 
-    /// Object covariance matrix [5,5].
+    /// Object covariance matrix `[5,5]`.
     ///
     /// Units: m²/s²
     ///
@@ -2396,7 +2408,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_ctdot_tdot(&mut self, v: f64) { self.inner.ctdot_tdot.value = v; }
 
-    /// Object covariance matrix [6,1].
+    /// Object covariance matrix `[6,1]`.
     ///
     /// Units: m²/s
     ///
@@ -2406,7 +2418,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cndot_r(&mut self, v: f64) { self.inner.cndot_r.value = v; }
 
-    /// Object covariance matrix [6,2].
+    /// Object covariance matrix `[6,2]`.
     ///
     /// Units: m²/s
     ///
@@ -2416,7 +2428,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cndot_t(&mut self, v: f64) { self.inner.cndot_t.value = v; }
 
-    /// Object covariance matrix [6,3].
+    /// Object covariance matrix `[6,3]`.
     ///
     /// Units: m²/s
     ///
@@ -2426,7 +2438,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cndot_n(&mut self, v: f64) { self.inner.cndot_n.value = v; }
 
-    /// Object covariance matrix [6,4].
+    /// Object covariance matrix `[6,4]`.
     ///
     /// Units: m²/s²
     ///
@@ -2436,7 +2448,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cndot_rdot(&mut self, v: f64) { self.inner.cndot_rdot.value = v; }
 
-    /// Object covariance matrix [6,5].
+    /// Object covariance matrix `[6,5]`.
     ///
     /// Units: m²/s²
     ///
@@ -2446,7 +2458,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cndot_tdot(&mut self, v: f64) { self.inner.cndot_tdot.value = v; }
 
-    /// Object covariance matrix [6,6].
+    /// Object covariance matrix `[6,6]`.
     ///
     /// Units: m²/s²
     ///
@@ -2456,7 +2468,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cndot_ndot(&mut self, v: f64) { self.inner.cndot_ndot.value = v; }
 
-    /// Object covariance matrix [7,1].
+    /// Object covariance matrix `[7,1]`.
     ///
     /// Units: m³/kg
     ///
@@ -2466,7 +2478,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cdrg_r(&mut self, v: Option<f64>) { self.inner.cdrg_r = v.map(|x| core_types::M3kg::new(x)); }
 
-    /// Object covariance matrix [7,2].
+    /// Object covariance matrix `[7,2]`.
     ///
     /// Units: m³/kg
     ///
@@ -2476,7 +2488,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cdrg_t(&mut self, v: Option<f64>) { self.inner.cdrg_t = v.map(|x| core_types::M3kg::new(x)); }
 
-    /// Object covariance matrix [7,3].
+    /// Object covariance matrix `[7,3]`.
     ///
     /// Units: m³/kg
     ///
@@ -2486,7 +2498,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cdrg_n(&mut self, v: Option<f64>) { self.inner.cdrg_n = v.map(|x| core_types::M3kg::new(x)); }
 
-    /// Object covariance matrix [7,4].
+    /// Object covariance matrix `[7,4]`.
     ///
     /// Units: m³/(kg*s)
     ///
@@ -2496,7 +2508,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cdrg_rdot(&mut self, v: Option<f64>) { self.inner.cdrg_rdot = v.map(|x| core_types::M3kgs::new(x)); }
 
-    /// Object covariance matrix [7,5].
+    /// Object covariance matrix `[7,5]`.
     ///
     /// Units: m³/(kg*s)
     ///
@@ -2506,7 +2518,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cdrg_tdot(&mut self, v: Option<f64>) { self.inner.cdrg_tdot = v.map(|x| core_types::M3kgs::new(x)); }
 
-    /// Object covariance matrix [7,6].
+    /// Object covariance matrix `[7,6]`.
     ///
     /// Units: m³/(kg*s)
     ///
@@ -2516,7 +2528,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cdrg_ndot(&mut self, v: Option<f64>) { self.inner.cdrg_ndot = v.map(|x| core_types::M3kgs::new(x)); }
 
-    /// Object covariance matrix [7,7].
+    /// Object covariance matrix `[7,7]`.
     ///
     /// Units: m⁴/kg²
     ///
@@ -2526,7 +2538,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cdrg_drg(&mut self, v: Option<f64>) { self.inner.cdrg_drg = v.map(|x| core_types::M4kg2::new(x)); }
 
-    /// Object covariance matrix [8,1].
+    /// Object covariance matrix `[8,1]`.
     ///
     /// Units: m³/kg
     ///
@@ -2536,7 +2548,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_csrp_r(&mut self, v: Option<f64>) { self.inner.csrp_r = v.map(|x| core_types::M3kg::new(x)); }
 
-    /// Object covariance matrix [8,2].
+    /// Object covariance matrix `[8,2]`.
     ///
     /// Units: m³/kg
     ///
@@ -2546,7 +2558,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_csrp_t(&mut self, v: Option<f64>) { self.inner.csrp_t = v.map(|x| core_types::M3kg::new(x)); }
 
-    /// Object covariance matrix [8,3].
+    /// Object covariance matrix `[8,3]`.
     ///
     /// Units: m³/kg
     ///
@@ -2556,7 +2568,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_csrp_n(&mut self, v: Option<f64>) { self.inner.csrp_n = v.map(|x| core_types::M3kg::new(x)); }
 
-    /// Object covariance matrix [8,4].
+    /// Object covariance matrix `[8,4]`.
     ///
     /// Units: m³/(kg*s)
     ///
@@ -2566,7 +2578,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_csrp_rdot(&mut self, v: Option<f64>) { self.inner.csrp_rdot = v.map(|x| core_types::M3kgs::new(x)); }
 
-    /// Object covariance matrix [8,5].
+    /// Object covariance matrix `[8,5]`.
     ///
     /// Units: m³/(kg*s)
     ///
@@ -2576,7 +2588,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_csrp_tdot(&mut self, v: Option<f64>) { self.inner.csrp_tdot = v.map(|x| core_types::M3kgs::new(x)); }
 
-    /// Object covariance matrix [8,6].
+    /// Object covariance matrix `[8,6]`.
     ///
     /// Units: m³/(kg*s)
     ///
@@ -2586,7 +2598,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_csrp_ndot(&mut self, v: Option<f64>) { self.inner.csrp_ndot = v.map(|x| core_types::M3kgs::new(x)); }
 
-    /// Object covariance matrix [8,7].
+    /// Object covariance matrix `[8,7]`.
     ///
     /// Units: m⁴/kg²
     ///
@@ -2596,7 +2608,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_csrp_drg(&mut self, v: Option<f64>) { self.inner.csrp_drg = v.map(|x| core_types::M4kg2::new(x)); }
 
-    /// Object covariance matrix [8,8].
+    /// Object covariance matrix `[8,8]`.
     ///
     /// Units: m⁴/kg²
     ///
@@ -2606,7 +2618,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_csrp_srp(&mut self, v: Option<f64>) { self.inner.csrp_srp = v.map(|x| core_types::M4kg2::new(x)); }
 
-    /// Object covariance matrix [9,1].
+    /// Object covariance matrix `[9,1]`.
     ///
     /// Units: m²/s²
     ///
@@ -2616,7 +2628,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cthr_r(&mut self, v: Option<f64>) { self.inner.cthr_r = v.map(|x| core_types::M2s2::new(x)); }
 
-    /// Object covariance matrix [9,2].
+    /// Object covariance matrix `[9,2]`.
     ///
     /// Units: m²/s²
     ///
@@ -2626,7 +2638,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cthr_t(&mut self, v: Option<f64>) { self.inner.cthr_t = v.map(|x| core_types::M2s2::new(x)); }
 
-    /// Object covariance matrix [9,3].
+    /// Object covariance matrix `[9,3]`.
     ///
     /// Units: m²/s²
     ///
@@ -2636,7 +2648,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cthr_n(&mut self, v: Option<f64>) { self.inner.cthr_n = v.map(|x| core_types::M2s2::new(x)); }
 
-    /// Object covariance matrix [9,4].
+    /// Object covariance matrix `[9,4]`.
     ///
     /// Units: m²/s³
     ///
@@ -2646,7 +2658,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cthr_rdot(&mut self, v: Option<f64>) { self.inner.cthr_rdot = v.map(|x| core_types::M2s3::new(x)); }
 
-    /// Object covariance matrix [9,5].
+    /// Object covariance matrix `[9,5]`.
     ///
     /// Units: m²/s³
     ///
@@ -2656,7 +2668,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cthr_tdot(&mut self, v: Option<f64>) { self.inner.cthr_tdot = v.map(|x| core_types::M2s3::new(x)); }
 
-    /// Object covariance matrix [9,6].
+    /// Object covariance matrix `[9,6]`.
     ///
     /// Units: m²/s³
     ///
@@ -2666,7 +2678,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cthr_ndot(&mut self, v: Option<f64>) { self.inner.cthr_ndot = v.map(|x| core_types::M2s3::new(x)); }
 
-    /// Object covariance matrix [9,7].
+    /// Object covariance matrix `[9,7]`.
     ///
     /// Units: m³/(kg*s²)
     ///
@@ -2676,7 +2688,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cthr_drg(&mut self, v: Option<f64>) { self.inner.cthr_drg = v.map(|x| core_types::M3kgs2::new(x)); }
 
-    /// Object covariance matrix [9,8].
+    /// Object covariance matrix `[9,8]`.
     ///
     /// Units: m³/(kg*s²)
     ///
@@ -2686,7 +2698,7 @@ impl CdmCovarianceMatrix {
     #[setter]
     fn set_cthr_srp(&mut self, v: Option<f64>) { self.inner.cthr_srp = v.map(|x| core_types::M3kgs2::new(x)); }
 
-    /// Object covariance matrix [9,9].
+    /// Object covariance matrix `[9,9]`.
     ///
     /// Units: m²/s⁴
     ///

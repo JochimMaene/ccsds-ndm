@@ -15,16 +15,33 @@ use std::borrow::Cow;
 // Root CDM Structure
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// Conjunction Data Message (CDM).
+///
+/// The CDM contains information about a single conjunction between a primary object (Object1)
+/// and a secondary object (Object2). It allows satellite operators to evaluate the risk of
+/// collision and plan avoidance maneuvers.
+///
+/// The message includes:
+/// - Positions and velocities of both objects at Time of Closest Approach (TCA).
+/// - Covariance matrices for both objects at TCA.
+/// - Relative position and velocity of Object2 with respect to Object1.
+/// - Metadata describing how the data was determined (orbit determination settings).
+///
+/// **CCSDS Reference**: 508.0-B-1.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "cdm")]
 pub struct Cdm {
     pub header: CdmHeader,
     pub body: CdmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
+
+impl crate::traits::Validate for Cdm {}
 
 impl Ndm for Cdm {
     fn to_kvn(&self) -> Result<String> {
@@ -55,7 +72,7 @@ impl Ndm for Cdm {
 //----------------------------------------------------------------------
 
 /// Represents the `cdmHeader` complex type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmHeader {
     /// Comments (allowed in the CDM Header only immediately after the CDM version number).
@@ -65,6 +82,7 @@ pub struct CdmHeader {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Message creation date/time in Coordinated Universal Time (UTC). (See 6.3.2.6 for
     /// formatting rules.)
@@ -74,13 +92,14 @@ pub struct CdmHeader {
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     pub creation_date: Epoch,
     /// Creating agency or owner/operator. Value should be the 'Abbreviation' value from the
-    /// SANA 'Organizations' registry (https://sanaregistry.org/r/organizations) for an
+    /// SANA 'Organizations' registry (<https://sanaregistry.org/r/organizations>) for an
     /// organization that has the Role of 'Conjunction Data Message Originator'. (See 5.2.9
     /// for formatting rules.)
     ///
     /// **Examples**: JSPOC, ESA SST, CAESAR, JPL, SDC
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
+    #[builder(into)]
     pub originator: String,
     /// Spacecraft name(s) for which the CDM is provided.
     ///
@@ -88,6 +107,7 @@ pub struct CdmHeader {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub message_for: Option<String>,
     /// ID that uniquely identifies a message from a given originator. The format and content
     /// of the message identifier value are at the discretion of the originator. (See 5.2.9
@@ -96,11 +116,13 @@ pub struct CdmHeader {
     /// **Examples**: 201113719185, ABC-12_34
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
+    #[builder(into)]
     pub message_id: String,
 }
 
 impl Cdm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.validate()?;
         Ok(())
     }
@@ -114,6 +136,12 @@ impl ToKvn for Cdm {
 
         // 2. Body
         self.body.write_kvn(writer);
+    }
+}
+
+impl CdmHeader {
+    pub fn validate(&self) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -134,7 +162,7 @@ impl ToKvn for CdmHeader {
 // Body
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct CdmBody {
     #[serde(rename = "relativeMetadataData")]
     pub relative_metadata_data: RelativeMetadataData,
@@ -172,13 +200,14 @@ impl CdmBody {
 // Relative Metadata/Data
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RelativeMetadataData {
     /// Comments (see 6.3.4 for formatting rules).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)
     ///
@@ -278,6 +307,7 @@ pub struct RelativeMetadataData {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub collision_probability_method: Option<String>,
 }
 
@@ -346,7 +376,7 @@ impl RelativeMetadataData {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RelativeStateVector {
     pub relative_position_r: Length,
@@ -381,7 +411,7 @@ impl ToKvn for RelativeStateVector {
 // Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct CdmSegment {
     pub metadata: CdmMetadata,
     pub data: CdmData,
@@ -401,13 +431,14 @@ impl CdmSegment {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmMetadata {
     /// Comments (see 6.3.4 for formatting rules).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// The object to which the metadata and data apply (Object1 or Object2).
     ///
@@ -420,20 +451,23 @@ pub struct CdmMetadata {
     /// **Examples**: 12345
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
+    #[builder(into)]
     pub object_designator: String,
     /// The satellite catalog used for the object. Value should be taken from the SANA
     /// 'Conjunction Data Message CATALOG_NAME' registry
-    /// (https://sanaregistry.org/r/cdm_catalog). (See 5.2.9 for formatting rules.)
+    /// (<https://sanaregistry.org/r/cdm_catalog>). (See 5.2.9 for formatting rules.)
     ///
     /// **Examples**: SATCAT
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
+    #[builder(into)]
     pub catalog_name: String,
     /// Spacecraft name for the object.
     ///
     /// **Examples**: SPOT, ENVISAT, IRIDIUM, INTELSAT
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
+    #[builder(into)]
     pub object_name: String,
     /// The full international designator for the object. Values shall have the format
     /// YYYY-NNNP{PP}, where: YYYY = year of launch; NNN = three-digit serial number of launch
@@ -444,6 +478,7 @@ pub struct CdmMetadata {
     /// **Examples**: 2002-021A, UNKNOWN
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
+    #[builder(into)]
     pub international_designator: String,
     /// The object type.
     ///
@@ -458,6 +493,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub operator_contact_position: Option<String>,
     /// Contact organization of the object.
     ///
@@ -465,6 +501,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub operator_organization: Option<String>,
     /// Phone number of the contact position or organization for the object.
     ///
@@ -472,6 +509,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub operator_phone: Option<String>,
     /// Email address of the contact position or organization of the object.
     ///
@@ -479,6 +517,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub operator_email: Option<String>,
     /// Unique name of the external ephemeris file used for the object or NONE. This is used to
     /// indicate whether an external (i.e., Owner/Operator [O/O] provided) ephemeris file was
@@ -488,6 +527,7 @@ pub struct CdmMetadata {
     /// **Examples**: EPHEMERIS SATELLITE A, NONE
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
+    #[builder(into)]
     pub ephemeris_name: String,
     /// Method used to calculate the covariance during the OD that produced the state vector, or
     /// whether an arbitrary, non-calculated default value was used. Caution should be used
@@ -510,9 +550,10 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub orbit_center: Option<String>,
     /// Name of the reference frame in which the state vector data are given. Value must be
-    /// selected from the list of values to the right (see reference [F1]) and be the same for
+    /// selected from the list of values to the right (see reference `[F1]`) and be the same for
     /// both Object1 and Object2.
     ///
     /// **Examples**: GCRF, EME2000, ITRF
@@ -526,6 +567,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub gravity_model: Option<String>,
     /// The atmospheric density model used for the OD of the object. If 'NONE' is specified,
     /// then no atmospheric model was used.
@@ -534,6 +576,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub atmospheric_model: Option<String>,
     /// The N-body gravitational perturbations used for the OD of the object. If 'NONE' is
     /// specified, then no third-body gravitational perturbations were used.
@@ -542,6 +585,7 @@ pub struct CdmMetadata {
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub n_body_perturbations: Option<String>,
     /// Indication of whether solar radiation pressure perturbations were used for the OD of the
     /// object.
@@ -634,11 +678,12 @@ impl CdmMetadata {
 // Data
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Orbit Determination Parameters.
     #[serde(
@@ -734,13 +779,14 @@ impl ToKvn for CdmData {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdditionalParameters {
     /// Comments (see 6.3.4 for formatting rules).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
 
     /// The actual area of the object. (See annex E for definition.)
@@ -813,7 +859,7 @@ pub struct AdditionalParameters {
     pub sedr: Option<Wkg>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmStateVector {
     /// Object Position Vector X component.
@@ -853,215 +899,215 @@ impl ToKvn for CdmStateVector {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmCovarianceMatrix {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// Object covariance matrix [1,1].
+    /// Object covariance matrix `[1,1]`.
     ///
     /// Units: m²
     pub cr_r: M2,
-    /// Object covariance matrix [2,1].
+    /// Object covariance matrix `[2,1]`.
     ///
     /// Units: m²
     pub ct_r: M2,
-    /// Object covariance matrix [2,2].
+    /// Object covariance matrix `[2,2]`.
     ///
     /// Units: m²
     pub ct_t: M2,
-    /// Object covariance matrix [3,1].
+    /// Object covariance matrix `[3,1]`.
     ///
     /// Units: m²
     pub cn_r: M2,
-    /// Object covariance matrix [3,2].
+    /// Object covariance matrix `[3,2]`.
     ///
     /// Units: m²
     pub cn_t: M2,
-    /// Object covariance matrix [3,3].
+    /// Object covariance matrix `[3,3]`.
     ///
     /// Units: m²
     pub cn_n: M2,
-    /// Object covariance matrix [4,1].
+    /// Object covariance matrix `[4,1]`.
     ///
     /// Units: m²/s
     pub crdot_r: M2s,
-    /// Object covariance matrix [4,2].
+    /// Object covariance matrix `[4,2]`.
     ///
     /// Units: m²/s
     pub crdot_t: M2s,
-    /// Object covariance matrix [4,3].
+    /// Object covariance matrix `[4,3]`.
     ///
     /// Units: m²/s
     pub crdot_n: M2s,
-    /// Object covariance matrix [4,4].
+    /// Object covariance matrix `[4,4]`.
     ///
     /// Units: m²/s²
     pub crdot_rdot: M2s2,
-    /// Object covariance matrix [5,1].
+    /// Object covariance matrix `[5,1]`.
     ///
     /// Units: m²/s
     pub ctdot_r: M2s,
-    /// Object covariance matrix [5,2].
+    /// Object covariance matrix `[5,2]`.
     ///
     /// Units: m²/s
     pub ctdot_t: M2s,
-    /// Object covariance matrix [5,3].
+    /// Object covariance matrix `[5,3]`.
     ///
     /// Units: m²/s
     pub ctdot_n: M2s,
-    /// Object covariance matrix [5,4].
+    /// Object covariance matrix `[5,4]`.
     ///
     /// Units: m²/s²
     pub ctdot_rdot: M2s2,
-    /// Object covariance matrix [5,5].
+    /// Object covariance matrix `[5,5]`.
     ///
     /// Units: m²/s²
     pub ctdot_tdot: M2s2,
-    /// Object covariance matrix [6,1].
+    /// Object covariance matrix `[6,1]`.
     ///
     /// Units: m²/s
     pub cndot_r: M2s,
-    /// Object covariance matrix [6,2].
+    /// Object covariance matrix `[6,2]`.
     ///
     /// Units: m²/s
     pub cndot_t: M2s,
-    /// Object covariance matrix [6,3].
+    /// Object covariance matrix `[6,3]`.
     ///
     /// Units: m²/s
     pub cndot_n: M2s,
-    /// Object covariance matrix [6,4].
+    /// Object covariance matrix `[6,4]`.
     ///
     /// Units: m²/s²
     pub cndot_rdot: M2s2,
-    /// Object covariance matrix [6,5].
+    /// Object covariance matrix `[6,5]`.
     ///
     /// Units: m²/s²
     pub cndot_tdot: M2s2,
-    /// Object covariance matrix [6,6].
+    /// Object covariance matrix `[6,6]`.
     ///
     /// Units: m²/s²
     pub cndot_ndot: M2s2,
 
-    /// Object covariance matrix [7,1].
+    /// Object covariance matrix `[7,1]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_r: Option<M3kg>,
-    /// Object covariance matrix [7,2].
+    /// Object covariance matrix `[7,2]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_t: Option<M3kg>,
-    /// Object covariance matrix [7,3].
+    /// Object covariance matrix `[7,3]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_n: Option<M3kg>,
-    /// Object covariance matrix [7,4].
+    /// Object covariance matrix `[7,4]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_rdot: Option<M3kgs>,
-    /// Object covariance matrix [7,5].
+    /// Object covariance matrix `[7,5]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_tdot: Option<M3kgs>,
-    /// Object covariance matrix [7,6].
+    /// Object covariance matrix `[7,6]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_ndot: Option<M3kgs>,
-    /// Object covariance matrix [7,7].
+    /// Object covariance matrix `[7,7]`.
     ///
     /// Units: m⁴/kg²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cdrg_drg: Option<M4kg2>,
 
-    /// Object covariance matrix [8,1].
+    /// Object covariance matrix `[8,1]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_r: Option<M3kg>,
-    /// Object covariance matrix [8,2].
+    /// Object covariance matrix `[8,2]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_t: Option<M3kg>,
-    /// Object covariance matrix [8,3].
+    /// Object covariance matrix `[8,3]`.
     ///
     /// Units: m³/kg
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_n: Option<M3kg>,
-    /// Object covariance matrix [8,4].
+    /// Object covariance matrix `[8,4]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_rdot: Option<M3kgs>,
-    /// Object covariance matrix [8,5].
+    /// Object covariance matrix `[8,5]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_tdot: Option<M3kgs>,
-    /// Object covariance matrix [8,6].
+    /// Object covariance matrix `[8,6]`.
     ///
     /// Units: m³/(kg*s)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_ndot: Option<M3kgs>,
-    /// Object covariance matrix [8,7].
+    /// Object covariance matrix `[8,7]`.
     ///
     /// Units: m⁴/kg²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_drg: Option<M4kg2>,
-    /// Object covariance matrix [8,8].
+    /// Object covariance matrix `[8,8]`.
     ///
     /// Units: m⁴/kg²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csrp_srp: Option<M4kg2>,
 
-    /// Object covariance matrix [9,1].
+    /// Object covariance matrix `[9,1]`.
     ///
     /// Units: m²/s²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_r: Option<M2s2>,
-    /// Object covariance matrix [9,2].
+    /// Object covariance matrix `[9,2]`.
     ///
     /// Units: m²/s²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_t: Option<M2s2>,
-    /// Object covariance matrix [9,3].
+    /// Object covariance matrix `[9,3]`.
     ///
     /// Units: m²/s²
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_n: Option<M2s2>,
-    /// Object covariance matrix [9,4].
+    /// Object covariance matrix `[9,4]`.
     ///
     /// Units: m²/s³
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_rdot: Option<M2s3>,
-    /// Object covariance matrix [9,5].
+    /// Object covariance matrix `[9,5]`.
     ///
     /// Units: m²/s³
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_tdot: Option<M2s3>,
-    /// Object covariance matrix [9,6].
+    /// Object covariance matrix `[9,6]`.
     ///
     /// Units: m²/s³
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_ndot: Option<M2s3>,
-    /// Object covariance matrix [9,7].
+    /// Object covariance matrix `[9,7]`.
     ///
     /// Units: m³/(kg*s²)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_drg: Option<M3kgs2>,
-    /// Object covariance matrix [9,8].
+    /// Object covariance matrix `[9,8]`.
     ///
     /// Units: m³/(kg*s²)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cthr_srp: Option<M3kgs2>,
-    /// Object covariance matrix [9,9].
+    /// Object covariance matrix `[9,9]`.
     ///
     /// Units: m²/s⁴
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1499,5 +1545,92 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
             .covariance_matrix
             .cthr_thr
             .is_some());
+    }
+
+    #[test]
+    fn test_cdm_validation_segment_count() {
+        // Construct a CDM with only 1 segment manually (hard to do via KVN since keys are repetitive)
+        // But we can try to parse a truncated KVN or use the builder
+        let kvn_one_seg = r#"
+CCSDS_CDM_VERS = 1.0
+CREATION_DATE = 2025-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+TCA = 2025-01-02T12:00:00
+MISS_DISTANCE = 100.0 [m]
+RELATIVE_SPEED = 7.5 [m/s]
+RELATIVE_POSITION_R = 10.0 [m]
+RELATIVE_POSITION_T = -20.0 [m]
+RELATIVE_POSITION_N = 5.0 [m]
+RELATIVE_VELOCITY_R = 0.1 [m/s]
+RELATIVE_VELOCITY_T = -0.2 [m/s]
+RELATIVE_VELOCITY_N = 0.05 [m/s]
+# Only one object segment
+OBJECT = OBJECT1
+OBJECT_DESIGNATOR = 00001
+CATALOG_NAME = CAT
+OBJECT_NAME = OBJ1
+INTERNATIONAL_DESIGNATOR = 1998-067A
+OBJECT_TYPE = PAYLOAD
+EPHEMERIS_NAME = EPH1
+COVARIANCE_METHOD = CALCULATED
+MANEUVERABLE = YES
+REF_FRAME = EME2000
+X = 1.0 [km]
+Y = 2.0 [km]
+Z = 3.0 [km]
+X_DOT = 0.1 [km/s]
+Y_DOT = 0.2 [km/s]
+Z_DOT = 0.3 [km/s]
+CR_R = 1.0 [m**2]
+CT_R = 0.0 [m**2]
+CT_T = 1.0 [m**2]
+CN_R = 0.0 [m**2]
+CN_T = 0.0 [m**2]
+CN_N = 1.0 [m**2]
+CRDOT_R = 0.0 [m**2/s]
+CRDOT_T = 0.0 [m**2/s]
+CRDOT_N = 0.0 [m**2/s]
+CRDOT_RDOT = 1.0 [m**2/s**2]
+CTDOT_R = 0.0 [m**2/s]
+CTDOT_T = 0.0 [m**2/s]
+CTDOT_N = 0.0 [m**2/s]
+CTDOT_RDOT = 0.0 [m**2/s**2]
+CTDOT_TDOT = 1.0 [m**2/s**2]
+CNDOT_R = 0.0 [m**2/s]
+CNDOT_T = 0.0 [m**2/s]
+CNDOT_N = 0.0 [m**2/s]
+CNDOT_RDOT = 0.0 [m**2/s**2]
+CNDOT_TDOT = 0.0 [m**2/s**2]
+CNDOT_NDOT = 1.0 [m**2/s**2]
+"#;
+        assert!(Cdm::from_kvn(kvn_one_seg).is_err());
+    }
+
+    #[test]
+    fn test_cdm_validation_probability_range() {
+        // Probability > 1.0
+        let mut kvn = sample_cdm_kvn();
+        kvn = kvn.replace(
+            "COLLISION_PROBABILITY = 0.001",
+            "COLLISION_PROBABILITY = 1.5",
+        );
+        assert!(Cdm::from_kvn(&kvn).is_err());
+    }
+
+    #[test]
+    fn test_cdm_validation_segment_count_mismatch() {
+        let mut cdm = Cdm::from_kvn(&sample_cdm_kvn()).unwrap();
+
+        // Remove one segment => 1 segment
+        cdm.body.segments.pop();
+        assert!(cdm.validate().is_err());
+
+        // Add valid segments to check 3 segments (also invalid)
+        let seg = cdm.body.segments[0].clone();
+        cdm.body.segments.push(seg.clone());
+        cdm.body.segments.push(seg); // Now 3
+        assert_eq!(cdm.body.segments.len(), 3);
+        assert!(cdm.validate().is_err());
     }
 }

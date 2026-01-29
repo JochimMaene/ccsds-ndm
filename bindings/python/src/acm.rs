@@ -16,6 +16,13 @@ use std::fs;
 /// An ACM specifies the attitude state of a single object at multiple epochs, contained within a
 /// specified time range. The ACM aggregates and extends APM and AEM content in a single
 /// comprehensive hybrid message.
+///
+/// Capabilities include:
+/// - Optional rate data elements
+/// - Optional spacecraft physical properties
+/// - Optional covariance elements
+/// - Optional maneuver parameters
+/// - Optional estimator information
 #[pyclass]
 #[derive(Clone)]
 pub struct Acm {
@@ -85,6 +92,13 @@ impl Acm {
     /// An ACM specifies the attitude state of a single object at multiple epochs, contained within a
     /// specified time range. The ACM aggregates and extends APM and AEM content in a single
     /// comprehensive hybrid message.
+    ///
+    /// Capabilities include:
+    /// - Optional rate data elements
+    /// - Optional spacecraft physical properties
+    /// - Optional covariance elements
+    /// - Optional maneuver parameters
+    /// - Optional estimator information
     ///
     /// :type: AdmHeader
     #[getter]
@@ -169,14 +183,28 @@ impl AcmMetadata {
                 international_designator,
                 time_system,
                 epoch_tzero: parse_epoch(&epoch_tzero)?,
-                ..Default::default()
+                catalog_name: None,
+                object_designator: None,
+                originator_poc: None,
+                originator_position: None,
+                originator_phone: None,
+                originator_email: None,
+                originator_address: None,
+                odm_msg_link: None,
+                center_name: None,
+                acm_data_elements: None,
+                start_time: None,
+                stop_time: None,
+                taimutc_at_tzero: None,
+                next_leap_epoch: None,
+                next_leap_taimutc: None,
             },
         })
     }
 
     /// Free-text field containing the name of the object. There is no CCSDS-based restriction on
     /// the value for this keyword, but it is recommended to use names from either the UN Office of
-    /// Outer Space Affairs designator index (reference [2]), which include Object name and
+    /// Outer Space Affairs designator index (reference `[2]`), which include Object name and
     /// international designator), the spacecraft operator, or a State Actor or commercial Space
     /// Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space catalog. If the
     /// object name is not known (uncorrelated object), ‘UNKNOWN’ may be used (or this keyword
@@ -224,7 +252,7 @@ impl AcmData {
         cov: Option<Vec<AcmCovarianceMatrix>>,
         man: Option<Vec<AcmManeuverParameters>>,
         ad: Option<AcmAttitudeDetermination>,
-        user_defined: Option<crate::opm::UserDefined>,
+        user: Option<crate::types::UserDefined>,
     ) -> Self {
         Self {
             inner: core_acm::AcmData {
@@ -233,9 +261,22 @@ impl AcmData {
                 cov: cov.unwrap_or_default().into_iter().map(|c| c.inner).collect(),
                 man: man.unwrap_or_default().into_iter().map(|m| m.inner).collect(),
                 ad: ad.map(|a| a.inner),
-                user_defined: user_defined.map(|u| u.inner),
+                user: user.map(|u| u.inner),
             },
         }
+    }
+
+    /// A single user-defined Data section.
+    ///
+    /// :type: UserDefined | None
+    #[getter]
+    fn get_user(&self) -> Option<crate::types::UserDefined> {
+        self.inner.user.as_ref().map(|u| crate::types::UserDefined { inner: u.clone() })
+    }
+
+    #[setter]
+    fn set_user(&mut self, user: Option<crate::types::UserDefined>) {
+        self.inner.user = user.map(|u| u.inner);
     }
 
     /// One or more optional attitude state time histories (each consisting of one or more attitude
@@ -281,7 +322,12 @@ impl AcmAttitudeState {
                 number_states: att_lines.len() as u32,
                 att_type,
                 att_lines: att_lines.into_iter().map(|values| core_acm::AttLine { values }).collect(),
-                ..Default::default()
+                att_id: None,
+                att_prev_id: None,
+                att_basis: None,
+                att_basis_id: None,
+                rate_type: None,
+                euler_rot_seq: None,
             },
         }
     }
@@ -301,7 +347,18 @@ impl AcmPhysicalDescription {
         Self {
             inner: core_acm::AcmPhysicalDescription {
                 comment: comment.unwrap_or_default(),
-                ..Default::default()
+                drag_coeff: None,
+                wet_mass: None,
+                dry_mass: None,
+                cp_ref_frame: None,
+                cp: None,
+                inertia_ref_frame: None,
+                ixx: None,
+                iyy: None,
+                izz: None,
+                ixy: None,
+                ixz: None,
+                iyz: None,
             },
         }
     }
@@ -331,7 +388,7 @@ impl AcmCovarianceMatrix {
                 cov_ref_frame,
                 cov_type,
                 cov_lines: cov_lines.into_iter().map(|values| core_acm::CovLine { values }).collect(),
-                ..Default::default()
+                cov_confidence: None,
             },
         }
     }
@@ -347,12 +404,19 @@ pub struct AcmManeuverParameters {
 #[pymethods]
 impl AcmManeuverParameters {
     #[new]
-    fn new(man_id: String, comment: Option<Vec<String>>) -> Self {
+    fn new(man_id: Option<String>, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_acm::AcmManeuverParameters {
                 comment: comment.unwrap_or_default(),
                 man_id,
-                ..Default::default()
+                man_prev_id: None,
+                man_purpose: None,
+                man_begin_time: None,
+                man_end_time: None,
+                man_duration: None,
+                actuator_used: None,
+                target_momentum: None,
+                target_mom_frame: None,
             },
         }
     }
@@ -368,12 +432,26 @@ pub struct AcmAttitudeDetermination {
 #[pymethods]
 impl AcmAttitudeDetermination {
     #[new]
-    fn new(ad_id: String, comment: Option<Vec<String>>) -> Self {
+    fn new(ad_id: Option<String>, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_acm::AcmAttitudeDetermination {
                 comment: comment.unwrap_or_default(),
                 ad_id,
-                ..Default::default()
+                ad_prev_id: None,
+                ad_method: None,
+                attitude_source: None,
+                number_states: None,
+                attitude_states: None,
+                cov_type: None,
+                ad_epoch: None,
+                ref_frame_a: None,
+                ref_frame_b: None,
+                attitude_type: None,
+                rate_states: None,
+                sigma_u: None,
+                sigma_v: None,
+                rate_process_noise_stddev: None,
+                sensors: vec![],
             },
         }
     }

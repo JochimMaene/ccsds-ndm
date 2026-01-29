@@ -6,12 +6,13 @@
 //! from `ndmxml-4.0.0-common-4.0.xsd` used by OEM.
 
 use super::types::*;
+use crate::error::Result;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::ToKvn;
 use serde::{Deserialize, Serialize};
 
 /// Represents the `ndmHeader` complex type from the XSD.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct NdmHeader {
     /// User-defined comments.
@@ -20,6 +21,7 @@ pub struct NdmHeader {
     ///
     /// **CCSDS Reference**: 505.0-B-3, Section 3.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// File creation date/time in UTC.
     ///
@@ -32,6 +34,7 @@ pub struct NdmHeader {
     /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     ///
     /// **CCSDS Reference**: 505.0-B-3, Section 3.2.
+    #[builder(into)]
     pub originator: String,
 }
 
@@ -43,17 +46,71 @@ impl ToKvn for NdmHeader {
     }
 }
 
-/// Represents the `admHeader` complex type from the XSD.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+impl crate::traits::Validate for NdmHeader {
+    fn validate(&self) -> Result<()> {
+        if self.originator.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "NDM Header".into(),
+                field: "ORIGINATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.creation_date.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "NDM Header".into(),
+                field: "CREATION_DATE".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdmHeader {
+    /// User-defined comments. (See 7.8 for formatting rules.)
+    ///
+    /// **Examples**: This is a comment
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
+    /// User-defined free-text message classification/caveats of this ADM. It is recommended
+    /// that selected values be pre-coordinated between exchanging entities by mutual agreement.
+    ///
+    /// **Examples**: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<String>,
+    /// File creation date/time in UTC. (For format specification, see 6.8.9.)
+    ///
+    /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
     pub creation_date: Epoch,
+    /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
+    /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
+    /// Abbreviation column is not populated. If desired organization is not listed there, follow
+    /// procedures to request that originator be added to SANA registry.
+    ///
+    /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    #[builder(into)]
     pub originator: String,
+    /// ID that uniquely identifies a message from a given originator. The format and content of
+    /// the message identifier value are at the discretion of the originator.
+    ///
+    /// **Examples**: APM_201113719185, ABC-12_34
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub message_id: Option<String>,
 }
 
@@ -71,8 +128,30 @@ impl ToKvn for AdmHeader {
     }
 }
 
+impl crate::traits::Validate for AdmHeader {
+    fn validate(&self) -> Result<()> {
+        if self.originator.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "ADM Header".into(),
+                field: "ORIGINATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.creation_date.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "ADM Header".into(),
+                field: "CREATION_DATE".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 /// Represents the `odmHeader` complex type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdmHeader {
     /// Comments (allowed in the ODM Header only immediately after the ODM version number).
@@ -82,6 +161,7 @@ pub struct OdmHeader {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// User-defined free-text message classification/caveats of this ODM. It is recommended
     /// that selected values be pre-coordinated between exchanging entities by mutual agreement.
@@ -105,6 +185,7 @@ pub struct OdmHeader {
     /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
+    #[builder(into)]
     pub originator: String,
     /// ID that uniquely identifies a message from a given originator. The format and content of
     /// the message identifier value are at the discretion of the originator.
@@ -113,6 +194,7 @@ pub struct OdmHeader {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub message_id: Option<String>,
 }
 
@@ -130,17 +212,40 @@ impl ToKvn for OdmHeader {
     }
 }
 
+impl crate::traits::Validate for OdmHeader {
+    fn validate(&self) -> Result<()> {
+        if self.originator.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "ODM Header".into(),
+                field: "ORIGINATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.creation_date.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "ODM Header".into(),
+                field: "CREATION_DATE".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 /// Spacecraft Parameters (if maneuver is specified, then mass must be provided).
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpacecraftParameters {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft mass.
     ///
@@ -189,13 +294,14 @@ pub struct SpacecraftParameters {
     pub drag_coeff: Option<NonNegativeDouble>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdParameters {
     /// Comments (see 6.3.4 for formatting rules).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
 
     /// The start of a time interval (UTC) that contains the time of the last accepted
@@ -275,7 +381,7 @@ pub struct OdParameters {
 }
 
 /// State Vector Components in the Specified Coordinate System.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVectorAcc {
     /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
@@ -424,8 +530,22 @@ impl Quaternion {
     }
 }
 
+impl crate::traits::Validate for Quaternion {
+    fn validate(&self) -> Result<()> {
+        let sum_sq = self.q1 * self.q1 + self.q2 * self.q2 + self.q3 * self.q3 + self.qc * self.qc;
+        if !(0.999..=1.001).contains(&sum_sq) {
+            return Err(crate::error::ValidationError::Generic {
+                message: format!("Quaternion not normalized: sum of squares = {}", sum_sq).into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 // Quaternion derivative (dot components with units 1/s)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionDot {
     pub q1_dot: QuaternionDotComponent,
@@ -435,7 +555,7 @@ pub struct QuaternionDot {
 }
 
 // Angular velocity triple (ANGVEL_X/Y/Z)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AngularVelocity {
     pub x: AngleRate,
     pub y: AngleRate,
@@ -443,13 +563,14 @@ pub struct AngularVelocity {
 }
 
 /// State Vector Components in the Specified Coordinate System.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct StateVector {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
     ///
@@ -506,27 +627,44 @@ impl ToKvn for StateVector {
     }
 }
 
+impl crate::traits::Validate for StateVector {
+    fn validate(&self) -> Result<()> {
+        if self.epoch.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "State Vector".into(),
+                field: "EPOCH".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 /// Attitude quaternion.
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Quaternion components Q1, Q2, Q3, QC.
     ///
@@ -552,23 +690,26 @@ pub struct QuaternionState {
 ///
 /// All mandatory elements of the logical block are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
     /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
@@ -623,23 +764,26 @@ pub struct EulerAngleState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AngVelState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Reference frame in which the components of the angular velocity vector are given. The set
     /// of allowed values is described in annex B, subsection B3.
@@ -670,23 +814,26 @@ pub struct AngVelState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Right ascension of spin axis vector in frame A.
     ///
@@ -760,18 +907,20 @@ pub struct SpinState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct InertiaState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Coordinate system for the inertia tensor. The set of allowed values is described in annex B,
     /// subsection B3.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
+    #[builder(into)]
     pub inertia_ref_frame: String,
     /// Moment of Inertia about the X-axis.
     ///
@@ -815,13 +964,14 @@ pub struct InertiaState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AttManeuverState {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of start of maneuver. (For format specification, see 6.8.9.)
     ///
@@ -992,7 +1142,7 @@ impl ToKvn for QuaternionDerivative {
 }
 
 /// AEM Attitude Ephemeris Data Line: Quaternion/AngVel.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionAngVel {
     /// Epoch of the attitude state.
@@ -1021,7 +1171,7 @@ impl ToKvn for QuaternionAngVel {
 }
 
 /// AEM Attitude Ephemeris Data Line: EulerAngle.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngle {
     /// Epoch of the attitude state.
@@ -1046,7 +1196,7 @@ impl ToKvn for EulerAngle {
 }
 
 /// AEM Attitude Ephemeris Data Line: EulerAngle/Derivative.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleDerivative {
     /// Epoch of the attitude state.
@@ -1081,7 +1231,7 @@ impl ToKvn for EulerAngleDerivative {
 }
 
 /// AEM Attitude Ephemeris Data Line: EulerAngle/AngVel.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleAngVel {
     /// Epoch of the attitude state.
@@ -1119,7 +1269,7 @@ impl ToKvn for EulerAngleAngVel {
 }
 
 /// AEM Attitude Ephemeris Data Line: Spin.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct Spin {
     /// Epoch of the attitude state.
@@ -1149,7 +1299,7 @@ impl ToKvn for Spin {
 }
 
 /// AEM Attitude Ephemeris Data Line: Spin/Nutation.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinNutation {
     /// Epoch of the attitude state.
@@ -1188,7 +1338,7 @@ impl ToKvn for SpinNutation {
 }
 
 /// AEM Attitude Ephemeris Data Line: Spin/Nutation_Mom.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinNutationMom {
     /// Epoch of the attitude state.
@@ -1227,7 +1377,7 @@ impl ToKvn for SpinNutationMom {
 }
 
 /// Represents the `angVelType` from XSD.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AngVel {
     pub angvel_x: AngleRate,
@@ -1432,144 +1582,146 @@ impl ToKvn for InertiaState {
 
 /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. None or all parameters of the
 /// matrix must be given. COV_REF_FRAME may be omitted if it is the same as REF_FRAME.)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmCovarianceMatrix {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Reference frame in which the covariance data are given. Select from the accepted set of
     /// values indicated in 3.2.4.11.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cov_ref_frame: Option<String>,
-    /// Covariance matrix [1,1]
+    /// Covariance matrix `[1,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_x: PositionCovariance,
-    /// Covariance matrix [2,1]
+    /// Covariance matrix `[2,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_x: PositionCovariance,
-    /// Covariance matrix [2,2]
+    /// Covariance matrix `[2,2]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_y: PositionCovariance,
-    /// Covariance matrix [3,1]
+    /// Covariance matrix `[3,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_x: PositionCovariance,
-    /// Covariance matrix [3,2]
+    /// Covariance matrix `[3,2]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_y: PositionCovariance,
-    /// Covariance matrix [3,3]
+    /// Covariance matrix `[3,3]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_z: PositionCovariance,
 
-    /// Covariance matrix [4,1]
+    /// Covariance matrix `[4,1]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_x: PositionVelocityCovariance,
-    /// Covariance matrix [4,2]
+    /// Covariance matrix `[4,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_y: PositionVelocityCovariance,
-    /// Covariance matrix [4,3]
+    /// Covariance matrix `[4,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_z: PositionVelocityCovariance,
-    /// Covariance matrix [4,4]
+    /// Covariance matrix `[4,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cx_dot_x_dot: VelocityCovariance,
 
-    /// Covariance matrix [5,1]
+    /// Covariance matrix `[5,1]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_x: PositionVelocityCovariance,
-    /// Covariance matrix [5,2]
+    /// Covariance matrix `[5,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_y: PositionVelocityCovariance,
-    /// Covariance matrix [5,3]
+    /// Covariance matrix `[5,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_z: PositionVelocityCovariance,
-    /// Covariance matrix [5,4]
+    /// Covariance matrix `[5,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_x_dot: VelocityCovariance,
-    /// Covariance matrix [5,5]
+    /// Covariance matrix `[5,5]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cy_dot_y_dot: VelocityCovariance,
 
-    /// Covariance matrix [6,1]
+    /// Covariance matrix `[6,1]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_x: PositionVelocityCovariance,
-    /// Covariance matrix [6,2]
+    /// Covariance matrix `[6,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_y: PositionVelocityCovariance,
-    /// Covariance matrix [6,3]
+    /// Covariance matrix `[6,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_z: PositionVelocityCovariance,
-    /// Covariance matrix [6,4]
+    /// Covariance matrix `[6,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_x_dot: VelocityCovariance,
-    /// Covariance matrix [6,5]
+    /// Covariance matrix `[6,5]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub cz_dot_y_dot: VelocityCovariance,
-    /// Covariance matrix [6,6]
+    /// Covariance matrix `[6,6]`
     ///
     /// **Units**: km²/s²
     ///
@@ -1612,7 +1764,7 @@ impl ToKvn for OpmCovarianceMatrix {
 }
 
 /// Atmospheric reentry parameters (atmosphericReentryParametersType, RDM).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AtmosphericReentryParameters {
     /// Comments (allowed only at the beginning of each RDM data logical block).
@@ -1687,8 +1839,33 @@ pub struct AtmosphericReentryParameters {
     pub orbit_lifetime_confidence_level: Option<PercentageRequired>,
 }
 
+impl ToKvn for AtmosphericReentryParameters {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_pair("ORBIT_LIFETIME", &self.orbit_lifetime);
+        writer.write_pair("REENTRY_ALTITUDE", &self.reentry_altitude);
+        if let Some(v) = &self.orbit_lifetime_window_start {
+            writer.write_pair("ORBIT_LIFETIME_WINDOW_START", v);
+        }
+        if let Some(v) = &self.orbit_lifetime_window_end {
+            writer.write_pair("ORBIT_LIFETIME_WINDOW_END", v);
+        }
+        if let Some(v) = &self.nominal_reentry_epoch {
+            writer.write_pair("NOMINAL_REENTRY_EPOCH", v);
+        }
+        if let Some(v) = &self.reentry_window_start {
+            writer.write_pair("REENTRY_WINDOW_START", v);
+        }
+        if let Some(v) = &self.reentry_window_end {
+            writer.write_pair("REENTRY_WINDOW_END", v);
+        }
+        if let Some(v) = &self.orbit_lifetime_confidence_level {
+            writer.write_pair("ORBIT_LIFETIME_CONFIDENCE_LEVEL", v);
+        }
+    }
+}
+
 /// Ground impact parameters (groundImpactParametersType, RDM).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct GroundImpactParameters {
     /// Comments (allowed only at the beginning of each RDM data logical block).
@@ -1739,7 +1916,7 @@ pub struct GroundImpactParameters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub impact_window_end: Option<Epoch>,
     /// Reference frame of the impact location data. The value should be taken from the keyword
-    /// value name column in the SANA celestial body reference frames registry, reference [11].
+    /// value name column in the SANA celestial body reference frames registry, reference `[11]`.
     /// Only frames with the value ‘Body-Fixed’ in the Frame Type column shall be used.
     /// Mandatory if NOMINAL_IMPACT_LON and NOMINAL_IMPACT_LAT are present.
     ///
@@ -1925,8 +2102,107 @@ pub struct GroundImpactParameters {
     pub impact_3_cross_track: Option<Distance>,
 }
 
+impl ToKvn for GroundImpactParameters {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        if let Some(v) = &self.probability_of_impact {
+            writer.write_pair("PROBABILITY_OF_IMPACT", v.value);
+        }
+        if let Some(v) = &self.probability_of_burn_up {
+            writer.write_pair("PROBABILITY_OF_BURN_UP", v.value);
+        }
+        if let Some(v) = &self.probability_of_break_up {
+            writer.write_pair("PROBABILITY_OF_BREAK_UP", v.value);
+        }
+        if let Some(v) = &self.probability_of_land_impact {
+            writer.write_pair("PROBABILITY_OF_LAND_IMPACT", v.value);
+        }
+        if let Some(v) = &self.probability_of_casualty {
+            writer.write_pair("PROBABILITY_OF_CASUALTY", v.value);
+        }
+        if let Some(v) = &self.nominal_impact_epoch {
+            writer.write_pair("NOMINAL_IMPACT_EPOCH", v);
+        }
+        if let Some(v) = &self.impact_window_start {
+            writer.write_pair("IMPACT_WINDOW_START", v);
+        }
+        if let Some(v) = &self.impact_window_end {
+            writer.write_pair("IMPACT_WINDOW_END", v);
+        }
+        if let Some(v) = &self.impact_ref_frame {
+            writer.write_pair("IMPACT_REF_FRAME", v);
+        }
+        if let Some(v) = &self.nominal_impact_lon {
+            writer.write_pair("NOMINAL_IMPACT_LON", v);
+        }
+        if let Some(v) = &self.nominal_impact_lat {
+            writer.write_pair("NOMINAL_IMPACT_LAT", v);
+        }
+        if let Some(v) = &self.nominal_impact_alt {
+            writer.write_pair("NOMINAL_IMPACT_ALT", v);
+        }
+
+        if let Some(v) = &self.impact_1_confidence {
+            writer.write_pair("IMPACT_1_CONFIDENCE", v);
+        }
+        if let Some(v) = &self.impact_1_start_lon {
+            writer.write_pair("IMPACT_1_START_LON", v);
+        }
+        if let Some(v) = &self.impact_1_start_lat {
+            writer.write_pair("IMPACT_1_START_LAT", v);
+        }
+        if let Some(v) = &self.impact_1_stop_lon {
+            writer.write_pair("IMPACT_1_STOP_LON", v);
+        }
+        if let Some(v) = &self.impact_1_stop_lat {
+            writer.write_pair("IMPACT_1_STOP_LAT", v);
+        }
+        if let Some(v) = &self.impact_1_cross_track {
+            writer.write_pair("IMPACT_1_CROSS_TRACK", v);
+        }
+
+        if let Some(v) = &self.impact_2_confidence {
+            writer.write_pair("IMPACT_2_CONFIDENCE", v);
+        }
+        if let Some(v) = &self.impact_2_start_lon {
+            writer.write_pair("IMPACT_2_START_LON", v);
+        }
+        if let Some(v) = &self.impact_2_start_lat {
+            writer.write_pair("IMPACT_2_START_LAT", v);
+        }
+        if let Some(v) = &self.impact_2_stop_lon {
+            writer.write_pair("IMPACT_2_STOP_LON", v);
+        }
+        if let Some(v) = &self.impact_2_stop_lat {
+            writer.write_pair("IMPACT_2_STOP_LAT", v);
+        }
+        if let Some(v) = &self.impact_2_cross_track {
+            writer.write_pair("IMPACT_2_CROSS_TRACK", v);
+        }
+
+        if let Some(v) = &self.impact_3_confidence {
+            writer.write_pair("IMPACT_3_CONFIDENCE", v);
+        }
+        if let Some(v) = &self.impact_3_start_lon {
+            writer.write_pair("IMPACT_3_START_LON", v);
+        }
+        if let Some(v) = &self.impact_3_start_lat {
+            writer.write_pair("IMPACT_3_START_LAT", v);
+        }
+        if let Some(v) = &self.impact_3_stop_lon {
+            writer.write_pair("IMPACT_3_STOP_LON", v);
+        }
+        if let Some(v) = &self.impact_3_stop_lat {
+            writer.write_pair("IMPACT_3_STOP_LAT", v);
+        }
+        if let Some(v) = &self.impact_3_cross_track {
+            writer.write_pair("IMPACT_3_CROSS_TRACK", v);
+        }
+    }
+}
+
 /// RDM spacecraft parameters (rdmSpacecraftParametersType).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmSpacecraftParameters {
     /// Comments (allowed only at the beginning of each RDM data logical block).
@@ -1999,4 +2275,436 @@ pub struct RdmSpacecraftParameters {
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thrust_acceleration: Option<Ms2>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::traits::ToKvn;
+    use crate::traits::Validate;
+
+    #[test]
+    fn test_ndm_header_validation() {
+        let h = NdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("  ") // empty originator
+            .build();
+        assert!(h.validate().is_err());
+
+        let h2 = NdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("NASA")
+            .build();
+        assert!(h2.validate().is_ok());
+    }
+
+    #[test]
+    fn test_ndm_header_kvn() {
+        let h = NdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("NASA")
+            .comment(vec!["msg".into()])
+            .build();
+        let mut w = KvnWriter::new();
+        h.write_kvn(&mut w);
+        let s = w.finish();
+        // Check for presence of key and value separately to avoid whitespace issues
+        assert!(s.contains("COMMENT msg"));
+        assert!(s.contains("CREATION_DATE"));
+        assert!(s.contains("2000-01-01T00:00:00"));
+        assert!(s.contains("ORIGINATOR"));
+        assert!(s.contains("NASA"));
+    }
+
+    #[test]
+    fn test_adm_header_validation() {
+        let h = AdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("")
+            .build();
+        assert!(h.validate().is_err());
+
+        // modify directly if possible or rebuild? Struct fields are public.
+        let mut h2 = h.clone();
+        h2.originator = "ESA".into();
+        assert!(h2.validate().is_ok());
+    }
+
+    #[test]
+    fn test_adm_header_kvn() {
+        let h = AdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("ESA")
+            .message_id("MSG1")
+            .classification("SECURE".to_string())
+            .build();
+        let mut w = KvnWriter::new();
+        h.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("CLASSIFICATION"));
+        assert!(s.contains("SECURE"));
+        assert!(s.contains("MESSAGE_ID"));
+        assert!(s.contains("MSG1"));
+    }
+
+    #[test]
+    fn test_odm_header_validation() {
+        let h = OdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("")
+            .build();
+        assert!(h.validate().is_err());
+    }
+
+    #[test]
+    fn test_odm_header_kvn() {
+        let h = OdmHeader::builder()
+            .creation_date("2000-01-01T00:00:00".parse().unwrap())
+            .originator("JAXA")
+            .build();
+        let mut w = KvnWriter::new();
+        h.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("ORIGINATOR"));
+        assert!(s.contains("JAXA"));
+    }
+
+    #[test]
+    fn test_state_vector_kvn() {
+        let sv = StateVector::builder()
+            .epoch("2000-01-01T00:00:00".parse().unwrap())
+            .x(Position::new(1.0, None))
+            .y(Position::new(2.0, None))
+            .z(Position::new(3.0, None))
+            .x_dot(Velocity::new(4.0, None))
+            .y_dot(Velocity::new(5.0, None))
+            .z_dot(Velocity::new(6.0, None))
+            .build();
+
+        let mut w = KvnWriter::new();
+        sv.write_kvn(&mut w);
+        let s = w.finish();
+        // check output
+        assert!(s.contains("EPOCH"));
+        assert!(s.contains("2000-01-01T00:00:00"));
+        assert!(s.contains("X"));
+        assert!(s.contains("1"));
+        assert!(s.contains("Z_DOT"));
+        assert!(s.contains("6"));
+    }
+
+    #[test]
+    fn test_state_vector_acc_kvn() {
+        let sv = StateVectorAcc::builder()
+            .epoch("2000-01-01T00:00:00".parse().unwrap())
+            .x(Position::new(1.0, None))
+            .y(Position::new(2.0, None))
+            .z(Position::new(3.0, None))
+            .x_dot(Velocity::new(4.0, None))
+            .y_dot(Velocity::new(5.0, None))
+            .z_dot(Velocity::new(6.0, None))
+            .build();
+        let mut w = KvnWriter::new();
+        // StateVectorAcc uses a custom write format in write_kvn?
+        // Looking at the code: it writes a raw line "epoch x y z ..."
+        sv.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("2000-01-01T00:00:00"));
+        assert!(s.contains("1"));
+        assert!(s.contains("2"));
+        assert!(s.contains("3"));
+    }
+
+    #[test]
+    fn test_quaternion_state_kvn() {
+        let qs = QuaternionState::builder()
+            .ref_frame_a("A")
+            .ref_frame_b("B")
+            .quaternion(Quaternion {
+                q1: 1.0,
+                q2: 0.0,
+                q3: 0.0,
+                qc: 0.0,
+            })
+            .build();
+        let mut w = KvnWriter::new();
+        qs.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("REF_FRAME_A"));
+        assert!(s.contains("A"));
+        assert!(s.contains("Q1"));
+        assert!(s.contains("1"));
+    }
+
+    #[test]
+    fn test_euler_angle_state_kvn() {
+        let es = EulerAngleState::builder()
+            .ref_frame_a("A")
+            .ref_frame_b("B")
+            .euler_rot_seq(RotSeq::XYZ)
+            .angle_1(Angle::new(10.0, None).unwrap())
+            .angle_2(Angle::new(20.0, None).unwrap())
+            .angle_3(Angle::new(30.0, None).unwrap())
+            .build();
+        let mut w = KvnWriter::new();
+        es.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("EULER_ROT_SEQ"));
+        assert!(s.contains("XYZ"));
+        assert!(s.contains("ANGLE_1"));
+        assert!(s.contains("10"));
+    }
+
+    #[test]
+    fn test_ang_vel_state_kvn() {
+        let avs = AngVelState::builder()
+            .ref_frame_a("A")
+            .ref_frame_b("B")
+            .angvel_frame(AngVelFrameType("FRAME".into()))
+            .angvel_x(AngleRate::new(0.1, None))
+            .angvel_y(AngleRate::new(0.2, None))
+            .angvel_z(AngleRate::new(0.3, None))
+            .build();
+        let mut w = KvnWriter::new();
+        avs.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("ANGVEL_FRAME"));
+        assert!(s.contains("FRAME"));
+        assert!(s.contains("ANGVEL_X"));
+        assert!(s.contains("0.1"));
+    }
+
+    #[test]
+    fn test_spin_state_kvn() {
+        let ss = SpinState::builder()
+            .ref_frame_a("A")
+            .ref_frame_b("B")
+            .spin_alpha(Angle::new(10.0, None).unwrap())
+            .spin_delta(Angle::new(20.0, None).unwrap())
+            .spin_angle(Angle::new(30.0, None).unwrap())
+            .spin_angle_vel(AngleRate::new(0.1, None))
+            .build();
+        let mut w = KvnWriter::new();
+        ss.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("SPIN_ALPHA"));
+        assert!(s.contains("10"));
+        assert!(s.contains("SPIN_ANGLE_VEL"));
+        assert!(s.contains("0.1"));
+    }
+
+    #[test]
+    fn test_inertia_state_kvn() {
+        let is = InertiaState::builder()
+            .inertia_ref_frame("FRAME")
+            .ixx(Moment::new(100.0, None))
+            .iyy(Moment::new(200.0, None))
+            .izz(Moment::new(300.0, None))
+            .ixy(Moment::new(10.0, None))
+            .ixz(Moment::new(20.0, None))
+            .iyz(Moment::new(30.0, None))
+            .build();
+        let mut w = KvnWriter::new();
+        is.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("IXX"));
+        assert!(s.contains("100"));
+        assert!(s.contains("IXY"));
+        assert!(s.contains("10"));
+    }
+
+    #[test]
+    fn test_ephemeris_kvn() {
+        let epoch = "2000-01-01T00:00:00".parse().unwrap();
+        let qe = QuaternionEphemeris {
+            epoch,
+            quaternion: Quaternion {
+                q1: 1.0,
+                q2: 0.0,
+                q3: 0.0,
+                qc: 0.0,
+            },
+        };
+        let mut w = KvnWriter::new();
+        qe.write_kvn(&mut w);
+        assert!(w.finish().contains("2000-01-01T00:00:00 1 0 0 0"));
+
+        let qd = QuaternionDerivative {
+            epoch,
+            quaternion: Quaternion {
+                q1: 1.0,
+                q2: 0.0,
+                q3: 0.0,
+                qc: 0.0,
+            },
+            quaternion_dot: QuaternionDot {
+                q1_dot: QuaternionDotComponent::new(0.1, None),
+                q2_dot: QuaternionDotComponent::new(0.2, None),
+                q3_dot: QuaternionDotComponent::new(0.3, None),
+                qc_dot: QuaternionDotComponent::new(0.4, None),
+            },
+        };
+        let mut w = KvnWriter::new();
+        qd.write_kvn(&mut w);
+        assert!(w
+            .finish()
+            .contains("2000-01-01T00:00:00 1 0 0 0 0.1 0.2 0.3 0.4"));
+    }
+
+    #[test]
+    fn test_opm_covariance_kvn() {
+        let cov = OpmCovarianceMatrix::builder()
+            .cx_x(PositionCovariance::new(1.0, None))
+            .cy_x(PositionCovariance::new(2.0, None))
+            .cy_y(PositionCovariance::new(3.0, None))
+            .cz_x(PositionCovariance::new(4.0, None))
+            .cz_y(PositionCovariance::new(5.0, None))
+            .cz_z(PositionCovariance::new(6.0, None))
+            .cx_dot_x(PositionVelocityCovariance::new(7.0, None))
+            .cx_dot_y(PositionVelocityCovariance::new(8.0, None))
+            .cx_dot_z(PositionVelocityCovariance::new(9.0, None))
+            .cx_dot_x_dot(VelocityCovariance::new(10.0, None))
+            .cy_dot_x(PositionVelocityCovariance::new(11.0, None))
+            .cy_dot_y(PositionVelocityCovariance::new(12.0, None))
+            .cy_dot_z(PositionVelocityCovariance::new(13.0, None))
+            .cy_dot_x_dot(VelocityCovariance::new(14.0, None))
+            .cy_dot_y_dot(VelocityCovariance::new(15.0, None))
+            .cz_dot_x(PositionVelocityCovariance::new(16.0, None))
+            .cz_dot_y(PositionVelocityCovariance::new(17.0, None))
+            .cz_dot_z(PositionVelocityCovariance::new(18.0, None))
+            .cz_dot_x_dot(VelocityCovariance::new(19.0, None))
+            .cz_dot_y_dot(VelocityCovariance::new(20.0, None))
+            .cz_dot_z_dot(VelocityCovariance::new(21.0, None))
+            .build();
+        let mut w = KvnWriter::new();
+        cov.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("CX_X"));
+        assert!(s.contains("1"));
+        assert!(s.contains("CZ_DOT_Z_DOT"));
+        assert!(s.contains("21"));
+    }
+
+    #[test]
+    fn test_reentry_params_kvn() {
+        // AtmosphericReentryParameters
+        // GroundImpactParameters
+        let gi = GroundImpactParameters::builder()
+            .comment(vec![])
+            .probability_of_impact(Probability::new(0.5).unwrap())
+            .build();
+        let mut w = KvnWriter::new();
+        gi.write_kvn(&mut w);
+        let s = w.finish();
+        assert!(s.contains("PROBABILITY_OF_IMPACT"));
+        assert!(s.contains("0.5"));
+    }
+
+    #[test]
+    fn test_header_validation_missing_date() {
+        let h = NdmHeader::builder()
+            .creation_date(Epoch::new("").unwrap())
+            .originator("NASA")
+            .build();
+        assert!(h.validate().is_err());
+
+        let h = AdmHeader::builder()
+            .creation_date(Epoch::new("").unwrap())
+            .originator("ESA")
+            .build();
+        assert!(h.validate().is_err());
+
+        let h = OdmHeader::builder()
+            .creation_date(Epoch::new("").unwrap())
+            .originator("JAXA")
+            .build();
+        assert!(h.validate().is_err());
+    }
+
+    #[test]
+    fn test_aem_attitude_state_variants_kvn() {
+        let epoch = "2000-01-01T00:00:00".parse().unwrap();
+
+        // QuaternionAngVel
+        let qav = QuaternionAngVel {
+            epoch,
+            quaternion: Quaternion {
+                q1: 1.0,
+                q2: 0.0,
+                q3: 0.0,
+                qc: 0.0,
+            },
+            ang_vel: AngVel {
+                angvel_x: AngleRate::new(0.1, None),
+                angvel_y: AngleRate::new(0.2, None),
+                angvel_z: AngleRate::new(0.3, None),
+            },
+        };
+        let mut w = KvnWriter::new();
+        AemAttitudeState::QuaternionAngVel(qav).write_kvn(&mut w);
+        assert!(w.finish().contains("1 0 0 0"));
+
+        // EulerAngleDerivative
+        let ead = EulerAngleDerivative {
+            epoch,
+            angle_1: Angle::new(10.0, None).unwrap(),
+            angle_2: Angle::new(20.0, None).unwrap(),
+            angle_3: Angle::new(30.0, None).unwrap(),
+            angle_1_dot: AngleRate::new(0.1, None),
+            angle_2_dot: AngleRate::new(0.2, None),
+            angle_3_dot: AngleRate::new(0.3, None),
+        };
+        let mut w = KvnWriter::new();
+        AemAttitudeState::EulerAngleDerivative(ead).write_kvn(&mut w);
+        assert!(w.finish().contains("10 20 30"));
+
+        // SpinNutation
+        let sn = SpinNutation {
+            epoch,
+            spin_alpha: Angle::new(10.0, None).unwrap(),
+            spin_delta: Angle::new(20.0, None).unwrap(),
+            spin_angle: Angle::new(30.0, None).unwrap(),
+            spin_angle_vel: AngleRate::new(0.1, None),
+            nutation: Angle::new(5.0, None).unwrap(),
+            nutation_per: Duration::new(1.0, Some(TimeUnits::Day)).unwrap(),
+            nutation_phase: Angle::new(0.0, None).unwrap(),
+        };
+        let mut w = KvnWriter::new();
+        AemAttitudeState::SpinNutation(sn).write_kvn(&mut w);
+        let kvn = w.finish();
+        assert!(kvn.contains("10 20 30 0.1 5 1 0"));
+
+        // SpinNutationMom
+        let snm = SpinNutationMom {
+            epoch,
+            spin_alpha: Angle::new(10.0, None).unwrap(),
+            spin_delta: Angle::new(20.0, None).unwrap(),
+            spin_angle: Angle::new(30.0, None).unwrap(),
+            spin_angle_vel: AngleRate::new(0.1, None),
+            momentum_alpha: Angle::new(5.0, None).unwrap(),
+            momentum_delta: Angle::new(5.0, None).unwrap(),
+            nutation_vel: AngleRate::new(0.01, None),
+        };
+        let mut w = KvnWriter::new();
+        AemAttitudeState::SpinNutationMom(snm).write_kvn(&mut w);
+        assert!(w.finish().contains("0.01"));
+    }
+
+    #[test]
+    fn test_quaternion_validation() {
+        let q = Quaternion {
+            q1: 2.0,
+            q2: 0.0,
+            q3: 0.0,
+            qc: 0.0,
+        };
+        assert!(q.validate().is_err()); // Not normalized
+        let q2 = Quaternion {
+            q1: 1.0,
+            q2: 0.0,
+            q3: 0.0,
+            qc: 0.0,
+        };
+        assert!(q2.validate().is_ok());
+    }
 }

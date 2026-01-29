@@ -45,15 +45,6 @@ impl<'de> Deserialize<'de> for Epoch {
     }
 }
 
-impl Default for Epoch {
-    fn default() -> Self {
-        Self {
-            bytes: [0u8; 64],
-            len: 0,
-        }
-    }
-}
-
 #[derive(Error, Debug, PartialEq, Clone)]
 pub enum EpochError {
     #[error("invalid epoch format: '{0}'")]
@@ -133,6 +124,11 @@ impl Epoch {
         // Bytes are validated to be ASCII/UTF-8 during creation.
         std::str::from_utf8(&self.bytes[..self.len as usize])
             .expect("Epoch bytes must be valid UTF-8")
+    }
+
+    /// Returns true if the epoch is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 }
 
@@ -950,12 +946,6 @@ impl std::fmt::Display for NonNegativeDouble {
 impl FromKvnFloat for NonNegativeDouble {
     fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
         Self::new(value)
-    }
-}
-
-impl From<f64> for NonNegativeDouble {
-    fn from(value: f64) -> Self {
-        Self { value }
     }
 }
 
@@ -1787,7 +1777,7 @@ impl std::str::FromStr for ControlledType {
 }
 
 // Time units ("s") plus Duration / RelTime / TimeOffset (optional units per XSD)
-define_unit_enum!(TimeUnits, Seconds, { Seconds => "s" });
+define_unit_enum!(TimeUnits, Seconds, { Seconds => "s", Day => "d" });
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Duration {
@@ -2971,5 +2961,227 @@ mod tests {
         assert!(ElementSetNo::new(0).is_ok());
         assert!(ElementSetNo::new(9999).is_ok());
         assert!(ElementSetNo::new(10000).is_err());
+    }
+
+    #[test]
+    fn test_epoch_xsd_compliance() {
+        // Valid calendar/ordinal formats
+        assert!(Epoch::new("2023-11-13T12:00:00").is_ok());
+        assert!(Epoch::new("2023-11-13T12:00:00Z").is_ok());
+        assert!(Epoch::new("2023-11-13T12:00:00.123Z").is_ok());
+        assert!(Epoch::new("2023-317T12:00:00Z").is_ok()); // Ordinal day
+        assert!(Epoch::new("2023-11-13T12:00:00+05:00").is_ok());
+        assert!(Epoch::new("2023-11-13T12:00:00-05:00").is_ok());
+        assert!(Epoch::new("-2023-11-13T12:00:00Z").is_ok()); // Negative year
+
+        // Valid numeric formats
+        assert!(Epoch::new("12345.678").is_ok());
+        assert!(Epoch::new("+12345.678").is_ok());
+        assert!(Epoch::new("-12345.678").is_ok());
+        assert!(Epoch::new(".678").is_ok());
+        assert!(Epoch::new("12345.").is_ok());
+        assert!(Epoch::new("12345").is_ok());
+        assert!(Epoch::new("+").is_ok()); // Technically valid according to XSD [+-]?\d*(\.\d*)?
+        assert!(Epoch::new("-").is_ok()); // Technically valid according to XSD
+        assert!(Epoch::new(".").is_ok()); // Technically valid according to XSD
+
+        // Empty string
+        assert!(Epoch::new("").is_ok());
+
+        // Invalid formats
+        assert!(Epoch::new("2023-11-13").is_err()); // Missing time
+        assert!(Epoch::new("2023-11-13T12:00").is_err()); // Missing seconds
+        assert!(Epoch::new("2023-11-13T12:00:00Z+05:00").is_err()); // Double TZ
+        assert!(Epoch::new("not-a-date").is_err());
+    }
+
+    #[test]
+    fn test_epoch_length_limit() {
+        let long_epoch = "A".repeat(65);
+        assert!(Epoch::new(&long_epoch).is_err());
+        let _max_epoch = "A".repeat(64);
+        // "A" is not a valid epoch format, so it should fail anyway, but let's test length check
+        // We can use numeric format for long valid epoch if needed, but 64 is huge for digits.
+        let long_numeric = "1".repeat(64);
+        assert!(Epoch::new(&long_numeric).is_ok());
+        let too_long_numeric = "1".repeat(65);
+        assert!(Epoch::new(&too_long_numeric).is_err());
+    }
+}
+
+#[cfg(test)]
+mod extra_tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_vec3double_from_kvn_error() {
+        assert!(Vec3Double::from_kvn_value("1.0 2.0").is_err()); // missing 3rd
+        assert!(Vec3Double::from_kvn_value("1.0 2.0 3.0 4.0").is_err()); // extra
+        assert!(Vec3Double::from_kvn_value("1.0 foo 3.0").is_err()); // invalid float
+        assert!(Vec3Double::from_kvn_value("invalid").is_err());
+    }
+
+    #[test]
+    fn test_vec3double_display() {
+        let v = Vec3Double::new(1.1, 2.2, 3.3);
+        assert_eq!(format!("{}", v), "1.1 2.2 3.3");
+    }
+
+    macro_rules! test_enum_from_str {
+        ($type:ty, $valid:expr, $invalid:expr) => {
+            // Test valid
+            assert!($valid.parse::<$type>().is_ok());
+            // Test invalid
+            let res = $invalid.parse::<$type>();
+            assert!(res.is_err());
+            // Check error message content if possible, or just strict existence
+            let err = res.unwrap_err();
+            assert!(!err.to_string().is_empty());
+        };
+    }
+
+    #[test]
+    fn test_enum_parsing_errors() {
+        test_enum_from_str!(ReentryUncertaintyMethodType, "NONE", "INVALID");
+        test_enum_from_str!(CdmObjectType, "OBJECT1", "INVALID");
+        test_enum_from_str!(ScreenVolumeFrameType, "RTN", "INVALID");
+        test_enum_from_str!(ScreenVolumeShapeType, "BOX", "INVALID");
+        test_enum_from_str!(ReferenceFrameType, "GCRF", "INVALID");
+        test_enum_from_str!(CovarianceMethodType, "CALCULATED", "INVALID");
+        test_enum_from_str!(ManeuverableType, "YES", "INVALID");
+        test_enum_from_str!(TdmAngleType, "AZEL", "INVALID");
+        test_enum_from_str!(TdmDataQuality, "RAW", "INVALID");
+        test_enum_from_str!(TdmIntegrationRef, "START", "INVALID");
+        test_enum_from_str!(TdmMode, "SEQUENTIAL", "INVALID");
+        test_enum_from_str!(TdmRangeMode, "COHERENT", "INVALID");
+        test_enum_from_str!(TdmRangeUnits, "km", "INVALID");
+        test_enum_from_str!(TdmReferenceFrame, "EME2000", "INVALID");
+        test_enum_from_str!(TdmTimetagRef, "TRANSMIT", "INVALID");
+    }
+
+    #[test]
+    fn test_unit_value_from_kvn() {
+        let uv = UnitValue::<f64, PositionUnits>::from_kvn("123.45", Some("km")).unwrap();
+        assert_eq!(uv.value, 123.45);
+        assert_eq!(uv.units, Some(PositionUnits::Km));
+
+        let uv_no_unit = UnitValue::<f64, PositionUnits>::from_kvn("123.45", None).unwrap();
+        assert_eq!(uv_no_unit.units, None);
+    }
+
+    #[test]
+    fn test_angle_validation() {
+        assert!(Angle::new(359.9, None).is_ok());
+        assert!(Angle::new(-359.9, None).is_ok());
+        assert!(Angle::new(360.0, None).is_err());
+        assert!(Angle::new(-360.1, None).is_err());
+    }
+
+    #[test]
+    fn test_day_interval_validation() {
+        assert!(DayInterval::new(10.0, None).is_ok());
+        assert!(DayInterval::new(-0.1, None).is_err());
+        assert!(DayIntervalRequired::new(0.1).is_ok());
+        assert!(DayIntervalRequired::new(0.0).is_err());
+    }
+
+    #[test]
+    fn test_frequency_validation() {
+        assert!(Frequency::new(1.0, None).is_ok());
+        assert!(Frequency::new(0.0, None).is_err());
+    }
+
+    #[test]
+    fn test_gm_validation() {
+        assert!(Gm::new(1.0, None).is_ok());
+        assert!(Gm::new(0.0, None).is_err());
+        assert!("KM**3/S**2".parse::<GmUnits>().is_ok());
+    }
+
+    #[test]
+    fn test_altitude_required_validation() {
+        assert!(AltitudeRequired::new(0.0).is_ok());
+        assert!(AltitudeRequired::new(9000.0).is_err());
+        assert!(AltitudeRequired::new(-431.0).is_err());
+    }
+
+    #[test]
+    fn test_mass_validation() {
+        assert!(Mass::new(0.0, None).is_ok());
+        assert!(Mass::new(-1.0, None).is_err());
+    }
+
+    #[test]
+    fn test_area_validation() {
+        assert!(Area::new(0.0, None).is_ok());
+        assert!(Area::new(-1.0, None).is_err());
+    }
+
+    #[test]
+    fn test_ms2_parsing() {
+        let ms2 = Ms2::from_str("9.81").unwrap();
+        assert_eq!(ms2.value, 9.81);
+        assert_eq!(ms2.units, Ms2Units::MPerS2);
+    }
+
+    #[test]
+    fn test_solar_flux_units() {
+        test_enum_from_str!(SolarFluxUnits, "SFU", "INVALID");
+        assert_eq!(format!("{}", SolarFluxUnits::JanskyScaled), "10**4 Jansky");
+    }
+
+    #[test]
+    fn test_epoch_conversion() {
+        let s = "2023-01-01T00:00:00Z";
+        let e = Epoch::from_str(s).unwrap();
+        assert_eq!(Epoch::try_from(s.to_string()).unwrap(), e);
+        assert_eq!(e.as_str(), s);
+        assert!(!e.is_empty());
+    }
+
+    #[test]
+    fn test_percentage_validation() {
+        assert!(Percentage::new(50.0, None).is_ok());
+        assert!(Percentage::new(-0.1, None).is_err());
+        assert!(Percentage::new(100.1, None).is_err());
+        assert!(PercentageRequired::new(50.0).is_ok());
+        assert!(PercentageRequired::new(-0.1).is_err());
+        assert!(PercentageRequired::new(100.1).is_err());
+    }
+
+    #[test]
+    fn test_unit_conversions() {
+        let f = Frequency::new(10.0, Some(FrequencyUnits::Hz)).unwrap();
+        let uv = f.to_unit_value();
+        assert_eq!(uv.value, 10.0);
+        assert_eq!(uv.units, Some(FrequencyUnits::Hz));
+
+        let gm = Gm::new(1.0, Some(GmUnits::Km3PerS2)).unwrap();
+        let uv = gm.to_unit_value();
+        assert_eq!(uv.value, 1.0);
+        assert_eq!(uv.units, Some(GmUnits::Km3PerS2));
+
+        let a = Angle::new(1.0, Some(AngleUnits::Deg)).unwrap();
+        let uv = a.to_unit_value();
+        assert_eq!(uv.value, 1.0);
+        assert_eq!(uv.units, Some(AngleUnits::Deg));
+    }
+
+    #[test]
+    fn test_from_kvn_float() {
+        let f = Frequency::from_kvn_float(10.0, Some("Hz")).unwrap();
+        assert_eq!(f.value, 10.0);
+        assert_eq!(f.units, Some(FrequencyUnits::Hz));
+
+        let gm = Gm::from_kvn_float(1.0, Some("KM**3/S**2")).unwrap();
+        assert_eq!(gm.value, 1.0);
+    }
+
+    #[test]
+    fn test_additional_units() {
+        test_enum_from_str!(AngleRateUnits, "deg/s", "INVALID");
+        test_enum_from_str!(MomentUnits, "kg*m**2", "INVALID");
+        test_enum_from_str!(QuaternionDotUnits, "1/s", "INVALID");
     }
 }

@@ -51,6 +51,7 @@ use winnow::ascii::space1;
 use winnow::combinator::{preceded, repeat};
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // OEM Version Parser
@@ -74,19 +75,19 @@ pub fn oem_header(input: &mut &str) -> KvnResult<OdmHeader> {
     let mut message_id = None;
 
     loop {
-        let checkpoint = input.checkpoint();
+        let checkpoint_loop = input.checkpoint();
         comment.extend(collect_comments.parse_next(input)?);
 
         let key = match preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
             Err(_) => {
-                input.reset(&checkpoint);
+                input.reset(&checkpoint_loop);
                 break;
             }
         };
 
         if key == "META_START" {
-            input.reset(&checkpoint);
+            input.reset(&checkpoint_loop);
             break;
         }
 
@@ -105,9 +106,13 @@ pub fn oem_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 message_id = Some(kv_string.parse_next(input)?);
             }
             _ => {
-                input.reset(&checkpoint);
+                input.reset(&checkpoint_loop);
                 break;
             }
+        }
+
+        if input.offset_from(&checkpoint_loop) == 0 {
+            break;
         }
     }
 
@@ -376,12 +381,17 @@ fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix
     let mut matrices: Vec<OemCovarianceMatrix> = Vec::new();
 
     loop {
+        let checkpoint = input.checkpoint();
         comment_line.parse_next(input).ok(); // Consume any comments
         if at_block_end("COVARIANCE", input) {
             break;
         }
         let matrix = parse_covariance_matrix.parse_next(input)?;
         matrices.push(matrix);
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     Ok(matrices)
@@ -501,7 +511,7 @@ pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
                 }
             },
             Err(e) => {
-                if e.is_backtrack() {
+                if e.is_backtrack() || input.offset_from(&checkpoint) == 0 {
                     input.reset(&checkpoint);
                     break;
                 } else {
@@ -560,6 +570,7 @@ pub fn oem_body(input: &mut &str) -> KvnResult<OemBody> {
 
     // Parse additional segments
     loop {
+        let checkpoint = input.checkpoint();
         // Skip comments/empty lines
         let _ = collect_comments.parse_next(input)?;
 
@@ -568,6 +579,10 @@ pub fn oem_body(input: &mut &str) -> KvnResult<OemBody> {
             let segment = oem_segment.parse_next(input)?;
             segments.push(segment);
         } else {
+            break;
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
             break;
         }
     }
@@ -2062,5 +2077,92 @@ META_STOP
 "#;
         let oem = Oem::from_kvn(kvn).unwrap();
         assert_eq!(oem.body.segment[0].metadata.comment.len(), 3);
+    }
+
+    #[test]
+    fn test_oem_header_loops() {
+        let mut input =
+            "COMMENT C1\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = ME\nMETA_START";
+        let header = oem_header.parse_next(&mut input).unwrap();
+        assert_eq!(header.comment, vec!["C1"]);
+        assert_eq!(header.originator, "ME");
+        assert_eq!(input, "META_START");
+    }
+
+    #[test]
+    fn test_oem_state_vector_error_counts() {
+        // Less than 6
+        let mut input = "2023-01-01T00:00:00 1 2 3 4 5\n";
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+
+        // Between 6 and 9
+        let mut input = "2023-01-01T00:00:00 1 2 3 4 5 6 7\n";
+        assert!(parse_state_vector_line.parse_next(&mut input).is_err());
+    }
+
+    #[test]
+    fn test_oem_data_invalid_order() {
+        let kvn = r#"2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+1.0
+2.0 3.0
+4.0 5.0 6.0
+7.0 8.0 9.0 10.0
+11.0 12.0 13.0 14.0 15.0
+16.0 17.0 18.0 19.0 20.0 21.0
+COVARIANCE_STOP
+2023-01-01T00:01:00 1000 2000 3000 1.0 2.0 3.0
+"#;
+        let mut input = kvn;
+        // Should error because state vector appears AFTER covariance
+        assert!(oem_data.parse_next(&mut input).is_err());
+    }
+
+    #[test]
+    fn test_oem_data_empty_sv() {
+        let mut input = "COVARIANCE_START\nEPOCH = 2023-01-01T00:00:00\n1\n2 3\n4 5 6\n7 8 9 10\n11 12 13 14 15\n16 17 18 19 20 21\nCOVARIANCE_STOP\n";
+        // Should error because no state vectors
+        assert!(oem_data.parse_next(&mut input).is_err());
+    }
+
+    #[test]
+    fn test_oem_data_interleaved_comments() {
+        let kvn = r#"COMMENT C_GLOBAL
+2023-01-01T00:00:00 1 2 3 4 5 6
+COMMENT C_DATA
+2023-01-01T00:01:00 1 2 3 4 5 6
+COVARIANCE_START
+EPOCH = 2023-01-01T00:00:00
+1
+2 3
+4 5 6
+7 8 9 10
+11 12 13 14 15
+16 17 18 19 20 21
+COVARIANCE_STOP
+COMMENT C_TRAILING
+"#;
+        let mut input = kvn;
+        let data = oem_data.parse_next(&mut input).unwrap();
+        assert!(data.comment.contains(&"C_GLOBAL".to_string()));
+        assert!(data.comment.contains(&"C_DATA".to_string()));
+        assert!(data.comment.contains(&"C_TRAILING".to_string()));
+    }
+
+    #[test]
+    fn test_oem_parser_error_paths() {
+        // Missing EPOCH in COVARIANCE
+        let mut input = "COVARIANCE_START\n1\nCOVARIANCE_STOP";
+        assert!(oem_data.parse_next(&mut input).is_err());
+
+        // Unexpected key in COVARIANCE
+        let mut input =
+            "COVARIANCE_START\nEPOCH = 2023-01-01T00:00:00\nINVALID_KEY = VAL\n1\nCOVARIANCE_STOP";
+        assert!(oem_data.parse_next(&mut input).is_err());
+
+        // State vector after covariance (triggering cut_err)
+        let mut input = "2023-01-01T00:00:00 1 2 3 4 5 6\nCOVARIANCE_START\nEPOCH = 2023-01-01T00:00:00\n1\n2 3\n4 5 6\n7 8 9 10\n11 12 13 14 15\n16 17 18 19 20 21\nCOVARIANCE_STOP\n2023-01-01T00:01:00 1 2 3 4 5 6";
+        assert!(oem_data.parse_next(&mut input).is_err());
     }
 }

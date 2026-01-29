@@ -71,6 +71,13 @@ perf.data
 perf.data.old
 
 # ------------------------------
+# cargo-fuzz
+# ------------------------------
+ccsds-ndm/fuzz/target/
+ccsds-ndm/fuzz/artifacts/
+ccsds-ndm/fuzz/corpus/
+
+# ------------------------------
 # Build artifacts
 # ------------------------------
 

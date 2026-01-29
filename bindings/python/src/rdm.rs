@@ -19,7 +19,17 @@ use std::str::FromStr;
 // RDM - Re-entry Data Message
 // ============================================================================
 
-/// A message format for use in exchanging spacecraft re-entry information.
+/// Re-entry Data Message (RDM).
+///
+/// The RDM specifies a standard message format to be used in the exchange of spacecraft
+/// re-entry information between Space Situational Awareness (SSA) or Space Surveillance and
+/// Tracking (SST) data providers, satellite owners/operators, and other parties.
+///
+/// It includes data such as:
+/// - Remaining orbital lifetime
+/// - Start and end of the re-entry and impact windows
+/// - Impact location and probabilities
+/// - Object physical properties
 ///
 /// Parameters
 /// ----------
@@ -59,7 +69,17 @@ impl Rdm {
         )
     }
 
-    /// A message format for use in exchanging spacecraft re-entry information.
+    /// Re-entry Data Message (RDM).
+    ///
+    /// The RDM specifies a standard message format to be used in the exchange of spacecraft
+    /// re-entry information between Space Situational Awareness (SSA) or Space Surveillance and
+    /// Tracking (SST) data providers, satellite owners/operators, and other parties.
+    ///
+    /// It includes data such as:
+    /// - Remaining orbital lifetime
+    /// - Start and end of the re-entry and impact windows
+    /// - Impact location and probabilities
+    /// - Object physical properties
     ///
     /// :type: RdmHeader
     #[getter]
@@ -593,7 +613,7 @@ impl RdmMetadata {
 
     /// Object name for which the orbit state is provided. There is no CCSDS-based restriction
     /// on the value for this keyword, but it is recommended to use names from the UNOOSA
-    /// registry—reference [7], which includes object name and international designator of the
+    /// registry—reference `[7]`, which includes object name and international designator of the
     /// participant (formatting rules specified in 5.2.3.3). For objects that are not in the
     /// UNOOSA registry, either a descriptive name (e.g., DEBRIS, if the object is identified as
     /// space debris) or UNKNOWN should be used.
@@ -631,7 +651,7 @@ impl RdmMetadata {
 
     /// The satellite catalog used for the object (formatting rules specified in 5.2.3.3). The
     /// name should be taken from the appropriate SANA registry for catalog names, reference
-    /// [8].
+    /// `[8]`.
     ///
     /// Examples: SATCAT, ESA SST
     ///
@@ -684,7 +704,7 @@ impl RdmMetadata {
 
     /// Owner of the object (e.g., company, agency, or country owning the satellite). The value
     /// should be taken from the abbreviation column in the SANA organizations registry,
-    /// reference [6].
+    /// reference `[6]`.
     ///
     /// Examples: DLR, INTELSAT, ESA, UNKNOWN
     ///
@@ -700,7 +720,7 @@ impl RdmMetadata {
 
     /// Operator of the object (e.g., company, agency, or country operating the satellite).
     /// The value should be taken from the abbreviation column in the SANA organizations
-    /// registry, reference [6].
+    /// registry, reference `[6]`.
     ///
     /// Examples: ESA, EUMETSAT
     ///
@@ -734,7 +754,7 @@ impl RdmMetadata {
     /// Celestial body orbited by the object and origin of the reference frame, which may be a
     /// natural solar system body (planets, asteroids, comets, and natural satellites),
     /// including any planet barycenter or the solar system barycenter. The value should be
-    /// taken from the orbit center column in the SANA orbit centers registry, reference [9].
+    /// taken from the orbit center column in the SANA orbit centers registry, reference `[9]`.
     ///
     /// Examples: EARTH, MOON, JUPITER
     ///
@@ -749,7 +769,7 @@ impl RdmMetadata {
     }
 
     /// Time system for all data/metadata. The value should be taken from the name column in
-    /// the SANA time systems registry, reference [10].
+    /// the SANA time systems registry, reference `[10]`.
     ///
     /// Examples: UTC, TAI
     ///
@@ -781,7 +801,7 @@ impl RdmMetadata {
 
     /// Reference frame in which the (optional) orbit information will be provided. The value
     /// should be taken from the keyword value name column in the SANA celestial body reference
-    /// frames registry, reference [11]. The reference frame must be the same for all orbit
+    /// frames registry, reference `[11]`. The reference frame must be the same for all orbit
     /// data elements, with the exception of the covariance matrix, for which a different
     /// reference frame may be specified, and the ground impact data. This keyword becomes
     /// mandatory if state vectors are provided in the data section.
@@ -876,7 +896,7 @@ impl RdmMetadata {
     }
 
     /// Comma separated list of other bodies used in the simulation. The names of the bodies
-    /// should be taken from the SANA registry for orbit centers, reference [9]. If no other
+    /// should be taken from the SANA registry for orbit centers, reference `[9]`. If no other
     /// bodies are used in the simulation, the value should be NONE.
     ///
     /// Examples: MOON, SUN, JUPITER, NONE
@@ -959,7 +979,7 @@ impl RdmMetadata {
     /// BALLISTIC_COEFF) are valid. The units shall be kilometers, and the conventions
     /// specified in 5.2.4.1 and 5.3.4 must be followed.
     ///
-    /// Examples: 200 [km], 175 [km]
+    /// Examples: 200 `[km]`, 175 `[km]`
     ///
     /// Units: km
     ///
@@ -1139,8 +1159,8 @@ impl RdmMetadata {
 ///     Object physical parameters.
 /// od_parameters : OdParameters, optional
 ///     Orbit determination parameters.
-/// user_defined_parameters : list[tuple[str, str]], optional
-///     User defined parameters as key-value pairs.
+/// user_defined_parameters : UserDefined, optional
+///     User defined parameters.
 /// comment : list[str], optional
 ///     Comments.
 #[pyclass]
@@ -1171,20 +1191,9 @@ impl RdmData {
         covariance_matrix: Option<OpmCovarianceMatrix>,
         spacecraft_parameters: Option<RdmSpacecraftParameters>,
         od_parameters: Option<OdParameters>,
-        user_defined_parameters: Option<Vec<(String, String)>>,
+        user_defined_parameters: Option<crate::types::UserDefined>,
         comment: Option<Vec<String>>,
     ) -> Self {
-        let user_defined = user_defined_parameters.map(|params| core_types::UserDefined {
-            comment: vec![],
-            user_defined: params
-                .into_iter()
-                .map(|(k, v)| core_types::UserDefinedParameter {
-                    parameter: k,
-                    value: v,
-                })
-                .collect(),
-        });
-
         Self {
             inner: core_rdm::RdmData {
                 comment: comment.unwrap_or_default(),
@@ -1194,7 +1203,7 @@ impl RdmData {
                 covariance_matrix: covariance_matrix.map(|cm| cm.inner),
                 spacecraft_parameters: spacecraft_parameters.map(|sp| sp.inner),
                 od_parameters: od_parameters.map(|op| op.inner),
-                user_defined_parameters: user_defined,
+                user_defined_parameters: user_defined_parameters.map(|u| u.inner),
             },
         }
     }
@@ -1300,36 +1309,19 @@ impl RdmData {
 
     /// User defined parameters.
     ///
-    /// :type: list[tuple[str, str]]
+    /// :type: UserDefined | None
     #[getter]
-    fn get_user_defined_parameters(&self) -> Vec<(String, String)> {
+    fn get_user_defined_parameters(&self) -> Option<crate::types::UserDefined> {
         self.inner
             .user_defined_parameters
             .as_ref()
-            .map(|ud| {
-                ud.user_defined
-                    .iter()
-                    .map(|p| (p.parameter.clone(), p.value.clone()))
-                    .collect()
+            .map(|ud| crate::types::UserDefined {
+                inner: ud.clone(),
             })
-            .unwrap_or_default()
     }
     #[setter]
-    fn set_user_defined_parameters(&mut self, v: Vec<(String, String)>) {
-        if v.is_empty() {
-            self.inner.user_defined_parameters = None;
-        } else {
-            self.inner.user_defined_parameters = Some(core_types::UserDefined {
-                comment: vec![],
-                user_defined: v
-                    .into_iter()
-                    .map(|(k, v)| core_types::UserDefinedParameter {
-                        parameter: k,
-                        value: v,
-                    })
-                    .collect(),
-            });
-        }
+    fn set_user_defined_parameters(&mut self, v: Option<crate::types::UserDefined>) {
+        self.inner.user_defined_parameters = v.map(|u| u.inner);
     }
 
     /// Comments.

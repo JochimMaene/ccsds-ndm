@@ -15,6 +15,7 @@ use crate::messages::rdm::{Rdm, RdmBody, RdmData, RdmHeader, RdmMetadata, RdmSeg
 use crate::parse_block;
 use crate::types::*;
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // RDM Version Parser
@@ -70,6 +71,10 @@ pub fn rdm_header(input: &mut &str) -> KvnResult<RdmHeader> {
                 input.reset(&checkpoint);
                 break;
             }
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
         }
     }
 
@@ -193,7 +198,6 @@ pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
 //----------------------------------------------------------------------
 // RDM Data Parser
 //----------------------------------------------------------------------
-
 pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
     let mut comment = Vec::new();
 
@@ -209,44 +213,38 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
     let mut ground_params = GroundImpactParameters::default();
     let mut have_ground = false;
 
-    let mut state_vector_data = StateVector {
-        comment: Vec::new(),
-        epoch: Epoch::default(),
-        x: Position::default(),
-        y: Position::default(),
-        z: Position::default(),
-        x_dot: Velocity::default(),
-        y_dot: Velocity::default(),
-        z_dot: Velocity::default(),
-    };
-    let mut have_sv = false;
+    let sv_comment = Vec::new();
+    let mut sv_epoch = None;
+    let mut sv_x = None;
+    let mut sv_y = None;
+    let mut sv_z = None;
+    let mut sv_x_dot = None;
+    let mut sv_y_dot = None;
+    let mut sv_z_dot = None;
 
-    let mut cov = OpmCovarianceMatrix {
-        comment: Vec::new(),
-        cov_ref_frame: None,
-        cx_x: PositionCovariance::default(),
-        cy_x: PositionCovariance::default(),
-        cy_y: PositionCovariance::default(),
-        cz_x: PositionCovariance::default(),
-        cz_y: PositionCovariance::default(),
-        cz_z: PositionCovariance::default(),
-        cx_dot_x: PositionVelocityCovariance::default(),
-        cx_dot_y: PositionVelocityCovariance::default(),
-        cx_dot_z: PositionVelocityCovariance::default(),
-        cx_dot_x_dot: VelocityCovariance::default(),
-        cy_dot_x: PositionVelocityCovariance::default(),
-        cy_dot_y: PositionVelocityCovariance::default(),
-        cy_dot_z: PositionVelocityCovariance::default(),
-        cy_dot_x_dot: VelocityCovariance::default(),
-        cy_dot_y_dot: VelocityCovariance::default(),
-        cz_dot_x: PositionVelocityCovariance::default(),
-        cz_dot_y: PositionVelocityCovariance::default(),
-        cz_dot_z: PositionVelocityCovariance::default(),
-        cz_dot_x_dot: VelocityCovariance::default(),
-        cz_dot_y_dot: VelocityCovariance::default(),
-        cz_dot_z_dot: VelocityCovariance::default(),
-    };
-    let mut have_cov = false;
+    let cov_comment = Vec::new();
+    let mut cov_ref_frame = None;
+    let mut cx_x = None;
+    let mut cy_x = None;
+    let mut cy_y = None;
+    let mut cz_x = None;
+    let mut cz_y = None;
+    let mut cz_z = None;
+    let mut cx_dot_x = None;
+    let mut cx_dot_y = None;
+    let mut cx_dot_z = None;
+    let mut cx_dot_x_dot = None;
+    let mut cy_dot_x = None;
+    let mut cy_dot_y = None;
+    let mut cy_dot_z = None;
+    let mut cy_dot_x_dot = None;
+    let mut cy_dot_y_dot = None;
+    let mut cz_dot_x = None;
+    let mut cz_dot_y = None;
+    let mut cz_dot_z = None;
+    let mut cz_dot_x_dot = None;
+    let mut cz_dot_y_dot = None;
+    let mut cz_dot_z_dot = None;
 
     let mut spacecraft_params = RdmSpacecraftParameters::default();
     let mut have_sp = false;
@@ -297,44 +295,44 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "IMPACT_3_STOP_LAT" => val: kv_from_kvn => { ground_params.impact_3_stop_lat = Some(val); have_ground = true; },
         "IMPACT_3_CROSS_TRACK" => val: kv_from_kvn => { ground_params.impact_3_cross_track = Some(val); have_ground = true; },
 
-        "EPOCH" => val: kv_epoch => { state_vector_data.epoch = val; have_sv = true; },
-        "X" => val: kv_from_kvn => { state_vector_data.x = val; have_sv = true; },
-        "Y" => val: kv_from_kvn => { state_vector_data.y = val; have_sv = true; },
-        "Z" => val: kv_from_kvn => { state_vector_data.z = val; have_sv = true; },
-        "X_DOT" => val: kv_from_kvn => { state_vector_data.x_dot = val; have_sv = true; },
-        "Y_DOT" => val: kv_from_kvn => { state_vector_data.y_dot = val; have_sv = true; },
-        "Z_DOT" => val: kv_from_kvn => { state_vector_data.z_dot = val; have_sv = true; },
+        "EPOCH" => val: kv_epoch => { sv_epoch = Some(val); },
+        "X" => val: kv_from_kvn => { sv_x = Some(val); },
+        "Y" => val: kv_from_kvn => { sv_y = Some(val); },
+        "Z" => val: kv_from_kvn => { sv_z = Some(val); },
+        "X_DOT" => val: kv_from_kvn => { sv_x_dot = Some(val); },
+        "Y_DOT" => val: kv_from_kvn => { sv_y_dot = Some(val); },
+        "Z_DOT" => val: kv_from_kvn => { sv_z_dot = Some(val); },
 
-        "COV_REF_FRAME" => val: kv_string => { cov.cov_ref_frame = Some(val); have_cov = true; },
-        "CX_X" => val: kv_from_kvn => { cov.cx_x = val; have_cov = true; },
-        "CY_X" => val: kv_from_kvn => { cov.cy_x = val; have_cov = true; },
-        "CY_Y" => val: kv_from_kvn => { cov.cy_y = val; have_cov = true; },
-        "CZ_X" => val: kv_from_kvn => { cov.cz_x = val; have_cov = true; },
-        "CZ_Y" => val: kv_from_kvn => { cov.cz_y = val; have_cov = true; },
-        "CZ_Z" => val: kv_from_kvn => { cov.cz_z = val; have_cov = true; },
-        "CX_DOT_X" => val: kv_from_kvn => { cov.cx_dot_x = val; have_cov = true; },
-        "CX_DOT_Y" => val: kv_from_kvn => { cov.cx_dot_y = val; have_cov = true; },
-        "CX_DOT_Z" => val: kv_from_kvn => { cov.cx_dot_z = val; have_cov = true; },
-        "CX_DOT_X_DOT" => val: kv_from_kvn => { cov.cx_dot_x_dot = val; have_cov = true; },
-        "CY_DOT_X" => val: kv_from_kvn => { cov.cy_dot_x = val; have_cov = true; },
-        "CY_DOT_Y" => val: kv_from_kvn => { cov.cy_dot_y = val; have_cov = true; },
-        "CY_DOT_Z" => val: kv_from_kvn => { cov.cy_dot_z = val; have_cov = true; },
-        "CY_DOT_X_DOT" => val: kv_from_kvn => { cov.cy_dot_x_dot = val; have_cov = true; },
-        "CY_DOT_Y_DOT" => val: kv_from_kvn => { cov.cy_dot_y_dot = val; have_cov = true; },
-        "CZ_DOT_X" => val: kv_from_kvn => { cov.cz_dot_x = val; have_cov = true; },
-        "CZ_DOT_Y" => val: kv_from_kvn => { cov.cz_dot_y = val; have_cov = true; },
-        "CZ_DOT_Z" => val: kv_from_kvn => { cov.cz_dot_z = val; have_cov = true; },
-        "CZ_DOT_X_DOT" => val: kv_from_kvn => { cov.cz_dot_x_dot = val; have_cov = true; },
-        "CZ_DOT_Y_DOT" => val: kv_from_kvn => { cov.cz_dot_y_dot = val; have_cov = true; },
-        "CZ_DOT_Z_DOT" => val: kv_from_kvn => { cov.cz_dot_z_dot = val; have_cov = true; },
+        "COV_REF_FRAME" => val: kv_string => { cov_ref_frame = Some(val); },
+        "CX_X" => val: kv_from_kvn => { cx_x = Some(val); },
+        "CY_X" => val: kv_from_kvn => { cy_x = Some(val); },
+        "CY_Y" => val: kv_from_kvn => { cy_y = Some(val); },
+        "CZ_X" => val: kv_from_kvn => { cz_x = Some(val); },
+        "CZ_Y" => val: kv_from_kvn => { cz_y = Some(val); },
+        "CZ_Z" => val: kv_from_kvn => { cz_z = Some(val); },
+        "CX_DOT_X" => val: kv_from_kvn => { cx_dot_x = Some(val); },
+        "CX_DOT_Y" => val: kv_from_kvn => { cx_dot_y = Some(val); },
+        "CX_DOT_Z" => val: kv_from_kvn => { cx_dot_z = Some(val); },
+        "CX_DOT_X_DOT" => val: kv_from_kvn => { cx_dot_x_dot = Some(val); },
+        "CY_DOT_X" => val: kv_from_kvn => { cy_dot_x = Some(val); },
+        "CY_DOT_Y" => val: kv_from_kvn => { cy_dot_y = Some(val); },
+        "CY_DOT_Z" => val: kv_from_kvn => { cy_dot_z = Some(val); },
+        "CY_DOT_X_DOT" => val: kv_from_kvn => { cy_dot_x_dot = Some(val); },
+        "CY_DOT_Y_DOT" => val: kv_from_kvn => { cy_dot_y_dot = Some(val); },
+        "CZ_DOT_X" => val: kv_from_kvn => { cz_dot_x = Some(val); },
+        "CZ_DOT_Y" => val: kv_from_kvn => { cz_dot_y = Some(val); },
+        "CZ_DOT_Z" => val: kv_from_kvn => { cz_dot_z = Some(val); },
+        "CZ_DOT_X_DOT" => val: kv_from_kvn => { cz_dot_x_dot = Some(val); },
+        "CZ_DOT_Y_DOT" => val: kv_from_kvn => { cz_dot_y_dot = Some(val); },
+        "CZ_DOT_Z_DOT" => val: kv_from_kvn => { cz_dot_z_dot = Some(val); },
 
         "WET_MASS" => val: kv_from_kvn => { spacecraft_params.wet_mass = Some(val); have_sp = true; },
         "DRY_MASS" => val: kv_from_kvn => { spacecraft_params.dry_mass = Some(val); have_sp = true; },
         "HAZARDOUS_SUBSTANCES" => val: kv_string => { spacecraft_params.hazardous_substances = Some(val); have_sp = true; },
         "SOLAR_RAD_AREA" => val: kv_from_kvn => { spacecraft_params.solar_rad_area = Some(val); have_sp = true; },
-        "SOLAR_RAD_COEFF" => val: kv_float => { spacecraft_params.solar_rad_coeff = Some(val.into()); have_sp = true; },
+        "SOLAR_RAD_COEFF" => solar_rad_coeff: kv_from_kvn => { spacecraft_params.solar_rad_coeff = Some(solar_rad_coeff); have_sp = true; },
         "DRAG_AREA" => val: kv_from_kvn => { spacecraft_params.drag_area = Some(val); have_sp = true; },
-        "DRAG_COEFF" => val: kv_float => { spacecraft_params.drag_coeff = Some(val.into()); have_sp = true; },
+        "DRAG_COEFF" => drag_coeff: kv_from_kvn => { spacecraft_params.drag_coeff = Some(drag_coeff); have_sp = true; },
         "RCS" => val: kv_from_kvn => { spacecraft_params.rcs = Some(val); have_sp = true; },
         "BALLISTIC_COEFF" => val: kv_from_kvn => { spacecraft_params.ballistic_coeff = Some(val); have_sp = true; },
         "THRUST_ACCELERATION" => val: kv_from_kvn => { spacecraft_params.thrust_acceleration = Some(val); have_sp = true; },
@@ -348,7 +346,7 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "TRACKS_AVAILABLE" => val: kv_u32 => { od_params.tracks_available = Some(val.into()); have_od = true; },
         "TRACKS_USED" => val: kv_u32 => { od_params.tracks_used = Some(val.into()); have_od = true; },
         "RESIDUALS_ACCEPTED" => val: kv_from_kvn => { od_params.residuals_accepted = Some(val); have_od = true; },
-        "WEIGHTED_RMS" => val: kv_float => { od_params.weighted_rms = Some(val.into()); have_od = true; },
+        "WEIGHTED_RMS" => weighted_rms: kv_from_kvn => { od_params.weighted_rms = Some(weighted_rms); have_od = true; },
     }, |i: &mut &str| {
         let checkpoint = i.checkpoint();
         let _ = collect_comments.parse_next(i);
@@ -356,6 +354,96 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         i.reset(&checkpoint);
         res
     });
+
+    let have_sv = sv_epoch.is_some()
+        || sv_x.is_some()
+        || sv_y.is_some()
+        || sv_z.is_some()
+        || sv_x_dot.is_some()
+        || sv_y_dot.is_some()
+        || sv_z_dot.is_some();
+
+    let state_vector = if have_sv {
+        Some(StateVector {
+            comment: sv_comment,
+            epoch: sv_epoch.ok_or_else(|| missing_field_err(input, "State Vector", "EPOCH"))?,
+            x: sv_x.ok_or_else(|| missing_field_err(input, "State Vector", "X"))?,
+            y: sv_y.ok_or_else(|| missing_field_err(input, "State Vector", "Y"))?,
+            z: sv_z.ok_or_else(|| missing_field_err(input, "State Vector", "Z"))?,
+            x_dot: sv_x_dot.ok_or_else(|| missing_field_err(input, "State Vector", "X_DOT"))?,
+            y_dot: sv_y_dot.ok_or_else(|| missing_field_err(input, "State Vector", "Y_DOT"))?,
+            z_dot: sv_z_dot.ok_or_else(|| missing_field_err(input, "State Vector", "Z_DOT"))?,
+        })
+    } else {
+        None
+    };
+
+    let have_cov = cx_x.is_some()
+        || cy_x.is_some()
+        || cy_y.is_some()
+        || cz_x.is_some()
+        || cz_y.is_some()
+        || cz_z.is_some()
+        || cx_dot_x.is_some()
+        || cx_dot_y.is_some()
+        || cx_dot_z.is_some()
+        || cx_dot_x_dot.is_some()
+        || cy_dot_x.is_some()
+        || cy_dot_y.is_some()
+        || cy_dot_z.is_some()
+        || cy_dot_x_dot.is_some()
+        || cy_dot_y_dot.is_some()
+        || cz_dot_x.is_some()
+        || cz_dot_y.is_some()
+        || cz_dot_z.is_some()
+        || cz_dot_x_dot.is_some()
+        || cz_dot_y_dot.is_some()
+        || cz_dot_z_dot.is_some();
+
+    let covariance_matrix = if have_cov {
+        Some(OpmCovarianceMatrix {
+            comment: cov_comment,
+            cov_ref_frame,
+            cx_x: cx_x.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_X"))?,
+            cy_x: cy_x.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_X"))?,
+            cy_y: cy_y.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_Y"))?,
+            cz_x: cz_x.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_X"))?,
+            cz_y: cz_y.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_Y"))?,
+            cz_z: cz_z.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_Z"))?,
+            cx_dot_x: cx_dot_x
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_X"))?,
+            cx_dot_y: cx_dot_y
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_Y"))?,
+            cx_dot_z: cx_dot_z
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_Z"))?,
+            cx_dot_x_dot: cx_dot_x_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CX_DOT_X_DOT"))?,
+            cy_dot_x: cy_dot_x
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_X"))?,
+            cy_dot_y: cy_dot_y
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_Y"))?,
+            cy_dot_z: cy_dot_z
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_Z"))?,
+            cy_dot_x_dot: cy_dot_x_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_X_DOT"))?,
+            cy_dot_y_dot: cy_dot_y_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CY_DOT_Y_DOT"))?,
+            cz_dot_x: cz_dot_x
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_X"))?,
+            cz_dot_y: cz_dot_y
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Y"))?,
+            cz_dot_z: cz_dot_z
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Z"))?,
+            cz_dot_x_dot: cz_dot_x_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_X_DOT"))?,
+            cz_dot_y_dot: cz_dot_y_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Y_DOT"))?,
+            cz_dot_z_dot: cz_dot_z_dot
+                .ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CZ_DOT_Z_DOT"))?,
+        })
+    } else {
+        None
+    };
 
     loop {
         let checkpoint = input.checkpoint();
@@ -371,9 +459,13 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         user_defined.comment.extend(loop_comments);
         let v = kv_string.parse_next(input)?;
         user_defined.user_defined.push(UserDefinedParameter {
-            parameter: key.to_string(),
+            parameter: key.strip_prefix("USER_DEFINED_").unwrap().to_string(),
             value: v,
         });
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     let atmospheric_reentry_parameters = AtmosphericReentryParameters {
@@ -398,12 +490,8 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         } else {
             None
         },
-        state_vector: if have_sv {
-            Some(state_vector_data)
-        } else {
-            None
-        },
-        covariance_matrix: if have_cov { Some(cov) } else { None },
+        state_vector,
+        covariance_matrix,
         spacecraft_parameters: if have_sp {
             Some(spacecraft_params)
         } else {

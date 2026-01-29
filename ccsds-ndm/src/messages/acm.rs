@@ -8,7 +8,7 @@ use crate::error::{Result, ValidationError};
 use crate::kvn::parser::KvnResult;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::SensorNoise;
 use crate::types::*;
 use serde::{Deserialize, Serialize};
@@ -23,17 +23,28 @@ use serde::{Deserialize, Serialize};
 /// specified time range. The ACM aggregates and extends APM and AEM content in a single
 /// comprehensive hybrid message.
 ///
+/// Capabilities include:
+/// - Optional rate data elements
+/// - Optional spacecraft physical properties
+/// - Optional covariance elements
+/// - Optional maneuver parameters
+/// - Optional estimator information
+///
 /// **CCSDS Reference**: 504.0-B-2, Section 5.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "acm")]
 pub struct Acm {
     pub header: AdmHeader,
     pub body: AcmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
+
+impl crate::traits::Validate for Acm {}
 
 impl Ndm for Acm {
     fn to_kvn(&self) -> Result<String> {
@@ -62,6 +73,7 @@ impl Ndm for Acm {
 
 impl Acm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.segment.validate(&self.header)
     }
 }
@@ -78,7 +90,7 @@ impl ToKvn for Acm {
 // Body & Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AcmBody {
     #[serde(rename = "segment")]
     pub segment: Box<AcmSegment>,
@@ -90,7 +102,7 @@ impl ToKvn for AcmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AcmSegment {
     pub metadata: AcmMetadata,
     pub data: AcmData,
@@ -111,7 +123,7 @@ impl ToKvn for AcmSegment {
 }
 
 /// ACM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmMetadata {
     /// Comments (allowed only at the beginning of the ACM Metadata). Each comment line shall begin
@@ -121,10 +133,11 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Free-text field containing the name of the object. There is no CCSDS-based restriction on
     /// the value for this keyword, but it is recommended to use names from either the UN Office of
-    /// Outer Space Affairs designator index (reference [2]), which include Object name and
+    /// Outer Space Affairs designator index (reference `[2]`), which include Object name and
     /// international designator), the spacecraft operator, or a State Actor or commercial Space
     /// Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space catalog. If the
     /// object name is not known (uncorrelated object), ‘UNKNOWN’ may be used (or this keyword
@@ -133,6 +146,7 @@ pub struct AcmMetadata {
     /// **Examples**: SPOT, ENVISAT, IRIDIUM, INTELSAT
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
+    #[builder(into)]
     pub object_name: String,
     /// Free text field containing an international designator for the object as assigned by the UN
     /// Committee on Space Research (COSPAR) and the US National Space Science Data Center (NSSDC).
@@ -147,6 +161,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub international_designator: Option<String>,
     /// Free text field containing the satellite catalog source or the source agency or operator
     /// abbreviated name (see annex B, subsection B1).
@@ -155,6 +170,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub catalog_name: Option<String>,
     /// Free text field specification of the unique satellite identification designator for the
     /// object, as reflected in the catalog whose name is ‘CATALOG_NAME’. If the ID is not known,
@@ -164,6 +180,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_designator: Option<String>,
     /// Free text field containing Programmatic or Technical Point-of-Contact (POC) for ACM.
     ///
@@ -171,6 +188,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_poc: Option<String>,
     /// Free text field containing contact position of the PoC.
     ///
@@ -178,6 +196,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_position: Option<String>,
     /// Free text field containing PoC phone number.
     ///
@@ -185,6 +204,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_phone: Option<String>,
     /// Free-text field containing originator PoC email address.
     ///
@@ -192,6 +212,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_email: Option<String>,
     /// Free text field containing Technical PoC information for ACM creator (suggest email,
     /// website, or physical address, etc.).
@@ -200,6 +221,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_address: Option<String>,
     /// Free text field containing a unique identifier of Orbit Data Message(s) that are linked
     /// (relevant) to this Attitude Data Message.
@@ -208,6 +230,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub odm_msg_link: Option<String>,
     /// Celestial body orbited by the object, which may be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -217,6 +240,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub center_name: Option<String>,
     /// Time system used for metadata, attitude data, covariance data. The set of allowed values is
     /// described in annex B, subsection B2.
@@ -224,6 +248,7 @@ pub struct AcmMetadata {
     /// **Examples**: UTC, TAI
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
+    #[builder(into)]
     pub time_system: String,
     /// Epoch from which all ACM relative times are referenced. (For format specification, see
     /// 6.8.9.) The time scale for EPOCH_TZERO is the one specified by ‘TIME_SYSTEM’ keyword in the
@@ -243,6 +268,7 @@ pub struct AcmMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub acm_data_elements: Option<String>,
     /// Time of the earliest data contained in the ACM, specified as either a relative or absolute
     /// time tag.
@@ -368,7 +394,7 @@ impl ToKvn for AcmMetadata {
 //----------------------------------------------------------------------
 
 /// ACM Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmData {
     /// One or more optional attitude state time histories (each consisting of one or more attitude
@@ -376,6 +402,7 @@ pub struct AcmData {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[serde(rename = "att", default)]
+    #[builder(default)]
     pub att: Vec<AcmAttitudeState>,
     /// A single space object physical characteristics section.
     ///
@@ -387,11 +414,13 @@ pub struct AcmData {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
     #[serde(rename = "cov", default)]
+    #[builder(default)]
     pub cov: Vec<AcmCovarianceMatrix>,
     /// One or more optional maneuver specification section(s).
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
     #[serde(rename = "man", default)]
+    #[builder(default)]
     pub man: Vec<AcmManeuverParameters>,
     /// A single attitude determination Data section.
     ///
@@ -401,8 +430,8 @@ pub struct AcmData {
     /// A single user-defined Data section.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.10.
-    #[serde(rename = "user_defined", default)]
-    pub user_defined: Option<UserDefined>,
+    #[serde(rename = "user", default)]
+    pub user: Option<UserDefined>,
 }
 
 impl AcmData {
@@ -428,10 +457,13 @@ impl ToKvn for AcmData {
         if let Some(ad) = &self.ad {
             ad.write_kvn(writer);
         }
-        if let Some(user) = &self.user_defined {
+        if let Some(user) = &self.user {
+            writer.write_section("USER_START");
+            writer.write_comments(&user.comment);
             for p in &user.user_defined {
-                writer.write_pair(&p.parameter, &p.value);
+                writer.write_user_defined(&p.parameter, &p.value);
             }
+            writer.write_section("USER_STOP");
         }
     }
 }
@@ -441,7 +473,7 @@ impl ToKvn for AcmData {
 //----------------------------------------------------------------------
 
 /// ACM Data: Attitude State Time History Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmAttitudeState {
     /// Comments allowed only immediately after the ATT_START keyword.
@@ -450,6 +482,7 @@ pub struct AcmAttitudeState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Optional alphanumeric free-text string containing the identification number for this
     /// attitude state time history.
@@ -458,6 +491,7 @@ pub struct AcmAttitudeState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub att_id: Option<String>,
     /// Optional alphanumeric free-text string containing the identification number for the
     /// previous attitude time history block. NOTE: If the message is not part of a sequence of
@@ -468,6 +502,7 @@ pub struct AcmAttitudeState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub att_prev_id: Option<String>,
     /// Basis of this attitude state time history data.
     ///
@@ -485,6 +520,7 @@ pub struct AcmAttitudeState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub att_basis_id: Option<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
@@ -492,6 +528,7 @@ pub struct AcmAttitudeState {
     /// **Examples**: J2000
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
+    #[builder(into)]
     pub ref_frame_a: String,
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
@@ -499,6 +536,7 @@ pub struct AcmAttitudeState {
     /// **Examples**: SC_BODY_1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
+    #[builder(into)]
     pub ref_frame_b: String,
     /// Number of data states included. States to be included are attitude states and optional rate
     /// states.
@@ -513,6 +551,7 @@ pub struct AcmAttitudeState {
     /// **Examples**: QUATERNION, EULER_ANGLES, DCM
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
+    #[builder(into)]
     pub att_type: String,
     /// Type of rate data, selected per annex B, subsection B4. If rate data are included,
     /// NUMBER_STATES must be at least 6 to include both attitude and rate data. The units that
@@ -523,6 +562,7 @@ pub struct AcmAttitudeState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub rate_type: Option<String>,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
     /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
@@ -541,6 +581,7 @@ pub struct AcmAttitudeState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[serde(rename = "attLine", default)]
+    #[builder(default)]
     pub att_lines: Vec<AttLine>,
 }
 
@@ -620,7 +661,7 @@ impl std::str::FromStr for AttBasis {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct AttLine {
-    #[serde(rename = "$value")]
+    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
     pub values: Vec<f64>,
 }
 
@@ -641,7 +682,7 @@ impl std::fmt::Display for AttLine {
 //----------------------------------------------------------------------
 
 /// ACM Data: Space Object Physical Characteristics Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmPhysicalDescription {
     /// Comments allowed only immediately after the PHYS_START keyword.
@@ -650,6 +691,7 @@ pub struct AcmPhysicalDescription {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Drag coefficient.
     ///
@@ -683,6 +725,7 @@ pub struct AcmPhysicalDescription {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cp_ref_frame: Option<String>,
     /// CP_REF_FRAME shall be present if CP is present. Vector location of spacecraft center of
     /// pressure for determining solar pressure torque, measured from the spacecraft center of
@@ -703,6 +746,7 @@ pub struct AcmPhysicalDescription {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub inertia_ref_frame: Option<String>,
     /// Moment of Inertia about the X axis of the spacecraft body frame defined by
     /// INERTIA_REF_FRAME.
@@ -812,7 +856,7 @@ impl ToKvn for AcmPhysicalDescription {
 //----------------------------------------------------------------------
 
 /// ACM Data: Covariance Time History Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmCovarianceMatrix {
     /// Comments allowed only immediately after the COV_START keyword.
@@ -873,7 +917,7 @@ impl ToKvn for AcmCovarianceMatrix {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct CovLine {
-    #[serde(rename = "$value")]
+    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
     pub values: Vec<f64>,
 }
 
@@ -894,7 +938,7 @@ impl std::fmt::Display for CovLine {
 //----------------------------------------------------------------------
 
 /// ACM Data: Maneuver Specification Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmManeuverParameters {
     /// Comments allowed only immediately after the MAN_START keyword.
@@ -910,7 +954,9 @@ pub struct AcmManeuverParameters {
     /// **Examples**: DH2018172
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    pub man_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub man_id: Option<String>,
     /// Optional alphanumeric free-text string containing the identification number for the
     /// previous maneuver block. If the message is not part of a sequence of maneuvers or if this
     /// maneuver is the first in a sequence of maneuvers, then MAN_PREV_ID should be excluded from
@@ -980,7 +1026,9 @@ impl ToKvn for AcmManeuverParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("MAN_START");
         writer.write_comments(&self.comment);
-        writer.write_pair("MAN_ID", &self.man_id);
+        if let Some(v) = &self.man_id {
+            writer.write_pair("MAN_ID", v);
+        }
         if let Some(v) = &self.man_prev_id {
             writer.write_pair("MAN_PREV_ID", v);
         }
@@ -1017,7 +1065,7 @@ impl ToKvn for AcmManeuverParameters {
 //----------------------------------------------------------------------
 
 /// ACM Data: Attitude Determination Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmAttitudeDetermination {
     /// Comments allowed only immediately after the AD_START keyword.
@@ -1032,7 +1080,9 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: AD_20190101
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    pub ad_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub ad_id: Option<String>,
     /// Optional alphanumeric free-text string containing the identification number for the
     /// previous attitude determination block. NOTE: If the message is not part of a sequence of
     /// attitude determination blocks or if this attitude determination block is the first in a
@@ -1043,6 +1093,7 @@ pub struct AcmAttitudeDetermination {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ad_prev_id: Option<String>,
     /// Type of attitude determination method used. (For further description, see annex B,
     /// subsection B5.)
@@ -1051,6 +1102,7 @@ pub struct AcmAttitudeDetermination {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ad_method: Option<String>,
     /// Source of attitude estimate, whether from a ground based estimator or onboard estimator.
     ///
@@ -1058,6 +1110,7 @@ pub struct AcmAttitudeDetermination {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub attitude_source: Option<String>,
     /// Number of states if EKF, BATCH, or FILTER SMOOTHER is specified.
     ///
@@ -1065,7 +1118,23 @@ pub struct AcmAttitudeDetermination {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number_states: Option<u32>,
+    /// Type of attitude states if EKF, BATCH, or FILTER SMOOTHER is specified.
+    ///
+    /// **Examples**: QUATERNION
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub attitude_states: Option<String>,
+    /// Indicates covariance composition. Select from annex B, subsection B6.
+    ///
+    /// **Examples**: ANGLE, ANGLE_GYROBIAS
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub cov_type: Option<String>,
     /// Epoch of the attitude determination.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
@@ -1143,7 +1212,9 @@ impl ToKvn for AcmAttitudeDetermination {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("AD_START");
         writer.write_comments(&self.comment);
-        writer.write_pair("AD_ID", &self.ad_id);
+        if let Some(v) = &self.ad_id {
+            writer.write_pair("AD_ID", v);
+        }
         if let Some(v) = &self.ad_prev_id {
             writer.write_pair("AD_PREV_ID", v);
         }
@@ -1153,8 +1224,14 @@ impl ToKvn for AcmAttitudeDetermination {
         if let Some(v) = &self.attitude_source {
             writer.write_pair("ATTITUDE_SOURCE", v);
         }
+        if let Some(v) = &self.number_states {
+            writer.write_pair("NUMBER_STATES", v);
+        }
         if let Some(v) = &self.attitude_states {
             writer.write_pair("ATTITUDE_STATES", v);
+        }
+        if let Some(v) = &self.cov_type {
+            writer.write_pair("COV_TYPE", v);
         }
         if let Some(v) = &self.ad_epoch {
             writer.write_pair("AD_EPOCH", v);
@@ -1188,7 +1265,7 @@ impl ToKvn for AcmAttitudeDetermination {
 }
 
 /// ACM Data: Sensor Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmSensor {
     /// Comments allowed only immediately after the SENSOR_START keyword.

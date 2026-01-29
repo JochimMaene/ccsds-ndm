@@ -6,7 +6,7 @@ use crate::common::OdmHeader;
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use fast_float;
 use serde::{Deserialize, Serialize};
@@ -18,22 +18,32 @@ use std::borrow::Cow;
 
 /// Orbit Comprehensive Message (OCM).
 ///
-/// An OCM aggregates and extends OMM, OPM, and OEM content in a single hybrid message.
-/// It emphasizes flexibility and message conciseness by offering extensive optional
-/// standardized content while minimizing mandatory content.
+/// An OCM specifies position and velocity of either a single object or an en masse parent/child
+/// deployment scenario stemming from a single object. The OCM aggregates and extends OPM, OEM,
+/// and OMM content in a single comprehensive hybrid message.
 ///
-/// References:
-/// - CCSDS 502.0-B-3, Section 5 (OCM)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+/// Key features:
+/// - Support for single object or parent/child deployment scenarios.
+/// - Aggregation of OPM, OMM, and OEM content.
+/// - Extensive optional content including physical properties, covariance, maneuvers, and
+///   perturbations.
+/// - Well-suited for exchanges involving automated interaction and large object catalogs.
+///
+/// **CCSDS Reference**: 502.0-B-3, Section 6.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "ocm")]
 pub struct Ocm {
     pub header: OdmHeader,
     pub body: OcmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
+
+impl crate::traits::Validate for Ocm {}
 
 impl Ndm for Ocm {
     fn to_kvn(&self) -> Result<String> {
@@ -62,6 +72,7 @@ impl Ndm for Ocm {
 
 impl Ocm {
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.segment.validate(&self.header)
     }
 }
@@ -187,7 +198,7 @@ impl OcmManeuverParameters {
 ///
 /// This struct serves as a container for the `OcmSegment`, which holds the
 /// metadata and data for the Orbit Comprehensive Message.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OcmBody {
     #[serde(rename = "segment")]
     pub segment: Box<OcmSegment>,
@@ -202,7 +213,7 @@ impl ToKvn for OcmBody {
 /// A single segment of the OCM.
 ///
 /// Contains metadata and data sections.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OcmSegment {
     pub metadata: OcmMetadata,
     pub data: OcmData,
@@ -220,7 +231,7 @@ impl ToKvn for OcmSegment {
 //----------------------------------------------------------------------
 
 /// OCM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmMetadata {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
@@ -228,13 +239,14 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Free-text field containing the name of the object. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from either
-    /// the UN Office of Outer Space Affairs designator index (reference [3], which include
+    /// the UN Office of Outer Space Affairs designator index (reference `[3]`, which include
     /// Object name and international designator of the participant), the spacecraft operator,
     /// or a State Actor or commercial Space Situational Awareness (SSA) provider maintaining
-    /// the ‘CATALOG_NAME’ space catalog. If OBJECT_NAME is not listed in reference [3] or the
+    /// the ‘CATALOG_NAME’ space catalog. If OBJECT_NAME is not listed in reference `[3]` or the
     /// content is either unknown (uncorrelated) or cannot be disclosed, the value should be
     /// set to UNKNOWN (or this keyword omitted).
     ///
@@ -242,6 +254,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_name: Option<String>,
     /// Free-text field containing an international designator for the object as assigned by
     /// the UN Committee on Space Research (COSPAR). Such designator values shall have the
@@ -257,18 +270,20 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub international_designator: Option<String>,
     /// Free-text field containing the satellite catalog source (or source agency or operator,
     /// value to be drawn from the SANA registry list of Space Object Catalogs at
-    /// https://sanaregistry.org/r/space_object_catalog, or alternatively, from the list of
+    /// <https://sanaregistry.org/r/space_object_catalog>, or alternatively, from the list of
     /// organizations listed in the 'Abbreviation' column of the SANA Organizations registry at
-    /// https://www.sanaregistry.org/r/organizations) from which 'OBJECT_DESIGNATOR' was
+    /// <https://www.sanaregistry.org/r/organizations>) from which 'OBJECT_DESIGNATOR' was
     /// obtained.
     ///
     /// **Examples**: CSPOC, RFSA, ESA, COMSPOC
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub catalog_name: Option<String>,
     /// Free-text field specification of the unique satellite identification designator for the
     /// object, as reflected in the catalog whose name is 'CATALOG_NAME'. If the ID is not known
@@ -279,6 +294,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_designator: Option<String>,
     /// Free-text comma-delimited field containing alternate name(s) of this space object,
     /// including assigned names used by spacecraft operator, State Actors, commercial SSA
@@ -288,6 +304,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub alternate_names: Option<String>,
     /// Free-text field containing originator or programmatic Point-of-Contact (POC) for OCM.
     ///
@@ -295,6 +312,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_poc: Option<String>,
     /// Free-text field containing contact position of the originator PoC.
     ///
@@ -302,6 +320,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_position: Option<String>,
     /// Free-text field containing originator PoC phone number.
     ///
@@ -309,6 +328,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_phone: Option<String>,
     /// Free-text field containing originator PoC email address.
     ///
@@ -316,6 +336,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_email: Option<String>,
     /// Free-text field containing originator's physical address information for OCM creator
     /// (suggest comma-delimited address lines).
@@ -324,15 +345,17 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub originator_address: Option<String>,
     /// Free-text field containing the creating agency or operator (value should be drawn from
     /// the 'Abbreviation' column of the SANA Organizations registry at
-    /// https://www.sanaregistry.org/r/organizations).
+    /// <https://www.sanaregistry.org/r/organizations>).
     ///
     /// **Examples**: NASA, ESA, JAXA
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_org: Option<String>,
     /// Free-text field containing technical PoC for OCM.
     ///
@@ -340,6 +363,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_poc: Option<String>,
     /// Free-text field containing contact position of the technical PoC.
     ///
@@ -347,6 +371,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_position: Option<String>,
     /// Free-text field containing technical PoC phone number.
     ///
@@ -354,6 +379,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_phone: Option<String>,
     /// Free-text field containing technical PoC email address.
     ///
@@ -361,6 +387,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_email: Option<String>,
     /// Free-text field containing technical PoC physical address information for OCM creator
     /// (suggest comma-delimited address lines).
@@ -369,6 +396,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tech_address: Option<String>,
     /// Free-text field containing an ID that uniquely identifies the previous message from
     /// this message originator for this space object. The format and content of the message
@@ -380,6 +408,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub previous_message_id: Option<String>,
     /// Free-text field containing an ID that uniquely identifies the next message from this
     /// message originator for this space object. The format and content of the message
@@ -390,47 +419,53 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub next_message_id: Option<String>,
     /// Free-text field containing a unique identifier of Attitude Data Message (ADM)
-    /// (reference [10]) that are linked (relevant) to this Orbit Data Message.
+    /// (reference `[10]`) that are linked (relevant) to this Orbit Data Message.
     ///
     /// **Examples**: ADM_MSG_35132.txt, ADM_ID_0572
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub adm_msg_link: Option<String>,
     /// Free-text field containing a unique identifier of Conjunction Data Message (CDM)
-    /// (reference [14]) that are linked (relevant) to this Orbit Data Message.
+    /// (reference `[14]`) that are linked (relevant) to this Orbit Data Message.
     ///
     /// **Examples**: CDM_MSG_35132.txt, CDM_ID_8257
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cdm_msg_link: Option<String>,
     /// Free-text field containing a unique identifier of Pointing Request Message (PRM)
-    /// (reference [13]) that are linked (relevant) to this Orbit Data Message.
+    /// (reference `[13]`) that are linked (relevant) to this Orbit Data Message.
     ///
     /// **Examples**: PRM_MSG_35132.txt, PRM_ID_6897
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub prm_msg_link: Option<String>,
     /// Free-text field containing a unique identifier of Reentry Data Message (RDM)
-    /// (reference [12]) that are linked (relevant) to this Orbit Data Message.
+    /// (reference `[12]`) that are linked (relevant) to this Orbit Data Message.
     ///
     /// **Examples**: RDM_MSG_35132.txt, RDM_ID_1839
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub rdm_msg_link: Option<String>,
     /// Free-text string containing a comma-separated list of file name(s) and/or associated
-    /// identification number(s) of Tracking Data Message (TDM) (reference [9]) observations
+    /// identification number(s) of Tracking Data Message (TDM) (reference `[9]`) observations
     /// upon which this OD is based.
     ///
     /// **Examples**: TDM_MSG_37.txt, TDM_835, TDM_836
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tdm_msg_link: Option<String>,
     /// Free-text field containing the operator of the space object.
     ///
@@ -438,6 +473,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub operator: Option<String>,
     /// Free-text field containing the owner of the space object.
     ///
@@ -445,6 +481,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub owner: Option<String>,
     /// Free-text field containing the name of the country, country code, or country
     /// abbreviation where the space object owner is based.
@@ -453,6 +490,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub country: Option<String>,
     /// Free-text field containing the name of the constellation to which this space object
     /// belongs.
@@ -461,6 +499,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub constellation: Option<String>,
     /// Specification of the type of object. Select from the accepted set of values indicated
     /// in annex B, subsection B11.
@@ -479,6 +518,7 @@ pub struct OcmMetadata {
     /// **Examples**: UTC
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
+    #[builder(into)]
     pub time_system: String,
     /// Default epoch to which all relative times are referenced in data blocks (for format
     /// specification, see 7.5.10). The time scale of EPOCH_TZERO is controlled via the
@@ -497,6 +537,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ops_status: Option<String>,
     /// Specification of the type of orbit. Select from the accepted set of values indicated in
     /// annex B, subsection B14.
@@ -505,6 +546,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub orbit_category: Option<String>,
     /// Comma-delimited list of elements of information data blocks included in this message.
     /// The order shall be the same as the order of the data blocks in the message. Values shall
@@ -516,6 +558,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ocm_data_elements: Option<String>,
     /// Defines the number of spacecraft clock counts existing at EPOCH_TZERO. This is only
     /// used if the SCLK timescale is employed by the user.
@@ -616,6 +659,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub eop_source: Option<String>,
     /// Free-text field specifying the method used to select or interpolate sequential EOP data.
     ///
@@ -623,6 +667,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub interp_method_eop: Option<String>,
     /// Free-text field specifying the source and version of the message originator's celestial
     /// body (e.g., Sun/Earth/Planetary) ephemeris data used in the creation of this message.
@@ -631,6 +676,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub celestial_source: Option<String>,
 }
 
@@ -788,20 +834,23 @@ impl ToKvn for OcmMetadata {
 /// This struct is the primary data container for the OCM. It holds all the
 /// different data blocks, such as trajectory, physical properties, covariance,
 /// maneuvers, and other related information.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmData {
     /// List of trajectory state time history blocks.
     #[serde(rename = "traj", default)]
+    #[builder(default)]
     pub traj: Vec<OcmTrajState>,
     /// Space object physical characteristics.
     #[serde(rename = "phys", default, skip_serializing_if = "Option::is_none")]
     pub phys: Option<OcmPhysicalDescription>,
     /// List of covariance time history blocks.
     #[serde(rename = "cov", default)]
+    #[builder(default)]
     pub cov: Vec<OcmCovarianceMatrix>,
     /// List of maneuver specifications.
     #[serde(rename = "man", default)]
+    #[builder(default)]
     pub man: Vec<OcmManeuverParameters>,
     /// Perturbation parameters.
     #[serde(rename = "pert", default, skip_serializing_if = "Option::is_none")]
@@ -838,7 +887,7 @@ impl ToKvn for OcmData {
             writer.write_section("USER_START");
             writer.write_comments(&u.comment);
             for p in &u.user_defined {
-                writer.write_pair(&p.parameter, &p.value);
+                writer.write_user_defined(&p.parameter, &p.value);
             }
             writer.write_section("USER_STOP");
         }
@@ -850,7 +899,7 @@ impl ToKvn for OcmData {
 //----------------------------------------------------------------------
 
 /// A block of trajectory state data, which can be a time history of states.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmTrajState {
     /// Comments (a contiguous set of one or more comment lines may be provided in the
@@ -859,6 +908,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Free-text field containing the identification number for this trajectory state time
     /// history block.
@@ -867,6 +917,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub traj_id: Option<String>,
     /// Free-text field containing the identification number for the previous trajectory state
     /// time history, contained either within this message or presented in a previous OCM.
@@ -878,6 +929,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub traj_prev_id: Option<String>,
     /// Free-text field containing the identification number for the next trajectory state
     /// time history, contained either within this message, or presented in a future OCM.
@@ -889,6 +941,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub traj_next_id: Option<String>,
     /// The basis of this trajectory state time history data. This is a free-text field with the
     /// following suggested values: a) 'PREDICTED'. b) 'DETERMINED' when estimated from
@@ -914,6 +967,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub traj_basis_id: Option<String>,
     /// This keyword may be used to specify the recommended interpolation method for ephemeris
     /// data in the immediately following set of ephemeris lines. PROPAGATE indicates that orbit
@@ -924,6 +978,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub interpolation: Option<String>,
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
     /// ephemeris lines. Must be an integer value. This keyword must be provided if the
@@ -941,6 +996,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub propagator: Option<String>,
     /// Origin of the orbit reference frame, which may be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -949,13 +1005,14 @@ pub struct OcmTrajState {
     /// accepted set of values indicated in annex B, subsection B2. For spacecraft, it is
     /// recommended to use either the 'OBJECT_NAME' or 'INTERNATIONAL_DESIGNATOR' of the
     /// participant as catalogued in the UN Office of Outer Space Affairs designator index
-    /// (reference [3]). Alternately, the 'OBJECT_DESIGNATOR' may be used. For other reference
+    /// (reference `[3]`). Alternately, the 'OBJECT_DESIGNATOR' may be used. For other reference
     /// frame origins, this field is a free-text descriptor which may draw upon other naming
     /// conventions and sources.
     ///
     /// **Examples**: EARTH, MOON, ISS, EROS
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
+    #[builder(into)]
     pub center_name: String,
     /// Reference frame of the trajectory state time history. Select from the accepted set of
     /// values indicated in annex B, subsection B4.
@@ -963,6 +1020,7 @@ pub struct OcmTrajState {
     /// **Examples**: ICRF3, J2000
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
+    #[builder(into)]
     pub traj_ref_frame: String,
     /// Epoch of the orbit data reference frame, if not intrinsic to the definition of the
     /// reference frame. (See 7.5.10 for formatting rules.)
@@ -1027,6 +1085,7 @@ pub struct OcmTrajState {
     /// **Examples**: CARTP, CARTPV
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
+    #[builder(into)]
     pub traj_type: String,
     /// If orbital elements are provided, specifies whether those elements are osculating
     /// elements or mean elements, and if mean elements, which mean element definition is
@@ -1043,6 +1102,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub orb_averaging: Option<String>,
     /// A comma-delimited set of SI unit designations for each element of the trajectory state
     /// time history following the trajectory state time tag solely for informational purposes,
@@ -1056,13 +1116,15 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub traj_units: Option<String>,
     /// Contiguous set of trajectory state data lines.
     #[serde(rename = "trajLine")]
+    #[builder(default)]
     pub traj_lines: Vec<TrajLine>,
 }
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TrajLine {
     pub epoch: String,
     pub values: Vec<f64>,
@@ -1174,7 +1236,7 @@ impl ToKvn for OcmTrajState {
 //----------------------------------------------------------------------
 
 /// Space Object Physical Characteristics.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmPhysicalDescription {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM Space
@@ -1282,7 +1344,7 @@ pub struct OcmPhysicalDescription {
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_parent_frame_epoch: Option<Epoch>,
-    /// q1 = e1 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e1 = 1st
+    /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
     /// (defined above) to the frame aligned with the OEB (defined in annex F, subsection F1).
     /// A value of '-999' denotes a tumbling space object.
@@ -1292,7 +1354,7 @@ pub struct OcmPhysicalDescription {
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_q1: Option<f64>,
-    /// q2 = e2 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e2 = 2nd
+    /// q2 = e2 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e2 = 2nd
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
     /// (defined above) to the frame aligned with the Optimally Encompassing Box (defined in
     /// annex F, subsection F1). A value of '-999' denotes a tumbling space object.
@@ -1302,7 +1364,7 @@ pub struct OcmPhysicalDescription {
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_q2: Option<f64>,
-    /// q3 = e3 * sin(φ/2), where per reference [H1], φ = Euler rotation angle and e3 = 3rd
+    /// q3 = e3 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e3 = 3rd
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
     /// (defined above) to the frame aligned with the Optimally Encompassing Box (defined in
     /// annex F, subsection F1). A value of '-999' denotes a tumbling space object.
@@ -1312,7 +1374,7 @@ pub struct OcmPhysicalDescription {
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_q3: Option<f64>,
-    /// qc = cos(φ/2), where per reference [H1], φ = the Euler rotation angle for the rotation
+    /// qc = cos(φ/2), where per reference `[H1]`, φ = the Euler rotation angle for the rotation
     /// that maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the
     /// Optimally Encompassing Box (annex F, subsection F1). qc shall be made non-negative by
     /// convention. A value of '-999' denotes a tumbling space object.
@@ -1581,7 +1643,7 @@ pub struct OcmPhysicalDescription {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dv_remaining: Option<Velocity>,
     /// Moment of Inertia about the X-axis of the space object's primary body frame (e.g.,
-    /// SC_Body_1) (see reference [H1]).
+    /// SC_Body_1) (see reference `[H1]`).
     ///
     /// **Examples**: 1000.0
     ///
@@ -1800,7 +1862,7 @@ impl ToKvn for OcmPhysicalDescription {
 //----------------------------------------------------------------------
 
 /// OCM Covariance Matrix.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmCovarianceMatrix {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
@@ -1809,6 +1871,7 @@ pub struct OcmCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Free-text field containing the identification number for this covariance time history
     /// block.
@@ -1817,6 +1880,7 @@ pub struct OcmCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cov_id: Option<String>,
     /// Free-text field containing the identification number for the previous covariance time
     /// history, contained either within this message or presented in a previous OCM. NOTE—If
@@ -1828,6 +1892,7 @@ pub struct OcmCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cov_prev_id: Option<String>,
     /// Free-text field containing the identification number for the next covariance time
     /// history, contained either within this message, or presented in a future OCM. NOTE—If
@@ -1839,6 +1904,7 @@ pub struct OcmCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cov_next_id: Option<String>,
     /// Basis of this covariance time history data. This is free-text field with the following
     /// suggested values: a) 'PREDICTED'. b) 'DETERMINED' when estimated from observation-based
@@ -1863,6 +1929,7 @@ pub struct OcmCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cov_basis_id: Option<String>,
     /// Reference frame of the covariance time history. Select from the accepted set of values
     /// indicated in annex B, subsection B4 and B5.
@@ -1870,6 +1937,7 @@ pub struct OcmCovarianceMatrix {
     /// **Examples**: TNW_INERTIA, J2000
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
+    #[builder(into)]
     pub cov_ref_frame: String,
     /// Epoch of the covariance data reference frame, if not intrinsic to the definition of the
     /// reference frame. (See 7.5.10 for formatting rules.)
@@ -1909,6 +1977,7 @@ pub struct OcmCovarianceMatrix {
     /// **Examples**: CARTP, CARTPV, ADBARV
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
+    #[builder(into)]
     pub cov_type: String,
     /// Indicates covariance ordering as being either LTM, UTM, Full covariance, LTM covariance
     /// with cross-correlation information provided in upper triangle off-diagonal terms
@@ -1918,6 +1987,7 @@ pub struct OcmCovarianceMatrix {
     /// **Examples**: LTM, UTM, FULL, LTMWCC, UTMWCC
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
+    #[builder(default)]
     pub cov_ordering: CovOrder,
     /// A comma-delimited set of SI unit designations for each element of the covariance time
     /// history following the covariance time tag, solely for informational purposes, provided
@@ -1934,13 +2004,15 @@ pub struct OcmCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cov_units: Option<String>,
     /// Contiguous set of covariance matrix data lines.
     #[serde(rename = "covLine")]
+    #[builder(default)]
     pub cov_lines: Vec<CovLine>,
 }
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CovLine {
     pub epoch: String,
     pub values: Vec<f64>,
@@ -2031,7 +2103,7 @@ impl ToKvn for OcmCovarianceMatrix {
 //----------------------------------------------------------------------
 
 /// OCM Maneuver Parameters.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmManeuverParameters {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
@@ -2040,6 +2112,7 @@ pub struct OcmManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Free-text field containing the unique maneuver identification number for this maneuver.
     /// All supplied maneuver 'constituents' within the same MAN_BASIS and MAN_REF_FRAME
@@ -2047,6 +2120,7 @@ pub struct OcmManeuverParameters {
     /// description.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    #[builder(into)]
     pub man_id: String,
     /// Free-text field containing the identification number of the previous maneuver for this
     /// MAN_BASIS, contained either within this message, or presented in a previous OCM. If
@@ -2056,6 +2130,7 @@ pub struct OcmManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub man_prev_id: Option<String>,
     /// Free-text field containing the identification number of the next maneuver for this
     /// MAN_BASIS, contained either within this message, or presented in a future OCM. If this
@@ -2092,6 +2167,7 @@ pub struct OcmManeuverParameters {
     /// or thrust imparted by any/all thrusters utilized in the maneuver.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    #[builder(into)]
     pub man_device_id: String,
     /// Identifies the completion time of the previous maneuver for this MAN_BASIS.
     ///
@@ -2108,6 +2184,7 @@ pub struct OcmManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub man_purpose: Option<String>,
     /// For future maneuvers, specifies the source of the orbit and/or attitude state(s) upon
     /// which the maneuver is based. While there is no CCSDS-based restriction on the value for
@@ -2116,6 +2193,7 @@ pub struct OcmManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub man_pred_source: Option<String>,
     /// Reference frame in which all maneuver vector direction data is provided in this
     /// maneuver data block. Select from the accepted set of values indicated in annex B,
@@ -2123,6 +2201,7 @@ pub struct OcmManeuverParameters {
     /// within a given maneuver time history block.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    #[builder(into)]
     pub man_ref_frame: String,
     /// Epoch of the maneuver data reference frame, if not intrinsic to the definition of the
     /// reference frame. (See 7.5.10 for formatting rules.)
@@ -2137,14 +2216,16 @@ pub struct OcmManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub grav_assist_name: Option<String>,
     /// Duty cycle type to use for this maneuver time history section: CONTINUOUS denotes
-    /// full/continuous thrust <default>; TIME denotes a time-based duty cycle driven by time
+    /// full/continuous thrust `<default>`; TIME denotes a time-based duty cycle driven by time
     /// past a reference time and the duty cycle ON and OFF durations; TIME_AND_ANGLE denotes a
     /// duty cycle driven by the phasing/clocking of a space object body frame 'trigger'
     /// direction past a reference direction.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    #[builder(default)]
     pub dc_type: ManDc,
     /// Start time of the duty cycle-based maneuver window that occurs on or prior to the
     /// actual maneuver execution start time. For example, this may identify the time at which
@@ -2191,7 +2272,7 @@ pub struct OcmManeuverParameters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dc_exec_stop: Option<Epoch>,
     /// Reference time for the THRUST duty cycle, specified as either time in seconds (relative
-    /// to EPOCH_TZERO), or as an absolute '<epoch>' (see 7.5.10 for formatting rules).
+    /// to EPOCH_TZERO), or as an absolute '`<epoch>`' (see 7.5.10 for formatting rules).
     /// NOTE—Depending upon EPOCH_TZERO, DC_REF_TIME relative times may be negative. This
     /// keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
@@ -2233,6 +2314,7 @@ pub struct OcmManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub dc_body_frame: Option<String>,
     /// For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the body frame
     /// reference vector direction in the 'DC_BODY_FRAME' reference frame at which, when its
@@ -2276,6 +2358,7 @@ pub struct OcmManeuverParameters {
     /// (TIME_ABSOLUTE or TIME_RELATIVE).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    #[builder(into)]
     pub man_composition: String,
     /// A comma-delimited set of SI unit designations for each and every element of the
     /// maneuver time history following the maneuver time tag(s), solely for informational
@@ -2288,13 +2371,15 @@ pub struct OcmManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub man_units: Option<String>,
     /// Maneuver time history data lines.
     #[serde(rename = "manLine")]
+    #[builder(default)]
     pub man_lines: Vec<ManLine>,
 }
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ManLine {
     pub epoch: String,
     pub values: Vec<String>,
@@ -2429,7 +2514,7 @@ impl ToKvn for OcmManeuverParameters {
 //----------------------------------------------------------------------
 
 /// OCM Perturbations Parameters.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmPerturbations {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
@@ -2545,7 +2630,7 @@ pub struct OcmPerturbations {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadow_model: Option<String>,
     /// List of bodies included in shadow calculations (value(s) to be drawn from the SANA
-    /// registry list of Orbit Centers at https://sanaregistry.org/r/orbit_centers).
+    /// registry list of Orbit Centers at <https://sanaregistry.org/r/orbit_centers>).
     ///
     /// **Examples**: EARTH, MOON
     ///
@@ -2754,19 +2839,21 @@ impl ToKvn for OcmPerturbations {
 //----------------------------------------------------------------------
 
 /// OCM Orbit Determination Parameters.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmOdParameters {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Identification number for this orbit determination.
     ///
     /// **Examples**: 1
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    #[builder(into)]
     pub od_id: String,
     /// Optional identification number for the previous orbit determination.
     ///
@@ -2774,12 +2861,14 @@ pub struct OcmOdParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub od_prev_id: Option<String>,
     /// Type of orbit determination method used to produce the orbit estimate.
     ///
     /// **Examples**: LEAST_SQUARES, KALMAN_FILTER
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    #[builder(into)]
     pub od_method: String,
     /// Relative or absolute time tag of the orbit determination solved-for state in the selected OCM
     /// time system recorded by the TIME_SYSTEM keyword.
@@ -2902,7 +2991,7 @@ pub struct OcmOdParameters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub od_confidence: Option<Percentage>,
     /// Generalized Dilution Of Precision for this orbit determination, based on the
-    /// observability grammian as defined in references [H15] and [H16] and expressed in
+    /// observability grammian as defined in references `[H15]` and `[H16]` and expressed in
     /// informative annex F, subsection F4. GDOP provides a rating metric of the observability
     /// of the element set from the OD. Alternate GDOP formations may be used as mutually
     /// defined by message exchange participants.
@@ -2964,7 +3053,7 @@ pub struct OcmOdParameters {
     pub weighted_rms: Option<NonNegativeDouble>,
     /// Comma-separated list of observation data types utilized in this orbit determination.
     /// Although this is a free-text field, it is recommended at a minimum to use data type
-    /// descriptor(s) as provided in table 3-5 of the TDM standard (reference [9]) (excluding
+    /// descriptor(s) as provided in table 3-5 of the TDM standard (reference `[9]`) (excluding
     /// the DATA_START, DATA_STOP, and COMMENT keywords). Additional descriptors/detail is
     /// encouraged if the descriptors of table 3-5 are not sufficiently clear; for example, one
     /// could replace ANGLE_1 and ANGLE_2 with RADEC (e.g., from a telescope), AZEL (e.g., from
@@ -3144,10 +3233,36 @@ mod tests {
 
     #[test]
     fn test_ocm_validation_traj_lines() {
-        let mut ocm = Ocm::default();
-        // Only 1 mandatory segment
+        let mut ocm = Ocm::builder()
+            .header(
+                OdmHeader::builder()
+                    .originator("TEST")
+                    .creation_date("2000-01-01T00:00:00".parse().unwrap())
+                    .build(),
+            )
+            .body(
+                OcmBody::builder()
+                    .segment(Box::new(
+                        OcmSegment::builder()
+                            .metadata(
+                                OcmMetadata::builder()
+                                    .time_system("UTC")
+                                    .epoch_tzero("2000-01-01T00:00:00".parse().unwrap())
+                                    .build(),
+                            )
+                            .data(OcmData::default())
+                            .build(),
+                    ))
+                    .build(),
+            )
+            .version("3.0")
+            .build();
 
-        let traj = OcmTrajState::default();
+        let traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("CARTPV")
+            .build();
         // Missing lines
         ocm.body.segment.data.traj.push(traj);
         assert!(ocm.validate().is_err());
@@ -3162,7 +3277,11 @@ mod tests {
 
     #[test]
     fn test_ocm_validation_orb_revnum() {
-        let mut traj = OcmTrajState::default();
+        let mut traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("CARTPV")
+            .build();
         traj.traj_lines.push(TrajLine {
             epoch: "2000-01-01T00:00:00".to_string(),
             values: vec![1.0],
@@ -3341,5 +3460,67 @@ TRAJ_STOP
         let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
         assert_eq!(deserialized.man_line.epoch, "2023-01-01T00:00:00");
         assert_eq!(deserialized.man_line.values.len(), 3);
+    }
+
+    #[test]
+    fn test_ocm_validation_gaps() {
+        // 1. DRAG_COEFF_NOM <= 0.0
+        let mut phys = OcmPhysicalDescription::default();
+        phys.drag_coeff_nom = Some(-1.0);
+        assert!(phys.validate().is_err());
+        phys.drag_coeff_nom = Some(0.0);
+        assert!(phys.validate().is_err());
+
+        // 2. ORB_REVNUM < 0.0
+        let mut traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("OSCULATING")
+            .build();
+        traj.orb_revnum = Some(-1.0);
+        // Also needs at least one line to pass first check
+        traj.traj_lines.push(TrajLine {
+            epoch: "2023-01-01T00:00:00".to_string(),
+            values: vec![0.0],
+        });
+        assert!(traj.validate().is_err());
+
+        // 3. OcmTrajState::traj_lines empty
+        traj.traj_lines.clear();
+        assert!(traj.validate().is_err());
+
+        // 4. OcmCovarianceMatrix::cov_lines empty
+        let cov = OcmCovarianceMatrix::builder()
+            .cov_ref_frame("GCRF")
+            .cov_type("SYMMETRIC")
+            .build();
+        assert!(cov.validate().is_err());
+
+        // 5. OcmManeuverParameters::man_lines empty
+        let man = OcmManeuverParameters::builder()
+            .man_id("MAN1")
+            .man_device_id("DEV1")
+            .man_ref_frame("GCRF")
+            .man_composition("CHEMICAL")
+            .build();
+        assert!(man.validate().is_err());
+
+        // 6. RevNumBasis::One coverage
+        let mut traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("OSCULATING")
+            .build();
+        traj.orb_revnum_basis = Some(RevNumBasis::One);
+        traj.traj_lines.push(TrajLine {
+            epoch: "2023-01-01T00:00:00".to_string(),
+            values: vec![0.0],
+        });
+        let mut writer = crate::kvn::ser::KvnWriter::new();
+        use crate::traits::ToKvn;
+        traj.write_kvn(&mut writer);
+        let kvn = writer.finish();
+        assert!(kvn.contains("ORB_REVNUM_BASIS"));
+        assert!(kvn.contains("= 1"));
     }
 }

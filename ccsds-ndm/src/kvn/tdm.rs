@@ -16,6 +16,7 @@ use crate::types::{Epoch, Percentage};
 use winnow::combinator::preceded;
 use winnow::error::{AddContext, ErrMode, StrContext};
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // TDM Version Parser
@@ -71,6 +72,10 @@ pub fn tdm_header(input: &mut &str) -> KvnResult<TdmHeader> {
                 break;
             }
         }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     Ok(TdmHeader {
@@ -88,82 +93,197 @@ pub fn tdm_header(input: &mut &str) -> KvnResult<TdmHeader> {
 pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
     expect_block_start("META").parse_next(input)?;
 
-    let mut meta = TdmMetadata::default();
+    let mut comment = Vec::new();
+    let mut track_id = None;
+    let mut data_types = None;
+    let mut time_system = None;
+    let mut start_time = None;
+    let mut stop_time = None;
+    let mut participant_1 = None;
+    let mut participant_2 = None;
+    let mut participant_3 = None;
+    let mut participant_4 = None;
+    let mut participant_5 = None;
+    let mut mode = None;
+    let mut path = None;
+    let mut path_1 = None;
+    let mut path_2 = None;
+    let mut transmit_band = None;
+    let mut receive_band = None;
+    let mut turnaround_numerator = None;
+    let mut turnaround_denominator = None;
+    let mut timetag_ref = None;
+    let mut integration_interval = None;
+    let mut integration_ref = None;
+    let mut freq_offset = None;
+    let mut range_mode = None;
+    let mut range_modulus = None;
+    let mut range_units = None;
+    let mut angle_type = None;
+    let mut reference_frame = None;
+    let mut interpolation = None;
+    let mut interpolation_degree = None;
+    let mut doppler_count_bias = None;
+    let mut doppler_count_scale = None;
+    let mut doppler_count_rollover = None;
+    let mut transmit_delay_1 = None;
+    let mut transmit_delay_2 = None;
+    let mut transmit_delay_3 = None;
+    let mut transmit_delay_4 = None;
+    let mut transmit_delay_5 = None;
+    let mut receive_delay_1 = None;
+    let mut receive_delay_2 = None;
+    let mut receive_delay_3 = None;
+    let mut receive_delay_4 = None;
+    let mut receive_delay_5 = None;
+    let mut data_quality = None;
+    let mut correction_angle_1 = None;
+    let mut correction_angle_2 = None;
+    let mut correction_doppler = None;
+    let mut correction_mag = None;
+    let mut correction_range = None;
+    let mut correction_rcs = None;
+    let mut correction_receive = None;
+    let mut correction_transmit = None;
+    let mut correction_aberration_yearly = None;
+    let mut correction_aberration_diurnal = None;
+    let mut corrections_applied = None;
+    let mut ephemeris_name_1 = None;
+    let mut ephemeris_name_2 = None;
+    let mut ephemeris_name_3 = None;
+    let mut ephemeris_name_4 = None;
+    let mut ephemeris_name_5 = None;
 
-    parse_block!(input, meta.comment, {
-        "TRACK_ID" => val: kv_string => { meta.track_id = Some(val); },
-        "DATA_TYPES" => val: kv_string => { meta.data_types = Some(val); },
-        "TIME_SYSTEM" => val: kv_string => { meta.time_system = val; },
-        "START_TIME" => val: kv_epoch => { meta.start_time = Some(val); },
-        "STOP_TIME" => val: kv_epoch => { meta.stop_time = Some(val); },
-        "PARTICIPANT_1" => val: kv_string => { meta.participant_1 = val; },
-        "PARTICIPANT_2" => val: kv_string => { meta.participant_2 = Some(val); },
-        "PARTICIPANT_3" => val: kv_string => { meta.participant_3 = Some(val); },
-        "PARTICIPANT_4" => val: kv_string => { meta.participant_4 = Some(val); },
-        "PARTICIPANT_5" => val: kv_string => { meta.participant_5 = Some(val); },
-        "MODE" => val: kv_enum => { meta.mode = Some(val); },
-        "PATH" => val: kv_from_kvn_value => { meta.path = Some(val); },
-        "PATH_1" => val: kv_from_kvn_value => { meta.path_1 = Some(val); },
-        "PATH_2" => val: kv_from_kvn_value => { meta.path_2 = Some(val); },
-        "TRANSMIT_BAND" => val: kv_string => { meta.transmit_band = Some(val); },
-        "RECEIVE_BAND" => val: kv_string => { meta.receive_band = Some(val); },
-        "TURNAROUND_NUMERATOR" => val: kv_i32 => { meta.turnaround_numerator = Some(val); },
-        "TURNAROUND_DENOMINATOR" => val: kv_i32 => { meta.turnaround_denominator = Some(val); },
-        "TIMETAG_REF" => val: kv_enum => { meta.timetag_ref = Some(val); },
-        "INTEGRATION_INTERVAL" => val: kv_float => { meta.integration_interval = Some(val); },
-        "INTEGRATION_REF" => val: kv_enum => { meta.integration_ref = Some(val); },
-        "FREQ_OFFSET" => val: kv_float => { meta.freq_offset = Some(val); },
-        "RANGE_MODE" => val: kv_enum => { meta.range_mode = Some(val); },
-        "RANGE_MODULUS" => val: kv_float => { meta.range_modulus = Some(val); },
-        "RANGE_UNITS" => val: kv_enum => { meta.range_units = Some(val); },
-        "ANGLE_TYPE" => val: kv_enum => { meta.angle_type = Some(val); },
-        "REFERENCE_FRAME" => val: kv_enum => { meta.reference_frame = Some(val); },
-        "INTERPOLATION" => val: kv_string => { meta.interpolation = Some(val); },
-        "INTERPOLATION_DEGREE" => val: kv_u32 => { meta.interpolation_degree = Some(val); },
-        "DOPPLER_COUNT_BIAS" => val: kv_float => { meta.doppler_count_bias = Some(val); },
-        "DOPPLER_COUNT_SCALE" => val: kv_u64 => { meta.doppler_count_scale = Some(val); },
-        "DOPPLER_COUNT_ROLLOVER" => val: kv_enum => { meta.doppler_count_rollover = Some(val); },
-        "TRANSMIT_DELAY_1" => val: kv_float => { meta.transmit_delay_1 = Some(val); },
-        "TRANSMIT_DELAY_2" => val: kv_float => { meta.transmit_delay_2 = Some(val); },
-        "TRANSMIT_DELAY_3" => val: kv_float => { meta.transmit_delay_3 = Some(val); },
-        "TRANSMIT_DELAY_4" => val: kv_float => { meta.transmit_delay_4 = Some(val); },
-        "TRANSMIT_DELAY_5" => val: kv_float => { meta.transmit_delay_5 = Some(val); },
-        "RECEIVE_DELAY_1" => val: kv_float => { meta.receive_delay_1 = Some(val); },
-        "RECEIVE_DELAY_2" => val: kv_float => { meta.receive_delay_2 = Some(val); },
-        "RECEIVE_DELAY_3" => val: kv_float => { meta.receive_delay_3 = Some(val); },
-        "RECEIVE_DELAY_4" => val: kv_float => { meta.receive_delay_4 = Some(val); },
-        "RECEIVE_DELAY_5" => val: kv_float => { meta.receive_delay_5 = Some(val); },
-        "DATA_QUALITY" => val: kv_enum => { meta.data_quality = Some(val); },
-        "CORRECTION_ANGLE_1" => val: kv_float => { meta.correction_angle_1 = Some(val); },
-        "CORRECTION_ANGLE_2" => val: kv_float => { meta.correction_angle_2 = Some(val); },
-        "CORRECTION_DOPPLER" => val: kv_float => { meta.correction_doppler = Some(val); },
-        "CORRECTION_MAG" => val: kv_float => { meta.correction_mag = Some(val); },
-        "CORRECTION_RANGE" => val: kv_float => { meta.correction_range = Some(val); },
-        "CORRECTION_RCS" => val: kv_float => { meta.correction_rcs = Some(val); },
-        "CORRECTION_RECEIVE" => val: kv_float => { meta.correction_receive = Some(val); },
-        "CORRECTION_TRANSMIT" => val: kv_float => { meta.correction_transmit = Some(val); },
-        "CORRECTION_ABERRATION_YEARLY" => val: kv_float => { meta.correction_aberration_yearly = Some(val); },
-        "CORRECTION_ABERRATION_DIURNAL" => val: kv_float => { meta.correction_aberration_diurnal = Some(val); },
-        "CORRECTIONS_APPLIED" => val: kv_enum => { meta.corrections_applied = Some(val); },
-        "EPHEMERIS_NAME_1" => val: kv_string => { meta.ephemeris_name_1 = Some(val); },
-        "EPHEMERIS_NAME_2" => val: kv_string => { meta.ephemeris_name_2 = Some(val); },
-        "EPHEMERIS_NAME_3" => val: kv_string => { meta.ephemeris_name_3 = Some(val); },
-        "EPHEMERIS_NAME_4" => val: kv_string => { meta.ephemeris_name_4 = Some(val); },
-        "EPHEMERIS_NAME_5" => val: kv_string => { meta.ephemeris_name_5 = Some(val); },
+    parse_block!(input, comment, {
+        "TRACK_ID" => val: kv_string => { track_id = Some(val); },
+        "DATA_TYPES" => val: kv_string => { data_types = Some(val); },
+        "TIME_SYSTEM" => val: kv_string => { time_system = Some(val); },
+        "START_TIME" => val: kv_epoch => { start_time = Some(val); },
+        "STOP_TIME" => val: kv_epoch => { stop_time = Some(val); },
+        "PARTICIPANT_1" => val: kv_string => { participant_1 = Some(val); },
+        "PARTICIPANT_2" => val: kv_string => { participant_2 = Some(val); },
+        "PARTICIPANT_3" => val: kv_string => { participant_3 = Some(val); },
+        "PARTICIPANT_4" => val: kv_string => { participant_4 = Some(val); },
+        "PARTICIPANT_5" => val: kv_string => { participant_5 = Some(val); },
+        "MODE" => val: kv_enum => { mode = Some(val); },
+        "PATH" => val: kv_from_kvn_value => { path = Some(val); },
+        "PATH_1" => val: kv_from_kvn_value => { path_1 = Some(val); },
+        "PATH_2" => val: kv_from_kvn_value => { path_2 = Some(val); },
+        "TRANSMIT_BAND" => val: kv_string => { transmit_band = Some(val); },
+        "RECEIVE_BAND" => val: kv_string => { receive_band = Some(val); },
+        "TURNAROUND_NUMERATOR" => val: kv_i32 => { turnaround_numerator = Some(val); },
+        "TURNAROUND_DENOMINATOR" => val: kv_i32 => { turnaround_denominator = Some(val); },
+        "TIMETAG_REF" => val: kv_enum => { timetag_ref = Some(val); },
+        "INTEGRATION_INTERVAL" => val: kv_float => { integration_interval = Some(val); },
+        "INTEGRATION_REF" => val: kv_enum => { integration_ref = Some(val); },
+        "FREQ_OFFSET" => val: kv_float => { freq_offset = Some(val); },
+        "RANGE_MODE" => val: kv_enum => { range_mode = Some(val); },
+        "RANGE_MODULUS" => val: kv_float => { range_modulus = Some(val); },
+        "RANGE_UNITS" => val: kv_enum => { range_units = Some(val); },
+        "ANGLE_TYPE" => val: kv_enum => { angle_type = Some(val); },
+        "REFERENCE_FRAME" => val: kv_enum => { reference_frame = Some(val); },
+        "INTERPOLATION" => val: kv_string => { interpolation = Some(val); },
+        "INTERPOLATION_DEGREE" => val: kv_u32 => { interpolation_degree = Some(val); },
+        "DOPPLER_COUNT_BIAS" => val: kv_float => { doppler_count_bias = Some(val); },
+        "DOPPLER_COUNT_SCALE" => val: kv_u64 => { doppler_count_scale = Some(val); },
+        "DOPPLER_COUNT_ROLLOVER" => val: kv_enum => { doppler_count_rollover = Some(val); },
+        "TRANSMIT_DELAY_1" => val: kv_float => { transmit_delay_1 = Some(val); },
+        "TRANSMIT_DELAY_2" => val: kv_float => { transmit_delay_2 = Some(val); },
+        "TRANSMIT_DELAY_3" => val: kv_float => { transmit_delay_3 = Some(val); },
+        "TRANSMIT_DELAY_4" => val: kv_float => { transmit_delay_4 = Some(val); },
+        "TRANSMIT_DELAY_5" => val: kv_float => { transmit_delay_5 = Some(val); },
+        "RECEIVE_DELAY_1" => val: kv_float => { receive_delay_1 = Some(val); },
+        "RECEIVE_DELAY_2" => val: kv_float => { receive_delay_2 = Some(val); },
+        "RECEIVE_DELAY_3" => val: kv_float => { receive_delay_3 = Some(val); },
+        "RECEIVE_DELAY_4" => val: kv_float => { receive_delay_4 = Some(val); },
+        "RECEIVE_DELAY_5" => val: kv_float => { receive_delay_5 = Some(val); },
+        "DATA_QUALITY" => val: kv_enum => { data_quality = Some(val); },
+        "CORRECTION_ANGLE_1" => val: kv_float => { correction_angle_1 = Some(val); },
+        "CORRECTION_ANGLE_2" => val: kv_float => { correction_angle_2 = Some(val); },
+        "CORRECTION_DOPPLER" => val: kv_float => { correction_doppler = Some(val); },
+        "CORRECTION_MAG" => val: kv_float => { correction_mag = Some(val); },
+        "CORRECTION_RANGE" => val: kv_float => { correction_range = Some(val); },
+        "CORRECTION_RCS" => val: kv_float => { correction_rcs = Some(val); },
+        "CORRECTION_RECEIVE" => val: kv_float => { correction_receive = Some(val); },
+        "CORRECTION_TRANSMIT" => val: kv_float => { correction_transmit = Some(val); },
+        "CORRECTION_ABERRATION_YEARLY" => val: kv_float => { correction_aberration_yearly = Some(val); },
+        "CORRECTION_ABERRATION_DIURNAL" => val: kv_float => { correction_aberration_diurnal = Some(val); },
+        "CORRECTIONS_APPLIED" => val: kv_enum => { corrections_applied = Some(val); },
+        "EPHEMERIS_NAME_1" => val: kv_string => { ephemeris_name_1 = Some(val); },
+        "EPHEMERIS_NAME_2" => val: kv_string => { ephemeris_name_2 = Some(val); },
+        "EPHEMERIS_NAME_3" => val: kv_string => { ephemeris_name_3 = Some(val); },
+        "EPHEMERIS_NAME_4" => val: kv_string => { ephemeris_name_4 = Some(val); },
+        "EPHEMERIS_NAME_5" => val: kv_string => { ephemeris_name_5 = Some(val); },
     }, |i| at_block_end("META", i), "Unexpected TDM Metadata key");
 
     if at_block_end("META", input) {
         expect_block_end("META").parse_next(input)?;
     }
 
-    if meta.time_system.is_empty() {
-        return Err(missing_field_err(input, "TDM Metadata", "TIME_SYSTEM"));
-    }
-    if meta.participant_1.is_empty() {
-        return Err(missing_field_err(input, "TDM Metadata", "PARTICIPANT_1"));
-    }
-
-    Ok(meta)
+    Ok(TdmMetadata {
+        comment,
+        track_id,
+        data_types,
+        time_system: time_system
+            .ok_or_else(|| missing_field_err(input, "TDM Metadata", "TIME_SYSTEM"))?,
+        start_time,
+        stop_time,
+        participant_1: participant_1
+            .ok_or_else(|| missing_field_err(input, "TDM Metadata", "PARTICIPANT_1"))?,
+        participant_2,
+        participant_3,
+        participant_4,
+        participant_5,
+        mode,
+        path,
+        path_1,
+        path_2,
+        transmit_band,
+        receive_band,
+        turnaround_numerator,
+        turnaround_denominator,
+        timetag_ref,
+        integration_interval,
+        integration_ref,
+        freq_offset,
+        range_mode,
+        range_modulus,
+        range_units,
+        angle_type,
+        reference_frame,
+        interpolation,
+        interpolation_degree,
+        doppler_count_bias,
+        doppler_count_scale,
+        doppler_count_rollover,
+        transmit_delay_1,
+        transmit_delay_2,
+        transmit_delay_3,
+        transmit_delay_4,
+        transmit_delay_5,
+        receive_delay_1,
+        receive_delay_2,
+        receive_delay_3,
+        receive_delay_4,
+        receive_delay_5,
+        data_quality,
+        correction_angle_1,
+        correction_angle_2,
+        correction_doppler,
+        correction_mag,
+        correction_range,
+        correction_rcs,
+        correction_receive,
+        correction_transmit,
+        correction_aberration_yearly,
+        correction_aberration_diurnal,
+        corrections_applied,
+        ephemeris_name_1,
+        ephemeris_name_2,
+        ephemeris_name_3,
+        ephemeris_name_4,
+        ephemeris_name_5,
+    })
 }
 
 //----------------------------------------------------------------------
@@ -259,6 +379,7 @@ pub fn tdm_data(input: &mut &str) -> KvnResult<TdmData> {
             break;
         }
 
+        let checkpoint = input.checkpoint();
         comment.extend(collect_comments.parse_next(input)?);
 
         if at_block_end("DATA", input) {
@@ -266,6 +387,10 @@ pub fn tdm_data(input: &mut &str) -> KvnResult<TdmData> {
         }
 
         observations.push(tdm_observation.parse_next(input)?);
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     if observations.is_empty() {
@@ -300,6 +425,7 @@ pub fn tdm_body(input: &mut &str) -> KvnResult<TdmBody> {
     let mut segments = Vec::new();
 
     loop {
+        let checkpoint = input.checkpoint();
         let _ = collect_comments.parse_next(input)?;
 
         if input.is_empty() || !at_block_start("META", input) {
@@ -307,6 +433,10 @@ pub fn tdm_body(input: &mut &str) -> KvnResult<TdmBody> {
         }
 
         segments.push(tdm_segment.parse_next(input)?);
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     if segments.is_empty() {
@@ -1368,5 +1498,85 @@ DATA_STOP
             },
             _ => panic!("Expected error, got: {:?}", err),
         }
+    }
+
+    #[test]
+    fn test_tdm_kvn_exhaustive_coverage() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+TRANSMIT_DELAY_3 = 0.3
+TRANSMIT_DELAY_4 = 0.4
+TRANSMIT_DELAY_5 = 0.5
+RECEIVE_DELAY_4 = 1.4
+RECEIVE_DELAY_5 = 1.5
+CORRECTION_DOPPLER = 0.3
+CORRECTION_MAG = 0.4
+CORRECTION_RCS = 0.5
+CORRECTION_TRANSMIT = 0.6
+CORRECTION_ABERRATION_DIURNAL = 0.7
+CORRECTIONS_APPLIED = YES
+META_STOP
+DATA_START
+RECEIVE_FREQ_2 = 2023-01-01T00:00:00 123.0
+RECEIVE_FREQ_4 = 2023-01-01T00:00:01 124.0
+RECEIVE_FREQ_5 = 2023-01-01T00:00:02 125.0
+RECEIVE_PHASE_CT_2 = 2023-01-01T00:00:03 222.0
+RECEIVE_PHASE_CT_3 = 2023-01-01T00:00:04 223.0
+RECEIVE_PHASE_CT_4 = 2023-01-01T00:00:05 224.0
+RECEIVE_PHASE_CT_5 = 2023-01-01T00:00:06 225.0
+TRANSMIT_FREQ_3 = 2023-01-01T00:00:07 323.0
+TRANSMIT_FREQ_4 = 2023-01-01T00:00:08 324.0
+TRANSMIT_FREQ_5 = 2023-01-01T00:00:09 325.0
+TRANSMIT_FREQ_RATE_2 = 2023-01-01T00:00:10 422.0
+TRANSMIT_FREQ_RATE_3 = 2023-01-01T00:00:11 423.0
+TRANSMIT_FREQ_RATE_4 = 2023-01-01T00:00:12 424.0
+TRANSMIT_FREQ_RATE_5 = 2023-01-01T00:00:13 425.0
+TRANSMIT_PHASE_CT_2 = 2023-01-01T00:00:14 522.0
+TRANSMIT_PHASE_CT_3 = 2023-01-01T00:00:15 523.0
+TRANSMIT_PHASE_CT_4 = 2023-01-01T00:00:16 524.0
+TRANSMIT_PHASE_CT_5 = 2023-01-01T00:00:17 525.0
+DATA_STOP
+"#;
+        let tdm = Tdm::from_kvn(kvn).expect("parse exhaustive tdm kvn");
+        let meta = &tdm.body.segments[0].metadata;
+        assert_eq!(meta.transmit_delay_5, Some(0.5));
+        assert_eq!(meta.correction_aberration_diurnal, Some(0.7));
+        assert_eq!(tdm.body.segments[0].data.observations.len(), 18);
+    }
+
+    #[test]
+    fn test_tdm_kvn_backtrack_and_errors() {
+        // Unknown key between header and body should FAIL
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+UNKNOWN_KEY = VALUE
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+
+        // Backtrack in tdm_observation (malformed key)
+        let kvn_malformed = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+META_STOP
+DATA_START
+BAD_KEY = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn_malformed).is_err());
     }
 }

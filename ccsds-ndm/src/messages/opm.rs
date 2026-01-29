@@ -6,7 +6,7 @@ use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateV
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -24,15 +24,24 @@ use std::borrow::Cow;
 /// such as mass, area, and maneuver planning data, if applicable) may be included with the message.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 3.1.1.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "opm")]
 pub struct Opm {
     pub header: OdmHeader,
     pub body: OpmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
+}
+
+impl crate::traits::Validate for Opm {
+    fn validate(&self) -> Result<()> {
+        self.header.validate()?;
+        self.body.validate()
+    }
 }
 
 impl Ndm for Opm {
@@ -43,9 +52,9 @@ impl Ndm for Opm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let omm = Self::from_kvn_str(kvn)?;
-        omm.validate()?;
-        Ok(omm)
+        let opm = Self::from_kvn_str(kvn)?;
+        opm.validate()?;
+        Ok(opm)
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -54,16 +63,14 @@ impl Ndm for Opm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let omm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
-        omm.validate()?;
-        Ok(omm)
+        let opm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
+        opm.validate()?;
+        Ok(opm)
     }
 }
 
 impl Opm {
-    pub fn validate(&self) -> Result<()> {
-        self.body.segment.data.validate()
-    }
+    // No inherent validate() anymore
 }
 
 impl ToKvn for Opm {
@@ -82,10 +89,16 @@ impl ToKvn for Opm {
 //----------------------------------------------------------------------
 
 /// The body of the OPM, containing a single segment.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OpmBody {
     #[serde(rename = "segment")]
     pub segment: OpmSegment,
+}
+
+impl crate::traits::Validate for OpmBody {
+    fn validate(&self) -> Result<()> {
+        self.segment.validate()
+    }
 }
 
 impl ToKvn for OpmBody {
@@ -97,10 +110,17 @@ impl ToKvn for OpmBody {
 /// A single segment of the OPM.
 ///
 /// Contains metadata and data sections.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OpmSegment {
     pub metadata: OpmMetadata,
     pub data: OpmData,
+}
+
+impl crate::traits::Validate for OpmSegment {
+    fn validate(&self) -> Result<()> {
+        // Metadata validation could go here if needed
+        self.data.validate()
+    }
 }
 
 impl ToKvn for OpmSegment {
@@ -115,7 +135,7 @@ impl ToKvn for OpmSegment {
 //----------------------------------------------------------------------
 
 /// OPM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmMetadata {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
@@ -124,31 +144,34 @@ pub struct OpmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft name for which orbit state data is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
-    /// Office of Outer Space Affairs designator index (reference [3], which include Object name
+    /// Office of Outer Space Affairs designator index (reference ``[3]``, which include Object name
     /// and international designator of the participant). If OBJECT_NAME is not listed in reference
-    /// [3] or the content is either unknown or cannot be disclosed, the value should be set to
+    /// `[3]` or the content is either unknown or cannot be disclosed, the value should be set to
     /// UNKNOWN.
     ///
     /// **Examples**: EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
+    #[builder(into)]
     pub object_name: String,
     /// Object identifier of the object for which orbit state data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
     /// international spacecraft designator as published in the UN Office of Outer Space Affairs
-    /// designator index (reference [3]). Recommended values have the format YYYY-NNNP{PP}, where:
+    /// designator index (reference ``[3]``). Recommended values have the format YYYY-NNNP{PP}, where:
     /// YYYY = Year of launch. NNN = Three-digit serial number of launch in year YYYY (with leading
     /// zeros). P{PP} = At least one capital letter for the identification of the part brought into
-    /// space by the launch. If the asset is not listed in reference [3], the UN Office of Outer
+    /// space by the launch. If the asset is not listed in reference ``[3]``, the UN Office of Outer
     /// Space Affairs designator index format is not used, or the content is either unknown or
     /// cannot be disclosed, the value should be set to UNKNOWN.
     ///
     /// **Examples**: 2000-052A 1996-068A 2000-053A 1996-008A UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
+    #[builder(into)]
     pub object_id: String,
     /// Origin of the OPM reference frame, which shall be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -159,6 +182,7 @@ pub struct OpmMetadata {
     /// STS 106 EROS
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
+    #[builder(into)]
     pub center_name: String,
     /// Reference frame in which the state vector and optional Keplerian element data are given.
     /// Use of values other than those in 3.2.3.3 should be documented in an ICD.
@@ -166,6 +190,7 @@ pub struct OpmMetadata {
     /// **Examples**: ICRF EME2000 ITRF2000 TEME
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
+    #[builder(into)]
     pub ref_frame: String,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
     /// 7.5.10 for formatting rules.)
@@ -181,8 +206,11 @@ pub struct OpmMetadata {
     /// **Examples**: UTC, TAI, TT, GPS, TDB, TCB
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
+    #[builder(into)]
     pub time_system: String,
 }
+
+impl crate::traits::Validate for OpmMetadata {}
 
 impl ToKvn for OpmMetadata {
     fn write_kvn(&self, writer: &mut KvnWriter) {
@@ -203,11 +231,12 @@ impl ToKvn for OpmMetadata {
 //----------------------------------------------------------------------
 
 /// OPM Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OpmData {
     /// Comments (see 7.8 for formatting rules).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
 
     /// State vector components (position and velocity).
@@ -244,6 +273,7 @@ pub struct OpmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub maneuver_parameters: Vec<ManeuverParameters>,
 
     /// User-defined parameters.
@@ -255,8 +285,8 @@ pub struct OpmData {
     pub user_defined_parameters: Option<UserDefined>,
 }
 
-impl OpmData {
-    pub fn validate(&self) -> Result<()> {
+impl Validate for OpmData {
+    fn validate(&self) -> Result<()> {
         if let Some(ke) = &self.keplerian_elements {
             ke.validate()?;
         }
@@ -309,7 +339,7 @@ impl ToKvn for OpmData {
         if let Some(ud) = &self.user_defined_parameters {
             writer.write_comments(&ud.comment);
             for p in &ud.user_defined {
-                writer.write_pair(&p.parameter, &p.value);
+                writer.write_user_defined(&p.parameter, &p.value);
             }
         }
     }
@@ -324,13 +354,14 @@ impl ToKvn for OpmData {
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct KeplerianElements {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Semi-major axis
     ///
@@ -384,8 +415,8 @@ pub struct KeplerianElements {
     pub gm: Gm,
 }
 
-impl KeplerianElements {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for KeplerianElements {
+    fn validate(&self) -> Result<()> {
         match (self.true_anomaly.is_some(), self.mean_anomaly.is_some()) {
             (true, false) | (false, true) => Ok(()),
             _ => Err(ValidationError::Generic {
@@ -425,13 +456,14 @@ impl ToKvn for KeplerianElements {
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct ManeuverParameters {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of ignition (see 7.5.10 for formatting rules)
     ///
@@ -456,6 +488,7 @@ pub struct ManeuverParameters {
     /// select from the accepted set of values indicated in 3.2.4.11.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
+    #[builder(into)]
     pub man_ref_frame: String,
     /// 1st component of the velocity increment
     ///
@@ -957,7 +990,7 @@ GM = 398600.4 [km**3/s**2]
 "#;
         let opm = Opm::from_kvn(kvn).unwrap();
         let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
-        assert_eq!(kep.eccentricity, 0.0.into());
+        assert_eq!(kep.eccentricity, NonNegativeDouble::new(0.0).unwrap());
     }
 
     #[test]
@@ -1169,9 +1202,15 @@ DRAG_COEFF = 2.2
             .unwrap();
         assert_eq!(sp.mass.as_ref().unwrap().value, 500.0);
         assert_eq!(sp.solar_rad_area.as_ref().unwrap().value, 10.0);
-        assert_eq!(sp.solar_rad_coeff.as_ref().unwrap(), &1.2.into());
+        assert_eq!(
+            sp.solar_rad_coeff.as_ref().unwrap(),
+            &NonNegativeDouble::new(1.2).unwrap()
+        );
         assert_eq!(sp.drag_area.as_ref().unwrap().value, 8.0);
-        assert_eq!(sp.drag_coeff.as_ref().unwrap(), &2.2.into());
+        assert_eq!(
+            sp.drag_coeff.as_ref().unwrap(),
+            &NonNegativeDouble::new(2.2).unwrap()
+        );
     }
 
     #[test]
@@ -1204,8 +1243,14 @@ DRAG_COEFF = 0.0
             .spacecraft_parameters
             .as_ref()
             .unwrap();
-        assert_eq!(sp.solar_rad_coeff.as_ref().unwrap(), &0.0.into());
-        assert_eq!(sp.drag_coeff.as_ref().unwrap(), &0.0.into());
+        assert_eq!(
+            sp.solar_rad_coeff.as_ref().unwrap(),
+            &NonNegativeDouble::new(0.0).unwrap()
+        );
+        assert_eq!(
+            sp.drag_coeff.as_ref().unwrap(),
+            &NonNegativeDouble::new(0.0).unwrap()
+        );
     }
 
     #[test]
@@ -1613,5 +1658,210 @@ Z_DOT = -4.191076 [km/s]
         // Conversion to XML may have serialization issues
         // but the structure should be valid
         let _ = opm.to_xml(); // Don't unwrap - may have unit serialization issues
+    }
+
+    #[test]
+    fn test_keplerian_elements_validation() {
+        use crate::traits::Validate;
+        let mut kep = KeplerianElements::builder()
+            .semi_major_axis(Distance::new(7000.0, Some(PositionUnits::Km)))
+            .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+            .inclination(Inclination::new(45.0, Some(AngleUnits::Deg)).unwrap())
+            .ra_of_asc_node(Angle::new(90.0, Some(AngleUnits::Deg)).unwrap())
+            .arg_of_pericenter(Angle::new(180.0, Some(AngleUnits::Deg)).unwrap())
+            .gm(Gm::new(398600.44, Some(GmUnits::Km3PerS2)).unwrap())
+            .build();
+
+        // Neither anomaly
+        assert!(kep.validate().is_err());
+
+        // Both anomalies
+        kep.true_anomaly = Some(Angle::new(0.0, Some(AngleUnits::Deg)).unwrap());
+        kep.mean_anomaly = Some(Angle::new(0.0, Some(AngleUnits::Deg)).unwrap());
+        assert!(kep.validate().is_err());
+
+        // Exactly one (true)
+        kep.mean_anomaly = None;
+        assert!(kep.validate().is_ok());
+
+        // Exactly one (mean)
+        kep.true_anomaly = None;
+        kep.mean_anomaly = Some(Angle::new(0.0, Some(AngleUnits::Deg)).unwrap());
+        assert!(kep.validate().is_ok());
+    }
+
+    #[test]
+    fn test_opm_data_validation() {
+        use crate::traits::Validate;
+        let mut data = OpmData::builder()
+            .state_vector(
+                StateVector::builder()
+                    .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .x(Distance::new(1.0, None))
+                    .y(Distance::new(1.0, None))
+                    .z(Distance::new(1.0, None))
+                    .x_dot(Velocity::new(1.0, None))
+                    .y_dot(Velocity::new(1.0, None))
+                    .z_dot(Velocity::new(1.0, None))
+                    .build(),
+            )
+            .build();
+
+        assert!(data.validate().is_ok());
+
+        // With invalid KeplerianElements
+        data.keplerian_elements = Some(
+            KeplerianElements::builder()
+                .semi_major_axis(Distance::new(7000.0, Some(PositionUnits::Km)))
+                .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                .inclination(Inclination::new(45.0, Some(AngleUnits::Deg)).unwrap())
+                .ra_of_asc_node(Angle::new(90.0, Some(AngleUnits::Deg)).unwrap())
+                .arg_of_pericenter(Angle::new(180.0, Some(AngleUnits::Deg)).unwrap())
+                .gm(Gm::new(398600.44, Some(GmUnits::Km3PerS2)).unwrap())
+                .build(),
+        );
+        assert!(data.validate().is_err());
+    }
+
+    #[test]
+    fn test_opm_serialization_gaps() {
+        use crate::common::OdmHeader;
+        let opm = Opm::builder()
+            .version("3.0")
+            .header(
+                OdmHeader::builder()
+                    .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .originator("TEST")
+                    .build(),
+            )
+            .body(
+                OpmBody::builder()
+                    .segment(
+                        OpmSegment::builder()
+                            .metadata(
+                                OpmMetadata::builder()
+                                    .object_name("SAT")
+                                    .object_id("1")
+                                    .center_name("EARTH")
+                                    .ref_frame("GCRF")
+                                    .ref_frame_epoch(Epoch::new("2000-01-01T12:00:00").unwrap())
+                                    .time_system("UTC")
+                                    .build(),
+                            )
+                            .data(
+                                OpmData::builder()
+                                    .state_vector(
+                                        StateVector::builder()
+                                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                                            .x(Distance::new(1.0, None))
+                                            .y(Distance::new(1.0, None))
+                                            .z(Distance::new(1.0, None))
+                                            .x_dot(Velocity::new(1.0, None))
+                                            .y_dot(Velocity::new(1.0, None))
+                                            .z_dot(Velocity::new(1.0, None))
+                                            .build(),
+                                    )
+                                    .keplerian_elements(
+                                        KeplerianElements::builder()
+                                            .semi_major_axis(Distance::new(7000.0, None))
+                                            .eccentricity(NonNegativeDouble::new(0.0).unwrap())
+                                            .inclination(Inclination::new(0.0, None).unwrap())
+                                            .ra_of_asc_node(Angle::new(0.0, None).unwrap())
+                                            .arg_of_pericenter(Angle::new(0.0, None).unwrap())
+                                            .mean_anomaly(Angle::new(0.0, None).unwrap())
+                                            .gm(Gm::new(398600.44, None).unwrap())
+                                            .build(),
+                                    )
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build();
+
+        let kvn = opm.to_kvn().unwrap();
+        assert!(kvn.contains("REF_FRAME_EPOCH"));
+        assert!(kvn.contains("2000-01-01T12:00:00"));
+        assert!(kvn.contains("MEAN_ANOMALY"));
+    }
+
+    #[test]
+    fn test_keplerian_elements_validation_detailed() {
+        // Invalid Anomaly Choice (Neither)
+        let mut ke = KeplerianElements::builder()
+            .semi_major_axis(Distance::new(7000.0, None))
+            .eccentricity(NonNegativeDouble::new(0.0).unwrap())
+            .inclination(Inclination::new(0.0, None).unwrap())
+            .ra_of_asc_node(Angle::new(0.0, None).unwrap())
+            .arg_of_pericenter(Angle::new(0.0, None).unwrap())
+            .gm(Gm::new(398600.0, None).unwrap())
+            .build();
+        assert!(ke.validate().is_err());
+
+        // Invalid Anomaly Choice (Both)
+        ke.true_anomaly = Some(Angle::new(0.0, None).unwrap());
+        ke.mean_anomaly = Some(Angle::new(0.0, None).unwrap());
+        assert!(ke.validate().is_err());
+
+        // Valid (True Anomaly)
+        ke.mean_anomaly = None;
+        assert!(ke.validate().is_ok());
+
+        // Valid (Mean Anomaly)
+        ke.true_anomaly = None;
+        ke.mean_anomaly = Some(Angle::new(0.0, None).unwrap());
+        assert!(ke.validate().is_ok());
+    }
+
+    #[test]
+    fn test_opm_minimal_data_gaps() {
+        use crate::common::OdmHeader;
+        // Minimal OPM without Keplerian Elements or optional Spacecraft Params
+        let opm = Opm::builder()
+            .version("3.0")
+            .header(
+                OdmHeader::builder()
+                    .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .originator("TEST")
+                    .build(),
+            )
+            .body(
+                OpmBody::builder()
+                    .segment(
+                        OpmSegment::builder()
+                            .metadata(
+                                OpmMetadata::builder()
+                                    .object_name("SAT")
+                                    .object_id("1")
+                                    .center_name("EARTH")
+                                    .ref_frame("GCRF")
+                                    .time_system("UTC")
+                                    .build(),
+                            )
+                            .data(
+                                OpmData::builder()
+                                    .state_vector(
+                                        StateVector::builder()
+                                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                                            .x(Distance::new(1.0, None))
+                                            .y(Distance::new(1.0, None))
+                                            .z(Distance::new(1.0, None))
+                                            .x_dot(Velocity::new(1.0, None))
+                                            .y_dot(Velocity::new(1.0, None))
+                                            .z_dot(Velocity::new(1.0, None))
+                                            .build(),
+                                    )
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build();
+
+        let kvn = opm.to_kvn().unwrap();
+        assert!(!kvn.contains("SEMI_MAJOR_AXIS"));
+        assert!(opm.validate().is_ok());
     }
 }

@@ -6,7 +6,7 @@ use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters};
 use crate::error::{EnumParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -15,7 +15,6 @@ use std::str::FromStr;
 //----------------------------------------------------------------------
 // OMM Specific Units
 //----------------------------------------------------------------------
-// ... (omitting units for clarity in this instruction, but they will be kept in the actual replace)
 
 // 1/ER (Inverse Earth Radii) for BSTAR
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
@@ -150,19 +149,29 @@ pub type MeanMotionDDot = UnitValue<f64, RevPerDay3Units>;
 /// Orbit Mean-Elements Message (OMM).
 ///
 /// The OMM contains the orbital characteristics of a single object at a specified epoch,
-/// expressed in mean Keplerian elements.
+/// expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
+/// ascension of ascending node, argument of perigee, and mean anomaly.
 ///
-/// **CCSDS Reference**: 502.0-B-3, Section 4.1.1.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// These elements are adequate for providing the initial mean state of analytical and
+/// semi-analytical orbit models (e.g., SGP4). The OMM includes keywords and values that may
+/// be used to generate canonical NORAD Two Line Element (TLE) sets to accommodate the needs
+/// of heritage users.
+///
+/// **CCSDS Reference**: 502.0-B-3, Section 4.1.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "omm")]
 pub struct Omm {
     pub header: OdmHeader,
     pub body: OmmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
+
+impl crate::traits::Validate for Omm {}
 
 impl Ndm for Omm {
     fn to_kvn(&self) -> Result<String> {
@@ -192,6 +201,7 @@ impl Ndm for Omm {
 impl Omm {
     /// Validates the OMM against CCSDS constraints that cannot be checked during parsing.
     pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
         self.body.segment.validate()
     }
 }
@@ -211,7 +221,7 @@ impl ToKvn for Omm {
 // Body & Segment
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OmmBody {
     #[serde(rename = "segment")]
     pub segment: OmmSegment,
@@ -223,7 +233,7 @@ impl ToKvn for OmmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OmmSegment {
     pub metadata: OmmMetadata,
     pub data: OmmData,
@@ -247,7 +257,7 @@ impl OmmSegment {
 //----------------------------------------------------------------------
 
 /// Metadata for the OMM.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OmmMetadata {
     /// Comments (allowed at the beginning of the OMM Metadata). (See 7.8 for formatting rules.)
@@ -256,32 +266,35 @@ pub struct OmmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft name for which mean element orbit state data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use names
-    /// from the UN Office of Outer Space Affairs designator index (reference [3], which include
+    /// from the UN Office of Outer Space Affairs designator index (reference `[3]`, which include
     /// Object name and international designator of the participant). If OBJECT_NAME is not
-    /// listed in reference [3] or the content is either unknown or cannot be disclosed, the
+    /// listed in reference `[3]` or the content is either unknown or cannot be disclosed, the
     /// value should be set to UNKNOWN.
     ///
     /// **Examples**: Telkom 2, Spaceway 2, INMARSAT 4-F2, UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub object_name: String,
     /// Object identifier of the object for which mean element orbit state data is provided.
     /// While there is no CCSDS-based restriction on the value for this keyword, it is
     /// recommended to use the international spacecraft designator as published in the UN Office
-    /// of Outer Space Affairs designator index (reference [3]). Recommended values have the
+    /// of Outer Space Affairs designator index (reference `[3]`). Recommended values have the
     /// format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-digit serial number of
     /// launch in year YYYY (with leading zeros). P{PP} = At least one capital letter for the
     /// identification of the part brought into space by the launch. If the asset is not listed
-    /// in reference [3], the UN Office of Outer Space Affairs designator index format is not
+    /// in reference `[3]`, the UN Office of Outer Space Affairs designator index format is not
     /// used, or the content is either unknown or cannot be disclosed, the value should be set
     /// to UNKNOWN.
     ///
     /// **Examples**: 2005-046A, 2005-046B, 2003-022A, UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub object_id: String,
     /// Origin of the OMM reference frame, which shall be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -291,6 +304,7 @@ pub struct OmmMetadata {
     /// **Examples**: EARTH, MARS, MOON
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub center_name: String,
     /// Reference frame in which the Keplerian element data are given. Use of values other than
     /// those in 3.2.3.3 should be documented in an ICD. NOTE—NORAD Two Line Element Sets and
@@ -298,11 +312,12 @@ pub struct OmmMetadata {
     /// are explicitly defined to be in the True Equator Mean Equinox of Date (TEME of Date)
     /// reference frame. Therefore, TEME of date shall be used for OMMs based on NORAD Two Line
     /// Element sets, rather than the almost imperceptibly different TEME of Epoch (see
-    /// reference [H2] or [H3] for further details).
+    /// reference `[H2]` or `[H3]` for further details).
     ///
     /// **Examples**: ICRF, ITRF2000, EME2000, TEME
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub ref_frame: String,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
     /// (See 7.5.10 for formatting rules.)
@@ -318,6 +333,7 @@ pub struct OmmMetadata {
     /// **Examples**: UTC
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub time_system: String,
     /// Description of the Mean Element Theory. Indicates the proper method to employ to
     /// propagate the state.
@@ -325,6 +341,7 @@ pub struct OmmMetadata {
     /// **Examples**: SGP, SGP4, SGP4-XP, DSST, USM
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
+    #[builder(into)]
     pub mean_element_theory: String,
 }
 
@@ -350,11 +367,12 @@ impl ToKvn for OmmMetadata {
 /// OMM Data section.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OmmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Mean Keplerian Elements in the Specified Reference Frame.
     #[serde(rename = "meanElements")]
@@ -429,7 +447,7 @@ impl ToKvn for OmmData {
         if let Some(ud) = &self.user_defined_parameters {
             writer.write_comments(&ud.comment);
             for p in &ud.user_defined {
-                writer.write_pair(&p.parameter, &p.value);
+                writer.write_user_defined(&p.parameter, &p.value);
             }
         }
     }
@@ -479,13 +497,14 @@ impl OmmData {
 //----------------------------------------------------------------------
 
 /// Mean Keplerian Elements in the Specified Reference Frame.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct MeanElements {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of Mean Keplerian elements (see 7.5.10 for formatting rules)
     ///
@@ -609,13 +628,14 @@ impl ToKvn for MeanElements {
 //----------------------------------------------------------------------
 
 /// TLE Related Parameters (This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct TleParameters {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Ephemeris type. Default value = 0. (See 4.2.4.7.)
     ///
@@ -626,6 +646,7 @@ pub struct TleParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub classification_type: Option<String>,
     /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
     /// is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
@@ -876,7 +897,7 @@ USER_DEFINED_BAZ = QUX
             .unwrap();
         let ud = &binding.user_defined;
         assert_eq!(ud.len(), 2);
-        assert_eq!(ud[0].parameter, "USER_DEFINED_FOO");
+        assert_eq!(ud[0].parameter, "FOO");
         assert_eq!(ud[0].value, "BAR");
 
         // Roundtrip
@@ -938,6 +959,453 @@ MEAN_ANOMALY = 30.0 [deg]
         assert_eq!(
             omm1.body.segment.data.mean_elements.eccentricity,
             omm2.body.segment.data.mean_elements.eccentricity
+        );
+    }
+
+    #[test]
+    fn test_omm_validation_missing_mandatory_metadata() {
+        // Missing OBJECT_NAME
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = EME2000
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP4
+EPOCH = 2023-01-01T00:00:00
+MEAN_MOTION = 15.0 [rev/day]
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+TLE_PARAMETERS =
+  EPHEMERIS_TYPE = 0
+  CLASSIFICATION_TYPE = U
+  NORAD_CAT_ID = 99999
+  ELEMENT_SET_NO = 123
+  REV_AT_EPOCH = 500
+  BSTAR = 0.0001 [1/ER]
+  MEAN_MOTION_DOT = 0.0 [rev/day**2]
+  MEAN_MOTION_DDOT = 0.0 [rev/day**3]
+"#;
+        // OBJECT_NAME is mandatory in the struct builder
+        // The parser usually fails if a required field is missing for the builder
+        assert!(Omm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_omm_validation_theory_sgp4_reqs() {
+        // Case 1: SGP4 theory but missing TLE Parameters block
+        let kvn_no_tle = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP4
+EPOCH = 2023-01-01T00:00:00
+MEAN_MOTION = 15.0 [rev/day]
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+"#;
+        let res = Omm::from_kvn(kvn_no_tle);
+        assert!(res.is_err());
+        // Check for specific error if possible, but strict error checking might be brittle
+        // Expecting ValidationError::MissingRequiredField for TLE_PARAMETERS
+
+        // Case 2: SGP4 theory but using SEMI_MAJOR_AXIS instead of MEAN_MOTION
+        let kvn_sma = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP4
+EPOCH = 2023-01-01T00:00:00
+SEMI_MAJOR_AXIS = 7000.0 [km]
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+TLE_PARAMETERS =
+  BSTAR = 0.0001 [1/ER]
+  MEAN_MOTION_DOT = 0.0 [rev/day**2]
+"#;
+        // Validation logic should flag missing MEAN_MOTION for SGP4
+        assert!(Omm::from_kvn(kvn_sma).is_err());
+
+        // Case 3: SGP4 theory but missing BSTAR in TLE parameters
+        let kvn_no_bstar = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP4
+EPOCH = 2023-01-01T00:00:00
+MEAN_MOTION = 15.0 [rev/day]
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+TLE_PARAMETERS =
+  MEAN_MOTION_DOT = 0.0 [rev/day**2]
+"#;
+        assert!(Omm::from_kvn(kvn_no_bstar).is_err());
+    }
+
+    #[test]
+    fn test_omm_validation_theory_sgp4_xp_reqs() {
+        // SGP4-XP requires AGOM and BTERM
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP4-XP
+EPOCH = 2023-01-01T00:00:00
+MEAN_MOTION = 15.0 [rev/day]
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+TLE_PARAMETERS =
+  BTERM = 0.01 [m**2/kg]
+  MEAN_MOTION_DOT = 0.0 [rev/day**2]
+  # Missing AGOM
+"#;
+        assert!(Omm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_omm_validation_mean_elements_choice() {
+        // Missing both SMA and Mean Motion
+        let kvn_none = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = EME2000
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = DSST
+EPOCH = 2023-01-01T00:00:00
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+"#;
+        assert!(Omm::from_kvn(kvn_none).is_err());
+
+        // Both SMA and Mean Motion present
+        let kvn_both = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = EME2000
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = DSST
+EPOCH = 2023-01-01T00:00:00
+SEMI_MAJOR_AXIS = 7000.0 [km]
+MEAN_MOTION = 15.0 [rev/day]
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+"#;
+        assert!(Omm::from_kvn(kvn_both).is_err());
+    }
+
+    #[test]
+    fn test_omm_validation_negative_values() {
+        // Negative Eccentricity
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = EME2000
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = DSST
+EPOCH = 2023-01-01T00:00:00
+SEMI_MAJOR_AXIS = 7000.0 [km]
+ECCENTRICITY = -0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+"#;
+        assert!(Omm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_omm_units_parsing() {
+        use std::str::FromStr;
+        assert!(InvErUnits::from_str("1/ER").is_ok());
+        assert!(InvErUnits::from_str("INVALID").is_err());
+
+        assert!(RevPerDayUnits::from_str("rev/day").is_ok());
+        assert!(RevPerDayUnits::from_str("REV/DAY").is_ok());
+        assert!(RevPerDayUnits::from_str("INVALID").is_err());
+
+        assert!(RevPerDay2Units::from_str("rev/day**2").is_ok());
+        assert!(RevPerDay2Units::from_str("REV/DAY**2").is_ok());
+        assert!(RevPerDay2Units::from_str("INVALID").is_err());
+
+        assert!(RevPerDay3Units::from_str("rev/day**3").is_ok());
+        assert!(RevPerDay3Units::from_str("REV/DAY**3").is_ok());
+        assert!(RevPerDay3Units::from_str("INVALID").is_err());
+    }
+
+    #[test]
+    fn test_omm_validation_theory_sgp_ppt3_reqs() {
+        // SGP/PPT3 requires MEAN_MOTION_DDOT
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP
+EPOCH = 2023-01-01T00:00:00
+MEAN_MOTION = 15.0 [rev/day]
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+TLE_PARAMETERS =
+  MEAN_MOTION_DOT = 0.0 [rev/day**2]
+  # Missing MEAN_MOTION_DDOT
+"#;
+        assert!(Omm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_omm_validation_theory_sgp4_xp_additional_reqs() {
+        // SGP4-XP requires BTERM and AGOM
+        let data = OmmData::builder()
+            .mean_elements(
+                MeanElements::builder()
+                    .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .mean_motion(MeanMotion::new(15.0, None))
+                    .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                    .inclination(Inclination::new(10.0, None).unwrap())
+                    .ra_of_asc_node(Angle::new(10.0, None).unwrap())
+                    .arg_of_pericenter(Angle::new(10.0, None).unwrap())
+                    .mean_anomaly(Angle::new(10.0, None).unwrap())
+                    .build(),
+            )
+            .tle_parameters(
+                TleParameters::builder()
+                    .mean_motion_dot(MeanMotionDot::new(0.0, None))
+                    .build(),
+            )
+            .build();
+
+        let mut segment = OmmSegment::builder()
+            .metadata(
+                OmmMetadata::builder()
+                    .object_name("SAT")
+                    .object_id("1")
+                    .center_name("EARTH")
+                    .ref_frame("TEME")
+                    .time_system("UTC")
+                    .mean_element_theory("SGP4-XP")
+                    .build(),
+            )
+            .data(data.clone())
+            .build();
+
+        // Missing BTERM
+        assert!(segment.validate().is_err());
+
+        segment.data.tle_parameters.as_mut().unwrap().bterm = Some(M2kg::new(0.01, None));
+        // Missing AGOM
+        assert!(segment.validate().is_err());
+
+        segment.data.tle_parameters.as_mut().unwrap().agom = Some(M2kg::new(1.0, None));
+        assert!(segment.validate().is_ok());
+    }
+
+    #[test]
+    fn test_omm_serialization_gaps() {
+        let mut tle = TleParameters::builder()
+            .mean_motion_dot(MeanMotionDot::new(0.0, None))
+            .build();
+        tle.bterm = Some(M2kg::new(0.01, None));
+        tle.agom = Some(M2kg::new(1.0, None));
+
+        let omm = Omm::builder()
+            .version("3.0")
+            .header(
+                OdmHeader::builder()
+                    .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .originator("ME")
+                    .build(),
+            )
+            .body(
+                OmmBody::builder()
+                    .segment(
+                        OmmSegment::builder()
+                            .metadata(
+                                OmmMetadata::builder()
+                                    .object_name("SAT")
+                                    .object_id("1")
+                                    .center_name("EARTH")
+                                    .ref_frame("TEME")
+                                    .time_system("UTC")
+                                    .mean_element_theory("SGP4-XP")
+                                    .build(),
+                            )
+                            .data(
+                                OmmData::builder()
+                                    .mean_elements(
+                                        MeanElements::builder()
+                                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                                            .mean_motion(MeanMotion::new(15.0, None))
+                                            .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                                            .inclination(Inclination::new(10.0, None).unwrap())
+                                            .ra_of_asc_node(Angle::new(10.0, None).unwrap())
+                                            .arg_of_pericenter(Angle::new(10.0, None).unwrap())
+                                            .mean_anomaly(Angle::new(10.0, None).unwrap())
+                                            .build(),
+                                    )
+                                    .tle_parameters(tle)
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build();
+
+        let kvn = omm.to_kvn().unwrap();
+        assert!(kvn.contains("BTERM"));
+        assert!(kvn.contains("0.01"));
+        assert!(kvn.contains("AGOM"));
+        assert!(kvn.contains("1"));
+    }
+
+    #[test]
+    fn test_omm_validation_theory_gaps() {
+        // SGP missing MEAN_MOTION
+        let meta = OmmMetadata::builder()
+            .object_name("SAT")
+            .object_id("1")
+            .center_name("EARTH")
+            .ref_frame("TEME")
+            .time_system("UTC")
+            .mean_element_theory("SGP")
+            .build();
+        let mut data = OmmData::builder()
+            .mean_elements(
+                MeanElements::builder()
+                    .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .semi_major_axis(Distance::new(7000.0, None))
+                    .eccentricity(NonNegativeDouble::new(0.001).unwrap())
+                    .inclination(Inclination::new(10.0, None).unwrap())
+                    .ra_of_asc_node(Angle::new(10.0, None).unwrap())
+                    .arg_of_pericenter(Angle::new(10.0, None).unwrap())
+                    .mean_anomaly(Angle::new(10.0, None).unwrap())
+                    .build(),
+            )
+            .tle_parameters(
+                TleParameters::builder()
+                    .mean_motion_dot(MeanMotionDot::new(0.0, None))
+                    .build(),
+            )
+            .build();
+
+        let segment = OmmSegment::builder()
+            .metadata(meta)
+            .data(data.clone())
+            .build();
+        assert!(segment.validate().is_err()); // Missing MEAN_MOTION for SGP
+
+        // TleParameters SGP/PPT3 missing mean_motion_ddot
+        assert!(data
+            .tle_parameters
+            .as_ref()
+            .unwrap()
+            .validate("SGP")
+            .is_err());
+        assert!(data
+            .tle_parameters
+            .as_ref()
+            .unwrap()
+            .validate("PPT3")
+            .is_err());
+
+        // TleParameters SGP4 missing bstar
+        assert!(data
+            .tle_parameters
+            .as_ref()
+            .unwrap()
+            .validate("SGP4")
+            .is_err());
+
+        // TleParameters SGP4-XP missing bterm/agom
+        assert!(data
+            .tle_parameters
+            .as_ref()
+            .unwrap()
+            .validate("SGP4-XP")
+            .is_err());
+        let mut tle_xp = data.tle_parameters.clone().unwrap();
+        tle_xp.bterm = Some(M2kg::new(0.01, None));
+        assert!(tle_xp.validate("SGP4-XP").is_err()); // Missing AGOM
+
+        // MeanElements both SMA and MeanMotion
+        data.mean_elements.mean_motion = Some(MeanMotion::new(15.0, None));
+        assert!(data.mean_elements.validate().is_err());
+
+        // MeanElements neither SMA nor MeanMotion
+        data.mean_elements.semi_major_axis = None;
+        data.mean_elements.mean_motion = None;
+        assert!(data.mean_elements.validate().is_err());
+
+        // Unknown theory in TleParameters
+        let tle = TleParameters::builder()
+            .mean_motion_dot(MeanMotionDot::new(0.0, None))
+            .build();
+        assert!(tle.validate("UNKNOWN").is_ok());
+    }
+
+    #[test]
+    fn test_rev_per_day_units_display_all() {
+        assert_eq!(format!("{}", RevPerDayUnits::RevPerDayUpper), "REV/DAY");
+        assert_eq!(
+            format!("{}", RevPerDay2Units::RevPerDay2Upper),
+            "REV/DAY**2"
+        );
+        assert_eq!(
+            format!("{}", RevPerDay3Units::RevPerDay3Upper),
+            "REV/DAY**3"
         );
     }
 }

@@ -88,7 +88,7 @@ pub fn mean_elements(input: &mut &str) -> KvnResult<(Vec<String>, MeanElements)>
         "EPOCH" => epoch: kv_epoch,
         "SEMI_MAJOR_AXIS" => semi_major_axis: kv_from_kvn,
         "MEAN_MOTION" => mean_motion: kv_from_kvn,
-        "ECCENTRICITY" => val: kv_float => { eccentricity = Some(val.into()); },
+        "ECCENTRICITY" => eccentricity: kv_from_kvn,
         "INCLINATION" => inclination: kv_from_kvn,
         "RA_OF_ASC_NODE" => ra_of_asc_node: kv_from_kvn,
         "ARG_OF_PERICENTER" => arg_of_pericenter: kv_from_kvn,

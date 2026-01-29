@@ -17,6 +17,7 @@ use crate::parse_block;
 use winnow::combinator::peek;
 use winnow::error::AddContext;
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // CDM Version Parser
@@ -76,6 +77,10 @@ pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
                 input.reset(&checkpoint);
                 break;
             }
+        }
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
         }
     }
 
@@ -434,7 +439,7 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
         "TRACKS_AVAILABLE" => val: kv_u32 => { od_params.tracks_available = Some(val.into()); has_od_params = true; },
         "TRACKS_USED" => val: kv_u32 => { od_params.tracks_used = Some(val.into()); has_od_params = true; },
         "RESIDUALS_ACCEPTED" => val: kv_from_kvn => { od_params.residuals_accepted = Some(val); has_od_params = true; },
-        "WEIGHTED_RMS" => val: kv_float => { od_params.weighted_rms = Some(val.into()); has_od_params = true; },
+        "WEIGHTED_RMS" => val: kv_from_kvn => { od_params.weighted_rms = Some(val); has_od_params = true; },
 
         "AREA_PC" => val: kv_from_kvn => { add_params.area_pc = Some(val); has_add_params = true; },
         "AREA_DRG" => val: kv_from_kvn => { add_params.area_drg = Some(val); has_add_params = true; },
@@ -1596,6 +1601,79 @@ TCA = 2025-01-02T12:00:00
             CcsdsNdmError::Validation(val_err)
                 if matches!(*val_err, ValidationError::MissingRequiredField { .. }) => {}
             _ => panic!("unexpected error: {:?}", err),
+        }
+    }
+    #[test]
+    fn test_parse_cdm_missing_relative_metadata() {
+        let input = r#"CCSDS_CDM_VERS = 1.0
+CREATION_DATE = 2025-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_FOR = OPERATOR
+MESSAGE_ID = MSG-001
+
+TCA = 2025-01-02T12:00:00
+MISS_DISTANCE = 100.0 [m]
+RELATIVE_SPEED = 7.5 [m/s]
+RELATIVE_POSITION_R = 10.0 [m]
+# Missing RELATIVE_POSITION_T etc.
+SCREEN_VOLUME_FRAME = RTN
+"#;
+        let err = Cdm::from_kvn(input).unwrap_err();
+        match err {
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField { field, .. } => {
+                    assert_eq!(field, "RELATIVE_POSITION_T");
+                }
+                _ => panic!("Expected missing field error, got {:?}", val_err),
+            },
+            _ => panic!("Expected Validation error, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_parse_cdm_covariance_keys() {
+        // Verify we can parse specific covariance keys like CDRG_R
+        let cdm_no_cov = r#"CCSDS_CDM_VERS = 1.0
+CREATION_DATE = 2025-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+
+TCA = 2025-01-02T12:00:00
+MISS_DISTANCE = 100.0 [m]
+RELATIVE_POSITION_R = 10.0 [m]
+RELATIVE_POSITION_T = 20.0 [m]
+RELATIVE_POSITION_N = 30.0 [m]
+RELATIVE_VELOCITY_R = 0.1 [m/s]
+RELATIVE_VELOCITY_T = 0.2 [m/s]
+RELATIVE_VELOCITY_N = 0.3 [m/s]
+
+OBJECT = OBJECT1
+OBJECT_DESIGNATOR = 12345
+CATALOG_NAME = SATCAT
+OBJECT_NAME = SAT A
+INTERNATIONAL_DESIGNATOR = 1998-067A
+OBJECT_TYPE = PAYLOAD
+EPHEMERIS_NAME = EPH1
+COVARIANCE_METHOD = CALCULATED
+MANEUVERABLE = YES
+REF_FRAME = GCRF
+X = 1000.0 [km]
+Y = 2000.0 [km]
+Z = 3000.0 [km]
+X_DOT = 1.0 [km/s]
+Y_DOT = 2.0 [km/s]
+Z_DOT = 3.0 [km/s]
+# No covariance keys here
+"#;
+        let err = Cdm::from_kvn(cdm_no_cov).unwrap_err();
+        match err {
+            CcsdsNdmError::Format(format_err) => match *format_err {
+                FormatError::Kvn(ref e) => {
+                    assert!(format!("{:?}", e).contains("Covariance Matrix keys"));
+                }
+                _ => panic!("Expected Kvn format error, got {:?}", format_err),
+            },
+            _ => panic!("Expected Format error, got {:?}", err),
         }
     }
 }

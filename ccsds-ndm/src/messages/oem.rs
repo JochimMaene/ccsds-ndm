@@ -6,7 +6,7 @@ use crate::common::{OdmHeader, StateVectorAcc};
 use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::{Epoch, PositionCovariance, PositionVelocityCovariance, VelocityCovariance};
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
@@ -23,22 +23,97 @@ use crate::error::CcsdsNdmError;
 
 /// Orbit Ephemeris Message (OEM).
 ///
-/// Ephemeris information may be exchanged between two participants by sending a state vector (see
-/// reference \[1\]) for multiple epochs using an Orbit Ephemeris Message (OEM). The OEM also contains
-/// an optional covariance matrix that reflects the uncertainty of the orbit solution used to
-/// generate states in the ephemeris.
+/// An OEM specifies the position and velocity of a single object at multiple epochs contained
+/// within a specified time range. The message recipient must have a means of interpolating
+/// across these state vectors to obtain the state at an arbitrary time contained within the
+/// span of the ephemeris.
 ///
-/// **CCSDS Reference**: 502.0-B-3, Section 5.1.1.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// The OEM is suited to exchanges that:
+/// 1. Involve automated interaction (e.g., computer-to-computer communication).
+/// 2. Require higher fidelity or higher precision dynamic modeling than is possible with the OPM.
+///
+/// **CCSDS Reference**: 502.0-B-3, Section 5.1.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "oem")]
 pub struct Oem {
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
     pub header: OdmHeader,
     pub body: OemBody,
 }
+
+impl Oem {
+    pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
+        self.body.validate()
+    }
+}
+
+impl OemBody {
+    pub fn validate(&self) -> Result<()> {
+        for segment in &self.segment {
+            segment.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl OemSegment {
+    pub fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate()
+    }
+}
+
+impl OemMetadata {
+    pub fn validate(&self) -> Result<()> {
+        if self.interpolation.is_some() && self.interpolation_degree.is_none() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Metadata".into(),
+                field: "INTERPOLATION_DEGREE (required when INTERPOLATION is present)".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.start_time.as_str() > self.stop_time.as_str() {
+            return Err(crate::error::ValidationError::Generic {
+                message: "START_TIME must be <= STOP_TIME".into(),
+                line: None,
+            }
+            .into());
+        }
+        if let (Some(start), Some(end)) = (&self.useable_start_time, &self.useable_stop_time) {
+            if start.as_str() > end.as_str() {
+                return Err(crate::error::ValidationError::Generic {
+                    message: "USEABLE_START_TIME must be <= USEABLE_STOP_TIME".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl OemData {
+    pub fn validate(&self) -> Result<()> {
+        if self.state_vector.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Data".into(),
+                field: "stateVector (at least one required)".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl crate::traits::Validate for Oem {}
 
 impl Ndm for Oem {
     fn to_kvn(&self) -> Result<String> {
@@ -55,16 +130,20 @@ impl Ndm for Oem {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        // Use the new winnow-based parser
-        Self::from_kvn_str(kvn)
+        let oem = Self::from_kvn_str(kvn)?;
+        oem.validate()?;
+        Ok(oem)
     }
 
     fn to_xml(&self) -> Result<String> {
+        self.validate()?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str_with_context(xml, "OEM")
+        let oem: Self = crate::xml::from_str_with_context(xml, "OEM")?;
+        oem.validate()?;
+        Ok(oem)
     }
 }
 
@@ -81,9 +160,10 @@ impl ToKvn for Oem {
 //----------------------------------------------------------------------
 
 /// The body of the OEM, containing one or more segments.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OemBody {
     #[serde(rename = "segment")]
+    #[builder(default)]
     pub segment: Vec<OemSegment>,
 }
 
@@ -98,7 +178,7 @@ impl ToKvn for OemBody {
 /// A single segment of the OEM.
 ///
 /// Each segment contains metadata (context) and a list of ephemeris data points.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OemSegment {
     pub metadata: OemMetadata,
     pub data: OemData,
@@ -118,24 +198,26 @@ impl ToKvn for OemSegment {
 //----------------------------------------------------------------------
 
 /// OEM Metadata Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OemMetadata {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Spacecraft name for which ephemeris data is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
-    /// Office of Outer Space Affairs designator index (reference [3], which include Object name
+    /// Office of Outer Space Affairs designator index (reference `[3]`, which include Object name
     /// and international designator of the participant). If OBJECT_NAME is not listed in
-    /// reference [3] or the content is either unknown or cannot be disclosed, the value should
+    /// reference `[3]` or the content is either unknown or cannot be disclosed, the value should
     /// be set to UNKNOWN.
     ///
     /// **Examples**: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
+    #[builder(into)]
     pub object_name: String,
     /// Object identifier of the object for which ephemeris data is provided. While there is no
     /// CCSDS-based restriction on the value for this keyword, it is recommended to use the
@@ -150,6 +232,7 @@ pub struct OemMetadata {
     /// **Examples**: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
+    #[builder(into)]
     pub object_id: String,
     /// Origin of the OEM reference frame, which may be a natural solar system body (planets,
     /// asteroids, comets, and natural satellites), including any planet barycenter or the
@@ -158,12 +241,13 @@ pub struct OemMetadata {
     /// from the accepted set of values indicated in annex B, subsection B2. For spacecraft, it
     /// is recommended to use either the OBJECT_ID or international designator of the
     /// participant as catalogued in the UN Office of Outer Space Affairs designator index
-    /// (reference [3]).
+    /// (reference `[3]`).
     ///
     /// **Examples**: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
     /// JUPITER BARYCENTER, STS 106, EROS
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
+    #[builder(into)]
     pub center_name: String,
     /// Reference frame in which the ephemeris data are given. Use of values other than those in
     /// 3.2.3.3 should be documented in an ICD.
@@ -171,6 +255,7 @@ pub struct OemMetadata {
     /// **Examples**: ICRF, ITRF2000, EME2000, TEME
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
+    #[builder(into)]
     pub ref_frame: String,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
     /// (See 7.5.10 for formatting rules.)
@@ -186,6 +271,7 @@ pub struct OemMetadata {
     /// **Examples**: UTC, TAI, TT, GPS, TDB, TCB
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
+    #[builder(into)]
     pub time_system: String,
     /// Start of TOTAL time span covered by ephemeris data and covariance data immediately
     /// following this metadata block. (For format specification, see 7.5.10.)
@@ -232,6 +318,7 @@ pub struct OemMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub interpolation: Option<String>,
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
     /// ephemeris lines. Must be an integer value. This keyword must be used if the
@@ -279,12 +366,13 @@ impl ToKvn for OemMetadata {
 /// OEM Data Section.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct OemData {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
 
     /// List of state vectors. Each vector contains position, velocity, and optional
@@ -296,6 +384,7 @@ pub struct OemData {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
     #[serde(rename = "stateVector", default)]
+    #[builder(default)]
     pub state_vector: Vec<StateVectorAcc>,
 
     /// List of covariance matrices (optional).
@@ -308,6 +397,7 @@ pub struct OemData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
+    #[builder(default)]
     pub covariance_matrix: Vec<OemCovarianceMatrix>,
 }
 
@@ -335,13 +425,14 @@ impl ToKvn for OemData {
 ///
 /// Represents a 6x6 symmetric covariance matrix for position and velocity at a specific epoch.
 /// The lower triangular portion is stored/transmitted.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OemCovarianceMatrix {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Epoch of covariance matrix. (See 7.5.10 for formatting rules.)
     ///
@@ -356,132 +447,133 @@ pub struct OemCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cov_ref_frame: Option<String>,
 
-    /// Covariance matrix [1,1]
+    /// Covariance matrix `[1,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cx_x: PositionCovariance,
-    /// Covariance matrix [2,1]
+    /// Covariance matrix `[2,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cy_x: PositionCovariance,
-    /// Covariance matrix [2,2]
+    /// Covariance matrix `[2,2]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cy_y: PositionCovariance,
-    /// Covariance matrix [3,1]
+    /// Covariance matrix `[3,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cz_x: PositionCovariance,
-    /// Covariance matrix [3,2]
+    /// Covariance matrix `[3,2]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cz_y: PositionCovariance,
-    /// Covariance matrix [3,3]
+    /// Covariance matrix `[3,3]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cz_z: PositionCovariance,
 
-    /// Covariance matrix [4,1]
+    /// Covariance matrix `[4,1]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cx_dot_x: PositionVelocityCovariance,
-    /// Covariance matrix [4,2]
+    /// Covariance matrix `[4,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cx_dot_y: PositionVelocityCovariance,
-    /// Covariance matrix [4,3]
+    /// Covariance matrix `[4,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cx_dot_z: PositionVelocityCovariance,
-    /// Covariance matrix [4,4]
+    /// Covariance matrix `[4,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cx_dot_x_dot: VelocityCovariance,
 
-    /// Covariance matrix [5,1]
+    /// Covariance matrix `[5,1]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cy_dot_x: PositionVelocityCovariance,
-    /// Covariance matrix [5,2]
+    /// Covariance matrix `[5,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cy_dot_y: PositionVelocityCovariance,
-    /// Covariance matrix [5,3]
+    /// Covariance matrix `[5,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cy_dot_z: PositionVelocityCovariance,
-    /// Covariance matrix [5,4]
+    /// Covariance matrix `[5,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cy_dot_x_dot: VelocityCovariance,
-    /// Covariance matrix [5,5]
+    /// Covariance matrix `[5,5]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cy_dot_y_dot: VelocityCovariance,
 
-    /// Covariance matrix [6,1]
+    /// Covariance matrix `[6,1]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cz_dot_x: PositionVelocityCovariance,
-    /// Covariance matrix [6,2]
+    /// Covariance matrix `[6,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cz_dot_y: PositionVelocityCovariance,
-    /// Covariance matrix [6,3]
+    /// Covariance matrix `[6,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cz_dot_z: PositionVelocityCovariance,
-    /// Covariance matrix [6,4]
+    /// Covariance matrix `[6,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cz_dot_x_dot: VelocityCovariance,
-    /// Covariance matrix [6,5]
+    /// Covariance matrix `[6,5]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cz_dot_y_dot: VelocityCovariance,
-    /// Covariance matrix [6,6]
+    /// Covariance matrix `[6,6]`
     ///
     /// **Units**: km²/s²
     ///
@@ -848,5 +940,117 @@ COVARIANCE_STOP
                 .as_deref(),
             Some("EME2000")
         );
+    }
+
+    #[test]
+    fn test_oem_validation_interpolation_reqs() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+INTERPOLATION = HERMITE
+# Missing INTERPOLATION_DEGREE
+META_STOP
+2023-01-01T00:00:00 1 2 3 4 5 6
+"#;
+        assert!(Oem::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_oem_validation_time_range() {
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-02T00:00:00
+STOP_TIME = 2023-01-01T00:00:00
+META_STOP
+2023-01-01T00:00:00 1 2 3 4 5 6
+"#;
+        assert!(Oem::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_oem_validation_empty_state_vector() {
+        // Construct KVN without data lines?
+        // Parser logic for OEM data: it expects lines or comments until next block.
+        // If no lines, `state_vector` will be empty.
+        let kvn = r#"CCSDS_OEM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+META_STOP
+COMMENT No data
+"#;
+        assert!(Oem::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_oem_metadata_time_validation() {
+        let mut meta = OemMetadata::builder()
+            .object_name("SAT")
+            .object_id("1")
+            .center_name("EARTH")
+            .ref_frame("GCRF")
+            .time_system("UTC")
+            .start_time(Epoch::new("2023-01-01T12:00:00").unwrap())
+            .stop_time(Epoch::new("2023-01-01T11:00:00").unwrap()) // STOP < START
+            .build();
+
+        // START > STOP
+        assert!(meta.validate().is_err());
+
+        meta.stop_time = Epoch::new("2023-01-01T13:00:00").unwrap();
+        assert!(meta.validate().is_ok());
+
+        // USEABLE_START > USEABLE_STOP
+        meta.useable_start_time = Some(Epoch::new("2023-01-01T12:30:00").unwrap());
+        meta.useable_stop_time = Some(Epoch::new("2023-01-01T12:15:00").unwrap());
+        assert!(meta.validate().is_err());
+    }
+
+    #[test]
+    fn test_oem_metadata_interpolation_validation() {
+        let mut meta = OemMetadata::builder()
+            .object_name("SAT")
+            .object_id("1")
+            .center_name("EARTH")
+            .ref_frame("GCRF")
+            .time_system("UTC")
+            .start_time(Epoch::new("2023-01-01T12:00:00").unwrap())
+            .stop_time(Epoch::new("2023-01-01T13:00:00").unwrap())
+            .build();
+
+        meta.interpolation = Some("LAGRANGE".to_string());
+        // Missing degree
+        assert!(meta.validate().is_err());
+
+        meta.interpolation_degree = Some(NonZeroU32::new(5).unwrap());
+        assert!(meta.validate().is_ok());
+    }
+
+    #[test]
+    fn test_oem_data_empty_validation_internal() {
+        let data = OemData::builder().build();
+        assert!(data.validate().is_err());
     }
 }

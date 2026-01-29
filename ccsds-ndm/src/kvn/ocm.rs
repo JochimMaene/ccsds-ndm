@@ -16,6 +16,7 @@ use winnow::ascii::{space1, till_line_ending};
 use winnow::combinator::repeat;
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
+use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // OCM Version Parser
@@ -272,6 +273,7 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
     }, |i| at_block_end("TRAJ", i), "Unexpected OCM Trajectory key");
 
     loop {
+        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
         if at_block_end("TRAJ", input) {
@@ -288,6 +290,10 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         // Otherwise, skip the line (handles continuations) or break
         let _ = till_line_ending.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     if traj_lines.is_empty() {
@@ -548,6 +554,7 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
     }, |i| at_block_end("COV", i), "Unexpected OCM Covariance key");
 
     loop {
+        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
         if at_block_end("COV", input) {
@@ -562,7 +569,9 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         }
 
         // Otherwise break or handle error
-        break;
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     Ok(OcmCovarianceMatrix {
@@ -671,6 +680,7 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
     }, |i| at_block_end("MAN", i), "Unexpected OCM Maneuver key");
 
     loop {
+        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
         if at_block_end("MAN", input) {
@@ -687,6 +697,10 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         // Otherwise, skip the line (handles continuations like in G17) or break
         let _ = till_line_ending.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
+
+        if input.offset_from(&checkpoint) == 0 {
+            break;
+        }
     }
 
     Ok(OcmManeuverParameters {
@@ -899,7 +913,7 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
         "SEDR" => sedr: kv_from_kvn,
         "SENSORS_N" => sensors_n: kv_u64,
         "SENSORS" => sensors: kv_string,
-        "WEIGHTED_RMS" => val: kv_float => { weighted_rms = Some(val.into()); },
+        "WEIGHTED_RMS" => weighted_rms: kv_from_kvn,
         "DATA_TYPES" => data_types: kv_string,
     }, |i| at_block_end("OD", i), "Unexpected OCM Orbit Determination key");
 
@@ -969,7 +983,7 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<UserDefined> {
                 comment.extend(comments);
                 let v = kv_string.parse_next(input)?;
                 user_defined.push(UserDefinedParameter {
-                    parameter: k.to_string(),
+                    parameter: k.strip_prefix("USER_DEFINED_").unwrap_or(k).to_string(),
                     value: v,
                 });
             }
@@ -2003,13 +2017,14 @@ TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-01-01T00:00:00
 META_STOP
 USER_START
-CUSTOM_PARAM = custom_value
-ANOTHER_PARAM = another_value
+USER_DEFINED_CUSTOM_PARAM = custom_value
+USER_DEFINED_ANOTHER_PARAM = another_value
 USER_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
         let user = ocm.body.segment.data.user.as_ref().unwrap();
         assert_eq!(user.user_defined.len(), 2);
+        assert_eq!(user.user_defined[0].parameter, "CUSTOM_PARAM");
     }
 
     // =========================================================================
@@ -3072,9 +3087,9 @@ OD_STOP
         assert!(od.consider_params.is_some());
         assert!(od.sedr.is_some());
         assert_eq!(od.sensors_n, Some(3));
-        assert!(od.sensors.is_some());
-        assert_eq!(od.weighted_rms, Some(1.2.into()));
-        assert!(od.data_types.is_some());
+        assert_eq!(od.sensors, Some("SENSOR_A SENSOR_B SENSOR_C".to_string()));
+        assert_eq!(od.weighted_rms, Some(NonNegativeDouble::new(1.2).unwrap()));
+        assert_eq!(od.data_types, Some("RANGE DOPPLER".to_string()));
 
         // Now write to KVN to cover all the write_kvn branches
         let output = ocm.to_kvn().unwrap();
@@ -3979,5 +3994,49 @@ TRAJ_STOP
 
         let output = ocm.to_kvn().unwrap();
         assert!(output.contains("ORB_REVNUM_BASIS"));
+    }
+
+    #[test]
+    fn test_ocm_parser_backtrack_and_gaps() {
+        // 1. ocm_traj_line backtrack (starts with uppercase)
+        let mut input = "TRAJ_STOP";
+        assert!(ocm_traj_line(&mut input).is_err());
+
+        // 2. ocm_cov_line backtrack
+        let mut input = "COV_STOP";
+        assert!(ocm_cov_line(&mut input).is_err());
+
+        // 3. ocm_man_line backtrack
+        let mut input = "MAN_STOP";
+        assert!(ocm_man_line(&mut input).is_err());
+
+        // 4. ocm_data_block loop break check
+        assert!(ocm_data_block(&mut "").is_err());
+        assert!(ocm_data_block(&mut " ").is_err());
+    }
+
+    #[test]
+    fn test_ocm_data_block_backtrack() {
+        let mut input = "123.456";
+        assert!(ocm_data_block(&mut input).is_err());
+
+        let mut input = "META_START";
+        assert!(ocm_data_block(&mut input).is_err());
+    }
+
+    #[test]
+    fn test_ocm_error_branches_detailed() {
+        // Cover missing fields with Cut error verification
+
+        // Missing MAN_ID
+        let kvn = r#"MAN_START
+MAN_DEVICE_ID = DEV
+MAN_STOP"#;
+        let mut input = kvn;
+        let err = ocm_man(&mut input).unwrap_err();
+        match err {
+            ErrMode::Cut(e) => assert!(format!("{:?}", e).contains("MAN_ID")),
+            _ => panic!("Expected Cut error"),
+        }
     }
 }

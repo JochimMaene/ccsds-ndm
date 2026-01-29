@@ -16,22 +16,103 @@ use crate::types::{
 };
 use serde::{Deserialize, Serialize};
 
-//----------------------------------------------------------------------
-// Root RDM Structure
-//----------------------------------------------------------------------
-
+/// Re-entry Data Message (RDM).
 ///
-/// A message format for use in exchanging spacecraft re-entry information.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// The RDM specifies a standard message format to be used in the exchange of spacecraft
+/// re-entry information between Space Situational Awareness (SSA) or Space Surveillance and
+/// Tracking (SST) data providers, satellite owners/operators, and other parties.
+///
+/// It includes data such as:
+/// - Remaining orbital lifetime
+/// - Start and end of the re-entry and impact windows
+/// - Impact location and probabilities
+/// - Object physical properties
+///
+/// **CCSDS Reference**: 508.1-B-1.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "rdm")]
 pub struct Rdm {
     pub header: RdmHeader,
     pub body: RdmBody,
     #[serde(rename = "@id")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(rename = "@version")]
+    #[builder(into)]
     pub version: String,
 }
+
+impl Rdm {
+    pub fn validate(&self) -> Result<()> {
+        self.header.validate()?;
+        self.body.segment.validate()
+    }
+}
+
+impl RdmSegment {
+    pub fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate()
+    }
+}
+
+impl RdmMetadata {
+    pub fn validate(&self) -> Result<()> {
+        if self.object_name.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Metadata".into(),
+                field: "OBJECT_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl RdmData {
+    pub fn validate(&self) -> Result<()> {
+        let arp = &self.atmospheric_reentry_parameters;
+        if let (Some(start), Some(end)) = (
+            &arp.orbit_lifetime_window_start,
+            &arp.orbit_lifetime_window_end,
+        ) {
+            if start.value > end.value {
+                return Err(crate::error::ValidationError::Generic {
+                    message: "ORBIT_LIFETIME_WINDOW_START must be <= ORBIT_LIFETIME_WINDOW_END"
+                        .into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        // Epoch comparison for reentry window
+        if let (Some(start), Some(end)) = (&arp.reentry_window_start, &arp.reentry_window_end) {
+            if start.as_str() > end.as_str() {
+                return Err(crate::error::ValidationError::Generic {
+                    message: "REENTRY_WINDOW_START must be <= REENTRY_WINDOW_END".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+
+        if let Some(gip) = &self.ground_impact_parameters {
+            if let (Some(start), Some(end)) = (&gip.impact_window_start, &gip.impact_window_end) {
+                if start.as_str() > end.as_str() {
+                    return Err(crate::error::ValidationError::Generic {
+                        message: "IMPACT_WINDOW_START must be <= IMPACT_WINDOW_END".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl crate::traits::Validate for Rdm {}
 
 impl Ndm for Rdm {
     fn to_kvn(&self) -> Result<String> {
@@ -41,15 +122,20 @@ impl Ndm for Rdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        Self::from_kvn_str(kvn)
+        let rdm = Self::from_kvn_str(kvn)?;
+        rdm.validate()?;
+        Ok(rdm)
     }
 
     fn to_xml(&self) -> Result<String> {
+        self.validate()?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::from_str_with_context(xml, "RDM")
+        let rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
+        rdm.validate()?;
+        Ok(rdm)
     }
 }
 
@@ -65,11 +151,12 @@ impl ToKvn for Rdm {
 // Header
 //----------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmHeader {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// File creation date and time in UTC.
     ///
@@ -78,11 +165,19 @@ pub struct RdmHeader {
     /// Creating agency or entity.
     ///
     /// Examples: DLR, ESA
+    #[builder(into)]
     pub originator: String,
     /// ID that uniquely identifies a message from a given originator.
     ///
     /// Examples: 201113719185, ESA20190101-3345
+    #[builder(into)]
     pub message_id: String,
+}
+
+impl RdmHeader {
+    pub fn validate(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl ToKvn for RdmHeader {
@@ -99,7 +194,7 @@ impl ToKvn for RdmHeader {
 //----------------------------------------------------------------------
 
 /// The RDM Body consists of a single segment.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct RdmBody {
     pub segment: Box<RdmSegment>,
 }
@@ -110,7 +205,7 @@ impl ToKvn for RdmBody {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct RdmSegment {
     /// The metadata for this RDM segment.
     pub metadata: RdmMetadata,
@@ -130,17 +225,18 @@ impl ToKvn for RdmSegment {
 //----------------------------------------------------------------------
 
 /// The RDM Metadata provides information about the re-entry event.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmMetadata {
     /// Comments (allowed only at the beginning of RDM metadata).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Object name for which the orbit state is provided. There is no CCSDS-based restriction
     /// on the value for this keyword, but it is recommended to use names from the UNOOSA
-    /// registry—reference [7], which includes object name and international designator of the
+    /// registry—reference `[7]`, which includes object name and international designator of the
     /// participant (formatting rules specified in 5.2.3.3). For objects that are not in the
     /// UNOOSA registry, either a descriptive name (e.g., DEBRIS, if the object is identified as
     /// space debris) or UNKNOWN should be used.
@@ -148,6 +244,7 @@ pub struct RdmMetadata {
     /// **Examples**: SENTINEL-1A, GOCE, ENVISAT, BRIZ R/B, DEBRIS, UNKNOWN
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
+    #[builder(into)]
     pub object_name: String,
     /// The full international designator (COSPAR ID) for the object. Values shall have the
     /// format YYYY-NNNP{PP}, where: YYYY = year of launch; NNN = three-digit serial number of
@@ -159,15 +256,17 @@ pub struct RdmMetadata {
     /// **Examples**: 2010-012C, 2016-001A, 1985-067CD, UNKNOWN
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
+    #[builder(into)]
     pub international_designator: String,
     /// The satellite catalog used for the object (formatting rules specified in 5.2.3.3). The
     /// name should be taken from the appropriate SANA registry for catalog names, reference
-    /// [8].
+    /// `[8]`.
     ///
     /// **Examples**: SATCAT, ESA SST
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub catalog_name: Option<String>,
     /// The CATALOG_NAME satellite catalog designator for the object (formatting rules
     /// specified in 5.2.3.3).
@@ -176,6 +275,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_designator: Option<String>,
     /// The object type.
     ///
@@ -186,21 +286,23 @@ pub struct RdmMetadata {
     pub object_type: Option<ObjectDescription>,
     /// Owner of the object (e.g., company, agency, or country owning the satellite). The value
     /// should be taken from the abbreviation column in the SANA organizations registry,
-    /// reference [6].
+    /// reference `[6]`.
     ///
     /// **Examples**: DLR, INTELSAT, ESA, UNKNOWN
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_owner: Option<String>,
     /// Operator of the object (e.g., company, agency, or country operating the satellite).
     /// The value should be taken from the abbreviation column in the SANA organizations
-    /// registry, reference [6].
+    /// registry, reference `[6]`.
     ///
     /// **Examples**: ESA, EUMETSAT
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub object_operator: Option<String>,
     /// Specification of whether the re-entry is controlled or not.
     ///
@@ -211,18 +313,20 @@ pub struct RdmMetadata {
     /// Celestial body orbited by the object and origin of the reference frame, which may be a
     /// natural solar system body (planets, asteroids, comets, and natural satellites),
     /// including any planet barycenter or the solar system barycenter. The value should be
-    /// taken from the orbit center column in the SANA orbit centers registry, reference [9].
+    /// taken from the orbit center column in the SANA orbit centers registry, reference `[9]`.
     ///
     /// **Examples**: EARTH, MOON, JUPITER
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
+    #[builder(into)]
     pub center_name: String,
     /// Time system for all data/metadata. The value should be taken from the name column in
-    /// the SANA time systems registry, reference [10].
+    /// the SANA time systems registry, reference `[10]`.
     ///
     /// **Examples**: UTC, TAI
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
+    #[builder(into)]
     pub time_system: String,
     /// Epoch from which the ORBIT_LIFETIME is calculated (formatting rules specified in
     /// 5.3.3.5).
@@ -233,7 +337,7 @@ pub struct RdmMetadata {
     pub epoch_tzero: Epoch,
     /// Reference frame in which the (optional) orbit information will be provided. The value
     /// should be taken from the keyword value name column in the SANA celestial body reference
-    /// frames registry, reference [11]. The reference frame must be the same for all orbit
+    /// frames registry, reference `[11]`. The reference frame must be the same for all orbit
     /// data elements, with the exception of the covariance matrix, for which a different
     /// reference frame may be specified, and the ground impact data. This keyword becomes
     /// mandatory if state vectors are provided in the data section.
@@ -242,6 +346,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ref_frame: Option<String>,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame
     /// (formatting rules specified in 5.3.3.5).
@@ -257,6 +362,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ephemeris_name: Option<String>,
     /// The gravity model used in the simulation. The degree (D) and order (O) of the spherical
     /// harmonic coefficients applied should be given along with the name of the model.
@@ -265,6 +371,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub gravity_model: Option<String>,
     /// The atmosphere model(s) used in the simulation. If more than one model is used they
     /// should be listed on the same line and separated by a comma.
@@ -273,6 +380,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub atmospheric_model: Option<String>,
     /// The method used to predict the solar flux and geomagnetic indices.
     ///
@@ -280,15 +388,17 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub solar_flux_prediction: Option<String>,
     /// Comma separated list of other bodies used in the simulation. The names of the bodies
-    /// should be taken from the SANA registry for orbit centers, reference [9]. If no other
+    /// should be taken from the SANA registry for orbit centers, reference `[9]`. If no other
     /// bodies are used in the simulation, the value should be NONE.
     ///
     /// **Examples**: MOON, SUN, JUPITER, NONE
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub n_body_perturbations: Option<String>,
     /// Model used for the solar radiation pressure: either model name, or NO if solar
     /// radiation pressure was not modelled.
@@ -297,6 +407,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub solar_rad_pressure: Option<String>,
     /// Model used for solid Earth and ocean tides: either model name, or NO if tides were not
     /// modelled.
@@ -305,6 +416,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub earth_tides: Option<String>,
     /// Indicator on whether in-track thrust modeling was used in the simulation.
     ///
@@ -320,12 +432,13 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub drag_parameters_source: Option<String>,
     /// The altitude (in km) at which the object drag parameters (DRAG_AREA, DRAG_COEFF, and/or
     /// BALLISTIC_COEFF) are valid. The units shall be kilometers, and the conventions
     /// specified in 5.2.4.1 and 5.3.4 must be followed.
     ///
-    /// **Examples**: 200 [km], 175 [km]
+    /// **Examples**: 200 `[km]`, 175 `[km]`
     ///
     /// **Units**: km
     ///
@@ -362,6 +475,7 @@ pub struct RdmMetadata {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub previous_message_id: Option<String>,
     /// UTC Epoch of the previous RDM issued for this object (formatting rules specified in
     /// 5.3.3.5).
@@ -467,11 +581,12 @@ impl ToKvn for RdmMetadata {
 //----------------------------------------------------------------------
 
 /// The RDM Data section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RdmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Atmospheric re-entry parameters.
     #[serde(rename = "atmosphericReentryParameters")]
@@ -525,120 +640,11 @@ impl ToKvn for RdmData {
         // No DATA_START
         writer.write_comments(&self.comment);
         // Atmospheric (mandatory)
-        let a = &self.atmospheric_reentry_parameters;
-        writer.write_pair("ORBIT_LIFETIME", &a.orbit_lifetime);
-        writer.write_pair("REENTRY_ALTITUDE", &a.reentry_altitude);
-        if let Some(v) = &a.orbit_lifetime_window_start {
-            writer.write_pair("ORBIT_LIFETIME_WINDOW_START", v);
-        }
-        if let Some(v) = &a.orbit_lifetime_window_end {
-            writer.write_pair("ORBIT_LIFETIME_WINDOW_END", v);
-        }
-        if let Some(v) = &a.nominal_reentry_epoch {
-            writer.write_pair("NOMINAL_REENTRY_EPOCH", v);
-        }
-        if let Some(v) = &a.reentry_window_start {
-            writer.write_pair("REENTRY_WINDOW_START", v);
-        }
-        if let Some(v) = &a.reentry_window_end {
-            writer.write_pair("REENTRY_WINDOW_END", v);
-        }
-        if let Some(v) = &a.orbit_lifetime_confidence_level {
-            writer.write_pair("ORBIT_LIFETIME_CONFIDENCE_LEVEL", v);
-        }
+        self.atmospheric_reentry_parameters.write_kvn(writer);
 
         // Ground impact (optional)
         if let Some(g) = &self.ground_impact_parameters {
-            if let Some(v) = &g.probability_of_impact {
-                writer.write_pair("PROBABILITY_OF_IMPACT", v);
-            }
-            if let Some(v) = &g.probability_of_burn_up {
-                writer.write_pair("PROBABILITY_OF_BURN_UP", v);
-            }
-            if let Some(v) = &g.probability_of_break_up {
-                writer.write_pair("PROBABILITY_OF_BREAK_UP", v);
-            }
-            if let Some(v) = &g.probability_of_land_impact {
-                writer.write_pair("PROBABILITY_OF_LAND_IMPACT", v);
-            }
-            if let Some(v) = &g.probability_of_casualty {
-                writer.write_pair("PROBABILITY_OF_CASUALTY", v);
-            }
-            if let Some(v) = &g.nominal_impact_epoch {
-                writer.write_pair("NOMINAL_IMPACT_EPOCH", v);
-            }
-            if let Some(v) = &g.impact_window_start {
-                writer.write_pair("IMPACT_WINDOW_START", v);
-            }
-            if let Some(v) = &g.impact_window_end {
-                writer.write_pair("IMPACT_WINDOW_END", v);
-            }
-            if let Some(v) = &g.impact_ref_frame {
-                writer.write_pair("IMPACT_REF_FRAME", v);
-            }
-            if let Some(v) = &g.nominal_impact_lon {
-                writer.write_pair("NOMINAL_IMPACT_LON", v);
-            }
-            if let Some(v) = &g.nominal_impact_lat {
-                writer.write_pair("NOMINAL_IMPACT_LAT", v);
-            }
-            if let Some(v) = &g.nominal_impact_alt {
-                writer.write_pair("NOMINAL_IMPACT_ALT", v);
-            }
-            if let Some(v) = &g.impact_1_confidence {
-                writer.write_pair("IMPACT_1_CONFIDENCE", v);
-            }
-            if let Some(v) = &g.impact_1_start_lon {
-                writer.write_pair("IMPACT_1_START_LON", v);
-            }
-            if let Some(v) = &g.impact_1_start_lat {
-                writer.write_pair("IMPACT_1_START_LAT", v);
-            }
-            if let Some(v) = &g.impact_1_stop_lon {
-                writer.write_pair("IMPACT_1_STOP_LON", v);
-            }
-            if let Some(v) = &g.impact_1_stop_lat {
-                writer.write_pair("IMPACT_1_STOP_LAT", v);
-            }
-            if let Some(v) = &g.impact_1_cross_track {
-                writer.write_pair("IMPACT_1_CROSS_TRACK", v);
-            }
-            if let Some(v) = &g.impact_2_confidence {
-                writer.write_pair("IMPACT_2_CONFIDENCE", v);
-            }
-            if let Some(v) = &g.impact_2_start_lon {
-                writer.write_pair("IMPACT_2_START_LON", v);
-            }
-            if let Some(v) = &g.impact_2_start_lat {
-                writer.write_pair("IMPACT_2_START_LAT", v);
-            }
-            if let Some(v) = &g.impact_2_stop_lon {
-                writer.write_pair("IMPACT_2_STOP_LON", v);
-            }
-            if let Some(v) = &g.impact_2_stop_lat {
-                writer.write_pair("IMPACT_2_STOP_LAT", v);
-            }
-            if let Some(v) = &g.impact_2_cross_track {
-                writer.write_pair("IMPACT_2_CROSS_TRACK", v);
-            }
-            if let Some(v) = &g.impact_3_confidence {
-                writer.write_pair("IMPACT_3_CONFIDENCE", v);
-            }
-            if let Some(v) = &g.impact_3_start_lon {
-                writer.write_pair("IMPACT_3_START_LON", v);
-            }
-            if let Some(v) = &g.impact_3_start_lat {
-                writer.write_pair("IMPACT_3_START_LAT", v);
-            }
-            if let Some(v) = &g.impact_3_stop_lon {
-                writer.write_pair("IMPACT_3_STOP_LON", v);
-            }
-            if let Some(v) = &g.impact_3_stop_lat {
-                writer.write_pair("IMPACT_3_STOP_LAT", v);
-            }
-            if let Some(v) = &g.impact_3_cross_track {
-                writer.write_pair("IMPACT_3_CROSS_TRACK", v);
-            }
+            g.write_kvn(writer);
         }
 
         // Optional blocks: write when present
@@ -717,7 +723,7 @@ impl ToKvn for RdmData {
         if let Some(ud) = &self.user_defined_parameters {
             writer.write_comments(&ud.comment);
             for p in &ud.user_defined {
-                writer.write_pair(&p.parameter, &p.value);
+                writer.write_user_defined(&p.parameter, &p.value);
             }
         }
     }
@@ -853,5 +859,90 @@ REENTRY_ALTITUDE = 80 [km]
             rdm.body.segment.metadata.object_name,
             rdm2.body.segment.metadata.object_name
         );
+    }
+
+    #[test]
+    fn test_rdm_validation_orbit_lifetime_window() {
+        let kvn = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+ORBIT_LIFETIME_WINDOW_START = 6.0 [d]
+ORBIT_LIFETIME_WINDOW_END = 5.0 [d]
+"#;
+        assert!(Rdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_rdm_validation_reentry_window() {
+        let kvn = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+REENTRY_WINDOW_START = 2023-01-06T00:00:00
+REENTRY_WINDOW_END = 2023-01-05T00:00:00
+"#;
+        assert!(Rdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_rdm_validation_empty_object_name() {
+        // Construct with empty OBJECT_NAME
+        // Note: parser might not allow empty value for key, but if it does (e.g. "OBJECT_NAME = \n"), validation should catch it.
+        // However, if parser treats empty value as error, then this test tests parser, which is fine.
+        // But if we construct struct manually and call validate, that's what we really want to test if parser is loose.
+        // For now, let's use KVN.
+        let kvn = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME =
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+"#;
+        // If parser allows empty value, validate() catches it.
+        // If parser disallows, it errors anyway.
+        assert!(Rdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_rdm_validation_impact_window() {
+        let kvn = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+IMPACT_WINDOW_START = 2023-01-06T00:00:00
+IMPACT_WINDOW_END = 2023-01-05T00:00:00
+"#;
+        assert!(Rdm::from_kvn(kvn).is_err());
     }
 }

@@ -18,7 +18,18 @@ use std::str::FromStr;
 
 /// Tracking Data Message (TDM).
 ///
-/// The TDM specifies a standard message format for use in exchanging tracking data.
+/// The TDM specifies a standard message format for use in exchanging spacecraft tracking data
+/// between space agencies. Such exchanges are used for distributing tracking data output from
+/// routine interagency cross-supports.
+///
+/// Tracking data includes data types such as:
+/// - Doppler
+/// - Transmit/Received frequencies
+/// - Range
+/// - Angles
+/// - Delta-DOR
+/// - Media correction (ionosphere, troposphere)
+/// - Meteorological data
 ///
 /// Parameters
 /// ----------
@@ -59,7 +70,18 @@ impl Tdm {
 
     /// Tracking Data Message (TDM).
     ///
-    /// The TDM specifies a standard message format for use in exchanging tracking data.
+    /// The TDM specifies a standard message format for use in exchanging spacecraft tracking data
+    /// between space agencies. Such exchanges are used for distributing tracking data output from
+    /// routine interagency cross-supports.
+    ///
+    /// Tracking data includes data types such as:
+    /// - Doppler
+    /// - Transmit/Received frequencies
+    /// - Range
+    /// - Angles
+    /// - Delta-DOR
+    /// - Media correction (ionosphere, troposphere)
+    /// - Meteorological data
     ///
     /// :type: TdmHeader
     #[getter]
@@ -266,8 +288,8 @@ impl TdmHeader {
     }
 
     /// Creating agency. Value should be an entry from the ‘Abbreviation’ column in the SANA
-    /// Organizations Registry, https://sanaregistry.org/r/organizations/organizations.html
-    /// (reference [11]).
+    /// Organizations Registry, <https://sanaregistry.org/r/organizations/organizations.html>
+    /// (reference `[11]`).
     ///
     /// Examples: CNES, ESA, GSFC, DLR, JPL, JAXA
     ///
@@ -782,7 +804,7 @@ impl TdmMetadata {
     /// The TIME_SYSTEM keyword shall specify the time system used for timetags in the
     /// associated Data Section. This should be UTC for ground-based data. The value associated
     /// with this keyword must be selected from the full set of allowed values enumerated in
-    /// the SANA Time Systems Registry https://sanaregistry.org/r/time_systems (reference [12]).
+    /// the SANA Time Systems Registry <https://sanaregistry.org/r/time_systems> (reference `[12]`).
     /// (See annex B.)
     ///
     /// Examples: UTC, TAI, GPS, SCLK
@@ -842,7 +864,7 @@ impl TdmMetadata {
     /// (max index is 5). At least two participants must be specified for most sessions; for
     /// some special TDMs such as tropospheric media, only one participant need be listed.
     ///
-    /// Examples: DSS-63-S400K, ROSETTA, <Quasar catalog name>, 1997-061A, UNKNOWN
+    /// Examples: DSS-63-S400K, ROSETTA, `<Quasar catalog name>`, 1997-061A, UNKNOWN
     ///
     /// :type: str
     #[getter]
