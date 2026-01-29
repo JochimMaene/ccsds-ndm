@@ -4,6 +4,7 @@
 
 import ccsds_ndm
 
+
 def test_acm_user_defined():
     kvn = """CCSDS_ACM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -21,13 +22,14 @@ USER_STOP
     user = acm.segment.data.user
     assert user is not None
     assert user.user_defined["FOO"] == "BAR"
-    
+
     # Roundtrip check
     kvn_out = acm.to_str("kvn")
     assert "USER_START" in kvn_out
     assert "USER_DEFINED_FOO" in kvn_out
     assert "BAR" in kvn_out
     assert "USER_STOP" in kvn_out
+
 
 def test_ocm_user_defined():
     kvn = """CCSDS_OCM_VERS = 3.0
@@ -45,6 +47,7 @@ USER_STOP
     user = ocm.segment.data.user
     assert user is not None
     assert user.user_defined["BAZ"] == "QUX"
+
 
 def test_opm_user_defined():
     kvn = """CCSDS_OPM_VERS = 3.0
@@ -68,6 +71,7 @@ USER_DEFINED_PARAM = VALUE
     ud = opm.segment.data.user_defined_parameters
     assert ud is not None
     assert ud.user_defined["PARAM"] == "VALUE"
+
 
 def test_rdm_user_defined():
     kvn = """CCSDS_RDM_VERS = 1.0
