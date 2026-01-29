@@ -143,7 +143,7 @@ class AcmData:
     """
     ACM Data Section.
     """
-    def __init__(att, phys, cov, man, ad, user_defined) -> None: ...
+    def __init__(att, phys, cov, man, ad, user) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -169,6 +169,15 @@ class AcmData:
 
     @phys.setter
     def phys(self, value: AcmPhysicalDescription) -> None: ...
+    @property
+    def user(self) -> UserDefined:
+        """
+        A single user-defined Data section.
+        """
+        ...
+
+    @user.setter
+    def user(self, value: UserDefined) -> None: ...
 
 class AcmManeuverParameters:
     """
@@ -4619,14 +4628,14 @@ class OcmData:
     @traj.setter
     def traj(self, value: list[OcmTrajState]) -> None: ...
     @property
-    def user(self) -> Optional[UserDefined]:
+    def user(self) -> UserDefined:
         """
         User-defined parameters.
         """
         ...
 
     @user.setter
-    def user(self, value: Optional[UserDefined]) -> None: ...
+    def user(self, value: UserDefined) -> None: ...
 
 class OcmManeuverParameters:
     """
@@ -8985,14 +8994,14 @@ class OmmData:
     @tle_parameters.setter
     def tle_parameters(self, value: Optional[TleParameters]) -> None: ...
     @property
-    def user_defined_parameters(self) -> Optional[UserDefined]:
+    def user_defined_parameters(self) -> UserDefined:
         """
         User-Defined Parameters.
         """
         ...
 
     @user_defined_parameters.setter
-    def user_defined_parameters(self, value: Optional[UserDefined]) -> None: ...
+    def user_defined_parameters(self, value: UserDefined) -> None: ...
 
 class OmmMetadata:
     """
@@ -9701,14 +9710,14 @@ class OpmData:
     @state_vector.setter
     def state_vector(self, value: StateVector) -> None: ...
     @property
-    def user_defined_parameters(self) -> Optional[UserDefined]:
+    def user_defined_parameters(self) -> UserDefined:
         """
         User defined parameters.
         """
         ...
 
     @user_defined_parameters.setter
-    def user_defined_parameters(self, value: Optional[UserDefined]) -> None: ...
+    def user_defined_parameters(self, value: UserDefined) -> None: ...
 
 class OpmMetadata:
     """
@@ -10152,8 +10161,8 @@ class RdmData:
         Object physical parameters.
     od_parameters : OdParameters, optional
         Orbit determination parameters.
-    user_defined_parameters : list[tuple[str, str]], optional
-        User defined parameters as key-value pairs.
+    user_defined_parameters : UserDefined, optional
+        User defined parameters.
     comment : list[str], optional
         Comments.
     """
@@ -10244,14 +10253,14 @@ class RdmData:
     @state_vector.setter
     def state_vector(self, value: Optional[StateVector]) -> None: ...
     @property
-    def user_defined_parameters(self) -> list[tuple[str, str]]:
+    def user_defined_parameters(self) -> UserDefined:
         """
         User defined parameters.
         """
         ...
 
     @user_defined_parameters.setter
-    def user_defined_parameters(self, value: list[tuple[str, str]]) -> None: ...
+    def user_defined_parameters(self, value: UserDefined) -> None: ...
 
 class RdmHeader:
     """
@@ -13150,14 +13159,12 @@ class UserDefined:
 
     Parameters
     ----------
-        params : dict[str, str]
+        parameters : dict[str, str], optional
         A dictionary of user-defined parameters and their values.
-        (Mandatory)
     comment : list[str], optional
         Comments.
-        (Optional)
     """
-    def __init__() -> None: ...
+    def __init__(parameters=None, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.

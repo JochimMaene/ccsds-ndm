@@ -1509,23 +1509,19 @@ impl OcmData {
 
     /// User-defined parameters.
     ///
-    /// :type: Optional[UserDefined]
+    /// :type: UserDefined | None
     #[getter]
-    fn get_user(&self) -> Option<UserDefined> {
+    fn get_user(&self) -> Option<crate::types::UserDefined> {
         self.inner
             .user
             .as_ref()
-            .map(|u| UserDefined { inner: u.clone() })
+            .map(|u| crate::types::UserDefined { inner: u.clone() })
     }
     #[setter]
-    fn set_user(&mut self, value: Option<UserDefined>) {
+    fn set_user(&mut self, value: Option<crate::types::UserDefined>) {
         self.inner.user = value.map(|u| u.inner);
     }
 }
-
-// ============================================================================
-// OCM Data Structures - Complete Implementation
-// ============================================================================
 
 /// A block of trajectory state data, which can be a time history of states.
 ///
@@ -5609,86 +5605,5 @@ impl OcmOdParameters {
     #[setter]
     fn set_data_types(&mut self, value: Option<String>) {
         self.inner.data_types = value;
-    }
-}
-
-// ============================================================================
-// UserDefined - User-Defined Parameters
-// ============================================================================
-
-/// USER DEFINED PARAMETERS block (`userDefinedType`).
-/// User-defined parameters.
-///
-/// Allow for the exchange of any desired orbital data not already provided in the message.
-///
-/// Parameters
-/// ----------
-///     params : dict[str, str]
-///     A dictionary of user-defined parameters and their values.
-///     (Mandatory)
-/// comment : list[str], optional
-///     Comments.
-///     (Optional)
-#[pyclass]
-#[derive(Clone)]
-pub struct UserDefined {
-    pub inner: ccsds_ndm::types::UserDefined,
-}
-
-#[pymethods]
-impl UserDefined {
-    /// Create a new UserDefined object.
-    ///
-    /// Parameters
-    /// ----------
-    /// params : dict[str, str], optional
-    ///     A dictionary of user-defined parameters and their values.
-    ///     (Mandatory)
-    /// comment : list[str], optional
-    ///     Comments.
-    ///     (Optional)
-    #[new]
-    fn new() -> Self {
-        Self {
-            inner: ccsds_ndm::types::UserDefined::default(),
-        }
-    }
-
-    fn __repr__(&self) -> String {
-        format!("UserDefined(params={})", self.inner.user_defined.len())
-    }
-
-    /// Comments (see 7.8 for formatting rules).
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
-    }
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
-    }
-    /// User-defined parameters.
-    ///
-    /// :type: dict[str, str]
-    #[getter]
-    fn get_user_defined(&self) -> std::collections::HashMap<String, String> {
-        self.inner
-            .user_defined
-            .iter()
-            .map(|p| (p.parameter.clone(), p.value.clone()))
-            .collect()
-    }
-    #[setter]
-    fn set_user_defined(&mut self, value: std::collections::HashMap<String, String>) {
-        use ccsds_ndm::types::UserDefinedParameter;
-        self.inner.user_defined = value
-            .into_iter()
-            .map(|(k, v)| UserDefinedParameter {
-                parameter: k,
-                value: v,
-            })
-            .collect();
     }
 }

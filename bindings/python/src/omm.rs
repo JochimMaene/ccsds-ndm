@@ -838,17 +838,17 @@ impl OmmData {
 
     /// User-Defined Parameters.
     ///
-    /// :type: Optional[UserDefined]
+    /// :type: UserDefined | None
     #[getter]
-    fn get_user_defined_parameters(&self) -> Option<UserDefined> {
+    fn get_user_defined_parameters(&self) -> Option<crate::types::UserDefined> {
         self.inner
             .user_defined_parameters
             .as_ref()
-            .map(|u| UserDefined { inner: u.clone() })
+            .map(|u| crate::types::UserDefined { inner: u.clone() })
     }
 
     #[setter]
-    fn set_user_defined_parameters(&mut self, value: Option<UserDefined>) {
+    fn set_user_defined_parameters(&mut self, value: Option<crate::types::UserDefined>) {
         self.inner.user_defined_parameters = value.map(|u| u.inner);
     }
 }
@@ -1098,81 +1098,5 @@ impl TleParameters {
     fn set_agom(&mut self, value: Option<f64>) {
         use ccsds_ndm::types::M2kg;
         self.inner.agom = value.map(|v| M2kg::new(v, Default::default()));
-    }
-}
-
-/// USER DEFINED PARAMETERS block (`userDefinedType`).
-/// User-defined parameters.
-///
-/// Allow for the exchange of any desired orbital data not already provided in the message.
-///
-/// Parameters
-/// ----------
-///     parameters : dict
-///     Dictionary of user defined parameters.
-#[pyclass]
-#[derive(Clone)]
-pub struct UserDefined {
-    pub inner: ccsds_ndm::types::UserDefined,
-}
-
-#[pymethods]
-impl UserDefined {
-    #[new]
-    #[pyo3(text_signature = "(parameters: Dict[str, str])")]
-    fn new(parameters: std::collections::HashMap<String, String>) -> Self {
-        let user_defined = parameters
-            .into_iter()
-            .map(|(k, v)| ccsds_ndm::types::UserDefinedParameter {
-                parameter: k,
-                value: v,
-            })
-            .collect();
-        Self {
-            inner: ccsds_ndm::types::UserDefined {
-                comment: vec![],
-                user_defined,
-            },
-        }
-    }
-
-    fn __repr__(&self) -> String {
-        format!("UserDefined(count={})", self.inner.user_defined.len())
-    }
-
-    /// Comments (see 7.8 for formatting rules).
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
-    }
-
-    /// User defined parameters as a dictionary.
-    ///
-    /// :type: Dict[str, str]
-    #[getter]
-    fn get_user_defined(&self) -> std::collections::HashMap<String, String> {
-        self.inner
-            .user_defined
-            .iter()
-            .map(|p| (p.parameter.clone(), p.value.clone()))
-            .collect()
-    }
-
-    #[setter]
-    fn set_user_defined(&mut self, value: std::collections::HashMap<String, String>) {
-        self.inner.user_defined = value
-            .into_iter()
-            .map(|(k, v)| ccsds_ndm::types::UserDefinedParameter {
-                parameter: k,
-                value: v,
-            })
-            .collect();
     }
 }

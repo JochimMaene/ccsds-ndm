@@ -1301,17 +1301,17 @@ impl OpmData {
 
     /// User defined parameters.
     ///
-    /// :type: Optional[UserDefined]
+    /// :type: UserDefined | None
     #[getter]
-    fn get_user_defined_parameters(&self) -> Option<UserDefined> {
+    fn get_user_defined_parameters(&self) -> Option<crate::types::UserDefined> {
         self.inner
             .user_defined_parameters
             .as_ref()
-            .map(|u| UserDefined { inner: u.clone() })
+            .map(|u| crate::types::UserDefined { inner: u.clone() })
     }
 
     #[setter]
-    fn set_user_defined_parameters(&mut self, value: Option<UserDefined>) {
+    fn set_user_defined_parameters(&mut self, value: Option<crate::types::UserDefined>) {
         self.inner.user_defined_parameters = value.map(|u| u.inner);
     }
 }
@@ -1498,80 +1498,5 @@ impl ManeuverParameters {
     #[setter]
     fn set_man_dv_3(&mut self, value: f64) {
         self.inner.man_dv_3.value = value;
-    }
-}
-
-/// USER DEFINED PARAMETERS block (`userDefinedType`).
-/// User-defined parameters.
-///
-/// Allow for the exchange of any desired orbital data not already provided in the message.
-///
-/// Parameters
-/// ----------
-///     parameters : dict
-///     Dictionary of user defined parameters. Keys should generally start with 'USER_DEFINED_'.
-#[pyclass]
-#[derive(Clone)]
-pub struct UserDefined {
-    pub inner: CoreUserDefined,
-}
-
-#[pymethods]
-impl UserDefined {
-    #[new]
-    fn new(parameters: std::collections::HashMap<String, String>) -> Self {
-        let user_defined = parameters
-            .into_iter()
-            .map(|(k, v)| UserDefinedParameter {
-                parameter: k,
-                value: v,
-            })
-            .collect();
-        Self {
-            inner: CoreUserDefined {
-                comment: vec![],
-                user_defined,
-            },
-        }
-    }
-
-    fn __repr__(&self) -> String {
-        format!("UserDefined(count={})", self.inner.user_defined.len())
-    }
-
-    /// Comments (see 7.8 for formatting rules).
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
-    }
-
-    /// User defined parameters as a dictionary.
-    ///
-    /// :type: Dict[str, str]
-    #[getter]
-    fn get_user_defined(&self) -> std::collections::HashMap<String, String> {
-        self.inner
-            .user_defined
-            .iter()
-            .map(|p| (p.parameter.clone(), p.value.clone()))
-            .collect()
-    }
-
-    #[setter]
-    fn set_user_defined(&mut self, value: std::collections::HashMap<String, String>) {
-        self.inner.user_defined = value
-            .into_iter()
-            .map(|(k, v)| UserDefinedParameter {
-                parameter: k,
-                value: v,
-            })
-            .collect();
     }
 }

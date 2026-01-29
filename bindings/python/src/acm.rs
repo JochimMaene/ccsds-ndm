@@ -252,7 +252,7 @@ impl AcmData {
         cov: Option<Vec<AcmCovarianceMatrix>>,
         man: Option<Vec<AcmManeuverParameters>>,
         ad: Option<AcmAttitudeDetermination>,
-        user_defined: Option<crate::opm::UserDefined>,
+        user: Option<crate::types::UserDefined>,
     ) -> Self {
         Self {
             inner: core_acm::AcmData {
@@ -261,9 +261,22 @@ impl AcmData {
                 cov: cov.unwrap_or_default().into_iter().map(|c| c.inner).collect(),
                 man: man.unwrap_or_default().into_iter().map(|m| m.inner).collect(),
                 ad: ad.map(|a| a.inner),
-                user_defined: user_defined.map(|u| u.inner),
+                user: user.map(|u| u.inner),
             },
         }
+    }
+
+    /// A single user-defined Data section.
+    ///
+    /// :type: UserDefined | None
+    #[getter]
+    fn get_user(&self) -> Option<crate::types::UserDefined> {
+        self.inner.user.as_ref().map(|u| crate::types::UserDefined { inner: u.clone() })
+    }
+
+    #[setter]
+    fn set_user(&mut self, user: Option<crate::types::UserDefined>) {
+        self.inner.user = user.map(|u| u.inner);
     }
 
     /// One or more optional attitude state time histories (each consisting of one or more attitude

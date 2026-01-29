@@ -1159,8 +1159,8 @@ impl RdmMetadata {
 ///     Object physical parameters.
 /// od_parameters : OdParameters, optional
 ///     Orbit determination parameters.
-/// user_defined_parameters : list[tuple[str, str]], optional
-///     User defined parameters as key-value pairs.
+/// user_defined_parameters : UserDefined, optional
+///     User defined parameters.
 /// comment : list[str], optional
 ///     Comments.
 #[pyclass]
@@ -1191,20 +1191,9 @@ impl RdmData {
         covariance_matrix: Option<OpmCovarianceMatrix>,
         spacecraft_parameters: Option<RdmSpacecraftParameters>,
         od_parameters: Option<OdParameters>,
-        user_defined_parameters: Option<Vec<(String, String)>>,
+        user_defined_parameters: Option<crate::types::UserDefined>,
         comment: Option<Vec<String>>,
     ) -> Self {
-        let user_defined = user_defined_parameters.map(|params| core_types::UserDefined {
-            comment: vec![],
-            user_defined: params
-                .into_iter()
-                .map(|(k, v)| core_types::UserDefinedParameter {
-                    parameter: k,
-                    value: v,
-                })
-                .collect(),
-        });
-
         Self {
             inner: core_rdm::RdmData {
                 comment: comment.unwrap_or_default(),
@@ -1214,7 +1203,7 @@ impl RdmData {
                 covariance_matrix: covariance_matrix.map(|cm| cm.inner),
                 spacecraft_parameters: spacecraft_parameters.map(|sp| sp.inner),
                 od_parameters: od_parameters.map(|op| op.inner),
-                user_defined_parameters: user_defined,
+                user_defined_parameters: user_defined_parameters.map(|u| u.inner),
             },
         }
     }
@@ -1320,36 +1309,19 @@ impl RdmData {
 
     /// User defined parameters.
     ///
-    /// :type: list[tuple[str, str]]
+    /// :type: UserDefined | None
     #[getter]
-    fn get_user_defined_parameters(&self) -> Vec<(String, String)> {
+    fn get_user_defined_parameters(&self) -> Option<crate::types::UserDefined> {
         self.inner
             .user_defined_parameters
             .as_ref()
-            .map(|ud| {
-                ud.user_defined
-                    .iter()
-                    .map(|p| (p.parameter.clone(), p.value.clone()))
-                    .collect()
+            .map(|ud| crate::types::UserDefined {
+                inner: ud.clone(),
             })
-            .unwrap_or_default()
     }
     #[setter]
-    fn set_user_defined_parameters(&mut self, v: Vec<(String, String)>) {
-        if v.is_empty() {
-            self.inner.user_defined_parameters = None;
-        } else {
-            self.inner.user_defined_parameters = Some(core_types::UserDefined {
-                comment: vec![],
-                user_defined: v
-                    .into_iter()
-                    .map(|(k, v)| core_types::UserDefinedParameter {
-                        parameter: k,
-                        value: v,
-                    })
-                    .collect(),
-            });
-        }
+    fn set_user_defined_parameters(&mut self, v: Option<crate::types::UserDefined>) {
+        self.inner.user_defined_parameters = v.map(|u| u.inner);
     }
 
     /// Comments.

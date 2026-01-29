@@ -74,6 +74,7 @@ from .ccsds_ndm import (
     TdmObservation,
     TdmSegment,
     TrajLine,
+    UserDefined,
     from_file,
     from_str,
 )
@@ -82,6 +83,7 @@ __all__ = [
     # Top-level API
     "from_str",
     "from_file",
+    "UserDefined",
     # Common Types
     "OdmHeader",
     "StateVector",
