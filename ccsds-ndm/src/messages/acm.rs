@@ -661,7 +661,7 @@ impl std::str::FromStr for AttBasis {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct AttLine {
-    #[serde(rename = "$value")]
+    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
     pub values: Vec<f64>,
 }
 
@@ -917,7 +917,7 @@ impl ToKvn for AcmCovarianceMatrix {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct CovLine {
-    #[serde(rename = "$value")]
+    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
     pub values: Vec<f64>,
 }
 

@@ -159,30 +159,40 @@ use std::path::Path;
 ///     _ => println!("Other message type"),
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum MessageType {
     /// Orbit Ephemeris Message - orbit state time series with optional covariance.
+    #[serde(rename = "oem")]
     Oem(messages::oem::Oem),
     /// Conjunction Data Message - collision assessment data between two objects.
+    #[serde(rename = "cdm")]
     Cdm(messages::cdm::Cdm),
     /// Orbit Parameter Message - single state vector and orbital parameters.
+    #[serde(rename = "opm")]
     Opm(messages::opm::Opm),
     /// Orbit Mean-Elements Message - mean orbital elements (e.g., TLE-like).
+    #[serde(rename = "omm")]
     Omm(messages::omm::Omm),
     /// Reentry Data Message - reentry prediction information.
+    #[serde(rename = "rdm")]
     Rdm(messages::rdm::Rdm),
     /// Tracking Data Message - ground station tracking measurements.
+    #[serde(rename = "tdm")]
     Tdm(messages::tdm::Tdm),
     /// Orbit Comprehensive Message - detailed orbit data with maneuvers.
+    #[serde(rename = "ocm")]
     Ocm(messages::ocm::Ocm),
     /// Attitude Comprehensive Message - detailed attitude data with maneuvers.
+    #[serde(rename = "acm")]
     Acm(messages::acm::Acm),
     /// Attitude Ephemeris Message - attitude state time series.
+    #[serde(rename = "aem")]
     Aem(messages::aem::Aem),
     /// Attitude Parameter Message - attitude state and parameter data.
+    #[serde(rename = "apm")]
     Apm(messages::apm::Apm),
     /// Combined Instantiation NDM - container for multiple messages.
+    #[serde(rename = "ndm")]
     Ndm(messages::ndm::CombinedNdm),
 }
 

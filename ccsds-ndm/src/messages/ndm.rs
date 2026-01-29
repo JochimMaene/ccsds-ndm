@@ -6,7 +6,7 @@ use crate::error::Result;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::MessageType;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Combined Instantiation Navigation Data Message (NDM).
 ///
@@ -19,7 +19,7 @@ use serde::Serialize;
 /// with the set of tracking data messages used in the orbit determination.
 ///
 /// **CCSDS Reference**: 505.0-B-3, Section 4.11.
-#[derive(Serialize, Debug, PartialEq, Clone, bon::Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "ndm")]
 pub struct CombinedNdm {
     /// Message Identifier (optional).
@@ -33,7 +33,7 @@ pub struct CombinedNdm {
     pub comments: Vec<String>,
 
     /// List of contained navigation messages.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(rename = "$value", default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
     pub messages: Vec<MessageType>,
 }
@@ -151,16 +151,9 @@ impl Ndm for CombinedNdm {
                             let val = reader.read_text(name_bytes)?;
                             comments.push(val.to_string());
                         }
-                        // For messages, we need to extract the sub-XML.
-                        // Ideally we'd use `read_to_end` relative to the current depth, but `quick-xml` 0.31+
-                        // makes getting the raw span trickier without `GenericReader::read_text` for elements.
-                        //
-                        // Alternative: Delegate to standard deserializers by reconstructing a mini-document
-                        // or using `from_reader` if we can align the cursor.
-                        //
-                        // Better approach for robust nesting:
                         // Extract the outer XML of the current element.
-                        "opm" | "omm" | "oem" | "ocm" | "cdm" | "tdm" | "rdm" => {
+                        "opm" | "omm" | "oem" | "ocm" | "cdm" | "tdm" | "rdm" | "acm" | "aem"
+                        | "apm" => {
                             // Capture the start position of this element in the original string.
                             // `reader.buffer_position()` is the byte offset after the last read event.
                             // The start tag `e` is what we just read.
@@ -242,9 +235,6 @@ impl ToKvn for CombinedNdm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         // For KVN, there is no top-level "NDM" header or structure.
         // We just write out the messages sequentially.
-        // Comments and ID at the NDM level are not standard in KVN (based on current understanding),
-        // but if they were to exist, they would likely be comments at the top.
-        // For now, we'll write comments if present, but ignore ID as it has no standard KVN key here.
         writer.write_comments(&self.comments);
 
         for msg in &self.messages {

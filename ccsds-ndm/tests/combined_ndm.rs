@@ -132,3 +132,112 @@ fn test_combined_ndm_xml() {
         _ => panic!("Expected MessageType::Ndm, got {:?}", msg),
     }
 }
+
+#[test]
+fn test_combined_ndm_xml_attitude() {
+    let input = r#"<?xml version="1.0" encoding="UTF-8"?>
+<ndm>
+    <COMMENT>Example: 1 each APM, AEM, ACM in combined instantiation</COMMENT>
+    <apm id="CCSDS_APM_VERS" version="2.0">
+        <header>
+            <CREATION_DATE>2007-11-10T15:23:57</CREATION_DATE>
+            <ORIGINATOR>CNES</ORIGINATOR>
+        </header>
+        <body>
+            <segment>
+                <metadata>
+                    <OBJECT_NAME>TEST</OBJECT_NAME>
+                    <OBJECT_ID>2007-011</OBJECT_ID>
+                    <CENTER_NAME>EARTH</CENTER_NAME>
+                    <TIME_SYSTEM>UTC</TIME_SYSTEM>
+                </metadata>
+                <data>
+                    <EPOCH>2007-10-01T00:02:00.000</EPOCH>
+                    <eulerAngleState>
+                        <REF_FRAME_A>SC_BODY</REF_FRAME_A>
+                        <REF_FRAME_B>J2000</REF_FRAME_B>
+                        <EULER_ROT_SEQ>ZXZ</EULER_ROT_SEQ>
+                        <ANGLE_1 units="deg">90.</ANGLE_1>
+                        <ANGLE_2 units="deg">130.</ANGLE_2>
+                        <ANGLE_3 units="deg">270.</ANGLE_3>
+                    </eulerAngleState>
+                </data>
+            </segment>
+        </body>
+    </apm>
+    <aem id="CCSDS_AEM_VERS" version="2.0">
+        <header>
+            <CREATION_DATE>2000-100T01:00:00</CREATION_DATE>
+            <ORIGINATOR>NASA/JPL</ORIGINATOR>
+        </header>
+        <body>
+            <segment>
+                <metadata>
+                    <OBJECT_NAME>TEST</OBJECT_NAME>
+                    <OBJECT_ID>2000-999Z</OBJECT_ID>
+                    <REF_FRAME_A>SC_BODY_1</REF_FRAME_A>
+                    <REF_FRAME_B>J2000</REF_FRAME_B>
+                    <TIME_SYSTEM>TDB</TIME_SYSTEM>
+                    <START_TIME>2000-100T00:00:00.000</START_TIME>
+                    <STOP_TIME>2000-100T00:00:00.000</STOP_TIME>
+                    <ATTITUDE_TYPE>QUATERNION</ATTITUDE_TYPE>
+                </metadata>
+                <data>
+                    <attitudeState>
+                        <quaternionEphemeris>
+                            <EPOCH>2000-100T00:00:00.000</EPOCH>
+                            <quaternion>
+                                <Q1>-0.005068</Q1>
+                                <Q2>0.906506</Q2>
+                                <Q3>0.002360</Q3>
+                                <QC>0.422157</QC>
+                            </quaternion>
+                        </quaternionEphemeris>
+                    </attitudeState>
+                </data>
+            </segment>
+        </body>
+    </aem>
+    <acm id="CCSDS_ACM_VERS" version="2.0">
+        <header>
+            <CREATION_DATE>1998-11-06T09:23:57</CREATION_DATE>
+            <ORIGINATOR>JAXA</ORIGINATOR>
+        </header>
+        <body>
+            <segment>
+                <metadata>
+                    <OBJECT_NAME>EUROBIRD-4A</OBJECT_NAME>
+                    <INTERNATIONAL_DESIGNATOR>2000-052A</INTERNATIONAL_DESIGNATOR>
+                    <TIME_SYSTEM>UTC</TIME_SYSTEM>
+                    <EPOCH_TZERO>1998-12-18T14:28:15.1172</EPOCH_TZERO>
+                </metadata>
+                <data>
+                    <att>
+                        <REF_FRAME_A>J2000</REF_FRAME_A>
+                        <REF_FRAME_B>SC_BODY</REF_FRAME_B>
+                        <NUMBER_STATES>1</NUMBER_STATES>
+                        <ATT_TYPE>QUATERNION</ATT_TYPE>
+                        <attLine>0.0 0.73566 -0.50547 0.41390 0.180707</attLine>
+                    </att>
+                </data>
+            </segment>
+        </body>
+    </acm>
+</ndm>
+"#;
+
+    let msg = from_str(input).unwrap();
+    match msg {
+        MessageType::Ndm(ndm) => {
+            assert_eq!(
+                ndm.comments,
+                vec!["Example: 1 each APM, AEM, ACM in combined instantiation".to_string()]
+            );
+            assert_eq!(ndm.messages.len(), 3);
+            assert!(matches!(ndm.messages[0], MessageType::Apm(_)));
+            assert!(matches!(ndm.messages[1], MessageType::Aem(_)));
+            assert!(matches!(ndm.messages[2], MessageType::Acm(_)));
+        }
+        _ => panic!("Expected MessageType::Ndm, got {:?}", msg),
+    }
+}
