@@ -404,14 +404,29 @@ impl OemSegment {
 impl OemMetadata {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        object_name,
+        object_id,
+        start_time,
+        stop_time,
+        center_name=String::from("EARTH"),
+        ref_frame=String::from("GCRF"),
+        time_system=String::from("UTC"),
+        ref_frame_epoch=None,
+        useable_start_time=None,
+        useable_stop_time=None,
+        interpolation=None,
+        interpolation_degree=None,
+        comment=None
+    ))]
     fn new(
         object_name: String,
         object_id: String,
+        start_time: String,
+        stop_time: String,
         center_name: String,
         ref_frame: String,
         time_system: String,
-        start_time: String,
-        stop_time: String,
         ref_frame_epoch: Option<String>,
         useable_start_time: Option<String>,
         useable_stop_time: Option<String>,
@@ -419,6 +434,7 @@ impl OemMetadata {
         interpolation_degree: Option<u32>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
+
         Ok(Self {
             inner: core_oem::OemMetadata {
                 object_name,

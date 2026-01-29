@@ -22,9 +22,11 @@ pub mod aem;
 pub mod apm;
 pub mod acm;
 pub mod attitude;
+pub mod errors;
 
 use cdm::*;
 use common::{OdmHeader, AdmHeader, StateVector, StateVectorAcc};
+use errors::ccsds_error_to_pyerr;
 use ndm::Ndm;
 use oem::*;
 use omm::*;
@@ -49,8 +51,7 @@ use opm::*;
 #[pyfunction]
 fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
     // Call the core library's auto-detection function
-    let message = ccsds_ndm::from_str(data)
-        .map_err(|e| PyValueError::new_err(format!("Parsing failed: {}", e)))?;
+    let message = ccsds_ndm::from_str(data).map_err(ccsds_error_to_pyerr)?;
 
     match message {
         MessageType::Oem(oem) => {
@@ -114,7 +115,7 @@ fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
 #[pyfunction]
 fn from_file(py: Python, path: &str) -> PyResult<Py<PyAny>> {
     let content = fs::read_to_string(path)
-        .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
+        .map_err(|e| errors::NdmIoError::new_err(e.to_string()))?;
     from_str(py, &content)
 }
 
@@ -122,6 +123,9 @@ fn from_file(py: Python, path: &str) -> PyResult<Py<PyAny>> {
 #[pymodule]
 #[pyo3(name = "ccsds_ndm")]
 fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // Register exception types
+    errors::register_exceptions(m)?;
+
     // High-level API aligned with Rust core
     m.add_function(wrap_pyfunction!(from_str, m)?)?;
     m.add_function(wrap_pyfunction!(from_file, m)?)?;

@@ -161,6 +161,13 @@ pub struct ApmMetadata {
 #[pymethods]
 impl ApmMetadata {
     #[new]
+    #[pyo3(signature = (
+        object_name,
+        object_id,
+        time_system=String::from("UTC"),
+        center_name=None,
+        comment=None
+    ))]
     fn new(
         object_name: String,
         object_id: String,
@@ -178,6 +185,7 @@ impl ApmMetadata {
             },
         }
     }
+
 
     /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN

@@ -510,12 +510,13 @@ impl TdmMetadata {
     #[new]
     #[pyo3(signature = (
         *,
-        time_system,
         participant_1,
+        time_system=String::from("UTC"),
         track_id=None,
         data_types=None,
         start_time=None,
         stop_time=None,
+
         participant_2=None,
         participant_3=None,
         participant_4=None,
@@ -573,9 +574,10 @@ impl TdmMetadata {
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        time_system: String,
         participant_1: String,
+        time_system: String,
         track_id: Option<String>,
+
         data_types: Option<String>,
         start_time: Option<String>,
         stop_time: Option<String>,

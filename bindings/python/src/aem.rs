@@ -171,14 +171,32 @@ pub struct AemMetadata {
 impl AemMetadata {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        object_name,
+        object_id,
+        ref_frame_a,
+        ref_frame_b,
+        start_time,
+        stop_time,
+        time_system=String::from("UTC"),
+        attitude_type=String::from("QUATERNION"),
+        center_name=None,
+        useable_start_time=None,
+        useable_stop_time=None,
+        euler_rot_seq=None,
+        angvel_frame=None,
+        interpolation_method=None,
+        interpolation_degree=None,
+        comment=None
+    ))]
     fn new(
         object_name: String,
         object_id: String,
         ref_frame_a: String,
         ref_frame_b: String,
-        time_system: String,
         start_time: String,
         stop_time: String,
+        time_system: String,
         attitude_type: String,
         center_name: Option<String>,
         useable_start_time: Option<String>,
@@ -212,6 +230,7 @@ impl AemMetadata {
             },
         })
     }
+
 
     /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN

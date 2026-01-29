@@ -290,6 +290,16 @@ pub struct OmmMetadata {
 impl OmmMetadata {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        object_name,
+        object_id,
+        center_name=String::from("EARTH"),
+        ref_frame=String::from("TEME"),
+        time_system=String::from("UTC"),
+        mean_element_theory=String::from("SGP4"),
+        ref_frame_epoch=None,
+        comment=None
+    ))]
     fn new(
         object_name: String,
         object_id: String,
@@ -313,6 +323,7 @@ impl OmmMetadata {
             },
         })
     }
+
 
     fn __repr__(&self) -> String {
         format!("OmmMetadata(object_name='{}')", self.inner.object_name)

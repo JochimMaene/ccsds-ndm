@@ -408,9 +408,10 @@ impl OcmMetadata {
     #[new]
     #[pyo3(signature = (
         *,
-        time_system,
         epoch_tzero,
+        time_system=String::from("UTC"),
         object_name=None,
+
         international_designator=None,
         catalog_name=None,
         object_designator=None,
@@ -459,9 +460,10 @@ impl OcmMetadata {
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        time_system: String,
         epoch_tzero: String,
+        time_system: String,
         object_name: Option<String>,
+
         international_designator: Option<String>,
         catalog_name: Option<String>,
         object_designator: Option<String>,

@@ -293,6 +293,15 @@ pub struct OpmMetadata {
 #[pymethods]
 impl OpmMetadata {
     #[new]
+    #[pyo3(signature = (
+        object_name,
+        object_id,
+        center_name=String::from("EARTH"),
+        ref_frame=String::from("GCRF"),
+        time_system=String::from("UTC"),
+        ref_frame_epoch=None,
+        comment=None
+    ))]
     fn new(
         object_name: String,
         object_id: String,
@@ -314,6 +323,7 @@ impl OpmMetadata {
             },
         })
     }
+
 
     fn __repr__(&self) -> String {
         format!("OpmMetadata(object_name='{}')", self.inner.object_name)

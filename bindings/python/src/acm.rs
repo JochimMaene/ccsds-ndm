@@ -169,11 +169,18 @@ pub struct AcmMetadata {
 impl AcmMetadata {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        object_name,
+        epoch_tzero,
+        time_system=String::from("UTC"),
+        international_designator=None,
+        comment=None
+    ))]
     fn new(
         object_name: String,
-        international_designator: Option<String>,
-        time_system: String,
         epoch_tzero: String,
+        time_system: String,
+        international_designator: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         Ok(Self {
@@ -201,6 +208,7 @@ impl AcmMetadata {
             },
         })
     }
+
 
     /// Free-text field containing the name of the object. There is no CCSDS-based restriction on
     /// the value for this keyword, but it is recommended to use names from either the UN Office of
