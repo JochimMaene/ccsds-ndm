@@ -2057,4 +2057,3 @@ pub fn parse_tdm_path(ob: &Bound<'_, PyAny>) -> PyResult<core_types::TdmPath> {
         Err(PyValueError::new_err("Expected TdmPath enum or string"))
     }
 }
-

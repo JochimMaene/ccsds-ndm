@@ -102,6 +102,10 @@ class Acm:
 
     @segment.setter
     def segment(self, value: AcmSegment) -> None: ...
+    def to_file(self, path, format):
+        """ """
+        ...
+
     def to_str(self, format):
         """ """
         ...
@@ -195,7 +199,11 @@ class AcmMetadata:
     ACM Metadata Section.
     """
     def __init__(
-        object_name, international_designator, time_system, epoch_tzero, comment
+        object_name,
+        epoch_tzero,
+        time_system=None,
+        international_designator=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -554,6 +562,10 @@ class Aem:
 
     @segments.setter
     def segments(self, value: list[AemSegment]) -> None: ...
+    def to_file(self, path, format):
+        """ """
+        ...
+
     def to_str(self, format):
         """ """
         ...
@@ -605,20 +617,20 @@ class AemMetadata:
     def __init__(
         object_name,
         object_id,
-        ref_frame_a,
-        ref_frame_b,
-        time_system,
-        start_time,
-        stop_time,
-        attitude_type,
-        center_name,
-        useable_start_time,
-        useable_stop_time,
-        euler_rot_seq,
-        angvel_frame,
-        interpolation_method,
-        interpolation_degree,
-        comment,
+        ref_frame_a=None,
+        ref_frame_b=None,
+        start_time=None,
+        stop_time=None,
+        time_system=None,
+        attitude_type=...,
+        center_name=None,
+        useable_start_time=None,
+        useable_stop_time=None,
+        euler_rot_seq=None,
+        angvel_frame=None,
+        interpolation_method=None,
+        interpolation_degree=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -1011,6 +1023,10 @@ class Apm:
 
     @segment.setter
     def segment(self, value: ApmSegment) -> None: ...
+    def to_file(self, path, format):
+        """ """
+        ...
+
     def to_str(self, format):
         """ """
         ...
@@ -1116,7 +1132,9 @@ class ApmMetadata:
     """
     APM Metadata Section.
     """
-    def __init__(object_name, object_id, time_system, center_name, comment) -> None: ...
+    def __init__(
+        object_name, object_id, time_system=None, center_name=None, comment=None
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -1367,6 +1385,15 @@ class AttitudeState:
         Helper for pickle.
         """
         ...
+
+    @property
+    def epoch(self): ...
+    @epoch.setter
+    def epoch(self, value: object) -> None: ...
+    @property
+    def values(self): ...
+    @values.setter
+    def values(self, value: object) -> None: ...
 
 class Cdm:
     """
@@ -2389,7 +2416,7 @@ class CdmMetadata:
 
     Parameters
     ----------
-    object : CdmObjectType
+    object : Union[CdmObjectType, str]
         The object identification (OBJECT1 or OBJECT2).
     object_designator : str
         The satellite catalog designator for the object.
@@ -2401,13 +2428,13 @@ class CdmMetadata:
         The full international designator (YYYY-NNNP{PP}).
     ephemeris_name : str
         Unique name of the external ephemeris file or 'NONE'.
-    covariance_method : CovarianceMethodType
+    covariance_method : Union[CovarianceMethodType, str]
         Method used to calculate the covariance (CALCULATED or DEFAULT).
-    maneuverable : ManeuverableType
+    maneuverable : Union[ManeuverableType, str]
         The maneuver capacity of the object (YES, NO, or NA).
-    ref_frame : ReferenceFrameType
+    ref_frame : Union[ReferenceFrameType, str]
         Reference frame for state vector data (GCRF, EME2000, or ITRF).
-    object_type : ObjectDescription, optional
+    object_type : Union[ObjectDescription, str], optional
         The object type (PAYLOAD, ROCKET BODY, DEBRIS, etc.).
     operator_contact_position : str, optional
         Contact position of the owner/operator.
@@ -2440,10 +2467,10 @@ class CdmMetadata:
         catalog_name,
         object_name,
         international_designator,
-        ephemeris_name,
-        covariance_method,
-        maneuverable,
-        ref_frame,
+        ephemeris_name=...,
+        covariance_method=None,
+        maneuverable=None,
+        ref_frame=None,
         object_type=None,
         operator_contact_position=None,
         operator_organization=None,
@@ -2858,6 +2885,13 @@ class CdmStateVector:
 
     @z_dot.setter
     def z_dot(self, value: float) -> None: ...
+
+class ControlledType:
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
 
 class CovLine:
     """
@@ -4149,6 +4183,19 @@ class Ndm:
     def messages(
         self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
     ) -> None: ...
+    def to_file(self, path, format):
+        """
+        Write to file.
+
+        Parameters
+        ----------
+        path : str
+            Output file path.
+        format : str
+            Output format ('kvn' or 'xml').
+        """
+        ...
+
     def to_str(self, format):
         """
         Serialize to a string.
@@ -5228,8 +5275,8 @@ class OcmMetadata:
     """
     def __init__(
         *,
-        time_system,
         epoch_tzero,
+        time_system=None,
         object_name=None,
         international_designator=None,
         catalog_name=None,
@@ -8589,17 +8636,17 @@ class OemMetadata:
     def __init__(
         object_name,
         object_id,
-        center_name,
-        ref_frame,
-        time_system,
         start_time,
         stop_time,
-        ref_frame_epoch,
-        useable_start_time,
-        useable_stop_time,
-        interpolation,
-        interpolation_degree,
-        comment,
+        center_name=...,
+        ref_frame=None,
+        time_system=None,
+        ref_frame_epoch=None,
+        useable_start_time=None,
+        useable_stop_time=None,
+        interpolation=None,
+        interpolation_degree=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -9029,12 +9076,12 @@ class OmmMetadata:
     def __init__(
         object_name,
         object_id,
-        center_name,
-        ref_frame,
-        time_system,
-        mean_element_theory,
-        ref_frame_epoch,
-        comment,
+        center_name=...,
+        ref_frame=None,
+        time_system=None,
+        mean_element_theory=...,
+        ref_frame_epoch=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -9743,11 +9790,11 @@ class OpmMetadata:
     def __init__(
         object_name,
         object_id,
-        center_name,
-        ref_frame,
-        time_system,
-        ref_frame_epoch,
-        comment,
+        center_name=...,
+        ref_frame=None,
+        time_system=None,
+        ref_frame_epoch=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -10356,10 +10403,10 @@ class RdmMetadata:
         *,
         object_name,
         international_designator,
-        controlled_reentry,
-        center_name,
-        time_system,
         epoch_tzero,
+        controlled_reentry=None,
+        center_name=...,
+        time_system=None,
         catalog_name=None,
         object_designator=None,
         object_type=None,
@@ -10931,6 +10978,13 @@ class RdmSpacecraftParameters:
     @wet_mass.setter
     def wet_mass(self, value: Optional[float]) -> None: ...
 
+class ReferenceFrame:
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
 class ReferenceFrameType:
     def __getstate__(self, /):
         """
@@ -10961,9 +11015,9 @@ class RelativeMetadataData:
         The start time in UTC of the screening period.
     stop_screen_period : str, optional
         The stop time in UTC of the screening period.
-    screen_volume_frame : ScreenVolumeFrameType, optional
+    screen_volume_frame : Union[ScreenVolumeFrameType, str], optional
         The reference frame for screening volume (RTN or TVN).
-    screen_volume_shape : ScreenVolumeShapeType, optional
+    screen_volume_shape : Union[ScreenVolumeShapeType, str], optional
         The shape of the screening volume (ELLIPSOID or BOX).
     screen_volume_x : float, optional
         The X component size of the screening volume. Units: m.
@@ -12037,8 +12091,8 @@ class TdmMetadata:
     """
     def __init__(
         *,
-        time_system,
         participant_1,
+        time_system=None,
         track_id=None,
         data_types=None,
         start_time=None,
@@ -12837,6 +12891,13 @@ class TdmMetadata:
     @turnaround_numerator.setter
     def turnaround_numerator(self, value: Optional[int]) -> None: ...
 
+class TdmMode:
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
 class TdmObservation:
     """
     A single tracking data record consisting of a timetag and a measurement.
@@ -12900,6 +12961,13 @@ class TdmObservation:
     @value_str.setter
     def value_str(self, value: str) -> None: ...
 
+class TdmPath:
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
 class TdmSegment:
     """
     Represents a single segment of a TDM.
@@ -12941,6 +13009,13 @@ class TdmSegment:
 
     @metadata.setter
     def metadata(self, value: TdmMetadata) -> None: ...
+
+class TimeSystem:
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
 
 class TleParameters:
     """
@@ -13189,3 +13264,166 @@ class UserDefined:
 
     @user_defined.setter
     def user_defined(self, value: dict[str, str]) -> None: ...
+
+class YesNo:
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+class NdmError(Exception):
+    """
+    Base exception for all CCSDS NDM errors.
+    """
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    def __setstate__():
+        """ """
+        ...
+
+    @property
+    def args(self): ...
+    @args.setter
+    def args(self, value: object) -> None: ...
+
+class NdmEpochError(ValueError):
+    """
+    Error parsing a CCSDS epoch string.
+    """
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    def __setstate__():
+        """ """
+        ...
+
+    @property
+    def args(self): ...
+    @args.setter
+    def args(self, value: object) -> None: ...
+
+class NdmFormatError(ValueError):
+    """
+    Error during parsing of NDM data (KVN or XML).
+    """
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    def __setstate__():
+        """ """
+        ...
+
+    @property
+    def args(self): ...
+    @args.setter
+    def args(self, value: object) -> None: ...
+
+class NdmIoError(OSError):
+    """
+    I/O error during file operations.
+    """
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    def __setstate__():
+        """ """
+        ...
+
+    @property
+    def args(self): ...
+    @args.setter
+    def args(self, value: object) -> None: ...
+    @property
+    def characters_written(self): ...
+    @characters_written.setter
+    def characters_written(self, value: object) -> None: ...
+
+class NdmUnsupportedMessageError(NdmError):
+    """
+    Unsupported CCSDS message type.
+    """
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    def __setstate__():
+        """ """
+        ...
+
+    @property
+    def args(self): ...
+    @args.setter
+    def args(self, value: object) -> None: ...
+
+class NdmValidationError(NdmError):
+    """
+    Validation error against CCSDS rules.
+    """
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    def __setstate__():
+        """ """
+        ...
+
+    @property
+    def args(self): ...
+    @args.setter
+    def args(self, value: object) -> None: ...
+
+class NdmKvnParseError(NdmFormatError):
+    """
+    Error during KVN parsing.
+    """
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    def __setstate__():
+        """ """
+        ...
+
+    @property
+    def args(self): ...
+    @args.setter
+    def args(self, value: object) -> None: ...
+
+class NdmXmlError(NdmFormatError):
+    """
+    Error during XML parsing or serialization.
+    """
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    def __setstate__():
+        """ """
+        ...
+
+    @property
+    def args(self): ...
+    @args.setter
+    def args(self, value: object) -> None: ...

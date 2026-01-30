@@ -452,9 +452,9 @@ impl CdmBody {
 ///     The start time in UTC of the screening period.
 /// stop_screen_period : str, optional
 ///     The stop time in UTC of the screening period.
-/// screen_volume_frame : ScreenVolumeFrameType, optional
+/// screen_volume_frame : Union[ScreenVolumeFrameType, str], optional
 ///     The reference frame for screening volume (RTN or TVN).
-/// screen_volume_shape : ScreenVolumeShapeType, optional
+/// screen_volume_shape : Union[ScreenVolumeShapeType, str], optional
 ///     The shape of the screening volume (ELLIPSOID or BOX).
 /// screen_volume_x : float, optional
 ///     The X component size of the screening volume. Units: m.
@@ -539,7 +539,7 @@ impl RelativeMetadataData {
         } else {
             None
         };
-        
+
         let screen_volume_frame = match screen_volume_frame {
              Some(ref ob) => Some(parse_screen_volume_frame_type(ob)?),
              None => None,
@@ -894,7 +894,7 @@ impl CdmSegment {
 ///
 /// Parameters
 /// ----------
-/// object : CdmObjectType
+/// object : Union[CdmObjectType, str]
 ///     The object identification (OBJECT1 or OBJECT2).
 /// object_designator : str
 ///     The satellite catalog designator for the object.
@@ -906,13 +906,13 @@ impl CdmSegment {
 ///     The full international designator (YYYY-NNNP{PP}).
 /// ephemeris_name : str
 ///     Unique name of the external ephemeris file or 'NONE'.
-/// covariance_method : CovarianceMethodType
+/// covariance_method : Union[CovarianceMethodType, str]
 ///     Method used to calculate the covariance (CALCULATED or DEFAULT).
-/// maneuverable : ManeuverableType
+/// maneuverable : Union[ManeuverableType, str]
 ///     The maneuver capacity of the object (YES, NO, or NA).
-/// ref_frame : ReferenceFrameType
+/// ref_frame : Union[ReferenceFrameType, str]
 ///     Reference frame for state vector data (GCRF, EME2000, or ITRF).
-/// object_type : ObjectDescription, optional
+/// object_type : Union[ObjectDescription, str], optional
 ///     The object type (PAYLOAD, ROCKET BODY, DEBRIS, etc.).
 /// operator_contact_position : str, optional
 ///     Contact position of the owner/operator.
