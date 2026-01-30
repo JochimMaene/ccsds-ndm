@@ -336,13 +336,21 @@ pub struct RelativeMetadataData {
     /// Data type = double.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub collision_probability: Option<Probability>,
     /// The method that was used to calculate the collision probability. (See annex E for
     /// definition.)
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     #[builder(into)]
     pub collision_probability_method: Option<String>,
 }

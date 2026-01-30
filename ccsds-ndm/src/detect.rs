@@ -129,28 +129,48 @@ fn detect_xml_type(s: &str) -> Result<MessageType> {
     reader.config_mut().trim_text_end = true;
 
     loop {
+        let pos = reader.buffer_position();
         match reader.read_event() {
             Ok(Event::Start(e)) => {
                 let name_bytes = e.name();
                 let name = String::from_utf8_lossy(name_bytes.as_ref()).to_lowercase();
 
-                return match name.as_str() {
-                    "oem" => crate::traits::Ndm::from_xml(s).map(MessageType::Oem),
-                    "cdm" => crate::traits::Ndm::from_xml(s).map(MessageType::Cdm),
-                    "opm" => crate::traits::Ndm::from_xml(s).map(MessageType::Opm),
-                    "omm" => crate::traits::Ndm::from_xml(s).map(MessageType::Omm),
-                    "rdm" => crate::traits::Ndm::from_xml(s).map(MessageType::Rdm),
-                    "tdm" => crate::traits::Ndm::from_xml(s).map(MessageType::Tdm),
-                    "ocm" => crate::traits::Ndm::from_xml(s).map(MessageType::Ocm),
-                    "acm" => crate::traits::Ndm::from_xml(s).map(MessageType::Acm),
-                    "aem" => crate::traits::Ndm::from_xml(s).map(MessageType::Aem),
-                    "apm" => crate::traits::Ndm::from_xml(s).map(MessageType::Apm),
-                    "ndm" => crate::traits::Ndm::from_xml(s).map(MessageType::Ndm),
-                    _ => Err(CcsdsNdmError::UnsupportedMessage(format!(
-                        "Unknown or unsupported XML root tag: <{}>",
-                        name
-                    ))),
-                };
+                // Calculate the start position of this tag (pointing to '<')
+                let offset = s[pos as usize..]
+                    .find('<')
+                    .map(|relative_offset| pos as usize + relative_offset)
+                    .unwrap_or(pos as usize);
+                let sliced_s = &s[offset..];
+
+                match name.as_str() {
+                    "oem" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Oem),
+                    "cdm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Cdm),
+                    "opm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Opm),
+                    "omm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Omm),
+                    "rdm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Rdm),
+                    "tdm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Tdm),
+                    "ocm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Ocm),
+                    "acm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Acm),
+                    "aem" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Aem),
+                    "apm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Apm),
+                    "ndm" | "message" => {
+                        let combined =
+                            crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Ndm)?;
+                        // If it's a CombinedNdm containing exactly one message and no global comments/ID,
+                        // flatten it to that specific message type for improved usability and test compatibility.
+                        if let MessageType::Ndm(ref c) = combined {
+                            if c.messages.len() == 1 && c.id.is_none() && c.comments.is_empty() {
+                                return Ok(c.messages[0].clone());
+                            }
+                        }
+                        return Ok(combined);
+                    }
+                    _ => {
+                        // Unknown tag, skip and keep looking for a valid CCSDS root
+                        // recursive search allows handling non-standard wrappers like <response> or <message> (handled above)
+                        continue;
+                    }
+                }
             }
             Ok(Event::Decl(_))
             | Ok(Event::Comment(_))
