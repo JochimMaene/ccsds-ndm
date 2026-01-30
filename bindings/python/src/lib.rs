@@ -25,7 +25,7 @@ pub mod attitude;
 pub mod errors;
 
 use cdm::*;
-use common::{OdmHeader, AdmHeader, StateVector, StateVectorAcc};
+use common::{OdmHeader, AdmHeader, StateVector, StateVectorAcc, ObjectDescription, YesNo, ControlledType, ReferenceFrame, TimeSystem};
 use errors::ccsds_error_to_pyerr;
 use ndm::Ndm;
 use oem::*;
@@ -185,6 +185,8 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<tdm::TdmMetadata>()?;
     m.add_class::<tdm::TdmData>()?;
     m.add_class::<tdm::TdmObservation>()?;
+    m.add_class::<tdm::TdmMode>()?;
+    m.add_class::<tdm::TdmPath>()?;
 
     // Register RDM wrapper classes
     m.add_class::<rdm::Rdm>()?;
@@ -253,6 +255,11 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<CovarianceMethodType>()?;
     m.add_class::<ManeuverableType>()?;
     m.add_class::<ObjectDescription>()?;
+    m.add_class::<YesNo>()?;
+    m.add_class::<ControlledType>()?;
+    m.add_class::<ReferenceFrame>()?;
+    m.add_class::<TimeSystem>()?;
 
     Ok(())
 }
+

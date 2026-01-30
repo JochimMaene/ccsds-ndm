@@ -7,7 +7,11 @@ use ccsds_ndm::common as core_common;
 use ccsds_ndm::messages::rdm as core_rdm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{self as core_types, *};
-use crate::common::{GroundImpactParameters, OdParameters, StateVector};
+use crate::common::{
+    GroundImpactParameters, OdParameters, StateVector,
+    ObjectDescription, ControlledType, ReferenceFrame, TimeSystem,
+    parse_object_description, parse_controlled_type, parse_reference_frame, parse_time_system
+};
 use crate::opm::OpmCovarianceMatrix;
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
@@ -449,9 +453,9 @@ impl RdmMetadata {
         object_name,
         international_designator,
         epoch_tzero,
-        controlled_reentry=String::from("UNKNOWN"),
+        controlled_reentry=None,
         center_name=String::from("EARTH"),
-        time_system=String::from("UTC"),
+        time_system=None,
         catalog_name=None,
         object_designator=None,
         object_type=None,
@@ -482,16 +486,17 @@ impl RdmMetadata {
         object_name: String,
         international_designator: String,
         epoch_tzero: String,
-        controlled_reentry: String,
+        controlled_reentry: Option<Bound<'_, PyAny>>,
         center_name: String,
-        time_system: String,
+        time_system: Option<Bound<'_, PyAny>>,
 
         catalog_name: Option<String>,
         object_designator: Option<String>,
-        object_type: Option<String>,
+        object_type: Option<Bound<'_, PyAny>>,
         object_owner: Option<String>,
         object_operator: Option<String>,
-        ref_frame: Option<String>,
+        ref_frame: Option<Bound<'_, PyAny>>,
+
         ref_frame_epoch: Option<String>,
         ephemeris_name: Option<String>,
         gravity_model: Option<String>,
@@ -513,31 +518,23 @@ impl RdmMetadata {
     ) -> PyResult<Self> {
         use std::str::FromStr;
 
-        let controlled_reentry_enum = ControlledType::from_str(&controlled_reentry)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let controlled_reentry_enum = match controlled_reentry {
+            Some(ref ob) => parse_controlled_type(ob)?,
+            None => ccsds_ndm::types::ControlledType::Unknown,
+        };
 
         let object_type_enum = match object_type {
-            Some(s) => {
-                let desc = ObjectDescription::from_str(&s)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?;
-                Some(match desc {
-                    ObjectDescription::Payload | ObjectDescription::PayloadLower => {
-                        core_types::ObjectDescription::Payload
-                    }
-                    ObjectDescription::RocketBody | ObjectDescription::RocketBodyLower => {
-                        core_types::ObjectDescription::RocketBody
-                    }
-                    ObjectDescription::Debris | ObjectDescription::DebrisLower => {
-                        core_types::ObjectDescription::Debris
-                    }
-                    ObjectDescription::Unknown | ObjectDescription::UnknownLower => {
-                        core_types::ObjectDescription::Unknown
-                    }
-                    ObjectDescription::Other | ObjectDescription::OtherLower => {
-                        core_types::ObjectDescription::Other
-                    }
-                })
-            }
+            Some(ref ob) => Some(parse_object_description(ob)?),
+            None => None,
+        };
+
+        let time_system = match time_system {
+            Some(ref ob) => parse_time_system(ob)?,
+            None => "UTC".to_string(),
+        };
+
+        let ref_frame = match ref_frame {
+            Some(ref ob) => Some(parse_reference_frame(ob)?),
             None => None,
         };
 
@@ -695,7 +692,7 @@ impl RdmMetadata {
         use std::str::FromStr;
         self.inner.object_type = match v {
             Some(s) => Some(
-                ObjectDescription::from_str(&s)
+                core_types::ObjectDescription::from_str(&s)
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
             ),
             None => None,
@@ -748,7 +745,7 @@ impl RdmMetadata {
     fn set_controlled_reentry(&mut self, v: String) -> PyResult<()> {
         use std::str::FromStr;
         self.inner.controlled_reentry =
-            ControlledType::from_str(&v).map_err(|e| PyValueError::new_err(e.to_string()))?;
+            core_types::ControlledType::from_str(&v).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 

@@ -12,6 +12,8 @@ use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
+use crate::common::{ReferenceFrame, TimeSystem, parse_reference_frame, parse_time_system};
+
 use std::str::FromStr;
 
 /// Attitude Ephemeris Message (AEM).
@@ -85,6 +87,17 @@ impl Aem {
             "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
             "xml" => self.inner.to_xml().map_err(|e| PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!("Unsupported format '{}'", other))),
+        }
+    }
+
+    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
+        let data = self.to_str(format)?;
+        match fs::write(path, data) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Failed to write file: {}",
+                e
+            ))),
         }
     }
 
@@ -174,11 +187,11 @@ impl AemMetadata {
     #[pyo3(signature = (
         object_name,
         object_id,
-        ref_frame_a,
-        ref_frame_b,
-        start_time,
-        stop_time,
-        time_system=String::from("UTC"),
+        ref_frame_a=None,
+        ref_frame_b=None,
+        start_time=None,
+        stop_time=None,
+        time_system=None,
         attitude_type=String::from("QUATERNION"),
         center_name=None,
         useable_start_time=None,
@@ -192,11 +205,11 @@ impl AemMetadata {
     fn new(
         object_name: String,
         object_id: String,
-        ref_frame_a: String,
-        ref_frame_b: String,
-        start_time: String,
-        stop_time: String,
-        time_system: String,
+        ref_frame_a: Option<Bound<'_, PyAny>>,
+        ref_frame_b: Option<Bound<'_, PyAny>>,
+        start_time: Option<String>,
+        stop_time: Option<String>,
+        time_system: Option<Bound<'_, PyAny>>,
         attitude_type: String,
         center_name: Option<String>,
         useable_start_time: Option<String>,
@@ -208,6 +221,22 @@ impl AemMetadata {
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         use std::num::NonZeroU32;
+
+        let time_system = match time_system {
+            Some(ref ob) => parse_time_system(ob)?,
+            None => "UTC".to_string(),
+        };
+        let ref_frame_a = match ref_frame_a {
+            Some(ref ob) => parse_reference_frame(ob)?,
+            None => "GCRF".to_string(),
+        };
+        let ref_frame_b = match ref_frame_b {
+            Some(ref ob) => parse_reference_frame(ob)?,
+            None => "GCRF".to_string(),
+        };
+        let start_time = start_time.ok_or_else(|| PyValueError::new_err("start_time is required"))?;
+        let stop_time = stop_time.ok_or_else(|| PyValueError::new_err("stop_time is required"))?;
+
         Ok(Self {
             inner: core_aem::AemMetadata {
                 comment: comment.unwrap_or_default(),
@@ -230,6 +259,7 @@ impl AemMetadata {
             },
         })
     }
+
 
 
     /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
@@ -581,5 +611,15 @@ impl AttitudeState {
             epoch: parse_epoch(&epoch)?,
             values,
         })
+    }
+
+    #[getter]
+    fn get_epoch(&self) -> String {
+        self.epoch.as_str().to_string()
+    }
+
+    #[getter]
+    fn get_values(&self) -> Vec<f64> {
+        self.values.clone()
     }
 }

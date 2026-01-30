@@ -10,6 +10,8 @@ use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
+use crate::common::{TimeSystem, parse_time_system};
+
 
 /// Attitude Comprehensive Message (ACM).
 ///
@@ -84,6 +86,17 @@ impl Acm {
             "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
             "xml" => self.inner.to_xml().map_err(|e| PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!("Unsupported format '{}'", other))),
+        }
+    }
+
+    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
+        let data = self.to_str(format)?;
+        match fs::write(path, data) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Failed to write file: {}",
+                e
+            ))),
         }
     }
 
@@ -172,17 +185,22 @@ impl AcmMetadata {
     #[pyo3(signature = (
         object_name,
         epoch_tzero,
-        time_system=String::from("UTC"),
+        time_system=None,
         international_designator=None,
         comment=None
     ))]
     fn new(
         object_name: String,
         epoch_tzero: String,
-        time_system: String,
+        time_system: Option<Bound<'_, PyAny>>,
         international_designator: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
+        let time_system = match time_system {
+            Some(ref ob) => parse_time_system(ob)?,
+            None => "UTC".to_string(),
+        };
+
         Ok(Self {
             inner: core_acm::AcmMetadata {
                 comment: comment.unwrap_or_default(),

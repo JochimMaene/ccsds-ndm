@@ -14,6 +14,8 @@ use numpy::{PyArray, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2, PyUntyp
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
+use crate::common::{ReferenceFrame, TimeSystem, parse_reference_frame, parse_time_system};
+
 use std::num::NonZeroU32;
 
 /// Orbit Ephemeris Message (OEM).
@@ -344,6 +346,8 @@ impl Oem {
             ))),
         }
     }
+
+
 }
 
 #[pymethods]
@@ -410,8 +414,8 @@ impl OemMetadata {
         start_time,
         stop_time,
         center_name=String::from("EARTH"),
-        ref_frame=String::from("GCRF"),
-        time_system=String::from("UTC"),
+        ref_frame=None,
+        time_system=None,
         ref_frame_epoch=None,
         useable_start_time=None,
         useable_stop_time=None,
@@ -425,8 +429,8 @@ impl OemMetadata {
         start_time: String,
         stop_time: String,
         center_name: String,
-        ref_frame: String,
-        time_system: String,
+        ref_frame: Option<Bound<'_, PyAny>>,
+        time_system: Option<Bound<'_, PyAny>>,
         ref_frame_epoch: Option<String>,
         useable_start_time: Option<String>,
         useable_stop_time: Option<String>,
@@ -434,8 +438,17 @@ impl OemMetadata {
         interpolation_degree: Option<u32>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
+        let ref_frame = match ref_frame {
+            Some(ref ob) => parse_reference_frame(ob)?,
+            None => "GCRF".to_string(),
+        };
+        let time_system = match time_system {
+            Some(ref ob) => parse_time_system(ob)?,
+            None => "UTC".to_string(),
+        };
 
         Ok(Self {
+
             inner: core_oem::OemMetadata {
                 object_name,
                 object_id,

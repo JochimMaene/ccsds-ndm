@@ -9,8 +9,9 @@ use ccsds_ndm::MessageType;
 use numpy::PyArray2;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use crate::common::OdParameters;
 use std::fs;
+use crate::common::{OdParameters, ObjectDescription, parse_object_description};
+
 
 // Helper to parse epoch strings
 fn parse_epoch_str(value: &str) -> PyResult<Epoch> {
@@ -176,6 +177,8 @@ impl Cdm {
             ))),
         }
     }
+
+
 
     /// Conjunction Data Message (CDM).
     ///
@@ -1029,13 +1032,6 @@ impl CdmMetadata {
             }
         };
 
-        let map_desc = |d: ObjectDescription| match d {
-            ObjectDescription::Payload => core_types::ObjectDescription::Payload,
-            ObjectDescription::RocketBody => core_types::ObjectDescription::RocketBody,
-            ObjectDescription::Debris => core_types::ObjectDescription::Debris,
-            ObjectDescription::Unknown => core_types::ObjectDescription::Unknown,
-            ObjectDescription::Other => core_types::ObjectDescription::Other,
-        };
 
         Ok(Self {
             inner: core_cdm::CdmMetadata {
@@ -1049,7 +1045,7 @@ impl CdmMetadata {
                 covariance_method: map_cov(covariance_method),
                 maneuverable: map_man(maneuverable),
                 ref_frame: map_ref(ref_frame),
-                object_type: object_type.map(map_desc),
+                object_type,
                 operator_contact_position,
                 operator_organization,
                 operator_phone,
@@ -1919,50 +1915,9 @@ fn parse_maneuverable_type(ob: &Bound<'_, PyAny>) -> PyResult<ManeuverableType> 
     }
 }
 
-#[pyclass(eq, eq_int)]
-#[derive(Clone, PartialEq)]
-pub enum ObjectDescription {
-    Payload,
-    RocketBody,
-    Debris,
-    Unknown,
-    Other,
-}
 
-#[pymethods]
-impl ObjectDescription {
-    fn __str__(&self) -> &'static str {
-        match self {
-            ObjectDescription::Payload => "PAYLOAD",
-            ObjectDescription::RocketBody => "ROCKET BODY",
-            ObjectDescription::Debris => "DEBRIS",
-            ObjectDescription::Unknown => "UNKNOWN",
-            ObjectDescription::Other => "OTHER",
-        }
-    }
-    fn __repr__(&self) -> String {
-        format!("ObjectDescription.{}", self.__str__())
-    }
-}
 
-/// Parse ObjectDescription from either an enum variant or a string.
-fn parse_object_description(ob: &Bound<'_, PyAny>) -> PyResult<ObjectDescription> {
-    if let Ok(val) = ob.extract::<ObjectDescription>() {
-        return Ok(val);
-    }
-    let s: String = ob.extract()?;
-    match s.to_uppercase().as_str() {
-        "PAYLOAD" => Ok(ObjectDescription::Payload),
-        "ROCKET BODY" | "ROCKET_BODY" | "ROCKETBODY" => Ok(ObjectDescription::RocketBody),
-        "DEBRIS" => Ok(ObjectDescription::Debris),
-        "UNKNOWN" => Ok(ObjectDescription::Unknown),
-        "OTHER" => Ok(ObjectDescription::Other),
-        other => Err(PyValueError::new_err(format!(
-            "Invalid ObjectDescription: '{}'. Expected 'PAYLOAD', 'ROCKET BODY', 'DEBRIS', 'UNKNOWN', or 'OTHER'",
-            other
-        ))),
-    }
-}
+
 
 
 /// Additional Parameters.

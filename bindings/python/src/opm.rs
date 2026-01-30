@@ -4,6 +4,7 @@
 
 use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_epoch;
+use crate::common::{ReferenceFrame, TimeSystem, parse_reference_frame, parse_time_system};
 use ccsds_ndm::messages::opm as core_opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{
@@ -297,8 +298,8 @@ impl OpmMetadata {
         object_name,
         object_id,
         center_name=String::from("EARTH"),
-        ref_frame=String::from("GCRF"),
-        time_system=String::from("UTC"),
+        ref_frame=None,
+        time_system=None,
         ref_frame_epoch=None,
         comment=None
     ))]
@@ -306,11 +307,20 @@ impl OpmMetadata {
         object_name: String,
         object_id: String,
         center_name: String,
-        ref_frame: String,
-        time_system: String,
+        ref_frame: Option<Bound<'_, PyAny>>,
+        time_system: Option<Bound<'_, PyAny>>,
         ref_frame_epoch: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
+        let ref_frame = match ref_frame {
+            Some(ref ob) => parse_reference_frame(ob)?,
+            None => "GCRF".to_string(),
+        };
+        let time_system = match time_system {
+            Some(ref ob) => parse_time_system(ob)?,
+            None => "UTC".to_string(),
+        };
+
         Ok(Self {
             inner: core_opm::OpmMetadata {
                 object_name,
@@ -323,6 +333,7 @@ impl OpmMetadata {
             },
         })
     }
+
 
 
     fn __repr__(&self) -> String {

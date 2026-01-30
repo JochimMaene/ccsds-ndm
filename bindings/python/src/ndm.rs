@@ -133,6 +133,25 @@ impl Ndm {
         }
     }
 
+    /// Write to file.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str
+    ///     Output file path.
+    /// format : str
+    ///     Output format ('kvn' or 'xml').
+    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
+        let data = self.to_str(format)?;
+        match fs::write(path, data) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Failed to write file: {}",
+                e
+            ))),
+        }
+    }
+
     /// List of contained navigation messages.
     ///
     /// :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]

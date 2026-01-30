@@ -11,6 +11,8 @@ use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
+use crate::common::{ObjectDescription, TimeSystem, parse_object_description, parse_time_system};
+
 
 /// Orbit Comprehensive Message (OCM).
 ///
@@ -409,7 +411,7 @@ impl OcmMetadata {
     #[pyo3(signature = (
         *,
         epoch_tzero,
-        time_system=String::from("UTC"),
+        time_system=None,
         object_name=None,
 
         international_designator=None,
@@ -461,8 +463,9 @@ impl OcmMetadata {
     #[allow(clippy::too_many_arguments)]
     fn new(
         epoch_tzero: String,
-        time_system: String,
+        time_system: Option<Bound<'_, PyAny>>,
         object_name: Option<String>,
+
 
         international_designator: Option<String>,
         catalog_name: Option<String>,
@@ -490,7 +493,7 @@ impl OcmMetadata {
         owner: Option<String>,
         country: Option<String>,
         constellation: Option<String>,
-        object_type: Option<String>,
+        object_type: Option<Bound<'_, PyAny>>,
         ops_status: Option<String>,
         orbit_category: Option<String>,
         ocm_data_elements: Option<String>,
@@ -511,6 +514,16 @@ impl OcmMetadata {
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         use ccsds_ndm::types::{DayInterval, TimeOffset};
+
+        let time_system = match time_system {
+            Some(ref ob) => parse_time_system(ob)?,
+            None => "UTC".to_string(),
+        };
+
+        let object_type_enum = match object_type {
+            Some(ref ob) => Some(parse_object_description(ob)?),
+            None => None,
+        };
 
         Ok(Self {
             inner: core_ocm::OcmMetadata {
@@ -542,11 +555,7 @@ impl OcmMetadata {
                 owner,
                 country,
                 constellation,
-                object_type: object_type.map(|s| s.parse()).transpose().map_err(
-                    |e: ccsds_ndm::error::EnumParseError| {
-                        PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
-                    },
-                )?,
+                object_type: object_type_enum,
                 time_system,
                 epoch_tzero: parse_epoch(&epoch_tzero)?,
                 ops_status,

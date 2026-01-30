@@ -7,6 +7,7 @@ use ccsds_ndm::common as core_common;
 use ccsds_ndm::types::{Acc, Position, Velocity};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use std::str::FromStr;
 
 /// Represents the `odmHeader` complex type.
 ///
@@ -1659,3 +1660,243 @@ impl GroundImpactParameters {
     }
     #[setter] fn set_impact_3_cross_track(&mut self, v: Option<f64>) { self.inner.impact_3_cross_track = v.map(|x| ccsds_ndm::types::Position::new(x, None)); }
 }
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq)]
+pub enum YesNo {
+    Yes,
+    No,
+}
+
+#[pymethods]
+impl YesNo {
+    fn __str__(&self) -> &'static str {
+        match self {
+            YesNo::Yes => "YES",
+            YesNo::No => "NO",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("YesNo.{}", self.__str__())
+    }
+}
+
+impl FromStr for YesNo {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "YES" => Ok(YesNo::Yes),
+            "NO" => Ok(YesNo::No),
+            _ => Err(format!("Invalid YesNo: {}", s)),
+        }
+    }
+}
+
+
+pub fn parse_yes_no(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::YesNo> {
+    use std::str::FromStr;
+    if let Ok(val) = ob.extract::<YesNo>() {
+        Ok(match val {
+            YesNo::Yes => ccsds_ndm::types::YesNo::Yes,
+            YesNo::No => ccsds_ndm::types::YesNo::No,
+        })
+    } else if let Ok(s) = ob.extract::<String>() {
+        ccsds_ndm::types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+    } else {
+        Err(PyValueError::new_err(
+            "Expected YesNo enum or string",
+        ))
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq, Copy)]
+pub enum ObjectDescription {
+    Payload,
+    RocketBody,
+    Debris,
+    Unknown,
+    Other,
+}
+
+#[pymethods]
+impl ObjectDescription {
+    fn __str__(&self) -> &'static str {
+        match self {
+            ObjectDescription::Payload => "PAYLOAD",
+            ObjectDescription::RocketBody => "ROCKET BODY",
+            ObjectDescription::Debris => "DEBRIS",
+            ObjectDescription::Unknown => "UNKNOWN",
+            ObjectDescription::Other => "OTHER",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("ObjectDescription.{}", self.__str__())
+    }
+}
+
+impl FromStr for ObjectDescription {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "PAYLOAD" => Ok(ObjectDescription::Payload),
+            "ROCKET BODY" | "ROCKET_BODY" | "ROCKETBODY" => Ok(ObjectDescription::RocketBody),
+            "DEBRIS" => Ok(ObjectDescription::Debris),
+            "UNKNOWN" | "N/A" => Ok(ObjectDescription::Unknown),
+            "OTHER" => Ok(ObjectDescription::Other),
+            _ => Err(format!("Invalid ObjectDescription: {}", s)),
+        }
+    }
+}
+
+
+pub fn parse_object_description(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::ObjectDescription> {
+    if let Ok(val) = ob.extract::<ObjectDescription>() {
+        Ok(match val {
+            ObjectDescription::Payload => ccsds_ndm::types::ObjectDescription::Payload,
+            ObjectDescription::RocketBody => ccsds_ndm::types::ObjectDescription::RocketBody,
+            ObjectDescription::Debris => ccsds_ndm::types::ObjectDescription::Debris,
+            ObjectDescription::Unknown => ccsds_ndm::types::ObjectDescription::Unknown,
+            ObjectDescription::Other => ccsds_ndm::types::ObjectDescription::Other,
+        })
+    } else if let Ok(s) = ob.extract::<String>() {
+        ccsds_ndm::types::ObjectDescription::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+    } else {
+        Err(PyValueError::new_err(
+            "Expected ObjectDescription enum or string",
+        ))
+    }
+}
+
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq, Copy)]
+pub enum ControlledType {
+    Yes,
+    No,
+    Unknown,
+}
+
+#[pymethods]
+impl ControlledType {
+    fn __str__(&self) -> &'static str {
+        match self {
+            ControlledType::Yes => "YES",
+            ControlledType::No => "NO",
+            ControlledType::Unknown => "UNKNOWN",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("ControlledType.{}", self.__str__())
+    }
+}
+
+impl FromStr for ControlledType {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "YES" => Ok(ControlledType::Yes),
+            "NO" => Ok(ControlledType::No),
+            "UNKNOWN" => Ok(ControlledType::Unknown),
+            _ => Err(format!("Invalid ControlledType: {}", s)),
+        }
+    }
+}
+
+
+pub fn parse_controlled_type(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::ControlledType> {
+    use std::str::FromStr;
+    if let Ok(val) = ob.extract::<ControlledType>() {
+        Ok(match val {
+            ControlledType::Yes => ccsds_ndm::types::ControlledType::Yes,
+            ControlledType::No => ccsds_ndm::types::ControlledType::No,
+            ControlledType::Unknown => ccsds_ndm::types::ControlledType::Unknown,
+        })
+    } else if let Ok(s) = ob.extract::<String>() {
+        ccsds_ndm::types::ControlledType::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+    } else {
+        Err(PyValueError::new_err(
+            "Expected ControlledType enum or string",
+        ))
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq, Copy)]
+pub enum ReferenceFrame {
+    Gcrf,
+    Teme,
+    Itrf,
+    J2000,
+    Eme2000,
+}
+
+#[pymethods]
+impl ReferenceFrame {
+    fn __str__(&self) -> &'static str {
+        match self {
+            ReferenceFrame::Gcrf => "GCRF",
+            ReferenceFrame::Teme => "TEME",
+            ReferenceFrame::Itrf => "ITRF",
+            ReferenceFrame::J2000 => "J2000",
+            ReferenceFrame::Eme2000 => "EME2000",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("ReferenceFrame.{}", self.__str__())
+    }
+}
+
+pub fn parse_reference_frame(ob: &Bound<'_, PyAny>) -> PyResult<String> {
+    if let Ok(val) = ob.extract::<ReferenceFrame>() {
+        Ok(val.__str__().to_string())
+    } else if let Ok(s) = ob.extract::<String>() {
+        Ok(s)
+    } else {
+        Err(PyValueError::new_err(
+            "Expected ReferenceFrame enum or string",
+        ))
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq, Copy)]
+pub enum TimeSystem {
+    Utc,
+    Tai,
+    Gps,
+    Sclk,
+    Tdb,
+    Ut1,
+}
+
+#[pymethods]
+impl TimeSystem {
+    fn __str__(&self) -> &'static str {
+        match self {
+            TimeSystem::Utc => "UTC",
+            TimeSystem::Tai => "TAI",
+            TimeSystem::Gps => "GPS",
+            TimeSystem::Sclk => "SCLK",
+            TimeSystem::Tdb => "TDB",
+            TimeSystem::Ut1 => "UT1",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("TimeSystem.{}", self.__str__())
+    }
+}
+
+pub fn parse_time_system(ob: &Bound<'_, PyAny>) -> PyResult<String> {
+    if let Ok(val) = ob.extract::<TimeSystem>() {
+        Ok(val.__str__().to_string())
+    } else if let Ok(s) = ob.extract::<String>() {
+        Ok(s)
+    } else {
+        Err(PyValueError::new_err(
+            "Expected TimeSystem enum or string",
+        ))
+    }
+}
+
+
