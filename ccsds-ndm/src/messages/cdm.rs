@@ -743,8 +743,12 @@ pub struct CdmData {
     #[serde(rename = "stateVector")]
     pub state_vector: CdmStateVector,
     /// Covariance Matrix.
-    #[serde(rename = "covarianceMatrix")]
-    pub covariance_matrix: CdmCovarianceMatrix,
+    #[serde(
+        rename = "covarianceMatrix",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub covariance_matrix: Option<CdmCovarianceMatrix>,
 }
 
 impl ToKvn for CdmData {
@@ -815,7 +819,9 @@ impl ToKvn for CdmData {
         // State Vector
         self.state_vector.write_kvn(writer);
         // Covariance
-        self.covariance_matrix.write_kvn(writer);
+        if let Some(cov) = &self.covariance_matrix {
+            cov.write_kvn(writer);
+        }
     }
 }
 
@@ -1626,11 +1632,15 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         assert!(cdm.body.segments[0]
             .data
             .covariance_matrix
+            .as_ref()
+            .unwrap()
             .cthr_thr
             .is_some());
         assert!(cdm2.body.segments[0]
             .data
             .covariance_matrix
+            .as_ref()
+            .unwrap()
             .cthr_thr
             .is_some());
     }

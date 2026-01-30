@@ -60,6 +60,34 @@ pub fn till_space_or_eol<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     preceded(ws, take_till(1.., (' ', '\t', '\r', '\n'))).parse_next(input)
 }
 
+/// Parses a float and its optional unit from a KVN line, allowing empty input.
+/// Returns Ok((None, u)) if no float found (but valid line end or unit-only).
+pub fn kv_float_unit_opt<'a>(input: &mut &'a str) -> KvnResult<(Option<f64>, Option<&'a str>)> {
+    ws.parse_next(input)?;
+
+    // Try to parse a float (peek first to ensure we don't consume partial match tokens if not float?)
+    // parse_f64_winnow works by take_while. If it takes nothing, it fails.
+    if peek(parse_f64_winnow).parse_next(input).is_ok() {
+        let f = parse_f64_winnow.parse_next(input)?;
+        let u = kv_unit.parse_next(input)?;
+        opt_line_ending.parse_next(input)?;
+        Ok((Some(f), u))
+    } else {
+        // No float. Could be just unit, or empty.
+        let u = kv_unit.parse_next(input)?;
+        
+        // After optional unit, we MUST be at end of line/comment or whitespace.
+        // If there's still non-whitespace content, it's invalid (garbage).
+        let remainder = till_line_ending.parse_next(input)?;
+        if !remainder.trim().is_empty() {
+             return Err(cut_err(input, "Invalid float value"));
+        }
+        
+        opt_line_ending.parse_next(input)?;
+        Ok((None, u))
+    }
+}
+
 //----------------------------------------------------------------------
 // Error Handling
 //----------------------------------------------------------------------
@@ -396,6 +424,46 @@ pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     })
 }
 
+/// Parses an optional u32 value from a KVN line.
+pub fn kv_u32_opt(input: &mut &str) -> KvnResult<Option<u32>> {
+    let checkpoint = input.checkpoint();
+    ws.parse_next(input)?;
+
+    // Check if line contains only whitespace/unit or is empty
+    let remainder = peek(till_line_ending).parse_next(input)?;
+    if remainder.trim().is_empty() || remainder.trim().starts_with('[') {
+       let _ = kv_unit.parse_next(input)?;
+       opt_line_ending.parse_next(input)?;
+       return Ok(None);
+    }
+
+    terminated(
+        (
+            take_while(1.., '0'..='9')
+                .map(|s: &str| s.parse::<u32>())
+                .verify(|res| res.is_ok())
+                .map(|res| res.ok()),
+            kv_unit,
+        )
+            .map(|(u, _)| u),
+        opt_line_ending,
+    )
+    .parse_next(input)
+    .map_err(|e| {
+        if e.is_backtrack() {
+            let mut err = InternalParserError::from_input(input);
+            err.message = std::borrow::Cow::Borrowed("Invalid unsigned integer");
+            ErrMode::Cut(err.add_context(
+                input,
+                &checkpoint,
+                StrContext::Label("Invalid unsigned integer"),
+            ))
+        } else {
+            e
+        }
+    })
+}
+
 /// Fast u64 parser for KVN values.
 pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
     let checkpoint = input.checkpoint();
@@ -405,6 +473,46 @@ pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
                 .map(|s: &str| s.parse::<u64>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
+            kv_unit,
+        )
+            .map(|(u, _)| u),
+        opt_line_ending,
+    )
+    .parse_next(input)
+    .map_err(|e| {
+        if e.is_backtrack() {
+            let mut err = InternalParserError::from_input(input);
+            err.message = std::borrow::Cow::Borrowed("Invalid unsigned integer");
+            ErrMode::Cut(err.add_context(
+                input,
+                &checkpoint,
+                StrContext::Label("Invalid unsigned integer"),
+            ))
+        } else {
+            e
+        }
+    })
+}
+
+/// Parses an optional u64 value from a KVN line.
+pub fn kv_u64_opt(input: &mut &str) -> KvnResult<Option<u64>> {
+    let checkpoint = input.checkpoint();
+    ws.parse_next(input)?;
+
+    // Check if line contains only whitespace/unit or is empty
+    let remainder = peek(till_line_ending).parse_next(input)?;
+    if remainder.trim().is_empty() || remainder.trim().starts_with('[') {
+       let _ = kv_unit.parse_next(input)?;
+       opt_line_ending.parse_next(input)?;
+       return Ok(None);
+    }
+
+    terminated(
+        (
+            take_while(1.., '0'..='9')
+                .map(|s: &str| s.parse::<u64>())
+                .verify(|res| res.is_ok())
+                .map(|res| res.ok()),
             kv_unit,
         )
             .map(|(u, _)| u),
@@ -448,11 +556,36 @@ pub fn kv_string(input: &mut &str) -> KvnResult<String> {
     Ok(v.trim().to_string())
 }
 
+/// Parses an optional string value from a KVN line.
+/// Returns None if empty.
+pub fn kv_string_opt(input: &mut &str) -> KvnResult<Option<String>> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    let trimmed = v.trim();
+    if trimmed.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(trimmed.to_string()))
+    }
+}
+
 /// Parses an Epoch value from a KVN line.
 pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     Epoch::from_str(v.trim())
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+}
+
+/// Parses an optional Epoch value from a KVN line.
+pub fn kv_epoch_opt(input: &mut &str) -> KvnResult<Option<Epoch>> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    let trimmed = v.trim();
+    if trimmed.is_empty() {
+        Ok(None)
+    } else {
+        Epoch::from_str(trimmed)
+            .map(Some)
+            .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    }
 }
 
 /// Parses an Epoch value as a single token (until next space).
@@ -469,6 +602,19 @@ pub fn kv_yes_no(input: &mut &str) -> KvnResult<YesNo> {
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
+/// Parses an optional boolean (YES/NO) from a KVN line.
+pub fn kv_yes_no_opt(input: &mut &str) -> KvnResult<Option<YesNo>> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    let trimmed = v.trim();
+    if trimmed.is_empty() {
+        Ok(None)
+    } else {
+        YesNo::from_str(trimmed)
+            .map(Some)
+            .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    }
+}
+
 /// Parses any type that implements FromStr from a KVN line.
 pub fn kv_enum<T: FromStr>(input: &mut &str) -> KvnResult<T>
 where
@@ -483,6 +629,27 @@ where
     })
 }
 
+/// Parses an optional type that implements FromStr from a KVN line.
+pub fn kv_enum_opt<T: FromStr>(input: &mut &str) -> KvnResult<Option<T>>
+where
+    EnumParseError: From<T::Err>,
+{
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    let trimmed = v.trim();
+    if trimmed.is_empty() {
+        Ok(None)
+    } else {
+        T::from_str(trimmed)
+            .map(Some)
+            .map_err(|e| {
+                ErrMode::Cut(InternalParserError::from_external_error(
+                    input,
+                    EnumParseError::from(e),
+                ))
+            })
+    }
+}
+
 /// Parses a value from a KVN line using the `FromKvnValue` trait.
 pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
     let (v, _) = kv_rest.parse_next(input)?;
@@ -495,6 +662,18 @@ pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
     let (v, u) = kv_float_unit.parse_next(input)?;
     T::from_kvn_float(v, u)
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+}
+
+/// Parses any optional type that implements FromKvnFloat from a KVN line.
+pub fn kv_from_kvn_opt<T: FromKvnFloat>(input: &mut &str) -> KvnResult<Option<T>> {
+    let (v, u) = kv_float_unit_opt.parse_next(input)?;
+    if let Some(val) = v {
+        T::from_kvn_float(val, u)
+            .map(Some)
+            .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Parses a float and its optional unit from a KVN line.
