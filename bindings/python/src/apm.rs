@@ -11,7 +11,7 @@ use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
-use crate::common::{TimeSystem, parse_time_system};
+use crate::common::{parse_time_system};
 
 
 /// Attitude Parameter Message (APM).

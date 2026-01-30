@@ -9,7 +9,6 @@ use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{self as core_types, *};
 use crate::common::{
     GroundImpactParameters, OdParameters, StateVector,
-    ObjectDescription, ControlledType, ReferenceFrame, TimeSystem,
     parse_object_description, parse_controlled_type, parse_reference_frame, parse_time_system
 };
 use crate::opm::OpmCovarianceMatrix;
@@ -17,7 +16,6 @@ use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
-use std::str::FromStr;
 
 // ============================================================================
 // RDM - Re-entry Data Message

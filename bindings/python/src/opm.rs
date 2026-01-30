@@ -4,11 +4,11 @@
 
 use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_epoch;
-use crate::common::{ReferenceFrame, TimeSystem, parse_reference_frame, parse_time_system};
+use crate::common::{parse_reference_frame, parse_time_system};
 use ccsds_ndm::messages::opm as core_opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{
-    Angle, Distance, Gm, Inclination, UserDefined as CoreUserDefined, UserDefinedParameter,
+    Angle, Distance, Gm, Inclination,
 };
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;

@@ -5,11 +5,11 @@
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::tdm as core_tdm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::types::{self as core_types, *};
+use ccsds_ndm::types::{self as core_types};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use crate::common::{TimeSystem, parse_time_system, parse_yes_no};
+use crate::common::{parse_time_system, parse_yes_no};
 use std::fs;
 use std::str::FromStr;
 
@@ -638,10 +638,6 @@ impl TdmMetadata {
         ephemeris_name_5: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        use ccsds_ndm::types::{
-            TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath, TdmRangeMode,
-            TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
-        };
         use std::str::FromStr;
 
         let time_system = match time_system {
@@ -731,7 +727,7 @@ impl TdmMetadata {
                 doppler_count_bias,
                 doppler_count_scale,
                 doppler_count_rollover: doppler_count_rollover
-                    .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .map(|s| core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
                     .transpose()?,
                 transmit_delay_1,
                 transmit_delay_2,
@@ -1423,10 +1419,9 @@ impl TdmMetadata {
     }
     #[setter]
     fn set_doppler_count_rollover(&mut self, value: Option<String>) -> PyResult<()> {
-        use ccsds_ndm::types::YesNo;
         use std::str::FromStr;
         self.inner.doppler_count_rollover = value
-            .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .map(|s| core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
             .transpose()?;
         Ok(())
     }
@@ -1769,10 +1764,9 @@ impl TdmMetadata {
     }
     #[setter]
     fn set_corrections_applied(&mut self, value: Option<String>) -> PyResult<()> {
-        use ccsds_ndm::types::YesNo;
         use std::str::FromStr;
         self.inner.corrections_applied = value
-            .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .map(|s| core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
             .transpose()?;
         Ok(())
     }

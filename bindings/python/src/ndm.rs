@@ -36,7 +36,7 @@ pub struct Ndm {
 impl Ndm {
     #[new]
     #[pyo3(signature = (messages, id=None, comments=vec![]))]
-    fn new(messages: Vec<PyObject>, id: Option<String>, comments: Vec<String>, py: Python) -> PyResult<Self> {
+    fn new(messages: Vec<Py<PyAny>>, id: Option<String>, comments: Vec<String>, py: Python) -> PyResult<Self> {
         let mut core_messages = Vec::new();
         for msg in messages {
             if let Ok(oem) = msg.extract::<Oem>(py) {
@@ -156,7 +156,7 @@ impl Ndm {
     ///
     /// :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
     #[getter]
-    fn messages(&self, py: Python) -> PyResult<Vec<PyObject>> {
+    fn messages(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         let mut py_messages = Vec::new();
         for msg in &self.inner.messages {
             let py_msg = match msg {

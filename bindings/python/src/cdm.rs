@@ -513,8 +513,8 @@ impl RelativeMetadataData {
         relative_velocity: Option<[f64; 3]>, // [R, T, N]
         start_screen_period: Option<String>,
         stop_screen_period: Option<String>,
-        screen_volume_frame: Option<ScreenVolumeFrameType>,
-        screen_volume_shape: Option<ScreenVolumeShapeType>,
+        screen_volume_frame: Option<Bound<'_, PyAny>>,
+        screen_volume_shape: Option<Bound<'_, PyAny>>,
         screen_volume_x: Option<f64>,
         screen_volume_y: Option<f64>,
         screen_volume_z: Option<f64>,
@@ -538,6 +538,16 @@ impl RelativeMetadataData {
             })
         } else {
             None
+        };
+        
+        let screen_volume_frame = match screen_volume_frame {
+             Some(ref ob) => Some(parse_screen_volume_frame_type(ob)?),
+             None => None,
+        };
+
+        let screen_volume_shape = match screen_volume_shape {
+             Some(ref ob) => Some(parse_screen_volume_shape_type(ob)?),
+             None => None,
         };
 
         let map_shape = |s: ScreenVolumeShapeType| match s {

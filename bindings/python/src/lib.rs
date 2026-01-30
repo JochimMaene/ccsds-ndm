@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::MessageType;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::Py;
 use std::fs;
