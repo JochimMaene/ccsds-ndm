@@ -1330,10 +1330,22 @@ impl std::str::FromStr for RotSeq {
             "ZXZ" => Ok(Self::ZXZ),
             "ZYX" => Ok(Self::ZYX),
             "ZYZ" => Ok(Self::ZYZ),
+            "121" => Ok(Self::XYX),
+            "123" => Ok(Self::XYZ),
+            "131" => Ok(Self::XZX),
+            "132" => Ok(Self::XZY),
+            "212" => Ok(Self::YXY),
+            "213" => Ok(Self::YXZ),
+            "231" => Ok(Self::YZX),
+            "232" => Ok(Self::YZY),
+            "312" => Ok(Self::ZXY),
+            "313" => Ok(Self::ZXZ),
+            "321" => Ok(Self::ZYX),
+            "323" => Ok(Self::ZYZ),
             _ => Err(crate::error::EnumParseError {
                 field: "EULER_ROT_SEQ",
                 value: s.to_string(),
-                expected: "XYX, XYZ, XZX, XZY, YXY, YXZ, YZX, YZY, ZXY, ZXZ, ZYX, or ZYZ",
+                expected: "XYX, XYZ, XZX, XZY, YXY, YXZ, YZX, YZY, ZXY, ZXZ, ZYX, ZYZ, or numeric equivalents",
             }),
         }
     }
@@ -2260,7 +2272,7 @@ pub struct UserDefined {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct UserDefinedParameter {
     /// Value of the user-defined parameter.
-    #[serde(rename = "$value")]
+    #[serde(rename = "$value", default)]
     pub value: String,
     /// Name of the user-defined parameter.
     #[serde(rename = "@parameter")]

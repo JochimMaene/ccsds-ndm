@@ -171,7 +171,11 @@ pub struct Omm {
     pub version: String,
 }
 
-impl crate::traits::Validate for Omm {}
+impl crate::traits::Validate for Omm {
+    fn validate(&self) -> Result<()> {
+        Omm::validate(self)
+    }
+}
 
 impl Ndm for Omm {
     fn to_kvn(&self) -> Result<String> {
@@ -182,7 +186,7 @@ impl Ndm for Omm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let omm = Self::from_kvn_str(kvn)?;
-        omm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Omm, &omm)?;
         Ok(omm)
     }
 
@@ -193,7 +197,7 @@ impl Ndm for Omm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let omm: Self = crate::xml::from_str_with_context(xml, "OMM")?;
-        omm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Omm, &omm)?;
         Ok(omm)
     }
 }
@@ -248,6 +252,7 @@ impl ToKvn for OmmSegment {
 
 impl OmmSegment {
     pub fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
         self.data.validate(&self.metadata)
     }
 }
@@ -343,6 +348,20 @@ pub struct OmmMetadata {
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
     #[builder(into)]
     pub mean_element_theory: String,
+}
+
+impl OmmMetadata {
+    pub fn validate(&self) -> Result<()> {
+        if self.object_id.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("OMM Metadata"),
+                field: Cow::Borrowed("OBJECT_ID"),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
 }
 
 impl ToKvn for OmmMetadata {

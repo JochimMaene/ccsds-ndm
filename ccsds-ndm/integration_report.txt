@@ -1,0 +1,120 @@
+Integration parsing cross-check report
+
+Counts
+- rust_success_orekit_failure: 19
+- round_trip_failure: 4
+- type_mismatch: 2
+- read_failure: 4
+- parse_failure_ccsds: 51
+- parse_failure_more_tests: 19
+
+Rust parses but Orekit expects failure
+- ccsds/adm/acm/incompatible-keys.txt parsed successfully but Orekit expects failure
+- ccsds/adm/acm/missing-center-of-pressure.txt parsed successfully but Orekit expects failure
+- ccsds/adm/acm/missing-sensor-index.txt parsed successfully but Orekit expects failure
+- ccsds/adm/acm/missing-target-momentum.txt parsed successfully but Orekit expects failure
+- ccsds/adm/acm/sensor-index-already-used.txt parsed successfully but Orekit expects failure
+- ccsds/adm/apm/APM-no-attitude.txt parsed successfully but Orekit expects failure
+- ccsds/cdm/CDM-missing-object1-covariance-block.xml parsed successfully but Orekit expects failure
+- ccsds/odm/ocm/OCM-incompatible-units-dimension.txt parsed successfully but Orekit expects failure
+- ccsds/odm/ocm/OCM-incompatible-units-scale.txt parsed successfully but Orekit expects failure
+- ccsds/odm/ocm/OCM-missing-maneuver-time.txt parsed successfully but Orekit expects failure
+- ccsds/odm/ocm/OCM-wrong-nb-elements.txt parsed successfully but Orekit expects failure
+- ccsds/odm/oem/OEM-inconsistent-time-systems.txt parsed successfully but Orekit expects failure
+- ccsds/odm/omm/OMM-empty-object-id.txt parsed successfully but Orekit expects failure
+- ccsds/odm/omm/OMM-empty-object-id.xml parsed successfully but Orekit expects failure
+- ccsds/odm/opm/OPM-no-designator.txt parsed successfully but Orekit expects failure
+- ccsds/odm/opm/OPM-unknown-center.txt parsed successfully but Orekit expects failure
+- ccsds/odm/opm/OPM-unknown-frame.txt parsed successfully but Orekit expects failure
+- ccsds/tdm/xml/TDM-metadata-timesystem-not-implemented.xml parsed successfully but Orekit expects failure
+- ccsds/tdm/xml/TDM-metadata-wrong-keyword.xml parsed successfully but Orekit expects failure
+
+Round-trip failures
+- ccsds/tdm/xml/TDMExample6.xml XML round-trip failed to parse: Failed to parse TDM from XML: Missing TDM observation data (must have one of: ANGLE_1, RANGE, etc.)
+- ccsds/tdm/xml/TDMExample8.xml XML round-trip failed to parse: Failed to parse TDM from XML: Missing TDM observation data (must have one of: ANGLE_1, RANGE, etc.)
+- ccsds/tdm/xml/TDMExampleAllKeywordsSequential.xml XML round-trip failed to parse: Failed to parse TDM from XML: Missing TDM observation data (must have one of: ANGLE_1, RANGE, etc.)
+- ccsds/tdm/xml/TDMExampleAllKeywordsSingleDiff.xml XML round-trip failed to parse: Failed to parse TDM from XML: Missing TDM observation data (must have one of: ANGLE_1, RANGE, etc.)
+
+Type mismatches
+- more_tests/xml/ndmxml-1.0-oem-2.0-single.xml parsed but type mismatch (got Oem(Oem { id: Some("CCSDS_OEM_VERS"), version: "2.0", header: OdmHeader { comment: [], classification: None, creation_date: Epoch { bytes: [50, 48, 48, 52, 45, 50, 56, 49, 84, 49, 55, 58, 50, 54, 58, 48, 54, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], len: 17 }, originator: "me", message_id: None }, body: OemBody { segment: [OemSegment { metadata: OemMetadata { comment: [], object_name: "Cassini", object_id: "1997-061A", center_name: "Saturn", ref_frame: "IAU-Saturn", ref_frame_epoch: None, time_system: "UTC", start_time: Epoch { bytes: [50, 48, 48, 52, 45, 49, 48, 48, 84, 48, 48, 58, 48, 48, 58, 48, 48, 46, 48, 48, 48, 48, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], len: 24 }, useable_start_time: None, useable_stop_time: None, stop_time: Epoch { bytes: [50, 48, 48, 52, 45, 49, 48, 48, 84, 48, 49, 58, 48, 48, 58, 48, 48, 46, 48, 48, 48, 48, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], len: 24 }, interpolation: Some("Hermite"), interpolation_degree: Some(1) }, data: OemData { comment: [], state_vector: [StateVectorAcc { epoch: Epoch { bytes: [50, 48, 48, 52, 45, 49, 48, 48, 84, 48, 48, 58, 48, 48, 58, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], len: 17 }, x: UnitValue { value: 1.0, units: Some(Km) }, y: UnitValue { value: 1.0, units: None }, z: UnitValue { value: 1.0, units: None }, x_dot: UnitValue { value: 1.0, units: Some(KmPerS) }, y_dot: UnitValue { value: 1.0, units: None }, z_dot: UnitValue { value: 1.0, units: None }, x_ddot: None, y_ddot: None, z_ddot: None }, StateVectorAcc { epoch: Epoch { bytes: [50, 48, 48, 52, 45, 49, 48, 48, 84, 48, 48, 58, 48, 48, 58, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], len: 17 }, x: UnitValue { value: 1.0, units: None }, y: UnitValue { value: 1.0, units: Some(Km) }, z: UnitValue { value: 1.0, units: None }, x_dot: UnitValue { value: 1.0, units: None }, y_dot: UnitValue { value: 1.0, units: Some(KmPerS) }, z_dot: UnitValue { value: 1.0, units: None }, x_ddot: None, y_ddot: None, z_ddot: None }, StateVectorAcc { epoch: Epoch { bytes: [50, 48, 48, 52, 45, 49, 48, 48, 84, 48, 48, 58, 48, 48, 58, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], len: 17 }, x: UnitValue { value: 1.0, units: None }, y: UnitValue { value: 1.0, units: None }, z: UnitValue { value: 1.0, units: Some(Km) }, x_dot: UnitValue { value: 1.0, units: None }, y_dot: UnitValue { value: 1.0, units: None }, z_dot: UnitValue { value: 1.0, units: Some(KmPerS) }, x_ddot: None, y_ddot: None, z_ddot: None }], covariance_matrix: [] } }] } }))
+- more_tests/xml/ndmxml-1.0-omm-2.0.xml parsed but type mismatch (got Omm(Omm { header: OdmHeader { comment: ["THIS EXAMPLE CONFORMS TO FIGURE 4-2 IN 502.0-B-2"], classification: None, creation_date: Epoch { bytes: [50, 48, 48, 55, 45, 48, 54, 53, 84, 49, 54, 58, 48, 48, 58, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], len: 17 }, originator: "NOAA/USA", message_id: None }, body: OmmBody { segment: OmmSegment { metadata: OmmMetadata { comment: [], object_name: "GOES-9", object_id: "1995-025A", center_name: "EARTH", ref_frame: "TEME", ref_frame_epoch: None, time_system: "UTC", mean_element_theory: "TLE" }, data: OmmData { comment: ["USAF SGP4 IS THE ONLY PROPAGATOR THAT SHOULD BE USED FOR THIS DATA"], mean_elements: MeanElements { comment: [], epoch: Epoch { bytes: [50, 48, 48, 55, 45, 48, 54, 52, 84, 49, 48, 58, 51, 52, 58, 52, 49, 46, 52, 50, 54, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], len: 22 }, semi_major_axis: None, mean_motion: Some(UnitValue { value: 1.00273272, units: None }), eccentricity: NonNegativeDouble { value: 0.0005013 }, inclination: Inclination { angle: Angle { value: 3.0539, units: None } }, ra_of_asc_node: Angle { value: 81.7939, units: None }, arg_of_pericenter: Angle { value: 249.2363, units: None }, mean_anomaly: Angle { value: 150.1602, units: None }, gm: Some(Gm { value: 398600.8, units: None }) }, spacecraft_parameters: None, tle_parameters: Some(TleParameters { comment: [], ephemeris_type: None, classification_type: None, norad_cat_id: Some(23581), element_set_no: Some(ElementSetNo { value: 925 }), rev_at_epoch: Some(4316), bstar: Some(UnitValue { value: 0.0001, units: None }), bterm: None, mean_motion_dot: UnitValue { value: -1.13e-6, units: None }, mean_motion_ddot: Some(UnitValue { value: 0.0, units: None }), agom: None }), covariance_matrix: None, user_defined_parameters: Some(UserDefined { comment: [], user_defined: [UserDefinedParameter { value: "xyz", parameter: "ABC0" }, UserDefinedParameter { value: "9", parameter: "ABC1" }, UserDefinedParameter { value: "xyz", parameter: "ABC2" }, UserDefinedParameter { value: "9", parameter: "ABC3" }, UserDefinedParameter { value: "xyz", parameter: "ABC4" }, UserDefinedParameter { value: "9", parameter: "ABC5" }, UserDefinedParameter { value: "xyz", parameter: "ABC6" }, UserDefinedParameter { value: "9", parameter: "ABC7" }, UserDefinedParameter { value: "xyz", parameter: "ABC8" }, UserDefinedParameter { value: "9", parameter: "ABC9" }] }) } } }, id: Some("CCSDS_OMM_VERS"), version: "2.0" }))
+
+Read failures
+- ccsds/lexical/minimalist-UCS-4-BE-BOM.xml failed to read: stream did not contain valid UTF-8
+- ccsds/lexical/minimalist-UCS-4-LE-BOM.xml failed to read: stream did not contain valid UTF-8
+- ccsds/lexical/minimalist-UTF-16-BE-BOM.xml failed to read: stream did not contain valid UTF-8
+- ccsds/lexical/minimalist-UTF-16-LE-BOM.xml failed to read: stream did not contain valid UTF-8
+
+Parse failures (ccsds)
+- ccsds/adm/acm/ACMExample05.txt failed: KVN parsing error at line 127, column 31: 
+- ccsds/adm/acm/ACMExample08.txt failed: KVN parsing error at line 18, column 1: 
+- ccsds/adm/aem/AEMExample01.txt failed: KVN parsing error at line 14, column 27: Expected META
+- ccsds/adm/aem/AEMExample02.txt failed: KVN parsing error at line 14, column 27: Expected META
+- ccsds/adm/aem/AEMExample03.txt failed: KVN parsing error at line 11, column 25: Expected META
+- ccsds/adm/aem/AEMExample04.txt failed: KVN parsing error at line 11, column 27: Expected META
+- ccsds/adm/aem/AEMExample05.txt failed: KVN parsing error at line 15, column 27: Expected META
+- ccsds/adm/aem/AEMExample06a.txt failed: KVN parsing error at line 11, column 25: Expected META
+- ccsds/adm/aem/AEMExample06b.txt failed: KVN parsing error at line 11, column 25: Expected META
+- ccsds/adm/aem/AEMExample07.txt failed: KVN parsing error at line 15, column 27: Expected META
+- ccsds/adm/aem/AEMExample08.txt failed: KVN parsing error at line 11, column 27: Expected META
+- ccsds/adm/aem/AEMExample09.txt failed: KVN parsing error at line 11, column 27: Expected META
+- ccsds/adm/aem/AEMExample10.txt failed: KVN parsing error at line 14, column 27: Expected META
+- ccsds/adm/aem/AEMExample11.xml failed: Failed to parse AEM from XML: unknown variant `123`, expected one of `XYX`, `XYZ`, `XZX`, `XZY`, `YXY`, `YXZ`, `YZX`, `YZY`, `ZXY`, `ZXZ`, `ZYX`, `ZYZ`
+- ccsds/adm/aem/AEMExample12.txt failed: KVN parsing error at line 11, column 27: Expected META
+- ccsds/adm/aem/AEMExample13.xml failed: Failed to parse AEM from XML: missing field `quaternionDot`
+- ccsds/adm/aem/aemLowerCaseValue.aem failed: KVN parsing error at line 14, column 27: Expected META
+- ccsds/adm/apm/APM-orbit-relative-frame-inertial.txt failed: KVN parsing error at line 12, column 1: 
+- ccsds/adm/apm/APM-orbit-relative-frame-rotating.txt failed: KVN parsing error at line 12, column 1: 
+- ccsds/adm/apm/APM-quaternion-euler-rates.xml failed: Failed to parse APM from XML: missing field `REF_FRAME_A`
+- ccsds/adm/apm/APMExample01.txt failed: KVN parsing error at line 18, column 1: 
+- ccsds/adm/apm/APMExample02.txt failed: KVN parsing error at line 20, column 1: 
+- ccsds/adm/apm/APMExample02.xml failed: Failed to parse APM from XML: missing field `REF_FRAME_A`
+- ccsds/adm/apm/APMExample03.txt failed: KVN parsing error at line 18, column 1: 
+- ccsds/adm/apm/APMExample04.txt failed: KVN parsing error at line 18, column 1: 
+- ccsds/adm/apm/APMExample05.txt failed: KVN parsing error at line 16, column 1: 
+- ccsds/adm/apm/APMExample06.txt failed: KVN parsing error at line 16, column 1: 
+- ccsds/cdm/CDMExample_issue_940.txt failed: KVN parsing error at line 5, column 1: 
+- ccsds/cdm/CDMExample_issue_940.xml failed: Failed to parse CDM from XML: duplicate field `covarianceMatrix`
+- ccsds/lexical/minimalist-UCS-4-BE.xml failed: Unsupported message type: Could not identify KVN header
+- ccsds/lexical/minimalist-UCS-4-LE.xml failed: Unsupported message type: Unknown or unsupported XML root tag: <   ?   x   m   l   >
+- ccsds/lexical/minimalist-UTF-16-BE.xml failed: Unsupported message type: Could not identify KVN header
+- ccsds/lexical/minimalist-UTF-16-LE.xml failed: Unsupported message type: Unknown or unsupported XML root tag: < ? x m l >
+- ccsds/lexical/minimalist-UTF-8-BOM.xml failed: Unsupported message type: Could not identify KVN header
+- ccsds/lexical/minimalist-UTF-8.kvn failed: Unsupported message type: Could not identify KVN header
+- ccsds/lexical/minimalist-UTF-8.xml failed: Unsupported message type: Unexpected XML event during detection: End(BytesEnd { name: Borrowed("greeting") })
+- ccsds/odm/ocm/OCMExample1.txt failed: Invalid value 'SIMULATION' for field 'TRAJ_BASIS'; expected one of: PREDICTED, DETERMINED, TELEMETRY, SIMULATED, or OTHER
+- ccsds/odm/ocm/OCMExample2.xml failed: Failed to parse OCM from XML: missing field `CENTER_NAME`
+- ccsds/odm/ocm/OCMExample4.txt failed: Invalid value 'DETERMINED_OD' for field 'TRAJ_BASIS'; expected one of: PREDICTED, DETERMINED, TELEMETRY, SIMULATED, or OTHER
+- ccsds/odm/ocm/OCMMinimal.txt failed: Missing required field: COV_TYPE in block Covariance
+- ccsds/odm/ocm/OCMMinimalExpected.txt failed: Missing required field: covLine in block COV
+- ccsds/odm/oem/OEMExample8.txt failed: KVN parsing error at line 17, column 1: 
+- ccsds/odm/opm/OPM-non-standard-units.txt failed: Invalid value 'm' for field 'unit'; expected one of: "km"
+- ccsds/tdm/kvn/TDM-inconsistent-time-systems.txt failed: KVN parsing error at line 2, column 1: 
+- ccsds/tdm/kvn/TDMExample15.txt failed: KVN parsing error at line 2, column 1: 
+- ccsds/tdm/kvn/TDMExample2.txt failed: KVN parsing error at line 2, column 1: 
+- ccsds/tdm/kvn/TDMExample4.txt failed: KVN parsing error at line 2, column 1: 
+- ccsds/tdm/kvn/TDMExample6.txt failed: KVN parsing error at line 2, column 1: 
+- ccsds/tdm/kvn/TDMExample8.txt failed: KVN parsing error at line 2, column 1: 
+- ccsds/tdm/kvn/TDMExampleAllKeywordsSequential.txt failed: KVN parsing error at line 2, column 1: 
+- ccsds/tdm/kvn/TDMExampleAllKeywordsSingleDiff.txt failed: KVN parsing error at line 2, column 1: 
+
+Parse failures (more_tests)
+- more_tests/json/omm1_ct.xml failed: Missing required field: ORIGINATOR in block ODM Header
+- more_tests/json/omm1_st.xml failed: Failed to parse OMM from XML: missing field `$value`
+- more_tests/kvn/504x0b1c1_fig3_6_apm.kvn failed: KVN parsing error at line 16, column 1: 
+- more_tests/kvn/504x0b1c1_fig3_6_apm.xml failed: Failed to parse APM from XML: missing field `REF_FRAME_A`
+- more_tests/kvn/504x0b1c1_fig3_8_apm.kvn failed: KVN parsing error at line 19, column 1: 
+- more_tests/kvn/504x0b1c1_fig3_8_apm.xml failed: Failed to parse APM from XML: missing field `REF_FRAME_A`
+- more_tests/kvn/adm-testcase04a_abbrev.kvn failed: KVN parsing error at line 16, column 20: Expected META
+- more_tests/kvn/adm-testcase04a_abbrev.xml failed: Failed to parse AEM from XML: unknown variant `321`, expected one of `XYX`, `XYZ`, `XZX`, `XZY`, `YXY`, `YXZ`, `YZX`, `YZY`, `ZXY`, `ZXZ`, `ZYX`, `ZYZ`
+- more_tests/kvn/adm-testcase04a_multi.kvn failed: KVN parsing error at line 16, column 20: Expected META
+- more_tests/kvn/adm-testcase04a_multi.xml failed: Failed to parse AEM from XML: unknown variant `321`, expected one of `XYX`, `XYZ`, `XZX`, `XZY`, `YXY`, `YXZ`, `YZX`, `YZY`, `ZXY`, `ZXZ`, `ZYX`, `ZYZ`
+- more_tests/kvn/omm1_ct.kvn failed: Missing required field: ORIGINATOR in block ODM Header
+- more_tests/kvn/omm1_ct.xml failed: Missing required field: ORIGINATOR in block ODM Header
+- more_tests/kvn/omm1_st.xml failed: Failed to parse OMM from XML: missing field `$value`
+- more_tests/kvn/tdm-testcase01b.kvn failed: KVN parsing error at line 14, column 1: Expected DATA
+- more_tests/kvn/tdm_opt_data.kvn failed: KVN parsing error at line 14, column 1: Expected DATA
+- more_tests/xml/NDMXML-P1.0.1-figure-B-2.xml failed: Missing required field: EULER_ROT_SEQ (required for EULER_ANGLE types) in block AEM Metadata
+- more_tests/xml/NDMXML-P1.0.1-figure-B-3.xml failed: Failed to parse APM from XML: missing field `REF_FRAME_A`
+- more_tests/xml/omm_combined.xml failed: Failed to parse OMM from XML: missing field `metadata`
+- more_tests/xml/omm_single_ndm.xml failed: Missing required field: ORIGINATOR in block ODM Header

@@ -112,7 +112,11 @@ impl RdmData {
     }
 }
 
-impl crate::traits::Validate for Rdm {}
+impl crate::traits::Validate for Rdm {
+    fn validate(&self) -> Result<()> {
+        Rdm::validate(self)
+    }
+}
 
 impl Ndm for Rdm {
     fn to_kvn(&self) -> Result<String> {
@@ -123,7 +127,7 @@ impl Ndm for Rdm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let rdm = Self::from_kvn_str(kvn)?;
-        rdm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Rdm, &rdm)?;
         Ok(rdm)
     }
 
@@ -134,7 +138,7 @@ impl Ndm for Rdm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
-        rdm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Rdm, &rdm)?;
         Ok(rdm)
     }
 }

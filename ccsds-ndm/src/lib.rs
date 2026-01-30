@@ -135,9 +135,11 @@ pub mod messages;
 pub mod traits;
 pub mod types;
 pub mod utils;
+pub mod validation;
 pub mod xml;
 
 use error::{CcsdsNdmError, Result};
+pub use validation::{take_warnings as take_validation_warnings, ValidationMode};
 use std::fs;
 use std::path::Path;
 
@@ -271,6 +273,11 @@ pub fn from_str(s: &str) -> Result<MessageType> {
     detect::detect_message_type(s)
 }
 
+/// Parse an NDM from a string with explicit validation mode.
+pub fn from_str_with_mode(s: &str, mode: ValidationMode) -> Result<MessageType> {
+    validation::with_validation_mode(mode, || detect::detect_message_type(s))
+}
+
 /// Parse an NDM from a file path, auto-detecting the message format (KVN or XML) and type.
 ///
 /// Reads the file contents and delegates to [`from_str`] for parsing.
@@ -294,4 +301,10 @@ pub fn from_str(s: &str) -> Result<MessageType> {
 pub fn from_file<P: AsRef<Path>>(path: P) -> Result<MessageType> {
     let content = fs::read_to_string(path).map_err(CcsdsNdmError::from)?;
     from_str(&content)
+}
+
+/// Parse an NDM from a file with explicit validation mode.
+pub fn from_file_with_mode<P: AsRef<Path>>(path: P, mode: ValidationMode) -> Result<MessageType> {
+    let content = fs::read_to_string(path).map_err(CcsdsNdmError::from)?;
+    from_str_with_mode(&content, mode)
 }

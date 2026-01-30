@@ -38,7 +38,26 @@ pub struct CombinedNdm {
     pub messages: Vec<MessageType>,
 }
 
-impl crate::traits::Validate for CombinedNdm {}
+impl crate::traits::Validate for CombinedNdm {
+    fn validate(&self) -> Result<()> {
+        for msg in &self.messages {
+            match msg {
+                MessageType::Opm(m) => m.validate()?,
+                MessageType::Omm(m) => m.validate()?,
+                MessageType::Oem(m) => m.validate()?,
+                MessageType::Ocm(m) => m.validate()?,
+                MessageType::Acm(m) => m.validate()?,
+                MessageType::Cdm(m) => m.validate()?,
+                MessageType::Tdm(m) => m.validate()?,
+                MessageType::Rdm(m) => m.validate()?,
+                MessageType::Aem(m) => m.validate()?,
+                MessageType::Apm(m) => m.validate()?,
+                MessageType::Ndm(m) => m.validate()?,
+            }
+        }
+        Ok(())
+    }
+}
 
 impl Ndm for CombinedNdm {
     fn to_kvn(&self) -> Result<String> {

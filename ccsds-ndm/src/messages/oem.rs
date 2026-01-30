@@ -55,6 +55,21 @@ impl Oem {
 
 impl OemBody {
     pub fn validate(&self) -> Result<()> {
+        if let Some(first) = self.segment.first() {
+            let ts = &first.metadata.time_system;
+            for segment in &self.segment[1..] {
+                if segment.metadata.time_system != *ts {
+                    return Err(crate::error::ValidationError::InvalidValue {
+                        field: "TIME_SYSTEM".into(),
+                        value: segment.metadata.time_system.clone(),
+                        expected: format!("consistent TIME_SYSTEM across OEM segments (expected {})", ts)
+                            .into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
         for segment in &self.segment {
             segment.validate()?;
         }
@@ -113,7 +128,11 @@ impl OemData {
     }
 }
 
-impl crate::traits::Validate for Oem {}
+impl crate::traits::Validate for Oem {
+    fn validate(&self) -> Result<()> {
+        Oem::validate(self)
+    }
+}
 
 impl Ndm for Oem {
     fn to_kvn(&self) -> Result<String> {
@@ -131,7 +150,7 @@ impl Ndm for Oem {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let oem = Self::from_kvn_str(kvn)?;
-        oem.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Oem, &oem)?;
         Ok(oem)
     }
 
@@ -142,7 +161,7 @@ impl Ndm for Oem {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let oem: Self = crate::xml::from_str_with_context(xml, "OEM")?;
-        oem.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Oem, &oem)?;
         Ok(oem)
     }
 }

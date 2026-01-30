@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::error::{CcsdsNdmError, Result, ValidationError};
+use quick_xml::events::Event;
+use quick_xml::Reader;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
@@ -45,7 +47,11 @@ pub struct Tdm {
     pub version: String,
 }
 
-impl crate::traits::Validate for Tdm {}
+impl crate::traits::Validate for Tdm {
+    fn validate(&self) -> Result<()> {
+        Tdm::validate(self)
+    }
+}
 
 impl Ndm for Tdm {
     fn to_kvn(&self) -> Result<String> {
@@ -56,7 +62,7 @@ impl Ndm for Tdm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let tdm = Self::from_kvn_str(kvn)?;
-        tdm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Tdm, &tdm)?;
         Ok(tdm)
     }
 
@@ -66,8 +72,15 @@ impl Ndm for Tdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        if crate::validation::current_mode() == crate::validation::ValidationMode::Strict
+            || crate::validation::current_mode() == crate::validation::ValidationMode::Lenient
+        {
+            if let Err(err) = validate_tdm_xml_metadata(xml) {
+                crate::validation::handle_validation_error(crate::validation::MessageKind::Tdm, err)?;
+            }
+        }
         let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
-        tdm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Tdm, &tdm)?;
         Ok(tdm)
     }
 }
@@ -653,6 +666,122 @@ impl TdmMetadata {
     }
 }
 
+fn validate_tdm_xml_metadata(xml: &str) -> Result<()> {
+    let allowed = tdm_metadata_allowed_tags();
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut in_metadata = false;
+    let mut depth = 0usize;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) => {
+                let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let name_upper = name.to_ascii_uppercase();
+                if name_upper == "METADATA" {
+                    in_metadata = true;
+                    depth = 1;
+                    continue;
+                }
+                if in_metadata {
+                    depth += 1;
+                    if !allowed.contains(name_upper.as_str()) {
+                        return Err(ValidationError::InvalidValue {
+                            field: Cow::Borrowed("TDM Metadata keyword"),
+                            value: name,
+                            expected: Cow::Borrowed("allowed TDM metadata keyword"),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+            }
+            Ok(Event::End(e)) => {
+                if in_metadata {
+                    let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                    if name.eq_ignore_ascii_case("metadata") {
+                        break;
+                    }
+                    if depth > 0 {
+                        depth -= 1;
+                    }
+                }
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+
+    Ok(())
+}
+
+fn tdm_metadata_allowed_tags() -> std::collections::HashSet<&'static str> {
+    let tags = [
+        "COMMENT",
+        "TRACK_ID",
+        "DATA_TYPES",
+        "TIME_SYSTEM",
+        "START_TIME",
+        "STOP_TIME",
+        "PARTICIPANT_1",
+        "PARTICIPANT_2",
+        "PARTICIPANT_3",
+        "PARTICIPANT_4",
+        "PARTICIPANT_5",
+        "MODE",
+        "PATH",
+        "PATH_1",
+        "PATH_2",
+        "TRANSMIT_BAND",
+        "RECEIVE_BAND",
+        "TURNAROUND_NUMERATOR",
+        "TURNAROUND_DENOMINATOR",
+        "TIMETAG_REF",
+        "INTEGRATION_INTERVAL",
+        "INTEGRATION_REF",
+        "FREQ_OFFSET",
+        "RANGE_MODE",
+        "RANGE_MODULUS",
+        "RANGE_UNITS",
+        "ANGLE_TYPE",
+        "REFERENCE_FRAME",
+        "INTERPOLATION",
+        "INTERPOLATION_DEGREE",
+        "DOPPLER_COUNT_BIAS",
+        "DOPPLER_COUNT_SCALE",
+        "DOPPLER_COUNT_ROLLOVER",
+        "TRANSMIT_DELAY_1",
+        "TRANSMIT_DELAY_2",
+        "TRANSMIT_DELAY_3",
+        "TRANSMIT_DELAY_4",
+        "TRANSMIT_DELAY_5",
+        "RECEIVE_DELAY_1",
+        "RECEIVE_DELAY_2",
+        "RECEIVE_DELAY_3",
+        "RECEIVE_DELAY_4",
+        "RECEIVE_DELAY_5",
+        "DATA_QUALITY",
+        "CORRECTION_ANGLE_1",
+        "CORRECTION_ANGLE_2",
+        "CORRECTION_DOPPLER",
+        "CORRECTION_MAG",
+        "CORRECTION_RANGE",
+        "CORRECTION_RCS",
+        "CORRECTION_RECEIVE",
+        "CORRECTION_TRANSMIT",
+        "CORRECTION_ABERRATION_YEARLY",
+        "CORRECTION_ABERRATION_DIURNAL",
+        "CORRECTIONS_APPLIED",
+        "EPHEMERIS_NAME_1",
+        "EPHEMERIS_NAME_2",
+        "EPHEMERIS_NAME_3",
+        "EPHEMERIS_NAME_4",
+        "EPHEMERIS_NAME_5",
+    ];
+    tags.into_iter().collect()
+}
+
 impl ToKvn for TdmMetadata {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("META_START");
@@ -1081,10 +1210,12 @@ pub enum TdmObservationData {
     /// Azimuth, right ascension, or 'X' angle of the measurement.
     ///
     /// Units: deg
+    #[serde(rename = "ANGLE_1")]
     Angle1(f64),
     /// Elevation, declination, or 'Y' angle of the measurement.
     ///
     /// Units: deg
+    #[serde(rename = "ANGLE_2")]
     Angle2(f64),
     /// The strength of the radio signal transmitted by the spacecraft.
     ///

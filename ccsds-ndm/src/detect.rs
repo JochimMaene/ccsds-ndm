@@ -128,12 +128,17 @@ fn detect_xml_type(s: &str) -> Result<MessageType> {
     reader.config_mut().trim_text_start = true;
     reader.config_mut().trim_text_end = true;
 
+    let mut first_tag = None;
     loop {
         let pos = reader.buffer_position();
         match reader.read_event() {
             Ok(Event::Start(e)) => {
                 let name_bytes = e.name();
                 let name = String::from_utf8_lossy(name_bytes.as_ref()).to_lowercase();
+
+                if first_tag.is_none() {
+                    first_tag = Some(name.clone());
+                }
 
                 // Calculate the start position of this tag (pointing to '<')
                 let offset = s[pos as usize..]
@@ -179,12 +184,25 @@ fn detect_xml_type(s: &str) -> Result<MessageType> {
                 continue;
             }
             Ok(Event::Eof) => {
-                return Err(CcsdsNdmError::UnexpectedEof {
-                    context: "XML parsing ended without finding root tag".into(),
-                });
+                if let Some(tag) = first_tag {
+                    return Err(CcsdsNdmError::UnsupportedMessage(format!(
+                        "Unknown or unsupported XML root tag: <{}>",
+                        tag
+                    )));
+                } else {
+                    return Err(CcsdsNdmError::UnexpectedEof {
+                        context: "No XML root tag found".into(),
+                    });
+                }
             }
-            Err(e) => return Err(CcsdsNdmError::from(e)),
-            _ => continue,
+            Ok(Event::Text(_)) => continue,
+            Ok(e) => {
+                return Err(CcsdsNdmError::UnsupportedMessage(format!(
+                    "Unexpected XML event during detection: {:?}",
+                    e
+                )))
+            }
+            Err(e) => return Err(e.into()),
         }
     }
 }

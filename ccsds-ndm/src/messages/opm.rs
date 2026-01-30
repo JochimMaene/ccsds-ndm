@@ -53,7 +53,7 @@ impl Ndm for Opm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let opm = Self::from_kvn_str(kvn)?;
-        opm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Opm, &opm)?;
         Ok(opm)
     }
 
@@ -64,7 +64,7 @@ impl Ndm for Opm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let opm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
-        opm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Opm, &opm)?;
         Ok(opm)
     }
 }
@@ -118,7 +118,7 @@ pub struct OpmSegment {
 
 impl crate::traits::Validate for OpmSegment {
     fn validate(&self) -> Result<()> {
-        // Metadata validation could go here if needed
+        self.metadata.validate()?;
         self.data.validate()
     }
 }
@@ -210,7 +210,25 @@ pub struct OpmMetadata {
     pub time_system: String,
 }
 
-impl crate::traits::Validate for OpmMetadata {}
+impl OpmMetadata {
+    fn validate(&self) -> Result<()> {
+        if self.object_id.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OPM Metadata".into(),
+                field: "OBJECT_ID".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl crate::traits::Validate for OpmMetadata {
+    fn validate(&self) -> Result<()> {
+        self.validate()
+    }
+}
 
 impl ToKvn for OpmMetadata {
     fn write_kvn(&self, writer: &mut KvnWriter) {

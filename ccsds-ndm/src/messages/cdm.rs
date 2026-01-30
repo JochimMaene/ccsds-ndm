@@ -41,7 +41,11 @@ pub struct Cdm {
     pub version: String,
 }
 
-impl crate::traits::Validate for Cdm {}
+impl crate::traits::Validate for Cdm {
+    fn validate(&self) -> Result<()> {
+        Cdm::validate(self)
+    }
+}
 
 impl Ndm for Cdm {
     fn to_kvn(&self) -> Result<String> {
@@ -52,7 +56,7 @@ impl Ndm for Cdm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let cdm = Self::from_kvn_str(kvn)?;
-        cdm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Cdm, &cdm)?;
         Ok(cdm)
     }
 
@@ -62,7 +66,7 @@ impl Ndm for Cdm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
-        cdm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Cdm, &cdm)?;
         Ok(cdm)
     }
 }
@@ -471,6 +475,7 @@ impl ToKvn for CdmSegment {
 impl CdmSegment {
     pub fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
+        self.data.validate()?;
         Ok(())
     }
 }
@@ -757,6 +762,20 @@ pub struct CdmData {
         skip_serializing_if = "Option::is_none"
     )]
     pub covariance_matrix: Option<CdmCovarianceMatrix>,
+}
+
+impl CdmData {
+    pub fn validate(&self) -> Result<()> {
+        if self.covariance_matrix.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Data".into(),
+                field: "COVARIANCE_MATRIX".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
 }
 
 impl ToKvn for CdmData {
