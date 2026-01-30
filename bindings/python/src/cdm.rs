@@ -9,8 +9,9 @@ use ccsds_ndm::MessageType;
 use numpy::PyArray2;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use crate::common::OdParameters;
 use std::fs;
+use crate::common::{OdParameters, ObjectDescription, parse_object_description};
+
 
 // Helper to parse epoch strings
 fn parse_epoch_str(value: &str) -> PyResult<Epoch> {
@@ -176,6 +177,8 @@ impl Cdm {
             ))),
         }
     }
+
+
 
     /// Conjunction Data Message (CDM).
     ///
@@ -449,9 +452,9 @@ impl CdmBody {
 ///     The start time in UTC of the screening period.
 /// stop_screen_period : str, optional
 ///     The stop time in UTC of the screening period.
-/// screen_volume_frame : ScreenVolumeFrameType, optional
+/// screen_volume_frame : Union[ScreenVolumeFrameType, str], optional
 ///     The reference frame for screening volume (RTN or TVN).
-/// screen_volume_shape : ScreenVolumeShapeType, optional
+/// screen_volume_shape : Union[ScreenVolumeShapeType, str], optional
 ///     The shape of the screening volume (ELLIPSOID or BOX).
 /// screen_volume_x : float, optional
 ///     The X component size of the screening volume. Units: m.
@@ -510,8 +513,8 @@ impl RelativeMetadataData {
         relative_velocity: Option<[f64; 3]>, // [R, T, N]
         start_screen_period: Option<String>,
         stop_screen_period: Option<String>,
-        screen_volume_frame: Option<ScreenVolumeFrameType>,
-        screen_volume_shape: Option<ScreenVolumeShapeType>,
+        screen_volume_frame: Option<Bound<'_, PyAny>>,
+        screen_volume_shape: Option<Bound<'_, PyAny>>,
         screen_volume_x: Option<f64>,
         screen_volume_y: Option<f64>,
         screen_volume_z: Option<f64>,
@@ -535,6 +538,16 @@ impl RelativeMetadataData {
             })
         } else {
             None
+        };
+
+        let screen_volume_frame = match screen_volume_frame {
+             Some(ref ob) => Some(parse_screen_volume_frame_type(ob)?),
+             None => None,
+        };
+
+        let screen_volume_shape = match screen_volume_shape {
+             Some(ref ob) => Some(parse_screen_volume_shape_type(ob)?),
+             None => None,
         };
 
         let map_shape = |s: ScreenVolumeShapeType| match s {
@@ -881,7 +894,7 @@ impl CdmSegment {
 ///
 /// Parameters
 /// ----------
-/// object : CdmObjectType
+/// object : Union[CdmObjectType, str]
 ///     The object identification (OBJECT1 or OBJECT2).
 /// object_designator : str
 ///     The satellite catalog designator for the object.
@@ -893,13 +906,13 @@ impl CdmSegment {
 ///     The full international designator (YYYY-NNNP{PP}).
 /// ephemeris_name : str
 ///     Unique name of the external ephemeris file or 'NONE'.
-/// covariance_method : CovarianceMethodType
+/// covariance_method : Union[CovarianceMethodType, str]
 ///     Method used to calculate the covariance (CALCULATED or DEFAULT).
-/// maneuverable : ManeuverableType
+/// maneuverable : Union[ManeuverableType, str]
 ///     The maneuver capacity of the object (YES, NO, or NA).
-/// ref_frame : ReferenceFrameType
+/// ref_frame : Union[ReferenceFrameType, str]
 ///     Reference frame for state vector data (GCRF, EME2000, or ITRF).
-/// object_type : ObjectDescription, optional
+/// object_type : Union[ObjectDescription, str], optional
 ///     The object type (PAYLOAD, ROCKET BODY, DEBRIS, etc.).
 /// operator_contact_position : str, optional
 ///     Contact position of the owner/operator.
@@ -941,10 +954,10 @@ impl CdmMetadata {
         catalog_name,
         object_name,
         international_designator,
-        ephemeris_name,
-        covariance_method,
-        maneuverable,
-        ref_frame,
+        ephemeris_name=String::from("NONE"),
+        covariance_method=None,
+        maneuverable=None,
+        ref_frame=None,
         object_type=None,
         operator_contact_position=None,
         operator_organization=None,
@@ -959,17 +972,18 @@ impl CdmMetadata {
         intrack_thrust=None,
         comment=vec![]
     ))]
+
     fn new(
-        object: CdmObjectType,
+        object: Bound<'_, PyAny>,
         object_designator: String,
         catalog_name: String,
         object_name: String,
         international_designator: String,
         ephemeris_name: String,
-        covariance_method: CovarianceMethodType,
-        maneuverable: ManeuverableType,
-        ref_frame: ReferenceFrameType,
-        object_type: Option<ObjectDescription>,
+        covariance_method: Option<Bound<'_, PyAny>>,
+        maneuverable: Option<Bound<'_, PyAny>>,
+        ref_frame: Option<Bound<'_, PyAny>>,
+        object_type: Option<Bound<'_, PyAny>>,
         operator_contact_position: Option<String>,
         operator_organization: Option<String>,
         operator_phone: Option<String>,
@@ -982,7 +996,23 @@ impl CdmMetadata {
         earth_tides: Option<bool>,
         intrack_thrust: Option<bool>,
         comment: Vec<String>,
-    ) -> Self {
+    ) -> PyResult<Self> {
+        // Parse enum-like arguments (accept str or Enum), with defaults
+        let object = parse_cdm_object_type(&object)?;
+        let covariance_method = match covariance_method {
+            Some(ref ob) => parse_covariance_method_type(ob)?,
+            None => CovarianceMethodType::Calculated,
+        };
+        let maneuverable = match maneuverable {
+            Some(ref ob) => parse_maneuverable_type(ob)?,
+            None => ManeuverableType::NA,
+        };
+        let ref_frame = match ref_frame {
+            Some(ref ob) => parse_reference_frame_type(ob)?,
+            None => ReferenceFrameType::Gcrf,
+        };
+        let object_type = object_type.map(|ob| parse_object_description(&ob)).transpose()?;
+
         let map_object = |o: CdmObjectType| match o {
             CdmObjectType::Object1 => core_types::CdmObjectType::Object1,
             CdmObjectType::Object2 => core_types::CdmObjectType::Object2,
@@ -1012,15 +1042,8 @@ impl CdmMetadata {
             }
         };
 
-        let map_desc = |d: ObjectDescription| match d {
-            ObjectDescription::Payload => core_types::ObjectDescription::Payload,
-            ObjectDescription::RocketBody => core_types::ObjectDescription::RocketBody,
-            ObjectDescription::Debris => core_types::ObjectDescription::Debris,
-            ObjectDescription::Unknown => core_types::ObjectDescription::Unknown,
-            ObjectDescription::Other => core_types::ObjectDescription::Other,
-        };
 
-        Self {
+        Ok(Self {
             inner: core_cdm::CdmMetadata {
                 comment,
                 object: map_object(object),
@@ -1032,7 +1055,7 @@ impl CdmMetadata {
                 covariance_method: map_cov(covariance_method),
                 maneuverable: map_man(maneuverable),
                 ref_frame: map_ref(ref_frame),
-                object_type: object_type.map(map_desc),
+                object_type,
                 operator_contact_position,
                 operator_organization,
                 operator_phone,
@@ -1045,8 +1068,9 @@ impl CdmMetadata {
                 earth_tides: earth_tides.map(map_bool_to_yn),
                 intrack_thrust: intrack_thrust.map(map_bool_to_yn),
             },
-        }
+        })
     }
+
 
     /// Spacecraft name for the object.
     ///
@@ -1679,59 +1703,232 @@ impl CdmStateVector {
 // Enums
 // -----------------------------------------------------------------------------------------
 
-#[pyclass]
-#[derive(Clone)]
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq)]
 pub enum CdmObjectType {
     Object1,
     Object2,
 }
 
-#[pyclass]
-#[derive(Clone)]
+#[pymethods]
+impl CdmObjectType {
+    fn __str__(&self) -> &'static str {
+        match self {
+            CdmObjectType::Object1 => "OBJECT1",
+            CdmObjectType::Object2 => "OBJECT2",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("CdmObjectType.{}", self.__str__())
+    }
+}
+
+/// Parse CdmObjectType from either an enum variant or a string.
+fn parse_cdm_object_type(ob: &Bound<'_, PyAny>) -> PyResult<CdmObjectType> {
+    if let Ok(val) = ob.extract::<CdmObjectType>() {
+        return Ok(val);
+    }
+    let s: String = ob.extract()?;
+    match s.to_uppercase().as_str() {
+        "OBJECT1" | "OBJECT 1" => Ok(CdmObjectType::Object1),
+        "OBJECT2" | "OBJECT 2" => Ok(CdmObjectType::Object2),
+        other => Err(PyValueError::new_err(format!(
+            "Invalid CdmObjectType: '{}'. Expected 'OBJECT1' or 'OBJECT2'",
+            other
+        ))),
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq)]
 pub enum ScreenVolumeFrameType {
     Rtn,
     Tvn,
 }
 
-#[pyclass]
-#[derive(Clone)]
+#[pymethods]
+impl ScreenVolumeFrameType {
+    fn __str__(&self) -> &'static str {
+        match self {
+            ScreenVolumeFrameType::Rtn => "RTN",
+            ScreenVolumeFrameType::Tvn => "TVN",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("ScreenVolumeFrameType.{}", self.__str__())
+    }
+}
+
+/// Parse ScreenVolumeFrameType from either an enum variant or a string.
+fn parse_screen_volume_frame_type(ob: &Bound<'_, PyAny>) -> PyResult<ScreenVolumeFrameType> {
+    if let Ok(val) = ob.extract::<ScreenVolumeFrameType>() {
+        return Ok(val);
+    }
+    let s: String = ob.extract()?;
+    match s.to_uppercase().as_str() {
+        "RTN" => Ok(ScreenVolumeFrameType::Rtn),
+        "TVN" => Ok(ScreenVolumeFrameType::Tvn),
+        other => Err(PyValueError::new_err(format!(
+            "Invalid ScreenVolumeFrameType: '{}'. Expected 'RTN' or 'TVN'",
+            other
+        ))),
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq)]
 pub enum ScreenVolumeShapeType {
     Ellipsoid,
     Box,
 }
 
-#[pyclass]
-#[derive(Clone)]
+#[pymethods]
+impl ScreenVolumeShapeType {
+    fn __str__(&self) -> &'static str {
+        match self {
+            ScreenVolumeShapeType::Ellipsoid => "ELLIPSOID",
+            ScreenVolumeShapeType::Box => "BOX",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("ScreenVolumeShapeType.{}", self.__str__())
+    }
+}
+
+/// Parse ScreenVolumeShapeType from either an enum variant or a string.
+fn parse_screen_volume_shape_type(ob: &Bound<'_, PyAny>) -> PyResult<ScreenVolumeShapeType> {
+    if let Ok(val) = ob.extract::<ScreenVolumeShapeType>() {
+        return Ok(val);
+    }
+    let s: String = ob.extract()?;
+    match s.to_uppercase().as_str() {
+        "ELLIPSOID" => Ok(ScreenVolumeShapeType::Ellipsoid),
+        "BOX" => Ok(ScreenVolumeShapeType::Box),
+        other => Err(PyValueError::new_err(format!(
+            "Invalid ScreenVolumeShapeType: '{}'. Expected 'ELLIPSOID' or 'BOX'",
+            other
+        ))),
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq)]
 pub enum ReferenceFrameType {
     Eme2000,
     Gcrf,
     Itrf,
 }
 
-#[pyclass]
-#[derive(Clone)]
+#[pymethods]
+impl ReferenceFrameType {
+    fn __str__(&self) -> &'static str {
+        match self {
+            ReferenceFrameType::Eme2000 => "EME2000",
+            ReferenceFrameType::Gcrf => "GCRF",
+            ReferenceFrameType::Itrf => "ITRF",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("ReferenceFrameType.{}", self.__str__())
+    }
+}
+
+/// Parse ReferenceFrameType from either an enum variant or a string.
+fn parse_reference_frame_type(ob: &Bound<'_, PyAny>) -> PyResult<ReferenceFrameType> {
+    if let Ok(val) = ob.extract::<ReferenceFrameType>() {
+        return Ok(val);
+    }
+    let s: String = ob.extract()?;
+    match s.to_uppercase().as_str() {
+        "EME2000" => Ok(ReferenceFrameType::Eme2000),
+        "GCRF" => Ok(ReferenceFrameType::Gcrf),
+        "ITRF" => Ok(ReferenceFrameType::Itrf),
+        other => Err(PyValueError::new_err(format!(
+            "Invalid ReferenceFrameType: '{}'. Expected 'EME2000', 'GCRF', or 'ITRF'",
+            other
+        ))),
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq)]
 pub enum CovarianceMethodType {
     Calculated,
     Default,
 }
 
-#[pyclass]
-#[derive(Clone)]
+#[pymethods]
+impl CovarianceMethodType {
+    fn __str__(&self) -> &'static str {
+        match self {
+            CovarianceMethodType::Calculated => "CALCULATED",
+            CovarianceMethodType::Default => "DEFAULT",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("CovarianceMethodType.{}", self.__str__())
+    }
+}
+
+/// Parse CovarianceMethodType from either an enum variant or a string.
+fn parse_covariance_method_type(ob: &Bound<'_, PyAny>) -> PyResult<CovarianceMethodType> {
+    if let Ok(val) = ob.extract::<CovarianceMethodType>() {
+        return Ok(val);
+    }
+    let s: String = ob.extract()?;
+    match s.to_uppercase().as_str() {
+        "CALCULATED" => Ok(CovarianceMethodType::Calculated),
+        "DEFAULT" => Ok(CovarianceMethodType::Default),
+        other => Err(PyValueError::new_err(format!(
+            "Invalid CovarianceMethodType: '{}'. Expected 'CALCULATED' or 'DEFAULT'",
+            other
+        ))),
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq)]
 pub enum ManeuverableType {
     Yes,
     No,
     NA,
 }
 
-#[pyclass]
-#[derive(Clone)]
-pub enum ObjectDescription {
-    Payload,
-    RocketBody,
-    Debris,
-    Unknown,
-    Other,
+#[pymethods]
+impl ManeuverableType {
+    fn __str__(&self) -> &'static str {
+        match self {
+            ManeuverableType::Yes => "YES",
+            ManeuverableType::No => "NO",
+            ManeuverableType::NA => "N/A",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("ManeuverableType.{}", self.__str__())
+    }
 }
+
+/// Parse ManeuverableType from either an enum variant or a string.
+fn parse_maneuverable_type(ob: &Bound<'_, PyAny>) -> PyResult<ManeuverableType> {
+    if let Ok(val) = ob.extract::<ManeuverableType>() {
+        return Ok(val);
+    }
+    let s: String = ob.extract()?;
+    match s.to_uppercase().as_str() {
+        "YES" => Ok(ManeuverableType::Yes),
+        "NO" => Ok(ManeuverableType::No),
+        "N/A" | "NA" => Ok(ManeuverableType::NA),
+        other => Err(PyValueError::new_err(format!(
+            "Invalid ManeuverableType: '{}'. Expected 'YES', 'NO', or 'N/A'",
+            other
+        ))),
+    }
+}
+
+
+
+
+
 
 /// Additional Parameters.
 ///

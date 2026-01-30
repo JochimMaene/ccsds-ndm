@@ -5,10 +5,11 @@
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::tdm as core_tdm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::types::{self as core_types, *};
+use ccsds_ndm::types::{self as core_types};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use crate::common::{parse_time_system, parse_yes_no};
 use std::fs;
 use std::str::FromStr;
 
@@ -510,12 +511,13 @@ impl TdmMetadata {
     #[new]
     #[pyo3(signature = (
         *,
-        time_system,
         participant_1,
+        time_system=None,
         track_id=None,
         data_types=None,
         start_time=None,
         stop_time=None,
+
         participant_2=None,
         participant_3=None,
         participant_4=None,
@@ -573,9 +575,10 @@ impl TdmMetadata {
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        time_system: String,
         participant_1: String,
+        time_system: Option<Bound<'_, PyAny>>,
         track_id: Option<String>,
+
         data_types: Option<String>,
         start_time: Option<String>,
         stop_time: Option<String>,
@@ -583,8 +586,9 @@ impl TdmMetadata {
         participant_3: Option<String>,
         participant_4: Option<String>,
         participant_5: Option<String>,
-        mode: Option<String>,
-        path: Option<String>,
+        mode: Option<Bound<'_, PyAny>>,
+        path: Option<Bound<'_, PyAny>>,
+
         path_1: Option<String>,
         path_2: Option<String>,
         transmit_band: Option<String>,
@@ -626,7 +630,7 @@ impl TdmMetadata {
         correction_transmit: Option<f64>,
         correction_aberration_yearly: Option<f64>,
         correction_aberration_diurnal: Option<f64>,
-        corrections_applied: Option<String>,
+        corrections_applied: Option<Bound<'_, PyAny>>,
         ephemeris_name_1: Option<String>,
         ephemeris_name_2: Option<String>,
         ephemeris_name_3: Option<String>,
@@ -634,11 +638,27 @@ impl TdmMetadata {
         ephemeris_name_5: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        use ccsds_ndm::types::{
-            TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath, TdmRangeMode,
-            TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
-        };
         use std::str::FromStr;
+
+        let time_system = match time_system {
+            Some(ref ob) => parse_time_system(ob)?,
+            None => "UTC".to_string(),
+        };
+
+        let mode = match mode {
+            Some(ref ob) => Some(parse_tdm_mode(ob)?),
+            None => None,
+        };
+
+        let path = match path {
+            Some(ref ob) => Some(parse_tdm_path(ob)?),
+            None => None,
+        };
+
+        let corrections_applied = match corrections_applied {
+            Some(ref ob) => Some(parse_yes_no(ob)?),
+            None => None,
+        };
 
         Ok(Self {
             inner: core_tdm::TdmMetadata {
@@ -653,17 +673,13 @@ impl TdmMetadata {
                 participant_3,
                 participant_4,
                 participant_5,
-                mode: mode
-                    .map(|s| TdmMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
-                    .transpose()?,
-                path: path
-                    .map(|s| TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
-                    .transpose()?,
+                mode,
+                path,
                 path_1: path_1
-                    .map(|s| TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .map(|s| core_types::TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
                     .transpose()?,
                 path_2: path_2
-                    .map(|s| TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .map(|s| core_types::TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
                     .transpose()?,
                 transmit_band,
                 receive_band,
@@ -671,38 +687,38 @@ impl TdmMetadata {
                 turnaround_denominator,
                 timetag_ref: timetag_ref
                     .map(|s| {
-                        TdmTimetagRef::from_str(&s)
+                        core_types::TdmTimetagRef::from_str(&s)
                             .map_err(|e| PyValueError::new_err(e.to_string()))
                     })
                     .transpose()?,
                 integration_interval,
                 integration_ref: integration_ref
                     .map(|s| {
-                        TdmIntegrationRef::from_str(&s)
+                        core_types::TdmIntegrationRef::from_str(&s)
                             .map_err(|e| PyValueError::new_err(e.to_string()))
                     })
                     .transpose()?,
                 freq_offset,
                 range_mode: range_mode
                     .map(|s| {
-                        TdmRangeMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+                        core_types::TdmRangeMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
                     })
                     .transpose()?,
                 range_modulus,
                 range_units: range_units
                     .map(|s| {
-                        TdmRangeUnits::from_str(&s)
+                        core_types::TdmRangeUnits::from_str(&s)
                             .map_err(|e| PyValueError::new_err(e.to_string()))
                     })
                     .transpose()?,
                 angle_type: angle_type
                     .map(|s| {
-                        TdmAngleType::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+                        core_types::TdmAngleType::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
                     })
                     .transpose()?,
                 reference_frame: reference_frame
                     .map(|s| {
-                        TdmReferenceFrame::from_str(&s)
+                        core_types::TdmReferenceFrame::from_str(&s)
                             .map_err(|e| PyValueError::new_err(e.to_string()))
                     })
                     .transpose()?,
@@ -711,7 +727,7 @@ impl TdmMetadata {
                 doppler_count_bias,
                 doppler_count_scale,
                 doppler_count_rollover: doppler_count_rollover
-                    .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .map(|s| core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
                     .transpose()?,
                 transmit_delay_1,
                 transmit_delay_2,
@@ -725,7 +741,7 @@ impl TdmMetadata {
                 receive_delay_5,
                 data_quality: data_quality
                     .map(|s| {
-                        TdmDataQuality::from_str(&s)
+                        core_types::TdmDataQuality::from_str(&s)
                             .map_err(|e| PyValueError::new_err(e.to_string()))
                     })
                     .transpose()?,
@@ -739,9 +755,7 @@ impl TdmMetadata {
                 correction_transmit,
                 correction_aberration_yearly,
                 correction_aberration_diurnal,
-                corrections_applied: corrections_applied
-                    .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
-                    .transpose()?,
+                corrections_applied,
                 ephemeris_name_1,
                 ephemeris_name_2,
                 ephemeris_name_3,
@@ -1405,10 +1419,9 @@ impl TdmMetadata {
     }
     #[setter]
     fn set_doppler_count_rollover(&mut self, value: Option<String>) -> PyResult<()> {
-        use ccsds_ndm::types::YesNo;
         use std::str::FromStr;
         self.inner.doppler_count_rollover = value
-            .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .map(|s| core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
             .transpose()?;
         Ok(())
     }
@@ -1751,10 +1764,9 @@ impl TdmMetadata {
     }
     #[setter]
     fn set_corrections_applied(&mut self, value: Option<String>) -> PyResult<()> {
-        use ccsds_ndm::types::YesNo;
         use std::str::FromStr;
         self.inner.corrections_applied = value
-            .map(|s| YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .map(|s| core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
             .transpose()?;
         Ok(())
     }
@@ -1978,5 +1990,70 @@ impl TdmObservation {
     #[getter]
     fn get_value_str(&self) -> String {
         self.inner.data.value_to_string()
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq, Copy)]
+pub enum TdmMode {
+    Sequential,
+    SingleDiff,
+}
+
+#[pymethods]
+impl TdmMode {
+    fn __str__(&self) -> &'static str {
+        match self {
+            TdmMode::Sequential => "SEQUENTIAL",
+            TdmMode::SingleDiff => "SINGLE_DIFF",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("TdmMode.{}", self.__str__())
+    }
+}
+
+pub fn parse_tdm_mode(ob: &Bound<'_, PyAny>) -> PyResult<core_types::TdmMode> {
+    if let Ok(val) = ob.extract::<TdmMode>() {
+        Ok(match val {
+            TdmMode::Sequential => core_types::TdmMode::Sequential,
+            TdmMode::SingleDiff => core_types::TdmMode::SingleDiff,
+        })
+    } else if let Ok(s) = ob.extract::<String>() {
+        core_types::TdmMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+    } else {
+        Err(PyValueError::new_err("Expected TdmMode enum or string"))
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq, Copy)]
+pub enum TdmPath {
+    Path1,
+    Path2,
+    Path3,
+}
+
+#[pymethods]
+impl TdmPath {
+    fn __str__(&self) -> &'static str {
+        match self {
+            TdmPath::Path1 => "1,2",
+            TdmPath::Path2 => "2,1",
+            TdmPath::Path3 => "1,2,1",
+        }
+    }
+    fn __repr__(&self) -> String {
+        format!("TdmPath.Path_{}", self.__str__())
+    }
+}
+
+pub fn parse_tdm_path(ob: &Bound<'_, PyAny>) -> PyResult<core_types::TdmPath> {
+    if let Ok(val) = ob.extract::<TdmPath>() {
+        Ok(core_types::TdmPath(val.__str__().to_string()))
+    } else if let Ok(s) = ob.extract::<String>() {
+        Ok(core_types::TdmPath(s))
+    } else {
+        Err(PyValueError::new_err("Expected TdmPath enum or string"))
     }
 }

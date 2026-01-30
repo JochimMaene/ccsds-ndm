@@ -11,6 +11,8 @@ use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
+use crate::common::{parse_time_system};
+
 
 /// Attitude Parameter Message (APM).
 ///
@@ -81,6 +83,17 @@ impl Apm {
             "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
             "xml" => self.inner.to_xml().map_err(|e| PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!("Unsupported format '{}'", other))),
+        }
+    }
+
+    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
+        let data = self.to_str(format)?;
+        match fs::write(path, data) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Failed to write file: {}",
+                e
+            ))),
         }
     }
 
@@ -161,14 +174,26 @@ pub struct ApmMetadata {
 #[pymethods]
 impl ApmMetadata {
     #[new]
+    #[pyo3(signature = (
+        object_name,
+        object_id,
+        time_system=None,
+        center_name=None,
+        comment=None
+    ))]
     fn new(
         object_name: String,
         object_id: String,
-        time_system: String,
+        time_system: Option<Bound<'_, PyAny>>,
         center_name: Option<String>,
         comment: Option<Vec<String>>,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        let time_system = match time_system {
+            Some(ref ob) => parse_time_system(ob)?,
+            None => "UTC".to_string(),
+        };
+
+        Ok(Self {
             inner: core_apm::ApmMetadata {
                 comment: comment.unwrap_or_default(),
                 object_name,
@@ -176,8 +201,10 @@ impl ApmMetadata {
                 center_name,
                 time_system,
             },
-        }
+        })
     }
+
+
 
     /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN

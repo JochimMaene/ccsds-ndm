@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::MessageType;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::Py;
 use std::fs;
@@ -22,9 +21,11 @@ pub mod aem;
 pub mod apm;
 pub mod acm;
 pub mod attitude;
+pub mod errors;
 
 use cdm::*;
-use common::{OdmHeader, AdmHeader, StateVector, StateVectorAcc};
+use common::{OdmHeader, AdmHeader, StateVector, StateVectorAcc, ObjectDescription, YesNo, ControlledType, ReferenceFrame, TimeSystem};
+use errors::ccsds_error_to_pyerr;
 use ndm::Ndm;
 use oem::*;
 use omm::*;
@@ -49,8 +50,7 @@ use opm::*;
 #[pyfunction]
 fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
     // Call the core library's auto-detection function
-    let message = ccsds_ndm::from_str(data)
-        .map_err(|e| PyValueError::new_err(format!("Parsing failed: {}", e)))?;
+    let message = ccsds_ndm::from_str(data).map_err(ccsds_error_to_pyerr)?;
 
     match message {
         MessageType::Oem(oem) => {
@@ -114,7 +114,7 @@ fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
 #[pyfunction]
 fn from_file(py: Python, path: &str) -> PyResult<Py<PyAny>> {
     let content = fs::read_to_string(path)
-        .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
+        .map_err(|e| errors::NdmIoError::new_err(e.to_string()))?;
     from_str(py, &content)
 }
 
@@ -122,6 +122,9 @@ fn from_file(py: Python, path: &str) -> PyResult<Py<PyAny>> {
 #[pymodule]
 #[pyo3(name = "ccsds_ndm")]
 fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // Register exception types
+    errors::register_exceptions(m)?;
+
     // High-level API aligned with Rust core
     m.add_function(wrap_pyfunction!(from_str, m)?)?;
     m.add_function(wrap_pyfunction!(from_file, m)?)?;
@@ -181,6 +184,8 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<tdm::TdmMetadata>()?;
     m.add_class::<tdm::TdmData>()?;
     m.add_class::<tdm::TdmObservation>()?;
+    m.add_class::<tdm::TdmMode>()?;
+    m.add_class::<tdm::TdmPath>()?;
 
     // Register RDM wrapper classes
     m.add_class::<rdm::Rdm>()?;
@@ -249,6 +254,10 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<CovarianceMethodType>()?;
     m.add_class::<ManeuverableType>()?;
     m.add_class::<ObjectDescription>()?;
+    m.add_class::<YesNo>()?;
+    m.add_class::<ControlledType>()?;
+    m.add_class::<ReferenceFrame>()?;
+    m.add_class::<TimeSystem>()?;
 
     Ok(())
 }

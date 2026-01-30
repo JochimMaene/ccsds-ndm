@@ -11,6 +11,8 @@ use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
+use crate::common::{parse_reference_frame, parse_time_system};
+
 
 // Import OpmCovarianceMatrix from opm module (shared type)
 use crate::opm::OpmCovarianceMatrix;
@@ -290,16 +292,35 @@ pub struct OmmMetadata {
 impl OmmMetadata {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        object_name,
+        object_id,
+        center_name=String::from("EARTH"),
+        ref_frame=None,
+        time_system=None,
+        mean_element_theory=String::from("SGP4"),
+        ref_frame_epoch=None,
+        comment=None
+    ))]
     fn new(
         object_name: String,
         object_id: String,
         center_name: String,
-        ref_frame: String,
-        time_system: String,
+        ref_frame: Option<Bound<'_, PyAny>>,
+        time_system: Option<Bound<'_, PyAny>>,
         mean_element_theory: String,
         ref_frame_epoch: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
+        let ref_frame = match ref_frame {
+            Some(ref ob) => parse_reference_frame(ob)?,
+            None => "TEME".to_string(),
+        };
+        let time_system = match time_system {
+            Some(ref ob) => parse_time_system(ob)?,
+            None => "UTC".to_string(),
+        };
+
         Ok(Self {
             inner: core_omm::OmmMetadata {
                 object_name,
@@ -313,6 +334,8 @@ impl OmmMetadata {
             },
         })
     }
+
+
 
     fn __repr__(&self) -> String {
         format!("OmmMetadata(object_name='{}')", self.inner.object_name)
