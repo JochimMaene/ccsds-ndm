@@ -2,6 +2,107 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+/// Helper module to deserialize optional fields that may have nil="true".
+///
+/// In CCSDS XML, optional fields can be represented as `<FIELD nil="true"/>`
+/// which has no text content. This module handles that case by checking the
+/// `@nil` attribute and treating `nil="true"` as `None`.
+pub mod nullable_value {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    /// Intermediate struct that captures both the nil attribute and optionally the value.
+    #[derive(Deserialize)]
+    struct NullableWrapper<T> {
+        #[serde(rename = "@nil", default)]
+        nil: Option<String>,
+        #[serde(flatten)]
+        value: Option<T>,
+    }
+
+    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        let wrapper: Option<NullableWrapper<T>> = Option::deserialize(deserializer)?;
+        match wrapper {
+            None => Ok(None),
+            Some(w) => {
+                // If nil="true", return None regardless of other content
+                if let Some(ref nil) = w.nil {
+                    if nil == "true" {
+                        return Ok(None);
+                    }
+                }
+                Ok(w.value)
+            }
+        }
+    }
+
+    pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize,
+    {
+        value.serialize(serializer)
+    }
+}
+
+/// Helper module to deserialize optional enum fields that may have empty text.
+///
+/// In CCSDS XML, optional fields can be represented as `<FIELD nil="true"/>`
+/// which results in an empty text (`$text`) being deserialized. Standard serde
+/// enum deserialization would fail because empty string is not a valid variant.
+/// This module handles that case by treating empty strings as `None`.
+pub mod nullable_enum {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    /// Intermediate struct that checks for nil="true" first.
+    #[derive(Deserialize)]
+    struct NullableEnumWrapper<T> {
+        #[serde(rename = "@nil", default)]
+        nil: Option<String>,
+        #[serde(rename = "$text", default)]
+        text: Option<String>,
+        #[serde(flatten)]
+        value: Option<T>,
+    }
+
+    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        let wrapper: Option<NullableEnumWrapper<T>> = Option::deserialize(deserializer)?;
+        match wrapper {
+            None => Ok(None),
+            Some(w) => {
+                // If nil="true", return None regardless of other content
+                if let Some(ref nil) = w.nil {
+                    if nil == "true" {
+                        return Ok(None);
+                    }
+                }
+                // If text is empty, return None
+                if let Some(ref text) = w.text {
+                    if text.trim().is_empty() {
+                        return Ok(None);
+                    }
+                }
+                Ok(w.value)
+            }
+        }
+    }
+
+    pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize,
+    {
+        value.serialize(serializer)
+    }
+}
+
 pub mod vec_f64_space_sep {
     use serde::{Deserialize, Deserializer, Serializer};
 

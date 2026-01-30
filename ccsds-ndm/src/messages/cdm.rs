@@ -239,25 +239,41 @@ pub struct RelativeMetadataData {
     /// 6.3.2.6 for formatting rules.)
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub start_screen_period: Option<Epoch>,
     /// The stop time in UTC of the screening period for the conjunction assessment. (See
     /// 6.3.2.6 for formatting rules.)
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub stop_screen_period: Option<Epoch>,
     /// Name of the Object1 centered reference frame in which the screening volume data are
     /// given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
     /// E for definition.)
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_enum"
+    )]
     pub screen_volume_frame: Option<ScreenVolumeFrameType>,
     /// Shape of the screening volume: ELLIPSOID or BOX.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_enum"
+    )]
     pub screen_volume_shape: Option<ScreenVolumeShapeType>,
 
     /// The R or T (depending on if RTN or TVN is selected) component size of the screening
@@ -266,7 +282,11 @@ pub struct RelativeMetadataData {
     /// **Units**: m
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub screen_volume_x: Option<Length>,
     /// The T or V (depending on if RTN or TVN is selected) component size of the screening
     /// volume in the SCREEN_VOLUME_FRAME. Data type = double.
@@ -274,7 +294,11 @@ pub struct RelativeMetadataData {
     /// **Units**: m
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub screen_volume_y: Option<Length>,
     /// The N component size of the screening volume in the SCREEN_VOLUME_FRAME. Data type =
     /// double.
@@ -282,19 +306,31 @@ pub struct RelativeMetadataData {
     /// **Units**: m
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub screen_volume_z: Option<Length>,
     /// The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for formatting
     /// rules.)
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub screen_entry_time: Option<Epoch>,
     /// The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
     /// rules.)
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub screen_exit_time: Option<Epoch>,
     /// The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will collide.
     /// Data type = double.
@@ -549,7 +585,11 @@ pub struct CdmMetadata {
     /// **Examples**: EARTH, SUN, MOON, MARS
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     #[builder(into)]
     pub orbit_center: Option<String>,
     /// Name of the reference frame in which the state vector data are given. Value must be
@@ -802,7 +842,11 @@ pub struct AdditionalParameters {
     /// **Units**: m²
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub area_drg: Option<Area>,
 
     /// The effective area of the object exposed to solar radiation pressure. (See annex E for
@@ -811,7 +855,11 @@ pub struct AdditionalParameters {
     /// **Units**: m²
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub area_srp: Option<Area>,
 
     /// The mass of the object.
@@ -819,7 +867,11 @@ pub struct AdditionalParameters {
     /// **Units**: kg
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub mass: Option<Mass>,
 
     /// The object's CD•A/m used to propagate the state vector and covariance to TCA. (See
@@ -1070,47 +1122,83 @@ pub struct CdmCovarianceMatrix {
     /// Object covariance matrix `[9,1]`.
     ///
     /// Units: m²/s²
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub cthr_r: Option<M2s2>,
     /// Object covariance matrix `[9,2]`.
     ///
     /// Units: m²/s²
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub cthr_t: Option<M2s2>,
     /// Object covariance matrix `[9,3]`.
     ///
     /// Units: m²/s²
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub cthr_n: Option<M2s2>,
     /// Object covariance matrix `[9,4]`.
     ///
     /// Units: m²/s³
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub cthr_rdot: Option<M2s3>,
     /// Object covariance matrix `[9,5]`.
     ///
     /// Units: m²/s³
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub cthr_tdot: Option<M2s3>,
     /// Object covariance matrix `[9,6]`.
     ///
     /// Units: m²/s³
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub cthr_ndot: Option<M2s3>,
     /// Object covariance matrix `[9,7]`.
     ///
     /// Units: m³/(kg*s²)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub cthr_drg: Option<M3kgs2>,
     /// Object covariance matrix `[9,8]`.
     ///
     /// Units: m³/(kg*s²)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub cthr_srp: Option<M3kgs2>,
     /// Object covariance matrix `[9,9]`.
     ///
     /// Units: m²/s⁴
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub cthr_thr: Option<M2s4>,
 }
 
