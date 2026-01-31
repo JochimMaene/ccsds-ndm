@@ -766,14 +766,7 @@ pub struct CdmData {
 
 impl CdmData {
     pub fn validate(&self) -> Result<()> {
-        if self.covariance_matrix.is_none() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "CDM Data".into(),
-                field: "COVARIANCE_MATRIX".into(),
-                line: None,
-            }
-            .into());
-        }
+        // Covariance matrix is optional per CCSDS CDM specification
         Ok(())
     }
 }
