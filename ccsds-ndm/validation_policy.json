@@ -1,19 +1,6 @@
 {
   "rules": [
     {
-      "message_kind": "ACM",
-      "error_kind": "missing_required_field",
-      "block_contains": "ACM Physical",
-      "field_contains": "CP",
-      "action": "warn"
-    },
-    {
-      "message_kind": "ACM",
-      "error_kind": "missing_required_field",
-      "field_contains": "TARGET_MOM",
-      "action": "warn"
-    },
-    {
       "message_kind": "CDM",
       "error_kind": "missing_required_field",
       "field_contains": "COVARIANCE_MATRIX",

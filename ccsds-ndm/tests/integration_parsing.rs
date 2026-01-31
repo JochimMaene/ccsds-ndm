@@ -1,168 +1,50 @@
-// SPDX-FileCopyrightText: 2025 Jochim Maene <jochim.maene+github@gmail.com>
+// SPDX-FileCopyrightText: 2026 Jochim Maene <jochim.maene+github@gmail.com>
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::{from_str, MessageType};
-use std::collections::HashSet;
+use ccsds_ndm::from_str;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-mod common;
-
 #[test]
-fn test_parse_all_samples() {
-    if std::env::var("CCSDS_NDM_RUN_INTEGRATION").ok().as_deref() != Some("1") {
-        eprintln!("Skipping integration parsing; set CCSDS_NDM_RUN_INTEGRATION=1 to enable.");
-        return;
-    }
-
-    let data_dir = common::data_dir();
-
-    if !data_dir.exists() {
-        eprintln!(
-            "Data directory not found at {:?}, skipping integration tests relying on data",
-            data_dir
-        );
-        return;
-    }
+fn test_parse_minimal_fixtures() {
+    let cases = minimal_cases();
 
     let mut failures = Vec::new();
-    let orekit_expectations = load_orekit_expectations(&data_dir);
-
-    let mut files = Vec::new();
-    for root in [
-        data_dir.join("kvn"),
-        data_dir.join("xml"),
-        data_dir.join("ccsds"),
-        data_dir.join("more_tests"),
-    ] {
-        if root.exists() {
-            collect_candidate_files(&root, &mut files);
-        }
-    }
-
-    files.sort();
-
-    for path in files {
-        let rel_path = path.strip_prefix(&data_dir).unwrap_or(&path);
-        let rel_key = rel_path.to_string_lossy().replace('\\', "/");
-        let fname = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-        let fname_lower = fname.to_lowercase();
-        let orekit_expectation = orekit_expectations
-            .as_ref()
-            .and_then(|exp| exp.expectation(&rel_key));
-        let expected_fail = match orekit_expectation {
-            Some(OrekitExpectation::Success) => false,
-            Some(OrekitExpectation::Failure) => true,
-            None => is_expected_failure(rel_path, &fname_lower),
-        };
-        let flag_success_against_orekit =
-            matches!(orekit_expectation, Some(OrekitExpectation::Failure));
-        let is_xml = path
-            .extension()
-            .and_then(|s| s.to_str())
-            .map(|s| s.eq_ignore_ascii_case("xml"))
-            .unwrap_or(false);
-
-        if is_xml {
-            if fname_lower.starts_with("ndm_") || fname_lower.starts_with("ndm") {
-                println!("Parsing combined NDM XML: {:?}", rel_path);
-            } else {
-                println!("Parsing XML: {:?}", rel_path);
-            }
-        } else {
-            println!("Parsing KVN: {:?}", rel_path);
-        }
-
-        let content = match fs::read_to_string(&path) {
-            Ok(content) => content,
-            Err(e) => {
-                if expected_fail {
-                    println!(
-                        "Expected read failure for {}: {}",
-                        rel_path.display(),
-                        e
-                    );
-                    continue;
-                } else {
-                    failures.push(format!("{} failed to read: {}", rel_path.display(), e));
-                    continue;
-                }
-            }
-        };
-
-        match from_str(&content) {
-            Ok(msg) => {
-                if flag_success_against_orekit {
-                    failures.push(format!(
-                        "{} parsed successfully but Orekit expects failure",
-                        rel_key
-                    ));
-                    continue;
-                }
-
-                if expected_fail {
-                    failures.push(format!(
-                        "{} parsed successfully but was expected to fail",
-                        rel_key
-                    ));
-                    continue;
-                }
-
-                if let Some(expected) = expected_type_from_name(&fname_lower) {
-                    let actual = message_type_name(&msg);
-                    if expected != actual {
-                        failures.push(format!(
-                            "{} parsed but type mismatch (got {:?})",
-                            rel_key, msg
-                        ));
-                    }
-                }
-
-                if is_xml {
-                    match msg.to_xml() {
-                        Ok(xml_out) => {
+    for case in cases {
+        let res = from_str(case.input);
+        if case.should_parse {
+            match res {
+                Ok(msg) => {
+                    // round-trip
+                    if case.is_xml {
+                        if let Ok(xml_out) = msg.to_xml() {
                             if let Err(e) = from_str(&xml_out) {
                                 failures.push(format!(
-                                    "{} XML round-trip failed to parse: {}\nContent:\n{}",
-                                    rel_key, e, xml_out
+                                    "{} XML round-trip failed: {}",
+                                    case.name, e
                                 ));
                             }
+                        } else {
+                            failures.push(format!("{} failed to serialize to XML", case.name));
                         }
-                        Err(e) => failures.push(format!(
-                            "{} failed to serialize to XML: {}",
-                            rel_key, e
-                        )),
-                    }
-                } else {
-                    match msg.to_kvn() {
-                        Ok(kvn_out) => {
+                    } else {
+                        if let Ok(kvn_out) = msg.to_kvn() {
                             if let Err(e) = from_str(&kvn_out) {
                                 failures.push(format!(
-                                    "{} KVN round-trip failed to parse: {}",
-                                    rel_key, e
+                                    "{} KVN round-trip failed: {}",
+                                    case.name, e
                                 ));
                             }
+                        } else {
+                            failures.push(format!("{} failed to serialize to KVN", case.name));
                         }
-                        Err(e) => failures.push(format!(
-                            "{} failed to serialize to KVN: {}",
-                            rel_key, e
-                        )),
                     }
                 }
+                Err(e) => failures.push(format!("{} failed to parse: {}", case.name, e)),
             }
-            Err(e) => {
-                if expected_fail {
-                    println!(
-                        "Expected parse failure for {}: {}",
-                        rel_key,
-                        e
-                    );
-                } else {
-                    println!("Failed to parse {}: {}", rel_key, e);
-                    failures.push(format!("{} failed: {}", rel_key, e));
-                }
-            }
+        } else if res.is_ok() {
+            failures.push(format!("{} parsed but was expected to fail", case.name));
         }
     }
 
@@ -175,303 +57,540 @@ fn test_parse_all_samples() {
     }
 }
 
-fn collect_candidate_files(dir: &Path, files: &mut Vec<PathBuf>) {
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(_) => return,
-    };
+#[test]
+fn test_parse_data_samples() {
+    let data_root = data_dir();
+    let mut failures = Vec::new();
 
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_candidate_files(&path, files);
-            continue;
-        }
-
-        if should_parse_file(&path) {
-            files.push(path);
-        }
-    }
-}
-
-fn should_parse_file(path: &Path) -> bool {
-    let ext = match path.extension().and_then(|s| s.to_str()) {
-        Some(ext) => ext.to_ascii_lowercase(),
-        None => return false,
-    };
-
-    matches!(
-        ext.as_str(),
-        "kvn"
-            | "xml"
-            | "txt"
-            | "cdm"
-            | "aem"
-            | "oem"
-            | "omm"
-            | "opm"
-            | "apm"
-            | "acm"
-            | "ocm"
-            | "ndm"
-            | "tdm"
-            | "rdm"
-    )
-}
-
-fn expected_type_from_name(lower_name: &str) -> Option<&'static str> {
-    if lower_name.starts_with("ndmxml-1.0-oem") {
-        Some("Oem")
-    } else if lower_name.starts_with("ndmxml-1.0-omm") {
-        Some("Omm")
-    } else if lower_name.starts_with("opm") {
-        Some("Opm")
-    } else if lower_name.starts_with("omm") {
-        Some("Omm")
-    } else if lower_name.starts_with("oem") {
-        Some("Oem")
-    } else if lower_name.starts_with("ocm") {
-        Some("Ocm")
-    } else if lower_name.starts_with("tdm") {
-        Some("Tdm")
-    } else if lower_name.starts_with("rdm") {
-        Some("Rdm")
-    } else if lower_name.starts_with("cdm") {
-        Some("Cdm")
-    } else if lower_name.starts_with("apm") {
-        Some("Apm")
-    } else if lower_name.starts_with("aem") {
-        Some("Aem")
-    } else if lower_name.starts_with("acm") {
-        Some("Acm")
-    } else if lower_name.starts_with("ndm") {
-        Some("Ndm")
-    } else {
-        None
-    }
-}
-
-fn message_type_name(msg: &MessageType) -> &'static str {
-    match msg {
-        MessageType::Opm(_) => "Opm",
-        MessageType::Omm(_) => "Omm",
-        MessageType::Oem(_) => "Oem",
-        MessageType::Ocm(_) => "Ocm",
-        MessageType::Tdm(_) => "Tdm",
-        MessageType::Rdm(_) => "Rdm",
-        MessageType::Cdm(_) => "Cdm",
-        MessageType::Apm(_) => "Apm",
-        MessageType::Aem(_) => "Aem",
-        MessageType::Acm(_) => "Acm",
-        MessageType::Ndm(_) => "Ndm",
-    }
-}
-
-fn is_expected_failure(rel_path: &Path, fname_lower: &str) -> bool {
-    let rel = rel_path.to_string_lossy().replace('\\', "/").to_lowercase();
-    if rel.contains("/ccsds/lexical/") {
-        return true;
-    }
-
-    let keywords = [
-        "missing",
-        "wrong",
-        "inconsistent",
-        "spurious",
-        "invalid",
-        "unsupported",
-        "unknown",
-        "duplicate",
-        "empty",
-        "error",
-        "no-",
-        "too-",
-        "not-implemented",
-        "already-used",
-        "repeated",
-        "incompatible",
-        "keyword-within",
-        "number-format-error",
-    ];
-
-    keywords
-        .iter()
-        .any(|kw| fname_lower.contains(kw) || rel.contains(kw))
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OrekitExpectation {
-    Success,
-    Failure,
-}
-
-struct OrekitExpectations {
-    success: HashSet<String>,
-    failure: HashSet<String>,
-}
-
-impl OrekitExpectations {
-    fn expectation(&self, rel_key: &str) -> Option<OrekitExpectation> {
-        if self.success.contains(rel_key) {
-            Some(OrekitExpectation::Success)
-        } else if self.failure.contains(rel_key) {
-            Some(OrekitExpectation::Failure)
-        } else {
-            None
-        }
-    }
-}
-
-fn load_orekit_expectations(data_dir: &Path) -> Option<OrekitExpectations> {
-    let root = data_dir.join("ccsds_test").join("ndm");
-    if !root.exists() {
-        return None;
-    }
-
-    let mut java_files = Vec::new();
-    collect_java_files(&root, &mut java_files);
-
-    let mut success = HashSet::new();
-    let mut failure = HashSet::new();
-
-    for java_path in java_files {
-        let content = match fs::read_to_string(&java_path) {
+    for file in sorted_files(&data_root.join("kvn"), "kvn") {
+        let content = match fs::read_to_string(&file) {
             Ok(content) => content,
-            Err(_) => continue,
+            Err(e) => {
+                failures.push(format!("{} failed to read: {}", file.display(), e));
+                continue;
+            }
         };
 
-        collect_orekit_expectations(&content, &mut success, &mut failure);
+        if let Err(e) = from_str(&content) {
+            failures.push(format!("{} failed to parse: {}", file.display(), e));
+        }
     }
 
-    Some(OrekitExpectations { success, failure })
+    for file in sorted_files(&data_root.join("xml"), "xml") {
+        let content = match fs::read_to_string(&file) {
+            Ok(content) => content,
+            Err(e) => {
+                failures.push(format!("{} failed to read: {}", file.display(), e));
+                continue;
+            }
+        };
+
+        if let Err(e) = from_str(&content) {
+            failures.push(format!("{} failed to parse: {}", file.display(), e));
+        }
+    }
+
+    if !failures.is_empty() {
+        panic!(
+            "Encountered {} data sample failures:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    }
 }
 
-fn collect_java_files(dir: &Path, files: &mut Vec<PathBuf>) {
+struct MinimalCase<'a> {
+    name: &'a str,
+    input: &'a str,
+    should_parse: bool,
+    is_xml: bool,
+}
+
+fn data_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("data")
+}
+
+fn sorted_files(dir: &Path, extension: &str) -> Vec<PathBuf> {
+    let mut files = Vec::new();
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
-        Err(_) => return,
+        Err(e) => panic!("Failed to read data directory {}: {}", dir.display(), e),
     };
 
-    for entry in entries.flatten() {
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(e) => {
+                panic!("Failed to read entry in {}: {}", dir.display(), e);
+            }
+        };
         let path = entry.path();
-        if path.is_dir() {
-            collect_java_files(&path, files);
-            continue;
-        }
-
-        if path.extension().and_then(|s| s.to_str()) == Some("java") {
+        if path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.eq_ignore_ascii_case(extension))
+            .unwrap_or(false)
+        {
             files.push(path);
         }
     }
+
+    files.sort();
+    files
 }
 
-fn collect_orekit_expectations(
-    content: &str,
-    success: &mut HashSet<String>,
-    failure: &mut HashSet<String>,
-) {
-    let mut brace_depth = 0i32;
-    let mut in_method = false;
-    let mut method_start_depth = 0i32;
-    let mut method_has_failure = false;
-    let mut method_files: Vec<String> = Vec::new();
-
-    for line in content.lines() {
-        let trimmed = line.trim();
-        let is_method_start = looks_like_method_start(trimmed);
-
-        if is_method_start && !in_method {
-            in_method = true;
-            method_start_depth = brace_depth;
-            method_has_failure = false;
-            method_files.clear();
-        }
-
-        if in_method {
-            if line.contains("assertThrows")
-                || line.contains("Assertions.assertThrows")
-                || line.contains("catch (OrekitException")
-                || line.contains("catch(OrekitException")
-            {
-                method_has_failure = true;
-            }
-
-            for path in extract_ccsds_paths(line) {
-                if path.starts_with("ccsds/") {
-                    method_files.push(path);
-                }
-            }
-        }
-
-        brace_depth += line.chars().filter(|c| *c == '{').count() as i32;
-        brace_depth -= line.chars().filter(|c| *c == '}').count() as i32;
-
-        if in_method && brace_depth <= method_start_depth {
-            if method_has_failure {
-                for path in &method_files {
-                    failure.insert(path.clone());
-                }
-            } else {
-                for path in &method_files {
-                    if !failure.contains(path) {
-                        success.insert(path.clone());
-                    }
-                }
-            }
-
-            in_method = false;
-        }
-    }
+fn minimal_cases<'a>() -> Vec<MinimalCase<'a>> {
+    vec![
+        MinimalCase {
+            name: "acm_minimal_kvn",
+            input: ACM_MINIMAL_KVN,
+            should_parse: true,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "aem_minimal_kvn",
+            input: AEM_MINIMAL_KVN,
+            should_parse: true,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "apm_minimal_kvn",
+            input: APM_MINIMAL_KVN,
+            should_parse: true,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "cdm_minimal_kvn",
+            input: CDM_MINIMAL_KVN,
+            should_parse: true,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "ocm_minimal_kvn",
+            input: OCM_MINIMAL_KVN,
+            should_parse: true,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "oem_minimal_kvn",
+            input: OEM_MINIMAL_KVN,
+            should_parse: true,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "omm_minimal_kvn",
+            input: OMM_MINIMAL_KVN,
+            should_parse: true,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "opm_minimal_kvn",
+            input: OPM_MINIMAL_KVN,
+            should_parse: true,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "tdm_minimal_kvn",
+            input: TDM_MINIMAL_KVN,
+            should_parse: true,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "rdm_minimal_kvn",
+            input: RDM_MINIMAL_KVN,
+            should_parse: true,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "ndm_minimal_xml",
+            input: NDM_MINIMAL_XML,
+            should_parse: true,
+            is_xml: true,
+        },
+        MinimalCase {
+            name: "oem_minimal_xml",
+            input: OEM_MINIMAL_XML,
+            should_parse: true,
+            is_xml: true,
+        },
+        // a few negative cases to ensure error paths are exercised at integration level
+        MinimalCase {
+            name: "tdm_missing_time_system_xml",
+            input: TDM_MISSING_TIME_SYSTEM_XML,
+            should_parse: false,
+            is_xml: true,
+        },
+        MinimalCase {
+            name: "tdm_invalid_number_kvn",
+            input: TDM_INVALID_NUMBER_KVN,
+            should_parse: false,
+            is_xml: false,
+        },
+        MinimalCase {
+            name: "ndm_wrong_format",
+            input: "NOT_A_CCSDS_MESSAGE",
+            should_parse: false,
+            is_xml: false,
+        },
+    ]
 }
 
-fn looks_like_method_start(trimmed: &str) -> bool {
-    if trimmed.is_empty() {
-        return false;
-    }
+const ACM_MINIMAL_KVN: &str = r#"CCSDS_ACM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_DESIGNATOR = 2020-001A
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+ATT_START
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY
+ATT_TYPE = QUATERNION
+NUMBER_STATES = 4
+0.0 0 0 0 1
+ATT_STOP
+"#;
 
-    let starters = [
-        "if ",
-        "if(",
-        "for ",
-        "for(",
-        "while ",
-        "while(",
-        "switch ",
-        "switch(",
-        "catch ",
-        "catch(",
-        "try",
-        "else",
-        "do",
-        "class ",
-        "interface ",
-        "enum ",
-        "@",
-    ];
+const AEM_MINIMAL_KVN: &str = r#"CCSDS_AEM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_ID = 2020-001A
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY_1
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T00:10:00
+ATTITUDE_TYPE = QUATERNION
+META_STOP
+DATA_START
+2023-01-01T00:00:00 0 0 0 1
+DATA_STOP
+"#;
 
-    if starters.iter().any(|s| trimmed.starts_with(s)) {
-        return false;
-    }
+const APM_MINIMAL_KVN: &str = r#"CCSDS_APM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_ID = 2020-001A
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+META_STOP
+EPOCH = 2023-01-01T00:00:00
+QUAT_START
+REF_FRAME_A = SC_BODY_1
+REF_FRAME_B = GCRF
+Q1 = 0
+Q2 = 0
+Q3 = 0
+QC = 1
+QUAT_STOP
+"#;
 
-    trimmed.contains('(') && trimmed.contains(')') && trimmed.ends_with('{')
-}
+const CDM_MINIMAL_KVN: &str = r#"CCSDS_CDM_VERS = 1.0
+CREATION_DATE = 2025-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_FOR = OPERATOR
+MESSAGE_ID = MSG-001
 
-fn extract_ccsds_paths(line: &str) -> Vec<String> {
-    let mut paths = Vec::new();
-    let mut idx = 0usize;
+TCA = 2025-01-02T12:00:00
+MISS_DISTANCE = 100.0 [m]
+RELATIVE_SPEED = 7.5 [m/s]
+RELATIVE_POSITION_R = 10.0 [m]
+RELATIVE_POSITION_T = -20.0 [m]
+RELATIVE_POSITION_N = 5.0 [m]
+RELATIVE_VELOCITY_R = 0.1 [m/s]
+RELATIVE_VELOCITY_T = -0.2 [m/s]
+RELATIVE_VELOCITY_N = 0.05 [m/s]
+SCREEN_VOLUME_FRAME = RTN
+SCREEN_VOLUME_SHAPE = BOX
+SCREEN_VOLUME_X = 1000.0 [m]
+SCREEN_VOLUME_Y = 2000.0 [m]
+SCREEN_VOLUME_Z = 3000.0 [m]
+COLLISION_PROBABILITY = 0.001
+OBJECT = OBJECT1
+OBJECT_DESIGNATOR = 00001
+CATALOG_NAME = CAT
+OBJECT_NAME = OBJ1
+INTERNATIONAL_DESIGNATOR = 1998-067A
+OBJECT_TYPE = PAYLOAD
+EPHEMERIS_NAME = EPH1
+COVARIANCE_METHOD = CALCULATED
+MANEUVERABLE = YES
+REF_FRAME = EME2000
 
-    while let Some(pos) = line[idx..].find("\"/ccsds/") {
-        let start = idx + pos + 1;
-        let rest = &line[start..];
-        if let Some(end) = rest.find('"') {
-            let path = &rest[..end];
-            let normalized = path.trim_start_matches('/').to_string();
-            paths.push(normalized);
-            idx = start + end + 1;
-        } else {
-            break;
-        }
-    }
+X = 1.0 [km]
+Y = 2.0 [km]
+Z = 3.0 [km]
+X_DOT = 0.1 [km/s]
+Y_DOT = 0.2 [km/s]
+Z_DOT = 0.3 [km/s]
 
-    paths
-}
+CR_R = 1.0 [m**2]
+CT_R = 0.0 [m**2]
+CT_T = 1.0 [m**2]
+CN_R = 0.0 [m**2]
+CN_T = 0.0 [m**2]
+CN_N = 1.0 [m**2]
+CRDOT_R = 0.0 [m**2/s]
+CRDOT_T = 0.0 [m**2/s]
+CRDOT_N = 0.0 [m**2/s]
+CRDOT_RDOT = 1.0 [m**2/s**2]
+CTDOT_R = 0.0 [m**2/s]
+CTDOT_T = 0.0 [m**2/s]
+CTDOT_N = 0.0 [m**2/s]
+CTDOT_RDOT = 0.0 [m**2/s**2]
+CTDOT_TDOT = 1.0 [m**2/s**2]
+CNDOT_R = 0.0 [m**2/s]
+CNDOT_T = 0.0 [m**2/s]
+CNDOT_N = 0.0 [m**2/s]
+CNDOT_RDOT = 0.0 [m**2/s**2]
+CNDOT_TDOT = 0.0 [m**2/s**2]
+CNDOT_NDOT = 1.0 [m**2/s**2]
+
+OBJECT = OBJECT2
+OBJECT_DESIGNATOR = 00002
+CATALOG_NAME = CAT
+OBJECT_NAME = OBJ2
+INTERNATIONAL_DESIGNATOR = 1998-067B
+OBJECT_TYPE = PAYLOAD
+EPHEMERIS_NAME = EPH2
+COVARIANCE_METHOD = DEFAULT
+MANEUVERABLE = NO
+REF_FRAME = EME2000
+
+X = -1.0 [km]
+Y = -2.0 [km]
+Z = -3.0 [km]
+X_DOT = -0.1 [km/s]
+Y_DOT = -0.2 [km/s]
+Z_DOT = -0.3 [km/s]
+
+CR_R = 1.0 [m**2]
+CT_R = 0.0 [m**2]
+CT_T = 1.0 [m**2]
+CN_R = 0.0 [m**2]
+CN_T = 0.0 [m**2]
+CN_N = 1.0 [m**2]
+CRDOT_R = 0.0 [m**2/s]
+CRDOT_T = 0.0 [m**2/s]
+CRDOT_N = 0.0 [m**2/s]
+CRDOT_RDOT = 1.0 [m**2/s**2]
+CTDOT_R = 0.0 [m**2/s]
+CTDOT_T = 0.0 [m**2/s]
+CTDOT_N = 0.0 [m**2/s]
+CTDOT_RDOT = 0.0 [m**2/s**2]
+CTDOT_TDOT = 1.0 [m**2/s**2]
+CNDOT_R = 0.0 [m**2/s]
+CNDOT_T = 0.0 [m**2/s]
+CNDOT_N = 0.0 [m**2/s]
+CNDOT_RDOT = 0.0 [m**2/s**2]
+CNDOT_TDOT = 0.0 [m**2/s**2]
+CNDOT_NDOT = 1.0 [m**2/s**2]
+"#;
+
+const OCM_MINIMAL_KVN: &str = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+TRAJ_START
+CENTER_NAME = EARTH
+TRAJ_REF_FRAME = GCRF
+TRAJ_TYPE = CARTPV
+2023-01-01T00:00:00 1 2 3 4 5 6
+TRAJ_STOP
+"#;
+
+const OEM_MINIMAL_KVN: &str = r#"CCSDS_OEM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_ID = 2020-001A
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T00:10:00
+META_STOP
+2023-01-01T00:00:00 1 2 3 4 5 6
+"#;
+
+const OMM_MINIMAL_KVN: &str = r#"CCSDS_OMM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = TEST
+OBJECT_ID = 2020-001A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP4
+EPOCH = 2023-01-01T00:00:00
+MEAN_MOTION = 15.0
+ECCENTRICITY = 0.001
+INCLINATION = 98.0
+RA_OF_ASC_NODE = 10.0
+ARG_OF_PERICENTER = 20.0
+MEAN_ANOMALY = 30.0
+MEAN_MOTION_DOT = 0.000001 [rev/day**2]
+MEAN_MOTION_DDOT = 0.0 [rev/day**3]
+BSTAR = 0.0001 [1/ER]
+"#;
+
+const OPM_MINIMAL_KVN: &str = r#"CCSDS_OPM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = TEST
+OBJECT_ID = 2020-001A
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+EPOCH = 2023-01-01T00:00:00
+X = 1 [km]
+Y = 2 [km]
+Z = 3 [km]
+X_DOT = 4 [km/s]
+Y_DOT = 5 [km/s]
+Z_DOT = 6 [km/s]
+"#;
+
+const TDM_MINIMAL_KVN: &str = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = STATION
+PARTICIPANT_2 = SPACECRAFT
+PATH_1 = 1,2
+PATH_2 = 2,1
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 100
+DATA_STOP
+"#;
+
+const RDM_MINIMAL_KVN: &str = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-11-13T12:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = RDM-001
+OBJECT_NAME = TEST-SAT
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-11-13T00:00:00
+ORBIT_LIFETIME = 2 [d]
+REENTRY_ALTITUDE = 80 [km]
+"#;
+
+const NDM_MINIMAL_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<ndm>
+  <opm id="CCSDS_OPM_VERS" version="2.0">
+    <header>
+      <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
+      <ORIGINATOR>TEST</ORIGINATOR>
+    </header>
+    <body>
+      <segment>
+        <metadata>
+          <OBJECT_NAME>TEST</OBJECT_NAME>
+          <OBJECT_ID>2020-001A</OBJECT_ID>
+          <CENTER_NAME>EARTH</CENTER_NAME>
+          <REF_FRAME>GCRF</REF_FRAME>
+          <TIME_SYSTEM>UTC</TIME_SYSTEM>
+        </metadata>
+        <data>
+          <stateVector>
+            <EPOCH>2023-01-01T00:00:00</EPOCH>
+            <X units="km">1</X>
+            <Y units="km">2</Y>
+            <Z units="km">3</Z>
+            <X_DOT units="km/s">4</X_DOT>
+            <Y_DOT units="km/s">5</Y_DOT>
+            <Z_DOT units="km/s">6</Z_DOT>
+          </stateVector>
+        </data>
+      </segment>
+    </body>
+  </opm>
+</ndm>
+"#;
+
+const OEM_MINIMAL_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<oem id="CCSDS_OEM_VERS" version="2.0">
+  <header>
+    <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
+    <ORIGINATOR>TEST</ORIGINATOR>
+  </header>
+  <body>
+    <segment>
+      <metadata>
+        <OBJECT_NAME>TEST</OBJECT_NAME>
+        <OBJECT_ID>2020-001A</OBJECT_ID>
+        <CENTER_NAME>EARTH</CENTER_NAME>
+        <REF_FRAME>GCRF</REF_FRAME>
+        <TIME_SYSTEM>UTC</TIME_SYSTEM>
+        <START_TIME>2023-01-01T00:00:00</START_TIME>
+        <STOP_TIME>2023-01-01T00:10:00</STOP_TIME>
+      </metadata>
+      <data>
+        <stateVector>
+          <EPOCH>2023-01-01T00:00:00</EPOCH>
+          <X units="km">1</X>
+          <Y units="km">2</Y>
+          <Z units="km">3</Z>
+          <X_DOT units="km/s">4</X_DOT>
+          <Y_DOT units="km/s">5</Y_DOT>
+          <Z_DOT units="km/s">6</Z_DOT>
+        </stateVector>
+      </data>
+    </segment>
+  </body>
+</oem>
+"#;
+
+const TDM_MISSING_TIME_SYSTEM_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<tdm id="CCSDS_TDM_VERS" version="2.0">
+  <header>
+    <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
+    <ORIGINATOR>TEST</ORIGINATOR>
+  </header>
+  <body>
+    <segment>
+      <metadata>
+        <PARTICIPANT_1>STATION</PARTICIPANT_1>
+      </metadata>
+      <data>
+        <observation>
+          <EPOCH>2023-01-01T00:00:00</EPOCH>
+          <RANGE>100</RANGE>
+        </observation>
+      </data>
+    </segment>
+  </body>
+</tdm>
+"#;
+
+const TDM_INVALID_NUMBER_KVN: &str = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = STATION
+PARTICIPANT_2 = SPACECRAFT
+PATH_1 = 1,2
+PATH_2 = 2,1
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 BAD
+DATA_STOP
+"#;

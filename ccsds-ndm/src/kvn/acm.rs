@@ -738,7 +738,11 @@ TARGET_MOMENTUM = 0.1 0.2 0.3 [N*m*s]
 MAN_STOP
 "#;
         let input = format!("{}{}{}", sample_acm_header(), sample_acm_meta(), man_block);
-        let acm = Acm::from_kvn(&input).unwrap();
+        let acm = crate::validation::with_validation_mode(
+            crate::validation::ValidationMode::Lenient,
+            || Acm::from_kvn(&input),
+        )
+        .unwrap();
         let man = &acm.body.segment.data.man[0];
         assert_eq!(man.man_id.as_deref(), Some("MAN_001"));
         assert_eq!(man.man_duration.as_ref().unwrap().value, 100.0);

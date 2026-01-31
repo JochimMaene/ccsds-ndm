@@ -1281,23 +1281,13 @@ impl AcmAttitudeDetermination {
         let mut numbers: Vec<u32> = self.sensors.iter().map(|s| s.sensor_number).collect();
         numbers.sort_unstable();
 
-        if numbers.first().copied() != Some(1) {
-            return Err(ValidationError::InvalidValue {
-                field: "SENSOR_NUMBER".into(),
-                value: format!("{:?}", numbers),
-                expected: "contiguous sequence starting at 1".into(),
-                line: None,
-            }
-            .into());
-        }
-
         for window in numbers.windows(2) {
             if let [prev, next] = *window {
-                if next == prev || next != prev + 1 {
+                if next == prev {
                     return Err(ValidationError::InvalidValue {
                         field: "SENSOR_NUMBER".into(),
                         value: format!("{:?}", numbers),
-                        expected: "contiguous sequence starting at 1".into(),
+                        expected: "unique values".into(),
                         line: None,
                     }
                     .into());

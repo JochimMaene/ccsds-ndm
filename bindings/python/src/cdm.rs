@@ -6,7 +6,7 @@ use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::MessageType;
-use numpy::{PyArray, PyArray1, PyArray2, PyReadonlyArray1};
+use numpy::{PyArray1, PyArray2, PyReadonlyArray1};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
@@ -1636,7 +1636,7 @@ impl CdmData {
                 od_parameters: None,
                 additional_parameters: None,
                 state_vector: state_vector.inner,
-                covariance_matrix: covariance_matrix.inner,
+                covariance_matrix: Some(covariance_matrix.inner),
             },
         }
     }
@@ -1653,12 +1653,13 @@ impl CdmData {
 
     /// Covariance Matrix.
     ///
-    /// :type: CdmCovarianceMatrix
+    /// :type: Optional[CdmCovarianceMatrix]
     #[getter]
-    fn covariance_matrix(&self) -> CdmCovarianceMatrix {
-        CdmCovarianceMatrix {
-            inner: self.inner.covariance_matrix.clone(),
-        }
+    fn covariance_matrix(&self) -> Option<CdmCovarianceMatrix> {
+        self.inner
+            .covariance_matrix
+            .as_ref()
+            .map(|cov| CdmCovarianceMatrix { inner: cov.clone() })
     }
 
     /// Comments.
@@ -1723,10 +1724,15 @@ impl CdmData {
         &self,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-        CdmCovarianceMatrix {
-            inner: self.inner.covariance_matrix.clone(),
+        match self.inner.covariance_matrix.as_ref() {
+            Some(cov) => CdmCovarianceMatrix {
+                inner: cov.clone(),
+            }
+            .to_numpy(py),
+            None => Err(PyValueError::new_err(
+                "COVARIANCE_MATRIX is missing; cannot build NumPy array",
+            )),
         }
-        .to_numpy(py)
     }
 
     fn __repr__(&self) -> String {

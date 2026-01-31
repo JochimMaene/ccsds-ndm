@@ -89,5 +89,6 @@ _build/
 
 copilot-instructions.md
 .geminiignore
+.codex
 GEMINI.md
 CLAUDE.md
