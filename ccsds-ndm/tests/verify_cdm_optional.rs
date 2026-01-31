@@ -27,7 +27,7 @@ SCREEN_VOLUME_SHAPE = BOX
 SCREEN_VOLUME_X = 1000.0 [m]
 SCREEN_VOLUME_Y = 2000.0 [m]
 SCREEN_VOLUME_Z = 3000.0 [m]
-START_SCREEN_PERIOD = 
+START_SCREEN_PERIOD =
 STOP_SCREEN_PERIOD =
 COLLISION_PROBABILITY = 0.001
 OBJECT = OBJECT1
@@ -65,10 +65,19 @@ Z_DOT = 3.5 [m/s]
 "#;
 
     let cdm = Cdm::from_kvn(kvn).expect("Failed to parse CDM KVN with empty optional fields");
-    
+
     // START_SCREEN_PERIOD and STOP_SCREEN_PERIOD were empty in KVN, so they should be None
-    assert!(cdm.body.relative_metadata_data.start_screen_period.is_none(), "START_SCREEN_PERIOD should be None");
-    assert!(cdm.body.relative_metadata_data.stop_screen_period.is_none(), "STOP_SCREEN_PERIOD should be None");
+    assert!(
+        cdm.body
+            .relative_metadata_data
+            .start_screen_period
+            .is_none(),
+        "START_SCREEN_PERIOD should be None"
+    );
+    assert!(
+        cdm.body.relative_metadata_data.stop_screen_period.is_none(),
+        "STOP_SCREEN_PERIOD should be None"
+    );
 }
 
 #[test]
@@ -156,18 +165,27 @@ fn test_cdm_xml_optional_nil() {
 "#;
 
     let cdm = Cdm::from_xml(xml).expect("Failed to parse CDM XML with nil optional fields");
-    
+
     // START_SCREEN_PERIOD was nil="true", so it should be None
-    assert!(cdm.body.relative_metadata_data.start_screen_period.is_none(), "START_SCREEN_PERIOD should be None");
-    
+    assert!(
+        cdm.body
+            .relative_metadata_data
+            .start_screen_period
+            .is_none(),
+        "START_SCREEN_PERIOD should be None"
+    );
+
     // STOP_SCREEN_PERIOD was empty tag, let's see what happens.
-    // Ideally it should also be None if we want robust optional handling, 
+    // Ideally it should also be None if we want robust optional handling,
     // or maybe it fails if not handled.
     // Based on `nullable_value` implementation:
     // It checks `nil="true"`.
-    // It doesn't seem to explicitly check for empty content if nil is absent, 
-    // so it might try to parse empty string as Epoch and fail, OR 
-    // maybe serde treats empty tag as "default" -> None? 
+    // It doesn't seem to explicitly check for empty content if nil is absent,
+    // so it might try to parse empty string as Epoch and fail, OR
+    // maybe serde treats empty tag as "default" -> None?
     // Let's assert None for now and see.
-    assert!(cdm.body.relative_metadata_data.stop_screen_period.is_none(), "STOP_SCREEN_PERIOD should be None");
+    assert!(
+        cdm.body.relative_metadata_data.stop_screen_period.is_none(),
+        "STOP_SCREEN_PERIOD should be None"
+    );
 }
