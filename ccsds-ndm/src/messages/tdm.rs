@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::error::{CcsdsNdmError, Result, ValidationError};
-use quick_xml::events::Event;
-use quick_xml::Reader;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
@@ -13,6 +11,8 @@ use crate::types::{
     TdmRangeMode, TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
 };
 use fast_float;
+use quick_xml::events::Event;
+use quick_xml::Reader;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -76,7 +76,10 @@ impl Ndm for Tdm {
             || crate::validation::current_mode() == crate::validation::ValidationMode::Lenient
         {
             if let Err(err) = validate_tdm_xml_metadata(xml) {
-                crate::validation::handle_validation_error(crate::validation::MessageKind::Tdm, err)?;
+                crate::validation::handle_validation_error(
+                    crate::validation::MessageKind::Tdm,
+                    err,
+                )?;
             }
         }
         let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
@@ -702,9 +705,7 @@ fn validate_tdm_xml_metadata(xml: &str) -> Result<()> {
                     if name.eq_ignore_ascii_case("metadata") {
                         break;
                     }
-                    if depth > 0 {
-                        depth -= 1;
-                    }
+                    depth = depth.saturating_sub(1);
                 }
             }
             Ok(Event::Eof) => break,

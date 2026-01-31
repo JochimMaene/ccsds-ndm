@@ -160,7 +160,7 @@ fn test_parse_wrapped_cdm_unknown_tag() {
     </cdm>
 </somethingExtra>"#;
 
-    // This should detect the CDM eventually. 
+    // This should detect the CDM eventually.
     // BUT we need to make sure Cdm::from_xml can handle it if it's not at the start.
     let ndm = from_str(xml).expect("Should find nested CDM in random wrapper");
     assert!(matches!(ndm, MessageType::Cdm(_)));

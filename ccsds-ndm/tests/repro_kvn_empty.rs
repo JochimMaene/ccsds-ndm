@@ -1,4 +1,3 @@
-
 #[cfg(test)]
 mod tests {
     use ccsds_ndm::messages::cdm::Cdm;
@@ -21,8 +20,8 @@ RELATIVE_POSITION_N = 18924.8 [m]
 RELATIVE_VELOCITY_R = -15.7 [m/s]
 RELATIVE_VELOCITY_T = -9702.6 [m/s]
 RELATIVE_VELOCITY_N = 7314.5 [m/s]
-COLLISION_PROBABILITY = 
-COLLISION_PROBABILITY_METHOD = 
+COLLISION_PROBABILITY =
+COLLISION_PROBABILITY_METHOD =
 
 OBJECT = OBJECT1
 OBJECT_DESIGNATOR = 62671
@@ -34,10 +33,10 @@ EPHEMERIS_NAME = EPH
 COVARIANCE_METHOD = CALCULATED
 MANEUVERABLE = N/A
 REF_FRAME = ITRF
-TIME_LASTOB_START = 
-TIME_LASTOB_END = 
+TIME_LASTOB_START =
+TIME_LASTOB_END =
 RESIDUALS_ACCEPTED = [%]
-WEIGHTED_RMS = 
+WEIGHTED_RMS =
 AREA_PC = 0.4842 [m**2]
 AREA_DRG = [m**2]
 AREA_SRP = [m**2]
@@ -67,6 +66,10 @@ Y_DOT = -6.2 [km/s]
 Z_DOT = -1.3 [km/s]
 "#;
         let res = Cdm::from_kvn(kvn);
-        assert!(res.is_ok(), "Failed to parse CDM KVN with empty optional values: {:?}", res.err());
+        assert!(
+            res.is_ok(),
+            "Failed to parse CDM KVN with empty optional values: {:?}",
+            res.err()
+        );
     }
 }

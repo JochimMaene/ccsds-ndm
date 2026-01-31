@@ -20,10 +20,8 @@ fn test_parse_minimal_fixtures() {
                     if case.is_xml {
                         if let Ok(xml_out) = msg.to_xml() {
                             if let Err(e) = from_str(&xml_out) {
-                                failures.push(format!(
-                                    "{} XML round-trip failed: {}",
-                                    case.name, e
-                                ));
+                                failures
+                                    .push(format!("{} XML round-trip failed: {}", case.name, e));
                             }
                         } else {
                             failures.push(format!("{} failed to serialize to XML", case.name));
@@ -31,10 +29,8 @@ fn test_parse_minimal_fixtures() {
                     } else {
                         if let Ok(kvn_out) = msg.to_kvn() {
                             if let Err(e) = from_str(&kvn_out) {
-                                failures.push(format!(
-                                    "{} KVN round-trip failed: {}",
-                                    case.name, e
-                                ));
+                                failures
+                                    .push(format!("{} KVN round-trip failed: {}", case.name, e));
                             }
                         } else {
                             failures.push(format!("{} failed to serialize to KVN", case.name));

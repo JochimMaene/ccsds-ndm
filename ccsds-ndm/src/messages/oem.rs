@@ -62,8 +62,11 @@ impl OemBody {
                     return Err(crate::error::ValidationError::InvalidValue {
                         field: "TIME_SYSTEM".into(),
                         value: segment.metadata.time_system.clone(),
-                        expected: format!("consistent TIME_SYSTEM across OEM segments (expected {})", ts)
-                            .into(),
+                        expected: format!(
+                            "consistent TIME_SYSTEM across OEM segments (expected {})",
+                            ts
+                        )
+                        .into(),
                         line: None,
                     }
                     .into());

@@ -772,8 +772,8 @@ impl RelativeMetadataData {
     ///
     /// :type: Optional[numpy.ndarray]
     #[getter]
-    fn get_relative_state<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray1<f64>>> {
-        self.inner.relative_state_vector.as_ref().map(|s| {
+    fn relative_state_vector(&self, py: Python<'_>) -> Option<Py<PyArray1<f64>>> {
+        self.inner.relative_state_vector.as_ref().map(move |s| {
             let data = [
                 s.relative_position_r.value,
                 s.relative_position_t.value,
@@ -782,12 +782,15 @@ impl RelativeMetadataData {
                 s.relative_velocity_t.value,
                 s.relative_velocity_n.value,
             ];
-            PyArray1::from_slice(py, &data)
+            PyArray1::from_slice(py, &data).unbind()
         })
     }
 
     #[setter]
-    fn set_relative_state(&mut self, value: Option<PyReadonlyArray1<f64>>) -> PyResult<()> {
+    fn set_relative_state_vector(
+        &mut self,
+        value: Option<PyReadonlyArray1<f64>>,
+    ) -> PyResult<()> {
         if let Some(array) = value {
             let slice = array.as_slice()?;
             if slice.len() != 6 {

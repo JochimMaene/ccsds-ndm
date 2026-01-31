@@ -75,14 +75,14 @@ pub fn kv_float_unit_opt<'a>(input: &mut &'a str) -> KvnResult<(Option<f64>, Opt
     } else {
         // No float. Could be just unit, or empty.
         let u = kv_unit.parse_next(input)?;
-        
+
         // After optional unit, we MUST be at end of line/comment or whitespace.
         // If there's still non-whitespace content, it's invalid (garbage).
         let remainder = till_line_ending.parse_next(input)?;
         if !remainder.trim().is_empty() {
-             return Err(cut_err(input, "Invalid float value"));
+            return Err(cut_err(input, "Invalid float value"));
         }
-        
+
         opt_line_ending.parse_next(input)?;
         Ok((None, u))
     }
@@ -432,9 +432,9 @@ pub fn kv_u32_opt(input: &mut &str) -> KvnResult<Option<u32>> {
     // Check if line contains only whitespace/unit or is empty
     let remainder = peek(till_line_ending).parse_next(input)?;
     if remainder.trim().is_empty() || remainder.trim().starts_with('[') {
-       let _ = kv_unit.parse_next(input)?;
-       opt_line_ending.parse_next(input)?;
-       return Ok(None);
+        let _ = kv_unit.parse_next(input)?;
+        opt_line_ending.parse_next(input)?;
+        return Ok(None);
     }
 
     terminated(
@@ -502,9 +502,9 @@ pub fn kv_u64_opt(input: &mut &str) -> KvnResult<Option<u64>> {
     // Check if line contains only whitespace/unit or is empty
     let remainder = peek(till_line_ending).parse_next(input)?;
     if remainder.trim().is_empty() || remainder.trim().starts_with('[') {
-       let _ = kv_unit.parse_next(input)?;
-       opt_line_ending.parse_next(input)?;
-       return Ok(None);
+        let _ = kv_unit.parse_next(input)?;
+        opt_line_ending.parse_next(input)?;
+        return Ok(None);
     }
 
     terminated(
@@ -639,14 +639,12 @@ where
     if trimmed.is_empty() {
         Ok(None)
     } else {
-        T::from_str(trimmed)
-            .map(Some)
-            .map_err(|e| {
-                ErrMode::Cut(InternalParserError::from_external_error(
-                    input,
-                    EnumParseError::from(e),
-                ))
-            })
+        T::from_str(trimmed).map(Some).map_err(|e| {
+            ErrMode::Cut(InternalParserError::from_external_error(
+                input,
+                EnumParseError::from(e),
+            ))
+        })
     }
 }
 

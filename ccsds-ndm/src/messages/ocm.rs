@@ -250,15 +250,7 @@ fn expected_traj_units(traj_type: &str) -> Option<Vec<&'static str>> {
         "CARTP" => Some(vec!["km", "km", "km"]),
         "CARTPV" => Some(vec!["km", "km", "km", "km/s", "km/s", "km/s"]),
         "CARTPVA" => Some(vec![
-            "km",
-            "km",
-            "km",
-            "km/s",
-            "km/s",
-            "km/s",
-            "km/s**2",
-            "km/s**2",
-            "km/s**2",
+            "km", "km", "km", "km/s", "km/s", "km/s", "km/s**2", "km/s**2", "km/s**2",
         ]),
         _ => None,
     }
@@ -275,10 +267,7 @@ fn unit_matches_expected(unit: &str, expected: &str) -> bool {
 }
 
 fn parse_units_list(units: &str) -> Vec<String> {
-    let trimmed = units
-        .trim()
-        .trim_start_matches('[')
-        .trim_end_matches(']');
+    let trimmed = units.trim().trim_start_matches('[').trim_end_matches(']');
     trimmed
         .split(|c: char| c == ',' || c.is_whitespace())
         .filter(|s| !s.is_empty())
