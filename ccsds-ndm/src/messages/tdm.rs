@@ -679,19 +679,23 @@ fn validate_tdm_xml_metadata(xml: &str) -> Result<()> {
     loop {
         match reader.read_event() {
             Ok(Event::Start(e)) => {
-                let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                let name_upper = name.to_ascii_uppercase();
-                if name_upper == "METADATA" {
+                let name = e.name();
+                let name_bytes = name.as_ref();
+                let name = String::from_utf8_lossy(name_bytes);
+                if name.eq_ignore_ascii_case("metadata") {
                     in_metadata = true;
                     depth = 1;
                     continue;
                 }
                 if in_metadata {
                     depth += 1;
-                    if !allowed.contains(name_upper.as_str()) {
+                    if !allowed
+                        .iter()
+                        .any(|tag| tag.eq_ignore_ascii_case(name.as_ref()))
+                    {
                         return Err(ValidationError::InvalidValue {
                             field: Cow::Borrowed("TDM Metadata keyword"),
-                            value: name,
+                            value: name.to_string(),
                             expected: Cow::Borrowed("allowed TDM metadata keyword"),
                             line: None,
                         }
@@ -701,7 +705,9 @@ fn validate_tdm_xml_metadata(xml: &str) -> Result<()> {
             }
             Ok(Event::End(e)) => {
                 if in_metadata {
-                    let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                    let name = e.name();
+                    let name_bytes = name.as_ref();
+                    let name = String::from_utf8_lossy(name_bytes);
                     if name.eq_ignore_ascii_case("metadata") {
                         break;
                     }
@@ -717,8 +723,8 @@ fn validate_tdm_xml_metadata(xml: &str) -> Result<()> {
     Ok(())
 }
 
-fn tdm_metadata_allowed_tags() -> std::collections::HashSet<&'static str> {
-    let tags = [
+fn tdm_metadata_allowed_tags() -> &'static [&'static str] {
+    &[
         "COMMENT",
         "TRACK_ID",
         "DATA_TYPES",
@@ -779,8 +785,7 @@ fn tdm_metadata_allowed_tags() -> std::collections::HashSet<&'static str> {
         "EPHEMERIS_NAME_3",
         "EPHEMERIS_NAME_4",
         "EPHEMERIS_NAME_5",
-    ];
-    tags.into_iter().collect()
+    ]
 }
 
 impl ToKvn for TdmMetadata {
