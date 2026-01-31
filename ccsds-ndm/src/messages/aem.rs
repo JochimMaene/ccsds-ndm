@@ -230,7 +230,11 @@ pub struct AemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.11
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub useable_start_time: Option<Epoch>,
     /// Optional stop of USEABLE time span covered by attitude ephemeris data immediately following
     /// this metadata block. (See also USEABLE_START_TIME.)
@@ -238,7 +242,11 @@ pub struct AemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.11
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub useable_stop_time: Option<Epoch>,
     /// End of TOTAL time span covered by the attitude ephemeris data immediately following this
     /// metadata block.

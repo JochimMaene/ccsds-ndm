@@ -312,7 +312,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub time_lastob_start: Option<Epoch>,
 
@@ -324,7 +324,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub time_lastob_end: Option<Epoch>,
 
@@ -338,7 +338,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub recommended_od_span: Option<DayInterval>,
 
@@ -353,7 +353,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub actual_od_span: Option<DayInterval>,
 
@@ -363,7 +363,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub obs_available: Option<PositiveInteger>,
 
@@ -373,7 +373,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub obs_used: Option<PositiveInteger>,
 
@@ -383,7 +383,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub tracks_available: Option<PositiveInteger>,
 
@@ -393,7 +393,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub tracks_used: Option<PositiveInteger>,
 
@@ -405,7 +405,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub residuals_accepted: Option<Percentage>,
 
@@ -415,7 +415,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub weighted_rms: Option<NonNegativeDouble>,
 }

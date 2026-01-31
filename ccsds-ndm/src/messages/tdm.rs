@@ -264,7 +264,11 @@ pub struct TdmMetadata {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub start_time: Option<Epoch>,
     /// The STOP_TIME keyword shall specify the UTC stop time of the total time span covered by
     /// the tracking data immediately following this Metadata Section. (For format
@@ -273,7 +277,11 @@ pub struct TdmMetadata {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub stop_time: Option<Epoch>,
     /// The PARTICIPANT_n keyword shall represent the participants (see 1.3.4.1) in a tracking
     /// data session. It is indexed to allow unambiguous reference to other data in the TDM

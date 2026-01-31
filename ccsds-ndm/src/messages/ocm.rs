@@ -683,7 +683,11 @@ pub struct OcmMetadata {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub previous_message_epoch: Option<Epoch>,
     /// Anticipated (or actual) epoch of the next message from this originator for this space
     /// object. (For format specification, see 7.5.10.) NOTE—One may provide the next message
@@ -692,7 +696,11 @@ pub struct OcmMetadata {
     /// **Examples**: 2001-11-07T11:17:33
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub next_message_epoch: Option<Epoch>,
     /// Time of the earliest data contained in the OCM, specified as either a relative or
     /// absolute time tag.
@@ -700,7 +708,11 @@ pub struct OcmMetadata {
     /// **Examples**: 2001-11-06T00:00:00
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub start_time: Option<Epoch>,
     /// Time of the latest data contained in the OCM, specified as either a relative or absolute
     /// time tag.
@@ -708,7 +720,11 @@ pub struct OcmMetadata {
     /// **Examples**: 2001-11-08T00:00:00
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub stop_time: Option<Epoch>,
     /// Span of time that the OCM covers, measured in days. TIME_SPAN is defined as
     /// (STOP_TIME-START_TIME), measured in days, irrespective of whether START_TIME or
@@ -732,7 +748,11 @@ pub struct OcmMetadata {
     /// **Examples**: 2016-12-31T23:59:60
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub next_leap_epoch: Option<Epoch>,
     /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since
     /// 1958) incorporated by the message originator at epoch 'NEXT_LEAP_EPOCH'. This keyword
@@ -1127,7 +1147,11 @@ pub struct OcmTrajState {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub traj_frame_epoch: Option<Epoch>,
     /// Start time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
@@ -1140,7 +1164,11 @@ pub struct OcmTrajState {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub useable_start_time: Option<Epoch>,
     /// Stop time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
@@ -1153,7 +1181,11 @@ pub struct OcmTrajState {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub useable_stop_time: Option<Epoch>,
     /// The integer orbit revolution number associated with the first trajectory state in this
     /// trajectory state time history block. NOTE—The first ascending node crossing that occurs
@@ -1441,7 +1473,11 @@ pub struct OcmPhysicalDescription {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub oeb_parent_frame_epoch: Option<Epoch>,
     /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
@@ -2044,7 +2080,11 @@ pub struct OcmCovarianceMatrix {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub cov_frame_epoch: Option<Epoch>,
     /// Minimum scale factor to apply to this covariance data to achieve realism.
     ///
@@ -2271,12 +2311,20 @@ pub struct OcmManeuverParameters {
     /// Identifies the completion time of the previous maneuver for this MAN_BASIS.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub man_prev_epoch: Option<Epoch>,
     /// Identifies the start time of the next maneuver for this MAN_BASIS.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub man_next_epoch: Option<Epoch>,
     /// A free-text field used to specify the intention(s) of the maneuver. Multiple maneuver
     /// purposes can be provided as a comma-delimited list.
@@ -2306,7 +2354,11 @@ pub struct OcmManeuverParameters {
     /// reference frame. (See 7.5.10 for formatting rules.)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub man_frame_epoch: Option<Epoch>,
     /// Origin of maneuver gravitational assist body, which may be a natural solar system body
     /// (planets, asteroids, comets, and natural satellites), including any planet barycenter
@@ -2332,7 +2384,11 @@ pub struct OcmManeuverParameters {
     /// keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub dc_win_open: Option<Epoch>,
     /// End time of the duty cycle-based maneuver window that occurs on or after the actual
     /// maneuver execution end time. For example, this may identify the time at which the
@@ -2340,7 +2396,11 @@ pub struct OcmManeuverParameters {
     /// be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub dc_win_close: Option<Epoch>,
     /// Minimum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional
     /// even if DC_TYPE = 'CONTINUOUS'.
@@ -2360,7 +2420,11 @@ pub struct OcmManeuverParameters {
     /// DC_WIN_OPEN. This keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub dc_exec_start: Option<Epoch>,
     /// End time of the final duty cycle-based maneuver sequence execution. DC_EXEC_STOP
     /// typically occurs on or after the end of the final maneuver 'ON' portion within the duty
@@ -2368,7 +2432,11 @@ pub struct OcmManeuverParameters {
     /// DC_WIN_CLOSE. This keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub dc_exec_stop: Option<Epoch>,
     /// Reference time for the THRUST duty cycle, specified as either time in seconds (relative
     /// to EPOCH_TZERO), or as an absolute '`<epoch>`' (see 7.5.10 for formatting rules).
@@ -2376,7 +2444,11 @@ pub struct OcmManeuverParameters {
     /// keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub dc_ref_time: Option<Epoch>,
     /// Thruster pulse 'ON' duration, initiated at first satisfaction of the burn 'ON' time
     /// constraint or upon completion of the previous DC_TIME_PULSE_PERIOD cycle. This keyword
@@ -2753,7 +2825,11 @@ pub struct OcmPerturbations {
     /// Epoch of the space weather data.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub sw_data_epoch: Option<Epoch>,
     /// Free-text field specifying the method used to select or interpolate any and all
     /// sequential space weather data (Kp, ap, Dst, F10.7, M10.7, S10.7, Y10.7, etc.). While

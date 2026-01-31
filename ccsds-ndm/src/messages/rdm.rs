@@ -358,7 +358,11 @@ pub struct RdmMetadata {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub ref_frame_epoch: Option<Epoch>,
     /// Unique identifier of an external ephemeris file used or NONE.
     ///
@@ -487,7 +491,11 @@ pub struct RdmMetadata {
     /// **Examples**: 2001-11-06T11:17:33
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub previous_message_epoch: Option<Epoch>,
     /// Scheduled UTC epoch of the next RDM for the same object (formatting rules specified in
     /// 5.3.3.5); N/A if no other message is scheduled.
@@ -495,7 +503,11 @@ pub struct RdmMetadata {
     /// **Examples**: 2001-11-06T11:17:33, N/A
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub next_message_epoch: Option<Epoch>,
 }
 

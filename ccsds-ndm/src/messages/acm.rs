@@ -280,7 +280,11 @@ pub struct AcmMetadata {
     /// **Examples**: 100.0, 2016-11-10T00:00:00
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub start_time: Option<Epoch>,
     /// Time of the latest data contained in the ACM, specified as either a relative or absolute
     /// time tag.
@@ -288,7 +292,11 @@ pub struct AcmMetadata {
     /// **Examples**: 1500.0, 2016-11-11T00:00:00
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub stop_time: Option<Epoch>,
     /// Difference (TAI – UTC) in seconds (i.e., total # leap seconds elapsed since 1958) as modeled
     /// by the message originator at epoch ‘EPOCH_TZERO’.
@@ -305,7 +313,11 @@ pub struct AcmMetadata {
     /// **Examples**: 2017-01-01T00:00:00
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub next_leap_epoch: Option<Epoch>,
     /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since 1958)
     /// incorporated by the message originator at epoch ‘NEXT_LEAP_EPOCH’. This keyword should be
@@ -1020,7 +1032,11 @@ pub struct AcmManeuverParameters {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub man_begin_time: Option<Epoch>,
     /// End time of actual maneuver, measured as a relative time with respect to EPOCH_TZERO.
     ///
@@ -1029,7 +1045,11 @@ pub struct AcmManeuverParameters {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub man_end_time: Option<Epoch>,
     /// Maneuver duration.
     ///
@@ -1202,7 +1222,11 @@ pub struct AcmAttitudeDetermination {
     /// Epoch of the attitude determination.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub ad_epoch: Option<Epoch>,
     /// Name of the reference frame that defines the starting point of the transformation described
     /// by the attitude state in the estimator. The set of allowed values is described in annex B,

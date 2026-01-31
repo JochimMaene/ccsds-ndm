@@ -285,7 +285,11 @@ pub struct OemMetadata {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub ref_frame_epoch: Option<Epoch>,
     /// Time system used for ephemeris and covariance data. Use of values other than those in
     /// 3.2.3.2 should be documented in an ICD.
@@ -312,7 +316,11 @@ pub struct OemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub useable_start_time: Option<Epoch>,
     /// Stop time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) This optional keyword allows the
@@ -324,7 +332,11 @@ pub struct OemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub useable_stop_time: Option<Epoch>,
     /// End of TOTAL time span covered by ephemeris data and covariance data immediately
     /// following this metadata block. (For format specification, see 7.5.10.)
