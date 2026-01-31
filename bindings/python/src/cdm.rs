@@ -6,7 +6,7 @@ use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::MessageType;
-use numpy::{PyArray1, PyArray2};
+use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
@@ -36,6 +36,171 @@ fn validate_unit<T: Default + std::fmt::Display + PartialEq>(
         }
     }
     Ok(())
+}
+
+fn build_cdm_covariance_from_array(
+    array: &PyReadonlyArray2<f64>,
+    comment: Vec<String>,
+) -> PyResult<core_cdm::CdmCovarianceMatrix> {
+    let shape = array.shape();
+    if shape.len() != 2 || shape[0] != shape[1] {
+        return Err(PyValueError::new_err(
+            "Covariance matrix must be a square 2D array",
+        ));
+    }
+    let dim = shape[0];
+    if dim < 6 || dim > 9 {
+        return Err(PyValueError::new_err(
+            "Covariance matrix must be 6x6, 7x7, 8x8, or 9x9",
+        ));
+    }
+
+    let a = array.as_array();
+
+    Ok(core_cdm::CdmCovarianceMatrix {
+        comment,
+        cr_r: core_types::M2::new(a[[0, 0]]),
+        ct_r: core_types::M2::new(a[[1, 0]]),
+        ct_t: core_types::M2::new(a[[1, 1]]),
+        cn_r: core_types::M2::new(a[[2, 0]]),
+        cn_t: core_types::M2::new(a[[2, 1]]),
+        cn_n: core_types::M2::new(a[[2, 2]]),
+        crdot_r: core_types::M2s::new(a[[3, 0]]),
+        crdot_t: core_types::M2s::new(a[[3, 1]]),
+        crdot_n: core_types::M2s::new(a[[3, 2]]),
+        crdot_rdot: core_types::M2s2::new(a[[3, 3]]),
+        ctdot_r: core_types::M2s::new(a[[4, 0]]),
+        ctdot_t: core_types::M2s::new(a[[4, 1]]),
+        ctdot_n: core_types::M2s::new(a[[4, 2]]),
+        ctdot_rdot: core_types::M2s2::new(a[[4, 3]]),
+        ctdot_tdot: core_types::M2s2::new(a[[4, 4]]),
+        cndot_r: core_types::M2s::new(a[[5, 0]]),
+        cndot_t: core_types::M2s::new(a[[5, 1]]),
+        cndot_n: core_types::M2s::new(a[[5, 2]]),
+        cndot_rdot: core_types::M2s2::new(a[[5, 3]]),
+        cndot_tdot: core_types::M2s2::new(a[[5, 4]]),
+        cndot_ndot: core_types::M2s2::new(a[[5, 5]]),
+        cdrg_r: if dim >= 7 {
+            Some(core_types::M3kg::new(a[[6, 0]]))
+        } else {
+            None
+        },
+        cdrg_t: if dim >= 7 {
+            Some(core_types::M3kg::new(a[[6, 1]]))
+        } else {
+            None
+        },
+        cdrg_n: if dim >= 7 {
+            Some(core_types::M3kg::new(a[[6, 2]]))
+        } else {
+            None
+        },
+        cdrg_rdot: if dim >= 7 {
+            Some(core_types::M3kgs::new(a[[6, 3]]))
+        } else {
+            None
+        },
+        cdrg_tdot: if dim >= 7 {
+            Some(core_types::M3kgs::new(a[[6, 4]]))
+        } else {
+            None
+        },
+        cdrg_ndot: if dim >= 7 {
+            Some(core_types::M3kgs::new(a[[6, 5]]))
+        } else {
+            None
+        },
+        cdrg_drg: if dim >= 7 {
+            Some(core_types::M4kg2::new(a[[6, 6]]))
+        } else {
+            None
+        },
+        csrp_r: if dim >= 8 {
+            Some(core_types::M3kg::new(a[[7, 0]]))
+        } else {
+            None
+        },
+        csrp_t: if dim >= 8 {
+            Some(core_types::M3kg::new(a[[7, 1]]))
+        } else {
+            None
+        },
+        csrp_n: if dim >= 8 {
+            Some(core_types::M3kg::new(a[[7, 2]]))
+        } else {
+            None
+        },
+        csrp_rdot: if dim >= 8 {
+            Some(core_types::M3kgs::new(a[[7, 3]]))
+        } else {
+            None
+        },
+        csrp_tdot: if dim >= 8 {
+            Some(core_types::M3kgs::new(a[[7, 4]]))
+        } else {
+            None
+        },
+        csrp_ndot: if dim >= 8 {
+            Some(core_types::M3kgs::new(a[[7, 5]]))
+        } else {
+            None
+        },
+        csrp_drg: if dim >= 8 {
+            Some(core_types::M4kg2::new(a[[7, 6]]))
+        } else {
+            None
+        },
+        csrp_srp: if dim >= 8 {
+            Some(core_types::M4kg2::new(a[[7, 7]]))
+        } else {
+            None
+        },
+        cthr_r: if dim >= 9 {
+            Some(core_types::M2s2::new(a[[8, 0]]))
+        } else {
+            None
+        },
+        cthr_t: if dim >= 9 {
+            Some(core_types::M2s2::new(a[[8, 1]]))
+        } else {
+            None
+        },
+        cthr_n: if dim >= 9 {
+            Some(core_types::M2s2::new(a[[8, 2]]))
+        } else {
+            None
+        },
+        cthr_rdot: if dim >= 9 {
+            Some(core_types::M2s3::new(a[[8, 3]]))
+        } else {
+            None
+        },
+        cthr_tdot: if dim >= 9 {
+            Some(core_types::M2s3::new(a[[8, 4]]))
+        } else {
+            None
+        },
+        cthr_ndot: if dim >= 9 {
+            Some(core_types::M2s3::new(a[[8, 5]]))
+        } else {
+            None
+        },
+        cthr_drg: if dim >= 9 {
+            Some(core_types::M3kgs2::new(a[[8, 6]]))
+        } else {
+            None
+        },
+        cthr_srp: if dim >= 9 {
+            Some(core_types::M3kgs2::new(a[[8, 7]]))
+        } else {
+            None
+        },
+        cthr_thr: if dim >= 9 {
+            Some(core_types::M2s4::new(a[[8, 8]]))
+        } else {
+            None
+        },
+    })
 }
 
 /// Conjunction Data Message (CDM).
@@ -1666,6 +1831,38 @@ impl CdmData {
         }
     }
 
+    #[staticmethod]
+    #[pyo3(signature = (
+        state_vector,
+        covariance_matrix=None,
+        od_parameters=None,
+        additional_parameters=None,
+        comments=None
+    ))]
+    fn from_numpy(
+        state_vector: PyReadonlyArrayDyn<f64>,
+        covariance_matrix: Option<PyReadonlyArray2<f64>>,
+        od_parameters: Option<OdParameters>,
+        additional_parameters: Option<AdditionalParameters>,
+        comments: Option<Vec<String>>,
+    ) -> PyResult<Self> {
+        let state = CdmStateVector::from_numpy(state_vector)?;
+        let cov = match covariance_matrix {
+            Some(array) => Some(build_cdm_covariance_from_array(&array, Vec::new())?),
+            None => None,
+        };
+
+        Ok(Self {
+            inner: core_cdm::CdmData {
+                comment: comments.unwrap_or_default(),
+                od_parameters: od_parameters.map(|o| o.inner),
+                additional_parameters: additional_parameters.map(|a| a.inner),
+                state_vector: state.inner,
+                covariance_matrix: cov,
+            },
+        })
+    }
+
     /// State Vector.
     ///
     /// :type: CdmStateVector
@@ -1738,6 +1935,13 @@ impl CdmData {
         .to_numpy(py)
     }
 
+    #[setter]
+    fn set_state_vector_numpy(&mut self, array: PyReadonlyArrayDyn<f64>) -> PyResult<()> {
+        let state = CdmStateVector::from_numpy(array)?;
+        self.inner.state_vector = state.inner;
+        Ok(())
+    }
+
     /// Covariance matrix as a NumPy array (convenience method).
     ///
     /// Returns:
@@ -1758,6 +1962,29 @@ impl CdmData {
                 "COVARIANCE_MATRIX is missing; cannot build NumPy array",
             )),
         }
+    }
+
+    #[setter]
+    fn set_covariance_matrix_numpy(
+        &mut self,
+        array: Option<PyReadonlyArray2<f64>>,
+    ) -> PyResult<()> {
+        match array {
+            Some(arr) => {
+                let comment = self
+                    .inner
+                    .covariance_matrix
+                    .as_ref()
+                    .map(|c| c.comment.clone())
+                    .unwrap_or_default();
+                let cov = build_cdm_covariance_from_array(&arr, comment)?;
+                self.inner.covariance_matrix = Some(cov);
+            }
+            None => {
+                self.inner.covariance_matrix = None;
+            }
+        }
+        Ok(())
     }
 
     fn __repr__(&self) -> String {
@@ -1806,6 +2033,33 @@ impl CdmStateVector {
                 z_dot: VelocityRequired::new(z_dot),
             },
         }
+    }
+
+    #[staticmethod]
+    fn from_numpy(array: PyReadonlyArrayDyn<f64>) -> PyResult<Self> {
+        let shape = array.shape();
+        let values = if shape.len() == 1 && shape[0] == 6 {
+            let v = array.as_array();
+            [v[0], v[1], v[2], v[3], v[4], v[5]]
+        } else if shape.len() == 2 && shape[0] == 1 && shape[1] == 6 {
+            let v = array.as_array();
+            [v[[0, 0]], v[[0, 1]], v[[0, 2]], v[[0, 3]], v[[0, 4]], v[[0, 5]]]
+        } else {
+            return Err(PyValueError::new_err(
+                "State vector must be shape (6,) or (1,6)",
+            ));
+        };
+
+        Ok(Self {
+            inner: core_cdm::CdmStateVector {
+                x: PositionRequired::new(values[0]),
+                y: PositionRequired::new(values[1]),
+                z: PositionRequired::new(values[2]),
+                x_dot: VelocityRequired::new(values[3]),
+                y_dot: VelocityRequired::new(values[4]),
+                z_dot: VelocityRequired::new(values[5]),
+            },
+        })
     }
 
     /// Object Position Vector X component.
@@ -2598,6 +2852,13 @@ impl CdmCovarianceMatrix {
             },
 
         }
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (array, comment=None))]
+    fn from_numpy(array: PyReadonlyArray2<f64>, comment: Option<Vec<String>>) -> PyResult<Self> {
+        let inner = build_cdm_covariance_from_array(&array, comment.unwrap_or_default())?;
+        Ok(Self { inner })
     }
 
     /// Comments.

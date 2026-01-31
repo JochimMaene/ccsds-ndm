@@ -44,7 +44,8 @@ class TestAem:
         data = AemData(attitude_states=[state1, state2], comment=[])
 
         # Test getting as numpy
-        epochs, array = data.attitude_states_numpy  # Note: Property access
+        epochs = data.attitude_states_epochs  # Note: Property access
+        array = data.attitude_states_numpy
         assert len(epochs) == 2
         assert array.shape == (2, 4)
         assert array[0, 3] == 1.0
@@ -52,13 +53,18 @@ class TestAem:
         # Test setting from numpy
         new_epochs = ["2023-01-01T00:00:00", "2023-01-01T00:01:00"]
         new_array = np.array([[0.5, 0.5, 0.5, 0.5], [0.1, 0.1, 0.1, 0.1]])
-        data.attitude_states_numpy = (new_epochs, new_array)
+        data.attitude_states_epochs = new_epochs
+        data.attitude_states_numpy = new_array
 
         # Verify update
         states = data.attitude_states
         assert len(states) == 2
         # Check tolerance or exact value
         assert abs(states[0].values[0] - 0.5) < 1e-9
+
+        # Test from_numpy constructor
+        data2 = AemData.from_numpy(new_epochs, new_array, comment=[])
+        assert len(data2.attitude_states) == 2
 
     def _create_valid_aem(self):
         header = AdmHeader(

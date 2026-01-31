@@ -575,6 +575,18 @@ class AemData:
     AEM Data Section.
     """
     def __init__(attitude_states, comment) -> None: ...
+    @staticmethod
+    def from_numpy(
+        epochs: list[str],
+        array: numpy.ndarray,
+        comment: Optional[list[str]] = ...,
+    ) -> "AemData":
+        """
+        Create AEM data from epochs and a NumPy array.
+
+        Currently only supports Quaternion Ephemeris states.
+        """
+        ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -591,14 +603,27 @@ class AemData:
     @attitude_states.setter
     def attitude_states(self, value: list[AttitudeState]) -> None: ...
     @property
-    def attitude_states_numpy(self) -> tuple[list[str], numpy.ndarray]:
+    def attitude_states_epochs(self) -> list[str]:
         """
-        Get attitude states as a tuple of epoch strings and a 2D NumPy array.
+        Epochs for attitude states (ISO 8601).
+        """
+        ...
+
+    @attitude_states_epochs.setter
+    def attitude_states_epochs(self, value: list[str]) -> None: ...
+    @property
+    def attitude_states_numpy(self) -> numpy.ndarray:
+        """
+        Get attitude states as a 2D NumPy array.
+
+        Use `attitude_states_epochs` for corresponding epochs.
+
+        Currently only supports Quaternion Ephemeris states.
         """
         ...
 
     @attitude_states_numpy.setter
-    def attitude_states_numpy(self, value: tuple[list[str], numpy.ndarray]) -> None: ...
+    def attitude_states_numpy(self, value: numpy.ndarray) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -1734,6 +1759,15 @@ class CdmCovarianceMatrix:
         cthr_thr=None,
         comment=None,
     ) -> None: ...
+    @staticmethod
+    def from_numpy(
+        array: numpy.ndarray,
+        comment: Optional[list[str]] = ...,
+    ) -> "CdmCovarianceMatrix":
+        """
+        Create a covariance matrix from a 6x6 to 9x9 NumPy array.
+        """
+        ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -2272,6 +2306,18 @@ class CdmData:
         additional_parameters=None,
         comments=None,
     ) -> None: ...
+    @staticmethod
+    def from_numpy(
+        state_vector: numpy.ndarray,
+        covariance_matrix: Optional[numpy.ndarray] = ...,
+        od_parameters: Optional[OdParameters] = ...,
+        additional_parameters: Optional[AdditionalParameters] = ...,
+        comments: Optional[list[str]] = ...,
+    ) -> "CdmData":
+        """
+        Create CDM data from NumPy arrays.
+        """
+        ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -2311,12 +2357,12 @@ class CdmData:
         Covariance matrix as a NumPy array (convenience method).
 
         Returns:
-            numpy.ndarray: 9x9 covariance matrix.
+            numpy.ndarray: 6x6 to 9x9 covariance matrix.
         """
         ...
 
     @covariance_matrix_numpy.setter
-    def covariance_matrix_numpy(self, value: numpy.ndarray) -> None: ...
+    def covariance_matrix_numpy(self, value: Optional[numpy.ndarray]) -> None: ...
     @property
     def od_parameters(self) -> Optional[OdParameters]:
         """
@@ -2844,6 +2890,12 @@ class CdmStateVector:
         Velocity Z component. Units: km/s.
     """
     def __init__(x, y, z, x_dot, y_dot, z_dot) -> None: ...
+    @staticmethod
+    def from_numpy(array: numpy.ndarray) -> "CdmStateVector":
+        """
+        Create a state vector from a NumPy array of shape (6,) or (1,6).
+        """
+        ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -8219,7 +8271,8 @@ class OemCovarianceMatrix:
     epoch : str
         Epoch of the covariance matrix (ISO 8601).
         values : numpy.ndarray
-        Flat NumPy array of length 21 containing the covariance values.
+        NumPy array of shape (21,) containing the lower-triangular values,
+        or (6,6) for a full symmetric matrix.
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
     comment : list[str], optional
@@ -8555,6 +8608,20 @@ class OemData:
         Comments.
     """
     def __init__(state_vectors, comments) -> None: ...
+    @staticmethod
+    def from_numpy(
+        state_vector_epochs: list[str],
+        state_vector_numpy: numpy.ndarray,
+        covariance_matrix_epochs: Optional[list[str]] = ...,
+        covariance_matrix_numpy: Optional[numpy.ndarray] = ...,
+        cov_ref_frames: Optional[list[Optional[str]]] = ...,
+        cov_comments: Optional[list[list[str]]] = ...,
+        comments: Optional[list[str]] = ...,
+    ) -> "OemData":
+        """
+        Create OEM data from epochs and NumPy arrays.
+        """
+        ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -8587,19 +8654,27 @@ class OemData:
     @covariance_matrix.setter
     def covariance_matrix(self, value: list[OemCovarianceMatrix]) -> None: ...
     @property
-    def covariance_matrix_numpy(self) -> tuple[list[str], numpy.ndarray]:
+    def covariance_matrix_epochs(self) -> list[str]:
         """
-        Get covariance matrices as a tuple associated with a NumPy array.
+        Epochs for covariance matrices (ISO 8601).
+        """
+        ...
 
-        Returns:
-            tuple[list[str], np.ndarray]: (Epochs, 2D Array of size Nx21).
+    @covariance_matrix_epochs.setter
+    def covariance_matrix_epochs(self, value: list[str]) -> None: ...
+    @property
+    def covariance_matrix_numpy(self) -> numpy.ndarray:
+        """
+        Get covariance matrices as a NumPy array (shape: N x 6 x 6).
+
+        Use `covariance_matrix_epochs` for corresponding epochs.
+
+        Setter accepts arrays shaped (N,6,6), (N,21), (6,6), or (21,).
         """
         ...
 
     @covariance_matrix_numpy.setter
-    def covariance_matrix_numpy(
-        self, value: tuple[list[str], numpy.ndarray]
-    ) -> None: ...
+    def covariance_matrix_numpy(self, value: numpy.ndarray) -> None: ...
     @property
     def state_vector(self) -> list[StateVectorAcc]:
         """
@@ -8615,19 +8690,25 @@ class OemData:
     @state_vector.setter
     def state_vector(self, value: list[StateVectorAcc]) -> None: ...
     @property
-    def state_vector_numpy(self) -> tuple[list[str], numpy.ndarray]:
+    def state_vector_epochs(self) -> list[str]:
         """
-        State vectors as a tuple of epochs and a NumPy array.
+        Epochs for state vectors (ISO 8601).
+        """
+        ...
 
-        This method allows for efficient zero-copy access to state vector data
-        compatible with scientific Python libraries.
+    @state_vector_epochs.setter
+    def state_vector_epochs(self, value: list[str]) -> None: ...
+    @property
+    def state_vector_numpy(self) -> numpy.ndarray:
+        """
+        State vectors as a NumPy array.
+
+        Use `state_vector_epochs` for corresponding epochs.
 
         Returns
         -------
-        tuple[list[str], numpy.ndarray]
-            A tuple containing:
-            - List of epoch strings (ISO 8601 format).
-            - 2D NumPy array of shape (N, 6) or (N, 9):
+        numpy.ndarray
+            2D array of shape (N, 6) or (N, 9):
               - N x 6: [X, Y, Z, X_DOT, Y_DOT, Z_DOT] if no accelerations.
               - N x 9: [X, Y, Z, X_DOT, Y_DOT, Z_DOT, X_DDOT, Y_DDOT, Z_DDOT] if accelerations present.
 
@@ -8639,7 +8720,7 @@ class OemData:
         ...
 
     @state_vector_numpy.setter
-    def state_vector_numpy(self, value: tuple[list[str], numpy.ndarray]) -> None: ...
+    def state_vector_numpy(self, value: numpy.ndarray) -> None: ...
 
 class OemMetadata:
     """

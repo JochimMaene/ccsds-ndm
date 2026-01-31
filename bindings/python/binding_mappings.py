@@ -95,7 +95,10 @@ PYTHON_ONLY_FIELDS: dict[str, list[str]] = {
     # OEM NumPy accessors
     "OemData": [
         "state_vector_numpy",
+        "state_vector_epochs",
         "covariance_matrix_numpy",
+        "covariance_matrix_epochs",
+        "from_numpy",
     ],
     # OCM NumPy accessors
     "OcmTrajectoryStateHistory": [
@@ -107,9 +110,21 @@ PYTHON_ONLY_FIELDS: dict[str, list[str]] = {
     # CDM NumPy accessors
     "CdmCovarianceMatrix": [
         "to_numpy",
+        "from_numpy",
+    ],
+    "CdmStateVector": [
+        "from_numpy",
+    ],
+    "CdmData": [
+        "state_vector_numpy",
+        "covariance_matrix_numpy",
+        "from_numpy",
     ],
     "AemData": [
         "attitude_states",
+        "attitude_states_numpy",
+        "attitude_states_epochs",
+        "from_numpy",
     ],
     # Add other NumPy accessors as needed
 }
