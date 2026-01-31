@@ -242,6 +242,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<CdmMetadata>()?;
     m.add_class::<CdmData>()?;
     m.add_class::<RelativeMetadataData>()?;
+    m.add_class::<RelativeStateVector>()?;
     m.add_class::<CdmStateVector>()?;
     m.add_class::<CdmCovarianceMatrix>()?;
     m.add_class::<AdditionalParameters>()?;

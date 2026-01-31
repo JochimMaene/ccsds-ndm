@@ -351,7 +351,7 @@ pub struct OemMetadata {
     /// **Examples**: HERMITE, LINEAR, LAGRANGE
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub interpolation: Option<String>,
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
@@ -361,7 +361,7 @@ pub struct OemMetadata {
     /// **Examples**: 5, 8
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     pub interpolation_degree: Option<NonZeroU32>,
 }
 
@@ -480,7 +480,7 @@ pub struct OemCovarianceMatrix {
     /// **Examples**: ICRF, EME2000
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub cov_ref_frame: Option<String>,
 

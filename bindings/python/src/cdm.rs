@@ -6,7 +6,7 @@ use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::MessageType;
-use numpy::{PyArray1, PyArray2, PyReadonlyArray1};
+use numpy::{PyArray1, PyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
@@ -783,174 +783,19 @@ impl RelativeMetadataData {
 
     /// Relative state vector [R, T, N, VR, VT, VN] (combined position and velocity).
     ///
-    /// :type: Optional[numpy.ndarray]
+    /// :type: Optional[RelativeStateVector]
     #[getter]
-    fn relative_state_vector(&self, py: Python<'_>) -> Option<Py<PyArray1<f64>>> {
-        self.inner.relative_state_vector.as_ref().map(move |s| {
-            let data = [
-                s.relative_position_r.value,
-                s.relative_position_t.value,
-                s.relative_position_n.value,
-                s.relative_velocity_r.value,
-                s.relative_velocity_t.value,
-                s.relative_velocity_n.value,
-            ];
-            PyArray1::from_slice(py, &data).unbind()
-        })
-    }
-
-    #[setter]
-    fn set_relative_state_vector(
-        &mut self,
-        value: Option<PyReadonlyArray1<f64>>,
-    ) -> PyResult<()> {
-        if let Some(array) = value {
-            let slice = array.as_slice()?;
-            if slice.len() != 6 {
-                return Err(PyValueError::new_err(
-                    "Relative state vector must be of length 6",
-                ));
-            }
-            self.inner.relative_state_vector = Some(core_cdm::RelativeStateVector {
-                relative_position_r: Length::new(slice[0], None),
-                relative_position_t: Length::new(slice[1], None),
-                relative_position_n: Length::new(slice[2], None),
-                relative_velocity_r: Dv::new(slice[3]),
-                relative_velocity_t: Dv::new(slice[4]),
-                relative_velocity_n: Dv::new(slice[5]),
-            });
-        } else {
-            self.inner.relative_state_vector = None;
-        }
-        Ok(())
-    }
-
-    /// Relative position R component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_position_r(&self) -> Option<f64> {
+    fn relative_state_vector(&self) -> Option<RelativeStateVector> {
         self.inner
             .relative_state_vector
             .as_ref()
-            .map(|s| s.relative_position_r.value)
+            .map(|s| RelativeStateVector { inner: s.clone() })
     }
 
     #[setter]
-    fn set_relative_position_r(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_position_r = Length::new(value, None);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
+    fn set_relative_state_vector(&mut self, value: Option<RelativeStateVector>) {
+        self.inner.relative_state_vector = value.map(|v| v.inner);
     }
-
-    /// Relative position T component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_position_t(&self) -> Option<f64> {
-        self.inner
-            .relative_state_vector
-            .as_ref()
-            .map(|s| s.relative_position_t.value)
-    }
-
-    #[setter]
-    fn set_relative_position_t(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_position_t = Length::new(value, None);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
-    }
-
-    /// Relative position N component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_position_n(&self) -> Option<f64> {
-        self.inner
-            .relative_state_vector
-            .as_ref()
-            .map(|s| s.relative_position_n.value)
-    }
-
-    #[setter]
-    fn set_relative_position_n(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_position_n = Length::new(value, None);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
-    }
-
-    /// Relative velocity R component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_velocity_r(&self) -> Option<f64> {
-        self.inner
-            .relative_state_vector
-            .as_ref()
-            .map(|s| s.relative_velocity_r.value)
-    }
-
-    #[setter]
-    fn set_relative_velocity_r(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_velocity_r = Dv::new(value);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
-    }
-
-    /// Relative velocity T component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_velocity_t(&self) -> Option<f64> {
-        self.inner
-            .relative_state_vector
-            .as_ref()
-            .map(|s| s.relative_velocity_t.value)
-    }
-
-    #[setter]
-    fn set_relative_velocity_t(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_velocity_t = Dv::new(value);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
-    }
-
-    /// Relative velocity N component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_velocity_n(&self) -> Option<f64> {
-        self.inner
-            .relative_state_vector
-            .as_ref()
-            .map(|s| s.relative_velocity_n.value)
-    }
-
-    #[setter]
-    fn set_relative_velocity_n(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_velocity_n = Dv::new(value);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
-    }
-
 
     /// Name of the Object1 centered reference frame in which the screening volume data are
     /// given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
@@ -997,6 +842,167 @@ impl RelativeMetadataData {
             self.inner.miss_distance.value,
             self.inner.collision_probability.as_ref().map(|p| p.value)
         )
+    }
+}
+
+/// Relative State Vector containing relative position and velocity.
+///
+/// Parameters
+/// ----------
+/// relative_position_r : float
+///     Relative position R component. Units: m.
+/// relative_position_t : float
+///     Relative position T component. Units: m.
+/// relative_position_n : float
+///     Relative position N component. Units: m.
+/// relative_velocity_r : float
+///     Relative velocity R component. Units: m/s.
+/// relative_velocity_t : float
+///     Relative velocity T component. Units: m/s.
+/// relative_velocity_n : float
+///     Relative velocity N component. Units: m/s.
+#[pyclass]
+#[derive(Clone)]
+pub struct RelativeStateVector {
+    pub inner: core_cdm::RelativeStateVector,
+}
+
+#[pymethods]
+impl RelativeStateVector {
+    #[new]
+    fn new(
+        relative_position_r: f64,
+        relative_position_t: f64,
+        relative_position_n: f64,
+        relative_velocity_r: f64,
+        relative_velocity_t: f64,
+        relative_velocity_n: f64,
+    ) -> Self {
+        Self {
+            inner: core_cdm::RelativeStateVector {
+                relative_position_r: Length::new(relative_position_r, None),
+                relative_position_t: Length::new(relative_position_t, None),
+                relative_position_n: Length::new(relative_position_n, None),
+                relative_velocity_r: Dv::new(relative_velocity_r),
+                relative_velocity_t: Dv::new(relative_velocity_t),
+                relative_velocity_n: Dv::new(relative_velocity_n),
+            },
+        }
+    }
+
+    /// Relative position R component.
+    ///
+    /// Units: m
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_position_r(&self) -> f64 {
+        self.inner.relative_position_r.value
+    }
+    #[setter]
+    fn set_relative_position_r(&mut self, value: f64) {
+        self.inner.relative_position_r = Length::new(value, None);
+    }
+
+    /// Relative position T component.
+    ///
+    /// Units: m
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_position_t(&self) -> f64 {
+        self.inner.relative_position_t.value
+    }
+    #[setter]
+    fn set_relative_position_t(&mut self, value: f64) {
+        self.inner.relative_position_t = Length::new(value, None);
+    }
+
+    /// Relative position N component.
+    ///
+    /// Units: m
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_position_n(&self) -> f64 {
+        self.inner.relative_position_n.value
+    }
+    #[setter]
+    fn set_relative_position_n(&mut self, value: f64) {
+        self.inner.relative_position_n = Length::new(value, None);
+    }
+
+    /// Relative velocity R component.
+    ///
+    /// Units: m/s
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_velocity_r(&self) -> f64 {
+        self.inner.relative_velocity_r.value
+    }
+    #[setter]
+    fn set_relative_velocity_r(&mut self, value: f64) {
+        self.inner.relative_velocity_r = Dv::new(value);
+    }
+
+    /// Relative velocity T component.
+    ///
+    /// Units: m/s
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_velocity_t(&self) -> f64 {
+        self.inner.relative_velocity_t.value
+    }
+    #[setter]
+    fn set_relative_velocity_t(&mut self, value: f64) {
+        self.inner.relative_velocity_t = Dv::new(value);
+    }
+
+    /// Relative velocity N component.
+    ///
+    /// Units: m/s
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_velocity_n(&self) -> f64 {
+        self.inner.relative_velocity_n.value
+    }
+    #[setter]
+    fn set_relative_velocity_n(&mut self, value: f64) {
+        self.inner.relative_velocity_n = Dv::new(value);
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "RelativeStateVector(pos=[{:.3}, {:.3}, {:.3}], vel=[{:.3}, {:.3}, {:.3}])",
+            self.inner.relative_position_r.value,
+            self.inner.relative_position_t.value,
+            self.inner.relative_position_n.value,
+            self.inner.relative_velocity_r.value,
+            self.inner.relative_velocity_t.value,
+            self.inner.relative_velocity_n.value
+        )
+    }
+
+    /// Return the relative state vector as a NumPy array.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: 1D array of shape (6,) containing [R, T, N, VR, VT, VN].
+    ///     Units: [m, m, m, m/s, m/s, m/s]
+    ///
+    /// :type: numpy.ndarray
+    fn to_numpy<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        let data = [
+            self.inner.relative_position_r.value,
+            self.inner.relative_position_t.value,
+            self.inner.relative_position_n.value,
+            self.inner.relative_velocity_r.value,
+            self.inner.relative_velocity_t.value,
+            self.inner.relative_velocity_n.value,
+        ];
+        PyArray1::from_slice(py, &data)
     }
 }
 
@@ -1558,59 +1564,63 @@ impl CdmMetadata {
     ///
     /// Examples: YES, NO
     ///
-    /// :type: Optional[str]
+    /// :type: Optional[bool]
     #[getter]
-    fn get_solar_rad_pressure(&self) -> Option<String> {
-        self.inner.solar_rad_pressure.as_ref().map(|v| v.to_string())
+    fn get_solar_rad_pressure(&self) -> Option<bool> {
+        self.inner.solar_rad_pressure.as_ref().map(|v| match v {
+            core_types::YesNo::Yes | core_types::YesNo::YesLower => true,
+            core_types::YesNo::No | core_types::YesNo::NoLower => false,
+        })
     }
-    // Setter via string parsing?
-    // Skip setter for now to avoid messy parse logic or add if needed.
-    // Audit complains about missing fields. Getters satisfy it usually?
-    // If Audit checks setters too, I need them.
-    // I'll provide setters using YesNo::from_str
     #[setter]
-    fn set_solar_rad_pressure(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.solar_rad_pressure = match v {
-             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?),
-             None => None,
-        };
-        Ok(())
+    fn set_solar_rad_pressure(&mut self, v: Option<bool>) {
+        self.inner.solar_rad_pressure = v.map(|b| if b {
+            core_types::YesNo::Yes
+        } else {
+            core_types::YesNo::No
+        });
     }
 
     /// Indication of whether solid Earth and ocean tides were used for the OD of the object.
     ///
     /// Examples: YES, NO
     ///
-    /// :type: Optional[str]
+    /// :type: Optional[bool]
     #[getter]
-    fn get_earth_tides(&self) -> Option<String> {
-        self.inner.earth_tides.as_ref().map(|v| v.to_string())
+    fn get_earth_tides(&self) -> Option<bool> {
+        self.inner.earth_tides.as_ref().map(|v| match v {
+            core_types::YesNo::Yes | core_types::YesNo::YesLower => true,
+            core_types::YesNo::No | core_types::YesNo::NoLower => false,
+        })
     }
     #[setter]
-    fn set_earth_tides(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.earth_tides = match v {
-             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?),
-             None => None,
-        };
-        Ok(())
+    fn set_earth_tides(&mut self, v: Option<bool>) {
+        self.inner.earth_tides = v.map(|b| if b {
+            core_types::YesNo::Yes
+        } else {
+            core_types::YesNo::No
+        });
     }
 
     /// Indication of whether in-track thrust modeling was used for the OD of the object.
     ///
     /// Examples: YES, NO
     ///
-    /// :type: Optional[str]
+    /// :type: Optional[bool]
     #[getter]
-    fn get_intrack_thrust(&self) -> Option<String> {
-        self.inner.intrack_thrust.as_ref().map(|v| v.to_string())
+    fn get_intrack_thrust(&self) -> Option<bool> {
+        self.inner.intrack_thrust.as_ref().map(|v| match v {
+            core_types::YesNo::Yes | core_types::YesNo::YesLower => true,
+            core_types::YesNo::No | core_types::YesNo::NoLower => false,
+        })
     }
     #[setter]
-    fn set_intrack_thrust(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.intrack_thrust = match v {
-             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?),
-             None => None,
-        };
-        Ok(())
+    fn set_intrack_thrust(&mut self, v: Option<bool>) {
+        self.inner.intrack_thrust = v.map(|b| if b {
+            core_types::YesNo::Yes
+        } else {
+            core_types::YesNo::No
+        });
     }
 
     fn __repr__(&self) -> String {

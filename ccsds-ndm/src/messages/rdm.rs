@@ -269,7 +269,7 @@ pub struct RdmMetadata {
     /// **Examples**: SATCAT, ESA SST
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub catalog_name: Option<String>,
     /// The CATALOG_NAME satellite catalog designator for the object (formatting rules
@@ -278,7 +278,7 @@ pub struct RdmMetadata {
     /// **Examples**: 37451, 125387U
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub object_designator: Option<String>,
     /// The object type.
@@ -286,7 +286,7 @@ pub struct RdmMetadata {
     /// **Examples**: PAYLOAD, ROCKET BODY, DEBRIS, OTHER, UNKNOWN
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     pub object_type: Option<ObjectDescription>,
     /// Owner of the object (e.g., company, agency, or country owning the satellite). The value
     /// should be taken from the abbreviation column in the SANA organizations registry,
@@ -295,7 +295,7 @@ pub struct RdmMetadata {
     /// **Examples**: DLR, INTELSAT, ESA, UNKNOWN
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub object_owner: Option<String>,
     /// Operator of the object (e.g., company, agency, or country operating the satellite).
@@ -305,7 +305,7 @@ pub struct RdmMetadata {
     /// **Examples**: ESA, EUMETSAT
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub object_operator: Option<String>,
     /// Specification of whether the re-entry is controlled or not.
@@ -349,7 +349,7 @@ pub struct RdmMetadata {
     /// **Examples**: ITRF-97, EME2000, ICRF
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub ref_frame: Option<String>,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame
@@ -369,7 +369,7 @@ pub struct RdmMetadata {
     /// **Examples**: NONE, EPHEMERIS, INTELSAT2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub ephemeris_name: Option<String>,
     /// The gravity model used in the simulation. The degree (D) and order (O) of the spherical
@@ -378,7 +378,7 @@ pub struct RdmMetadata {
     /// **Examples**: EGM-96: 36D 36O, JGM-2: 41D 41O
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub gravity_model: Option<String>,
     /// The atmosphere model(s) used in the simulation. If more than one model is used they
@@ -387,7 +387,7 @@ pub struct RdmMetadata {
     /// **Examples**: MSIS, JACCHIA 70, MSISE-90, NRLMSISE-00
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub atmospheric_model: Option<String>,
     /// The method used to predict the solar flux and geomagnetic indices.
@@ -395,7 +395,7 @@ pub struct RdmMetadata {
     /// **Examples**: STOCHASTIC, PREDICTED: MLLRT
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub solar_flux_prediction: Option<String>,
     /// Comma separated list of other bodies used in the simulation. The names of the bodies
@@ -405,7 +405,7 @@ pub struct RdmMetadata {
     /// **Examples**: MOON, SUN, JUPITER, NONE
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub n_body_perturbations: Option<String>,
     /// Model used for the solar radiation pressure: either model name, or NO if solar
@@ -414,7 +414,7 @@ pub struct RdmMetadata {
     /// **Examples**: GSPM04, NO
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub solar_rad_pressure: Option<String>,
     /// Model used for solid Earth and ocean tides: either model name, or NO if tides were not
@@ -423,7 +423,7 @@ pub struct RdmMetadata {
     /// **Examples**: ESR, NO
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub earth_tides: Option<String>,
     /// Indicator on whether in-track thrust modeling was used in the simulation.
@@ -431,7 +431,7 @@ pub struct RdmMetadata {
     /// **Examples**: YES, NO
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     pub intrack_thrust: Option<YesNo>,
     /// The method used to estimate the drag parameters of the object (DRAG_AREA, DRAG_COEFF,
     /// and/or BALLISTIC_COEFF).
@@ -439,7 +439,7 @@ pub struct RdmMetadata {
     /// **Examples**: DESIGN, CFD: TOOL1, CFD DMSCFOAM, OD
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub drag_parameters_source: Option<String>,
     /// The altitude (in km) at which the object drag parameters (DRAG_AREA, DRAG_COEFF, and/or
@@ -451,14 +451,14 @@ pub struct RdmMetadata {
     /// **Units**: km
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     pub drag_parameters_altitude: Option<Distance>,
     /// The method used to determine the orbit lifetime uncertainty or the re-entry windows.
     ///
     /// **Examples**: NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     pub reentry_uncertainty_method: Option<ReentryUncertaintyMethodType>,
     /// The aspects of disintegration during re-entry considered during simulations: none (the
     /// object was treated as a point mass), mass loss, break-ups (including explosion), or
@@ -468,21 +468,21 @@ pub struct RdmMetadata {
     /// **Examples**: NONE, MASS-LOSS, BREAK-UP, MASS-LOSS + BREAK-UP
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     pub reentry_disintegration: Option<DisintegrationType>,
     /// The method used to determine the impact location confidence interval(s).
     ///
     /// **Examples**: NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     pub impact_uncertainty_method: Option<ImpactUncertaintyType>,
     /// ID of the previous RDM issued for this object.
     ///
     /// **Examples**: ESA/2015-563892348
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     #[builder(into)]
     pub previous_message_id: Option<String>,
     /// UTC Epoch of the previous RDM issued for this object (formatting rules specified in

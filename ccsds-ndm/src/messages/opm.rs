@@ -420,14 +420,14 @@ pub struct KeplerianElements {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     pub true_anomaly: Option<Angle>,
     /// True anomaly or mean anomaly
     ///
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
     pub mean_anomaly: Option<Angle>,
     /// Gravitational Coefficient (Gravitational Constant × Central Mass)
     ///
