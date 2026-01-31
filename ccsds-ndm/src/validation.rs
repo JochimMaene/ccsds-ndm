@@ -55,8 +55,8 @@ pub struct ValidationIssue {
 }
 
 thread_local! {
-    static VALIDATION_MODE: Cell<ValidationMode> = Cell::new(ValidationMode::Strict);
-    static VALIDATION_WARNINGS: RefCell<Vec<ValidationIssue>> = RefCell::new(Vec::new());
+    static VALIDATION_MODE: Cell<ValidationMode> = const { Cell::new(ValidationMode::Strict) };
+    static VALIDATION_WARNINGS: RefCell<Vec<ValidationIssue>> = const { RefCell::new(Vec::new()) };
 }
 
 pub fn current_mode() -> ValidationMode {
@@ -243,12 +243,14 @@ fn policy_allows_warning(kind: MessageKind, err: &ValidationError) -> bool {
 }
 
 fn matches_error_kind(kind: &str, err: &ValidationError) -> bool {
-    match (kind, err) {
-        ("missing_required_field", ValidationError::MissingRequiredField { .. }) => true,
-        ("conflict", ValidationError::Conflict { .. }) => true,
-        ("invalid_value", ValidationError::InvalidValue { .. }) => true,
-        ("out_of_range", ValidationError::OutOfRange { .. }) => true,
-        ("generic", ValidationError::Generic { .. }) => true,
-        _ => false,
-    }
+    matches!(
+        (kind, err),
+        (
+            "missing_required_field",
+            ValidationError::MissingRequiredField { .. }
+        ) | ("conflict", ValidationError::Conflict { .. })
+            | ("invalid_value", ValidationError::InvalidValue { .. })
+            | ("out_of_range", ValidationError::OutOfRange { .. })
+            | ("generic", ValidationError::Generic { .. })
+    )
 }

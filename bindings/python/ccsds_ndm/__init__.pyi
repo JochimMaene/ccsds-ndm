@@ -11180,23 +11180,14 @@ class RelativeMetadataData:
     @relative_speed.setter
     def relative_speed(self, value: Optional[float]) -> None: ...
     @property
-    def relative_state(self) -> Optional[numpy.ndarray]:
+    def relative_state_vector(self) -> Optional[numpy.ndarray]:
         """
         Relative state vector [R, T, N, VR, VT, VN] (combined position and velocity).
         """
         ...
 
-    @relative_state.setter
-    def relative_state(self, value: Optional[numpy.ndarray]) -> None: ...
-    @property
-    def relative_state_vector(self) -> Optional[list[float]]:
-        """
-        Relative state vector [R, T, N, VR, VT, VN] as a list.
-        """
-        ...
-
     @relative_state_vector.setter
-    def relative_state_vector(self, value: Optional[list[float]]) -> None: ...
+    def relative_state_vector(self, value: Optional[numpy.ndarray]) -> None: ...
     @property
     def relative_velocity_n(self) -> Optional[float]:
         """

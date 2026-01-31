@@ -139,9 +139,9 @@ pub mod validation;
 pub mod xml;
 
 use error::{CcsdsNdmError, Result};
-pub use validation::{take_warnings as take_validation_warnings, ValidationMode};
 use std::fs;
 use std::path::Path;
+pub use validation::{take_warnings as take_validation_warnings, ValidationMode};
 
 /// A generic container for any parsed NDM message.
 ///

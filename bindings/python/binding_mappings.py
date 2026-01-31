@@ -54,8 +54,7 @@ FIELD_MAPPINGS: dict[str, dict[str, str]] = {
         "segment": "body.segment",
     },
     "RelativeMetadataData": {
-        "relative_position": "relative_state_vector",
-        "relative_velocity": "relative_state_vector",
+        "relative_state_vector": "relative_state_vector",
     },
     "ManeuverParameters": {
         "man_epoch_start": "man_epoch_ignition",
