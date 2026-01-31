@@ -524,6 +524,17 @@ pub struct MeanElements {
 impl MeanElements {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        epoch,
+        eccentricity,
+        inclination,
+        ra_of_asc_node,
+        arg_of_pericenter,
+        mean_anomaly,
+        semi_major_axis=None,
+        mean_motion=None,
+        gm=None
+    ))]
     fn new(
         epoch: String,
         eccentricity: f64,
@@ -763,6 +774,7 @@ impl OmmData {
     /// mean_elements : MeanElements
     ///     Mean elements.
     #[new]
+    #[pyo3(signature = (mean_elements, comments=None))]
     fn new(mean_elements: MeanElements, comments: Option<Vec<String>>) -> Self {
         Self {
             inner: core_omm::OmmData {

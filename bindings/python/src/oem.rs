@@ -10,7 +10,7 @@ use ccsds_ndm::types::{
     Acc, Position, PositionCovariance, PositionVelocityCovariance, Velocity, VelocityCovariance,
 };
 use ccsds_ndm::MessageType;
-use numpy::{PyArray, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArrayMethods};
+use numpy::{PyArray, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArray3, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
@@ -721,6 +721,7 @@ impl OemMetadata {
 #[pymethods]
 impl OemData {
     #[new]
+    #[pyo3(signature = (state_vectors, comments=None))]
     fn new(state_vectors: Vec<StateVectorAcc>, comments: Option<Vec<String>>) -> Self {
         Self {
             inner: core_oem::OemData {
@@ -942,8 +943,13 @@ impl OemData {
 
     /// Get covariance matrices as a tuple associated with a NumPy array.
     ///
+    /// The returned array is a 3D tensor of shape (N, 6, 6), where N is the number of covariance
+    /// matrices. Each 6x6 matrix is symmetric and constructed from the lower-triangular CCSDS data.
+    ///
+    /// Indices: 0=X, 1=Y, 2=Z, 3=X_DOT, 4=Y_DOT, 5=Z_DOT
+    ///
     /// Returns:
-    ///     tuple[list[str], np.ndarray]: (Epochs, 2D Array of size Nx21).
+    ///     tuple[list[str], np.ndarray]: (Epochs, 3D Array of size Nx6x6).
     ///
     /// :type: tuple[list[str], numpy.ndarray]
     #[getter]
@@ -959,58 +965,83 @@ impl OemData {
             .collect();
 
         let num_matrices = self.inner.covariance_matrix.len();
-        let mut data = Vec::with_capacity(num_matrices * 21);
+        // 6x6 matrix = 36 elements per epoch
+        let mut data = Vec::with_capacity(num_matrices * 36);
 
         for cm in &self.inner.covariance_matrix {
-            data.extend_from_slice(&[
-                cm.cx_x.value,
-                cm.cy_x.value,
-                cm.cy_y.value,
-                cm.cz_x.value,
-                cm.cz_y.value,
-                cm.cz_z.value,
-                cm.cx_dot_x.value,
-                cm.cx_dot_y.value,
-                cm.cx_dot_z.value,
-                cm.cx_dot_x_dot.value,
-                cm.cy_dot_x.value,
-                cm.cy_dot_y.value,
-                cm.cy_dot_z.value,
-                cm.cy_dot_x_dot.value,
-                cm.cy_dot_y_dot.value,
-                cm.cz_dot_x.value,
-                cm.cz_dot_y.value,
-                cm.cz_dot_z.value,
-                cm.cz_dot_x_dot.value,
-                cm.cz_dot_y_dot.value,
-                cm.cz_dot_z_dot.value,
-            ]);
+            // Row 0 (X)
+            data.push(cm.cx_x.value);        // 0,0
+            data.push(cm.cy_x.value);        // 0,1
+            data.push(cm.cz_x.value);        // 0,2
+            data.push(cm.cx_dot_x.value);    // 0,3
+            data.push(cm.cy_dot_x.value);    // 0,4
+            data.push(cm.cz_dot_x.value);    // 0,5
+
+            // Row 1 (Y)
+            data.push(cm.cy_x.value);        // 1,0 (Symmetric)
+            data.push(cm.cy_y.value);        // 1,1
+            data.push(cm.cz_y.value);        // 1,2
+            data.push(cm.cx_dot_y.value);    // 1,3
+            data.push(cm.cy_dot_y.value);    // 1,4
+            data.push(cm.cz_dot_y.value);    // 1,5
+
+            // Row 2 (Z)
+            data.push(cm.cz_x.value);        // 2,0 (Symmetric)
+            data.push(cm.cz_y.value);        // 2,1 (Symmetric)
+            data.push(cm.cz_z.value);        // 2,2
+            data.push(cm.cx_dot_z.value);    // 2,3
+            data.push(cm.cy_dot_z.value);    // 2,4
+            data.push(cm.cz_dot_z.value);    // 2,5
+
+            // Row 3 (X_DOT)
+            data.push(cm.cx_dot_x.value);    // 3,0 (Symmetric)
+            data.push(cm.cx_dot_y.value);    // 3,1 (Symmetric)
+            data.push(cm.cx_dot_z.value);    // 3,2 (Symmetric)
+            data.push(cm.cx_dot_x_dot.value);// 3,3
+            data.push(cm.cy_dot_x_dot.value);// 3,4
+            data.push(cm.cz_dot_x_dot.value);// 3,5
+
+            // Row 4 (Y_DOT)
+            data.push(cm.cy_dot_x.value);    // 4,0 (Symmetric)
+            data.push(cm.cy_dot_y.value);    // 4,1 (Symmetric)
+            data.push(cm.cy_dot_z.value);    // 4,2 (Symmetric)
+            data.push(cm.cy_dot_x_dot.value);// 4,3 (Symmetric)
+            data.push(cm.cy_dot_y_dot.value);// 4,4
+            data.push(cm.cz_dot_y_dot.value);// 4,5
+
+            // Row 5 (Z_DOT)
+            data.push(cm.cz_dot_x.value);    // 5,0 (Symmetric)
+            data.push(cm.cz_dot_y.value);    // 5,1 (Symmetric)
+            data.push(cm.cz_dot_z.value);    // 5,2 (Symmetric)
+            data.push(cm.cz_dot_x_dot.value);// 5,3 (Symmetric)
+            data.push(cm.cz_dot_y_dot.value);// 5,4 (Symmetric)
+            data.push(cm.cz_dot_z_dot.value);// 5,5
         }
 
-        let array = PyArray::from_vec(py, data).reshape([num_matrices, 21])?;
+        let array = PyArray::from_vec(py, data).reshape([num_matrices, 6, 6])?;
         Ok((epochs, array.into()))
     }
 
     #[setter]
     fn set_covariance_matrix_numpy(
         &mut self,
-        value: (Vec<String>, PyReadonlyArray2<f64>),
+        value: (Vec<String>, PyReadonlyArray3<f64>),
     ) -> PyResult<()> {
         let (epochs, array) = value;
         let shape = array.shape();
-        if shape.len() != 2 {
+        if shape.len() != 3 {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "NumPy array must be 2-dimensional",
+                "NumPy array must be 3-dimensional (N, 6, 6)",
             ));
         }
         if epochs.len() != shape[0] {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Number of epochs must match number of rows in NumPy array",
+                "Number of epochs must match number of matrices in NumPy array",
             ));
         }
-        if shape[1] != 21 {
+        if shape[1] != 6 || shape[2] != 6 {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "NumPy array must have 21 columns",
+                "Covariance matrices must be 6x6",
             ));
         }
 
@@ -1018,93 +1049,95 @@ impl OemData {
         let array_view = array.as_array();
 
         for (i, epoch_str) in epochs.iter().enumerate() {
-            let row = array_view.row(i);
+            // Get the 6x6 slice for this epoch
+            // We only need the lower triangle elements.
+            // Indices based on the getter mapping:
+            // 0,0 -> cx_x
+            // 0,1 -> cy_x
+            // 0,2 -> cz_x
+            // 0,3 -> cx_dot_x
+            // 0,4 -> cy_dot_x
+            // 0,5 -> cz_dot_x
+            // 1,1 -> cy_y
+            // 1,2 -> cz_y
+            // ...
+            // Wait, CCSDS standard typically stores:
+            // CX_X
+            // CY_X, CY_Y
+            // CZ_X, CZ_Y, CZ_Z
+            // CX_DOT_X, CX_DOT_Y, CX_DOT_Z, CX_DOT_X_DOT
+            // ...
+            // My getter mapping constructed a full matrix. Now I need to extract back.
+            // Note: The getter put cy_x at (0,1) AND (1,0).
+            // We'll read from the lower triangle or upper triangle, assuming symmetry?
+            // Let's read the indices corresponding to the struct fields.
+
+            // (0,0)
+            let cx_x = array_view[[i, 0, 0]];
+            // (1,0)
+            let cy_x = array_view[[i, 1, 0]];
+            // (1,1)
+            let cy_y = array_view[[i, 1, 1]];
+            // (2,0)
+            let cz_x = array_view[[i, 2, 0]];
+            // (2,1)
+            let cz_y = array_view[[i, 2, 1]];
+            // (2,2)
+            let cz_z = array_view[[i, 2, 2]];
+            // (3,0)
+            let cx_dot_x = array_view[[i, 3, 0]];
+            // (3,1)
+            let cx_dot_y = array_view[[i, 3, 1]];
+            // (3,2)
+            let cx_dot_z = array_view[[i, 3, 2]];
+            // (3,3)
+            let cx_dot_x_dot = array_view[[i, 3, 3]];
+            // (4,0)
+            let cy_dot_x = array_view[[i, 4, 0]];
+            // (4,1)
+            let cy_dot_y = array_view[[i, 4, 1]];
+            // (4,2)
+            let cy_dot_z = array_view[[i, 4, 2]];
+            // (4,3)
+            let cy_dot_x_dot = array_view[[i, 4, 3]];
+            // (4,4)
+            let cy_dot_y_dot = array_view[[i, 4, 4]];
+            // (5,0)
+            let cz_dot_x = array_view[[i, 5, 0]];
+            // (5,1)
+            let cz_dot_y = array_view[[i, 5, 1]];
+            // (5,2)
+            let cz_dot_z = array_view[[i, 5, 2]];
+            // (5,3)
+            let cz_dot_x_dot = array_view[[i, 5, 3]];
+            // (5,4)
+            let cz_dot_y_dot = array_view[[i, 5, 4]];
+            // (5,5)
+            let cz_dot_z_dot = array_view[[i, 5, 5]];
+
             covariance_matrices.push(core_oem::OemCovarianceMatrix {
                 epoch: parse_epoch(epoch_str)?,
-                cx_x: PositionCovariance {
-                    value: row[0],
-                    units: None,
-                },
-                cy_x: PositionCovariance {
-                    value: row[1],
-                    units: None,
-                },
-                cy_y: PositionCovariance {
-                    value: row[2],
-                    units: None,
-                },
-                cz_x: PositionCovariance {
-                    value: row[3],
-                    units: None,
-                },
-                cz_y: PositionCovariance {
-                    value: row[4],
-                    units: None,
-                },
-                cz_z: PositionCovariance {
-                    value: row[5],
-                    units: None,
-                },
-                cx_dot_x: PositionVelocityCovariance {
-                    value: row[6],
-                    units: None,
-                },
-                cx_dot_y: PositionVelocityCovariance {
-                    value: row[7],
-                    units: None,
-                },
-                cx_dot_z: PositionVelocityCovariance {
-                    value: row[8],
-                    units: None,
-                },
-                cx_dot_x_dot: VelocityCovariance {
-                    value: row[9],
-                    units: None,
-                },
-                cy_dot_x: PositionVelocityCovariance {
-                    value: row[10],
-                    units: None,
-                },
-                cy_dot_y: PositionVelocityCovariance {
-                    value: row[11],
-                    units: None,
-                },
-                cy_dot_z: PositionVelocityCovariance {
-                    value: row[12],
-                    units: None,
-                },
-                cy_dot_x_dot: VelocityCovariance {
-                    value: row[13],
-                    units: None,
-                },
-                cy_dot_y_dot: VelocityCovariance {
-                    value: row[14],
-                    units: None,
-                },
-                cz_dot_x: PositionVelocityCovariance {
-                    value: row[15],
-                    units: None,
-                },
-                cz_dot_y: PositionVelocityCovariance {
-                    value: row[16],
-                    units: None,
-                },
-                cz_dot_z: PositionVelocityCovariance {
-                    value: row[17],
-                    units: None,
-                },
-                cz_dot_x_dot: VelocityCovariance {
-                    value: row[18],
-                    units: None,
-                },
-                cz_dot_y_dot: VelocityCovariance {
-                    value: row[19],
-                    units: None,
-                },
-                cz_dot_z_dot: VelocityCovariance {
-                    value: row[20],
-                    units: None,
-                },
+                cx_x: PositionCovariance { value: cx_x, units: None },
+                cy_x: PositionCovariance { value: cy_x, units: None },
+                cy_y: PositionCovariance { value: cy_y, units: None },
+                cz_x: PositionCovariance { value: cz_x, units: None },
+                cz_y: PositionCovariance { value: cz_y, units: None },
+                cz_z: PositionCovariance { value: cz_z, units: None },
+                cx_dot_x: PositionVelocityCovariance { value: cx_dot_x, units: None },
+                cx_dot_y: PositionVelocityCovariance { value: cx_dot_y, units: None },
+                cx_dot_z: PositionVelocityCovariance { value: cx_dot_z, units: None },
+                cx_dot_x_dot: VelocityCovariance { value: cx_dot_x_dot, units: None },
+                cy_dot_x: PositionVelocityCovariance { value: cy_dot_x, units: None },
+                cy_dot_y: PositionVelocityCovariance { value: cy_dot_y, units: None },
+                cy_dot_z: PositionVelocityCovariance { value: cy_dot_z, units: None },
+                cy_dot_x_dot: VelocityCovariance { value: cy_dot_x_dot, units: None },
+                cy_dot_y_dot: VelocityCovariance { value: cy_dot_y_dot, units: None },
+                cz_dot_x: PositionVelocityCovariance { value: cz_dot_x, units: None },
+                cz_dot_y: PositionVelocityCovariance { value: cz_dot_y, units: None },
+                cz_dot_z: PositionVelocityCovariance { value: cz_dot_z, units: None },
+                cz_dot_x_dot: VelocityCovariance { value: cz_dot_x_dot, units: None },
+                cz_dot_y_dot: VelocityCovariance { value: cz_dot_y_dot, units: None },
+                cz_dot_z_dot: VelocityCovariance { value: cz_dot_z_dot, units: None },
                 comment: vec![],
                 cov_ref_frame: None,
             });

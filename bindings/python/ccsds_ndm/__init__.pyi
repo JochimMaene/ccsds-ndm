@@ -1708,31 +1708,31 @@ class CdmCovarianceMatrix:
         cndot_rdot,
         cndot_tdot,
         cndot_ndot,
-        cdrg_r,
-        cdrg_t,
-        cdrg_n,
-        cdrg_rdot,
-        cdrg_tdot,
-        cdrg_ndot,
-        cdrg_drg,
-        csrp_r,
-        csrp_t,
-        csrp_n,
-        csrp_rdot,
-        csrp_tdot,
-        csrp_ndot,
-        csrp_drg,
-        csrp_srp,
-        cthr_r,
-        cthr_t,
-        cthr_n,
-        cthr_rdot,
-        cthr_tdot,
-        cthr_ndot,
-        cthr_drg,
-        cthr_srp,
-        cthr_thr,
-        comment,
+        cdrg_r=None,
+        cdrg_t=None,
+        cdrg_n=None,
+        cdrg_rdot=None,
+        cdrg_tdot=None,
+        cdrg_ndot=None,
+        cdrg_drg=None,
+        csrp_r=None,
+        csrp_t=None,
+        csrp_n=None,
+        csrp_rdot=None,
+        csrp_tdot=None,
+        csrp_ndot=None,
+        csrp_drg=None,
+        csrp_srp=None,
+        cthr_r=None,
+        cthr_t=None,
+        cthr_n=None,
+        cthr_rdot=None,
+        cthr_tdot=None,
+        cthr_ndot=None,
+        cthr_drg=None,
+        cthr_srp=None,
+        cthr_thr=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -2265,7 +2265,13 @@ class CdmData:
     covariance_matrix : CdmCovarianceMatrix
         Object covariance at TCA.
     """
-    def __init__(state_vector, covariance_matrix, comments) -> None: ...
+    def __init__(
+        state_vector,
+        covariance_matrix=None,
+        od_parameters=None,
+        additional_parameters=None,
+        comments=None,
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -2492,10 +2498,10 @@ class CdmMetadata:
         catalog_name,
         object_name,
         international_designator,
-        ephemeris_name=...,
-        covariance_method=None,
-        maneuverable=None,
-        ref_frame=None,
+        ephemeris_name,
+        covariance_method,
+        maneuverable,
+        ref_frame,
         object_type=None,
         operator_contact_position=None,
         operator_organization=None,
@@ -2564,7 +2570,7 @@ class CdmMetadata:
     @covariance_method.setter
     def covariance_method(self, value: CovarianceMethodType) -> None: ...
     @property
-    def earth_tides(self) -> Optional[str]:
+    def earth_tides(self) -> Optional[bool]:
         """
         Indication of whether solid Earth and ocean tides were used for the OD of the object.
 
@@ -2573,7 +2579,7 @@ class CdmMetadata:
         ...
 
     @earth_tides.setter
-    def earth_tides(self, value: Optional[str]) -> None: ...
+    def earth_tides(self, value: Optional[bool]) -> None: ...
     @property
     def ephemeris_name(self) -> str:
         """
@@ -2616,7 +2622,7 @@ class CdmMetadata:
     @international_designator.setter
     def international_designator(self, value: str) -> None: ...
     @property
-    def intrack_thrust(self) -> Optional[str]:
+    def intrack_thrust(self) -> Optional[bool]:
         """
         Indication of whether in-track thrust modeling was used for the OD of the object.
 
@@ -2625,7 +2631,7 @@ class CdmMetadata:
         ...
 
     @intrack_thrust.setter
-    def intrack_thrust(self, value: Optional[str]) -> None: ...
+    def intrack_thrust(self, value: Optional[bool]) -> None: ...
     @property
     def maneuverable(self) -> ManeuverableType:
         """
@@ -2763,7 +2769,7 @@ class CdmMetadata:
     @ref_frame.setter
     def ref_frame(self, value: ReferenceFrameType) -> None: ...
     @property
-    def solar_rad_pressure(self) -> Optional[str]:
+    def solar_rad_pressure(self) -> Optional[bool]:
         """
         Indication of whether solar radiation pressure perturbations were used for the OD of the
         object.
@@ -2773,7 +2779,7 @@ class CdmMetadata:
         ...
 
     @solar_rad_pressure.setter
-    def solar_rad_pressure(self, value: Optional[str]) -> None: ...
+    def solar_rad_pressure(self, value: Optional[bool]) -> None: ...
 
 class CdmObjectType:
     """
@@ -11141,33 +11147,6 @@ class RelativeMetadataData:
     @miss_distance.setter
     def miss_distance(self, value: float) -> None: ...
     @property
-    def relative_position_n(self) -> Optional[float]:
-        """
-        Relative position N component.
-        """
-        ...
-
-    @relative_position_n.setter
-    def relative_position_n(self, value: Optional[float]) -> None: ...
-    @property
-    def relative_position_r(self) -> Optional[float]:
-        """
-        Relative position R component.
-        """
-        ...
-
-    @relative_position_r.setter
-    def relative_position_r(self, value: Optional[float]) -> None: ...
-    @property
-    def relative_position_t(self) -> Optional[float]:
-        """
-        Relative position T component.
-        """
-        ...
-
-    @relative_position_t.setter
-    def relative_position_t(self, value: Optional[float]) -> None: ...
-    @property
     def relative_speed(self) -> Optional[float]:
         """
         The norm of the relative velocity vector. It indicates how fast the two objects are
@@ -11180,41 +11159,14 @@ class RelativeMetadataData:
     @relative_speed.setter
     def relative_speed(self, value: Optional[float]) -> None: ...
     @property
-    def relative_state_vector(self) -> Optional[numpy.ndarray]:
+    def relative_state_vector(self) -> Optional[RelativeStateVector]:
         """
         Relative state vector [R, T, N, VR, VT, VN] (combined position and velocity).
         """
         ...
 
     @relative_state_vector.setter
-    def relative_state_vector(self, value: Optional[numpy.ndarray]) -> None: ...
-    @property
-    def relative_velocity_n(self) -> Optional[float]:
-        """
-        Relative velocity N component.
-        """
-        ...
-
-    @relative_velocity_n.setter
-    def relative_velocity_n(self, value: Optional[float]) -> None: ...
-    @property
-    def relative_velocity_r(self) -> Optional[float]:
-        """
-        Relative velocity R component.
-        """
-        ...
-
-    @relative_velocity_r.setter
-    def relative_velocity_r(self, value: Optional[float]) -> None: ...
-    @property
-    def relative_velocity_t(self) -> Optional[float]:
-        """
-        Relative velocity T component.
-        """
-        ...
-
-    @relative_velocity_t.setter
-    def relative_velocity_t(self, value: Optional[float]) -> None: ...
+    def relative_state_vector(self, value: Optional[RelativeStateVector]) -> None: ...
     @property
     def screen_entry_time(self) -> Optional[str]:
         """
@@ -11320,6 +11272,115 @@ class RelativeMetadataData:
 
     @tca.setter
     def tca(self, value: str) -> None: ...
+
+class RelativeStateVector:
+    """
+    Relative State Vector containing relative position and velocity.
+
+    Parameters
+    ----------
+    relative_position_r : float
+        Relative position R component. Units: m.
+    relative_position_t : float
+        Relative position T component. Units: m.
+    relative_position_n : float
+        Relative position N component. Units: m.
+    relative_velocity_r : float
+        Relative velocity R component. Units: m/s.
+    relative_velocity_t : float
+        Relative velocity T component. Units: m/s.
+    relative_velocity_n : float
+        Relative velocity N component. Units: m/s.
+    """
+    def __init__(
+        relative_position_r,
+        relative_position_t,
+        relative_position_n,
+        relative_velocity_r,
+        relative_velocity_t,
+        relative_velocity_n,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def relative_position_n(self) -> float:
+        """
+        Relative position N component.
+
+        Units: m
+        """
+        ...
+
+    @relative_position_n.setter
+    def relative_position_n(self, value: float) -> None: ...
+    @property
+    def relative_position_r(self) -> float:
+        """
+        Relative position R component.
+
+        Units: m
+        """
+        ...
+
+    @relative_position_r.setter
+    def relative_position_r(self, value: float) -> None: ...
+    @property
+    def relative_position_t(self) -> float:
+        """
+        Relative position T component.
+
+        Units: m
+        """
+        ...
+
+    @relative_position_t.setter
+    def relative_position_t(self, value: float) -> None: ...
+    @property
+    def relative_velocity_n(self) -> float:
+        """
+        Relative velocity N component.
+
+        Units: m/s
+        """
+        ...
+
+    @relative_velocity_n.setter
+    def relative_velocity_n(self, value: float) -> None: ...
+    @property
+    def relative_velocity_r(self) -> float:
+        """
+        Relative velocity R component.
+
+        Units: m/s
+        """
+        ...
+
+    @relative_velocity_r.setter
+    def relative_velocity_r(self, value: float) -> None: ...
+    @property
+    def relative_velocity_t(self) -> float:
+        """
+        Relative velocity T component.
+
+        Units: m/s
+        """
+        ...
+
+    @relative_velocity_t.setter
+    def relative_velocity_t(self, value: float) -> None: ...
+    def to_numpy(self) -> numpy.ndarray:
+        """
+        Return the relative state vector as a NumPy array.
+
+        Returns:
+            numpy.ndarray: 1D array of shape (6,) containing [R, T, N, VR, VT, VN].
+            Units: [m, m, m, m/s, m/s, m/s]
+        """
+        ...
 
 class ScreenVolumeFrameType:
     def __getstate__(self, /):

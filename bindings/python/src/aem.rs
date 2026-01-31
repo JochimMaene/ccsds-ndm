@@ -472,6 +472,7 @@ pub struct AemData {
 #[pymethods]
 impl AemData {
     #[new]
+    #[pyo3(signature = (attitude_states, comment=None))]
     fn new(attitude_states: Vec<AttitudeState>, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_aem::AemData {

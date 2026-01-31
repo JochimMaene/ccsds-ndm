@@ -272,6 +272,7 @@ pub struct AcmData {
 #[pymethods]
 impl AcmData {
     #[new]
+    #[pyo3(signature = (att=None, phys=None, cov=None, man=None, ad=None, user=None))]
     fn new(
         att: Option<Vec<AcmAttitudeState>>,
         phys: Option<AcmPhysicalDescription>,
@@ -333,6 +334,7 @@ pub struct AcmAttitudeState {
 #[pymethods]
 impl AcmAttitudeState {
     #[new]
+    #[pyo3(signature = (ref_frame_a, ref_frame_b, att_type, att_lines, comment=None))]
     fn new(
         ref_frame_a: String,
         ref_frame_b: String,
@@ -369,6 +371,7 @@ pub struct AcmPhysicalDescription {
 #[pymethods]
 impl AcmPhysicalDescription {
     #[new]
+    #[pyo3(signature = (comment=None))]
     fn new(comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_acm::AcmPhysicalDescription {
@@ -400,6 +403,7 @@ pub struct AcmCovarianceMatrix {
 #[pymethods]
 impl AcmCovarianceMatrix {
     #[new]
+    #[pyo3(signature = (cov_basis, cov_ref_frame, cov_type, cov_lines, comment=None))]
     fn new(
         cov_basis: String,
         cov_ref_frame: String,
@@ -430,6 +434,7 @@ pub struct AcmManeuverParameters {
 #[pymethods]
 impl AcmManeuverParameters {
     #[new]
+    #[pyo3(signature = (man_id=None, comment=None))]
     fn new(man_id: Option<String>, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_acm::AcmManeuverParameters {
@@ -458,6 +463,7 @@ pub struct AcmAttitudeDetermination {
 #[pymethods]
 impl AcmAttitudeDetermination {
     #[new]
+    #[pyo3(signature = (ad_id=None, comment=None))]
     fn new(ad_id: Option<String>, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_acm::AcmAttitudeDetermination {

@@ -1120,10 +1120,10 @@ impl CdmMetadata {
         catalog_name,
         object_name,
         international_designator,
-        ephemeris_name=String::from("NONE"),
-        covariance_method=None,
-        maneuverable=None,
-        ref_frame=None,
+        ephemeris_name,
+        covariance_method,
+        maneuverable,
+        ref_frame,
         object_type=None,
         operator_contact_position=None,
         operator_organization=None,
@@ -1138,7 +1138,6 @@ impl CdmMetadata {
         intrack_thrust=None,
         comment=vec![]
     ))]
-
     fn new(
         object: Bound<'_, PyAny>,
         object_designator: String,
@@ -1146,9 +1145,9 @@ impl CdmMetadata {
         object_name: String,
         international_designator: String,
         ephemeris_name: String,
-        covariance_method: Option<Bound<'_, PyAny>>,
-        maneuverable: Option<Bound<'_, PyAny>>,
-        ref_frame: Option<Bound<'_, PyAny>>,
+        covariance_method: Bound<'_, PyAny>,
+        maneuverable: Bound<'_, PyAny>,
+        ref_frame: Bound<'_, PyAny>,
         object_type: Option<Bound<'_, PyAny>>,
         operator_contact_position: Option<String>,
         operator_organization: Option<String>,
@@ -1163,20 +1162,11 @@ impl CdmMetadata {
         intrack_thrust: Option<bool>,
         comment: Vec<String>,
     ) -> PyResult<Self> {
-        // Parse enum-like arguments (accept str or Enum), with defaults
+        // Parse enum-like arguments (accept str or Enum)
         let object = parse_cdm_object_type(&object)?;
-        let covariance_method = match covariance_method {
-            Some(ref ob) => parse_covariance_method_type(ob)?,
-            None => CovarianceMethodType::Calculated,
-        };
-        let maneuverable = match maneuverable {
-            Some(ref ob) => parse_maneuverable_type(ob)?,
-            None => ManeuverableType::NA,
-        };
-        let ref_frame = match ref_frame {
-            Some(ref ob) => parse_reference_frame_type(ob)?,
-            None => ReferenceFrameType::Gcrf,
-        };
+        let covariance_method = parse_covariance_method_type(&covariance_method)?;
+        let maneuverable = parse_maneuverable_type(&maneuverable)?;
+        let ref_frame = parse_reference_frame_type(&ref_frame)?;
         let object_type = object_type.map(|ob| parse_object_description(&ob)).transpose()?;
 
         let map_object = |o: CdmObjectType| match o {
@@ -1651,18 +1641,27 @@ pub struct CdmData {
 #[pymethods]
 impl CdmData {
     #[new]
+    #[pyo3(signature = (
+        state_vector,
+        covariance_matrix=None,
+        od_parameters=None,
+        additional_parameters=None,
+        comments=None
+    ))]
     fn new(
         state_vector: CdmStateVector,
-        covariance_matrix: CdmCovarianceMatrix,
+        covariance_matrix: Option<CdmCovarianceMatrix>,
+        od_parameters: Option<OdParameters>,
+        additional_parameters: Option<AdditionalParameters>,
         comments: Option<Vec<String>>,
     ) -> Self {
         Self {
             inner: core_cdm::CdmData {
                 comment: comments.unwrap_or_default(),
-                od_parameters: None,
-                additional_parameters: None,
+                od_parameters: od_parameters.map(|o| o.inner),
+                additional_parameters: additional_parameters.map(|a| a.inner),
                 state_vector: state_vector.inner,
-                covariance_matrix: Some(covariance_matrix.inner),
+                covariance_matrix: covariance_matrix.map(|c| c.inner),
             },
         }
     }
@@ -2452,6 +2451,54 @@ pub struct CdmCovarianceMatrix {
 impl CdmCovarianceMatrix {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        cr_r,
+        ct_r,
+        ct_t,
+        cn_r,
+        cn_t,
+        cn_n,
+        crdot_r,
+        crdot_t,
+        crdot_n,
+        crdot_rdot,
+        ctdot_r,
+        ctdot_t,
+        ctdot_n,
+        ctdot_rdot,
+        ctdot_tdot,
+        cndot_r,
+        cndot_t,
+        cndot_n,
+        cndot_rdot,
+        cndot_tdot,
+        cndot_ndot,
+        cdrg_r=None,
+        cdrg_t=None,
+        cdrg_n=None,
+        cdrg_rdot=None,
+        cdrg_tdot=None,
+        cdrg_ndot=None,
+        cdrg_drg=None,
+        csrp_r=None,
+        csrp_t=None,
+        csrp_n=None,
+        csrp_rdot=None,
+        csrp_tdot=None,
+        csrp_ndot=None,
+        csrp_drg=None,
+        csrp_srp=None,
+        cthr_r=None,
+        cthr_t=None,
+        cthr_n=None,
+        cthr_rdot=None,
+        cthr_tdot=None,
+        cthr_ndot=None,
+        cthr_drg=None,
+        cthr_srp=None,
+        cthr_thr=None,
+        comment=None
+    ))]
     fn new(
         cr_r: f64,
         ct_r: f64,
@@ -2565,19 +2612,33 @@ impl CdmCovarianceMatrix {
         self.inner.comment = v;
     }
 
-    /// Returns the full 9x9 covariance matrix as a NumPy array.
-    /// If the optional 7,8,9 rows (Drag, SRP, Thrust) are missing, they are filled with 0.0.
+    /// Returns the covariance matrix as a NumPy array.
+    /// The size will be 6x6, 7x7, 8x8, or 9x9 depending on whether optional
+    /// Drag, SRP, and Thrust parameters are provided, as per CCSDS 508.0-B-1.
     fn to_numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
-        let mut array = vec![0.0; 81]; // 9x9 flattened
         let c = &self.inner;
 
-        // Helper to set symmetric values
-        let mut set = |r: usize, c: usize, val: f64| {
-            array[r * 9 + c] = val;
-            array[c * 9 + r] = val;
+        // Determine dimension based on presence of optional rows
+        // Rule 5.2.8: If a row is provided, all preceding optional rows must be provided.
+        let dim = if c.cthr_r.is_some() {
+            9
+        } else if c.csrp_r.is_some() {
+            8
+        } else if c.cdrg_r.is_some() {
+            7
+        } else {
+            6
         };
 
-        // 1-6 Basic State (Diagonal and Lower Tri provided in struct)
+        let mut array = vec![0.0; dim * dim];
+
+        // Helper to set symmetric values
+        let mut set = |r: usize, col: usize, val: f64| {
+            array[r * dim + col] = val;
+            array[col * dim + r] = val;
+        };
+
+        // 1-6 Basic State (Mandatory)
         set(0, 0, c.cr_r.value);
         set(1, 0, c.ct_r.value);
         set(1, 1, c.ct_t.value);
@@ -2601,83 +2662,46 @@ impl CdmCovarianceMatrix {
         set(5, 4, c.cndot_tdot.value);
         set(5, 5, c.cndot_ndot.value);
 
-        // Optional Rows (7, 8, 9)
-        // Row 7: Drag
-        if let (Some(r), Some(t), Some(n), Some(rd), Some(td), Some(nd), Some(drg)) = (
-            &c.cdrg_r,
-            &c.cdrg_t,
-            &c.cdrg_n,
-            &c.cdrg_rdot,
-            &c.cdrg_tdot,
-            &c.cdrg_ndot,
-            &c.cdrg_drg,
-        ) {
-            set(6, 0, r.value);
-            set(6, 1, t.value);
-            set(6, 2, n.value);
-            set(6, 3, rd.value);
-            set(6, 4, td.value);
-            set(6, 5, nd.value);
-            set(6, 6, drg.value);
+        // Optional Row 7: Drag
+        if dim >= 7 {
+            // Presence is guaranteed by dim check and Section 5.2.8
+            set(6, 0, c.cdrg_r.as_ref().unwrap().value);
+            set(6, 1, c.cdrg_t.as_ref().unwrap().value);
+            set(6, 2, c.cdrg_n.as_ref().unwrap().value);
+            set(6, 3, c.cdrg_rdot.as_ref().unwrap().value);
+            set(6, 4, c.cdrg_tdot.as_ref().unwrap().value);
+            set(6, 5, c.cdrg_ndot.as_ref().unwrap().value);
+            set(6, 6, c.cdrg_drg.as_ref().unwrap().value);
         }
 
-        // Row 8: SRP
-        if let (Some(r), Some(t), Some(n), Some(rd), Some(td), Some(nd), Some(drg), Some(srp)) = (
-            &c.csrp_r,
-            &c.csrp_t,
-            &c.csrp_n,
-            &c.csrp_rdot,
-            &c.csrp_tdot,
-            &c.csrp_ndot,
-            &c.csrp_drg,
-            &c.csrp_srp,
-        ) {
-            set(7, 0, r.value);
-            set(7, 1, t.value);
-            set(7, 2, n.value);
-            set(7, 3, rd.value);
-            set(7, 4, td.value);
-            set(7, 5, nd.value);
-            set(7, 6, drg.value);
-            set(7, 7, srp.value);
+        // Optional Row 8: SRP
+        if dim >= 8 {
+            set(7, 0, c.csrp_r.as_ref().unwrap().value);
+            set(7, 1, c.csrp_t.as_ref().unwrap().value);
+            set(7, 2, c.csrp_n.as_ref().unwrap().value);
+            set(7, 3, c.csrp_rdot.as_ref().unwrap().value);
+            set(7, 4, c.csrp_tdot.as_ref().unwrap().value);
+            set(7, 5, c.csrp_ndot.as_ref().unwrap().value);
+            set(7, 6, c.csrp_drg.as_ref().unwrap().value);
+            set(7, 7, c.csrp_srp.as_ref().unwrap().value);
         }
 
-        // Row 9: Thrust
-        if let (
-            Some(r),
-            Some(t),
-            Some(n),
-            Some(rd),
-            Some(td),
-            Some(nd),
-            Some(drg),
-            Some(srp),
-            Some(thr),
-        ) = (
-            &c.cthr_r,
-            &c.cthr_t,
-            &c.cthr_n,
-            &c.cthr_rdot,
-            &c.cthr_tdot,
-            &c.cthr_ndot,
-            &c.cthr_drg,
-            &c.cthr_srp,
-            &c.cthr_thr,
-        ) {
-            set(8, 0, r.value);
-            set(8, 1, t.value);
-            set(8, 2, n.value);
-            set(8, 3, rd.value);
-            set(8, 4, td.value);
-            set(8, 5, nd.value);
-            set(8, 6, drg.value);
-            set(8, 7, srp.value);
-            set(8, 8, thr.value);
+        // Optional Row 9: Thrust
+        if dim >= 9 {
+            set(8, 0, c.cthr_r.as_ref().unwrap().value);
+            set(8, 1, c.cthr_t.as_ref().unwrap().value);
+            set(8, 2, c.cthr_n.as_ref().unwrap().value);
+            set(8, 3, c.cthr_rdot.as_ref().unwrap().value);
+            set(8, 4, c.cthr_tdot.as_ref().unwrap().value);
+            set(8, 5, c.cthr_ndot.as_ref().unwrap().value);
+            set(8, 6, c.cthr_drg.as_ref().unwrap().value);
+            set(8, 7, c.cthr_srp.as_ref().unwrap().value);
+            set(8, 8, c.cthr_thr.as_ref().unwrap().value);
         }
 
-        // Return 9x9 array
+        // Return dim x dim array
         let numpy_arr =
-            PyArray2::from_vec2(py, &array.chunks(9).map(|c| c.to_vec()).collect::<Vec<_>>())
+            PyArray2::from_vec2(py, &array.chunks(dim).map(|c| c.to_vec()).collect::<Vec<_>>())
                 .unwrap();
         Ok(numpy_arr)
     }
