@@ -40,7 +40,11 @@ pub struct Aem {
     pub version: String,
 }
 
-impl crate::traits::Validate for Aem {}
+impl crate::traits::Validate for Aem {
+    fn validate(&self) -> Result<()> {
+        Aem::validate(self)
+    }
+}
 
 impl Ndm for Aem {
     fn to_kvn(&self) -> Result<String> {
@@ -51,7 +55,7 @@ impl Ndm for Aem {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let aem = Self::from_kvn_str(kvn)?;
-        aem.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Aem, &aem)?;
         Ok(aem)
     }
 
@@ -62,7 +66,7 @@ impl Ndm for Aem {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let aem: Self = crate::xml::from_str_with_context(xml, "AEM")?;
-        aem.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Aem, &aem)?;
         Ok(aem)
     }
 }

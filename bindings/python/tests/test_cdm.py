@@ -24,7 +24,7 @@ from ccsds_ndm import (
 
 def test_cdm():
     cdm = Cdm.from_file(
-        str(pathlib.Path(__file__).parent / "test_cdm.xml"), format="xml"
+        str(pathlib.Path(__file__).parent / "cdm_spacetrack1.xml"), format="xml"
     )
     print(cdm)
 

@@ -37,7 +37,11 @@ pub struct Apm {
     pub version: String,
 }
 
-impl crate::traits::Validate for Apm {}
+impl crate::traits::Validate for Apm {
+    fn validate(&self) -> Result<()> {
+        Apm::validate(self)
+    }
+}
 
 impl Ndm for Apm {
     fn to_kvn(&self) -> Result<String> {
@@ -48,7 +52,7 @@ impl Ndm for Apm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let apm = Self::from_kvn_str(kvn)?;
-        apm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Apm, &apm)?;
         Ok(apm)
     }
 
@@ -59,7 +63,7 @@ impl Ndm for Apm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let apm: Self = crate::xml::from_str_with_context(xml, "APM")?;
-        apm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Apm, &apm)?;
         Ok(apm)
     }
 }

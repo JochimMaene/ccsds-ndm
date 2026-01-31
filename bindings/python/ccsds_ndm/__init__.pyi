@@ -2291,14 +2291,26 @@ class CdmData:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def covariance_matrix(self) -> CdmCovarianceMatrix:
+    def covariance_matrix(self) -> Optional[CdmCovarianceMatrix]:
         """
         Covariance Matrix.
         """
         ...
 
     @covariance_matrix.setter
-    def covariance_matrix(self, value: CdmCovarianceMatrix) -> None: ...
+    def covariance_matrix(self, value: Optional[CdmCovarianceMatrix]) -> None: ...
+    @property
+    def covariance_matrix_numpy(self) -> numpy.ndarray:
+        """
+        Covariance matrix as a NumPy array (convenience method).
+
+        Returns:
+            numpy.ndarray: 9x9 covariance matrix.
+        """
+        ...
+
+    @covariance_matrix_numpy.setter
+    def covariance_matrix_numpy(self, value: numpy.ndarray) -> None: ...
     @property
     def od_parameters(self) -> Optional[OdParameters]:
         """
@@ -2317,6 +2329,19 @@ class CdmData:
 
     @state_vector.setter
     def state_vector(self, value: CdmStateVector) -> None: ...
+    @property
+    def state_vector_numpy(self) -> numpy.ndarray:
+        """
+        State vector as a NumPy array (convenience method).
+
+        Returns:
+            numpy.ndarray: 1D array of shape (6,) containing [X, Y, Z, X_DOT, Y_DOT, Z_DOT].
+            Units: [km, km, km, km/s, km/s, km/s]
+        """
+        ...
+
+    @state_vector_numpy.setter
+    def state_vector_numpy(self, value: numpy.ndarray) -> None: ...
 
 class CdmHeader:
     """
@@ -2816,6 +2841,16 @@ class CdmStateVector:
     def __getstate__(self, /):
         """
         Helper for pickle.
+        """
+        ...
+
+    def to_numpy(self) -> numpy.ndarray:
+        """
+        Return the state vector as a NumPy array.
+
+        Returns:
+            numpy.ndarray: 1D array of shape (6,) containing [X, Y, Z, X_DOT, Y_DOT, Z_DOT].
+            Units: [km, km, km, km/s, km/s, km/s]
         """
         ...
 
@@ -11106,14 +11141,32 @@ class RelativeMetadataData:
     @miss_distance.setter
     def miss_distance(self, value: float) -> None: ...
     @property
-    def relative_position(self) -> Optional[list[float]]:
+    def relative_position_n(self) -> Optional[float]:
         """
-        Relative position [R, T, N].
+        Relative position N component.
         """
         ...
 
-    @relative_position.setter
-    def relative_position(self, value: Optional[list[float]]) -> None: ...
+    @relative_position_n.setter
+    def relative_position_n(self, value: Optional[float]) -> None: ...
+    @property
+    def relative_position_r(self) -> Optional[float]:
+        """
+        Relative position R component.
+        """
+        ...
+
+    @relative_position_r.setter
+    def relative_position_r(self, value: Optional[float]) -> None: ...
+    @property
+    def relative_position_t(self) -> Optional[float]:
+        """
+        Relative position T component.
+        """
+        ...
+
+    @relative_position_t.setter
+    def relative_position_t(self, value: Optional[float]) -> None: ...
     @property
     def relative_speed(self) -> Optional[float]:
         """
@@ -11127,14 +11180,41 @@ class RelativeMetadataData:
     @relative_speed.setter
     def relative_speed(self, value: Optional[float]) -> None: ...
     @property
-    def relative_velocity(self) -> Optional[list[float]]:
+    def relative_state_vector(self) -> Optional[numpy.ndarray]:
         """
-        Relative velocity [R, T, N].
+        Relative state vector [R, T, N, VR, VT, VN] (combined position and velocity).
         """
         ...
 
-    @relative_velocity.setter
-    def relative_velocity(self, value: Optional[list[float]]) -> None: ...
+    @relative_state_vector.setter
+    def relative_state_vector(self, value: Optional[numpy.ndarray]) -> None: ...
+    @property
+    def relative_velocity_n(self) -> Optional[float]:
+        """
+        Relative velocity N component.
+        """
+        ...
+
+    @relative_velocity_n.setter
+    def relative_velocity_n(self, value: Optional[float]) -> None: ...
+    @property
+    def relative_velocity_r(self) -> Optional[float]:
+        """
+        Relative velocity R component.
+        """
+        ...
+
+    @relative_velocity_r.setter
+    def relative_velocity_r(self, value: Optional[float]) -> None: ...
+    @property
+    def relative_velocity_t(self) -> Optional[float]:
+        """
+        Relative velocity T component.
+        """
+        ...
+
+    @relative_velocity_t.setter
+    def relative_velocity_t(self, value: Optional[float]) -> None: ...
     @property
     def screen_entry_time(self) -> Optional[str]:
         """

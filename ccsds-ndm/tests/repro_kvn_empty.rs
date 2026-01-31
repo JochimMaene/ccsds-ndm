@@ -1,0 +1,75 @@
+#[cfg(test)]
+mod tests {
+    use ccsds_ndm::messages::cdm::Cdm;
+    use ccsds_ndm::traits::Ndm;
+
+    #[test]
+    fn test_kvn_empty_optional_values() {
+        let kvn = r#"CCSDS_CDM_VERS = 1.0
+CREATION_DATE = 2025-09-22T01:46:27.000000
+ORIGINATOR = CSpOC
+MESSAGE_FOR = SKYBEE-A01
+MESSAGE_ID = ID123
+
+TCA = 2025-09-25T02:08:04.134000
+MISS_DISTANCE = 23750 [m]
+RELATIVE_SPEED = 12150 [m/s]
+RELATIVE_POSITION_R = -1515.5 [m]
+RELATIVE_POSITION_T = 14270.4 [m]
+RELATIVE_POSITION_N = 18924.8 [m]
+RELATIVE_VELOCITY_R = -15.7 [m/s]
+RELATIVE_VELOCITY_T = -9702.6 [m/s]
+RELATIVE_VELOCITY_N = 7314.5 [m/s]
+COLLISION_PROBABILITY =
+COLLISION_PROBABILITY_METHOD =
+
+OBJECT = OBJECT1
+OBJECT_DESIGNATOR = 62671
+CATALOG_NAME = SATCAT
+OBJECT_NAME = SKYBEE-A01
+INTERNATIONAL_DESIGNATOR = 2025-009BQ
+OBJECT_TYPE = PAYLOAD
+EPHEMERIS_NAME = EPH
+COVARIANCE_METHOD = CALCULATED
+MANEUVERABLE = N/A
+REF_FRAME = ITRF
+TIME_LASTOB_START =
+TIME_LASTOB_END =
+RESIDUALS_ACCEPTED = [%]
+WEIGHTED_RMS =
+AREA_PC = 0.4842 [m**2]
+AREA_DRG = [m**2]
+AREA_SRP = [m**2]
+MASS = [kg]
+X = 100 [km]
+Y = 100 [km]
+Z = 100 [km]
+X_DOT = 1 [km/s]
+Y_DOT = 1 [km/s]
+Z_DOT = 1 [km/s]
+
+OBJECT = OBJECT2
+OBJECT_DESIGNATOR = 65489
+CATALOG_NAME = SATCAT
+OBJECT_NAME = OBJECT-B
+INTERNATIONAL_DESIGNATOR = 2025-197B
+OBJECT_TYPE = UNKNOWN
+EPHEMERIS_NAME = NONE
+COVARIANCE_METHOD = CALCULATED
+MANEUVERABLE = N/A
+REF_FRAME = ITRF
+X = 85.5 [km]
+Y = -1488.6 [km]
+Z = 6714.2 [km]
+X_DOT = -4.2 [km/s]
+Y_DOT = -6.2 [km/s]
+Z_DOT = -1.3 [km/s]
+"#;
+        let res = Cdm::from_kvn(kvn);
+        assert!(
+            res.is_ok(),
+            "Failed to parse CDM KVN with empty optional values: {:?}",
+            res.err()
+        );
+    }
+}

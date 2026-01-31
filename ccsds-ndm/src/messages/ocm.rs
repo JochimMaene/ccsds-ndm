@@ -43,7 +43,11 @@ pub struct Ocm {
     pub version: String,
 }
 
-impl crate::traits::Validate for Ocm {}
+impl crate::traits::Validate for Ocm {
+    fn validate(&self) -> Result<()> {
+        Ocm::validate(self)
+    }
+}
 
 impl Ndm for Ocm {
     fn to_kvn(&self) -> Result<String> {
@@ -54,7 +58,7 @@ impl Ndm for Ocm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let ocm = Self::from_kvn_str(kvn)?;
-        ocm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Ocm, &ocm)?;
         Ok(ocm)
     }
 
@@ -65,7 +69,7 @@ impl Ndm for Ocm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
-        ocm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Ocm, &ocm)?;
         Ok(ocm)
     }
 }
@@ -152,6 +156,41 @@ impl OcmTrajState {
                 .into());
             }
         }
+
+        let traj_type = self.traj_type.trim().to_uppercase();
+
+        if let Some(units) = &self.traj_units {
+            let unit_list = parse_units_list(units);
+            if let Some(expected_units) = expected_traj_units(&traj_type) {
+                if unit_list.len() == expected_units.len() {
+                    for (unit, expected) in unit_list.iter().zip(expected_units.iter()) {
+                        if !unit_matches_expected(unit, expected) {
+                            return Err(ValidationError::InvalidValue {
+                                field: Cow::Borrowed("TRAJ_UNITS"),
+                                value: units.clone(),
+                                expected: format!("expected {} units", traj_type).into(),
+                                line: None,
+                            }
+                            .into());
+                        }
+                    }
+                }
+            } else if traj_type == "DELAUNAY" {
+                let has_angle_unit = unit_list.iter().any(|u| {
+                    let u = u.to_ascii_lowercase();
+                    u.contains("rad") || u.contains("deg") || u.contains("rev")
+                });
+                if !has_angle_unit {
+                    return Err(ValidationError::InvalidValue {
+                        field: Cow::Borrowed("TRAJ_UNITS"),
+                        value: units.clone(),
+                        expected: "expected angular units for DELAUNAY".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
         Ok(())
     }
 
@@ -186,8 +225,68 @@ impl OcmManeuverParameters {
             }
             .into());
         }
+        let tokens = parse_csv_list(&self.man_composition);
+        let time_tags = tokens.iter().filter(|t| is_man_time_tag(t)).count();
+        let expected = tokens.len().saturating_sub(time_tags);
+        if expected > 0 {
+            for line in &self.man_lines {
+                if line.values.len() < expected {
+                    return Err(ValidationError::InvalidValue {
+                        field: Cow::Borrowed("MAN_COMPOSITION"),
+                        value: format!("{} ({} values)", self.man_composition, line.values.len()),
+                        expected: format!("{} values per line", expected).into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
         Ok(())
     }
+}
+
+fn expected_traj_units(traj_type: &str) -> Option<Vec<&'static str>> {
+    match traj_type {
+        "CARTP" => Some(vec!["km", "km", "km"]),
+        "CARTPV" => Some(vec!["km", "km", "km", "km/s", "km/s", "km/s"]),
+        "CARTPVA" => Some(vec![
+            "km", "km", "km", "km/s", "km/s", "km/s", "km/s**2", "km/s**2", "km/s**2",
+        ]),
+        _ => None,
+    }
+}
+
+fn unit_matches_expected(unit: &str, expected: &str) -> bool {
+    let u = unit.trim().to_ascii_lowercase();
+    match expected {
+        "km" => u == "km",
+        "km/s" => u == "km/s",
+        "km/s**2" => u == "km/s**2" || u == "km/s^2",
+        _ => false,
+    }
+}
+
+fn parse_units_list(units: &str) -> Vec<String> {
+    let trimmed = units.trim().trim_start_matches('[').trim_end_matches(']');
+    trimmed
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.trim().to_string())
+        .collect()
+}
+
+fn parse_csv_list(value: &str) -> Vec<String> {
+    value
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
+}
+
+fn is_man_time_tag(value: &str) -> bool {
+    let v = value.trim().to_ascii_uppercase();
+    matches!(v.as_str(), "EPOCH" | "TIME_ABSOLUTE" | "TIME_RELATIVE")
 }
 
 //----------------------------------------------------------------------

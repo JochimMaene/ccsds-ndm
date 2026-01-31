@@ -309,7 +309,11 @@ pub struct OdParameters {
     /// of zero duration (i.e., same value as that of TIME_LASTOB_END).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub time_lastob_start: Option<Epoch>,
 
     /// The end of a time interval (UTC) that contains the time of the last accepted
@@ -317,7 +321,11 @@ pub struct OdParameters {
     /// of zero duration (i.e., same value as that of TIME_LASTOB_START).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub time_lastob_end: Option<Epoch>,
 
     /// The recommended OD time span calculated for the object.
@@ -327,7 +335,11 @@ pub struct OdParameters {
     /// **Units**: days
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub recommended_od_span: Option<DayInterval>,
 
     /// Based on the observations available and the RECOMMENDED_OD_SPAN, the actual
@@ -338,31 +350,51 @@ pub struct OdParameters {
     /// **Units**: days
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub actual_od_span: Option<DayInterval>,
 
     /// The total number of observations available for orbit determination.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub obs_available: Option<PositiveInteger>,
 
     /// The number of observations used in the orbit determination.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub obs_used: Option<PositiveInteger>,
 
     /// The total number of tracks available for orbit determination.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub tracks_available: Option<PositiveInteger>,
 
     /// The number of tracks used in the orbit determination.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub tracks_used: Option<PositiveInteger>,
 
     /// The percentage of residuals accepted during orbit determination.
@@ -370,13 +402,21 @@ pub struct OdParameters {
     /// **Units**: %
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub residuals_accepted: Option<Percentage>,
 
     /// The weighted root mean square (RMS) of the residuals.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub weighted_rms: Option<NonNegativeDouble>,
 }
 

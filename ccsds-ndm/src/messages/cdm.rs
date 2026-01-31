@@ -41,7 +41,11 @@ pub struct Cdm {
     pub version: String,
 }
 
-impl crate::traits::Validate for Cdm {}
+impl crate::traits::Validate for Cdm {
+    fn validate(&self) -> Result<()> {
+        Cdm::validate(self)
+    }
+}
 
 impl Ndm for Cdm {
     fn to_kvn(&self) -> Result<String> {
@@ -52,7 +56,7 @@ impl Ndm for Cdm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let cdm = Self::from_kvn_str(kvn)?;
-        cdm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Cdm, &cdm)?;
         Ok(cdm)
     }
 
@@ -62,7 +66,7 @@ impl Ndm for Cdm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
-        cdm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Cdm, &cdm)?;
         Ok(cdm)
     }
 }
@@ -336,13 +340,21 @@ pub struct RelativeMetadataData {
     /// Data type = double.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     pub collision_probability: Option<Probability>,
     /// The method that was used to calculate the collision probability. (See annex E for
     /// definition.)
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable_value"
+    )]
     #[builder(into)]
     pub collision_probability_method: Option<String>,
 }
@@ -463,6 +475,7 @@ impl ToKvn for CdmSegment {
 impl CdmSegment {
     pub fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
+        self.data.validate()?;
         Ok(())
     }
 }
@@ -743,8 +756,26 @@ pub struct CdmData {
     #[serde(rename = "stateVector")]
     pub state_vector: CdmStateVector,
     /// Covariance Matrix.
-    #[serde(rename = "covarianceMatrix")]
-    pub covariance_matrix: CdmCovarianceMatrix,
+    #[serde(
+        rename = "covarianceMatrix",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub covariance_matrix: Option<CdmCovarianceMatrix>,
+}
+
+impl CdmData {
+    pub fn validate(&self) -> Result<()> {
+        if self.covariance_matrix.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Data".into(),
+                field: "COVARIANCE_MATRIX".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
 }
 
 impl ToKvn for CdmData {
@@ -815,7 +846,9 @@ impl ToKvn for CdmData {
         // State Vector
         self.state_vector.write_kvn(writer);
         // Covariance
-        self.covariance_matrix.write_kvn(writer);
+        if let Some(cov) = &self.covariance_matrix {
+            cov.write_kvn(writer);
+        }
     }
 }
 
@@ -1626,11 +1659,15 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         assert!(cdm.body.segments[0]
             .data
             .covariance_matrix
+            .as_ref()
+            .unwrap()
             .cthr_thr
             .is_some());
         assert!(cdm2.body.segments[0]
             .data
             .covariance_matrix
+            .as_ref()
+            .unwrap()
             .cthr_thr
             .is_some());
     }

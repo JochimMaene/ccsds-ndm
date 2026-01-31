@@ -44,7 +44,11 @@ pub struct Acm {
     pub version: String,
 }
 
-impl crate::traits::Validate for Acm {}
+impl crate::traits::Validate for Acm {
+    fn validate(&self) -> Result<()> {
+        Acm::validate(self)
+    }
+}
 
 impl Ndm for Acm {
     fn to_kvn(&self) -> Result<String> {
@@ -55,7 +59,7 @@ impl Ndm for Acm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let acm = Self::from_kvn_str(kvn)?;
-        acm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Acm, &acm)?;
         Ok(acm)
     }
 
@@ -66,7 +70,7 @@ impl Ndm for Acm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let acm: Self = crate::xml::from_str_with_context(xml, "ACM")?;
-        acm.validate()?;
+        crate::validation::validate_with_mode(crate::validation::MessageKind::Acm, &acm)?;
         Ok(acm)
     }
 }
@@ -436,6 +440,15 @@ pub struct AcmData {
 
 impl AcmData {
     fn validate(&self, _metadata: &AcmMetadata) -> Result<()> {
+        if let Some(phys) = &self.phys {
+            phys.validate()?;
+        }
+        if let Some(ad) = &self.ad {
+            ad.validate()?;
+        }
+        for man in &self.man {
+            man.validate()?;
+        }
         Ok(())
     }
 }
@@ -805,6 +818,28 @@ pub struct AcmPhysicalDescription {
     pub iyz: Option<Moment>,
 }
 
+impl AcmPhysicalDescription {
+    fn validate(&self) -> Result<()> {
+        if self.cp_ref_frame.is_some() && self.cp.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Physical Description".into(),
+                field: "CP".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.cp.is_some() && self.cp_ref_frame.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Physical Description".into(),
+                field: "CP_REF_FRAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 impl ToKvn for AcmPhysicalDescription {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("PHYS_START");
@@ -1022,6 +1057,35 @@ pub struct AcmManeuverParameters {
     pub target_mom_frame: Option<String>,
 }
 
+impl AcmManeuverParameters {
+    fn validate(&self) -> Result<()> {
+        if self.man_end_time.is_some() && self.man_duration.is_some() {
+            return Err(ValidationError::Conflict {
+                fields: vec!["MAN_END_TIME".into(), "MAN_DURATION".into()],
+                line: None,
+            }
+            .into());
+        }
+        if self.target_momentum.is_some() && self.target_mom_frame.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Maneuver".into(),
+                field: "TARGET_MOM_FRAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.target_momentum.is_none() && self.target_mom_frame.is_some() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Maneuver".into(),
+                field: "TARGET_MOMENTUM".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 impl ToKvn for AcmManeuverParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("MAN_START");
@@ -1206,6 +1270,33 @@ pub struct AcmAttitudeDetermination {
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(rename = "sensor", default)]
     pub sensors: Vec<AcmSensor>,
+}
+
+impl AcmAttitudeDetermination {
+    fn validate(&self) -> Result<()> {
+        if self.sensors.is_empty() {
+            return Ok(());
+        }
+
+        let mut numbers: Vec<u32> = self.sensors.iter().map(|s| s.sensor_number).collect();
+        numbers.sort_unstable();
+
+        for window in numbers.windows(2) {
+            if let [prev, next] = *window {
+                if next == prev {
+                    return Err(ValidationError::InvalidValue {
+                        field: "SENSOR_NUMBER".into(),
+                        value: format!("{:?}", numbers),
+                        expected: "unique values".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl ToKvn for AcmAttitudeDetermination {

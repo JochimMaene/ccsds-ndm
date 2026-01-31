@@ -1,0 +1,22 @@
+{
+  "rules": [
+    {
+      "message_kind": "CDM",
+      "error_kind": "missing_required_field",
+      "field_contains": "COVARIANCE_MATRIX",
+      "action": "warn"
+    },
+    {
+      "message_kind": "OMM",
+      "error_kind": "missing_required_field",
+      "field_contains": "OBJECT_ID",
+      "action": "warn"
+    },
+    {
+      "message_kind": "OPM",
+      "error_kind": "invalid_value",
+      "field_contains": "OBJECT_ID",
+      "action": "warn"
+    }
+  ]
+}

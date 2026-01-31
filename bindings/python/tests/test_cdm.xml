@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?><cdm id="CCSDS_CDM_VERS" version="1.0">
+    <header>
+        <COMMENT>CDM_ID:1118472492</COMMENT>
+        <CREATION_DATE>2025-08-15T07:19:57.000000</CREATION_DATE>
+        <ORIGINATOR>CSpOC</ORIGINATOR>
+        <MESSAGE_FOR>SKYBEE-A01</MESSAGE_FOR>
+        <MESSAGE_ID>000062671_conj_000063359_2025229074309_22707133783280</MESSAGE_ID>
+    </header>
+    <body>
+        <relativeMetadataData>
+            <COMMENT>Screening Option = Covariance</COMMENT>
+            <TCA>2025-08-17T07:43:09.002000</TCA>
+            <MISS_DISTANCE units="m">3833</MISS_DISTANCE>
+            <RELATIVE_SPEED units="m/s">11735</RELATIVE_SPEED>
+            <relativeStateVector>
+                <RELATIVE_POSITION_R units="m">-1.9</RELATIVE_POSITION_R>
+                <RELATIVE_POSITION_T units="m">-2433.2</RELATIVE_POSITION_T>
+                <RELATIVE_POSITION_N units="m">-2962.7</RELATIVE_POSITION_N>
+                <RELATIVE_VELOCITY_R units="m/s">41.1</RELATIVE_VELOCITY_R>
+                <RELATIVE_VELOCITY_T units="m/s">-9073.3</RELATIVE_VELOCITY_T>
+                <RELATIVE_VELOCITY_N units="m/s">7442.1</RELATIVE_VELOCITY_N>
+            </relativeStateVector>
+            <START_SCREEN_PERIOD nil="true"/>
+            <STOP_SCREEN_PERIOD nil="true"/>
+            <SCREEN_VOLUME_FRAME nil="true"/>
+            <SCREEN_VOLUME_SHAPE nil="true"/>
+            <SCREEN_VOLUME_X nil="true" units="m"/>
+            <SCREEN_VOLUME_Y nil="true" units="m"/>
+            <SCREEN_VOLUME_Z nil="true" units="m"/>
+            <SCREEN_ENTRY_TIME nil="true"/>
+            <SCREEN_EXIT_TIME nil="true"/>
+            <COLLISION_PROBABILITY>0.0000505218</COLLISION_PROBABILITY>
+            <COLLISION_PROBABILITY_METHOD>FOSTER-1992</COLLISION_PROBABILITY_METHOD>
+        </relativeMetadataData>
+        <segment>
+            <metadata>
+                <COMMENT>Screened with = inertial state vector.</COMMENT>
+                <OBJECT>OBJECT1</OBJECT>
+                <OBJECT_DESIGNATOR>62671</OBJECT_DESIGNATOR>
+                <CATALOG_NAME>SATCAT</CATALOG_NAME>
+                <OBJECT_NAME>SKYBEE-A01</OBJECT_NAME>
+                <INTERNATIONAL_DESIGNATOR>2025-009BQ</INTERNATIONAL_DESIGNATOR>
+                <OBJECT_TYPE>PAYLOAD</OBJECT_TYPE>
+                <OPERATOR_CONTACT_POSITION>https://www.space-track.org/expandedspacedata/query/class/organization/object/~~62671/orderby/ORG_NAME,INFO_ID/format/html/emptyresult/show/</OPERATOR_CONTACT_POSITION>
+                <OPERATOR_ORGANIZATION>CNES,Kongsberg NanoAvionics,Constellr GmbH,SSTOC</OPERATOR_ORGANIZATION>
+                <OPERATOR_PHONE>https://www.space-track.org/expandedspacedata/query/class/organization/object/~~62671/orderby/ORG_NAME,INFO_ID/format/html/emptyresult/show/</OPERATOR_PHONE>
+                <OPERATOR_EMAIL>https://www.space-track.org/expandedspacedata/query/class/organization/object/~~62671/orderby/ORG_NAME,INFO_ID/format/html/emptyresult/show/</OPERATOR_EMAIL>
+                <EPHEMERIS_NAME>NONE</EPHEMERIS_NAME>
+                <COVARIANCE_METHOD>CALCULATED</COVARIANCE_METHOD>
+                <MANEUVERABLE>N/A</MANEUVERABLE>
+                <ORBIT_CENTER nil="true"/>
+                <REF_FRAME>ITRF</REF_FRAME>
+                <GRAVITY_MODEL>EGM-96: 70D 70O</GRAVITY_MODEL>
+                <ATMOSPHERIC_MODEL>JBH09</ATMOSPHERIC_MODEL>
+                <N_BODY_PERTURBATIONS>MOON,SUN</N_BODY_PERTURBATIONS>
+                <SOLAR_RAD_PRESSURE>YES</SOLAR_RAD_PRESSURE>
+                <EARTH_TIDES>YES</EARTH_TIDES>
+                <INTRACK_THRUST>NO</INTRACK_THRUST>
+            </metadata>
+            <data>
+                <odParameters>
+                    <COMMENT>Covariance Scale Factor = 1.000000</COMMENT>
+                    <COMMENT>Exclusion Volume Radius = 5.000000 [m]</COMMENT>
+                    <TIME_LASTOB_START>2025-08-14T07:19:57.681000</TIME_LASTOB_START>
+                    <TIME_LASTOB_END>2025-08-15T07:19:57.681000</TIME_LASTOB_END>
+                    <RECOMMENDED_OD_SPAN units="d">1.98</RECOMMENDED_OD_SPAN>
+                    <ACTUAL_OD_SPAN units="d">1.98</ACTUAL_OD_SPAN>
+                    <OBS_AVAILABLE>184</OBS_AVAILABLE>
+                    <OBS_USED>180</OBS_USED>
+                    <TRACKS_AVAILABLE>57</TRACKS_AVAILABLE>
+                    <TRACKS_USED>57</TRACKS_USED>
+                    <RESIDUALS_ACCEPTED units="%">99.7</RESIDUALS_ACCEPTED>
+                    <WEIGHTED_RMS>1.081</WEIGHTED_RMS>
+                </odParameters>
+                <additionalParameters>
+                    <COMMENT>Apogee Altitude = 536   [km]</COMMENT>
+                    <COMMENT>Perigee Altitude = 501   [km]</COMMENT>
+                    <COMMENT>Inclination = 97.4  [deg]</COMMENT>
+                    <COMMENT>Operator Hard Body Radius = 1.31 [m]</COMMENT>
+                    <AREA_PC units="m**2">0.4842</AREA_PC>
+                    <AREA_DRG nil="true" units="m**2"/>
+                    <AREA_SRP nil="true" units="m**2"/>
+                    <MASS nil="true" units="kg"/>
+                    <CD_AREA_OVER_MASS units="m**2/kg">0.009571852168</CD_AREA_OVER_MASS>
+                    <CR_AREA_OVER_MASS units="m**2/kg">0.016433115836</CR_AREA_OVER_MASS>
+                    <THRUST_ACCELERATION units="m/s**2">0</THRUST_ACCELERATION>
+                    <SEDR units="W/kg">0.000839989</SEDR>
+                </additionalParameters>
+                <stateVector>
+                    <X units="km">-125.756501</X>
+                    <Y units="km">-1411.150474</Y>
+                    <Z units="km">-6746.175385</Z>
+                    <X_DOT units="km/s">-5.376166845</X_DOT>
+                    <Y_DOT units="km/s">-5.319139458</Y_DOT>
+                    <Z_DOT units="km/s">1.216072234</Z_DOT>
+                </stateVector>
+                <covarianceMatrix>
+                    <COMMENT>DCP Density Forecast Uncertainty = 1.880420510000000E-01</COMMENT>
+                    <COMMENT>DCP Sensitivity Vector RTN Pos = -4.886892713664175E+01 6.380207242292344E+03  4.950051818445590E-01  [m]</COMMENT>
+                    <COMMENT>DCP Sensitivity Vector RTN Vel = -7.036719515231478E+00 3.273602304805896E-02  -4.272901693038072E-03 [m/sec]</COMMENT>
+                    <CR_R units="m**2">241.3686871017043</CR_R>
+                    <CT_R units="m**2">-11292.79761820995</CT_R>
+                    <CT_T units="m**2">1523877.773036505</CT_T>
+                    <CN_R units="m**2">17.06450379481325</CN_R>
+                    <CN_T units="m**2">189.899981335918</CN_T>
+                    <CN_N units="m**2">16.94036794460631</CN_N>
+                    <CRDOT_R units="m**2/s">12.36705868202984</CRDOT_R>
+                    <CRDOT_T units="m**2/s">-1680.50083171685</CRDOT_T>
+                    <CRDOT_N units="m**2/s">-0.2160364434134298</CRDOT_N>
+                    <CRDOT_RDOT units="m**2/s**2">1.853343842827921</CRDOT_RDOT>
+                    <CTDOT_R units="m**2/s">-0.2294777590080287</CTDOT_R>
+                    <CTDOT_T units="m**2/s">7.449182562983062</CTDOT_T>
+                    <CTDOT_N units="m**2/s">-0.01944184664280365</CTDOT_N>
+                    <CTDOT_RDOT units="m**2/s**2">-0.008118263697993289</CTDOT_RDOT>
+                    <CTDOT_TDOT units="m**2/s**2">0.0002290872498160037</CTDOT_TDOT>
+                    <CNDOT_R units="m**2/s">-0.02204736346276181</CNDOT_R>
+                    <CNDOT_T units="m**2/s">-0.835085647835061</CNDOT_T>
+                    <CNDOT_N units="m**2/s">0.003607742220276354</CNDOT_N>
+                    <CNDOT_RDOT units="m**2/s**2">0.0009642135133726056</CNDOT_RDOT>
+                    <CNDOT_TDOT units="m**2/s**2">0.00002757760534464879</CNDOT_TDOT>
+                    <CNDOT_NDOT units="m**2/s**2">0.00007884473853865426</CNDOT_NDOT>
+                    <CDRG_R units="m**3/kg">0</CDRG_R>
+                    <CDRG_T units="m**3/kg">0</CDRG_T>
+                    <CDRG_N units="m**3/kg">0</CDRG_N>
+                    <CDRG_RDOT units="m**3/(kg*s)">0</CDRG_RDOT>
+                    <CDRG_TDOT units="m**3/(kg*s)">0</CDRG_TDOT>
+                    <CDRG_NDOT units="m**3/(kg*s)">0</CDRG_NDOT>
+                    <CDRG_DRG units="m**4/kg**2">0</CDRG_DRG>
+                    <CSRP_R units="m**3/kg">0</CSRP_R>
+                    <CSRP_T units="m**3/kg">0</CSRP_T>
+                    <CSRP_N units="m**3/kg">0</CSRP_N>
+                    <CSRP_RDOT units="m**3/(kg*s)">0</CSRP_RDOT>
+                    <CSRP_TDOT units="m**3/(kg*s)">0</CSRP_TDOT>
+                    <CSRP_NDOT units="m**3/(kg*s)">0</CSRP_NDOT>
+                    <CSRP_DRG units="m**4/kg**2">0</CSRP_DRG>
+                    <CSRP_SRP units="m**4/kg**2">0</CSRP_SRP>
+                    <CTHR_R nil="true" units="m**2/s**2"/>
+                    <CTHR_T nil="true" units="m**2/s**2"/>
+                    <CTHR_N nil="true" units="m**2/s**2"/>
+                    <CTHR_RDOT nil="true" units="m**2/s**3"/>
+                    <CTHR_TDOT nil="true" units="m**2/s**3"/>
+                    <CTHR_NDOT nil="true" units="m**2/s**3"/>
+                    <CTHR_DRG nil="true" units="m**3/(kg*s**2)"/>
+                    <CTHR_SRP nil="true" units="m**3/(kg*s**2)"/>
+                    <CTHR_THR nil="true" units="m**2/s**4"/>
+                </covarianceMatrix>
+            </data>
+        </segment>
+        <segment>
+            <metadata>
+                <COMMENT>Screened with = inertial state vector.</COMMENT>
+                <OBJECT>OBJECT2</OBJECT>
+                <OBJECT_DESIGNATOR>63359</OBJECT_DESIGNATOR>
+                <CATALOG_NAME>SATCAT</CATALOG_NAME>
+                <OBJECT_NAME>ELECTRON KICK STAGE R/B</OBJECT_NAME>
+                <INTERNATIONAL_DESIGNATOR>2025-061J</INTERNATIONAL_DESIGNATOR>
+                <OBJECT_TYPE>ROCKET BODY</OBJECT_TYPE>
+                <OPERATOR_CONTACT_POSITION>https://www.space-track.org/expandedspacedata/query/class/organization/object/~~63359/orderby/ORG_NAME,INFO_ID/format/html/emptyresult/show/</OPERATOR_CONTACT_POSITION>
+                <OPERATOR_ORGANIZATION>NONE</OPERATOR_ORGANIZATION>
+                <OPERATOR_PHONE>https://www.space-track.org/expandedspacedata/query/class/organization/object/~~63359/orderby/ORG_NAME,INFO_ID/format/html/emptyresult/show/</OPERATOR_PHONE>
+                <OPERATOR_EMAIL>https://www.space-track.org/expandedspacedata/query/class/organization/object/~~63359/orderby/ORG_NAME,INFO_ID/format/html/emptyresult/show/</OPERATOR_EMAIL>
+                <EPHEMERIS_NAME>NONE</EPHEMERIS_NAME>
+                <COVARIANCE_METHOD>CALCULATED</COVARIANCE_METHOD>
+                <MANEUVERABLE>N/A</MANEUVERABLE>
+                <ORBIT_CENTER nil="true"/>
+                <REF_FRAME>ITRF</REF_FRAME>
+                <GRAVITY_MODEL>EGM-96: 70D 70O</GRAVITY_MODEL>
+                <ATMOSPHERIC_MODEL>JBH09</ATMOSPHERIC_MODEL>
+                <N_BODY_PERTURBATIONS>MOON,SUN</N_BODY_PERTURBATIONS>
+                <SOLAR_RAD_PRESSURE>NO</SOLAR_RAD_PRESSURE>
+                <EARTH_TIDES>YES</EARTH_TIDES>
+                <INTRACK_THRUST>NO</INTRACK_THRUST>
+            </metadata>
+            <data>
+                <odParameters>
+                    <COMMENT>Covariance Scale Factor = 1.000000</COMMENT>
+                    <COMMENT>Exclusion Volume Radius = 3.000000 [m]</COMMENT>
+                    <TIME_LASTOB_START>2025-08-14T07:19:57.605000</TIME_LASTOB_START>
+                    <TIME_LASTOB_END>2025-08-15T07:19:57.605000</TIME_LASTOB_END>
+                    <RECOMMENDED_OD_SPAN units="d">2.82</RECOMMENDED_OD_SPAN>
+                    <ACTUAL_OD_SPAN units="d">2.82</ACTUAL_OD_SPAN>
+                    <OBS_AVAILABLE>90</OBS_AVAILABLE>
+                    <OBS_USED>90</OBS_USED>
+                    <TRACKS_AVAILABLE>22</TRACKS_AVAILABLE>
+                    <TRACKS_USED>22</TRACKS_USED>
+                    <RESIDUALS_ACCEPTED units="%">99.4</RESIDUALS_ACCEPTED>
+                    <WEIGHTED_RMS>0.97</WEIGHTED_RMS>
+                </odParameters>
+                <additionalParameters>
+                    <COMMENT>Apogee Altitude = 542   [km]</COMMENT>
+                    <COMMENT>Perigee Altitude = 455   [km]</COMMENT>
+                    <COMMENT>Inclination = 97.5  [deg]</COMMENT>
+                    <AREA_PC units="m**2">1.4741</AREA_PC>
+                    <AREA_DRG nil="true" units="m**2"/>
+                    <AREA_SRP nil="true" units="m**2"/>
+                    <MASS nil="true" units="kg"/>
+                    <CD_AREA_OVER_MASS units="m**2/kg">0.029101869962</CD_AREA_OVER_MASS>
+                    <CR_AREA_OVER_MASS units="m**2/kg">0</CR_AREA_OVER_MASS>
+                    <THRUST_ACCELERATION units="m/s**2">0</THRUST_ACCELERATION>
+                    <SEDR units="W/kg">0.00325204</SEDR>
+                </additionalParameters>
+                <stateVector>
+                    <X units="km">-121.935554</X>
+                    <Y units="km">-1411.464641</Y>
+                    <Z units="km">-6746.178971</Z>
+                    <X_DOT units="km/s">-4.430732462</X_DOT>
+                    <Y_DOT units="km/s">6.117571935</Y_DOT>
+                    <Z_DOT units="km/s">-1.235929196</Z_DOT>
+                </stateVector>
+                <covarianceMatrix>
+                    <COMMENT>DCP Density Forecast Uncertainty = 1.750764010000000E-01</COMMENT>
+                    <COMMENT>DCP Sensitivity Vector RTN Pos = -6.708480617606043E+01 2.669354476480711E+04  3.540565293159683E+00  [m]</COMMENT>
+                    <COMMENT>DCP Sensitivity Vector RTN Vel = -2.942424733779627E+01 1.121656960883052E-01  -1.623586975539325E-02 [m/sec]</COMMENT>
+                    <CR_R units="m**2">188.3960290893595</CR_R>
+                    <CT_R units="m**2">-57297.9002294758</CT_R>
+                    <CT_T units="m**2">23440066.63437352</CT_T>
+                    <CN_R units="m**2">25.94126264574146</CN_R>
+                    <CN_T units="m**2">3080.596232027528</CN_T>
+                    <CN_N units="m**2">75.62248204924548</CN_N>
+                    <CRDOT_R units="m**2/s">63.17410006216606</CRDOT_R>
+                    <CRDOT_T units="m**2/s">-25838.01666963606</CRDOT_T>
+                    <CRDOT_N units="m**2/s">-3.386657713840111</CRDOT_N>
+                    <CRDOT_RDOT units="m**2/s**2">28.48131877434107</CRDOT_RDOT>
+                    <CTDOT_R units="m**2/s">-0.2917119790713006</CTDOT_R>
+                    <CTDOT_T units="m**2/s">98.07722831541875</CTDOT_T>
+                    <CTDOT_N units="m**2/s">-0.02438368078884043</CTDOT_N>
+                    <CTDOT_RDOT units="m**2/s**2">-0.1081267657176715</CTDOT_RDOT>
+                    <CTDOT_TDOT units="m**2/s**2">0.0004676715045104121</CTDOT_TDOT>
+                    <CNDOT_R units="m**2/s">0.05962563367753227</CNDOT_R>
+                    <CNDOT_T units="m**2/s">-15.27649899474262</CNDOT_T>
+                    <CNDOT_N units="m**2/s">0.02176767236065183</CNDOT_N>
+                    <CNDOT_RDOT units="m**2/s**2">0.01685081628570797</CNDOT_RDOT>
+                    <CNDOT_TDOT units="m**2/s**2">-0.00008955219744953529</CNDOT_TDOT>
+                    <CNDOT_NDOT units="m**2/s**2">0.00007685668424704941</CNDOT_NDOT>
+                    <CDRG_R units="m**3/kg">0</CDRG_R>
+                    <CDRG_T units="m**3/kg">0</CDRG_T>
+                    <CDRG_N units="m**3/kg">0</CDRG_N>
+                    <CDRG_RDOT units="m**3/(kg*s)">0</CDRG_RDOT>
+                    <CDRG_TDOT units="m**3/(kg*s)">0</CDRG_TDOT>
+                    <CDRG_NDOT units="m**3/(kg*s)">0</CDRG_NDOT>
+                    <CDRG_DRG units="m**4/kg**2">0</CDRG_DRG>
+                    <CSRP_R units="m**3/kg">0</CSRP_R>
+                    <CSRP_T units="m**3/kg">0</CSRP_T>
+                    <CSRP_N units="m**3/kg">0</CSRP_N>
+                    <CSRP_RDOT units="m**3/(kg*s)">0</CSRP_RDOT>
+                    <CSRP_TDOT units="m**3/(kg*s)">0</CSRP_TDOT>
+                    <CSRP_NDOT units="m**3/(kg*s)">0</CSRP_NDOT>
+                    <CSRP_DRG units="m**4/kg**2">0</CSRP_DRG>
+                    <CSRP_SRP units="m**4/kg**2">0</CSRP_SRP>
+                    <CTHR_R nil="true" units="m**2/s**2"/>
+                    <CTHR_T nil="true" units="m**2/s**2"/>
+                    <CTHR_N nil="true" units="m**2/s**2"/>
+                    <CTHR_RDOT nil="true" units="m**2/s**3"/>
+                    <CTHR_TDOT nil="true" units="m**2/s**3"/>
+                    <CTHR_NDOT nil="true" units="m**2/s**3"/>
+                    <CTHR_DRG nil="true" units="m**3/(kg*s**2)"/>
+                    <CTHR_SRP nil="true" units="m**3/(kg*s**2)"/>
+                    <CTHR_THR nil="true" units="m**2/s**4"/>
+                </covarianceMatrix>
+            </data>
+        </segment>
+    </body>
+</cdm>

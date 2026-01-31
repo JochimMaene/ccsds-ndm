@@ -124,24 +124,24 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
     parse_block!(input, comment, {
         "TCA" => tca: kv_epoch,
         "MISS_DISTANCE" => miss_distance: kv_from_kvn,
-        "RELATIVE_SPEED" => relative_speed: kv_from_kvn,
-        "RELATIVE_POSITION_R" => rel_pos_r: kv_from_kvn,
-        "RELATIVE_POSITION_T" => rel_pos_t: kv_from_kvn,
-        "RELATIVE_POSITION_N" => rel_pos_n: kv_from_kvn,
-        "RELATIVE_VELOCITY_R" => rel_vel_r: kv_from_kvn,
-        "RELATIVE_VELOCITY_T" => rel_vel_t: kv_from_kvn,
-        "RELATIVE_VELOCITY_N" => rel_vel_n: kv_from_kvn,
-        "START_SCREEN_PERIOD" => start_screen_period: kv_epoch,
-        "STOP_SCREEN_PERIOD" => stop_screen_period: kv_epoch,
-        "SCREEN_VOLUME_FRAME" => screen_volume_frame: kv_enum,
-        "SCREEN_VOLUME_SHAPE" => screen_volume_shape: kv_enum,
-        "SCREEN_VOLUME_X" => screen_volume_x: kv_from_kvn,
-        "SCREEN_VOLUME_Y" => screen_volume_y: kv_from_kvn,
-        "SCREEN_VOLUME_Z" => screen_volume_z: kv_from_kvn,
-        "SCREEN_ENTRY_TIME" => screen_entry_time: kv_epoch,
-        "SCREEN_EXIT_TIME" => screen_exit_time: kv_epoch,
-        "COLLISION_PROBABILITY" => collision_probability: kv_from_kvn,
-        "COLLISION_PROBABILITY_METHOD" => collision_probability_method: kv_string,
+        "RELATIVE_SPEED" => val: kv_from_kvn_opt => { relative_speed = val; },
+        "RELATIVE_POSITION_R" => val: kv_from_kvn_opt => { rel_pos_r = val; },
+        "RELATIVE_POSITION_T" => val: kv_from_kvn_opt => { rel_pos_t = val; },
+        "RELATIVE_POSITION_N" => val: kv_from_kvn_opt => { rel_pos_n = val; },
+        "RELATIVE_VELOCITY_R" => val: kv_from_kvn_opt => { rel_vel_r = val; },
+        "RELATIVE_VELOCITY_T" => val: kv_from_kvn_opt => { rel_vel_t = val; },
+        "RELATIVE_VELOCITY_N" => val: kv_from_kvn_opt => { rel_vel_n = val; },
+        "START_SCREEN_PERIOD" => val: kv_epoch_opt => { start_screen_period = val; },
+        "STOP_SCREEN_PERIOD" => val: kv_epoch_opt => { stop_screen_period = val; },
+        "SCREEN_VOLUME_FRAME" => val: kv_enum_opt => { screen_volume_frame = val; },
+        "SCREEN_VOLUME_SHAPE" => val: kv_enum_opt => { screen_volume_shape = val; },
+        "SCREEN_VOLUME_X" => val: kv_from_kvn_opt => { screen_volume_x = val; },
+        "SCREEN_VOLUME_Y" => val: kv_from_kvn_opt => { screen_volume_y = val; },
+        "SCREEN_VOLUME_Z" => val: kv_from_kvn_opt => { screen_volume_z = val; },
+        "SCREEN_ENTRY_TIME" => val: kv_epoch_opt => { screen_entry_time = val; },
+        "SCREEN_EXIT_TIME" => val: kv_epoch_opt => { screen_exit_time = val; },
+        "COLLISION_PROBABILITY" => val: kv_from_kvn_opt => { collision_probability = val; },
+        "COLLISION_PROBABILITY_METHOD" => val: kv_string_opt => { collision_probability_method = val; },
     }, |i: &mut &str| at_block_start("META", i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Relative Metadata key");
 
     let relative_state_vector = if rel_pos_r.is_some() || rel_pos_t.is_some() || rel_pos_n.is_some()
@@ -305,25 +305,25 @@ pub fn cdm_metadata(input: &mut &str) -> KvnResult<CdmMetadata> {
     parse_block!(input, comment, {
         "OBJECT" => object: kv_enum,
         "OBJECT_DESIGNATOR" => object_designator: kv_string,
-        "CATALOG_NAME" => catalog_name: kv_string,
+        "CATALOG_NAME" => val: kv_string_opt => { catalog_name = val; },
         "OBJECT_NAME" => object_name: kv_string,
         "INTERNATIONAL_DESIGNATOR" => international_designator: kv_string,
-        "OBJECT_TYPE" => object_type: kv_enum,
-        "OPERATOR_CONTACT_POSITION" => operator_contact_position: kv_string,
-        "OPERATOR_ORGANIZATION" => operator_organization: kv_string,
-        "OPERATOR_PHONE" => operator_phone: kv_string,
-        "OPERATOR_EMAIL" => operator_email: kv_string,
-        "EPHEMERIS_NAME" => ephemeris_name: kv_string,
+        "OBJECT_TYPE" => val: kv_enum_opt => { object_type = val; },
+        "OPERATOR_CONTACT_POSITION" => val: kv_string_opt => { operator_contact_position = val; },
+        "OPERATOR_ORGANIZATION" => val: kv_string_opt => { operator_organization = val; },
+        "OPERATOR_PHONE" => val: kv_string_opt => { operator_phone = val; },
+        "OPERATOR_EMAIL" => val: kv_string_opt => { operator_email = val; },
+        "EPHEMERIS_NAME" => val: kv_string_opt => { ephemeris_name = val; },
         "COVARIANCE_METHOD" => covariance_method: kv_enum,
         "MANEUVERABLE" => maneuverable: kv_enum,
-        "ORBIT_CENTER" => orbit_center: kv_string,
-        "REF_FRAME" => ref_frame: kv_enum,
-        "GRAVITY_MODEL" => gravity_model: kv_string,
-        "ATMOSPHERIC_MODEL" => atmospheric_model: kv_string,
-        "N_BODY_PERTURBATIONS" => n_body_perturbations: kv_string,
-        "SOLAR_RAD_PRESSURE" => solar_rad_pressure: kv_yes_no,
-        "EARTH_TIDES" => earth_tides: kv_yes_no,
-        "INTRACK_THRUST" => intrack_thrust: kv_yes_no,
+        "ORBIT_CENTER" => val: kv_string_opt => { orbit_center = val; },
+        "REF_FRAME" => val: kv_enum_opt => { ref_frame = val; },
+        "GRAVITY_MODEL" => val: kv_string_opt => { gravity_model = val; },
+        "ATMOSPHERIC_MODEL" => val: kv_string_opt => { atmospheric_model = val; },
+        "N_BODY_PERTURBATIONS" => val: kv_string_opt => { n_body_perturbations = val; },
+        "SOLAR_RAD_PRESSURE" => val: kv_yes_no_opt => { solar_rad_pressure = val; },
+        "EARTH_TIDES" => val: kv_yes_no_opt => { earth_tides = val; },
+        "INTRACK_THRUST" => val: kv_yes_no_opt => { intrack_thrust = val; },
     }, |i: &mut &str| (has_meta_block && at_block_end("META", i)) || (!has_meta_block && is_cdm_data_key(peek(key_token).parse_next(i).unwrap_or(""))), "Unknown metadata key");
 
     if has_meta_block && at_block_end("META", input) {
@@ -430,25 +430,25 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
     let mut has_cov = false;
 
     parse_block!(input, comment, {
-        "TIME_LASTOB_START" => val: kv_epoch => { od_params.time_lastob_start = Some(val); has_od_params = true; },
-        "TIME_LASTOB_END" => val: kv_epoch => { od_params.time_lastob_end = Some(val); has_od_params = true; },
-        "RECOMMENDED_OD_SPAN" => val: kv_from_kvn => { od_params.recommended_od_span = Some(val); has_od_params = true; },
-        "ACTUAL_OD_SPAN" => val: kv_from_kvn => { od_params.actual_od_span = Some(val); has_od_params = true; },
-        "OBS_AVAILABLE" => val: kv_u32 => { od_params.obs_available = Some(val.into()); has_od_params = true; },
-        "OBS_USED" => val: kv_u32 => { od_params.obs_used = Some(val.into()); has_od_params = true; },
-        "TRACKS_AVAILABLE" => val: kv_u32 => { od_params.tracks_available = Some(val.into()); has_od_params = true; },
-        "TRACKS_USED" => val: kv_u32 => { od_params.tracks_used = Some(val.into()); has_od_params = true; },
-        "RESIDUALS_ACCEPTED" => val: kv_from_kvn => { od_params.residuals_accepted = Some(val); has_od_params = true; },
-        "WEIGHTED_RMS" => val: kv_from_kvn => { od_params.weighted_rms = Some(val); has_od_params = true; },
+        "TIME_LASTOB_START" => val: kv_epoch_opt => { od_params.time_lastob_start = val; has_od_params = true; },
+        "TIME_LASTOB_END" => val: kv_epoch_opt => { od_params.time_lastob_end = val; has_od_params = true; },
+        "RECOMMENDED_OD_SPAN" => val: kv_from_kvn_opt => { od_params.recommended_od_span = val; has_od_params = true; },
+        "ACTUAL_OD_SPAN" => val: kv_from_kvn_opt => { od_params.actual_od_span = val; has_od_params = true; },
+        "OBS_AVAILABLE" => val: kv_u32_opt => { od_params.obs_available = val.map(|v| v.into()); has_od_params = true; },
+        "OBS_USED" => val: kv_u32_opt => { od_params.obs_used = val.map(|v| v.into()); has_od_params = true; },
+        "TRACKS_AVAILABLE" => val: kv_u32_opt => { od_params.tracks_available = val.map(|v| v.into()); has_od_params = true; },
+        "TRACKS_USED" => val: kv_u32_opt => { od_params.tracks_used = val.map(|v| v.into()); has_od_params = true; },
+        "RESIDUALS_ACCEPTED" => val: kv_from_kvn_opt => { od_params.residuals_accepted = val; has_od_params = true; },
+        "WEIGHTED_RMS" => val: kv_from_kvn_opt => { od_params.weighted_rms = val; has_od_params = true; },
 
-        "AREA_PC" => val: kv_from_kvn => { add_params.area_pc = Some(val); has_add_params = true; },
-        "AREA_DRG" => val: kv_from_kvn => { add_params.area_drg = Some(val); has_add_params = true; },
-        "AREA_SRP" => val: kv_from_kvn => { add_params.area_srp = Some(val); has_add_params = true; },
-        "MASS" => val: kv_from_kvn => { add_params.mass = Some(val); has_add_params = true; },
-        "CD_AREA_OVER_MASS" => val: kv_from_kvn => { add_params.cd_area_over_mass = Some(val); has_add_params = true; },
-        "CR_AREA_OVER_MASS" => val: kv_from_kvn => { add_params.cr_area_over_mass = Some(val); has_add_params = true; },
-        "THRUST_ACCELERATION" => val: kv_from_kvn => { add_params.thrust_acceleration = Some(val); has_add_params = true; },
-        "SEDR" => val: kv_from_kvn => { add_params.sedr = Some(val); has_add_params = true; },
+        "AREA_PC" => val: kv_from_kvn_opt => { add_params.area_pc = val; has_add_params = true; },
+        "AREA_DRG" => val: kv_from_kvn_opt => { add_params.area_drg = val; has_add_params = true; },
+        "AREA_SRP" => val: kv_from_kvn_opt => { add_params.area_srp = val; has_add_params = true; },
+        "MASS" => val: kv_from_kvn_opt => { add_params.mass = val; has_add_params = true; },
+        "CD_AREA_OVER_MASS" => val: kv_from_kvn_opt => { add_params.cd_area_over_mass = val; has_add_params = true; },
+        "CR_AREA_OVER_MASS" => val: kv_from_kvn_opt => { add_params.cr_area_over_mass = val; has_add_params = true; },
+        "THRUST_ACCELERATION" => val: kv_from_kvn_opt => { add_params.thrust_acceleration = val; has_add_params = true; },
+        "SEDR" => val: kv_from_kvn_opt => { add_params.sedr = val; has_add_params = true; },
 
         "X" => val: kv_from_kvn => { x = Some(val); },
         "Y" => val: kv_from_kvn => { y = Some(val); },
@@ -457,55 +457,55 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
         "Y_DOT" => val: kv_from_kvn => { y_dot = Some(val); },
         "Z_DOT" => val: kv_from_kvn => { z_dot = Some(val); },
 
-        "CR_R" => val: kv_from_kvn => { cr_r = Some(val); has_cov = true; },
-        "CT_R" => val: kv_from_kvn => { ct_r = Some(val); has_cov = true; },
-        "CT_T" => val: kv_from_kvn => { ct_t = Some(val); has_cov = true; },
-        "CN_R" => val: kv_from_kvn => { cn_r = Some(val); has_cov = true; },
-        "CN_T" => val: kv_from_kvn => { cn_t = Some(val); has_cov = true; },
-        "CN_N" => val: kv_from_kvn => { cn_n = Some(val); has_cov = true; },
-        "CRDOT_R" => val: kv_from_kvn => { crdot_r = Some(val); has_cov = true; },
-        "CRDOT_T" => val: kv_from_kvn => { crdot_t = Some(val); has_cov = true; },
-        "CRDOT_N" => val: kv_from_kvn => { crdot_n = Some(val); has_cov = true; },
-        "CRDOT_RDOT" => val: kv_from_kvn => { crdot_rdot = Some(val); has_cov = true; },
-        "CTDOT_R" => val: kv_from_kvn => { ctdot_r = Some(val); has_cov = true; },
-        "CTDOT_T" => val: kv_from_kvn => { ctdot_t = Some(val); has_cov = true; },
-        "CTDOT_N" => val: kv_from_kvn => { ctdot_n = Some(val); has_cov = true; },
-        "CTDOT_RDOT" => val: kv_from_kvn => { ctdot_rdot = Some(val); has_cov = true; },
-        "CTDOT_TDOT" => val: kv_from_kvn => { ctdot_tdot = Some(val); has_cov = true; },
-        "CNDOT_R" => val: kv_from_kvn => { cndot_r = Some(val); has_cov = true; },
-        "CNDOT_T" => val: kv_from_kvn => { cndot_t = Some(val); has_cov = true; },
-        "CNDOT_N" => val: kv_from_kvn => { cndot_n = Some(val); has_cov = true; },
-        "CNDOT_RDOT" => val: kv_from_kvn => { cndot_rdot = Some(val); has_cov = true; },
-        "CNDOT_TDOT" => val: kv_from_kvn => { cndot_tdot = Some(val); has_cov = true; },
-        "CNDOT_NDOT" => val: kv_from_kvn => { cndot_ndot = Some(val); has_cov = true; },
-        "CDRG_R" => val: kv_from_kvn => { cdrg_r = Some(val); has_cov = true; },
-        "CDRG_T" => val: kv_from_kvn => { cdrg_t = Some(val); has_cov = true; },
-        "CDRG_N" => val: kv_from_kvn => { cdrg_n = Some(val); has_cov = true; },
-        "CDRG_RDOT" => val: kv_from_kvn => { cdrg_rdot = Some(val); has_cov = true; },
-        "CDRG_TDOT" => val: kv_from_kvn => { cdrg_tdot = Some(val); has_cov = true; },
-        "CDRG_NDOT" => val: kv_from_kvn => { cdrg_ndot = Some(val); has_cov = true; },
-        "CDRG_DRG" => val: kv_from_kvn => { cdrg_drg = Some(val); has_cov = true; },
-        "CSRP_R" => val: kv_from_kvn => { csrp_r = Some(val); has_cov = true; },
-        "CSRP_T" => val: kv_from_kvn => { csrp_t = Some(val); has_cov = true; },
-        "CSRP_N" => val: kv_from_kvn => { csrp_n = Some(val); has_cov = true; },
-        "CSRP_RDOT" => val: kv_from_kvn => { csrp_rdot = Some(val); has_cov = true; },
-        "CSRP_TDOT" => val: kv_from_kvn => { csrp_tdot = Some(val); has_cov = true; },
-        "CSRP_NDOT" => val: kv_from_kvn => { csrp_ndot = Some(val); has_cov = true; },
-        "CSRP_DRG" => val: kv_from_kvn => { csrp_drg = Some(val); has_cov = true; },
-        "CSRP_SRP" => val: kv_from_kvn => { csrp_srp = Some(val); has_cov = true; },
-        "CTHR_R" => val: kv_from_kvn => { cthr_r = Some(val); has_cov = true; },
-        "CTHR_T" => val: kv_from_kvn => { cthr_t = Some(val); has_cov = true; },
-        "CTHR_N" => val: kv_from_kvn => { cthr_n = Some(val); has_cov = true; },
-        "CTHR_RDOT" => val: kv_from_kvn => { cthr_rdot = Some(val); has_cov = true; },
-        "CTHR_TDOT" => val: kv_from_kvn => { cthr_tdot = Some(val); has_cov = true; },
-        "CTHR_NDOT" => val: kv_from_kvn => { cthr_ndot = Some(val); has_cov = true; },
-        "CTHR_DRG" => val: kv_from_kvn => { cthr_drg = Some(val); has_cov = true; },
-        "CTHR_SRP" => val: kv_from_kvn => { cthr_srp = Some(val); has_cov = true; },
-        "CTHR_THR" => val: kv_from_kvn => { cthr_thr = Some(val); has_cov = true; },
+        "CR_R" => val: kv_from_kvn_opt => { cr_r = val; has_cov = true; },
+        "CT_R" => val: kv_from_kvn_opt => { ct_r = val; has_cov = true; },
+        "CT_T" => val: kv_from_kvn_opt => { ct_t = val; has_cov = true; },
+        "CN_R" => val: kv_from_kvn_opt => { cn_r = val; has_cov = true; },
+        "CN_T" => val: kv_from_kvn_opt => { cn_t = val; has_cov = true; },
+        "CN_N" => val: kv_from_kvn_opt => { cn_n = val; has_cov = true; },
+        "CRDOT_R" => val: kv_from_kvn_opt => { crdot_r = val; has_cov = true; },
+        "CRDOT_T" => val: kv_from_kvn_opt => { crdot_t = val; has_cov = true; },
+        "CRDOT_N" => val: kv_from_kvn_opt => { crdot_n = val; has_cov = true; },
+        "CRDOT_RDOT" => val: kv_from_kvn_opt => { crdot_rdot = val; has_cov = true; },
+        "CTDOT_R" => val: kv_from_kvn_opt => { ctdot_r = val; has_cov = true; },
+        "CTDOT_T" => val: kv_from_kvn_opt => { ctdot_t = val; has_cov = true; },
+        "CTDOT_N" => val: kv_from_kvn_opt => { ctdot_n = val; has_cov = true; },
+        "CTDOT_RDOT" => val: kv_from_kvn_opt => { ctdot_rdot = val; has_cov = true; },
+        "CTDOT_TDOT" => val: kv_from_kvn_opt => { ctdot_tdot = val; has_cov = true; },
+        "CNDOT_R" => val: kv_from_kvn_opt => { cndot_r = val; has_cov = true; },
+        "CNDOT_T" => val: kv_from_kvn_opt => { cndot_t = val; has_cov = true; },
+        "CNDOT_N" => val: kv_from_kvn_opt => { cndot_n = val; has_cov = true; },
+        "CNDOT_RDOT" => val: kv_from_kvn_opt => { cndot_rdot = val; has_cov = true; },
+        "CNDOT_TDOT" => val: kv_from_kvn_opt => { cndot_tdot = val; has_cov = true; },
+        "CNDOT_NDOT" => val: kv_from_kvn_opt => { cndot_ndot = val; has_cov = true; },
+        "CDRG_R" => val: kv_from_kvn_opt => { cdrg_r = val; has_cov = true; },
+        "CDRG_T" => val: kv_from_kvn_opt => { cdrg_t = val; has_cov = true; },
+        "CDRG_N" => val: kv_from_kvn_opt => { cdrg_n = val; has_cov = true; },
+        "CDRG_RDOT" => val: kv_from_kvn_opt => { cdrg_rdot = val; has_cov = true; },
+        "CDRG_TDOT" => val: kv_from_kvn_opt => { cdrg_tdot = val; has_cov = true; },
+        "CDRG_NDOT" => val: kv_from_kvn_opt => { cdrg_ndot = val; has_cov = true; },
+        "CDRG_DRG" => val: kv_from_kvn_opt => { cdrg_drg = val; has_cov = true; },
+        "CSRP_R" => val: kv_from_kvn_opt => { csrp_r = val; has_cov = true; },
+        "CSRP_T" => val: kv_from_kvn_opt => { csrp_t = val; has_cov = true; },
+        "CSRP_N" => val: kv_from_kvn_opt => { csrp_n = val; has_cov = true; },
+        "CSRP_RDOT" => val: kv_from_kvn_opt => { csrp_rdot = val; has_cov = true; },
+        "CSRP_TDOT" => val: kv_from_kvn_opt => { csrp_tdot = val; has_cov = true; },
+        "CSRP_NDOT" => val: kv_from_kvn_opt => { csrp_ndot = val; has_cov = true; },
+        "CSRP_DRG" => val: kv_from_kvn_opt => { csrp_drg = val; has_cov = true; },
+        "CSRP_SRP" => val: kv_from_kvn_opt => { csrp_srp = val; has_cov = true; },
+        "CTHR_R" => val: kv_from_kvn_opt => { cthr_r = val; has_cov = true; },
+        "CTHR_T" => val: kv_from_kvn_opt => { cthr_t = val; has_cov = true; },
+        "CTHR_N" => val: kv_from_kvn_opt => { cthr_n = val; has_cov = true; },
+        "CTHR_RDOT" => val: kv_from_kvn_opt => { cthr_rdot = val; has_cov = true; },
+        "CTHR_TDOT" => val: kv_from_kvn_opt => { cthr_tdot = val; has_cov = true; },
+        "CTHR_NDOT" => val: kv_from_kvn_opt => { cthr_ndot = val; has_cov = true; },
+        "CTHR_DRG" => val: kv_from_kvn_opt => { cthr_drg = val; has_cov = true; },
+        "CTHR_SRP" => val: kv_from_kvn_opt => { cthr_srp = val; has_cov = true; },
+        "CTHR_THR" => val: kv_from_kvn_opt => { cthr_thr = val; has_cov = true; },
     }, |i: &mut &str| at_block_start("META", i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Data key");
 
     let covariance_matrix = if has_cov {
-        CdmCovarianceMatrix {
+        Some(CdmCovarianceMatrix {
             comment: Vec::new(),
             cr_r: cr_r.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CR_R"))?,
             ct_r: ct_r.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CT_R"))?,
@@ -567,9 +567,9 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
             cthr_drg,
             cthr_srp,
             cthr_thr,
-        }
+        })
     } else {
-        return Err(cut_err(input, "Covariance Matrix keys"));
+        None
     };
 
     Ok(CdmData {
@@ -1484,7 +1484,11 @@ ORIGINATOR = TEST
         );
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with CDRG fields");
-        let cov = &cdm.body.segments[0].data.covariance_matrix;
+        let cov = &cdm.body.segments[0]
+            .data
+            .covariance_matrix
+            .as_ref()
+            .expect("Covariance matrix missing");
         assert!(cov.cdrg_r.is_some());
         assert!(cov.cdrg_t.is_some());
         assert!(cov.cdrg_n.is_some());
@@ -1504,7 +1508,11 @@ ORIGINATOR = TEST
         );
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with CSRP fields");
-        let cov = &cdm.body.segments[0].data.covariance_matrix;
+        let cov = &cdm.body.segments[0]
+            .data
+            .covariance_matrix
+            .as_ref()
+            .expect("Covariance matrix missing");
         assert!(cov.csrp_r.is_some());
         assert!(cov.csrp_t.is_some());
         assert!(cov.csrp_n.is_some());
@@ -1525,7 +1533,11 @@ ORIGINATOR = TEST
         );
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with CTHR fields");
-        let cov = &cdm.body.segments[0].data.covariance_matrix;
+        let cov = &cdm.body.segments[0]
+            .data
+            .covariance_matrix
+            .as_ref()
+            .expect("Covariance matrix missing");
         assert!(cov.cthr_r.is_some());
         assert!(cov.cthr_t.is_some());
         assert!(cov.cthr_n.is_some());
@@ -1631,8 +1643,8 @@ SCREEN_VOLUME_FRAME = RTN
     }
 
     #[test]
-    fn test_parse_cdm_covariance_keys() {
-        // Verify we can parse specific covariance keys like CDRG_R
+    fn test_parse_cdm_missing_covariance() {
+        // Verify we can parse CDM without covariance matrix (it is optional)
         let cdm_no_cov = r#"CCSDS_CDM_VERS = 1.0
 CREATION_DATE = 2025-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1663,17 +1675,26 @@ Z = 3000.0 [km]
 X_DOT = 1.0 [km/s]
 Y_DOT = 2.0 [km/s]
 Z_DOT = 3.0 [km/s]
-# No covariance keys here
+
+OBJECT = OBJECT2
+OBJECT_DESIGNATOR = 67890
+CATALOG_NAME = SATCAT
+OBJECT_NAME = SAT B
+INTERNATIONAL_DESIGNATOR = 2000-001A
+OBJECT_TYPE = PAYLOAD
+EPHEMERIS_NAME = EPH1
+COVARIANCE_METHOD = CALCULATED
+MANEUVERABLE = NO
+REF_FRAME = GCRF
+X = 1500.0 [km]
+Y = 2500.0 [km]
+Z = 3500.0 [km]
+X_DOT = 1.5 [km/s]
+Y_DOT = 2.5 [km/s]
+Z_DOT = 3.5 [km/s]
 "#;
-        let err = Cdm::from_kvn(cdm_no_cov).unwrap_err();
-        match err {
-            CcsdsNdmError::Format(format_err) => match *format_err {
-                FormatError::Kvn(ref e) => {
-                    assert!(format!("{:?}", e).contains("Covariance Matrix keys"));
-                }
-                _ => panic!("Expected Kvn format error, got {:?}", format_err),
-            },
-            _ => panic!("Expected Format error, got {:?}", err),
-        }
+        let cdm = Cdm::from_kvn(cdm_no_cov).expect("should parse without covariance");
+        assert!(cdm.body.segments[0].data.covariance_matrix.is_none());
+        assert!(cdm.body.segments[1].data.covariance_matrix.is_none());
     }
 }

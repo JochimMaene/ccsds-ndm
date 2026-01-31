@@ -6,7 +6,7 @@ use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::MessageType;
-use numpy::PyArray2;
+use numpy::{PyArray1, PyArray2, PyReadonlyArray1};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
@@ -107,8 +107,21 @@ impl Cdm {
             match format {
                 Some("kvn") => core_cdm::Cdm::from_kvn(data)
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
-                Some("xml") => core_cdm::Cdm::from_xml(data)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                Some("xml") => match core_cdm::Cdm::from_xml(data) {
+                    Ok(cdm) => cdm,
+                    Err(primary_err) => match ccsds_ndm::from_str(data) {
+                        Ok(MessageType::Cdm(cdm)) => cdm,
+                        Ok(other) => {
+                            return Err(PyValueError::new_err(format!(
+                                "Parsed message is not CDM (got {:?})",
+                                other
+                            )))
+                        }
+                        Err(_) => {
+                            return Err(PyValueError::new_err(primary_err.to_string()));
+                        }
+                    },
+                },
                 Some(other) => {
                     return Err(PyValueError::new_err(format!(
                         "Unsupported format '{}'. Use 'kvn' or 'xml'",
@@ -768,29 +781,176 @@ impl RelativeMetadataData {
         self.inner.comment = value;
     }
 
-    /// Relative position [R, T, N].
+    /// Relative state vector [R, T, N, VR, VT, VN] (combined position and velocity).
     ///
-    /// :type: Optional[list[float]]
+    /// :type: Optional[numpy.ndarray]
     #[getter]
-    fn get_relative_position(&self) -> Option<[f64; 3]> {
-        self.inner.relative_state_vector.as_ref().map(|s| [
-            s.relative_position_r.value,
-            s.relative_position_t.value,
-            s.relative_position_n.value,
-        ])
+    fn relative_state_vector(&self, py: Python<'_>) -> Option<Py<PyArray1<f64>>> {
+        self.inner.relative_state_vector.as_ref().map(move |s| {
+            let data = [
+                s.relative_position_r.value,
+                s.relative_position_t.value,
+                s.relative_position_n.value,
+                s.relative_velocity_r.value,
+                s.relative_velocity_t.value,
+                s.relative_velocity_n.value,
+            ];
+            PyArray1::from_slice(py, &data).unbind()
+        })
     }
 
-    /// Relative velocity [R, T, N].
-    ///
-    /// :type: Optional[list[float]]
-    #[getter]
-    fn get_relative_velocity(&self) -> Option<[f64; 3]> {
-        self.inner.relative_state_vector.as_ref().map(|s| [
-            s.relative_velocity_r.value,
-            s.relative_velocity_t.value,
-            s.relative_velocity_n.value,
-        ])
+    #[setter]
+    fn set_relative_state_vector(
+        &mut self,
+        value: Option<PyReadonlyArray1<f64>>,
+    ) -> PyResult<()> {
+        if let Some(array) = value {
+            let slice = array.as_slice()?;
+            if slice.len() != 6 {
+                return Err(PyValueError::new_err(
+                    "Relative state vector must be of length 6",
+                ));
+            }
+            self.inner.relative_state_vector = Some(core_cdm::RelativeStateVector {
+                relative_position_r: Length::new(slice[0], None),
+                relative_position_t: Length::new(slice[1], None),
+                relative_position_n: Length::new(slice[2], None),
+                relative_velocity_r: Dv::new(slice[3]),
+                relative_velocity_t: Dv::new(slice[4]),
+                relative_velocity_n: Dv::new(slice[5]),
+            });
+        } else {
+            self.inner.relative_state_vector = None;
+        }
+        Ok(())
     }
+
+    /// Relative position R component.
+    ///
+    /// :type: Optional[float]
+    #[getter]
+    fn get_relative_position_r(&self) -> Option<f64> {
+        self.inner
+            .relative_state_vector
+            .as_ref()
+            .map(|s| s.relative_position_r.value)
+    }
+
+    #[setter]
+    fn set_relative_position_r(&mut self, value: f64) -> PyResult<()> {
+        if let Some(s) = self.inner.relative_state_vector.as_mut() {
+            s.relative_position_r = Length::new(value, None);
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Relative state vector not initialized"))
+        }
+    }
+
+    /// Relative position T component.
+    ///
+    /// :type: Optional[float]
+    #[getter]
+    fn get_relative_position_t(&self) -> Option<f64> {
+        self.inner
+            .relative_state_vector
+            .as_ref()
+            .map(|s| s.relative_position_t.value)
+    }
+
+    #[setter]
+    fn set_relative_position_t(&mut self, value: f64) -> PyResult<()> {
+        if let Some(s) = self.inner.relative_state_vector.as_mut() {
+            s.relative_position_t = Length::new(value, None);
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Relative state vector not initialized"))
+        }
+    }
+
+    /// Relative position N component.
+    ///
+    /// :type: Optional[float]
+    #[getter]
+    fn get_relative_position_n(&self) -> Option<f64> {
+        self.inner
+            .relative_state_vector
+            .as_ref()
+            .map(|s| s.relative_position_n.value)
+    }
+
+    #[setter]
+    fn set_relative_position_n(&mut self, value: f64) -> PyResult<()> {
+        if let Some(s) = self.inner.relative_state_vector.as_mut() {
+            s.relative_position_n = Length::new(value, None);
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Relative state vector not initialized"))
+        }
+    }
+
+    /// Relative velocity R component.
+    ///
+    /// :type: Optional[float]
+    #[getter]
+    fn get_relative_velocity_r(&self) -> Option<f64> {
+        self.inner
+            .relative_state_vector
+            .as_ref()
+            .map(|s| s.relative_velocity_r.value)
+    }
+
+    #[setter]
+    fn set_relative_velocity_r(&mut self, value: f64) -> PyResult<()> {
+        if let Some(s) = self.inner.relative_state_vector.as_mut() {
+            s.relative_velocity_r = Dv::new(value);
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Relative state vector not initialized"))
+        }
+    }
+
+    /// Relative velocity T component.
+    ///
+    /// :type: Optional[float]
+    #[getter]
+    fn get_relative_velocity_t(&self) -> Option<f64> {
+        self.inner
+            .relative_state_vector
+            .as_ref()
+            .map(|s| s.relative_velocity_t.value)
+    }
+
+    #[setter]
+    fn set_relative_velocity_t(&mut self, value: f64) -> PyResult<()> {
+        if let Some(s) = self.inner.relative_state_vector.as_mut() {
+            s.relative_velocity_t = Dv::new(value);
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Relative state vector not initialized"))
+        }
+    }
+
+    /// Relative velocity N component.
+    ///
+    /// :type: Optional[float]
+    #[getter]
+    fn get_relative_velocity_n(&self) -> Option<f64> {
+        self.inner
+            .relative_state_vector
+            .as_ref()
+            .map(|s| s.relative_velocity_n.value)
+    }
+
+    #[setter]
+    fn set_relative_velocity_n(&mut self, value: f64) -> PyResult<()> {
+        if let Some(s) = self.inner.relative_state_vector.as_mut() {
+            s.relative_velocity_n = Dv::new(value);
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Relative state vector not initialized"))
+        }
+    }
+
 
     /// Name of the Object1 centered reference frame in which the screening volume data are
     /// given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
@@ -1492,7 +1652,7 @@ impl CdmData {
                 od_parameters: None,
                 additional_parameters: None,
                 state_vector: state_vector.inner,
-                covariance_matrix: covariance_matrix.inner,
+                covariance_matrix: Some(covariance_matrix.inner),
             },
         }
     }
@@ -1509,12 +1669,13 @@ impl CdmData {
 
     /// Covariance Matrix.
     ///
-    /// :type: CdmCovarianceMatrix
+    /// :type: Optional[CdmCovarianceMatrix]
     #[getter]
-    fn covariance_matrix(&self) -> CdmCovarianceMatrix {
-        CdmCovarianceMatrix {
-            inner: self.inner.covariance_matrix.clone(),
-        }
+    fn covariance_matrix(&self) -> Option<CdmCovarianceMatrix> {
+        self.inner
+            .covariance_matrix
+            .as_ref()
+            .map(|cov| CdmCovarianceMatrix { inner: cov.clone() })
     }
 
     /// Comments.
@@ -1551,6 +1712,43 @@ impl CdmData {
     #[setter]
     fn set_additional_parameters(&mut self, v: Option<AdditionalParameters>) {
         self.inner.additional_parameters = v.map(|a| a.inner);
+    }
+
+    /// State vector as a NumPy array (convenience method).
+    ///
+    /// Returns:
+    ///     numpy.ndarray: 1D array of shape (6,) containing [X, Y, Z, X_DOT, Y_DOT, Z_DOT].
+    ///     Units: [km, km, km, km/s, km/s, km/s]
+    ///
+    /// :type: numpy.ndarray
+    #[getter]
+    fn get_state_vector_numpy<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        CdmStateVector {
+            inner: self.inner.state_vector.clone(),
+        }
+        .to_numpy(py)
+    }
+
+    /// Covariance matrix as a NumPy array (convenience method).
+    ///
+    /// Returns:
+    ///     numpy.ndarray: 9x9 covariance matrix.
+    ///
+    /// :type: numpy.ndarray
+    #[getter]
+    fn get_covariance_matrix_numpy<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        match self.inner.covariance_matrix.as_ref() {
+            Some(cov) => CdmCovarianceMatrix {
+                inner: cov.clone(),
+            }
+            .to_numpy(py),
+            None => Err(PyValueError::new_err(
+                "COVARIANCE_MATRIX is missing; cannot build NumPy array",
+            )),
+        }
     }
 
     fn __repr__(&self) -> String {
@@ -1690,6 +1888,25 @@ impl CdmStateVector {
             "CdmStateVector(x={:.3}, y={:.3}, z={:.3} km)",
             self.inner.x.value, self.inner.y.value, self.inner.z.value
         )
+    }
+
+    /// Return the state vector as a NumPy array.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: 1D array of shape (6,) containing [X, Y, Z, X_DOT, Y_DOT, Z_DOT].
+    ///     Units: [km, km, km, km/s, km/s, km/s]
+    ///
+    /// :type: numpy.ndarray
+    fn to_numpy<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        let data = [
+            self.inner.x.value,
+            self.inner.y.value,
+            self.inner.z.value,
+            self.inner.x_dot.value,
+            self.inner.y_dot.value,
+            self.inner.z_dot.value,
+        ];
+        PyArray1::from_slice(py, &data)
     }
 }
 
