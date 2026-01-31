@@ -107,8 +107,21 @@ impl Cdm {
             match format {
                 Some("kvn") => core_cdm::Cdm::from_kvn(data)
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
-                Some("xml") => core_cdm::Cdm::from_xml(data)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                Some("xml") => match core_cdm::Cdm::from_xml(data) {
+                    Ok(cdm) => cdm,
+                    Err(primary_err) => match ccsds_ndm::from_str(data) {
+                        Ok(MessageType::Cdm(cdm)) => cdm,
+                        Ok(other) => {
+                            return Err(PyValueError::new_err(format!(
+                                "Parsed message is not CDM (got {:?})",
+                                other
+                            )))
+                        }
+                        Err(_) => {
+                            return Err(PyValueError::new_err(primary_err.to_string()));
+                        }
+                    },
+                },
                 Some(other) => {
                     return Err(PyValueError::new_err(format!(
                         "Unsupported format '{}'. Use 'kvn' or 'xml'",
