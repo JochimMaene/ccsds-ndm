@@ -4,7 +4,7 @@
 
 [package]
 name = "ccsds-ndm"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Jochim Maene <jochim.maene+github@gmail.com>"]
 edition = "2021"
 description = "Parse and generate CCSDS Navigation Data Messages (NDM) in KVN and XML formats"

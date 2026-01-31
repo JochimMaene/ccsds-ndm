@@ -1,10 +1,8 @@
 # CCSDS NDM
 
 [![Python](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/python.yml/badge.svg)](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/python.yml)
-[![Rust](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/rust.yml/badge.svg)](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/rust.yml)
 [![codecov](https://codecov.io/gh/JochimMaene/ccsds-ndm/branch/main/graph/badge.svg)](https://codecov.io/gh/JochimMaene/ccsds-ndm)
 [![PyPI](https://img.shields.io/pypi/v/ccsds-ndm-py)](https://pypi.org/project/ccsds-ndm-py/)
-[![crates.io](https://img.shields.io/crates/v/ccsds-ndm)](https://crates.io/crates/ccsds-ndm)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 
 A Rust library with Python bindings for parsing and generating [CCSDS Navigation Data Messages (NDM)](https://public.ccsds.org/Pubs/500x0g4.pdf) in both KVN (Key-Value Notation) and XML formats.
