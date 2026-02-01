@@ -172,7 +172,6 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
     "AcmMetadata": ["*"],
     "AcmPhysicalDescription": ["*"],
     "AcmSegment": ["*"],
-    "OdmHeader": ["*"],
     "QuaternionState": ["quaternion_dot"],
 }
 

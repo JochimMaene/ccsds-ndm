@@ -454,11 +454,7 @@ pub struct AemAttitudeStateWrapper {
         default
     )]
     pub euler_angle_ang_vel: Option<crate::common::EulerAngleAngVel>,
-    #[serde(
-        rename = "spin",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
+    #[serde(rename = "spin", skip_serializing_if = "Option::is_none", default)]
     pub spin: Option<crate::common::Spin>,
     #[serde(
         rename = "spinNutation",

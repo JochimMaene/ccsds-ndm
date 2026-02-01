@@ -7,7 +7,9 @@ use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn, Validate};
-use crate::types::{Epoch, InterpolationDegree, PositionCovariance, PositionVelocityCovariance, VelocityCovariance};
+use crate::types::{
+    Epoch, InterpolationDegree, PositionCovariance, PositionVelocityCovariance, VelocityCovariance,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 

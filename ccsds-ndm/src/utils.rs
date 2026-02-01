@@ -45,9 +45,9 @@ pub mod vec_f64_space_sep {
 /// - `<FIELD units="km">value</FIELD>` — map with attributes
 pub mod nullable {
     use super::*;
-    use std::marker::PhantomData;
-    use serde::de::{self, Visitor, MapAccess, IntoDeserializer};
+    use serde::de::{self, IntoDeserializer, MapAccess, Visitor};
     use std::collections::HashMap;
+    use std::marker::PhantomData;
 
     pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -77,11 +77,17 @@ pub mod nullable {
                 formatter.write_str("an optional value, empty string, or nil-attributed element")
             }
 
-            fn visit_unit<E>(self) -> Result<Self::Value, E> where E: de::Error {
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
                 Ok(None)
             }
 
-            fn visit_none<E>(self) -> Result<Self::Value, E> where E: de::Error {
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
                 Ok(None)
             }
 
@@ -103,7 +109,7 @@ pub mod nullable {
                 if v == "n/a" {
                     return Ok(None);
                 }
-                
+
                 // Try treating as valid JSON value first (handles numbers like u32 "23581")
                 if let Ok(val) = serde_json::from_str::<T>(v) {
                     return Ok(Some(val));
@@ -126,12 +132,14 @@ pub mod nullable {
                 while let Some(key) = map.next_key::<String>()? {
                     if key == "@nil" || key == "@xsi:nil" {
                         let v: String = map.next_value()?;
-                        if v == "true" { nil = true; }
+                        if v == "true" {
+                            nil = true;
+                        }
                     } else if key == "$text" || key == "$value" {
                         // Normalize content key to "$value" for UnitValue compatibility
                         let v: String = map.next_value()?;
                         if v == "n/a" || v.trim().is_empty() {
-                             // potential null content
+                            // potential null content
                         }
                         text_val = Some(v.clone());
                         values.insert("$value".to_string(), v);
@@ -141,12 +149,17 @@ pub mod nullable {
                     }
                 }
 
-                if nil { return Ok(None); }
-                if values.is_empty() { return Ok(None); }
+                if nil {
+                    return Ok(None);
+                }
+                if values.is_empty() {
+                    return Ok(None);
+                }
 
                 // Strategy 1: Try to deserialize T as a Struct/Map (e.g., UnitValue)
                 // This will use the buffered attributes (like @units) and content ($value).
-                let md: de::value::MapDeserializer<'_, _, A::Error> = de::value::MapDeserializer::new(values.clone().into_iter());
+                let md: de::value::MapDeserializer<'_, _, A::Error> =
+                    de::value::MapDeserializer::new(values.clone().into_iter());
                 match T::deserialize(md) {
                     Ok(val) => Ok(Some(val)),
                     Err(_) => {
@@ -158,7 +171,7 @@ pub mod nullable {
                             if let Ok(val) = serde_json::from_str::<T>(&txt) {
                                 return Ok(Some(val));
                             }
-                            
+
                             let sd = txt.into_deserializer();
                             T::deserialize(sd).map(Some)
                         } else {
@@ -236,8 +249,8 @@ mod tests {
 
         // Test 2: Whitespace text
         let json = r#"{ "field": "   " }"#; // Using scalar string because Visit_str handles it?
-        // Wait, for JSON input "field": "   " calls visit_str? Yes.
-        // My visitor handles visit_str.
+                                            // Wait, for JSON input "field": "   " calls visit_str? Yes.
+                                            // My visitor handles visit_str.
         let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
         assert_eq!(w.field, None);
 
@@ -251,10 +264,10 @@ mod tests {
         let json = r#"{ "u32_field": "23581" }"#;
         let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
         assert_eq!(w.u32_field, Some(23581));
-        
+
         // Test 5: u32 from Map (XML style)
         let json = r#"{ "u32_field": { "$text": "23581" } }"#;
         let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
-        assert_eq!(w.u32_field, Some(23581)); 
+        assert_eq!(w.u32_field, Some(23581));
     }
 }

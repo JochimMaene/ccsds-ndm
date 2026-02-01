@@ -106,7 +106,9 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
         euler_rot_seq,
         angvel_frame: rate_frame,
         interpolation_method,
-        interpolation_degree: interpolation_degree.and_then(std::num::NonZeroU32::new).map(InterpolationDegree),
+        interpolation_degree: interpolation_degree
+            .and_then(std::num::NonZeroU32::new)
+            .map(InterpolationDegree),
     })
 }
 

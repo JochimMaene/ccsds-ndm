@@ -125,7 +125,8 @@ impl OdmHeader {
         self.inner.classification = value;
     }
 
-    /// User-defined comments. (See 7.8 for formatting rules.)
+    /// Comments (allowed in the ODM Header only immediately after the ODM version number).
+    /// (See 7.8 for formatting rules.)
     ///
     /// Examples: This is a comment
     ///

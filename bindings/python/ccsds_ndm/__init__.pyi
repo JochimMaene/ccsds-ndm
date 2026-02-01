@@ -114,7 +114,7 @@ class AcmAttitudeDetermination:
     """
     ACM Data: Attitude Determination Data Section.
     """
-    def __init__(ad_id, comment) -> None: ...
+    def __init__(ad_id=None, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -125,7 +125,9 @@ class AcmAttitudeState:
     """
     ACM Data: Attitude State Time History Section.
     """
-    def __init__(ref_frame_a, ref_frame_b, att_type, att_lines, comment) -> None: ...
+    def __init__(
+        ref_frame_a, ref_frame_b, att_type, att_lines, comment=None
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -136,7 +138,9 @@ class AcmCovarianceMatrix:
     """
     ACM Data: Covariance Time History Section.
     """
-    def __init__(cov_basis, cov_ref_frame, cov_type, cov_lines, comment) -> None: ...
+    def __init__(
+        cov_basis, cov_ref_frame, cov_type, cov_lines, comment=None
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -147,7 +151,9 @@ class AcmData:
     """
     ACM Data Section.
     """
-    def __init__(att, phys, cov, man, ad, user) -> None: ...
+    def __init__(
+        att=None, phys=None, cov=None, man=None, ad=None, user=None
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -187,7 +193,7 @@ class AcmManeuverParameters:
     """
     ACM Data: Maneuver Specification Section.
     """
-    def __init__(man_id, comment) -> None: ...
+    def __init__(man_id=None, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -251,7 +257,7 @@ class AcmPhysicalDescription:
     """
     ACM Data: Space Object Physical Characteristics Section.
     """
-    def __init__(comment) -> None: ...
+    def __init__(comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -436,7 +442,7 @@ class AdmHeader:
     Represents the `admHeader` complex type from the XSD.
     """
     def __init__(
-        creation_date, originator, classification, message_id, comment
+        creation_date, originator, classification=None, message_id=None, comment=None
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -574,19 +580,7 @@ class AemData:
     """
     AEM Data Section.
     """
-    def __init__(attitude_states, comment) -> None: ...
-    @staticmethod
-    def from_numpy(
-        epochs: list[str],
-        array: numpy.ndarray,
-        comment: Optional[list[str]] = ...,
-    ) -> "AemData":
-        """
-        Create AEM data from epochs and a NumPy array.
-
-        Currently only supports Quaternion Ephemeris states.
-        """
-        ...
+    def __init__(attitude_states, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -616,7 +610,7 @@ class AemData:
         """
         Get attitude states as a 2D NumPy array.
 
-        Use `attitude_states_epochs` for corresponding epochs.
+        Use `attitude_states_epochs` for the corresponding epochs.
 
         Currently only supports Quaternion Ephemeris states.
         """
@@ -634,6 +628,10 @@ class AemData:
 
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
+    @staticmethod
+    def from_numpy(epochs, array, comment=None):
+        """ """
+        ...
 
 class AemMetadata:
     """
@@ -1062,13 +1060,13 @@ class ApmData:
     """
     def __init__(
         epoch,
-        quaternion_state,
-        euler_angle_state,
-        angular_velocity,
-        spin,
-        inertia,
-        maneuver_parameters,
-        comment,
+        quaternion_state=None,
+        euler_angle_state=None,
+        angular_velocity=None,
+        spin=None,
+        inertia=None,
+        maneuver_parameters=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -1759,15 +1757,6 @@ class CdmCovarianceMatrix:
         cthr_thr=None,
         comment=None,
     ) -> None: ...
-    @staticmethod
-    def from_numpy(
-        array: numpy.ndarray,
-        comment: Optional[list[str]] = ...,
-    ) -> "CdmCovarianceMatrix":
-        """
-        Create a covariance matrix from a 6x6 to 9x9 NumPy array.
-        """
-        ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -2278,10 +2267,16 @@ class CdmCovarianceMatrix:
 
     @cthr_thr.setter
     def cthr_thr(self, value: float) -> None: ...
+    @staticmethod
+    def from_numpy(array, comment=None):
+        """ """
+        ...
+
     def to_numpy(self):
         """
-        Returns the full 9x9 covariance matrix as a NumPy array.
-        If the optional 7,8,9 rows (Drag, SRP, Thrust) are missing, they are filled with 0.0.
+        Returns the covariance matrix as a NumPy array.
+        The size will be 6x6, 7x7, 8x8, or 9x9 depending on whether optional
+        Drag, SRP, and Thrust parameters are provided, as per CCSDS 508.0-B-1.
         """
         ...
 
@@ -2306,18 +2301,6 @@ class CdmData:
         additional_parameters=None,
         comments=None,
     ) -> None: ...
-    @staticmethod
-    def from_numpy(
-        state_vector: numpy.ndarray,
-        covariance_matrix: Optional[numpy.ndarray] = ...,
-        od_parameters: Optional[OdParameters] = ...,
-        additional_parameters: Optional[AdditionalParameters] = ...,
-        comments: Optional[list[str]] = ...,
-    ) -> "CdmData":
-        """
-        Create CDM data from NumPy arrays.
-        """
-        ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -2357,12 +2340,23 @@ class CdmData:
         Covariance matrix as a NumPy array (convenience method).
 
         Returns:
-            numpy.ndarray: 6x6 to 9x9 covariance matrix.
+            numpy.ndarray: 9x9 covariance matrix.
         """
         ...
 
     @covariance_matrix_numpy.setter
-    def covariance_matrix_numpy(self, value: Optional[numpy.ndarray]) -> None: ...
+    def covariance_matrix_numpy(self, value: numpy.ndarray) -> None: ...
+    @staticmethod
+    def from_numpy(
+        state_vector,
+        covariance_matrix=None,
+        od_parameters=None,
+        additional_parameters=None,
+        comments=None,
+    ):
+        """ """
+        ...
+
     @property
     def od_parameters(self) -> Optional[OdParameters]:
         """
@@ -2544,10 +2538,10 @@ class CdmMetadata:
         catalog_name,
         object_name,
         international_designator,
-        ephemeris_name,
-        covariance_method,
-        maneuverable,
         ref_frame,
+        ephemeris_name=...,
+        covariance_method=None,
+        maneuverable=None,
         object_type=None,
         operator_contact_position=None,
         operator_organization=None,
@@ -2890,16 +2884,15 @@ class CdmStateVector:
         Velocity Z component. Units: km/s.
     """
     def __init__(x, y, z, x_dot, y_dot, z_dot) -> None: ...
-    @staticmethod
-    def from_numpy(array: numpy.ndarray) -> "CdmStateVector":
-        """
-        Create a state vector from a NumPy array of shape (6,) or (1,6).
-        """
-        ...
     def __getstate__(self, /):
         """
         Helper for pickle.
         """
+        ...
+
+    @staticmethod
+    def from_numpy(array):
+        """ """
         ...
 
     def to_numpy(self) -> numpy.ndarray:
@@ -3783,8 +3776,8 @@ class KeplerianElements:
         ra_of_asc_node,
         arg_of_pericenter,
         gm,
-        true_anomaly,
-        mean_anomaly,
+        true_anomaly=None,
+        mean_anomaly=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -3941,8 +3934,8 @@ class ManeuverParameters:
         man_tor_1,
         man_tor_2,
         man_tor_3,
-        man_delta_mass,
-        comment,
+        man_delta_mass=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -4077,9 +4070,9 @@ class MeanElements:
         ra_of_asc_node,
         arg_of_pericenter,
         mean_anomaly,
-        semi_major_axis,
-        mean_motion,
-        gm,
+        semi_major_axis=None,
+        mean_motion=None,
+        gm=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -7932,17 +7925,17 @@ class OdParameters:
         Comments.
     """
     def __init__(
-        time_lastob_start,
-        time_lastob_end,
-        recommended_od_span,
-        actual_od_span,
-        obs_available,
-        obs_used,
-        tracks_available,
-        tracks_used,
-        residuals_accepted,
-        weighted_rms,
-        comment,
+        time_lastob_start=None,
+        time_lastob_end=None,
+        recommended_od_span=None,
+        actual_od_span=None,
+        obs_available=None,
+        obs_used=None,
+        tracks_available=None,
+        tracks_used=None,
+        residuals_accepted=None,
+        weighted_rms=None,
+        comment=...,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -8083,7 +8076,7 @@ class OdmHeader:
         Comments.
     """
     def __init__(
-        creation_date, originator, classification, message_id, comment
+        creation_date, originator, classification=None, message_id=None, comment=None
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -8104,9 +8097,17 @@ class OdmHeader:
     @classification.setter
     def classification(self, value: Optional[str]) -> None: ...
     @property
-    def comment(self): ...
+    def comment(self) -> list[str]:
+        """
+        Comments (allowed in the ODM Header only immediately after the ODM version number).
+        (See 7.8 for formatting rules.)
+
+        Examples: This is a comment
+        """
+        ...
+
     @comment.setter
-    def comment(self, value: object) -> None: ...
+    def comment(self, value: list[str]) -> None: ...
     @property
     def creation_date(self) -> str:
         """
@@ -8271,8 +8272,8 @@ class OemCovarianceMatrix:
     epoch : str
         Epoch of the covariance matrix (ISO 8601).
         values : numpy.ndarray
-        NumPy array of shape (21,) containing the lower-triangular values,
-        or (6,6) for a full symmetric matrix.
+        NumPy array of shape (21,) containing the lower-triangular values, or (6,6) for
+        a full symmetric matrix.
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
     comment : list[str], optional
@@ -8607,21 +8608,7 @@ class OemData:
         comments : list[str], optional
         Comments.
     """
-    def __init__(state_vectors, comments) -> None: ...
-    @staticmethod
-    def from_numpy(
-        state_vector_epochs: list[str],
-        state_vector_numpy: numpy.ndarray,
-        covariance_matrix_epochs: Optional[list[str]] = ...,
-        covariance_matrix_numpy: Optional[numpy.ndarray] = ...,
-        cov_ref_frames: Optional[list[Optional[str]]] = ...,
-        cov_comments: Optional[list[list[str]]] = ...,
-        comments: Optional[list[str]] = ...,
-    ) -> "OemData":
-        """
-        Create OEM data from epochs and NumPy arrays.
-        """
-        ...
+    def __init__(state_vectors, comments=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -8665,16 +8652,32 @@ class OemData:
     @property
     def covariance_matrix_numpy(self) -> numpy.ndarray:
         """
-        Get covariance matrices as a NumPy array (shape: N x 6 x 6).
+        Get covariance matrices as a NumPy array.
 
-        Use `covariance_matrix_epochs` for corresponding epochs.
+        Use `covariance_matrix_epochs` for the corresponding epochs.
 
-        Setter accepts arrays shaped (N,6,6), (N,21), (6,6), or (21,).
+        The returned array is a 3D tensor of shape (N, 6, 6), where N is the number of covariance
+        matrices. Each 6x6 matrix is symmetric and constructed from the lower-triangular CCSDS data.
+
+        Indices: 0=X, 1=Y, 2=Z, 3=X_DOT, 4=Y_DOT, 5=Z_DOT
         """
         ...
 
     @covariance_matrix_numpy.setter
     def covariance_matrix_numpy(self, value: numpy.ndarray) -> None: ...
+    @staticmethod
+    def from_numpy(
+        state_vector_epochs,
+        state_vector_numpy,
+        covariance_matrix_epochs=None,
+        covariance_matrix_numpy=None,
+        cov_ref_frames=None,
+        cov_comments=None,
+        comments=None,
+    ):
+        """ """
+        ...
+
     @property
     def state_vector(self) -> list[StateVectorAcc]:
         """
@@ -8703,19 +8706,19 @@ class OemData:
         """
         State vectors as a NumPy array.
 
-        Use `state_vector_epochs` for corresponding epochs.
+        Use `state_vector_epochs` for the corresponding epochs.
 
         Returns
         -------
         numpy.ndarray
             2D array of shape (N, 6) or (N, 9):
-              - N x 6: [X, Y, Z, X_DOT, Y_DOT, Z_DOT] if no accelerations.
-              - N x 9: [X, Y, Z, X_DOT, Y_DOT, Z_DOT, X_DDOT, Y_DDOT, Z_DDOT] if accelerations present.
+            - N x 6: [X, Y, Z, X_DOT, Y_DOT, Z_DOT] if no accelerations.
+            - N x 9: [X, Y, Z, X_DOT, Y_DOT, Z_DOT, X_DDOT, Y_DDOT, Z_DDOT] if accelerations present.
 
-            Units:
-            - Position: km
-            - Velocity: km/s
-            - Acceleration: km/s²
+        Units:
+        - Position: km
+        - Velocity: km/s
+        - Acceleration: km/s²
         """
         ...
 
@@ -9110,7 +9113,7 @@ class OmmData:
     """
     OMM Data section.
     """
-    def __init__(mean_elements, comments) -> None: ...
+    def __init__(mean_elements, comments=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -9527,29 +9530,29 @@ class OpmCovarianceMatrix:
         ... (see Parameters for full list of attributes with units)
     """
     def __init__(
-        cx_x,
-        cy_x,
-        cy_y,
-        cz_x,
-        cz_y,
-        cz_z,
-        cx_dot_x,
-        cx_dot_y,
-        cx_dot_z,
-        cy_dot_x,
-        cy_dot_y,
-        cy_dot_z,
-        cz_dot_x,
-        cz_dot_y,
-        cz_dot_z,
-        cx_dot_x_dot,
-        cy_dot_x_dot,
-        cy_dot_y_dot,
-        cz_dot_x_dot,
-        cz_dot_y_dot,
-        cz_dot_z_dot,
-        cov_ref_frame,
-        comments,
+        cx_x=None,
+        cy_x=None,
+        cy_y=None,
+        cz_x=None,
+        cz_y=None,
+        cz_z=None,
+        cx_dot_x=None,
+        cx_dot_y=None,
+        cx_dot_z=None,
+        cy_dot_x=None,
+        cy_dot_y=None,
+        cy_dot_z=None,
+        cz_dot_x=None,
+        cz_dot_y=None,
+        cz_dot_z=None,
+        cx_dot_x_dot=None,
+        cy_dot_x_dot=None,
+        cy_dot_y_dot=None,
+        cz_dot_x_dot=None,
+        cz_dot_y_dot=None,
+        cz_dot_z_dot=None,
+        cov_ref_frame=None,
+        comments=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -9817,7 +9820,7 @@ class OpmData:
     state_vector : StateVector
         State vector.
     """
-    def __init__(state_vector, comment) -> None: ...
+    def __init__(state_vector, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -11498,7 +11501,11 @@ class SpacecraftParameters:
         Drag coefficient.
     """
     def __init__(
-        mass, solar_rad_area, solar_rad_coeff, drag_area, drag_coeff
+        mass=None,
+        solar_rad_area=None,
+        solar_rad_coeff=None,
+        drag_area=None,
+        drag_coeff=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -11770,7 +11777,7 @@ class StateVector:
     z_dot : float
         Velocity vector Z-component (km/s).
     """
-    def __init__(epoch, x, y, z, x_dot, y_dot, z_dot, comments) -> None: ...
+    def __init__(epoch, x, y, z, x_dot, y_dot, z_dot, comments=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -11890,7 +11897,7 @@ class StateVectorAcc:
         Acceleration vector Z-component (km/s²).
     """
     def __init__(
-        epoch, x, y, z, x_dot, y_dot, z_dot, x_ddot, y_ddot, z_ddot
+        epoch, x, y, z, x_dot, y_dot, z_dot, x_ddot=None, y_ddot=None, z_ddot=None
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -12190,7 +12197,7 @@ class TdmData:
         Comments in the data section.
         (Optional)
     """
-    def __init__(*, observations=None, comment=None) -> None: ...
+    def __init__(observations=None, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.

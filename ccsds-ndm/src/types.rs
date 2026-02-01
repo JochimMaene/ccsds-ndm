@@ -379,27 +379,35 @@ macro_rules! define_required_type {
 
         impl<'de> serde::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-            where D: serde::Deserializer<'de> {
+            where
+                D: serde::Deserializer<'de>,
+            {
                 struct Visitor;
                 impl<'de> serde::de::Visitor<'de> for Visitor {
                     type Value = $name;
                     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                         formatter.write_str("a float value or map with $value and @units")
                     }
-                    
+
                     fn visit_f64<E>(self, v: f64) -> std::result::Result<Self::Value, E>
-                    where E: serde::de::Error {
+                    where
+                        E: serde::de::Error,
+                    {
                         Ok($name::new(v))
                     }
 
                     fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-                    where E: serde::de::Error {
+                    where
+                        E: serde::de::Error,
+                    {
                         let val = v.parse::<f64>().map_err(E::custom)?;
                         Ok($name::new(val))
                     }
 
                     fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-                    where A: serde::de::MapAccess<'de> {
+                    where
+                        A: serde::de::MapAccess<'de>,
+                    {
                         let mut value = None;
                         let mut units = None;
                         while let Some(key) = map.next_key::<String>()? {
@@ -411,9 +419,12 @@ macro_rules! define_required_type {
                                 let _ = map.next_value::<serde::de::IgnoredAny>()?;
                             }
                         }
-                        let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                        let value =
+                            value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
                         let mut s = $name::new(value);
-                        if let Some(u) = units { s.units = u; }
+                        if let Some(u) = units {
+                            s.units = u;
+                        }
                         Ok(s)
                     }
                 }
@@ -725,27 +736,35 @@ pub struct Percentage {
 
 impl<'de> serde::Deserialize<'de> for Percentage {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
+    where
+        D: serde::Deserializer<'de>,
+    {
         struct Visitor;
         impl<'de> serde::de::Visitor<'de> for Visitor {
             type Value = Percentage;
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("a float value or map with $value and optionally @units")
             }
-            
+
             fn visit_f64<E>(self, v: f64) -> std::result::Result<Self::Value, E>
-            where E: serde::de::Error {
+            where
+                E: serde::de::Error,
+            {
                 Percentage::new(v, None).map_err(E::custom)
             }
 
             fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-            where E: serde::de::Error {
+            where
+                E: serde::de::Error,
+            {
                 let val = v.parse::<f64>().map_err(E::custom)?;
                 Percentage::new(val, None).map_err(E::custom)
             }
 
             fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-            where A: serde::de::MapAccess<'de> {
+            where
+                A: serde::de::MapAccess<'de>,
+            {
                 let mut value = None;
                 let mut units = None;
                 while let Some(key) = map.next_key::<String>()? {
@@ -1282,27 +1301,35 @@ pub struct PercentageRequired {
 
 impl<'de> serde::Deserialize<'de> for PercentageRequired {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
+    where
+        D: serde::Deserializer<'de>,
+    {
         struct Visitor;
         impl<'de> serde::de::Visitor<'de> for Visitor {
             type Value = PercentageRequired;
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("a float value or map with $value and @units")
             }
-            
+
             fn visit_f64<E>(self, v: f64) -> std::result::Result<Self::Value, E>
-            where E: serde::de::Error {
+            where
+                E: serde::de::Error,
+            {
                 PercentageRequired::new(v).map_err(E::custom)
             }
 
             fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-            where E: serde::de::Error {
+            where
+                E: serde::de::Error,
+            {
                 let val = v.parse::<f64>().map_err(E::custom)?;
                 PercentageRequired::new(val).map_err(E::custom)
             }
 
             fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-            where A: serde::de::MapAccess<'de> {
+            where
+                A: serde::de::MapAccess<'de>,
+            {
                 let mut value = None;
                 let mut units = None;
                 while let Some(key) = map.next_key::<String>()? {
@@ -1316,7 +1343,9 @@ impl<'de> serde::Deserialize<'de> for PercentageRequired {
                 }
                 let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
                 let mut s = PercentageRequired::new(value).map_err(serde::de::Error::custom)?;
-                if let Some(u) = units { s.units = u; }
+                if let Some(u) = units {
+                    s.units = u;
+                }
                 Ok(s)
             }
         }
@@ -1642,13 +1671,14 @@ impl<'de> serde::Deserialize<'de> for InterpolationDegree {
             {
                 v.parse::<InterpolationDegree>().map_err(E::custom)
             }
-            
+
             fn visit_u32<E>(self, v: u32) -> std::result::Result<Self::Value, E>
-            where E: serde::de::Error
+            where
+                E: serde::de::Error,
             {
-                std::num::NonZeroU32::new(v).map(InterpolationDegree).ok_or_else(|| {
-                    E::custom("expected non-zero u32")
-                })
+                std::num::NonZeroU32::new(v)
+                    .map(InterpolationDegree)
+                    .ok_or_else(|| E::custom("expected non-zero u32"))
             }
 
             fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
@@ -1666,9 +1696,9 @@ impl<'de> serde::Deserialize<'de> for InterpolationDegree {
                 }
 
                 let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
-                std::num::NonZeroU32::new(value).map(InterpolationDegree).ok_or_else(|| {
-                    serde::de::Error::custom("expected non-zero u32")
-                })
+                std::num::NonZeroU32::new(value)
+                    .map(InterpolationDegree)
+                    .ok_or_else(|| serde::de::Error::custom("expected non-zero u32"))
             }
         }
 
@@ -2597,7 +2627,10 @@ impl std::str::FromStr for TimeOffset {
     type Err = crate::error::CcsdsNdmError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let val = s.parse::<f64>()?;
-        Ok(Self { value: val, units: None })
+        Ok(Self {
+            value: val,
+            units: None,
+        })
     }
 }
 

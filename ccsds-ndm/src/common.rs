@@ -602,7 +602,6 @@ pub struct Quaternion {
     pub qc: f64,
 }
 
-
 impl Quaternion {
     pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> crate::error::Result<Self> {
         for (name, v) in [("Q1", q1), ("Q2", q2), ("Q3", q3), ("QC", qc)] {
@@ -3039,7 +3038,7 @@ mod tests {
         let q: Quaternion = quick_xml::de::from_str(xml).expect("Failed to parse Quaternion");
         assert_eq!(q.q1, -0.005068);
     }
-    
+
     #[test]
     fn test_quaternion_ephemeris_xml_repro() {
         let xml = r#"<quaternionEphemeris>
@@ -3052,7 +3051,8 @@ mod tests {
             </quaternion>
         </quaternionEphemeris>"#;
         // quick-xml usually expects root tag to match
-        let qe: QuaternionEphemeris = quick_xml::de::from_str(xml).expect("Failed to parse QuaternionEphemeris");
+        let qe: QuaternionEphemeris =
+            quick_xml::de::from_str(xml).expect("Failed to parse QuaternionEphemeris");
         assert_eq!(qe.quaternion.q1, -0.005068);
     }
 
@@ -3075,7 +3075,7 @@ mod tests {
                 </quaternion>
             </quaternionEphemeris>
         </attitudeState>"#;
-        
+
         let w: Wrapper = quick_xml::de::from_str(xml).expect("Failed to parse Wrapper");
         assert!(w.qe.is_some());
         assert_eq!(w.qe.unwrap().quaternion.q1, -0.005068);
