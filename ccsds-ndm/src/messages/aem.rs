@@ -324,7 +324,7 @@ pub struct AemMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub interpolation_degree: Option<std::num::NonZeroU32>,
+    pub interpolation_degree: Option<InterpolationDegree>,
 }
 
 impl AemMetadata {
@@ -434,13 +434,13 @@ pub struct AemAttitudeStateWrapper {
     #[serde(
         rename = "quaternionAngVel",
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
+        default
     )]
     pub quaternion_ang_vel: Option<crate::common::QuaternionAngVel>,
     #[serde(
         rename = "eulerAngle",
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
+        default
     )]
     pub euler_angle: Option<crate::common::EulerAngle>,
     #[serde(
@@ -451,25 +451,25 @@ pub struct AemAttitudeStateWrapper {
     #[serde(
         rename = "eulerAngleAngVel",
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
+        default
     )]
     pub euler_angle_ang_vel: Option<crate::common::EulerAngleAngVel>,
     #[serde(
         rename = "spin",
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
+        default
     )]
     pub spin: Option<crate::common::Spin>,
     #[serde(
         rename = "spinNutation",
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
+        default
     )]
     pub spin_nutation: Option<crate::common::SpinNutation>,
     #[serde(
         rename = "spinNutationMom",
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
+        default
     )]
     pub spin_nutation_mom: Option<crate::common::SpinNutationMom>,
 }

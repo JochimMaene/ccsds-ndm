@@ -7,9 +7,11 @@ use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn, Validate};
-use crate::types::{Epoch, PositionCovariance, PositionVelocityCovariance, VelocityCovariance};
+use crate::types::{Epoch, InterpolationDegree, PositionCovariance, PositionVelocityCovariance, VelocityCovariance};
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
+
+#[cfg(test)]
 use std::num::NonZeroU32;
 
 // Re-export CcsdsNdmError for use in tests
@@ -383,7 +385,7 @@ pub struct OemMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub interpolation_degree: Option<NonZeroU32>,
+    pub interpolation_degree: Option<InterpolationDegree>,
 }
 
 impl ToKvn for OemMetadata {
@@ -1103,7 +1105,7 @@ COMMENT No data
         // Missing degree
         assert!(meta.validate().is_err());
 
-        meta.interpolation_degree = Some(NonZeroU32::new(5).unwrap());
+        meta.interpolation_degree = Some(InterpolationDegree::from(NonZeroU32::new(5).unwrap()));
         assert!(meta.validate().is_ok());
     }
 

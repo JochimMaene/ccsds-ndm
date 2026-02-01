@@ -543,11 +543,7 @@ pub struct MeanElements {
     /// **Units**: km or rev/day
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub semi_major_axis: Option<Distance>,
     /// Semi-major axis in kilometers (preferred), or, if MEAN_ELEMENT_THEORY = SGP/SGP4, the
     /// Keplerian Mean motion in revolutions per day
@@ -557,11 +553,7 @@ pub struct MeanElements {
     /// **Units**: km or rev/day
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mean_motion: Option<MeanMotion>,
     /// Eccentricity
     ///

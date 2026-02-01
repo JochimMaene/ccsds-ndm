@@ -101,6 +101,26 @@ pub trait FromKvnValue: Sized {
     fn from_kvn_value(s: &str) -> Result<Self>;
 }
 
+/// Trait to check if a value is considered "null" or "empty" in CCSDS context.
+///
+/// This unifies the logic for XML (nil="true" or empty text) and KVN (empty value).
+pub trait CcsdsNullable {
+    /// Returns true if the value represents a null/empty state.
+    fn is_null(&self) -> bool;
+}
+
+impl CcsdsNullable for String {
+    fn is_null(&self) -> bool {
+        self.trim().is_empty() || self.trim() == "n/a"
+    }
+}
+
+impl CcsdsNullable for str {
+    fn is_null(&self) -> bool {
+        self.trim().is_empty() || self.trim() == "n/a"
+    }
+}
+
 impl<T> FromKvnValue for T
 where
     T: std::str::FromStr,

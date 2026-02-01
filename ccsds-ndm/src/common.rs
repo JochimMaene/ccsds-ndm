@@ -593,13 +593,74 @@ impl ToKvn for StateVectorAcc {
 }
 
 // Quaternion (components each in [-1, 1])
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Quaternion {
     pub q1: f64,
     pub q2: f64,
     pub q3: f64,
     pub qc: f64,
+}
+
+impl<'de> serde::Deserialize<'de> for Quaternion {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        struct QuaternionVisitor;
+        impl<'de> serde::de::Visitor<'de> for QuaternionVisitor {
+            type Value = Quaternion;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct Quaternion with fields Q1, Q2, Q3, QC")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
+            where A: serde::de::MapAccess<'de> {
+                let mut q1 = None;
+                let mut q2 = None;
+                let mut q3 = None;
+                let mut qc = None;
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "Q1" => {
+                            if q1.is_some() {
+                                return Err(serde::de::Error::duplicate_field("Q1"));
+                            }
+                            q1 = Some(map.next_value()?);
+                        }
+                        "Q2" => {
+                            if q2.is_some() {
+                                return Err(serde::de::Error::duplicate_field("Q2"));
+                            }
+                            q2 = Some(map.next_value()?);
+                        }
+                        "Q3" => {
+                            if q3.is_some() {
+                                return Err(serde::de::Error::duplicate_field("Q3"));
+                            }
+                            q3 = Some(map.next_value()?);
+                        }
+                        "QC" => {
+                            if qc.is_some() {
+                                return Err(serde::de::Error::duplicate_field("QC"));
+                            }
+                            qc = Some(map.next_value()?);
+                        }
+                        _ => {
+                            let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let q1 = q1.ok_or_else(|| serde::de::Error::missing_field("Q1"))?;
+                let q2 = q2.ok_or_else(|| serde::de::Error::missing_field("Q2"))?;
+                let q3 = q3.ok_or_else(|| serde::de::Error::missing_field("Q3"))?;
+                let qc = qc.ok_or_else(|| serde::de::Error::missing_field("QC"))?;
+
+                Quaternion::new(q1, q2, q3, qc).map_err(serde::de::Error::custom)
+            }
+        }
+        // Use deserialize_map to be robust against attributes vs elements confusion in XML
+        deserializer.deserialize_map(QuaternionVisitor)
+    }
 }
 impl Quaternion {
     pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> crate::error::Result<Self> {
@@ -632,6 +693,7 @@ impl crate::traits::Validate for Quaternion {
     }
 }
 
+// Quaternion derivative (dot components with units 1/s)
 // Quaternion derivative (dot components with units 1/s)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -1270,6 +1332,7 @@ impl ToKvn for QuaternionDerivative {
 }
 
 /// AEM Attitude Ephemeris Data Line: Quaternion/AngVel.
+// AEM Attitude Ephemeris Data Line: Quaternion/AngVel.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionAngVel {
@@ -3022,5 +3085,58 @@ mod tests {
             qc: 0.0,
         };
         assert!(q2.validate().is_ok());
+    }
+
+    #[test]
+    fn test_quaternion_xml_repro() {
+        let xml = r#"<quaternion>
+            <Q1>-0.005068</Q1>
+            <Q2>0.906506</Q2>
+            <Q3>0.002360</Q3>
+            <QC>0.422157</QC>
+        </quaternion>"#;
+        let q: Quaternion = quick_xml::de::from_str(xml).expect("Failed to parse Quaternion");
+        assert_eq!(q.q1, -0.005068);
+    }
+    
+    #[test]
+    fn test_quaternion_ephemeris_xml_repro() {
+        let xml = r#"<quaternionEphemeris>
+            <EPOCH>2000-100T00:00:00.000</EPOCH>
+            <quaternion>
+                <Q1>-0.005068</Q1>
+                <Q2>0.906506</Q2>
+                <Q3>0.002360</Q3>
+                <QC>0.422157</QC>
+            </quaternion>
+        </quaternionEphemeris>"#;
+        // quick-xml usually expects root tag to match
+        let qe: QuaternionEphemeris = quick_xml::de::from_str(xml).expect("Failed to parse QuaternionEphemeris");
+        assert_eq!(qe.quaternion.q1, -0.005068);
+    }
+
+    #[test]
+    fn test_nested_wrapper_xml_repro() {
+        #[derive(Deserialize, Debug)]
+        struct Wrapper {
+            #[serde(rename = "quaternionEphemeris")]
+            pub qe: Option<QuaternionEphemeris>,
+        }
+
+        let xml = r#"<attitudeState>
+            <quaternionEphemeris>
+                <EPOCH>2000-100T00:00:00.000</EPOCH>
+                <quaternion>
+                    <Q1>-0.005068</Q1>
+                    <Q2>0.906506</Q2>
+                    <Q3>0.002360</Q3>
+                    <QC>0.422157</QC>
+                </quaternion>
+            </quaternionEphemeris>
+        </attitudeState>"#;
+        
+        let w: Wrapper = quick_xml::de::from_str(xml).expect("Failed to parse Wrapper");
+        assert!(w.qe.is_some());
+        assert_eq!(w.qe.unwrap().quaternion.q1, -0.005068);
     }
 }
