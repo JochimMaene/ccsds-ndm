@@ -65,9 +65,7 @@ impl Ndm for Cdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let content = crate::xml::extract_message_content(xml, "cdm")
-            .unwrap_or(std::borrow::Cow::Borrowed(xml));
-        let cdm: Self = crate::xml::from_str_with_context(&content, "CDM")?;
+        let cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
         crate::validation::validate_with_mode(crate::validation::MessageKind::Cdm, &cdm)?;
         Ok(cdm)
     }

@@ -72,20 +72,17 @@ impl Ndm for Tdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let content = crate::xml::extract_message_content(xml, "tdm")
-            .unwrap_or(std::borrow::Cow::Borrowed(xml));
-
         if crate::validation::current_mode() == crate::validation::ValidationMode::Strict
             || crate::validation::current_mode() == crate::validation::ValidationMode::Lenient
         {
-            if let Err(err) = validate_tdm_xml_metadata(&content) {
+            if let Err(err) = validate_tdm_xml_metadata(xml) {
                 crate::validation::handle_validation_error(
                     crate::validation::MessageKind::Tdm,
                     err,
                 )?;
             }
         }
-        let tdm: Self = crate::xml::from_str_with_context(&content, "TDM")?;
+        let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
         crate::validation::validate_with_mode(crate::validation::MessageKind::Tdm, &tdm)?;
         Ok(tdm)
     }

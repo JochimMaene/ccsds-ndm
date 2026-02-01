@@ -113,7 +113,11 @@ pub struct AdmHeader {
     /// **Examples**: APM_201113719185, ABC-12_34
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub message_id: Option<String>,
 }
@@ -201,7 +205,11 @@ pub struct OdmHeader {
     /// **Examples**: OPM_201113719185, ABC-12_34
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub message_id: Option<String>,
 }
@@ -3014,19 +3022,5 @@ mod tests {
             qc: 0.0,
         };
         assert!(q2.validate().is_ok());
-    }
-}
-
-impl crate::traits::FromNullableStr for SpinNutationMom {
-    fn from_nullable_str(s: &str) -> crate::error::Result<Option<Self>> {
-        if s.trim().is_empty() {
-            Ok(None)
-        } else {
-            Err(crate::error::FormatError::InvalidFormat(format!(
-                "Cannot parse SpinNutationMom from flat string: {}",
-                s
-            ))
-            .into())
-        }
     }
 }

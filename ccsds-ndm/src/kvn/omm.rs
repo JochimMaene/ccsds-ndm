@@ -152,7 +152,7 @@ pub fn tle_parameters(input: &mut &str) -> KvnResult<Option<TleParameters>> {
 
     parse_block!(input, comment, {
         "EPHEMERIS_TYPE" => ephemeris_type: kv_i32,
-        "CLASSIFICATION_TYPE" => val: kv_string_opt => { classification_type = val; },
+        "CLASSIFICATION_TYPE" => classification_type: kv_string,
         "NORAD_CAT_ID" => norad_cat_id: kv_u32,
         "ELEMENT_SET_NO" => val: kv_u32 => { element_set_no = Some(val.into()); },
         "REV_AT_EPOCH" => rev_at_epoch: kv_u32,
