@@ -10,7 +10,9 @@ use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::tdm::Tdm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::types::{Epoch, Position, PositionUnits, Velocity, VelocityUnits};
+use ccsds_ndm::types::{
+    Epoch, InterpolationDegree, Position, PositionUnits, Velocity, VelocityUnits,
+};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::hint::black_box;
 use std::num::NonZeroU32;
@@ -77,7 +79,7 @@ fn create_test_oem(num_states: usize) -> Oem {
                     useable_stop_time: None,
                     stop_time: Epoch::from_str("2023-09-26T12:02:00Z").unwrap(),
                     interpolation: Some("LAGRANGE".to_string()),
-                    interpolation_degree: NonZeroU32::new(5),
+                    interpolation_degree: NonZeroU32::new(5).map(InterpolationDegree),
                 },
                 data: OemData {
                     comment: vec![],
