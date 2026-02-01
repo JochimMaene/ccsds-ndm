@@ -160,9 +160,10 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
         "STOP_TIME" => stop_time: kv_epoch,
         "INTERPOLATION" => interpolation: kv_string,
         "INTERPOLATION_DEGREE" => val: kv_u32 => {
-            interpolation_degree = Some(NonZeroU32::new(val).ok_or_else(|| {
+            let nz = NonZeroU32::new(val).ok_or_else(|| {
                 cut_err(input, "positive integer")
-            })?);
+            })?;
+            interpolation_degree = Some(InterpolationDegree(nz));
         },
     }, |i| at_block_end("META", i), "Unexpected OEM Metadata key");
 
@@ -1129,7 +1130,7 @@ META_STOP
         let oem = Oem::from_kvn(kvn).unwrap();
         let meta = &oem.body.segment[0].metadata;
         assert_eq!(meta.interpolation.as_deref(), Some("LAGRANGE"));
-        assert_eq!(meta.interpolation_degree.map(|v| v.get()), Some(5));
+        assert_eq!(meta.interpolation_degree.map(|v| v.0.get()), Some(5));
 
         let kvn_bad_degree = r#"CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -2033,7 +2034,7 @@ META_STOP
             oem.body.segment[0]
                 .metadata
                 .interpolation_degree
-                .map(|v| v.get()),
+                .map(|v| v.0.get()),
             Some(7)
         );
 

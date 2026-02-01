@@ -22,7 +22,7 @@ use crate::common::{AdmHeader, OdmHeader, OpmCovarianceMatrix, SpacecraftParamet
 use crate::error::{
     CcsdsNdmError, EnumParseError, FormatError, InternalParserError, ValidationError,
 };
-use crate::traits::{FromKvnFloat, FromKvnValue};
+use crate::traits::{CcsdsNullable, FromKvnFloat, FromKvnValue};
 use crate::types::{UserDefined, UserDefinedParameter, *};
 use fast_float;
 use std::str::FromStr;
@@ -79,7 +79,7 @@ pub fn kv_float_unit_opt<'a>(input: &mut &'a str) -> KvnResult<(Option<f64>, Opt
         // After optional unit, we MUST be at end of line/comment or whitespace.
         // If there's still non-whitespace content, it's invalid (garbage).
         let remainder = till_line_ending.parse_next(input)?;
-        if !remainder.trim().is_empty() {
+        if !remainder.is_null() {
             return Err(cut_err(input, "Invalid float value"));
         }
 
@@ -431,7 +431,7 @@ pub fn kv_u32_opt(input: &mut &str) -> KvnResult<Option<u32>> {
 
     // Check if line contains only whitespace/unit or is empty
     let remainder = peek(till_line_ending).parse_next(input)?;
-    if remainder.trim().is_empty() || remainder.trim().starts_with('[') {
+    if remainder.is_null() || remainder.trim().starts_with('[') {
         let _ = kv_unit.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
         return Ok(None);
@@ -501,7 +501,7 @@ pub fn kv_u64_opt(input: &mut &str) -> KvnResult<Option<u64>> {
 
     // Check if line contains only whitespace/unit or is empty
     let remainder = peek(till_line_ending).parse_next(input)?;
-    if remainder.trim().is_empty() || remainder.trim().starts_with('[') {
+    if remainder.is_null() || remainder.trim().starts_with('[') {
         let _ = kv_unit.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
         return Ok(None);
@@ -561,7 +561,7 @@ pub fn kv_string(input: &mut &str) -> KvnResult<String> {
 pub fn kv_string_opt(input: &mut &str) -> KvnResult<Option<String>> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     let trimmed = v.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_null() {
         Ok(None)
     } else {
         Ok(Some(trimmed.to_string()))
@@ -579,7 +579,7 @@ pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
 pub fn kv_epoch_opt(input: &mut &str) -> KvnResult<Option<Epoch>> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     let trimmed = v.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_null() {
         Ok(None)
     } else {
         Epoch::from_str(trimmed)
@@ -606,7 +606,7 @@ pub fn kv_yes_no(input: &mut &str) -> KvnResult<YesNo> {
 pub fn kv_yes_no_opt(input: &mut &str) -> KvnResult<Option<YesNo>> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     let trimmed = v.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_null() {
         Ok(None)
     } else {
         YesNo::from_str(trimmed)
@@ -636,7 +636,7 @@ where
 {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     let trimmed = v.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_null() {
         Ok(None)
     } else {
         T::from_str(trimmed).map(Some).map_err(|e| {

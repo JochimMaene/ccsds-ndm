@@ -6,7 +6,7 @@ use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::MessageType;
-use numpy::{PyArray1, PyArray2, PyReadonlyArray1};
+use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
@@ -36,6 +36,171 @@ fn validate_unit<T: Default + std::fmt::Display + PartialEq>(
         }
     }
     Ok(())
+}
+
+fn build_cdm_covariance_from_array(
+    array: &PyReadonlyArray2<f64>,
+    comment: Vec<String>,
+) -> PyResult<core_cdm::CdmCovarianceMatrix> {
+    let shape = array.shape();
+    if shape.len() != 2 || shape[0] != shape[1] {
+        return Err(PyValueError::new_err(
+            "Covariance matrix must be a square 2D array",
+        ));
+    }
+    let dim = shape[0];
+    if dim < 6 || dim > 9 {
+        return Err(PyValueError::new_err(
+            "Covariance matrix must be 6x6, 7x7, 8x8, or 9x9",
+        ));
+    }
+
+    let a = array.as_array();
+
+    Ok(core_cdm::CdmCovarianceMatrix {
+        comment,
+        cr_r: core_types::M2::new(a[[0, 0]]),
+        ct_r: core_types::M2::new(a[[1, 0]]),
+        ct_t: core_types::M2::new(a[[1, 1]]),
+        cn_r: core_types::M2::new(a[[2, 0]]),
+        cn_t: core_types::M2::new(a[[2, 1]]),
+        cn_n: core_types::M2::new(a[[2, 2]]),
+        crdot_r: core_types::M2s::new(a[[3, 0]]),
+        crdot_t: core_types::M2s::new(a[[3, 1]]),
+        crdot_n: core_types::M2s::new(a[[3, 2]]),
+        crdot_rdot: core_types::M2s2::new(a[[3, 3]]),
+        ctdot_r: core_types::M2s::new(a[[4, 0]]),
+        ctdot_t: core_types::M2s::new(a[[4, 1]]),
+        ctdot_n: core_types::M2s::new(a[[4, 2]]),
+        ctdot_rdot: core_types::M2s2::new(a[[4, 3]]),
+        ctdot_tdot: core_types::M2s2::new(a[[4, 4]]),
+        cndot_r: core_types::M2s::new(a[[5, 0]]),
+        cndot_t: core_types::M2s::new(a[[5, 1]]),
+        cndot_n: core_types::M2s::new(a[[5, 2]]),
+        cndot_rdot: core_types::M2s2::new(a[[5, 3]]),
+        cndot_tdot: core_types::M2s2::new(a[[5, 4]]),
+        cndot_ndot: core_types::M2s2::new(a[[5, 5]]),
+        cdrg_r: if dim >= 7 {
+            Some(core_types::M3kg::new(a[[6, 0]]))
+        } else {
+            None
+        },
+        cdrg_t: if dim >= 7 {
+            Some(core_types::M3kg::new(a[[6, 1]]))
+        } else {
+            None
+        },
+        cdrg_n: if dim >= 7 {
+            Some(core_types::M3kg::new(a[[6, 2]]))
+        } else {
+            None
+        },
+        cdrg_rdot: if dim >= 7 {
+            Some(core_types::M3kgs::new(a[[6, 3]]))
+        } else {
+            None
+        },
+        cdrg_tdot: if dim >= 7 {
+            Some(core_types::M3kgs::new(a[[6, 4]]))
+        } else {
+            None
+        },
+        cdrg_ndot: if dim >= 7 {
+            Some(core_types::M3kgs::new(a[[6, 5]]))
+        } else {
+            None
+        },
+        cdrg_drg: if dim >= 7 {
+            Some(core_types::M4kg2::new(a[[6, 6]]))
+        } else {
+            None
+        },
+        csrp_r: if dim >= 8 {
+            Some(core_types::M3kg::new(a[[7, 0]]))
+        } else {
+            None
+        },
+        csrp_t: if dim >= 8 {
+            Some(core_types::M3kg::new(a[[7, 1]]))
+        } else {
+            None
+        },
+        csrp_n: if dim >= 8 {
+            Some(core_types::M3kg::new(a[[7, 2]]))
+        } else {
+            None
+        },
+        csrp_rdot: if dim >= 8 {
+            Some(core_types::M3kgs::new(a[[7, 3]]))
+        } else {
+            None
+        },
+        csrp_tdot: if dim >= 8 {
+            Some(core_types::M3kgs::new(a[[7, 4]]))
+        } else {
+            None
+        },
+        csrp_ndot: if dim >= 8 {
+            Some(core_types::M3kgs::new(a[[7, 5]]))
+        } else {
+            None
+        },
+        csrp_drg: if dim >= 8 {
+            Some(core_types::M4kg2::new(a[[7, 6]]))
+        } else {
+            None
+        },
+        csrp_srp: if dim >= 8 {
+            Some(core_types::M4kg2::new(a[[7, 7]]))
+        } else {
+            None
+        },
+        cthr_r: if dim >= 9 {
+            Some(core_types::M2s2::new(a[[8, 0]]))
+        } else {
+            None
+        },
+        cthr_t: if dim >= 9 {
+            Some(core_types::M2s2::new(a[[8, 1]]))
+        } else {
+            None
+        },
+        cthr_n: if dim >= 9 {
+            Some(core_types::M2s2::new(a[[8, 2]]))
+        } else {
+            None
+        },
+        cthr_rdot: if dim >= 9 {
+            Some(core_types::M2s3::new(a[[8, 3]]))
+        } else {
+            None
+        },
+        cthr_tdot: if dim >= 9 {
+            Some(core_types::M2s3::new(a[[8, 4]]))
+        } else {
+            None
+        },
+        cthr_ndot: if dim >= 9 {
+            Some(core_types::M2s3::new(a[[8, 5]]))
+        } else {
+            None
+        },
+        cthr_drg: if dim >= 9 {
+            Some(core_types::M3kgs2::new(a[[8, 6]]))
+        } else {
+            None
+        },
+        cthr_srp: if dim >= 9 {
+            Some(core_types::M3kgs2::new(a[[8, 7]]))
+        } else {
+            None
+        },
+        cthr_thr: if dim >= 9 {
+            Some(core_types::M2s4::new(a[[8, 8]]))
+        } else {
+            None
+        },
+    })
 }
 
 /// Conjunction Data Message (CDM).
@@ -783,174 +948,19 @@ impl RelativeMetadataData {
 
     /// Relative state vector [R, T, N, VR, VT, VN] (combined position and velocity).
     ///
-    /// :type: Optional[numpy.ndarray]
+    /// :type: Optional[RelativeStateVector]
     #[getter]
-    fn relative_state_vector(&self, py: Python<'_>) -> Option<Py<PyArray1<f64>>> {
-        self.inner.relative_state_vector.as_ref().map(move |s| {
-            let data = [
-                s.relative_position_r.value,
-                s.relative_position_t.value,
-                s.relative_position_n.value,
-                s.relative_velocity_r.value,
-                s.relative_velocity_t.value,
-                s.relative_velocity_n.value,
-            ];
-            PyArray1::from_slice(py, &data).unbind()
-        })
-    }
-
-    #[setter]
-    fn set_relative_state_vector(
-        &mut self,
-        value: Option<PyReadonlyArray1<f64>>,
-    ) -> PyResult<()> {
-        if let Some(array) = value {
-            let slice = array.as_slice()?;
-            if slice.len() != 6 {
-                return Err(PyValueError::new_err(
-                    "Relative state vector must be of length 6",
-                ));
-            }
-            self.inner.relative_state_vector = Some(core_cdm::RelativeStateVector {
-                relative_position_r: Length::new(slice[0], None),
-                relative_position_t: Length::new(slice[1], None),
-                relative_position_n: Length::new(slice[2], None),
-                relative_velocity_r: Dv::new(slice[3]),
-                relative_velocity_t: Dv::new(slice[4]),
-                relative_velocity_n: Dv::new(slice[5]),
-            });
-        } else {
-            self.inner.relative_state_vector = None;
-        }
-        Ok(())
-    }
-
-    /// Relative position R component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_position_r(&self) -> Option<f64> {
+    fn relative_state_vector(&self) -> Option<RelativeStateVector> {
         self.inner
             .relative_state_vector
             .as_ref()
-            .map(|s| s.relative_position_r.value)
+            .map(|s| RelativeStateVector { inner: s.clone() })
     }
 
     #[setter]
-    fn set_relative_position_r(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_position_r = Length::new(value, None);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
+    fn set_relative_state_vector(&mut self, value: Option<RelativeStateVector>) {
+        self.inner.relative_state_vector = value.map(|v| v.inner);
     }
-
-    /// Relative position T component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_position_t(&self) -> Option<f64> {
-        self.inner
-            .relative_state_vector
-            .as_ref()
-            .map(|s| s.relative_position_t.value)
-    }
-
-    #[setter]
-    fn set_relative_position_t(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_position_t = Length::new(value, None);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
-    }
-
-    /// Relative position N component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_position_n(&self) -> Option<f64> {
-        self.inner
-            .relative_state_vector
-            .as_ref()
-            .map(|s| s.relative_position_n.value)
-    }
-
-    #[setter]
-    fn set_relative_position_n(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_position_n = Length::new(value, None);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
-    }
-
-    /// Relative velocity R component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_velocity_r(&self) -> Option<f64> {
-        self.inner
-            .relative_state_vector
-            .as_ref()
-            .map(|s| s.relative_velocity_r.value)
-    }
-
-    #[setter]
-    fn set_relative_velocity_r(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_velocity_r = Dv::new(value);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
-    }
-
-    /// Relative velocity T component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_velocity_t(&self) -> Option<f64> {
-        self.inner
-            .relative_state_vector
-            .as_ref()
-            .map(|s| s.relative_velocity_t.value)
-    }
-
-    #[setter]
-    fn set_relative_velocity_t(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_velocity_t = Dv::new(value);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
-    }
-
-    /// Relative velocity N component.
-    ///
-    /// :type: Optional[float]
-    #[getter]
-    fn get_relative_velocity_n(&self) -> Option<f64> {
-        self.inner
-            .relative_state_vector
-            .as_ref()
-            .map(|s| s.relative_velocity_n.value)
-    }
-
-    #[setter]
-    fn set_relative_velocity_n(&mut self, value: f64) -> PyResult<()> {
-        if let Some(s) = self.inner.relative_state_vector.as_mut() {
-            s.relative_velocity_n = Dv::new(value);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err("Relative state vector not initialized"))
-        }
-    }
-
 
     /// Name of the Object1 centered reference frame in which the screening volume data are
     /// given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
@@ -997,6 +1007,167 @@ impl RelativeMetadataData {
             self.inner.miss_distance.value,
             self.inner.collision_probability.as_ref().map(|p| p.value)
         )
+    }
+}
+
+/// Relative State Vector containing relative position and velocity.
+///
+/// Parameters
+/// ----------
+/// relative_position_r : float
+///     Relative position R component. Units: m.
+/// relative_position_t : float
+///     Relative position T component. Units: m.
+/// relative_position_n : float
+///     Relative position N component. Units: m.
+/// relative_velocity_r : float
+///     Relative velocity R component. Units: m/s.
+/// relative_velocity_t : float
+///     Relative velocity T component. Units: m/s.
+/// relative_velocity_n : float
+///     Relative velocity N component. Units: m/s.
+#[pyclass]
+#[derive(Clone)]
+pub struct RelativeStateVector {
+    pub inner: core_cdm::RelativeStateVector,
+}
+
+#[pymethods]
+impl RelativeStateVector {
+    #[new]
+    fn new(
+        relative_position_r: f64,
+        relative_position_t: f64,
+        relative_position_n: f64,
+        relative_velocity_r: f64,
+        relative_velocity_t: f64,
+        relative_velocity_n: f64,
+    ) -> Self {
+        Self {
+            inner: core_cdm::RelativeStateVector {
+                relative_position_r: Length::new(relative_position_r, None),
+                relative_position_t: Length::new(relative_position_t, None),
+                relative_position_n: Length::new(relative_position_n, None),
+                relative_velocity_r: Dv::new(relative_velocity_r),
+                relative_velocity_t: Dv::new(relative_velocity_t),
+                relative_velocity_n: Dv::new(relative_velocity_n),
+            },
+        }
+    }
+
+    /// Relative position R component.
+    ///
+    /// Units: m
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_position_r(&self) -> f64 {
+        self.inner.relative_position_r.value
+    }
+    #[setter]
+    fn set_relative_position_r(&mut self, value: f64) {
+        self.inner.relative_position_r = Length::new(value, None);
+    }
+
+    /// Relative position T component.
+    ///
+    /// Units: m
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_position_t(&self) -> f64 {
+        self.inner.relative_position_t.value
+    }
+    #[setter]
+    fn set_relative_position_t(&mut self, value: f64) {
+        self.inner.relative_position_t = Length::new(value, None);
+    }
+
+    /// Relative position N component.
+    ///
+    /// Units: m
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_position_n(&self) -> f64 {
+        self.inner.relative_position_n.value
+    }
+    #[setter]
+    fn set_relative_position_n(&mut self, value: f64) {
+        self.inner.relative_position_n = Length::new(value, None);
+    }
+
+    /// Relative velocity R component.
+    ///
+    /// Units: m/s
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_velocity_r(&self) -> f64 {
+        self.inner.relative_velocity_r.value
+    }
+    #[setter]
+    fn set_relative_velocity_r(&mut self, value: f64) {
+        self.inner.relative_velocity_r = Dv::new(value);
+    }
+
+    /// Relative velocity T component.
+    ///
+    /// Units: m/s
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_velocity_t(&self) -> f64 {
+        self.inner.relative_velocity_t.value
+    }
+    #[setter]
+    fn set_relative_velocity_t(&mut self, value: f64) {
+        self.inner.relative_velocity_t = Dv::new(value);
+    }
+
+    /// Relative velocity N component.
+    ///
+    /// Units: m/s
+    ///
+    /// :type: float
+    #[getter]
+    fn relative_velocity_n(&self) -> f64 {
+        self.inner.relative_velocity_n.value
+    }
+    #[setter]
+    fn set_relative_velocity_n(&mut self, value: f64) {
+        self.inner.relative_velocity_n = Dv::new(value);
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "RelativeStateVector(pos=[{:.3}, {:.3}, {:.3}], vel=[{:.3}, {:.3}, {:.3}])",
+            self.inner.relative_position_r.value,
+            self.inner.relative_position_t.value,
+            self.inner.relative_position_n.value,
+            self.inner.relative_velocity_r.value,
+            self.inner.relative_velocity_t.value,
+            self.inner.relative_velocity_n.value
+        )
+    }
+
+    /// Return the relative state vector as a NumPy array.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: 1D array of shape (6,) containing [R, T, N, VR, VT, VN].
+    ///     Units: [m, m, m, m/s, m/s, m/s]
+    ///
+    /// :type: numpy.ndarray
+    fn to_numpy<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        let data = [
+            self.inner.relative_position_r.value,
+            self.inner.relative_position_t.value,
+            self.inner.relative_position_n.value,
+            self.inner.relative_velocity_r.value,
+            self.inner.relative_velocity_t.value,
+            self.inner.relative_velocity_n.value,
+        ];
+        PyArray1::from_slice(py, &data)
     }
 }
 
@@ -1114,10 +1285,10 @@ impl CdmMetadata {
         catalog_name,
         object_name,
         international_designator,
+        ref_frame,
         ephemeris_name=String::from("NONE"),
         covariance_method=None,
         maneuverable=None,
-        ref_frame=None,
         object_type=None,
         operator_contact_position=None,
         operator_organization=None,
@@ -1132,17 +1303,16 @@ impl CdmMetadata {
         intrack_thrust=None,
         comment=vec![]
     ))]
-
     fn new(
         object: Bound<'_, PyAny>,
         object_designator: String,
         catalog_name: String,
         object_name: String,
         international_designator: String,
+        ref_frame: Bound<'_, PyAny>,
         ephemeris_name: String,
         covariance_method: Option<Bound<'_, PyAny>>,
         maneuverable: Option<Bound<'_, PyAny>>,
-        ref_frame: Option<Bound<'_, PyAny>>,
         object_type: Option<Bound<'_, PyAny>>,
         operator_contact_position: Option<String>,
         operator_organization: Option<String>,
@@ -1157,20 +1327,17 @@ impl CdmMetadata {
         intrack_thrust: Option<bool>,
         comment: Vec<String>,
     ) -> PyResult<Self> {
-        // Parse enum-like arguments (accept str or Enum), with defaults
+        // Parse enum-like arguments (accept str or Enum)
         let object = parse_cdm_object_type(&object)?;
         let covariance_method = match covariance_method {
-            Some(ref ob) => parse_covariance_method_type(ob)?,
+            Some(m) => parse_covariance_method_type(&m)?,
             None => CovarianceMethodType::Calculated,
         };
         let maneuverable = match maneuverable {
-            Some(ref ob) => parse_maneuverable_type(ob)?,
-            None => ManeuverableType::NA,
+            Some(m) => parse_maneuverable_type(&m)?,
+            None => ManeuverableType::Yes,
         };
-        let ref_frame = match ref_frame {
-            Some(ref ob) => parse_reference_frame_type(ob)?,
-            None => ReferenceFrameType::Gcrf,
-        };
+        let ref_frame = parse_reference_frame_type(&ref_frame)?;
         let object_type = object_type.map(|ob| parse_object_description(&ob)).transpose()?;
 
         let map_object = |o: CdmObjectType| match o {
@@ -1558,59 +1725,63 @@ impl CdmMetadata {
     ///
     /// Examples: YES, NO
     ///
-    /// :type: Optional[str]
+    /// :type: Optional[bool]
     #[getter]
-    fn get_solar_rad_pressure(&self) -> Option<String> {
-        self.inner.solar_rad_pressure.as_ref().map(|v| v.to_string())
+    fn get_solar_rad_pressure(&self) -> Option<bool> {
+        self.inner.solar_rad_pressure.as_ref().map(|v| match v {
+            core_types::YesNo::Yes | core_types::YesNo::YesLower => true,
+            core_types::YesNo::No | core_types::YesNo::NoLower => false,
+        })
     }
-    // Setter via string parsing?
-    // Skip setter for now to avoid messy parse logic or add if needed.
-    // Audit complains about missing fields. Getters satisfy it usually?
-    // If Audit checks setters too, I need them.
-    // I'll provide setters using YesNo::from_str
     #[setter]
-    fn set_solar_rad_pressure(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.solar_rad_pressure = match v {
-             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?),
-             None => None,
-        };
-        Ok(())
+    fn set_solar_rad_pressure(&mut self, v: Option<bool>) {
+        self.inner.solar_rad_pressure = v.map(|b| if b {
+            core_types::YesNo::Yes
+        } else {
+            core_types::YesNo::No
+        });
     }
 
     /// Indication of whether solid Earth and ocean tides were used for the OD of the object.
     ///
     /// Examples: YES, NO
     ///
-    /// :type: Optional[str]
+    /// :type: Optional[bool]
     #[getter]
-    fn get_earth_tides(&self) -> Option<String> {
-        self.inner.earth_tides.as_ref().map(|v| v.to_string())
+    fn get_earth_tides(&self) -> Option<bool> {
+        self.inner.earth_tides.as_ref().map(|v| match v {
+            core_types::YesNo::Yes | core_types::YesNo::YesLower => true,
+            core_types::YesNo::No | core_types::YesNo::NoLower => false,
+        })
     }
     #[setter]
-    fn set_earth_tides(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.earth_tides = match v {
-             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?),
-             None => None,
-        };
-        Ok(())
+    fn set_earth_tides(&mut self, v: Option<bool>) {
+        self.inner.earth_tides = v.map(|b| if b {
+            core_types::YesNo::Yes
+        } else {
+            core_types::YesNo::No
+        });
     }
 
     /// Indication of whether in-track thrust modeling was used for the OD of the object.
     ///
     /// Examples: YES, NO
     ///
-    /// :type: Optional[str]
+    /// :type: Optional[bool]
     #[getter]
-    fn get_intrack_thrust(&self) -> Option<String> {
-        self.inner.intrack_thrust.as_ref().map(|v| v.to_string())
+    fn get_intrack_thrust(&self) -> Option<bool> {
+        self.inner.intrack_thrust.as_ref().map(|v| match v {
+            core_types::YesNo::Yes | core_types::YesNo::YesLower => true,
+            core_types::YesNo::No | core_types::YesNo::NoLower => false,
+        })
     }
     #[setter]
-    fn set_intrack_thrust(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.intrack_thrust = match v {
-             Some(s) => Some(s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?),
-             None => None,
-        };
-        Ok(())
+    fn set_intrack_thrust(&mut self, v: Option<bool>) {
+        self.inner.intrack_thrust = v.map(|b| if b {
+            core_types::YesNo::Yes
+        } else {
+            core_types::YesNo::No
+        });
     }
 
     fn __repr__(&self) -> String {
@@ -1641,20 +1812,95 @@ pub struct CdmData {
 #[pymethods]
 impl CdmData {
     #[new]
+    #[pyo3(signature = (
+        state_vector,
+        covariance_matrix=None,
+        od_parameters=None,
+        additional_parameters=None,
+        comments=None
+    ))]
     fn new(
         state_vector: CdmStateVector,
-        covariance_matrix: CdmCovarianceMatrix,
+        covariance_matrix: Option<CdmCovarianceMatrix>,
+        od_parameters: Option<Bound<'_, PyAny>>,
+        additional_parameters: Option<Bound<'_, PyAny>>,
         comments: Option<Vec<String>>,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        let od_p = match od_parameters {
+            Some(ob) => {
+                if let Ok(list) = ob.downcast::<pyo3::types::PyList>() {
+                    if list.is_empty() {
+                        None
+                    } else {
+                        Some(list.get_item(0)?.extract::<OdParameters>()?)
+                    }
+                } else if ob.is_none() {
+                    None
+                } else {
+                    Some(ob.extract::<OdParameters>()?)
+                }
+            }
+            None => None,
+        };
+
+        let add_p = match additional_parameters {
+            Some(ob) => {
+                if let Ok(list) = ob.downcast::<pyo3::types::PyList>() {
+                    if list.is_empty() {
+                        None
+                    } else {
+                        Some(list.get_item(0)?.extract::<AdditionalParameters>()?)
+                    }
+                } else if ob.is_none() {
+                    None
+                } else {
+                    Some(ob.extract::<AdditionalParameters>()?)
+                }
+            }
+            None => None,
+        };
+
+        Ok(Self {
             inner: core_cdm::CdmData {
                 comment: comments.unwrap_or_default(),
-                od_parameters: None,
-                additional_parameters: None,
+                od_parameters: od_p.map(|o| o.inner),
+                additional_parameters: add_p.map(|a| a.inner),
                 state_vector: state_vector.inner,
-                covariance_matrix: Some(covariance_matrix.inner),
+                covariance_matrix: covariance_matrix.map(|c| c.inner),
             },
-        }
+        })
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (
+        state_vector,
+        covariance_matrix=None,
+        od_parameters=None,
+        additional_parameters=None,
+        comments=None
+    ))]
+    fn from_numpy(
+        state_vector: PyReadonlyArrayDyn<f64>,
+        covariance_matrix: Option<PyReadonlyArray2<f64>>,
+        od_parameters: Option<OdParameters>,
+        additional_parameters: Option<AdditionalParameters>,
+        comments: Option<Vec<String>>,
+    ) -> PyResult<Self> {
+        let state = CdmStateVector::from_numpy(state_vector)?;
+        let cov = match covariance_matrix {
+            Some(array) => Some(build_cdm_covariance_from_array(&array, Vec::new())?),
+            None => None,
+        };
+
+        Ok(Self {
+            inner: core_cdm::CdmData {
+                comment: comments.unwrap_or_default(),
+                od_parameters: od_parameters.map(|o| o.inner),
+                additional_parameters: additional_parameters.map(|a| a.inner),
+                state_vector: state.inner,
+                covariance_matrix: cov,
+            },
+        })
     }
 
     /// State Vector.
@@ -1729,6 +1975,13 @@ impl CdmData {
         .to_numpy(py)
     }
 
+    #[setter]
+    fn set_state_vector_numpy(&mut self, array: PyReadonlyArrayDyn<f64>) -> PyResult<()> {
+        let state = CdmStateVector::from_numpy(array)?;
+        self.inner.state_vector = state.inner;
+        Ok(())
+    }
+
     /// Covariance matrix as a NumPy array (convenience method).
     ///
     /// Returns:
@@ -1749,6 +2002,29 @@ impl CdmData {
                 "COVARIANCE_MATRIX is missing; cannot build NumPy array",
             )),
         }
+    }
+
+    #[setter]
+    fn set_covariance_matrix_numpy(
+        &mut self,
+        array: Option<PyReadonlyArray2<f64>>,
+    ) -> PyResult<()> {
+        match array {
+            Some(arr) => {
+                let comment = self
+                    .inner
+                    .covariance_matrix
+                    .as_ref()
+                    .map(|c| c.comment.clone())
+                    .unwrap_or_default();
+                let cov = build_cdm_covariance_from_array(&arr, comment)?;
+                self.inner.covariance_matrix = Some(cov);
+            }
+            None => {
+                self.inner.covariance_matrix = None;
+            }
+        }
+        Ok(())
     }
 
     fn __repr__(&self) -> String {
@@ -1797,6 +2073,33 @@ impl CdmStateVector {
                 z_dot: VelocityRequired::new(z_dot),
             },
         }
+    }
+
+    #[staticmethod]
+    fn from_numpy(array: PyReadonlyArrayDyn<f64>) -> PyResult<Self> {
+        let shape = array.shape();
+        let values = if shape.len() == 1 && shape[0] == 6 {
+            let v = array.as_array();
+            [v[0], v[1], v[2], v[3], v[4], v[5]]
+        } else if shape.len() == 2 && shape[0] == 1 && shape[1] == 6 {
+            let v = array.as_array();
+            [v[[0, 0]], v[[0, 1]], v[[0, 2]], v[[0, 3]], v[[0, 4]], v[[0, 5]]]
+        } else {
+            return Err(PyValueError::new_err(
+                "State vector must be shape (6,) or (1,6)",
+            ));
+        };
+
+        Ok(Self {
+            inner: core_cdm::CdmStateVector {
+                x: PositionRequired::new(values[0]),
+                y: PositionRequired::new(values[1]),
+                z: PositionRequired::new(values[2]),
+                x_dot: VelocityRequired::new(values[3]),
+                y_dot: VelocityRequired::new(values[4]),
+                z_dot: VelocityRequired::new(values[5]),
+            },
+        })
     }
 
     /// Object Position Vector X component.
@@ -2442,6 +2745,54 @@ pub struct CdmCovarianceMatrix {
 impl CdmCovarianceMatrix {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        cr_r,
+        ct_r,
+        ct_t,
+        cn_r,
+        cn_t,
+        cn_n,
+        crdot_r,
+        crdot_t,
+        crdot_n,
+        crdot_rdot,
+        ctdot_r,
+        ctdot_t,
+        ctdot_n,
+        ctdot_rdot,
+        ctdot_tdot,
+        cndot_r,
+        cndot_t,
+        cndot_n,
+        cndot_rdot,
+        cndot_tdot,
+        cndot_ndot,
+        cdrg_r=None,
+        cdrg_t=None,
+        cdrg_n=None,
+        cdrg_rdot=None,
+        cdrg_tdot=None,
+        cdrg_ndot=None,
+        cdrg_drg=None,
+        csrp_r=None,
+        csrp_t=None,
+        csrp_n=None,
+        csrp_rdot=None,
+        csrp_tdot=None,
+        csrp_ndot=None,
+        csrp_drg=None,
+        csrp_srp=None,
+        cthr_r=None,
+        cthr_t=None,
+        cthr_n=None,
+        cthr_rdot=None,
+        cthr_tdot=None,
+        cthr_ndot=None,
+        cthr_drg=None,
+        cthr_srp=None,
+        cthr_thr=None,
+        comment=None
+    ))]
     fn new(
         cr_r: f64,
         ct_r: f64,
@@ -2543,6 +2894,13 @@ impl CdmCovarianceMatrix {
         }
     }
 
+    #[staticmethod]
+    #[pyo3(signature = (array, comment=None))]
+    fn from_numpy(array: PyReadonlyArray2<f64>, comment: Option<Vec<String>>) -> PyResult<Self> {
+        let inner = build_cdm_covariance_from_array(&array, comment.unwrap_or_default())?;
+        Ok(Self { inner })
+    }
+
     /// Comments.
     ///
     /// :type: list[str]
@@ -2555,19 +2913,33 @@ impl CdmCovarianceMatrix {
         self.inner.comment = v;
     }
 
-    /// Returns the full 9x9 covariance matrix as a NumPy array.
-    /// If the optional 7,8,9 rows (Drag, SRP, Thrust) are missing, they are filled with 0.0.
+    /// Returns the covariance matrix as a NumPy array.
+    /// The size will be 6x6, 7x7, 8x8, or 9x9 depending on whether optional
+    /// Drag, SRP, and Thrust parameters are provided, as per CCSDS 508.0-B-1.
     fn to_numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
-        let mut array = vec![0.0; 81]; // 9x9 flattened
         let c = &self.inner;
 
-        // Helper to set symmetric values
-        let mut set = |r: usize, c: usize, val: f64| {
-            array[r * 9 + c] = val;
-            array[c * 9 + r] = val;
+        // Determine dimension based on presence of optional rows
+        // Rule 5.2.8: If a row is provided, all preceding optional rows must be provided.
+        let dim = if c.cthr_r.is_some() {
+            9
+        } else if c.csrp_r.is_some() {
+            8
+        } else if c.cdrg_r.is_some() {
+            7
+        } else {
+            6
         };
 
-        // 1-6 Basic State (Diagonal and Lower Tri provided in struct)
+        let mut array = vec![0.0; dim * dim];
+
+        // Helper to set symmetric values
+        let mut set = |r: usize, col: usize, val: f64| {
+            array[r * dim + col] = val;
+            array[col * dim + r] = val;
+        };
+
+        // 1-6 Basic State (Mandatory)
         set(0, 0, c.cr_r.value);
         set(1, 0, c.ct_r.value);
         set(1, 1, c.ct_t.value);
@@ -2591,83 +2963,46 @@ impl CdmCovarianceMatrix {
         set(5, 4, c.cndot_tdot.value);
         set(5, 5, c.cndot_ndot.value);
 
-        // Optional Rows (7, 8, 9)
-        // Row 7: Drag
-        if let (Some(r), Some(t), Some(n), Some(rd), Some(td), Some(nd), Some(drg)) = (
-            &c.cdrg_r,
-            &c.cdrg_t,
-            &c.cdrg_n,
-            &c.cdrg_rdot,
-            &c.cdrg_tdot,
-            &c.cdrg_ndot,
-            &c.cdrg_drg,
-        ) {
-            set(6, 0, r.value);
-            set(6, 1, t.value);
-            set(6, 2, n.value);
-            set(6, 3, rd.value);
-            set(6, 4, td.value);
-            set(6, 5, nd.value);
-            set(6, 6, drg.value);
+        // Optional Row 7: Drag
+        if dim >= 7 {
+            // Presence is guaranteed by dim check and Section 5.2.8
+            set(6, 0, c.cdrg_r.as_ref().unwrap().value);
+            set(6, 1, c.cdrg_t.as_ref().unwrap().value);
+            set(6, 2, c.cdrg_n.as_ref().unwrap().value);
+            set(6, 3, c.cdrg_rdot.as_ref().unwrap().value);
+            set(6, 4, c.cdrg_tdot.as_ref().unwrap().value);
+            set(6, 5, c.cdrg_ndot.as_ref().unwrap().value);
+            set(6, 6, c.cdrg_drg.as_ref().unwrap().value);
         }
 
-        // Row 8: SRP
-        if let (Some(r), Some(t), Some(n), Some(rd), Some(td), Some(nd), Some(drg), Some(srp)) = (
-            &c.csrp_r,
-            &c.csrp_t,
-            &c.csrp_n,
-            &c.csrp_rdot,
-            &c.csrp_tdot,
-            &c.csrp_ndot,
-            &c.csrp_drg,
-            &c.csrp_srp,
-        ) {
-            set(7, 0, r.value);
-            set(7, 1, t.value);
-            set(7, 2, n.value);
-            set(7, 3, rd.value);
-            set(7, 4, td.value);
-            set(7, 5, nd.value);
-            set(7, 6, drg.value);
-            set(7, 7, srp.value);
+        // Optional Row 8: SRP
+        if dim >= 8 {
+            set(7, 0, c.csrp_r.as_ref().unwrap().value);
+            set(7, 1, c.csrp_t.as_ref().unwrap().value);
+            set(7, 2, c.csrp_n.as_ref().unwrap().value);
+            set(7, 3, c.csrp_rdot.as_ref().unwrap().value);
+            set(7, 4, c.csrp_tdot.as_ref().unwrap().value);
+            set(7, 5, c.csrp_ndot.as_ref().unwrap().value);
+            set(7, 6, c.csrp_drg.as_ref().unwrap().value);
+            set(7, 7, c.csrp_srp.as_ref().unwrap().value);
         }
 
-        // Row 9: Thrust
-        if let (
-            Some(r),
-            Some(t),
-            Some(n),
-            Some(rd),
-            Some(td),
-            Some(nd),
-            Some(drg),
-            Some(srp),
-            Some(thr),
-        ) = (
-            &c.cthr_r,
-            &c.cthr_t,
-            &c.cthr_n,
-            &c.cthr_rdot,
-            &c.cthr_tdot,
-            &c.cthr_ndot,
-            &c.cthr_drg,
-            &c.cthr_srp,
-            &c.cthr_thr,
-        ) {
-            set(8, 0, r.value);
-            set(8, 1, t.value);
-            set(8, 2, n.value);
-            set(8, 3, rd.value);
-            set(8, 4, td.value);
-            set(8, 5, nd.value);
-            set(8, 6, drg.value);
-            set(8, 7, srp.value);
-            set(8, 8, thr.value);
+        // Optional Row 9: Thrust
+        if dim >= 9 {
+            set(8, 0, c.cthr_r.as_ref().unwrap().value);
+            set(8, 1, c.cthr_t.as_ref().unwrap().value);
+            set(8, 2, c.cthr_n.as_ref().unwrap().value);
+            set(8, 3, c.cthr_rdot.as_ref().unwrap().value);
+            set(8, 4, c.cthr_tdot.as_ref().unwrap().value);
+            set(8, 5, c.cthr_ndot.as_ref().unwrap().value);
+            set(8, 6, c.cthr_drg.as_ref().unwrap().value);
+            set(8, 7, c.cthr_srp.as_ref().unwrap().value);
+            set(8, 8, c.cthr_thr.as_ref().unwrap().value);
         }
 
-        // Return 9x9 array
+        // Return dim x dim array
         let numpy_arr =
-            PyArray2::from_vec2(py, &array.chunks(9).map(|c| c.to_vec()).collect::<Vec<_>>())
+            PyArray2::from_vec2(py, &array.chunks(dim).map(|c| c.to_vec()).collect::<Vec<_>>())
                 .unwrap();
         Ok(numpy_arr)
     }

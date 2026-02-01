@@ -85,7 +85,11 @@ pub struct AdmHeader {
     /// **Examples**: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub classification: Option<String>,
     /// File creation date/time in UTC. (For format specification, see 6.8.9.)
     ///
@@ -109,7 +113,11 @@ pub struct AdmHeader {
     /// **Examples**: APM_201113719185, ABC-12_34
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub message_id: Option<String>,
 }
@@ -169,7 +177,11 @@ pub struct OdmHeader {
     /// **Examples**: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub classification: Option<String>,
     /// File creation date/time in UTC. (For format specification, see 7.5.10.)
     ///
@@ -193,7 +205,11 @@ pub struct OdmHeader {
     /// **Examples**: OPM_201113719185, ABC-12_34
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub message_id: Option<String>,
 }
@@ -254,7 +270,11 @@ pub struct SpacecraftParameters {
     /// **Units**: kg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub mass: Option<Mass>,
     /// Solar Radiation Pressure Area (AR).
     ///
@@ -263,7 +283,11 @@ pub struct SpacecraftParameters {
     /// **Units**: m²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub solar_rad_area: Option<Area>,
     /// Solar Radiation Pressure Coefficient (CR).
     ///
@@ -272,7 +296,11 @@ pub struct SpacecraftParameters {
     /// **Units**: n/a
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub solar_rad_coeff: Option<NonNegativeDouble>,
     /// Drag Area (AD).
     ///
@@ -281,7 +309,11 @@ pub struct SpacecraftParameters {
     /// **Units**: m²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub drag_area: Option<Area>,
     /// Drag Coefficient (CD).
     ///
@@ -290,7 +322,11 @@ pub struct SpacecraftParameters {
     /// **Units**: n/a
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub drag_coeff: Option<NonNegativeDouble>,
 }
 
@@ -312,7 +348,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub time_lastob_start: Option<Epoch>,
 
@@ -324,7 +360,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub time_lastob_end: Option<Epoch>,
 
@@ -338,7 +374,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub recommended_od_span: Option<DayInterval>,
 
@@ -353,7 +389,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub actual_od_span: Option<DayInterval>,
 
@@ -363,7 +399,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub obs_available: Option<PositiveInteger>,
 
@@ -373,7 +409,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub obs_used: Option<PositiveInteger>,
 
@@ -383,7 +419,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub tracks_available: Option<PositiveInteger>,
 
@@ -393,7 +429,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub tracks_used: Option<PositiveInteger>,
 
@@ -405,7 +441,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub residuals_accepted: Option<Percentage>,
 
@@ -415,7 +451,7 @@ pub struct OdParameters {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable_value"
+        with = "crate::utils::nullable"
     )]
     pub weighted_rms: Option<NonNegativeDouble>,
 }
@@ -476,7 +512,11 @@ pub struct StateVectorAcc {
     /// **Units**: km/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub x_ddot: Option<Acc>,
 
     /// Acceleration vector Y-component.
@@ -484,7 +524,11 @@ pub struct StateVectorAcc {
     /// **Units**: km/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub y_ddot: Option<Acc>,
 
     /// Acceleration vector Z-component.
@@ -492,7 +536,11 @@ pub struct StateVectorAcc {
     /// **Units**: km/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub z_ddot: Option<Acc>,
 }
 
@@ -553,6 +601,7 @@ pub struct Quaternion {
     pub q3: f64,
     pub qc: f64,
 }
+
 impl Quaternion {
     pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> crate::error::Result<Self> {
         for (name, v) in [("Q1", q1), ("Q2", q2), ("Q3", q3), ("QC", qc)] {
@@ -584,6 +633,7 @@ impl crate::traits::Validate for Quaternion {
     }
 }
 
+// Quaternion derivative (dot components with units 1/s)
 // Quaternion derivative (dot components with units 1/s)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -782,21 +832,33 @@ pub struct EulerAngleState {
     /// **Units**: deg/s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub angle_1_dot: Option<AngleRate>,
     /// Time derivative of angle of the second rotation.
     ///
     /// **Units**: deg/s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub angle_2_dot: Option<AngleRate>,
     /// Time derivative of angle of the third rotation.
     ///
     /// **Units**: deg/s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub angle_3_dot: Option<AngleRate>,
 }
 
@@ -904,42 +966,66 @@ pub struct SpinState {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub nutation: Option<Angle>,
     /// Body nutation period of the spin axis.
     ///
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub nutation_per: Option<Duration>,
     /// Inertial nutation phase.
     ///
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub nutation_phase: Option<Angle>,
     /// Right ascension of angular momentum vector in frame A.
     ///
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub momentum_alpha: Option<Angle>,
     /// Declination of angular momentum vector in frame A.
     ///
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub momentum_delta: Option<Angle>,
     /// Angular velocity of spin vector around the angular momentum vector.
     ///
     /// **Units**: deg/s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub nutation_vel: Option<AngleRate>,
 }
 
@@ -1051,7 +1137,11 @@ pub struct AttManeuverState {
     /// **Units**: kg
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub man_delta_mass: Option<DeltaMassZ>,
 }
 
@@ -1182,6 +1272,7 @@ impl ToKvn for QuaternionDerivative {
 }
 
 /// AEM Attitude Ephemeris Data Line: Quaternion/AngVel.
+// AEM Attitude Ephemeris Data Line: Quaternion/AngVel.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionAngVel {
@@ -1635,7 +1726,11 @@ pub struct OpmCovarianceMatrix {
     /// values indicated in 3.2.4.11.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub cov_ref_frame: Option<String>,
     /// Covariance matrix `[1,1]`
@@ -1838,7 +1933,11 @@ pub struct AtmosphericReentryParameters {
     /// **Units**: d
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub orbit_lifetime_window_start: Option<DayIntervalRequired>,
     /// End of the predicted orbital lifetime window from the EPOCH_TZERO epoch in the metadata
     /// (days—double precision values allowed; integer values assumed to have .0 fractional
@@ -1848,25 +1947,41 @@ pub struct AtmosphericReentryParameters {
     /// **Units**: d
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub orbit_lifetime_window_end: Option<DayIntervalRequired>,
     /// Predicted epoch at which the object’s altitude permanently drops below
     /// NOMINAL_REENTRY_ALTITUDE (formatting rules specified in 5.3.3.5).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub nominal_reentry_epoch: Option<Epoch>,
     /// Start epoch of the predicted atmospheric re-entry window (formatting rules specified in
     /// 5.3.3.5).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub reentry_window_start: Option<Epoch>,
     /// End epoch of the predicted atmospheric re-entry window (formatting rules specified in
     /// 5.3.3.5).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub reentry_window_end: Option<Epoch>,
     /// Confidence level of the orbit lifetime or re-entry epoch being inside the window
     /// defined by ORBIT_LIFETIME_WINDOW_START and ORBIT_LIFETIME_WINDOW_END or
@@ -1875,7 +1990,11 @@ pub struct AtmosphericReentryParameters {
     /// **Units**: %
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub orbit_lifetime_confidence_level: Option<PercentageRequired>,
 }
 
@@ -1916,44 +2035,76 @@ pub struct GroundImpactParameters {
     /// Probability that any fragment will impact the Earth (either land or sea; 0 to 1).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub probability_of_impact: Option<Probability>,
     /// Probability that the entire object and any fragments will burn up during atmospheric
     /// re-entry (0 to 1).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub probability_of_burn_up: Option<Probability>,
     /// Probability that the object will break up during re-entry (0 to 1).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub probability_of_break_up: Option<Probability>,
     /// Probability that any fragment will impact solid ground (0 to 1).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub probability_of_land_impact: Option<Probability>,
     /// Probability that the re-entry event will cause any casualties (severe injuries or
     /// deaths—0 to 1).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub probability_of_casualty: Option<Probability>,
     /// Epoch of the predicted impact (formatting rules specified in 5.3.3.5).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub nominal_impact_epoch: Option<Epoch>,
     /// Start epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_window_start: Option<Epoch>,
     /// End epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_window_end: Option<Epoch>,
     /// Reference frame of the impact location data. The value should be taken from the keyword
     /// value name column in the SANA celestial body reference frames registry, reference `[11]`.
@@ -1961,7 +2112,11 @@ pub struct GroundImpactParameters {
     /// Mandatory if NOMINAL_IMPACT_LON and NOMINAL_IMPACT_LAT are present.
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_ref_frame: Option<String>,
     /// Longitude of the predicted impact location with respect to the value of
     /// IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in
@@ -1970,7 +2125,11 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub nominal_impact_lon: Option<LongitudeRequired>,
     /// Latitude of the predicted impact location with respect to the value of
     /// IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in
@@ -1979,21 +2138,33 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub nominal_impact_lat: Option<LatitudeRequired>,
     /// Altitude of the impact location with respect to the value of IMPACT_REF_FRAME.
     ///
     /// **Units**: m
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub nominal_impact_alt: Option<AltitudeRequired>,
     /// First (lowest) confidence interval for the impact location.
     ///
     /// **Units**: %
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_1_confidence: Option<PercentageRequired>,
     /// Longitude of the start of the first confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2002,7 +2173,11 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_1_start_lon: Option<LongitudeRequired>,
     /// Latitude of the start of the first confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2011,7 +2186,11 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_1_start_lat: Option<LatitudeRequired>,
     /// Longitude of the end of the first confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2020,7 +2199,11 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_1_stop_lon: Option<LongitudeRequired>,
     /// Latitude of the end of the first confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2029,14 +2212,22 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_1_stop_lat: Option<LatitudeRequired>,
     /// Cross-track size of the first confidence interval.
     ///
     /// **Units**: km
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_1_cross_track: Option<Distance>,
     /// Second confidence interval for the impact location. The IMPACT_1_* block must be
     /// present if IMPACT_2_* is used.
@@ -2044,7 +2235,11 @@ pub struct GroundImpactParameters {
     /// **Units**: %
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_2_confidence: Option<PercentageRequired>,
     /// Longitude of the start of the second confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2053,7 +2248,11 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_2_start_lon: Option<LongitudeRequired>,
     /// Latitude of the start of the second confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2062,7 +2261,11 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_2_start_lat: Option<LatitudeRequired>,
     /// Longitude of the end of the second confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2071,7 +2274,11 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_2_stop_lon: Option<LongitudeRequired>,
     /// Latitude of the end of the second confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2080,14 +2287,22 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_2_stop_lat: Option<LatitudeRequired>,
     /// Cross-track size of the second confidence interval.
     ///
     /// **Units**: km
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_2_cross_track: Option<Distance>,
     /// Third (highest) confidence interval for the impact location. The IMPACT_2_* block must
     /// be present if IMPACT_3_* is used.
@@ -2095,7 +2310,11 @@ pub struct GroundImpactParameters {
     /// **Units**: %
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_3_confidence: Option<PercentageRequired>,
     /// Longitude of the start of the third confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2104,7 +2323,11 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_3_start_lon: Option<LongitudeRequired>,
     /// Latitude of the start of the third confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2113,7 +2336,11 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_3_start_lat: Option<LatitudeRequired>,
     /// Longitude of the end of the third confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2122,7 +2349,11 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_3_stop_lon: Option<LongitudeRequired>,
     /// Latitude of the end of the third confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -2131,14 +2362,22 @@ pub struct GroundImpactParameters {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_3_stop_lat: Option<LatitudeRequired>,
     /// Cross-track size of the third confidence interval.
     ///
     /// **Units**: km
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub impact_3_cross_track: Option<Distance>,
 }
 
@@ -2255,57 +2494,93 @@ pub struct RdmSpacecraftParameters {
     /// **Units**: kg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub wet_mass: Option<Mass>,
     /// Object dry mass (without propellant).
     ///
     /// **Units**: kg
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub dry_mass: Option<Mass>,
     /// Comma separated list of hazardous substances contained by the object.
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub hazardous_substances: Option<String>,
     /// Object area exposed to Solar Radiation Pressure (SRP).
     ///
     /// **Units**: m²
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub solar_rad_area: Option<Area>,
     /// Object solar radiation coefficient.
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub solar_rad_coeff: Option<NonNegativeDouble>,
     /// Object cross-sectional area.
     ///
     /// **Units**: m²
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub drag_area: Option<Area>,
     /// Object drag coefficient.
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub drag_coeff: Option<NonNegativeDouble>,
     /// Object radar cross section.
     ///
     /// **Units**: m²
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub rcs: Option<Area>,
     /// Object ballistic coefficient.
     ///
     /// **Units**: kg/m²
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub ballistic_coeff: Option<BallisticCoeff>,
     /// The object’s acceleration due to in-track thrust used to propagate the state vector and
     /// covariance to NOMINAL_RENTRY_EPOCH (if a controlled re-entry).
@@ -2313,7 +2588,11 @@ pub struct RdmSpacecraftParameters {
     /// **Units**: m/s²
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub thrust_acceleration: Option<Ms2>,
 }
 
@@ -2746,5 +3025,59 @@ mod tests {
             qc: 0.0,
         };
         assert!(q2.validate().is_ok());
+    }
+
+    #[test]
+    fn test_quaternion_xml_repro() {
+        let xml = r#"<quaternion>
+            <Q1>-0.005068</Q1>
+            <Q2>0.906506</Q2>
+            <Q3>0.002360</Q3>
+            <QC>0.422157</QC>
+        </quaternion>"#;
+        let q: Quaternion = quick_xml::de::from_str(xml).expect("Failed to parse Quaternion");
+        assert_eq!(q.q1, -0.005068);
+    }
+
+    #[test]
+    fn test_quaternion_ephemeris_xml_repro() {
+        let xml = r#"<quaternionEphemeris>
+            <EPOCH>2000-100T00:00:00.000</EPOCH>
+            <quaternion>
+                <Q1>-0.005068</Q1>
+                <Q2>0.906506</Q2>
+                <Q3>0.002360</Q3>
+                <QC>0.422157</QC>
+            </quaternion>
+        </quaternionEphemeris>"#;
+        // quick-xml usually expects root tag to match
+        let qe: QuaternionEphemeris =
+            quick_xml::de::from_str(xml).expect("Failed to parse QuaternionEphemeris");
+        assert_eq!(qe.quaternion.q1, -0.005068);
+    }
+
+    #[test]
+    fn test_nested_wrapper_xml_repro() {
+        #[derive(Deserialize, Debug)]
+        struct Wrapper {
+            #[serde(rename = "quaternionEphemeris")]
+            pub qe: Option<QuaternionEphemeris>,
+        }
+
+        let xml = r#"<attitudeState>
+            <quaternionEphemeris>
+                <EPOCH>2000-100T00:00:00.000</EPOCH>
+                <quaternion>
+                    <Q1>-0.005068</Q1>
+                    <Q2>0.906506</Q2>
+                    <Q3>0.002360</Q3>
+                    <QC>0.422157</QC>
+                </quaternion>
+            </quaternionEphemeris>
+        </attitudeState>"#;
+
+        let w: Wrapper = quick_xml::de::from_str(xml).expect("Failed to parse Wrapper");
+        assert!(w.qe.is_some());
+        assert_eq!(w.qe.unwrap().quaternion.q1, -0.005068);
     }
 }

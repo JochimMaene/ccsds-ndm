@@ -93,6 +93,35 @@ class TestOem:
         oem2 = Oem.from_file(str(path), format="kvn")
         assert oem2.header.originator == "TEST"
 
+    def test_oem_data_numpy_api(self):
+        epochs = ["2023-01-01T00:00:00", "2023-01-01T00:01:00"]
+        state = np.array(
+            [
+                [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0],
+                [7001.0, 0.1, 0.2, 0.0, 7.5, 0.0],
+            ],
+            dtype=float,
+        )
+        cov_epochs = ["2023-01-01T00:00:00"]
+        cov = np.eye(6, dtype=float).reshape(1, 6, 6)
+
+        data = OemData.from_numpy(
+            state_vector_epochs=epochs,
+            state_vector_numpy=state,
+            covariance_matrix_epochs=cov_epochs,
+            covariance_matrix_numpy=cov,
+            comments=[],
+        )
+
+        assert data.state_vector_epochs == epochs
+        assert data.state_vector_numpy.shape == (2, 6)
+        assert data.covariance_matrix_epochs == cov_epochs
+        assert data.covariance_matrix_numpy.shape == (1, 6, 6)
+
+        new_state = state + 1.0
+        data.state_vector_numpy = new_state
+        assert np.allclose(data.state_vector_numpy, new_state)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

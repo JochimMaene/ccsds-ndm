@@ -523,6 +523,16 @@ pub struct KeplerianElements {
 impl KeplerianElements {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        semi_major_axis,
+        eccentricity,
+        inclination,
+        ra_of_asc_node,
+        arg_of_pericenter,
+        gm,
+        true_anomaly=None,
+        mean_anomaly=None
+    ))]
     fn new(
         semi_major_axis: f64,
         eccentricity: f64,
@@ -787,6 +797,31 @@ pub struct OpmCovarianceMatrix {
 impl OpmCovarianceMatrix {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        cx_x=None,
+        cy_x=None,
+        cy_y=None,
+        cz_x=None,
+        cz_y=None,
+        cz_z=None,
+        cx_dot_x=None,
+        cx_dot_y=None,
+        cx_dot_z=None,
+        cy_dot_x=None,
+        cy_dot_y=None,
+        cy_dot_z=None,
+        cz_dot_x=None,
+        cz_dot_y=None,
+        cz_dot_z=None,
+        cx_dot_x_dot=None,
+        cy_dot_x_dot=None,
+        cy_dot_y_dot=None,
+        cz_dot_x_dot=None,
+        cz_dot_y_dot=None,
+        cz_dot_z_dot=None,
+        cov_ref_frame=None,
+        comments=None
+    ))]
     fn new(
         cx_x: Option<f64>,
         cy_x: Option<f64>,
@@ -1206,6 +1241,7 @@ pub struct OpmData {
 #[pymethods]
 impl OpmData {
     #[new]
+    #[pyo3(signature = (state_vector, comment=None))]
     fn new(state_vector: StateVector, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_opm::OpmData {

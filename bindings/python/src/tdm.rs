@@ -1795,7 +1795,7 @@ pub struct TdmData {
 #[pymethods]
 impl TdmData {
     #[new]
-    #[pyo3(signature = (*, observations=None, comment=None))]
+    #[pyo3(signature = (observations=None, comment=None))]
     fn new(observations: Option<Vec<TdmObservation>>, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_tdm::TdmData {

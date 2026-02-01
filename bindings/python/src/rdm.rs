@@ -1179,7 +1179,6 @@ impl RdmData {
         user_defined_parameters=None,
         comment=None
     ))]
-    #[allow(clippy::too_many_arguments)]
     fn new(
         atmospheric_reentry_parameters: AtmosphericReentryParameters,
         ground_impact_parameters: Option<GroundImpactParameters>,
@@ -1189,8 +1188,8 @@ impl RdmData {
         od_parameters: Option<OdParameters>,
         user_defined_parameters: Option<crate::types::UserDefined>,
         comment: Option<Vec<String>>,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        Ok(Self {
             inner: core_rdm::RdmData {
                 comment: comment.unwrap_or_default(),
                 atmospheric_reentry_parameters: atmospheric_reentry_parameters.inner,
@@ -1201,7 +1200,7 @@ impl RdmData {
                 od_parameters: od_parameters.map(|op| op.inner),
                 user_defined_parameters: user_defined_parameters.map(|u| u.inner),
             },
-        }
+        })
     }
 
     fn __repr__(&self) -> String {

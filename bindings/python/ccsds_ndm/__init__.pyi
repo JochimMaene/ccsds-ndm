@@ -114,7 +114,7 @@ class AcmAttitudeDetermination:
     """
     ACM Data: Attitude Determination Data Section.
     """
-    def __init__(ad_id, comment) -> None: ...
+    def __init__(ad_id=None, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -125,7 +125,9 @@ class AcmAttitudeState:
     """
     ACM Data: Attitude State Time History Section.
     """
-    def __init__(ref_frame_a, ref_frame_b, att_type, att_lines, comment) -> None: ...
+    def __init__(
+        ref_frame_a, ref_frame_b, att_type, att_lines, comment=None
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -136,7 +138,9 @@ class AcmCovarianceMatrix:
     """
     ACM Data: Covariance Time History Section.
     """
-    def __init__(cov_basis, cov_ref_frame, cov_type, cov_lines, comment) -> None: ...
+    def __init__(
+        cov_basis, cov_ref_frame, cov_type, cov_lines, comment=None
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -147,7 +151,9 @@ class AcmData:
     """
     ACM Data Section.
     """
-    def __init__(att, phys, cov, man, ad, user) -> None: ...
+    def __init__(
+        att=None, phys=None, cov=None, man=None, ad=None, user=None
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -187,7 +193,7 @@ class AcmManeuverParameters:
     """
     ACM Data: Maneuver Specification Section.
     """
-    def __init__(man_id, comment) -> None: ...
+    def __init__(man_id=None, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -251,7 +257,7 @@ class AcmPhysicalDescription:
     """
     ACM Data: Space Object Physical Characteristics Section.
     """
-    def __init__(comment) -> None: ...
+    def __init__(comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -436,7 +442,7 @@ class AdmHeader:
     Represents the `admHeader` complex type from the XSD.
     """
     def __init__(
-        creation_date, originator, classification, message_id, comment
+        creation_date, originator, classification=None, message_id=None, comment=None
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -574,7 +580,7 @@ class AemData:
     """
     AEM Data Section.
     """
-    def __init__(attitude_states, comment) -> None: ...
+    def __init__(attitude_states, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -591,14 +597,27 @@ class AemData:
     @attitude_states.setter
     def attitude_states(self, value: list[AttitudeState]) -> None: ...
     @property
-    def attitude_states_numpy(self) -> tuple[list[str], numpy.ndarray]:
+    def attitude_states_epochs(self) -> list[str]:
         """
-        Get attitude states as a tuple of epoch strings and a 2D NumPy array.
+        Epochs for attitude states (ISO 8601).
+        """
+        ...
+
+    @attitude_states_epochs.setter
+    def attitude_states_epochs(self, value: list[str]) -> None: ...
+    @property
+    def attitude_states_numpy(self) -> numpy.ndarray:
+        """
+        Get attitude states as a 2D NumPy array.
+
+        Use `attitude_states_epochs` for the corresponding epochs.
+
+        Currently only supports Quaternion Ephemeris states.
         """
         ...
 
     @attitude_states_numpy.setter
-    def attitude_states_numpy(self, value: tuple[list[str], numpy.ndarray]) -> None: ...
+    def attitude_states_numpy(self, value: numpy.ndarray) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -609,6 +628,10 @@ class AemData:
 
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
+    @staticmethod
+    def from_numpy(epochs, array, comment=None):
+        """ """
+        ...
 
 class AemMetadata:
     """
@@ -1037,13 +1060,13 @@ class ApmData:
     """
     def __init__(
         epoch,
-        quaternion_state,
-        euler_angle_state,
-        angular_velocity,
-        spin,
-        inertia,
-        maneuver_parameters,
-        comment,
+        quaternion_state=None,
+        euler_angle_state=None,
+        angular_velocity=None,
+        spin=None,
+        inertia=None,
+        maneuver_parameters=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -1708,31 +1731,31 @@ class CdmCovarianceMatrix:
         cndot_rdot,
         cndot_tdot,
         cndot_ndot,
-        cdrg_r,
-        cdrg_t,
-        cdrg_n,
-        cdrg_rdot,
-        cdrg_tdot,
-        cdrg_ndot,
-        cdrg_drg,
-        csrp_r,
-        csrp_t,
-        csrp_n,
-        csrp_rdot,
-        csrp_tdot,
-        csrp_ndot,
-        csrp_drg,
-        csrp_srp,
-        cthr_r,
-        cthr_t,
-        cthr_n,
-        cthr_rdot,
-        cthr_tdot,
-        cthr_ndot,
-        cthr_drg,
-        cthr_srp,
-        cthr_thr,
-        comment,
+        cdrg_r=None,
+        cdrg_t=None,
+        cdrg_n=None,
+        cdrg_rdot=None,
+        cdrg_tdot=None,
+        cdrg_ndot=None,
+        cdrg_drg=None,
+        csrp_r=None,
+        csrp_t=None,
+        csrp_n=None,
+        csrp_rdot=None,
+        csrp_tdot=None,
+        csrp_ndot=None,
+        csrp_drg=None,
+        csrp_srp=None,
+        cthr_r=None,
+        cthr_t=None,
+        cthr_n=None,
+        cthr_rdot=None,
+        cthr_tdot=None,
+        cthr_ndot=None,
+        cthr_drg=None,
+        cthr_srp=None,
+        cthr_thr=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -2244,10 +2267,16 @@ class CdmCovarianceMatrix:
 
     @cthr_thr.setter
     def cthr_thr(self, value: float) -> None: ...
+    @staticmethod
+    def from_numpy(array, comment=None):
+        """ """
+        ...
+
     def to_numpy(self):
         """
-        Returns the full 9x9 covariance matrix as a NumPy array.
-        If the optional 7,8,9 rows (Drag, SRP, Thrust) are missing, they are filled with 0.0.
+        Returns the covariance matrix as a NumPy array.
+        The size will be 6x6, 7x7, 8x8, or 9x9 depending on whether optional
+        Drag, SRP, and Thrust parameters are provided, as per CCSDS 508.0-B-1.
         """
         ...
 
@@ -2265,7 +2294,13 @@ class CdmData:
     covariance_matrix : CdmCovarianceMatrix
         Object covariance at TCA.
     """
-    def __init__(state_vector, covariance_matrix, comments) -> None: ...
+    def __init__(
+        state_vector,
+        covariance_matrix=None,
+        od_parameters=None,
+        additional_parameters=None,
+        comments=None,
+    ) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -2311,6 +2346,17 @@ class CdmData:
 
     @covariance_matrix_numpy.setter
     def covariance_matrix_numpy(self, value: numpy.ndarray) -> None: ...
+    @staticmethod
+    def from_numpy(
+        state_vector,
+        covariance_matrix=None,
+        od_parameters=None,
+        additional_parameters=None,
+        comments=None,
+    ):
+        """ """
+        ...
+
     @property
     def od_parameters(self) -> Optional[OdParameters]:
         """
@@ -2492,10 +2538,10 @@ class CdmMetadata:
         catalog_name,
         object_name,
         international_designator,
+        ref_frame,
         ephemeris_name=...,
         covariance_method=None,
         maneuverable=None,
-        ref_frame=None,
         object_type=None,
         operator_contact_position=None,
         operator_organization=None,
@@ -2564,7 +2610,7 @@ class CdmMetadata:
     @covariance_method.setter
     def covariance_method(self, value: CovarianceMethodType) -> None: ...
     @property
-    def earth_tides(self) -> Optional[str]:
+    def earth_tides(self) -> Optional[bool]:
         """
         Indication of whether solid Earth and ocean tides were used for the OD of the object.
 
@@ -2573,7 +2619,7 @@ class CdmMetadata:
         ...
 
     @earth_tides.setter
-    def earth_tides(self, value: Optional[str]) -> None: ...
+    def earth_tides(self, value: Optional[bool]) -> None: ...
     @property
     def ephemeris_name(self) -> str:
         """
@@ -2616,7 +2662,7 @@ class CdmMetadata:
     @international_designator.setter
     def international_designator(self, value: str) -> None: ...
     @property
-    def intrack_thrust(self) -> Optional[str]:
+    def intrack_thrust(self) -> Optional[bool]:
         """
         Indication of whether in-track thrust modeling was used for the OD of the object.
 
@@ -2625,7 +2671,7 @@ class CdmMetadata:
         ...
 
     @intrack_thrust.setter
-    def intrack_thrust(self, value: Optional[str]) -> None: ...
+    def intrack_thrust(self, value: Optional[bool]) -> None: ...
     @property
     def maneuverable(self) -> ManeuverableType:
         """
@@ -2763,7 +2809,7 @@ class CdmMetadata:
     @ref_frame.setter
     def ref_frame(self, value: ReferenceFrameType) -> None: ...
     @property
-    def solar_rad_pressure(self) -> Optional[str]:
+    def solar_rad_pressure(self) -> Optional[bool]:
         """
         Indication of whether solar radiation pressure perturbations were used for the OD of the
         object.
@@ -2773,7 +2819,7 @@ class CdmMetadata:
         ...
 
     @solar_rad_pressure.setter
-    def solar_rad_pressure(self, value: Optional[str]) -> None: ...
+    def solar_rad_pressure(self, value: Optional[bool]) -> None: ...
 
 class CdmObjectType:
     """
@@ -2842,6 +2888,11 @@ class CdmStateVector:
         """
         Helper for pickle.
         """
+        ...
+
+    @staticmethod
+    def from_numpy(array):
+        """ """
         ...
 
     def to_numpy(self) -> numpy.ndarray:
@@ -3725,8 +3776,8 @@ class KeplerianElements:
         ra_of_asc_node,
         arg_of_pericenter,
         gm,
-        true_anomaly,
-        mean_anomaly,
+        true_anomaly=None,
+        mean_anomaly=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -3883,8 +3934,8 @@ class ManeuverParameters:
         man_tor_1,
         man_tor_2,
         man_tor_3,
-        man_delta_mass,
-        comment,
+        man_delta_mass=None,
+        comment=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -4019,9 +4070,9 @@ class MeanElements:
         ra_of_asc_node,
         arg_of_pericenter,
         mean_anomaly,
-        semi_major_axis,
-        mean_motion,
-        gm,
+        semi_major_axis=None,
+        mean_motion=None,
+        gm=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -7874,17 +7925,17 @@ class OdParameters:
         Comments.
     """
     def __init__(
-        time_lastob_start,
-        time_lastob_end,
-        recommended_od_span,
-        actual_od_span,
-        obs_available,
-        obs_used,
-        tracks_available,
-        tracks_used,
-        residuals_accepted,
-        weighted_rms,
-        comment,
+        time_lastob_start=None,
+        time_lastob_end=None,
+        recommended_od_span=None,
+        actual_od_span=None,
+        obs_available=None,
+        obs_used=None,
+        tracks_available=None,
+        tracks_used=None,
+        residuals_accepted=None,
+        weighted_rms=None,
+        comment=...,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -8025,7 +8076,7 @@ class OdmHeader:
         Comments.
     """
     def __init__(
-        creation_date, originator, classification, message_id, comment
+        creation_date, originator, classification=None, message_id=None, comment=None
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -8046,9 +8097,17 @@ class OdmHeader:
     @classification.setter
     def classification(self, value: Optional[str]) -> None: ...
     @property
-    def comment(self): ...
+    def comment(self) -> list[str]:
+        """
+        Comments (allowed in the ODM Header only immediately after the ODM version number).
+        (See 7.8 for formatting rules.)
+
+        Examples: This is a comment
+        """
+        ...
+
     @comment.setter
-    def comment(self, value: object) -> None: ...
+    def comment(self, value: list[str]) -> None: ...
     @property
     def creation_date(self) -> str:
         """
@@ -8213,7 +8272,8 @@ class OemCovarianceMatrix:
     epoch : str
         Epoch of the covariance matrix (ISO 8601).
         values : numpy.ndarray
-        Flat NumPy array of length 21 containing the covariance values.
+        NumPy array of shape (21,) containing the lower-triangular values, or (6,6) for
+        a full symmetric matrix.
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
     comment : list[str], optional
@@ -8548,7 +8608,7 @@ class OemData:
         comments : list[str], optional
         Comments.
     """
-    def __init__(state_vectors, comments) -> None: ...
+    def __init__(state_vectors, comments=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -8581,19 +8641,43 @@ class OemData:
     @covariance_matrix.setter
     def covariance_matrix(self, value: list[OemCovarianceMatrix]) -> None: ...
     @property
-    def covariance_matrix_numpy(self) -> tuple[list[str], numpy.ndarray]:
+    def covariance_matrix_epochs(self) -> list[str]:
         """
-        Get covariance matrices as a tuple associated with a NumPy array.
+        Epochs for covariance matrices (ISO 8601).
+        """
+        ...
 
-        Returns:
-            tuple[list[str], np.ndarray]: (Epochs, 2D Array of size Nx21).
+    @covariance_matrix_epochs.setter
+    def covariance_matrix_epochs(self, value: list[str]) -> None: ...
+    @property
+    def covariance_matrix_numpy(self) -> numpy.ndarray:
+        """
+        Get covariance matrices as a NumPy array.
+
+        Use `covariance_matrix_epochs` for the corresponding epochs.
+
+        The returned array is a 3D tensor of shape (N, 6, 6), where N is the number of covariance
+        matrices. Each 6x6 matrix is symmetric and constructed from the lower-triangular CCSDS data.
+
+        Indices: 0=X, 1=Y, 2=Z, 3=X_DOT, 4=Y_DOT, 5=Z_DOT
         """
         ...
 
     @covariance_matrix_numpy.setter
-    def covariance_matrix_numpy(
-        self, value: tuple[list[str], numpy.ndarray]
-    ) -> None: ...
+    def covariance_matrix_numpy(self, value: numpy.ndarray) -> None: ...
+    @staticmethod
+    def from_numpy(
+        state_vector_epochs,
+        state_vector_numpy,
+        covariance_matrix_epochs=None,
+        covariance_matrix_numpy=None,
+        cov_ref_frames=None,
+        cov_comments=None,
+        comments=None,
+    ):
+        """ """
+        ...
+
     @property
     def state_vector(self) -> list[StateVectorAcc]:
         """
@@ -8609,31 +8693,37 @@ class OemData:
     @state_vector.setter
     def state_vector(self, value: list[StateVectorAcc]) -> None: ...
     @property
-    def state_vector_numpy(self) -> tuple[list[str], numpy.ndarray]:
+    def state_vector_epochs(self) -> list[str]:
         """
-        State vectors as a tuple of epochs and a NumPy array.
+        Epochs for state vectors (ISO 8601).
+        """
+        ...
 
-        This method allows for efficient zero-copy access to state vector data
-        compatible with scientific Python libraries.
+    @state_vector_epochs.setter
+    def state_vector_epochs(self, value: list[str]) -> None: ...
+    @property
+    def state_vector_numpy(self) -> numpy.ndarray:
+        """
+        State vectors as a NumPy array.
+
+        Use `state_vector_epochs` for the corresponding epochs.
 
         Returns
         -------
-        tuple[list[str], numpy.ndarray]
-            A tuple containing:
-            - List of epoch strings (ISO 8601 format).
-            - 2D NumPy array of shape (N, 6) or (N, 9):
-              - N x 6: [X, Y, Z, X_DOT, Y_DOT, Z_DOT] if no accelerations.
-              - N x 9: [X, Y, Z, X_DOT, Y_DOT, Z_DOT, X_DDOT, Y_DDOT, Z_DDOT] if accelerations present.
+        numpy.ndarray
+            2D array of shape (N, 6) or (N, 9):
+            - N x 6: [X, Y, Z, X_DOT, Y_DOT, Z_DOT] if no accelerations.
+            - N x 9: [X, Y, Z, X_DOT, Y_DOT, Z_DOT, X_DDOT, Y_DDOT, Z_DDOT] if accelerations present.
 
-            Units:
-            - Position: km
-            - Velocity: km/s
-            - Acceleration: km/s²
+        Units:
+        - Position: km
+        - Velocity: km/s
+        - Acceleration: km/s²
         """
         ...
 
     @state_vector_numpy.setter
-    def state_vector_numpy(self, value: tuple[list[str], numpy.ndarray]) -> None: ...
+    def state_vector_numpy(self, value: numpy.ndarray) -> None: ...
 
 class OemMetadata:
     """
@@ -9023,7 +9113,7 @@ class OmmData:
     """
     OMM Data section.
     """
-    def __init__(mean_elements, comments) -> None: ...
+    def __init__(mean_elements, comments=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -9440,29 +9530,29 @@ class OpmCovarianceMatrix:
         ... (see Parameters for full list of attributes with units)
     """
     def __init__(
-        cx_x,
-        cy_x,
-        cy_y,
-        cz_x,
-        cz_y,
-        cz_z,
-        cx_dot_x,
-        cx_dot_y,
-        cx_dot_z,
-        cy_dot_x,
-        cy_dot_y,
-        cy_dot_z,
-        cz_dot_x,
-        cz_dot_y,
-        cz_dot_z,
-        cx_dot_x_dot,
-        cy_dot_x_dot,
-        cy_dot_y_dot,
-        cz_dot_x_dot,
-        cz_dot_y_dot,
-        cz_dot_z_dot,
-        cov_ref_frame,
-        comments,
+        cx_x=None,
+        cy_x=None,
+        cy_y=None,
+        cz_x=None,
+        cz_y=None,
+        cz_z=None,
+        cx_dot_x=None,
+        cx_dot_y=None,
+        cx_dot_z=None,
+        cy_dot_x=None,
+        cy_dot_y=None,
+        cy_dot_z=None,
+        cz_dot_x=None,
+        cz_dot_y=None,
+        cz_dot_z=None,
+        cx_dot_x_dot=None,
+        cy_dot_x_dot=None,
+        cy_dot_y_dot=None,
+        cz_dot_x_dot=None,
+        cz_dot_y_dot=None,
+        cz_dot_z_dot=None,
+        cov_ref_frame=None,
+        comments=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -9730,7 +9820,7 @@ class OpmData:
     state_vector : StateVector
         State vector.
     """
-    def __init__(state_vector, comment) -> None: ...
+    def __init__(state_vector, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -11141,33 +11231,6 @@ class RelativeMetadataData:
     @miss_distance.setter
     def miss_distance(self, value: float) -> None: ...
     @property
-    def relative_position_n(self) -> Optional[float]:
-        """
-        Relative position N component.
-        """
-        ...
-
-    @relative_position_n.setter
-    def relative_position_n(self, value: Optional[float]) -> None: ...
-    @property
-    def relative_position_r(self) -> Optional[float]:
-        """
-        Relative position R component.
-        """
-        ...
-
-    @relative_position_r.setter
-    def relative_position_r(self, value: Optional[float]) -> None: ...
-    @property
-    def relative_position_t(self) -> Optional[float]:
-        """
-        Relative position T component.
-        """
-        ...
-
-    @relative_position_t.setter
-    def relative_position_t(self, value: Optional[float]) -> None: ...
-    @property
     def relative_speed(self) -> Optional[float]:
         """
         The norm of the relative velocity vector. It indicates how fast the two objects are
@@ -11180,41 +11243,14 @@ class RelativeMetadataData:
     @relative_speed.setter
     def relative_speed(self, value: Optional[float]) -> None: ...
     @property
-    def relative_state_vector(self) -> Optional[numpy.ndarray]:
+    def relative_state_vector(self) -> Optional[RelativeStateVector]:
         """
         Relative state vector [R, T, N, VR, VT, VN] (combined position and velocity).
         """
         ...
 
     @relative_state_vector.setter
-    def relative_state_vector(self, value: Optional[numpy.ndarray]) -> None: ...
-    @property
-    def relative_velocity_n(self) -> Optional[float]:
-        """
-        Relative velocity N component.
-        """
-        ...
-
-    @relative_velocity_n.setter
-    def relative_velocity_n(self, value: Optional[float]) -> None: ...
-    @property
-    def relative_velocity_r(self) -> Optional[float]:
-        """
-        Relative velocity R component.
-        """
-        ...
-
-    @relative_velocity_r.setter
-    def relative_velocity_r(self, value: Optional[float]) -> None: ...
-    @property
-    def relative_velocity_t(self) -> Optional[float]:
-        """
-        Relative velocity T component.
-        """
-        ...
-
-    @relative_velocity_t.setter
-    def relative_velocity_t(self, value: Optional[float]) -> None: ...
+    def relative_state_vector(self, value: Optional[RelativeStateVector]) -> None: ...
     @property
     def screen_entry_time(self) -> Optional[str]:
         """
@@ -11321,6 +11357,115 @@ class RelativeMetadataData:
     @tca.setter
     def tca(self, value: str) -> None: ...
 
+class RelativeStateVector:
+    """
+    Relative State Vector containing relative position and velocity.
+
+    Parameters
+    ----------
+    relative_position_r : float
+        Relative position R component. Units: m.
+    relative_position_t : float
+        Relative position T component. Units: m.
+    relative_position_n : float
+        Relative position N component. Units: m.
+    relative_velocity_r : float
+        Relative velocity R component. Units: m/s.
+    relative_velocity_t : float
+        Relative velocity T component. Units: m/s.
+    relative_velocity_n : float
+        Relative velocity N component. Units: m/s.
+    """
+    def __init__(
+        relative_position_r,
+        relative_position_t,
+        relative_position_n,
+        relative_velocity_r,
+        relative_velocity_t,
+        relative_velocity_n,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def relative_position_n(self) -> float:
+        """
+        Relative position N component.
+
+        Units: m
+        """
+        ...
+
+    @relative_position_n.setter
+    def relative_position_n(self, value: float) -> None: ...
+    @property
+    def relative_position_r(self) -> float:
+        """
+        Relative position R component.
+
+        Units: m
+        """
+        ...
+
+    @relative_position_r.setter
+    def relative_position_r(self, value: float) -> None: ...
+    @property
+    def relative_position_t(self) -> float:
+        """
+        Relative position T component.
+
+        Units: m
+        """
+        ...
+
+    @relative_position_t.setter
+    def relative_position_t(self, value: float) -> None: ...
+    @property
+    def relative_velocity_n(self) -> float:
+        """
+        Relative velocity N component.
+
+        Units: m/s
+        """
+        ...
+
+    @relative_velocity_n.setter
+    def relative_velocity_n(self, value: float) -> None: ...
+    @property
+    def relative_velocity_r(self) -> float:
+        """
+        Relative velocity R component.
+
+        Units: m/s
+        """
+        ...
+
+    @relative_velocity_r.setter
+    def relative_velocity_r(self, value: float) -> None: ...
+    @property
+    def relative_velocity_t(self) -> float:
+        """
+        Relative velocity T component.
+
+        Units: m/s
+        """
+        ...
+
+    @relative_velocity_t.setter
+    def relative_velocity_t(self, value: float) -> None: ...
+    def to_numpy(self) -> numpy.ndarray:
+        """
+        Return the relative state vector as a NumPy array.
+
+        Returns:
+            numpy.ndarray: 1D array of shape (6,) containing [R, T, N, VR, VT, VN].
+            Units: [m, m, m, m/s, m/s, m/s]
+        """
+        ...
+
 class ScreenVolumeFrameType:
     def __getstate__(self, /):
         """
@@ -11356,7 +11501,11 @@ class SpacecraftParameters:
         Drag coefficient.
     """
     def __init__(
-        mass, solar_rad_area, solar_rad_coeff, drag_area, drag_coeff
+        mass=None,
+        solar_rad_area=None,
+        solar_rad_coeff=None,
+        drag_area=None,
+        drag_coeff=None,
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -11628,7 +11777,7 @@ class StateVector:
     z_dot : float
         Velocity vector Z-component (km/s).
     """
-    def __init__(epoch, x, y, z, x_dot, y_dot, z_dot, comments) -> None: ...
+    def __init__(epoch, x, y, z, x_dot, y_dot, z_dot, comments=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -11748,7 +11897,7 @@ class StateVectorAcc:
         Acceleration vector Z-component (km/s²).
     """
     def __init__(
-        epoch, x, y, z, x_dot, y_dot, z_dot, x_ddot, y_ddot, z_ddot
+        epoch, x, y, z, x_dot, y_dot, z_dot, x_ddot=None, y_ddot=None, z_ddot=None
     ) -> None: ...
     def __getstate__(self, /):
         """
@@ -12048,7 +12197,7 @@ class TdmData:
         Comments in the data section.
         (Optional)
     """
-    def __init__(*, observations=None, comment=None) -> None: ...
+    def __init__(observations=None, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.

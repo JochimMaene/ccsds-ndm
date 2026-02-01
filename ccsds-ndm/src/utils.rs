@@ -2,109 +2,13 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-/// Helper module to deserialize optional fields that may have nil="true".
-///
-/// In CCSDS XML, optional fields can be represented as `<FIELD nil="true"/>`
-/// which has no text content. This module handles that case by checking the
-/// `@nil` attribute and treating `nil="true"` as `None`.
-pub mod nullable_value {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+//! Utility functions and serialization helpers for CCSDS NDM.
 
-    /// Intermediate struct that captures both the nil attribute and optionally the value.
-    #[derive(Deserialize)]
-    struct NullableWrapper<T> {
-        #[serde(rename = "@nil", default)]
-        nil: Option<String>,
-        #[serde(flatten)]
-        value: Option<T>,
-    }
+use serde::{Deserialize, Deserializer, Serializer};
 
-    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
-    where
-        D: Deserializer<'de>,
-        T: Deserialize<'de>,
-    {
-        let wrapper: Option<NullableWrapper<T>> = Option::deserialize(deserializer)?;
-        match wrapper {
-            None => Ok(None),
-            Some(w) => {
-                // If nil="true", return None regardless of other content
-                if let Some(ref nil) = w.nil {
-                    if nil == "true" {
-                        return Ok(None);
-                    }
-                }
-                Ok(w.value)
-            }
-        }
-    }
-
-    pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: Serialize,
-    {
-        value.serialize(serializer)
-    }
-}
-
-/// Helper module to deserialize optional enum fields that may have empty text.
-///
-/// In CCSDS XML, optional fields can be represented as `<FIELD nil="true"/>`
-/// which results in an empty text (`$text`) being deserialized. Standard serde
-/// enum deserialization would fail because empty string is not a valid variant.
-/// This module handles that case by treating empty strings as `None`.
-pub mod nullable_enum {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    /// Intermediate struct that checks for nil="true" first.
-    #[derive(Deserialize)]
-    struct NullableEnumWrapper<T> {
-        #[serde(rename = "@nil", default)]
-        nil: Option<String>,
-        #[serde(rename = "$text", default)]
-        text: Option<String>,
-        #[serde(flatten)]
-        value: Option<T>,
-    }
-
-    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
-    where
-        D: Deserializer<'de>,
-        T: Deserialize<'de>,
-    {
-        let wrapper: Option<NullableEnumWrapper<T>> = Option::deserialize(deserializer)?;
-        match wrapper {
-            None => Ok(None),
-            Some(w) => {
-                // If nil="true", return None regardless of other content
-                if let Some(ref nil) = w.nil {
-                    if nil == "true" {
-                        return Ok(None);
-                    }
-                }
-                // If text is empty, return None
-                if let Some(ref text) = w.text {
-                    if text.trim().is_empty() {
-                        return Ok(None);
-                    }
-                }
-                Ok(w.value)
-            }
-        }
-    }
-
-    pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: Serialize,
-    {
-        value.serialize(serializer)
-    }
-}
-
+/// Serialization helper for `Vec<f64>` that uses space separation.
 pub mod vec_f64_space_sep {
-    use serde::{Deserialize, Deserializer, Serializer};
+    use super::*;
 
     pub fn serialize<S>(values: &[f64], serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -123,9 +27,164 @@ pub mod vec_f64_space_sep {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
+        if s.trim().is_empty() {
+            return Ok(Vec::new());
+        }
         s.split_whitespace()
             .map(|part| part.parse::<f64>().map_err(serde::de::Error::custom))
             .collect()
+    }
+}
+
+/// Unified helper module to deserialize optional fields that may be nil or empty.
+///
+/// In CCSDS XML, optional fields can be represented as:
+/// - `<FIELD nil="true"/>` or `<FIELD xsi:nil="true"/>` — no content
+/// - `<FIELD></FIELD>` — empty text content
+/// - `<FIELD>value</FIELD>` — scalar value
+/// - `<FIELD units="km">value</FIELD>` — map with attributes
+pub mod nullable {
+    use super::*;
+    use serde::de::{self, IntoDeserializer, MapAccess, Visitor};
+    use std::collections::HashMap;
+    use std::marker::PhantomData;
+
+    pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: serde::Serialize,
+    {
+        match value {
+            Some(v) => v.serialize(serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: serde::de::DeserializeOwned,
+    {
+        struct OptionVisitor<T>(PhantomData<T>);
+
+        impl<'de, T> Visitor<'de> for OptionVisitor<T>
+        where
+            T: serde::de::DeserializeOwned,
+        {
+            type Value = Option<T>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("an optional value, empty string, or nil-attributed element")
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(None)
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(None)
+            }
+
+            fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                T::deserialize(deserializer).map(Some)
+            }
+
+            // KVN / XML scalar case
+            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                if v.trim().is_empty() {
+                    return Ok(None);
+                }
+                if v == "n/a" {
+                    return Ok(None);
+                }
+
+                // Try treating as valid JSON value first (handles numbers like u32 "23581")
+                if let Ok(val) = serde_json::from_str::<T>(v) {
+                    return Ok(Some(val));
+                }
+
+                let de = v.into_deserializer();
+                T::deserialize(de).map(Some)
+            }
+
+            // XML Attribute case (<Tag attr="...">val</Tag>)
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                // Buffer all map entries to support flexible deserialization strategies
+                let mut values = HashMap::new();
+                let mut nil = false;
+                let mut text_val = None;
+
+                while let Some(key) = map.next_key::<String>()? {
+                    if key == "@nil" || key == "@xsi:nil" {
+                        let v: String = map.next_value()?;
+                        if v == "true" {
+                            nil = true;
+                        }
+                    } else if key == "$text" || key == "$value" {
+                        // Normalize content key to "$value" for UnitValue compatibility
+                        let v: String = map.next_value()?;
+                        if v == "n/a" || v.trim().is_empty() {
+                            // potential null content
+                        }
+                        text_val = Some(v.clone());
+                        values.insert("$value".to_string(), v);
+                    } else {
+                        let v: String = map.next_value()?;
+                        values.insert(key, v);
+                    }
+                }
+
+                if nil {
+                    return Ok(None);
+                }
+                if values.is_empty() {
+                    return Ok(None);
+                }
+
+                // Strategy 1: Try to deserialize T as a Struct/Map (e.g., UnitValue)
+                // This will use the buffered attributes (like @units) and content ($value).
+                let md: de::value::MapDeserializer<'_, _, A::Error> =
+                    de::value::MapDeserializer::new(values.clone().into_iter());
+                match T::deserialize(md) {
+                    Ok(val) => Ok(Some(val)),
+                    Err(_) => {
+                        // Strategy 2: Fallback to deserializing T as a Primitive (e.g., f64, u32)
+                        // If T is a primitive, Strategy 1 fails because it receives a Map.
+                        // We extract just the text content and try again.
+                        if let Some(txt) = text_val {
+                            // Try JSON parsing for numbers first
+                            if let Ok(val) = serde_json::from_str::<T>(&txt) {
+                                return Ok(Some(val));
+                            }
+
+                            let sd = txt.into_deserializer();
+                            T::deserialize(sd).map(Some)
+                        } else {
+                            // No text content but had attributes... e.g. <FIELD unit="m"/> (empty text)
+                            // Treat as None
+                            Ok(None)
+                        }
+                    }
+                }
+            }
+        }
+
+        deserializer.deserialize_any(OptionVisitor(PhantomData))
     }
 }
 
@@ -145,9 +204,6 @@ mod tests {
         let w = Wrapper {
             values: vec![1.1, 2.2, 3.3],
         };
-        // Serialization to JSON normally doesn't use the custom serializer unless we are serializing to a format that uses it,
-        // but here we are using serde(with) so it should apply to the field.
-        // However, serde_json might serialize the string as a JSON string.
         let s = serde_json::to_string(&w).unwrap();
         assert_eq!(s, r#"{"values":"1.1 2.2 3.3"}"#);
     }
@@ -167,5 +223,51 @@ mod tests {
 
         let w2: Wrapper = serde_json::from_str(&s).unwrap();
         assert_eq!(w2.values, Vec::<f64>::new());
+    }
+
+    #[derive(Deserialize, Debug, PartialEq)]
+    struct TestStruct {
+        data: String,
+    }
+
+    #[derive(Deserialize, Debug, PartialEq)]
+    struct NullableTestWrapper {
+        #[serde(with = "crate::utils::nullable", default)]
+        field: Option<String>,
+        #[serde(with = "crate::utils::nullable", default)]
+        struct_field: Option<TestStruct>,
+        #[serde(with = "crate::utils::nullable", default)]
+        u32_field: Option<u32>,
+    }
+
+    #[test]
+    fn test_nullable_deserialization() {
+        // Test 1: Explicit nil="true"
+        let json = r#"{ "field": { "@nil": "true", "$text": "some text" } }"#;
+        let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
+        assert_eq!(w.field, None);
+
+        // Test 2: Whitespace text
+        let json = r#"{ "field": "   " }"#; // Using scalar string because Visit_str handles it?
+                                            // Wait, for JSON input "field": "   " calls visit_str? Yes.
+                                            // My visitor handles visit_str.
+        let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
+        assert_eq!(w.field, None);
+
+        // Test 3: "n/a" text
+        let json = r#"{ "field": "n/a" }"#;
+        let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
+        assert_eq!(w.field, None);
+
+        // Test 4: u32 from string (fixes OMM regression)
+        // Note: JSON input "23581" (string) for u32 field?
+        let json = r#"{ "u32_field": "23581" }"#;
+        let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
+        assert_eq!(w.u32_field, Some(23581));
+
+        // Test 5: u32 from Map (XML style)
+        let json = r#"{ "u32_field": { "$text": "23581" } }"#;
+        let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
+        assert_eq!(w.u32_field, Some(23581));
     }
 }

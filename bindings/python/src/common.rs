@@ -32,6 +32,7 @@ pub struct OdmHeader {
 #[pymethods]
 impl OdmHeader {
     #[new]
+    #[pyo3(signature = (creation_date, originator, classification=None, message_id=None, comment=None))]
     fn new(
         creation_date: String,
         originator: String,
@@ -124,6 +125,17 @@ impl OdmHeader {
         self.inner.classification = value;
     }
 
+    /// Comments (allowed in the ODM Header only immediately after the ODM version number).
+    /// (See 7.8 for formatting rules.)
+    ///
+    /// Examples: This is a comment
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
     #[setter]
     fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
@@ -140,6 +152,7 @@ pub struct AdmHeader {
 #[pymethods]
 impl AdmHeader {
     #[new]
+    #[pyo3(signature = (creation_date, originator, classification=None, message_id=None, comment=None))]
     fn new(
         creation_date: String,
         originator: String,
@@ -282,6 +295,7 @@ pub struct StateVectorAcc {
 impl StateVectorAcc {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (epoch, x, y, z, x_dot, y_dot, z_dot, x_ddot=None, y_ddot=None, z_ddot=None))]
     fn new(
         epoch: String,
         x: f64,
@@ -537,6 +551,7 @@ pub struct StateVector {
 impl StateVector {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (epoch, x, y, z, x_dot, y_dot, z_dot, comments=None))]
     fn new(
         epoch: String,
         x: f64,
@@ -736,6 +751,7 @@ pub struct SpacecraftParameters {
 #[pymethods]
 impl SpacecraftParameters {
     #[new]
+    #[pyo3(signature = (mass=None, solar_rad_area=None, solar_rad_coeff=None, drag_area=None, drag_coeff=None))]
     fn new(
         mass: Option<f64>,
         solar_rad_area: Option<f64>,
@@ -917,6 +933,19 @@ pub struct OdParameters {
 impl OdParameters {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        time_lastob_start=None,
+        time_lastob_end=None,
+        recommended_od_span=None,
+        actual_od_span=None,
+        obs_available=None,
+        obs_used=None,
+        tracks_available=None,
+        tracks_used=None,
+        residuals_accepted=None,
+        weighted_rms=None,
+        comment=vec![]
+    ))]
     fn new(
         time_lastob_start: Option<String>,
         time_lastob_end: Option<String>,

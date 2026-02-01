@@ -198,7 +198,11 @@ pub struct OpmMetadata {
     /// **Examples**: 2001-11-06T11:17:33 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub ref_frame_epoch: Option<Epoch>,
     /// Time system used for state vector, maneuver, and covariance data. Use of values other than
     /// those in 3.2.3.2 should be documented in an ICD.
@@ -416,14 +420,22 @@ pub struct KeplerianElements {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub true_anomaly: Option<Angle>,
     /// True anomaly or mean anomaly
     ///
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub mean_anomaly: Option<Angle>,
     /// Gravitational Coefficient (Gravitational Constant × Central Mass)
     ///

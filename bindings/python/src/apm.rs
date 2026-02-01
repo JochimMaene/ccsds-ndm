@@ -284,6 +284,16 @@ pub struct ApmData {
 impl ApmData {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        epoch,
+        quaternion_state=None,
+        euler_angle_state=None,
+        angular_velocity=None,
+        spin=None,
+        inertia=None,
+        maneuver_parameters=None,
+        comment=None
+    ))]
     fn new(
         epoch: String,
         quaternion_state: Option<Vec<QuaternionState>>,
@@ -439,6 +449,16 @@ pub struct ManeuverParameters {
 impl ManeuverParameters {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        man_epoch_start,
+        man_duration,
+        man_ref_frame,
+        man_tor_1,
+        man_tor_2,
+        man_tor_3,
+        man_delta_mass=None,
+        comment=None
+    ))]
     fn new(
         man_epoch_start: String,
         man_duration: f64,

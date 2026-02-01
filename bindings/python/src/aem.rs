@@ -7,7 +7,7 @@ use crate::types::parse_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::MessageType;
-use ccsds_ndm::types::RotSeq;
+use ccsds_ndm::types::{RotSeq, InterpolationDegree};
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -255,7 +255,7 @@ impl AemMetadata {
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 angvel_frame,
                 interpolation_method,
-                interpolation_degree: interpolation_degree.and_then(NonZeroU32::new),
+                interpolation_degree: interpolation_degree.and_then(NonZeroU32::new).map(InterpolationDegree),
             },
         })
     }
@@ -458,7 +458,7 @@ impl AemMetadata {
     /// :type: int | None
     #[getter]
     fn get_interpolation_degree(&self) -> Option<u32> {
-        self.inner.interpolation_degree.map(|d| d.get())
+        self.inner.interpolation_degree.map(|d| d.0.get())
     }
 }
 
@@ -472,6 +472,7 @@ pub struct AemData {
 #[pymethods]
 impl AemData {
     #[new]
+    #[pyo3(signature = (attitude_states, comment=None))]
     fn new(attitude_states: Vec<AttitudeState>, comment: Option<Vec<String>>) -> Self {
         Self {
             inner: core_aem::AemData {
@@ -493,6 +494,51 @@ impl AemData {
                 }).collect(),
             },
         }
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (epochs, array, comment=None))]
+    fn from_numpy(
+        epochs: Vec<String>,
+        array: PyReadonlyArray2<f64>,
+        comment: Option<Vec<String>>,
+    ) -> PyResult<Self> {
+        let shape = array.shape();
+        if shape.len() != 2 {
+            return Err(PyValueError::new_err("NumPy array must be 2-dimensional"));
+        }
+        if epochs.len() != shape[0] {
+            return Err(PyValueError::new_err(
+                "Number of epochs must match number of rows in NumPy array",
+            ));
+        }
+
+        let array_view = array.as_array();
+        let mut attitude_states = Vec::with_capacity(shape[0]);
+
+        for (i, epoch_str) in epochs.iter().enumerate() {
+            let row = array_view.row(i);
+            use ccsds_ndm::common::{Quaternion, QuaternionEphemeris};
+            let state = ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(
+                QuaternionEphemeris {
+                    epoch: parse_epoch(epoch_str)?,
+                    quaternion: Quaternion {
+                        q1: row.get(0).copied().unwrap_or(0.0),
+                        q2: row.get(1).copied().unwrap_or(0.0),
+                        q3: row.get(2).copied().unwrap_or(0.0),
+                        qc: row.get(3).copied().unwrap_or(1.0),
+                    },
+                },
+            );
+            attitude_states.push(state.into());
+        }
+
+        Ok(Self {
+            inner: core_aem::AemData {
+                comment: comment.unwrap_or_default(),
+                attitude_states,
+            },
+        })
     }
 
     /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
@@ -524,71 +570,193 @@ impl AemData {
             .collect()
     }
 
-    /// Get attitude states as a tuple of epoch strings and a 2D NumPy array.
+    /// Epochs for attitude states (ISO 8601).
     ///
-    /// :type: tuple[list[str], numpy.ndarray]
+    /// :type: list[str]
     #[getter]
-    fn get_attitude_states_numpy<'py>(&self, py: Python<'py>) -> (Vec<String>, Py<PyAny>) {
+    fn get_attitude_states_epochs(&self) -> PyResult<Vec<String>> {
         let mut epochs = Vec::with_capacity(self.inner.attitude_states.len());
-        let mut max_cols = 0;
-
-        // First pass to find max columns and collect epochs
         for s in &self.inner.attitude_states {
-            if let Some(content) = s.content() {
-                let values = match content {
-                    ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) =>
-                        (v.epoch, vec![v.quaternion.q1, v.quaternion.q2, v.quaternion.q3, v.quaternion.qc]),
-                    _ => (ccsds_ndm::types::Epoch::new("1958-01-01T00:00:00").unwrap(), vec![]),
-                };
-                epochs.push(values.0.as_str().to_string());
-                max_cols = max_cols.max(values.1.len());
+            let content = s.content().ok_or_else(|| {
+                PyValueError::new_err("Attitude state is missing content")
+            })?;
+            let epoch = match content {
+                ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) => v.epoch,
+                ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(v) => v.epoch,
+                ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(v) => v.epoch,
+                ccsds_ndm::common::AemAttitudeState::EulerAngle(v) => v.epoch,
+                ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(v) => v.epoch,
+                ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(v) => v.epoch,
+                ccsds_ndm::common::AemAttitudeState::Spin(v) => v.epoch,
+                ccsds_ndm::common::AemAttitudeState::SpinNutation(v) => v.epoch,
+                ccsds_ndm::common::AemAttitudeState::SpinNutationMom(v) => v.epoch,
+            };
+            epochs.push(epoch.as_str().to_string());
+        }
+        Ok(epochs)
+    }
+
+    #[setter]
+    fn set_attitude_states_epochs(&mut self, epochs: Vec<String>) -> PyResult<()> {
+        if self.inner.attitude_states.is_empty() {
+            let mut attitude_states = Vec::with_capacity(epochs.len());
+            for epoch_str in epochs {
+                use ccsds_ndm::common::{Quaternion, QuaternionEphemeris};
+                let state = ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(
+                    QuaternionEphemeris {
+                        epoch: parse_epoch(&epoch_str)?,
+                        quaternion: Quaternion {
+                            q1: 0.0,
+                            q2: 0.0,
+                            q3: 0.0,
+                            qc: 1.0,
+                        },
+                    },
+                );
+                attitude_states.push(state.into());
             }
+            self.inner.attitude_states = attitude_states;
+            return Ok(());
         }
 
-        let mut data = Vec::with_capacity(epochs.len() * max_cols);
+        if epochs.len() != self.inner.attitude_states.len() {
+            return Err(PyValueError::new_err(
+                "Number of epochs must match number of attitude states",
+            ));
+        }
+
+        let mut updated = Vec::with_capacity(epochs.len());
+        for (state, epoch_str) in self.inner.attitude_states.iter().zip(epochs.iter()) {
+            let content = state.content().ok_or_else(|| {
+                PyValueError::new_err("Attitude state is missing content")
+            })?;
+            let epoch = parse_epoch(epoch_str)?;
+            let updated_state = match content {
+                ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(mut v) => {
+                    v.epoch = epoch;
+                    ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v)
+                }
+                ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(mut v) => {
+                    v.epoch = epoch;
+                    ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(v)
+                }
+                ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(mut v) => {
+                    v.epoch = epoch;
+                    ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(v)
+                }
+                ccsds_ndm::common::AemAttitudeState::EulerAngle(mut v) => {
+                    v.epoch = epoch;
+                    ccsds_ndm::common::AemAttitudeState::EulerAngle(v)
+                }
+                ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(mut v) => {
+                    v.epoch = epoch;
+                    ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(v)
+                }
+                ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(mut v) => {
+                    v.epoch = epoch;
+                    ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(v)
+                }
+                ccsds_ndm::common::AemAttitudeState::Spin(mut v) => {
+                    v.epoch = epoch;
+                    ccsds_ndm::common::AemAttitudeState::Spin(v)
+                }
+                ccsds_ndm::common::AemAttitudeState::SpinNutation(mut v) => {
+                    v.epoch = epoch;
+                    ccsds_ndm::common::AemAttitudeState::SpinNutation(v)
+                }
+                ccsds_ndm::common::AemAttitudeState::SpinNutationMom(mut v) => {
+                    v.epoch = epoch;
+                    ccsds_ndm::common::AemAttitudeState::SpinNutationMom(v)
+                }
+            };
+            updated.push(updated_state.into());
+        }
+        self.inner.attitude_states = updated;
+        Ok(())
+    }
+
+    /// Get attitude states as a 2D NumPy array.
+    ///
+    /// Use `attitude_states_epochs` for the corresponding epochs.
+    ///
+    /// Currently only supports Quaternion Ephemeris states.
+    ///
+    /// :type: numpy.ndarray
+    #[getter]
+    fn get_attitude_states_numpy<'py>(&self, py: Python<'py>) -> PyResult<Py<PyAny>> {
+        let mut data = Vec::with_capacity(self.inner.attitude_states.len() * 4);
+
         for s in &self.inner.attitude_states {
             if let Some(content) = s.content() {
-                let values = match content {
-                    ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) =>
-                        vec![v.quaternion.q1, v.quaternion.q2, v.quaternion.q3, v.quaternion.qc],
-                    _ => vec![],
-                };
-                let mut row = values;
-                row.resize(max_cols, f64::NAN);
-                data.extend(row);
+                match content {
+                    ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) => {
+                        data.push(v.quaternion.q1);
+                        data.push(v.quaternion.q2);
+                        data.push(v.quaternion.q3);
+                        data.push(v.quaternion.qc);
+                    }
+                    _ => {
+                        return Err(PyValueError::new_err(
+                            "NumPy access currently supports only Quaternion Ephemeris states",
+                        ));
+                    }
+                }
+            } else {
+                return Err(PyValueError::new_err("Attitude state is missing content"));
             }
         }
 
         let array = PyArray::from_vec(py, data)
-            .reshape([epochs.len(), max_cols])
+            .reshape([self.inner.attitude_states.len(), 4])
             .unwrap();
-        (epochs, array.into())
+        Ok(array.into())
     }
 
     #[setter]
-    fn set_attitude_states_numpy(&mut self, value: (Vec<String>, PyReadonlyArray2<f64>)) -> PyResult<()> {
-        let (epochs, array) = value;
+    fn set_attitude_states_numpy(&mut self, array: PyReadonlyArray2<f64>) -> PyResult<()> {
         let shape = array.shape();
-        if epochs.len() != shape[0] {
-            return Err(PyValueError::new_err("Number of epochs must match number of rows in NumPy array"));
+        if shape.len() != 2 {
+            return Err(PyValueError::new_err("NumPy array must be 2-dimensional"));
+        }
+        if self.inner.attitude_states.is_empty() {
+            return Err(PyValueError::new_err(
+                "Attitude epochs are missing; set attitude_states_epochs or use from_numpy",
+            ));
+        }
+        if self.inner.attitude_states.len() != shape[0] {
+            return Err(PyValueError::new_err(
+                "Number of rows must match number of attitude states",
+            ));
         }
 
         let array_view = array.as_array();
         let mut attitude_states = Vec::with_capacity(shape[0]);
 
-        for (i, epoch_str) in epochs.iter().enumerate() {
+        for (i, existing) in self.inner.attitude_states.iter().enumerate() {
+            let epoch = match existing.content() {
+                Some(ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v)) => v.epoch,
+                Some(_) => {
+                    return Err(PyValueError::new_err(
+                        "NumPy access currently supports only Quaternion Ephemeris states",
+                    ))
+                }
+                None => {
+                    return Err(PyValueError::new_err("Attitude state is missing content"));
+                }
+            };
             let row = array_view.row(i);
-            // NOTE: Simplified to QuaternionEphemeris for now, matching other implementation
-            use ccsds_ndm::common::{QuaternionEphemeris, Quaternion};
-            let state = ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
-                epoch: parse_epoch(epoch_str)?,
-                quaternion: Quaternion {
-                    q1: row.get(0).copied().unwrap_or(0.0),
-                    q2: row.get(1).copied().unwrap_or(0.0),
-                    q3: row.get(2).copied().unwrap_or(0.0),
-                    qc: row.get(3).copied().unwrap_or(1.0),
+            use ccsds_ndm::common::{Quaternion, QuaternionEphemeris};
+            let state = ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(
+                QuaternionEphemeris {
+                    epoch,
+                    quaternion: Quaternion {
+                        q1: row.get(0).copied().unwrap_or(0.0),
+                        q2: row.get(1).copied().unwrap_or(0.0),
+                        q3: row.get(2).copied().unwrap_or(0.0),
+                        qc: row.get(3).copied().unwrap_or(1.0),
+                    },
                 },
-            });
+            );
             attitude_states.push(state.into());
         }
         self.inner.attitude_states = attitude_states;

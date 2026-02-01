@@ -12,7 +12,7 @@ use crate::error::InternalParserError;
 use crate::kvn::parser::*;
 use crate::messages::aem::{Aem, AemBody, AemData, AemMetadata, AemSegment};
 use crate::parse_block;
-use crate::types::Angle;
+use crate::types::{Angle, InterpolationDegree};
 use std::str::FromStr;
 use winnow::combinator::{peek, terminated};
 use winnow::error::{AddContext, ErrMode, FromExternalError};
@@ -106,7 +106,9 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
         euler_rot_seq,
         angvel_frame: rate_frame,
         interpolation_method,
-        interpolation_degree: interpolation_degree.and_then(std::num::NonZeroU32::new),
+        interpolation_degree: interpolation_degree
+            .and_then(std::num::NonZeroU32::new)
+            .map(InterpolationDegree),
     })
 }
 

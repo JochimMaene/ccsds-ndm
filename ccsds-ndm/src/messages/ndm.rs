@@ -23,7 +23,11 @@ use serde::{Deserialize, Serialize};
 #[serde(rename = "ndm")]
 pub struct CombinedNdm {
     /// Message Identifier (optional).
-    #[serde(rename = "MESSAGE_ID", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "MESSAGE_ID",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub id: Option<String>,
 

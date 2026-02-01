@@ -7,9 +7,13 @@ use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn, Validate};
-use crate::types::{Epoch, PositionCovariance, PositionVelocityCovariance, VelocityCovariance};
+use crate::types::{
+    Epoch, InterpolationDegree, PositionCovariance, PositionVelocityCovariance, VelocityCovariance,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
+
+#[cfg(test)]
 use std::num::NonZeroU32;
 
 // Re-export CcsdsNdmError for use in tests
@@ -46,15 +50,26 @@ pub struct Oem {
     pub body: OemBody,
 }
 
-impl Oem {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for Oem {
+    fn validate(&self) -> Result<()> {
+        if let Some(ref id) = self.id {
+            if id != "CCSDS_OEM_VERS" {
+                return Err(crate::error::ValidationError::InvalidValue {
+                    field: "id".into(),
+                    value: id.clone(),
+                    expected: "CCSDS_OEM_VERS".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
         self.header.validate()?;
         self.body.validate()
     }
 }
 
-impl OemBody {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for OemBody {
+    fn validate(&self) -> Result<()> {
         if let Some(first) = self.segment.first() {
             let ts = &first.metadata.time_system;
             for segment in &self.segment[1..] {
@@ -80,15 +95,23 @@ impl OemBody {
     }
 }
 
-impl OemSegment {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for OemSegment {
+    fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate()
     }
 }
 
-impl OemMetadata {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for OemMetadata {
+    fn validate(&self) -> Result<()> {
+        if self.object_id.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Metadata".into(),
+                field: "OBJECT_ID".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.interpolation.is_some() && self.interpolation_degree.is_none() {
             return Err(crate::error::ValidationError::MissingRequiredField {
                 block: "OEM Metadata".into(),
@@ -117,8 +140,8 @@ impl OemMetadata {
     }
 }
 
-impl OemData {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for OemData {
+    fn validate(&self) -> Result<()> {
         if self.state_vector.is_empty() {
             return Err(crate::error::ValidationError::MissingRequiredField {
                 block: "OEM Data".into(),
@@ -128,12 +151,6 @@ impl OemData {
             .into());
         }
         Ok(())
-    }
-}
-
-impl crate::traits::Validate for Oem {
-    fn validate(&self) -> Result<()> {
-        Oem::validate(self)
     }
 }
 
@@ -285,7 +302,11 @@ pub struct OemMetadata {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub ref_frame_epoch: Option<Epoch>,
     /// Time system used for ephemeris and covariance data. Use of values other than those in
     /// 3.2.3.2 should be documented in an ICD.
@@ -312,7 +333,11 @@ pub struct OemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub useable_start_time: Option<Epoch>,
     /// Stop time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) This optional keyword allows the
@@ -324,7 +349,11 @@ pub struct OemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub useable_stop_time: Option<Epoch>,
     /// End of TOTAL time span covered by ephemeris data and covariance data immediately
     /// following this metadata block. (For format specification, see 7.5.10.)
@@ -339,7 +368,11 @@ pub struct OemMetadata {
     /// **Examples**: HERMITE, LINEAR, LAGRANGE
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub interpolation: Option<String>,
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
@@ -349,8 +382,12 @@ pub struct OemMetadata {
     /// **Examples**: 5, 8
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interpolation_degree: Option<NonZeroU32>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub interpolation_degree: Option<InterpolationDegree>,
 }
 
 impl ToKvn for OemMetadata {
@@ -468,7 +505,11 @@ pub struct OemCovarianceMatrix {
     /// **Examples**: ICRF, EME2000
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub cov_ref_frame: Option<String>,
 
@@ -1066,7 +1107,7 @@ COMMENT No data
         // Missing degree
         assert!(meta.validate().is_err());
 
-        meta.interpolation_degree = Some(NonZeroU32::new(5).unwrap());
+        meta.interpolation_degree = Some(InterpolationDegree::from(NonZeroU32::new(5).unwrap()));
         assert!(meta.validate().is_ok());
     }
 
