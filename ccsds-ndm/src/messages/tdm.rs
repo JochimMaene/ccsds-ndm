@@ -141,7 +141,11 @@ pub struct TdmHeader {
     /// **Examples**: 201113719185
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub message_id: Option<String>,
 }
@@ -233,7 +237,11 @@ pub struct TdmMetadata {
     /// **Examples**: 20190918_1200135-0001
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub track_id: Option<String>,
     /// Comma-separated list of data types in the Data Section. The elements of the list shall
@@ -243,7 +251,11 @@ pub struct TdmMetadata {
     /// **Examples**: RANGE, TRANSMIT_FREQ_n, RECEIVE_FREQ
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub data_types: Option<String>,
     /// The TIME_SYSTEM keyword shall specify the time system used for timetags in the
@@ -294,19 +306,35 @@ pub struct TdmMetadata {
     #[builder(into)]
     pub participant_1: String,
     /// The second participant in a tracking data session.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub participant_2: Option<String>,
     /// The third participant in a tracking data session.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub participant_3: Option<String>,
     /// The fourth participant in a tracking data session.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub participant_4: Option<String>,
     /// The fifth participant in a tracking data session.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub participant_5: Option<String>,
     /// The MODE keyword shall reflect the tracking mode associated with the Data Section of
@@ -317,7 +345,11 @@ pub struct TdmMetadata {
     /// **Examples**: SEQUENTIAL, SINGLE_DIFF
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub mode: Option<TdmMode>,
     /// The PATH keywords shall reflect the signal path by listing the index of each participant
     /// in order, separated by commas, with no inserted white space. Correlated with the
@@ -327,13 +359,25 @@ pub struct TdmMetadata {
     /// **Examples**: PATH = 1,2,1, PATH_1 = 1,2,1, PATH_2 = 3,1
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub path: Option<TdmPath>,
     /// The first signal path where the MODE is 'SINGLE_DIFF'.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub path_1: Option<TdmPath>,
     /// The second signal path where the MODE is 'SINGLE_DIFF'.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub path_2: Option<TdmPath>,
     /// The TRANSMIT_BAND keyword shall indicate the frequency band for transmitted
     /// frequencies. The frequency ranges associated with each band should be specified in the
@@ -342,7 +386,11 @@ pub struct TdmMetadata {
     /// **Examples**: S, X, Ka, L, UHF, GREEN
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub transmit_band: Option<String>,
     /// The RECEIVE_BAND keyword shall indicate the frequency band for received frequencies.
@@ -353,7 +401,11 @@ pub struct TdmMetadata {
     /// **Examples**: S, X, Ka, L, UHF, GREEN
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub receive_band: Option<String>,
     /// The TURNAROUND_NUMERATOR keyword shall indicate the numerator of the turnaround ratio
@@ -362,7 +414,11 @@ pub struct TdmMetadata {
     /// **Examples**: 240, 880
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub turnaround_numerator: Option<i32>,
     /// The TURNAROUND_DENOMINATOR keyword shall indicate the denominator of the turnaround
     /// ratio that is necessary to calculate the coherent downlink from the uplink frequency.
@@ -370,7 +426,11 @@ pub struct TdmMetadata {
     /// **Examples**: 221, 749
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub turnaround_denominator: Option<i32>,
     /// The TIMETAG_REF keyword shall provide a reference for time tags in the tracking data.
     /// This keyword indicates whether the timetag associated with the data is the transmit
@@ -379,7 +439,11 @@ pub struct TdmMetadata {
     /// **Examples**: TRANSMIT, RECEIVE
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub timetag_ref: Option<TdmTimetagRef>,
     /// The INTEGRATION_INTERVAL keyword shall provide the Doppler count time in seconds for
     /// Doppler data or for the creation of normal points.
@@ -389,7 +453,11 @@ pub struct TdmMetadata {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub integration_interval: Option<f64>,
     /// Indicates the relationship between the INTEGRATION_INTERVAL and the timetag on the
     /// data, i.e., whether the timetag represents the start, middle, or end of the integration
@@ -398,7 +466,11 @@ pub struct TdmMetadata {
     /// **Examples**: START, MIDDLE, END
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub integration_ref: Option<TdmIntegrationRef>,
     /// The FREQ_OFFSET keyword represents a frequency in Hz that must be added to every
     /// RECEIVE_FREQ to reconstruct it. One use is if a Doppler shift frequency observable is
@@ -409,7 +481,11 @@ pub struct TdmMetadata {
     /// **Units**: Hz
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub freq_offset: Option<f64>,
     /// The value of the RANGE_MODE keyword shall be ‘COHERENT’, in which case the range tones
     /// are coherent with the uplink carrier; ‘CONSTANT’, in which case the range tones have a
@@ -418,7 +494,11 @@ pub struct TdmMetadata {
     /// **Examples**: COHERENT, CONSTANT, ONE_WAY
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub range_mode: Option<TdmRangeMode>,
     /// The value associated with the RANGE_MODULUS keyword shall be the modulus of the range
     /// observable in the units as specified by the RANGE_UNITS keyword; that is, the actual
@@ -428,7 +508,11 @@ pub struct TdmMetadata {
     /// **Examples**: 32768.0, 2.0e+23, 0.0, 161.6484
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub range_modulus: Option<f64>,
     /// The RANGE_UNITS keyword specifies the units for the range observable. ‘km’ shall be
     /// used if the range is measured in kilometers. ‘s’ shall be used if the range is measured
@@ -438,7 +522,11 @@ pub struct TdmMetadata {
     /// **Examples**: km, s, RU
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub range_units: Option<TdmRangeUnits>,
     /// The ANGLE_TYPE keyword shall indicate the type of antenna geometry represented in the
     /// angle data (ANGLE_1 and ANGLE_2 keywords).
@@ -446,7 +534,11 @@ pub struct TdmMetadata {
     /// **Examples**: AZEL, RADEC, XEYN, XSYE
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub angle_type: Option<TdmAngleType>,
     /// The REFERENCE_FRAME keyword shall be used in conjunction with the ‘ANGLE_TYPE=RADEC’
     /// keyword/value combination, indicating the inertial reference frame to which the antenna
@@ -455,7 +547,11 @@ pub struct TdmMetadata {
     /// **Examples**: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub reference_frame: Option<TdmReferenceFrame>,
     /// The INTERPOLATION keyword shall specify the interpolation method to be used to calculate
     /// a transmit phase count at an arbitrary time in tracking data where the uplink frequency
@@ -464,7 +560,11 @@ pub struct TdmMetadata {
     /// **Examples**: HERMITE, LAGRANGE, LINEAR
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub interpolation: Option<String>,
     /// The INTERPOLATION_DEGREE keyword shall specify the recommended degree of the
@@ -474,7 +574,11 @@ pub struct TdmMetadata {
     /// **Examples**: 3, 5, 7, 11
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub interpolation_degree: Option<u32>,
     /// Doppler counts are generally biased so as to accommodate negative Doppler within an
     /// accumulator. In order to reconstruct the measurement, the bias shall be subtracted from
@@ -485,7 +589,11 @@ pub struct TdmMetadata {
     /// **Units**: Hz
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub doppler_count_bias: Option<f64>,
     /// Doppler counts are generally scaled so as to capture partial cycles in an integer
     /// count. In order to reconstruct the measurement, the DOPPLER_COUNT data value shall be
@@ -494,7 +602,11 @@ pub struct TdmMetadata {
     /// **Examples**: 1000, 1
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub doppler_count_scale: Option<u64>,
     /// Doppler counts may overflow the accumulator and roll over in cases where the track is
     /// of long duration or very high Doppler shift. This flag indicates whether or not a
@@ -503,7 +615,11 @@ pub struct TdmMetadata {
     /// **Examples**: YES, NO
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub doppler_count_rollover: Option<YesNo>,
     /// The TRANSMIT_DELAY_n keyword shall specify a fixed interval of time, in seconds,
     /// required for the signal to travel from the transmitting electronics to the transmit
@@ -514,31 +630,51 @@ pub struct TdmMetadata {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub transmit_delay_1: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 2.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub transmit_delay_2: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 3.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub transmit_delay_3: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 4.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub transmit_delay_4: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 5.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub transmit_delay_5: Option<f64>,
     /// The RECEIVE_DELAY_n keyword shall specify a fixed interval of time, in seconds,
     /// required for the signal to travel from the tracking point to the receiving electronics.
@@ -549,31 +685,51 @@ pub struct TdmMetadata {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub receive_delay_1: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 2.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub receive_delay_2: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 3.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub receive_delay_3: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 4.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub receive_delay_4: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 5.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub receive_delay_5: Option<f64>,
     /// Provides an estimate of the quality of the data, based on indicators from the producers
     /// of the data (e.g., bad time synchronization flags, marginal lock status indicators,
@@ -582,7 +738,11 @@ pub struct TdmMetadata {
     /// **Examples**: RAW, VALIDATED, DEGRADED
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub data_quality: Option<TdmDataQuality>,
     /// The set of CORRECTION_* keywords may be used to reflect the values of corrections that
     /// have been added to the data or should be added to the data (e.g., ranging station delay
@@ -591,25 +751,65 @@ pub struct TdmMetadata {
     /// **Examples**: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub correction_angle_1: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub correction_angle_2: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub correction_doppler: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub correction_mag: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub correction_range: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub correction_rcs: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub correction_receive: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub correction_transmit: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub correction_aberration_yearly: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub correction_aberration_diurnal: Option<f64>,
     /// This keyword is used to indicate whether or not the values associated with the
     /// CORRECTION_* keywords have been applied to the tracking data. Required if any of the
@@ -618,36 +818,60 @@ pub struct TdmMetadata {
     /// **Examples**: YES, NO
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub corrections_applied: Option<YesNo>,
     /// Unique name of the external ephemeris file used for participant 1.
     ///
     /// Examples: SATELLITE_A_EPHEM27
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub ephemeris_name_1: Option<String>,
     /// Unique name of the external ephemeris file used for participant 2.
     ///
     /// Examples: SATELLITE_A_EPHEM27
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub ephemeris_name_2: Option<String>,
     /// Unique name of the external ephemeris file used for participant 3.
     ///
     /// Examples: SATELLITE_A_EPHEMERIS
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub ephemeris_name_3: Option<String>,
     /// Unique name of the external ephemeris file used for participant 4.
     ///
     /// Examples: SATELLITE_A_EPHEMERIS
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub ephemeris_name_4: Option<String>,
     /// Unique name of the external ephemeris file used for participant 5.
     ///
     /// Examples: SATELLITE_A_EPHEMERIS
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub ephemeris_name_5: Option<String>,
 }

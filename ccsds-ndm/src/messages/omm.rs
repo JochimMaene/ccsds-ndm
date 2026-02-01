@@ -543,7 +543,11 @@ pub struct MeanElements {
     /// **Units**: km or rev/day
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub semi_major_axis: Option<Distance>,
     /// Semi-major axis in kilometers (preferred), or, if MEAN_ELEMENT_THEORY = SGP/SGP4, the
     /// Keplerian Mean motion in revolutions per day
@@ -553,7 +557,11 @@ pub struct MeanElements {
     /// **Units**: km or rev/day
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub mean_motion: Option<MeanMotion>,
     /// Eccentricity
     ///
@@ -602,7 +610,11 @@ pub struct MeanElements {
     /// **Units**: km³/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub gm: Option<Gm>,
 }
 
@@ -663,19 +675,31 @@ pub struct TleParameters {
     /// Ephemeris type. Default value = 0. (See 4.2.4.7.)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub ephemeris_type: Option<i32>,
     /// Classification type. Default value = U. (See 4.2.4.7.)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub classification_type: Option<String>,
     /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
     /// is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub norad_cat_id: Option<u32>,
     /// Element set number for this satellite. Normally incremented sequentially but may be out
     /// of sync if it is generated from a backup source. Used to distinguish different TLEs,
@@ -683,12 +707,20 @@ pub struct TleParameters {
     /// MEAN_ELEMENT_THEORY = SGP/SGP4).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub element_set_no: Option<ElementSetNo>,
     /// Revolution Number
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub rev_at_epoch: Option<u32>,
     /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
     /// MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
@@ -696,7 +728,11 @@ pub struct TleParameters {
     /// **Units**: 1/[Earth radii]
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub bstar: Option<BStar>,
     /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
     /// MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag
@@ -707,7 +743,11 @@ pub struct TleParameters {
     /// **Units**: m²/kg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub bterm: Option<M2kg>,
     /// First Time Derivative of the Mean Motion (i.e., a drag term, required when
     /// MEAN_ELEMENT_THEORY = SGP or PPT3). (See 4.2.4.7 for important details).
@@ -722,7 +762,11 @@ pub struct TleParameters {
     /// **Units**: rev/day³
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub mean_motion_ddot: Option<MeanMotionDDot>,
     /// Solar radiation pressure coefficient AY/m, where y = reflectivity, A = average
     /// cross-sectional area, m = mass. Example values AGOM = 0.01 (rocket body) and 0.001
@@ -732,7 +776,11 @@ pub struct TleParameters {
     /// **Units**: m²/kg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub agom: Option<M2kg>,
 }
 

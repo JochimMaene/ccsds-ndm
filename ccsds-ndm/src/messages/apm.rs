@@ -184,7 +184,11 @@ pub struct ApmMetadata {
     /// **Examples**: EARTH, BARYCENTER, MOON
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub center_name: Option<String>,
     /// Time system used for attitude and maneuver data. The set of allowed values is described in

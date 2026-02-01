@@ -46,15 +46,26 @@ pub struct Oem {
     pub body: OemBody,
 }
 
-impl Oem {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for Oem {
+    fn validate(&self) -> Result<()> {
+        if let Some(ref id) = self.id {
+            if id != "CCSDS_OEM_VERS" {
+                return Err(crate::error::ValidationError::InvalidValue {
+                    field: "id".into(),
+                    value: id.clone(),
+                    expected: "CCSDS_OEM_VERS".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
         self.header.validate()?;
         self.body.validate()
     }
 }
 
-impl OemBody {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for OemBody {
+    fn validate(&self) -> Result<()> {
         if let Some(first) = self.segment.first() {
             let ts = &first.metadata.time_system;
             for segment in &self.segment[1..] {
@@ -80,15 +91,23 @@ impl OemBody {
     }
 }
 
-impl OemSegment {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for OemSegment {
+    fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate()
     }
 }
 
-impl OemMetadata {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for OemMetadata {
+    fn validate(&self) -> Result<()> {
+        if self.object_id.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Metadata".into(),
+                field: "OBJECT_ID".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.interpolation.is_some() && self.interpolation_degree.is_none() {
             return Err(crate::error::ValidationError::MissingRequiredField {
                 block: "OEM Metadata".into(),
@@ -117,8 +136,8 @@ impl OemMetadata {
     }
 }
 
-impl OemData {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for OemData {
+    fn validate(&self) -> Result<()> {
         if self.state_vector.is_empty() {
             return Err(crate::error::ValidationError::MissingRequiredField {
                 block: "OEM Data".into(),
@@ -128,12 +147,6 @@ impl OemData {
             .into());
         }
         Ok(())
-    }
-}
-
-impl crate::traits::Validate for Oem {
-    fn validate(&self) -> Result<()> {
-        Oem::validate(self)
     }
 }
 
@@ -351,7 +364,11 @@ pub struct OemMetadata {
     /// **Examples**: HERMITE, LINEAR, LAGRANGE
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub interpolation: Option<String>,
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
@@ -361,7 +378,11 @@ pub struct OemMetadata {
     /// **Examples**: 5, 8
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub interpolation_degree: Option<NonZeroU32>,
 }
 
@@ -480,7 +501,11 @@ pub struct OemCovarianceMatrix {
     /// **Examples**: ICRF, EME2000
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub cov_ref_frame: Option<String>,
 

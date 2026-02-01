@@ -186,7 +186,11 @@ pub struct AemMetadata {
     /// **Examples**: EARTH, STS-106
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub center_name: Option<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
@@ -274,7 +278,11 @@ pub struct AemMetadata {
     /// **Examples**: ZXZ, XYZ
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub euler_rot_seq: Option<RotSeq>,
     /// The frame of reference in which angular velocity data are specified. The set of allowed
     /// values is described in annex B, subsection B3. This keyword is applicable only if
@@ -284,7 +292,11 @@ pub struct AemMetadata {
     /// **Examples**: ICRF, SC_BODY_1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub angvel_frame: Option<String>,
     /// Recommended interpolation method for attitude ephemeris data in the block immediately
@@ -293,7 +305,11 @@ pub struct AemMetadata {
     /// **Examples**: LINEAR, HERMITE, LAGRANGE
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     #[builder(into)]
     pub interpolation_method: Option<String>,
     /// Recommended interpolation degree for attitude ephemeris data in the block immediately
@@ -303,7 +319,11 @@ pub struct AemMetadata {
     /// **Examples**: 1, 5
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub interpolation_degree: Option<std::num::NonZeroU32>,
 }
 
@@ -411,22 +431,46 @@ pub struct AemAttitudeStateWrapper {
         skip_serializing_if = "Option::is_none"
     )]
     pub quaternion_derivative: Option<crate::common::QuaternionDerivative>,
-    #[serde(rename = "quaternionAngVel", skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        rename = "quaternionAngVel",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub quaternion_ang_vel: Option<crate::common::QuaternionAngVel>,
-    #[serde(rename = "eulerAngle", skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        rename = "eulerAngle",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub euler_angle: Option<crate::common::EulerAngle>,
     #[serde(
         rename = "eulerAngleDerivative",
         skip_serializing_if = "Option::is_none"
     )]
     pub euler_angle_derivative: Option<crate::common::EulerAngleDerivative>,
-    #[serde(rename = "eulerAngleAngVel", skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        rename = "eulerAngleAngVel",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub euler_angle_ang_vel: Option<crate::common::EulerAngleAngVel>,
-    #[serde(rename = "spin", skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        rename = "spin",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub spin: Option<crate::common::Spin>,
-    #[serde(rename = "spinNutation", skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        rename = "spinNutation",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub spin_nutation: Option<crate::common::SpinNutation>,
-    #[serde(rename = "spinNutationMom", skip_serializing_if = "Option::is_none", with = "crate::utils::nullable")]
+    #[serde(
+        rename = "spinNutationMom",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
     pub spin_nutation_mom: Option<crate::common::SpinNutationMom>,
 }
 
