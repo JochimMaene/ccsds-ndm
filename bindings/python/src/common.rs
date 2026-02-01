@@ -125,6 +125,16 @@ impl OdmHeader {
         self.inner.classification = value;
     }
 
+    /// User-defined comments. (See 7.8 for formatting rules.)
+    ///
+    /// Examples: This is a comment
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
     #[setter]
     fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;

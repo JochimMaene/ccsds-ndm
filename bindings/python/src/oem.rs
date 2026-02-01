@@ -8,7 +8,7 @@ use crate::types::parse_epoch;
 use ccsds_ndm::messages::oem as core_oem;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{
-    Acc, Position, PositionCovariance, PositionVelocityCovariance, Velocity, VelocityCovariance,
+    Acc, InterpolationDegree, Position, PositionCovariance, PositionVelocityCovariance, Velocity, VelocityCovariance,
 };
 use ccsds_ndm::MessageType;
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
@@ -557,7 +557,7 @@ impl OemMetadata {
                 useable_start_time: useable_start_time.map(|s| parse_epoch(&s)).transpose()?,
                 useable_stop_time: useable_stop_time.map(|s| parse_epoch(&s)).transpose()?,
                 interpolation,
-                interpolation_degree: interpolation_degree.and_then(NonZeroU32::new),
+                interpolation_degree: interpolation_degree.and_then(NonZeroU32::new).map(InterpolationDegree),
             },
         })
     }
@@ -791,12 +791,12 @@ impl OemMetadata {
     /// :type: Optional[int]
     #[getter]
     fn get_interpolation_degree(&self) -> Option<u32> {
-        self.inner.interpolation_degree.map(|d| d.get())
+        self.inner.interpolation_degree.map(|d| d.0.get())
     }
 
     #[setter]
     fn set_interpolation_degree(&mut self, interpolation_degree: Option<u32>) {
-        self.inner.interpolation_degree = interpolation_degree.and_then(NonZeroU32::new);
+        self.inner.interpolation_degree = interpolation_degree.and_then(NonZeroU32::new).map(InterpolationDegree);
     }
 
     /// Comments (see 7.8 for formatting rules).

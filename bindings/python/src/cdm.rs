@@ -1285,10 +1285,10 @@ impl CdmMetadata {
         catalog_name,
         object_name,
         international_designator,
-        ephemeris_name,
-        covariance_method,
-        maneuverable,
         ref_frame,
+        ephemeris_name=String::from("NONE"),
+        covariance_method=None,
+        maneuverable=None,
         object_type=None,
         operator_contact_position=None,
         operator_organization=None,
@@ -1309,10 +1309,10 @@ impl CdmMetadata {
         catalog_name: String,
         object_name: String,
         international_designator: String,
-        ephemeris_name: String,
-        covariance_method: Bound<'_, PyAny>,
-        maneuverable: Bound<'_, PyAny>,
         ref_frame: Bound<'_, PyAny>,
+        ephemeris_name: String,
+        covariance_method: Option<Bound<'_, PyAny>>,
+        maneuverable: Option<Bound<'_, PyAny>>,
         object_type: Option<Bound<'_, PyAny>>,
         operator_contact_position: Option<String>,
         operator_organization: Option<String>,
@@ -1329,8 +1329,14 @@ impl CdmMetadata {
     ) -> PyResult<Self> {
         // Parse enum-like arguments (accept str or Enum)
         let object = parse_cdm_object_type(&object)?;
-        let covariance_method = parse_covariance_method_type(&covariance_method)?;
-        let maneuverable = parse_maneuverable_type(&maneuverable)?;
+        let covariance_method = match covariance_method {
+            Some(m) => parse_covariance_method_type(&m)?,
+            None => CovarianceMethodType::Calculated,
+        };
+        let maneuverable = match maneuverable {
+            Some(m) => parse_maneuverable_type(&m)?,
+            None => ManeuverableType::Yes,
+        };
         let ref_frame = parse_reference_frame_type(&ref_frame)?;
         let object_type = object_type.map(|ob| parse_object_description(&ob)).transpose()?;
 
@@ -1816,19 +1822,53 @@ impl CdmData {
     fn new(
         state_vector: CdmStateVector,
         covariance_matrix: Option<CdmCovarianceMatrix>,
-        od_parameters: Option<OdParameters>,
-        additional_parameters: Option<AdditionalParameters>,
+        od_parameters: Option<Bound<'_, PyAny>>,
+        additional_parameters: Option<Bound<'_, PyAny>>,
         comments: Option<Vec<String>>,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        let od_p = match od_parameters {
+            Some(ob) => {
+                if let Ok(list) = ob.downcast::<pyo3::types::PyList>() {
+                    if list.is_empty() {
+                        None
+                    } else {
+                        Some(list.get_item(0)?.extract::<OdParameters>()?)
+                    }
+                } else if ob.is_none() {
+                    None
+                } else {
+                    Some(ob.extract::<OdParameters>()?)
+                }
+            }
+            None => None,
+        };
+
+        let add_p = match additional_parameters {
+            Some(ob) => {
+                if let Ok(list) = ob.downcast::<pyo3::types::PyList>() {
+                    if list.is_empty() {
+                        None
+                    } else {
+                        Some(list.get_item(0)?.extract::<AdditionalParameters>()?)
+                    }
+                } else if ob.is_none() {
+                    None
+                } else {
+                    Some(ob.extract::<AdditionalParameters>()?)
+                }
+            }
+            None => None,
+        };
+
+        Ok(Self {
             inner: core_cdm::CdmData {
                 comment: comments.unwrap_or_default(),
-                od_parameters: od_parameters.map(|o| o.inner),
-                additional_parameters: additional_parameters.map(|a| a.inner),
+                od_parameters: od_p.map(|o| o.inner),
+                additional_parameters: add_p.map(|a| a.inner),
                 state_vector: state_vector.inner,
                 covariance_matrix: covariance_matrix.map(|c| c.inner),
             },
-        }
+        })
     }
 
     #[staticmethod]

@@ -7,7 +7,7 @@ use crate::types::parse_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::MessageType;
-use ccsds_ndm::types::RotSeq;
+use ccsds_ndm::types::{RotSeq, InterpolationDegree};
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -255,7 +255,7 @@ impl AemMetadata {
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 angvel_frame,
                 interpolation_method,
-                interpolation_degree: interpolation_degree.and_then(NonZeroU32::new),
+                interpolation_degree: interpolation_degree.and_then(NonZeroU32::new).map(InterpolationDegree),
             },
         })
     }
@@ -458,7 +458,7 @@ impl AemMetadata {
     /// :type: int | None
     #[getter]
     fn get_interpolation_degree(&self) -> Option<u32> {
-        self.inner.interpolation_degree.map(|d| d.get())
+        self.inner.interpolation_degree.map(|d| d.0.get())
     }
 }
 
