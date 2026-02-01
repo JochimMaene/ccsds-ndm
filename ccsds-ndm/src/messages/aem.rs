@@ -65,7 +65,9 @@ impl Ndm for Aem {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let aem: Self = crate::xml::from_str_with_context(xml, "AEM")?;
+        let content = crate::xml::extract_message_content(xml, "aem")
+            .unwrap_or(std::borrow::Cow::Borrowed(xml));
+        let aem: Self = crate::xml::from_str_with_context(&content, "AEM")?;
         crate::validation::validate_with_mode(crate::validation::MessageKind::Aem, &aem)?;
         Ok(aem)
     }

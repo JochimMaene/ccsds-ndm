@@ -135,3 +135,41 @@ pub trait ToKvn {
     /// * `writer` - The KVN writer to output to
     fn write_kvn(&self, writer: &mut KvnWriter);
 }
+
+/// Trait for types that can be parsed from potentially empty/null string values.
+///
+/// This trait provides a unified way to handle nullable values in both XML and KVN
+/// formats. Types implementing this trait define what constitutes an "empty" or "null"
+/// value and how to parse non-null values.
+///
+/// # Design Rationale
+///
+/// CCSDS NDM messages can have optional fields that appear as:
+/// - XML: `<FIELD nil="true"/>` or `<FIELD></FIELD>` (empty content)
+/// - KVN: `FIELD =` (empty value after equals) or omitted entirely
+///
+/// This trait ensures both formats handle empty values consistently.
+pub trait FromNullableStr: Sized {
+    /// Returns true if the string representation is considered null/empty.
+    ///
+    /// The default implementation treats empty or whitespace-only strings as null.
+    fn is_null_str(s: &str) -> bool {
+        s.trim().is_empty()
+    }
+
+    /// Parse from a string, returning `None` if the value is null/empty.
+    fn from_nullable_str(s: &str) -> Result<Option<Self>>;
+}
+
+// Blanket implementation for String
+impl FromNullableStr for String {
+    fn from_nullable_str(s: &str) -> Result<Option<Self>> {
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(trimmed.to_string()))
+        }
+    }
+}
+

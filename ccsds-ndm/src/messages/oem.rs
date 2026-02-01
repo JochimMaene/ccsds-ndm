@@ -176,7 +176,9 @@ impl Ndm for Oem {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let oem: Self = crate::xml::from_str_with_context(xml, "OEM")?;
+        let content = crate::xml::extract_message_content(xml, "oem")
+            .unwrap_or(std::borrow::Cow::Borrowed(xml));
+        let oem: Self = crate::xml::from_str_with_context(&content, "OEM")?;
         crate::validation::validate_with_mode(crate::validation::MessageKind::Oem, &oem)?;
         Ok(oem)
     }

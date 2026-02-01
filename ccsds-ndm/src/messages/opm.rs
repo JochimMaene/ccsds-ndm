@@ -63,7 +63,9 @@ impl Ndm for Opm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let opm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
+        let content = crate::xml::extract_message_content(xml, "opm")
+            .unwrap_or(std::borrow::Cow::Borrowed(xml));
+        let opm: Self = crate::xml::from_str_with_context(&content, "OPM")?;
         crate::validation::validate_with_mode(crate::validation::MessageKind::Opm, &opm)?;
         Ok(opm)
     }

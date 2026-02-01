@@ -62,7 +62,9 @@ impl Ndm for Apm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let apm: Self = crate::xml::from_str_with_context(xml, "APM")?;
+        let content = crate::xml::extract_message_content(xml, "apm")
+            .unwrap_or(std::borrow::Cow::Borrowed(xml));
+        let apm: Self = crate::xml::from_str_with_context(&content, "APM")?;
         crate::validation::validate_with_mode(crate::validation::MessageKind::Apm, &apm)?;
         Ok(apm)
     }

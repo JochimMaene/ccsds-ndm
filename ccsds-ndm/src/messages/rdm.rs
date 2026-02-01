@@ -137,7 +137,9 @@ impl Ndm for Rdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
+        let content = crate::xml::extract_message_content(xml, "rdm")
+            .unwrap_or(std::borrow::Cow::Borrowed(xml));
+        let rdm: Self = crate::xml::from_str_with_context(&content, "RDM")?;
         crate::validation::validate_with_mode(crate::validation::MessageKind::Rdm, &rdm)?;
         Ok(rdm)
     }
