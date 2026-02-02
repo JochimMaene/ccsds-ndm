@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::common::{parse_object_description, ObjectDescription, OdParameters};
 use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{self as core_types, *};
@@ -10,8 +11,6 @@ use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedA
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
-use crate::common::{OdParameters, ObjectDescription, parse_object_description};
-
 
 // Helper to parse epoch strings
 fn parse_epoch_str(value: &str) -> PyResult<Epoch> {
@@ -223,15 +222,55 @@ pub struct Cdm {
 #[pymethods]
 impl Cdm {
     #[new]
-    #[pyo3(signature = (header, body, id=None, version="1.0".to_string()))]
-    fn new(header: CdmHeader, body: CdmBody, id: Option<String>, version: String) -> Self {
+    fn new(header: CdmHeader, body: CdmBody) -> Self {
         Self {
             inner: core_cdm::Cdm {
                 header: header.inner,
                 body: body.inner,
-                id,
-                version,
+                id: Some("CCSDS_CDM_VERS".to_string()),
+                version: "1.0".to_string(),
             },
+        }
+    }
+
+    /// Validate the message against CCSDS rules.
+    ///
+    /// Parameters
+    /// ----------
+    /// strict : bool, optional
+    ///     If True (default), raises ValueError on the first error found.
+    ///     If False, returns a list of validation error messages (or None if valid).
+    #[pyo3(signature = (strict=true))]
+    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
+
+        if strict {
+            self.inner
+                .validate()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(None)
+        } else {
+            let mut issues = Vec::new();
+            let _ = ccsds_ndm::validation::with_validation_mode(
+                ccsds_ndm::validation::ValidationMode::Lenient,
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
+                    }
+                },
+            );
+
+            let warnings = ccsds_ndm::validation::take_warnings();
+            for w in warnings {
+                issues.push(w.error.to_string());
+            }
+
+            if issues.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(issues))
+            }
         }
     }
 
@@ -268,32 +307,13 @@ impl Cdm {
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner =
-            match format {
-                Some("kvn") => core_cdm::Cdm::from_kvn(data)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
-                Some("xml") => match core_cdm::Cdm::from_xml(data) {
-                    Ok(cdm) => cdm,
-                    Err(primary_err) => match ccsds_ndm::from_str(data) {
-                        Ok(MessageType::Cdm(cdm)) => cdm,
-                        Ok(other) => {
-                            return Err(PyValueError::new_err(format!(
-                                "Parsed message is not CDM (got {:?})",
-                                other
-                            )))
-                        }
-                        Err(_) => {
-                            return Err(PyValueError::new_err(primary_err.to_string()));
-                        }
-                    },
-                },
-                Some(other) => {
-                    return Err(PyValueError::new_err(format!(
-                        "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                        other
-                    )))
-                }
-                None => match ccsds_ndm::from_str(data) {
+        let inner = match format {
+            Some("kvn") => {
+                core_cdm::Cdm::from_kvn(data).map_err(|e| PyValueError::new_err(e.to_string()))?
+            }
+            Some("xml") => match core_cdm::Cdm::from_xml(data) {
+                Ok(cdm) => cdm,
+                Err(primary_err) => match ccsds_ndm::from_str(data) {
                     Ok(MessageType::Cdm(cdm)) => cdm,
                     Ok(other) => {
                         return Err(PyValueError::new_err(format!(
@@ -301,9 +321,28 @@ impl Cdm {
                             other
                         )))
                     }
-                    Err(e) => return Err(PyValueError::new_err(e.to_string())),
+                    Err(_) => {
+                        return Err(PyValueError::new_err(primary_err.to_string()));
+                    }
                 },
-            };
+            },
+            Some(other) => {
+                return Err(PyValueError::new_err(format!(
+                    "Unsupported format '{}'. Use 'kvn' or 'xml'",
+                    other
+                )))
+            }
+            None => match ccsds_ndm::from_str(data) {
+                Ok(MessageType::Cdm(cdm)) => cdm,
+                Ok(other) => {
+                    return Err(PyValueError::new_err(format!(
+                        "Parsed message is not CDM (got {:?})",
+                        other
+                    )))
+                }
+                Err(e) => return Err(PyValueError::new_err(e.to_string())),
+            },
+        };
         Ok(Self { inner })
     }
 
@@ -334,20 +373,24 @@ impl Cdm {
     /// ----------
     /// format : str
     ///     The output format ('kvn' or 'xml').
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
     ///
     /// Returns
     /// -------
     /// str
     ///     The serialized CDM string.
-    fn to_str(&self, format: &str) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true))]
+    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+        if validate {
+            self.validate(true)?;
+        }
         match format {
             "kvn" => self
                 .inner
                 .to_kvn()
                 .map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => self
-                .inner
-                .to_xml()
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
                 .map_err(|e| PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
@@ -355,8 +398,6 @@ impl Cdm {
             ))),
         }
     }
-
-
 
     /// Conjunction Data Message (CDM).
     ///
@@ -411,8 +452,11 @@ impl Cdm {
     ///     The output file path.
     /// format : str
     ///     The output format ('kvn' or 'xml').
-    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
-        let data = self.to_str(format)?;
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
+    #[pyo3(signature = (path, format, validate=true))]
+    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
+        let data = self.to_str(format, validate)?;
         match fs::write(path, data) {
             Ok(_) => Ok(()),
             Err(e) => Err(PyValueError::new_err(format!(
@@ -719,13 +763,13 @@ impl RelativeMetadataData {
         };
 
         let screen_volume_frame = match screen_volume_frame {
-             Some(ref ob) => Some(parse_screen_volume_frame_type(ob)?),
-             None => None,
+            Some(ref ob) => Some(parse_screen_volume_frame_type(ob)?),
+            None => None,
         };
 
         let screen_volume_shape = match screen_volume_shape {
-             Some(ref ob) => Some(parse_screen_volume_shape_type(ob)?),
-             None => None,
+            Some(ref ob) => Some(parse_screen_volume_shape_type(ob)?),
+            None => None,
         };
 
         let map_shape = |s: ScreenVolumeShapeType| match s {
@@ -1338,7 +1382,9 @@ impl CdmMetadata {
             None => ManeuverableType::Yes,
         };
         let ref_frame = parse_reference_frame_type(&ref_frame)?;
-        let object_type = object_type.map(|ob| parse_object_description(&ob)).transpose()?;
+        let object_type = object_type
+            .map(|ob| parse_object_description(&ob))
+            .transpose()?;
 
         let map_object = |o: CdmObjectType| match o {
             CdmObjectType::Object1 => core_types::CdmObjectType::Object1,
@@ -1369,7 +1415,6 @@ impl CdmMetadata {
             }
         };
 
-
         Ok(Self {
             inner: core_cdm::CdmMetadata {
                 comment,
@@ -1397,7 +1442,6 @@ impl CdmMetadata {
             },
         })
     }
-
 
     /// Spacecraft name for the object.
     ///
@@ -1614,8 +1658,8 @@ impl CdmMetadata {
     #[getter]
     fn get_object(&self) -> CdmObjectType {
         match self.inner.object {
-             core_types::CdmObjectType::Object1 => CdmObjectType::Object1,
-             core_types::CdmObjectType::Object2 => CdmObjectType::Object2,
+            core_types::CdmObjectType::Object1 => CdmObjectType::Object1,
+            core_types::CdmObjectType::Object2 => CdmObjectType::Object2,
         }
     }
     #[setter]
@@ -1634,11 +1678,18 @@ impl CdmMetadata {
     #[getter]
     fn get_object_type(&self) -> Option<ObjectDescription> {
         self.inner.object_type.as_ref().map(|d| match d {
-            core_types::ObjectDescription::Payload | core_types::ObjectDescription::PayloadLower => ObjectDescription::Payload,
-            core_types::ObjectDescription::RocketBody | core_types::ObjectDescription::RocketBodyLower => ObjectDescription::RocketBody,
-            core_types::ObjectDescription::Debris | core_types::ObjectDescription::DebrisLower => ObjectDescription::Debris,
-            core_types::ObjectDescription::Unknown | core_types::ObjectDescription::UnknownLower => ObjectDescription::Unknown,
-            core_types::ObjectDescription::Other | core_types::ObjectDescription::OtherLower => ObjectDescription::Other,
+            core_types::ObjectDescription::Payload
+            | core_types::ObjectDescription::PayloadLower => ObjectDescription::Payload,
+            core_types::ObjectDescription::RocketBody
+            | core_types::ObjectDescription::RocketBodyLower => ObjectDescription::RocketBody,
+            core_types::ObjectDescription::Debris | core_types::ObjectDescription::DebrisLower => {
+                ObjectDescription::Debris
+            }
+            core_types::ObjectDescription::Unknown
+            | core_types::ObjectDescription::UnknownLower => ObjectDescription::Unknown,
+            core_types::ObjectDescription::Other | core_types::ObjectDescription::OtherLower => {
+                ObjectDescription::Other
+            }
         })
     }
     #[setter]
@@ -1735,10 +1786,12 @@ impl CdmMetadata {
     }
     #[setter]
     fn set_solar_rad_pressure(&mut self, v: Option<bool>) {
-        self.inner.solar_rad_pressure = v.map(|b| if b {
-            core_types::YesNo::Yes
-        } else {
-            core_types::YesNo::No
+        self.inner.solar_rad_pressure = v.map(|b| {
+            if b {
+                core_types::YesNo::Yes
+            } else {
+                core_types::YesNo::No
+            }
         });
     }
 
@@ -1756,10 +1809,12 @@ impl CdmMetadata {
     }
     #[setter]
     fn set_earth_tides(&mut self, v: Option<bool>) {
-        self.inner.earth_tides = v.map(|b| if b {
-            core_types::YesNo::Yes
-        } else {
-            core_types::YesNo::No
+        self.inner.earth_tides = v.map(|b| {
+            if b {
+                core_types::YesNo::Yes
+            } else {
+                core_types::YesNo::No
+            }
         });
     }
 
@@ -1777,10 +1832,12 @@ impl CdmMetadata {
     }
     #[setter]
     fn set_intrack_thrust(&mut self, v: Option<bool>) {
-        self.inner.intrack_thrust = v.map(|b| if b {
-            core_types::YesNo::Yes
-        } else {
-            core_types::YesNo::No
+        self.inner.intrack_thrust = v.map(|b| {
+            if b {
+                core_types::YesNo::Yes
+            } else {
+                core_types::YesNo::No
+            }
         });
     }
 
@@ -1828,7 +1885,7 @@ impl CdmData {
     ) -> PyResult<Self> {
         let od_p = match od_parameters {
             Some(ob) => {
-                if let Ok(list) = ob.downcast::<pyo3::types::PyList>() {
+                if let Ok(list) = ob.cast::<pyo3::types::PyList>() {
                     if list.is_empty() {
                         None
                     } else {
@@ -1845,7 +1902,7 @@ impl CdmData {
 
         let add_p = match additional_parameters {
             Some(ob) => {
-                if let Ok(list) = ob.downcast::<pyo3::types::PyList>() {
+                if let Ok(list) = ob.cast::<pyo3::types::PyList>() {
                     if list.is_empty() {
                         None
                     } else {
@@ -1941,7 +1998,10 @@ impl CdmData {
     /// :type: Optional[OdParameters]
     #[getter]
     fn get_od_parameters(&self) -> Option<OdParameters> {
-        self.inner.od_parameters.as_ref().map(|o| OdParameters { inner: o.clone() })
+        self.inner
+            .od_parameters
+            .as_ref()
+            .map(|o| OdParameters { inner: o.clone() })
     }
     #[setter]
     fn set_od_parameters(&mut self, v: Option<OdParameters>) {
@@ -1953,7 +2013,10 @@ impl CdmData {
     /// :type: Optional[AdditionalParameters]
     #[getter]
     fn get_additional_parameters(&self) -> Option<AdditionalParameters> {
-        self.inner.additional_parameters.as_ref().map(|a| AdditionalParameters { inner: a.clone() })
+        self.inner
+            .additional_parameters
+            .as_ref()
+            .map(|a| AdditionalParameters { inner: a.clone() })
     }
     #[setter]
     fn set_additional_parameters(&mut self, v: Option<AdditionalParameters>) {
@@ -1994,10 +2057,7 @@ impl CdmData {
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyArray2<f64>>> {
         match self.inner.covariance_matrix.as_ref() {
-            Some(cov) => CdmCovarianceMatrix {
-                inner: cov.clone(),
-            }
-            .to_numpy(py),
+            Some(cov) => CdmCovarianceMatrix { inner: cov.clone() }.to_numpy(py),
             None => Err(PyValueError::new_err(
                 "COVARIANCE_MATRIX is missing; cannot build NumPy array",
             )),
@@ -2083,7 +2143,14 @@ impl CdmStateVector {
             [v[0], v[1], v[2], v[3], v[4], v[5]]
         } else if shape.len() == 2 && shape[0] == 1 && shape[1] == 6 {
             let v = array.as_array();
-            [v[[0, 0]], v[[0, 1]], v[[0, 2]], v[[0, 3]], v[[0, 4]], v[[0, 5]]]
+            [
+                v[[0, 0]],
+                v[[0, 1]],
+                v[[0, 2]],
+                v[[0, 3]],
+                v[[0, 4]],
+                v[[0, 5]],
+            ]
         } else {
             return Err(PyValueError::new_err(
                 "State vector must be shape (6,) or (1,6)",
@@ -2217,7 +2284,6 @@ impl CdmStateVector {
 ///
 /// Provides uncertainty information for the state vector.
 /// Can be converted to a NumPy array using `to_numpy()`.
-
 
 // -----------------------------------------------------------------------------------------
 // Enums
@@ -2444,11 +2510,6 @@ fn parse_maneuverable_type(ob: &Bound<'_, PyAny>) -> PyResult<ManeuverableType> 
         ))),
     }
 }
-
-
-
-
-
 
 /// Additional Parameters.
 ///
@@ -2890,7 +2951,6 @@ impl CdmCovarianceMatrix {
                 cthr_srp: cthr_srp.map(|v| core_types::M3kgs2::new(v)),
                 cthr_thr: cthr_thr.map(|v| core_types::M2s4::new(v)),
             },
-
         }
     }
 
@@ -3001,9 +3061,11 @@ impl CdmCovarianceMatrix {
         }
 
         // Return dim x dim array
-        let numpy_arr =
-            PyArray2::from_vec2(py, &array.chunks(dim).map(|c| c.to_vec()).collect::<Vec<_>>())
-                .unwrap();
+        let numpy_arr = PyArray2::from_vec2(
+            py,
+            &array.chunks(dim).map(|c| c.to_vec()).collect::<Vec<_>>(),
+        )
+        .unwrap();
         Ok(numpy_arr)
     }
 
@@ -3013,9 +3075,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cr_r(&self) -> f64 { self.inner.cr_r.value }
+    fn get_cr_r(&self) -> f64 {
+        self.inner.cr_r.value
+    }
     #[setter]
-    fn set_cr_r(&mut self, v: f64) { self.inner.cr_r.value = v; }
+    fn set_cr_r(&mut self, v: f64) {
+        self.inner.cr_r.value = v;
+    }
 
     /// Object covariance matrix `[2,1]`.
     ///
@@ -3023,9 +3089,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_ct_r(&self) -> f64 { self.inner.ct_r.value }
+    fn get_ct_r(&self) -> f64 {
+        self.inner.ct_r.value
+    }
     #[setter]
-    fn set_ct_r(&mut self, v: f64) { self.inner.ct_r.value = v; }
+    fn set_ct_r(&mut self, v: f64) {
+        self.inner.ct_r.value = v;
+    }
 
     /// Object covariance matrix `[2,2]`.
     ///
@@ -3033,9 +3103,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_ct_t(&self) -> f64 { self.inner.ct_t.value }
+    fn get_ct_t(&self) -> f64 {
+        self.inner.ct_t.value
+    }
     #[setter]
-    fn set_ct_t(&mut self, v: f64) { self.inner.ct_t.value = v; }
+    fn set_ct_t(&mut self, v: f64) {
+        self.inner.ct_t.value = v;
+    }
 
     /// Object covariance matrix `[3,1]`.
     ///
@@ -3043,9 +3117,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cn_r(&self) -> f64 { self.inner.cn_r.value }
+    fn get_cn_r(&self) -> f64 {
+        self.inner.cn_r.value
+    }
     #[setter]
-    fn set_cn_r(&mut self, v: f64) { self.inner.cn_r.value = v; }
+    fn set_cn_r(&mut self, v: f64) {
+        self.inner.cn_r.value = v;
+    }
 
     /// Object covariance matrix `[3,2]`.
     ///
@@ -3053,9 +3131,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cn_t(&self) -> f64 { self.inner.cn_t.value }
+    fn get_cn_t(&self) -> f64 {
+        self.inner.cn_t.value
+    }
     #[setter]
-    fn set_cn_t(&mut self, v: f64) { self.inner.cn_t.value = v; }
+    fn set_cn_t(&mut self, v: f64) {
+        self.inner.cn_t.value = v;
+    }
 
     /// Object covariance matrix `[3,3]`.
     ///
@@ -3063,9 +3145,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cn_n(&self) -> f64 { self.inner.cn_n.value }
+    fn get_cn_n(&self) -> f64 {
+        self.inner.cn_n.value
+    }
     #[setter]
-    fn set_cn_n(&mut self, v: f64) { self.inner.cn_n.value = v; }
+    fn set_cn_n(&mut self, v: f64) {
+        self.inner.cn_n.value = v;
+    }
 
     /// Object covariance matrix `[4,1]`.
     ///
@@ -3073,9 +3159,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_crdot_r(&self) -> f64 { self.inner.crdot_r.value }
+    fn get_crdot_r(&self) -> f64 {
+        self.inner.crdot_r.value
+    }
     #[setter]
-    fn set_crdot_r(&mut self, v: f64) { self.inner.crdot_r.value = v; }
+    fn set_crdot_r(&mut self, v: f64) {
+        self.inner.crdot_r.value = v;
+    }
 
     /// Object covariance matrix `[4,2]`.
     ///
@@ -3083,9 +3173,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_crdot_t(&self) -> f64 { self.inner.crdot_t.value }
+    fn get_crdot_t(&self) -> f64 {
+        self.inner.crdot_t.value
+    }
     #[setter]
-    fn set_crdot_t(&mut self, v: f64) { self.inner.crdot_t.value = v; }
+    fn set_crdot_t(&mut self, v: f64) {
+        self.inner.crdot_t.value = v;
+    }
 
     /// Object covariance matrix `[4,3]`.
     ///
@@ -3093,9 +3187,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_crdot_n(&self) -> f64 { self.inner.crdot_n.value }
+    fn get_crdot_n(&self) -> f64 {
+        self.inner.crdot_n.value
+    }
     #[setter]
-    fn set_crdot_n(&mut self, v: f64) { self.inner.crdot_n.value = v; }
+    fn set_crdot_n(&mut self, v: f64) {
+        self.inner.crdot_n.value = v;
+    }
 
     /// Object covariance matrix `[4,4]`.
     ///
@@ -3103,9 +3201,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_crdot_rdot(&self) -> f64 { self.inner.crdot_rdot.value }
+    fn get_crdot_rdot(&self) -> f64 {
+        self.inner.crdot_rdot.value
+    }
     #[setter]
-    fn set_crdot_rdot(&mut self, v: f64) { self.inner.crdot_rdot.value = v; }
+    fn set_crdot_rdot(&mut self, v: f64) {
+        self.inner.crdot_rdot.value = v;
+    }
 
     /// Object covariance matrix `[5,1]`.
     ///
@@ -3113,9 +3215,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_ctdot_r(&self) -> f64 { self.inner.ctdot_r.value }
+    fn get_ctdot_r(&self) -> f64 {
+        self.inner.ctdot_r.value
+    }
     #[setter]
-    fn set_ctdot_r(&mut self, v: f64) { self.inner.ctdot_r.value = v; }
+    fn set_ctdot_r(&mut self, v: f64) {
+        self.inner.ctdot_r.value = v;
+    }
 
     /// Object covariance matrix `[5,2]`.
     ///
@@ -3123,9 +3229,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_ctdot_t(&self) -> f64 { self.inner.ctdot_t.value }
+    fn get_ctdot_t(&self) -> f64 {
+        self.inner.ctdot_t.value
+    }
     #[setter]
-    fn set_ctdot_t(&mut self, v: f64) { self.inner.ctdot_t.value = v; }
+    fn set_ctdot_t(&mut self, v: f64) {
+        self.inner.ctdot_t.value = v;
+    }
 
     /// Object covariance matrix `[5,3]`.
     ///
@@ -3133,9 +3243,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_ctdot_n(&self) -> f64 { self.inner.ctdot_n.value }
+    fn get_ctdot_n(&self) -> f64 {
+        self.inner.ctdot_n.value
+    }
     #[setter]
-    fn set_ctdot_n(&mut self, v: f64) { self.inner.ctdot_n.value = v; }
+    fn set_ctdot_n(&mut self, v: f64) {
+        self.inner.ctdot_n.value = v;
+    }
 
     /// Object covariance matrix `[5,4]`.
     ///
@@ -3143,9 +3257,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_ctdot_rdot(&self) -> f64 { self.inner.ctdot_rdot.value }
+    fn get_ctdot_rdot(&self) -> f64 {
+        self.inner.ctdot_rdot.value
+    }
     #[setter]
-    fn set_ctdot_rdot(&mut self, v: f64) { self.inner.ctdot_rdot.value = v; }
+    fn set_ctdot_rdot(&mut self, v: f64) {
+        self.inner.ctdot_rdot.value = v;
+    }
 
     /// Object covariance matrix `[5,5]`.
     ///
@@ -3153,9 +3271,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_ctdot_tdot(&self) -> f64 { self.inner.ctdot_tdot.value }
+    fn get_ctdot_tdot(&self) -> f64 {
+        self.inner.ctdot_tdot.value
+    }
     #[setter]
-    fn set_ctdot_tdot(&mut self, v: f64) { self.inner.ctdot_tdot.value = v; }
+    fn set_ctdot_tdot(&mut self, v: f64) {
+        self.inner.ctdot_tdot.value = v;
+    }
 
     /// Object covariance matrix `[6,1]`.
     ///
@@ -3163,9 +3285,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cndot_r(&self) -> f64 { self.inner.cndot_r.value }
+    fn get_cndot_r(&self) -> f64 {
+        self.inner.cndot_r.value
+    }
     #[setter]
-    fn set_cndot_r(&mut self, v: f64) { self.inner.cndot_r.value = v; }
+    fn set_cndot_r(&mut self, v: f64) {
+        self.inner.cndot_r.value = v;
+    }
 
     /// Object covariance matrix `[6,2]`.
     ///
@@ -3173,9 +3299,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cndot_t(&self) -> f64 { self.inner.cndot_t.value }
+    fn get_cndot_t(&self) -> f64 {
+        self.inner.cndot_t.value
+    }
     #[setter]
-    fn set_cndot_t(&mut self, v: f64) { self.inner.cndot_t.value = v; }
+    fn set_cndot_t(&mut self, v: f64) {
+        self.inner.cndot_t.value = v;
+    }
 
     /// Object covariance matrix `[6,3]`.
     ///
@@ -3183,9 +3313,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cndot_n(&self) -> f64 { self.inner.cndot_n.value }
+    fn get_cndot_n(&self) -> f64 {
+        self.inner.cndot_n.value
+    }
     #[setter]
-    fn set_cndot_n(&mut self, v: f64) { self.inner.cndot_n.value = v; }
+    fn set_cndot_n(&mut self, v: f64) {
+        self.inner.cndot_n.value = v;
+    }
 
     /// Object covariance matrix `[6,4]`.
     ///
@@ -3193,9 +3327,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cndot_rdot(&self) -> f64 { self.inner.cndot_rdot.value }
+    fn get_cndot_rdot(&self) -> f64 {
+        self.inner.cndot_rdot.value
+    }
     #[setter]
-    fn set_cndot_rdot(&mut self, v: f64) { self.inner.cndot_rdot.value = v; }
+    fn set_cndot_rdot(&mut self, v: f64) {
+        self.inner.cndot_rdot.value = v;
+    }
 
     /// Object covariance matrix `[6,5]`.
     ///
@@ -3203,9 +3341,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cndot_tdot(&self) -> f64 { self.inner.cndot_tdot.value }
+    fn get_cndot_tdot(&self) -> f64 {
+        self.inner.cndot_tdot.value
+    }
     #[setter]
-    fn set_cndot_tdot(&mut self, v: f64) { self.inner.cndot_tdot.value = v; }
+    fn set_cndot_tdot(&mut self, v: f64) {
+        self.inner.cndot_tdot.value = v;
+    }
 
     /// Object covariance matrix `[6,6]`.
     ///
@@ -3213,9 +3355,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cndot_ndot(&self) -> f64 { self.inner.cndot_ndot.value }
+    fn get_cndot_ndot(&self) -> f64 {
+        self.inner.cndot_ndot.value
+    }
     #[setter]
-    fn set_cndot_ndot(&mut self, v: f64) { self.inner.cndot_ndot.value = v; }
+    fn set_cndot_ndot(&mut self, v: f64) {
+        self.inner.cndot_ndot.value = v;
+    }
 
     /// Object covariance matrix `[7,1]`.
     ///
@@ -3223,9 +3369,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cdrg_r(&self) -> Option<f64> { self.inner.cdrg_r.as_ref().map(|v| v.value) }
+    fn get_cdrg_r(&self) -> Option<f64> {
+        self.inner.cdrg_r.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cdrg_r(&mut self, v: Option<f64>) { self.inner.cdrg_r = v.map(|x| core_types::M3kg::new(x)); }
+    fn set_cdrg_r(&mut self, v: Option<f64>) {
+        self.inner.cdrg_r = v.map(|x| core_types::M3kg::new(x));
+    }
 
     /// Object covariance matrix `[7,2]`.
     ///
@@ -3233,9 +3383,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cdrg_t(&self) -> Option<f64> { self.inner.cdrg_t.as_ref().map(|v| v.value) }
+    fn get_cdrg_t(&self) -> Option<f64> {
+        self.inner.cdrg_t.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cdrg_t(&mut self, v: Option<f64>) { self.inner.cdrg_t = v.map(|x| core_types::M3kg::new(x)); }
+    fn set_cdrg_t(&mut self, v: Option<f64>) {
+        self.inner.cdrg_t = v.map(|x| core_types::M3kg::new(x));
+    }
 
     /// Object covariance matrix `[7,3]`.
     ///
@@ -3243,9 +3397,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cdrg_n(&self) -> Option<f64> { self.inner.cdrg_n.as_ref().map(|v| v.value) }
+    fn get_cdrg_n(&self) -> Option<f64> {
+        self.inner.cdrg_n.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cdrg_n(&mut self, v: Option<f64>) { self.inner.cdrg_n = v.map(|x| core_types::M3kg::new(x)); }
+    fn set_cdrg_n(&mut self, v: Option<f64>) {
+        self.inner.cdrg_n = v.map(|x| core_types::M3kg::new(x));
+    }
 
     /// Object covariance matrix `[7,4]`.
     ///
@@ -3253,9 +3411,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cdrg_rdot(&self) -> Option<f64> { self.inner.cdrg_rdot.as_ref().map(|v| v.value) }
+    fn get_cdrg_rdot(&self) -> Option<f64> {
+        self.inner.cdrg_rdot.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cdrg_rdot(&mut self, v: Option<f64>) { self.inner.cdrg_rdot = v.map(|x| core_types::M3kgs::new(x)); }
+    fn set_cdrg_rdot(&mut self, v: Option<f64>) {
+        self.inner.cdrg_rdot = v.map(|x| core_types::M3kgs::new(x));
+    }
 
     /// Object covariance matrix `[7,5]`.
     ///
@@ -3263,9 +3425,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cdrg_tdot(&self) -> Option<f64> { self.inner.cdrg_tdot.as_ref().map(|v| v.value) }
+    fn get_cdrg_tdot(&self) -> Option<f64> {
+        self.inner.cdrg_tdot.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cdrg_tdot(&mut self, v: Option<f64>) { self.inner.cdrg_tdot = v.map(|x| core_types::M3kgs::new(x)); }
+    fn set_cdrg_tdot(&mut self, v: Option<f64>) {
+        self.inner.cdrg_tdot = v.map(|x| core_types::M3kgs::new(x));
+    }
 
     /// Object covariance matrix `[7,6]`.
     ///
@@ -3273,9 +3439,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cdrg_ndot(&self) -> Option<f64> { self.inner.cdrg_ndot.as_ref().map(|v| v.value) }
+    fn get_cdrg_ndot(&self) -> Option<f64> {
+        self.inner.cdrg_ndot.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cdrg_ndot(&mut self, v: Option<f64>) { self.inner.cdrg_ndot = v.map(|x| core_types::M3kgs::new(x)); }
+    fn set_cdrg_ndot(&mut self, v: Option<f64>) {
+        self.inner.cdrg_ndot = v.map(|x| core_types::M3kgs::new(x));
+    }
 
     /// Object covariance matrix `[7,7]`.
     ///
@@ -3283,9 +3453,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cdrg_drg(&self) -> Option<f64> { self.inner.cdrg_drg.as_ref().map(|v| v.value) }
+    fn get_cdrg_drg(&self) -> Option<f64> {
+        self.inner.cdrg_drg.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cdrg_drg(&mut self, v: Option<f64>) { self.inner.cdrg_drg = v.map(|x| core_types::M4kg2::new(x)); }
+    fn set_cdrg_drg(&mut self, v: Option<f64>) {
+        self.inner.cdrg_drg = v.map(|x| core_types::M4kg2::new(x));
+    }
 
     /// Object covariance matrix `[8,1]`.
     ///
@@ -3293,9 +3467,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_csrp_r(&self) -> Option<f64> { self.inner.csrp_r.as_ref().map(|v| v.value) }
+    fn get_csrp_r(&self) -> Option<f64> {
+        self.inner.csrp_r.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_csrp_r(&mut self, v: Option<f64>) { self.inner.csrp_r = v.map(|x| core_types::M3kg::new(x)); }
+    fn set_csrp_r(&mut self, v: Option<f64>) {
+        self.inner.csrp_r = v.map(|x| core_types::M3kg::new(x));
+    }
 
     /// Object covariance matrix `[8,2]`.
     ///
@@ -3303,9 +3481,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_csrp_t(&self) -> Option<f64> { self.inner.csrp_t.as_ref().map(|v| v.value) }
+    fn get_csrp_t(&self) -> Option<f64> {
+        self.inner.csrp_t.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_csrp_t(&mut self, v: Option<f64>) { self.inner.csrp_t = v.map(|x| core_types::M3kg::new(x)); }
+    fn set_csrp_t(&mut self, v: Option<f64>) {
+        self.inner.csrp_t = v.map(|x| core_types::M3kg::new(x));
+    }
 
     /// Object covariance matrix `[8,3]`.
     ///
@@ -3313,9 +3495,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_csrp_n(&self) -> Option<f64> { self.inner.csrp_n.as_ref().map(|v| v.value) }
+    fn get_csrp_n(&self) -> Option<f64> {
+        self.inner.csrp_n.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_csrp_n(&mut self, v: Option<f64>) { self.inner.csrp_n = v.map(|x| core_types::M3kg::new(x)); }
+    fn set_csrp_n(&mut self, v: Option<f64>) {
+        self.inner.csrp_n = v.map(|x| core_types::M3kg::new(x));
+    }
 
     /// Object covariance matrix `[8,4]`.
     ///
@@ -3323,9 +3509,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_csrp_rdot(&self) -> Option<f64> { self.inner.csrp_rdot.as_ref().map(|v| v.value) }
+    fn get_csrp_rdot(&self) -> Option<f64> {
+        self.inner.csrp_rdot.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_csrp_rdot(&mut self, v: Option<f64>) { self.inner.csrp_rdot = v.map(|x| core_types::M3kgs::new(x)); }
+    fn set_csrp_rdot(&mut self, v: Option<f64>) {
+        self.inner.csrp_rdot = v.map(|x| core_types::M3kgs::new(x));
+    }
 
     /// Object covariance matrix `[8,5]`.
     ///
@@ -3333,9 +3523,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_csrp_tdot(&self) -> Option<f64> { self.inner.csrp_tdot.as_ref().map(|v| v.value) }
+    fn get_csrp_tdot(&self) -> Option<f64> {
+        self.inner.csrp_tdot.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_csrp_tdot(&mut self, v: Option<f64>) { self.inner.csrp_tdot = v.map(|x| core_types::M3kgs::new(x)); }
+    fn set_csrp_tdot(&mut self, v: Option<f64>) {
+        self.inner.csrp_tdot = v.map(|x| core_types::M3kgs::new(x));
+    }
 
     /// Object covariance matrix `[8,6]`.
     ///
@@ -3343,9 +3537,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_csrp_ndot(&self) -> Option<f64> { self.inner.csrp_ndot.as_ref().map(|v| v.value) }
+    fn get_csrp_ndot(&self) -> Option<f64> {
+        self.inner.csrp_ndot.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_csrp_ndot(&mut self, v: Option<f64>) { self.inner.csrp_ndot = v.map(|x| core_types::M3kgs::new(x)); }
+    fn set_csrp_ndot(&mut self, v: Option<f64>) {
+        self.inner.csrp_ndot = v.map(|x| core_types::M3kgs::new(x));
+    }
 
     /// Object covariance matrix `[8,7]`.
     ///
@@ -3353,9 +3551,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_csrp_drg(&self) -> Option<f64> { self.inner.csrp_drg.as_ref().map(|v| v.value) }
+    fn get_csrp_drg(&self) -> Option<f64> {
+        self.inner.csrp_drg.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_csrp_drg(&mut self, v: Option<f64>) { self.inner.csrp_drg = v.map(|x| core_types::M4kg2::new(x)); }
+    fn set_csrp_drg(&mut self, v: Option<f64>) {
+        self.inner.csrp_drg = v.map(|x| core_types::M4kg2::new(x));
+    }
 
     /// Object covariance matrix `[8,8]`.
     ///
@@ -3363,9 +3565,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_csrp_srp(&self) -> Option<f64> { self.inner.csrp_srp.as_ref().map(|v| v.value) }
+    fn get_csrp_srp(&self) -> Option<f64> {
+        self.inner.csrp_srp.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_csrp_srp(&mut self, v: Option<f64>) { self.inner.csrp_srp = v.map(|x| core_types::M4kg2::new(x)); }
+    fn set_csrp_srp(&mut self, v: Option<f64>) {
+        self.inner.csrp_srp = v.map(|x| core_types::M4kg2::new(x));
+    }
 
     /// Object covariance matrix `[9,1]`.
     ///
@@ -3373,9 +3579,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cthr_r(&self) -> Option<f64> { self.inner.cthr_r.as_ref().map(|v| v.value) }
+    fn get_cthr_r(&self) -> Option<f64> {
+        self.inner.cthr_r.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cthr_r(&mut self, v: Option<f64>) { self.inner.cthr_r = v.map(|x| core_types::M2s2::new(x)); }
+    fn set_cthr_r(&mut self, v: Option<f64>) {
+        self.inner.cthr_r = v.map(|x| core_types::M2s2::new(x));
+    }
 
     /// Object covariance matrix `[9,2]`.
     ///
@@ -3383,9 +3593,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cthr_t(&self) -> Option<f64> { self.inner.cthr_t.as_ref().map(|v| v.value) }
+    fn get_cthr_t(&self) -> Option<f64> {
+        self.inner.cthr_t.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cthr_t(&mut self, v: Option<f64>) { self.inner.cthr_t = v.map(|x| core_types::M2s2::new(x)); }
+    fn set_cthr_t(&mut self, v: Option<f64>) {
+        self.inner.cthr_t = v.map(|x| core_types::M2s2::new(x));
+    }
 
     /// Object covariance matrix `[9,3]`.
     ///
@@ -3393,9 +3607,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cthr_n(&self) -> Option<f64> { self.inner.cthr_n.as_ref().map(|v| v.value) }
+    fn get_cthr_n(&self) -> Option<f64> {
+        self.inner.cthr_n.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cthr_n(&mut self, v: Option<f64>) { self.inner.cthr_n = v.map(|x| core_types::M2s2::new(x)); }
+    fn set_cthr_n(&mut self, v: Option<f64>) {
+        self.inner.cthr_n = v.map(|x| core_types::M2s2::new(x));
+    }
 
     /// Object covariance matrix `[9,4]`.
     ///
@@ -3403,9 +3621,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cthr_rdot(&self) -> Option<f64> { self.inner.cthr_rdot.as_ref().map(|v| v.value) }
+    fn get_cthr_rdot(&self) -> Option<f64> {
+        self.inner.cthr_rdot.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cthr_rdot(&mut self, v: Option<f64>) { self.inner.cthr_rdot = v.map(|x| core_types::M2s3::new(x)); }
+    fn set_cthr_rdot(&mut self, v: Option<f64>) {
+        self.inner.cthr_rdot = v.map(|x| core_types::M2s3::new(x));
+    }
 
     /// Object covariance matrix `[9,5]`.
     ///
@@ -3413,9 +3635,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cthr_tdot(&self) -> Option<f64> { self.inner.cthr_tdot.as_ref().map(|v| v.value) }
+    fn get_cthr_tdot(&self) -> Option<f64> {
+        self.inner.cthr_tdot.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cthr_tdot(&mut self, v: Option<f64>) { self.inner.cthr_tdot = v.map(|x| core_types::M2s3::new(x)); }
+    fn set_cthr_tdot(&mut self, v: Option<f64>) {
+        self.inner.cthr_tdot = v.map(|x| core_types::M2s3::new(x));
+    }
 
     /// Object covariance matrix `[9,6]`.
     ///
@@ -3423,9 +3649,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cthr_ndot(&self) -> Option<f64> { self.inner.cthr_ndot.as_ref().map(|v| v.value) }
+    fn get_cthr_ndot(&self) -> Option<f64> {
+        self.inner.cthr_ndot.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cthr_ndot(&mut self, v: Option<f64>) { self.inner.cthr_ndot = v.map(|x| core_types::M2s3::new(x)); }
+    fn set_cthr_ndot(&mut self, v: Option<f64>) {
+        self.inner.cthr_ndot = v.map(|x| core_types::M2s3::new(x));
+    }
 
     /// Object covariance matrix `[9,7]`.
     ///
@@ -3433,9 +3663,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cthr_drg(&self) -> Option<f64> { self.inner.cthr_drg.as_ref().map(|v| v.value) }
+    fn get_cthr_drg(&self) -> Option<f64> {
+        self.inner.cthr_drg.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cthr_drg(&mut self, v: Option<f64>) { self.inner.cthr_drg = v.map(|x| core_types::M3kgs2::new(x)); }
+    fn set_cthr_drg(&mut self, v: Option<f64>) {
+        self.inner.cthr_drg = v.map(|x| core_types::M3kgs2::new(x));
+    }
 
     /// Object covariance matrix `[9,8]`.
     ///
@@ -3443,9 +3677,13 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cthr_srp(&self) -> Option<f64> { self.inner.cthr_srp.as_ref().map(|v| v.value) }
+    fn get_cthr_srp(&self) -> Option<f64> {
+        self.inner.cthr_srp.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cthr_srp(&mut self, v: Option<f64>) { self.inner.cthr_srp = v.map(|x| core_types::M3kgs2::new(x)); }
+    fn set_cthr_srp(&mut self, v: Option<f64>) {
+        self.inner.cthr_srp = v.map(|x| core_types::M3kgs2::new(x));
+    }
 
     /// Object covariance matrix `[9,9]`.
     ///
@@ -3453,9 +3691,11 @@ impl CdmCovarianceMatrix {
     ///
     /// :type: float
     #[getter]
-    fn get_cthr_thr(&self) -> Option<f64> { self.inner.cthr_thr.as_ref().map(|v| v.value) }
+    fn get_cthr_thr(&self) -> Option<f64> {
+        self.inner.cthr_thr.as_ref().map(|v| v.value)
+    }
     #[setter]
-    fn set_cthr_thr(&mut self, v: Option<f64>) { self.inner.cthr_thr = v.map(|x| core_types::M2s4::new(x)); }
-
-
+    fn set_cthr_thr(&mut self, v: Option<f64>) {
+        self.inner.cthr_thr = v.map(|x| core_types::M2s4::new(x));
+    }
 }

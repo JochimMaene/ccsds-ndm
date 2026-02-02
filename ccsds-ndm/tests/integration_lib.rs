@@ -50,7 +50,7 @@ fn write_temp_file(name: &str, content: &str) -> PathBuf {
     path
 }
 
-const OPM_MINIMAL_KVN: &str = r#"CCSDS_OPM_VERS = 2.0
+const OPM_MINIMAL_KVN: &str = r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 OBJECT_NAME = TEST
@@ -68,7 +68,7 @@ Z_DOT = 6 [km/s]
 "#;
 
 const OPM_MINIMAL_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
-<opm id="CCSDS_OPM_VERS" version="2.0">
+<opm id="CCSDS_OPM_VERS" version="3.0">
   <header>
     <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
     <ORIGINATOR>TEST</ORIGINATOR>

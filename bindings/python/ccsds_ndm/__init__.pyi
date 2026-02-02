@@ -94,6 +94,15 @@ class Acm:
     @header.setter
     def header(self, value: AdmHeader) -> None: ...
     @property
+    def id(self) -> Optional[str]:
+        """
+        The message identifier.
+        """
+        ...
+
+    @id.setter
+    def id(self, value: Optional[str]) -> None: ...
+    @property
     def segment(self) -> AcmSegment:
         """
         ACM Segment.
@@ -102,13 +111,35 @@ class Acm:
 
     @segment.setter
     def segment(self, value: AcmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """ """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """ """
         ...
+
+    def validate(self, strict=True):
+        """
+        Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
+        """
+        ...
+
+    @property
+    def version(self) -> str:
+        """
+        The message version.
+        """
+        ...
+
+    @version.setter
+    def version(self, value: str) -> None: ...
 
 class AcmAttitudeDetermination:
     """
@@ -188,6 +219,11 @@ class AcmData:
 
     @user.setter
     def user(self, value: UserDefined) -> None: ...
+    def validate(self, metadata):
+        """
+        Validate the data section against CCSDS rules.
+        """
+        ...
 
 class AcmManeuverParameters:
     """
@@ -252,6 +288,11 @@ class AcmMetadata:
 
     @object_name.setter
     def object_name(self, value: str) -> None: ...
+    def validate(self):
+        """
+        Validate the metadata section against CCSDS rules.
+        """
+        ...
 
 class AcmPhysicalDescription:
     """
@@ -290,6 +331,11 @@ class AcmSegment:
 
     @metadata.setter
     def metadata(self, value: AcmMetadata) -> None: ...
+    def validate(self, header):
+        """
+        Validate the segment against CCSDS rules.
+        """
+        ...
 
 class AdditionalParameters:
     """
@@ -560,6 +606,15 @@ class Aem:
     @header.setter
     def header(self, value: AdmHeader) -> None: ...
     @property
+    def id(self) -> Optional[str]:
+        """
+        The message identifier.
+        """
+        ...
+
+    @id.setter
+    def id(self, value: Optional[str]) -> None: ...
+    @property
     def segments(self) -> list[AemSegment]:
         """
         AEM Segments.
@@ -568,13 +623,39 @@ class Aem:
 
     @segments.setter
     def segments(self, value: list[AemSegment]) -> None: ...
-    def to_file(self, path, format):
-        """ """
+    def to_file(self, path, format, validate=True):
+        """
+        Write to file.
+        """
         ...
 
-    def to_str(self, format):
-        """ """
+    def to_str(self, format, validate=True):
+        """
+        Serialize to string.
+        """
         ...
+
+    def validate(self, strict=True):
+        """
+        Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
+        """
+        ...
+
+    @property
+    def version(self) -> str:
+        """
+        The message version.
+        """
+        ...
+
+    @version.setter
+    def version(self, value: str) -> None: ...
 
 class AemData:
     """
@@ -631,6 +712,12 @@ class AemData:
     @staticmethod
     def from_numpy(epochs, array, comment=None):
         """ """
+        ...
+
+    def validate(self, attitude_type):
+        """
+        Validate the data section against CCSDS rules.
+        """
         ...
 
 class AemMetadata:
@@ -876,6 +963,11 @@ class AemMetadata:
 
     @useable_stop_time.setter
     def useable_stop_time(self, value: str) -> None: ...
+    def validate(self):
+        """
+        Validate the metadata section against CCSDS rules.
+        """
+        ...
 
 class AemSegment:
     def __init__(metadata, data) -> None: ...
@@ -903,6 +995,11 @@ class AemSegment:
 
     @metadata.setter
     def metadata(self, value: AemMetadata) -> None: ...
+    def validate(self):
+        """
+        Validate the segment against CCSDS rules.
+        """
+        ...
 
 class AngVelState:
     """
@@ -1038,6 +1135,15 @@ class Apm:
     @header.setter
     def header(self, value: AdmHeader) -> None: ...
     @property
+    def id(self) -> Optional[str]:
+        """
+        The message identifier.
+        """
+        ...
+
+    @id.setter
+    def id(self, value: Optional[str]) -> None: ...
+    @property
     def segment(self) -> ApmSegment:
         """
         APM Segment.
@@ -1046,13 +1152,39 @@ class Apm:
 
     @segment.setter
     def segment(self, value: ApmSegment) -> None: ...
-    def to_file(self, path, format):
-        """ """
+    def to_file(self, path, format, validate=True):
+        """
+        Write to file.
+        """
         ...
 
-    def to_str(self, format):
-        """ """
+    def to_str(self, format, validate=True):
+        """
+        Serialize to string.
+        """
         ...
+
+    def validate(self, strict=True):
+        """
+        Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
+        """
+        ...
+
+    @property
+    def version(self) -> str:
+        """
+        The message version.
+        """
+        ...
+
+    @version.setter
+    def version(self, value: str) -> None: ...
 
 class ApmData:
     """
@@ -1432,7 +1564,7 @@ class Cdm:
     - Relative position and velocity of Object2 with respect to Object1.
     - Metadata describing how the data was determined (orbit determination settings).
     """
-    def __init__(header, body, id=None, version=...) -> None: ...
+    def __init__(header, body) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -1531,7 +1663,7 @@ class Cdm:
 
     @id.setter
     def id(self, value: Optional[str]) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write the CDM to a file.
 
@@ -1541,10 +1673,12 @@ class Cdm:
             The output file path.
         format : str
             The output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize the CDM to a string.
 
@@ -1552,11 +1686,25 @@ class Cdm:
         ----------
         format : str
             The output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
         str
             The serialized CDM string.
+        """
+        ...
+
+    def validate(self, strict=True):
+        """
+        Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -4269,7 +4417,7 @@ class Ndm:
     def messages(
         self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
     ) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -4279,12 +4427,26 @@ class Ndm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to a string.
+        """
+        ...
+
+    def validate(self, strict=True):
+        """
+        Validate the combined message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -4383,6 +4545,15 @@ class Ocm:
     @header.setter
     def header(self, value: OdmHeader) -> None: ...
     @property
+    def id(self) -> Optional[str]:
+        """
+        The message identifier.
+        """
+        ...
+
+    @id.setter
+    def id(self, value: Optional[str]) -> None: ...
+    @property
     def segment(self) -> OcmSegment:
         """
         The OCM data segment.
@@ -4391,7 +4562,7 @@ class Ocm:
 
     @segment.setter
     def segment(self, value: OcmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -4401,10 +4572,12 @@ class Ocm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
 
@@ -4412,6 +4585,8 @@ class Ocm:
         ----------
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -4419,6 +4594,28 @@ class Ocm:
             The serialized string.
         """
         ...
+
+    def validate(self, strict=True):
+        """
+        Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
+        """
+        ...
+
+    @property
+    def version(self) -> str:
+        """
+        The message version.
+        """
+        ...
+
+    @version.setter
+    def version(self, value: str) -> None: ...
 
 class OcmCovarianceMatrix:
     """
@@ -8223,6 +8420,15 @@ class Oem:
     @header.setter
     def header(self, value: OdmHeader) -> None: ...
     @property
+    def id(self) -> Optional[str]:
+        """
+        The message identifier.
+        """
+        ...
+
+    @id.setter
+    def id(self, value: Optional[str]) -> None: ...
+    @property
     def segments(self) -> list[OemSegment]:
         """
         The list of data segments.
@@ -8231,7 +8437,7 @@ class Oem:
 
     @segments.setter
     def segments(self, value: list[OemSegment]) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -8241,10 +8447,20 @@ class Oem:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        Write to file.
+
+        Parameters
+        ----------
+        path : str
+            Output file path.
+        format : str
+            Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
 
@@ -8257,8 +8473,43 @@ class Oem:
         -------
         str
             The serialized string.
+        Serialize to string.
+
+        Parameters
+        ----------
+        format : str
+            Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
+
+        Returns
+        -------
+        str
+            The serialized string.
         """
         ...
+
+    def validate(self, strict=True):
+        """
+        Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
+        """
+        ...
+
+    @property
+    def version(self) -> str:
+        """
+        The message version.
+        """
+        ...
+
+    @version.setter
+    def version(self, value: str) -> None: ...
 
 class OemCovarianceMatrix:
     """
@@ -8608,7 +8859,7 @@ class OemData:
         comments : list[str], optional
         Comments.
     """
-    def __init__(state_vectors, comments=None) -> None: ...
+    def __init__(state_vectors, covariance_matrix=None, comments=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -8724,6 +8975,11 @@ class OemData:
 
     @state_vector_numpy.setter
     def state_vector_numpy(self, value: numpy.ndarray) -> None: ...
+    def validate(self):
+        """
+        Validate the data section against CCSDS rules.
+        """
+        ...
 
 class OemMetadata:
     """
@@ -8959,6 +9215,11 @@ class OemMetadata:
 
     @useable_stop_time.setter
     def useable_stop_time(self, value: Optional[str]) -> None: ...
+    def validate(self):
+        """
+        Validate the metadata against CCSDS rules.
+        """
+        ...
 
 class OemSegment:
     """
@@ -9000,6 +9261,11 @@ class OemSegment:
 
     @metadata.setter
     def metadata(self, value: OemMetadata) -> None: ...
+    def validate(self):
+        """
+        Validate the segment against CCSDS rules.
+        """
+        ...
 
 class Omm:
     """
@@ -9071,6 +9337,15 @@ class Omm:
     @header.setter
     def header(self, value: OdmHeader) -> None: ...
     @property
+    def id(self) -> Optional[str]:
+        """
+        The message identifier.
+        """
+        ...
+
+    @id.setter
+    def id(self, value: Optional[str]) -> None: ...
+    @property
     def segment(self) -> OmmSegment:
         """
         The data segment.
@@ -9079,7 +9354,7 @@ class Omm:
 
     @segment.setter
     def segment(self, value: OmmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -9089,10 +9364,12 @@ class Omm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
 
@@ -9101,6 +9378,8 @@ class Omm:
         format : str
             Output format ('kvn' or 'xml').
             (Mandatory)
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -9108,6 +9387,28 @@ class Omm:
             The serialized string.
         """
         ...
+
+    def validate(self, strict=True):
+        """
+        Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
+        """
+        ...
+
+    @property
+    def version(self) -> str:
+        """
+        The message version.
+        """
+        ...
+
+    @version.setter
+    def version(self, value: str) -> None: ...
 
 class OmmData:
     """
@@ -9432,6 +9733,15 @@ class Opm:
     @header.setter
     def header(self, value: OdmHeader) -> None: ...
     @property
+    def id(self) -> Optional[str]:
+        """
+        The message identifier.
+        """
+        ...
+
+    @id.setter
+    def id(self, value: Optional[str]) -> None: ...
+    @property
     def segment(self) -> OpmSegment:
         """
         The data segment.
@@ -9440,7 +9750,7 @@ class Opm:
 
     @segment.setter
     def segment(self, value: OpmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -9450,10 +9760,12 @@ class Opm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
 
@@ -9461,6 +9773,8 @@ class Opm:
         ----------
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -9468,6 +9782,28 @@ class Opm:
             The serialized string.
         """
         ...
+
+    def validate(self, strict=True):
+        """
+        Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
+        """
+        ...
+
+    @property
+    def version(self) -> str:
+        """
+        The message version.
+        """
+        ...
+
+    @version.setter
+    def version(self, value: str) -> None: ...
 
 class OpmCovarianceMatrix:
     """
@@ -10256,6 +10592,15 @@ class Rdm:
     @header.setter
     def header(self, value: RdmHeader) -> None: ...
     @property
+    def id(self) -> Optional[str]:
+        """
+        The message identifier.
+        """
+        ...
+
+    @id.setter
+    def id(self, value: Optional[str]) -> None: ...
+    @property
     def segment(self) -> RdmSegment:
         """
         The RDM Body consists of a single segment.
@@ -10264,7 +10609,7 @@ class Rdm:
 
     @segment.setter
     def segment(self, value: RdmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to a file.
 
@@ -10274,6 +10619,8 @@ class Rdm:
             Output file path.
         format : str
             Format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
@@ -10288,7 +10635,7 @@ class Rdm:
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string (generic).
 
@@ -10296,6 +10643,8 @@ class Rdm:
         ----------
         format : str
             Format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -10314,6 +10663,28 @@ class Rdm:
             The serialized XML string.
         """
         ...
+
+    def validate(self, strict=True):
+        """
+        Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
+        """
+        ...
+
+    @property
+    def version(self) -> str:
+        """
+        The message version.
+        """
+        ...
+
+    @version.setter
+    def version(self, value: str) -> None: ...
 
 class RdmData:
     """
@@ -12119,6 +12490,15 @@ class Tdm:
     @header.setter
     def header(self, value: TdmHeader) -> None: ...
     @property
+    def id(self) -> Optional[str]:
+        """
+        The message identifier.
+        """
+        ...
+
+    @id.setter
+    def id(self, value: Optional[str]) -> None: ...
+    @property
     def segments(self) -> list[TdmSegment]:
         """
         Shortcut to access segments directly from the body.
@@ -12127,7 +12507,7 @@ class Tdm:
 
     @segments.setter
     def segments(self, value: list[TdmSegment]) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -12137,10 +12517,12 @@ class Tdm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
 
@@ -12148,6 +12530,8 @@ class Tdm:
         ----------
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -12155,6 +12539,28 @@ class Tdm:
             The serialized string.
         """
         ...
+
+    def validate(self, strict=True):
+        """
+        Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
+        """
+        ...
+
+    @property
+    def version(self) -> str:
+        """
+        The message version.
+        """
+        ...
+
+    @version.setter
+    def version(self, value: str) -> None: ...
 
 class TdmBody:
     """

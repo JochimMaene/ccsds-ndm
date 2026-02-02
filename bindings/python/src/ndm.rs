@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::ndm as core_ndm;
-use ccsds_ndm::traits::Ndm as _;
+use ccsds_ndm::traits::{Ndm as _, Validate};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -36,7 +36,12 @@ pub struct Ndm {
 impl Ndm {
     #[new]
     #[pyo3(signature = (messages, id=None, comments=vec![]))]
-    fn new(messages: Vec<Py<PyAny>>, id: Option<String>, comments: Vec<String>, py: Python) -> PyResult<Self> {
+    fn new(
+        messages: Vec<Py<PyAny>>,
+        id: Option<String>,
+        comments: Vec<String>,
+        py: Python,
+    ) -> PyResult<Self> {
         let mut core_messages = Vec::new();
         for msg in messages {
             if let Ok(oem) = msg.extract::<Oem>(py) {
@@ -60,7 +65,9 @@ impl Ndm {
             } else if let Ok(ndm) = msg.extract::<Ndm>(py) {
                 core_messages.push(MessageType::Ndm(ndm.inner));
             } else {
-                return Err(PyValueError::new_err("Unsupported message type in NDM combined instantiation"));
+                return Err(PyValueError::new_err(
+                    "Unsupported message type in NDM combined instantiation",
+                ));
             }
         }
 
@@ -71,6 +78,47 @@ impl Ndm {
                 messages: core_messages,
             },
         })
+    }
+
+    /// Validate the combined message against CCSDS rules.
+    ///
+    /// Parameters
+    /// ----------
+    /// strict : bool, optional
+    ///     If True (default), raises ValueError on the first error found.
+    ///     If False, returns a list of validation error messages (or None if valid).
+    #[pyo3(signature = (strict=true))]
+    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
+
+        if strict {
+            self.inner
+                .validate()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(None)
+        } else {
+            let mut issues = Vec::new();
+            let _ = ccsds_ndm::validation::with_validation_mode(
+                ccsds_ndm::validation::ValidationMode::Lenient,
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
+                    }
+                },
+            );
+
+            let warnings = ccsds_ndm::validation::take_warnings();
+            for w in warnings {
+                issues.push(w.error.to_string());
+            }
+
+            if issues.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(issues))
+            }
+        }
     }
 
     /// Parse an NDM combined instantiation from a string.
@@ -116,15 +164,17 @@ impl Ndm {
     }
 
     /// Serialize to a string.
-    fn to_str(&self, format: &str) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true))]
+    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+        if validate {
+            self.validate(true)?;
+        }
         match format {
             "kvn" => self
                 .inner
                 .to_kvn()
                 .map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => self
-                .inner
-                .to_xml()
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
                 .map_err(|e| PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
@@ -141,8 +191,11 @@ impl Ndm {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
-        let data = self.to_str(format)?;
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
+    #[pyo3(signature = (path, format, validate=true))]
+    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
+        let data = self.to_str(format, validate)?;
         match fs::write(path, data) {
             Ok(_) => Ok(()),
             Err(e) => Err(PyValueError::new_err(format!(
@@ -168,9 +221,15 @@ impl Ndm {
                 MessageType::Rdm(m) => Py::new(py, Rdm { inner: m.clone() })?.into_any(),
                 MessageType::Tdm(m) => Py::new(py, Tdm { inner: m.clone() })?.into_any(),
                 MessageType::Ndm(m) => Py::new(py, Ndm { inner: m.clone() })?.into_any(),
-                MessageType::Aem(m) => Py::new(py, crate::aem::Aem { inner: m.clone() })?.into_any(),
-                MessageType::Apm(m) => Py::new(py, crate::apm::Apm { inner: m.clone() })?.into_any(),
-                MessageType::Acm(m) => Py::new(py, crate::acm::Acm { inner: m.clone() })?.into_any(),
+                MessageType::Aem(m) => {
+                    Py::new(py, crate::aem::Aem { inner: m.clone() })?.into_any()
+                }
+                MessageType::Apm(m) => {
+                    Py::new(py, crate::apm::Apm { inner: m.clone() })?.into_any()
+                }
+                MessageType::Acm(m) => {
+                    Py::new(py, crate::acm::Acm { inner: m.clone() })?.into_any()
+                }
             };
             py_messages.push(py_msg);
         }

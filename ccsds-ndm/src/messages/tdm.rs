@@ -5,7 +5,7 @@
 use crate::error::{CcsdsNdmError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::{
     Epoch, Percentage, TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath,
     TdmRangeMode, TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
@@ -40,16 +40,22 @@ pub struct Tdm {
     pub header: TdmHeader,
     pub body: TdmBody,
     #[serde(rename = "@id")]
-    #[builder(into)]
+    #[builder(required, default = Some("CCSDS_TDM_VERS".to_string()))]
     pub id: Option<String>,
     #[serde(rename = "@version")]
-    #[builder(into)]
+    #[builder(default = "2.0".to_string(), into)]
     pub version: String,
 }
 
 impl crate::traits::Validate for Tdm {
     fn validate(&self) -> Result<()> {
-        Tdm::validate(self)
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Tdm,
+            &self.id,
+            &self.version,
+        )?;
+        self.header.validate()?;
+        self.body.validate()
     }
 }
 
@@ -85,13 +91,6 @@ impl Ndm for Tdm {
         let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
         crate::validation::validate_with_mode(crate::validation::MessageKind::Tdm, &tdm)?;
         Ok(tdm)
-    }
-}
-
-impl Tdm {
-    pub fn validate(&self) -> Result<()> {
-        self.header.validate()?;
-        self.body.validate()
     }
 }
 
@@ -150,8 +149,24 @@ pub struct TdmHeader {
     pub message_id: Option<String>,
 }
 
-impl TdmHeader {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for TdmHeader {
+    fn validate(&self) -> Result<()> {
+        if self.creation_date.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Header".into(),
+                field: "CREATION_DATE".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.originator.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Header".into(),
+                field: "ORIGINATOR".into(),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
     }
 }
@@ -179,20 +194,20 @@ pub struct TdmBody {
     pub segments: Vec<TdmSegment>,
 }
 
+impl crate::traits::Validate for TdmBody {
+    fn validate(&self) -> Result<()> {
+        for segment in &self.segments {
+            segment.validate()?;
+        }
+        Ok(())
+    }
+}
+
 impl ToKvn for TdmBody {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         for segment in &self.segments {
             segment.write_kvn(writer);
         }
-    }
-}
-
-impl TdmBody {
-    pub fn validate(&self) -> Result<()> {
-        for segment in &self.segments {
-            segment.validate()?;
-        }
-        Ok(())
     }
 }
 
@@ -204,9 +219,16 @@ pub struct TdmSegment {
     pub data: TdmData,
 }
 
+impl crate::traits::Validate for TdmSegment {
+    fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate()
+    }
+}
+
 impl TdmSegment {
     pub fn validate(&self) -> Result<()> {
-        self.metadata.validate()
+        crate::traits::Validate::validate(self)
     }
 }
 
@@ -876,8 +898,24 @@ pub struct TdmMetadata {
     pub ephemeris_name_5: Option<String>,
 }
 
-impl TdmMetadata {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for TdmMetadata {
+    fn validate(&self) -> Result<()> {
+        if self.time_system.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Metadata".into(),
+                field: "TIME_SYSTEM".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.participant_1.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Metadata".into(),
+                field: "PARTICIPANT_1".into(),
+                line: None,
+            }
+            .into());
+        }
         // XSD Choice between PATH and (PATH_1, PATH_2)
         if self.path.is_some() && (self.path_1.is_some() || self.path_2.is_some()) {
             return Err(ValidationError::Generic {
@@ -898,6 +936,12 @@ impl TdmMetadata {
             .into());
         }
         Ok(())
+    }
+}
+
+impl TdmMetadata {
+    pub fn validate(&self) -> Result<()> {
+        crate::traits::Validate::validate(self)
     }
 }
 
@@ -1216,6 +1260,26 @@ pub struct TdmData {
     #[serde(rename = "observation")]
     #[builder(default)]
     pub observations: Vec<TdmObservation>,
+}
+
+impl crate::traits::Validate for TdmData {
+    fn validate(&self) -> Result<()> {
+        if self.observations.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Data".into(),
+                field: "observation (at least one required)".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl TdmData {
+    pub fn validate(&self) -> Result<()> {
+        crate::traits::Validate::validate(self)
+    }
 }
 
 impl ToKvn for TdmData {
@@ -2158,7 +2222,7 @@ DATA_STOP
     #[test]
     fn test_tdm_xml_exhaustive_observations() {
         // Exercise XML deserializer for a wide range of observation types
-        let xml = r#"<tdm version="2.0">
+        let xml = r#"<tdm id="CCSDS_TDM_VERS" version="2.0">
   <header>
     <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
     <ORIGINATOR>TEST</ORIGINATOR>
@@ -2371,7 +2435,7 @@ DATA_STOP
         }
 
         // Test duplicate EPOCH error handling
-        let xml_dup = r#"<tdm version="2.0">
+        let xml_dup = r#"<tdm id="CCSDS_TDM_VERS" version="2.0">
   <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
   <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
   <data><observation><EPOCH>2023-01-01T00:00:00</EPOCH><EPOCH>2023-01-01T00:00:01</EPOCH><RANGE>1.0</RANGE></observation></data>
@@ -2379,7 +2443,7 @@ DATA_STOP
         assert!(Tdm::from_xml(xml_dup).is_err());
 
         // Test unknown attribute/field skip
-        let xml_unknown = r#"<tdm version="2.0" extra="val">
+        let xml_unknown = r#"<tdm id="CCSDS_TDM_VERS" version="2.0" extra="val">
   <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
   <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
   <data><observation extra="ignore"><EPOCH>2023-01-01T00:00:00</EPOCH><RANGE>1.0</RANGE></observation></data>

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::OdmHeader;
+use crate::common::{parse_reference_frame, parse_time_system};
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::omm as core_omm;
 use ccsds_ndm::traits::Ndm;
@@ -11,8 +12,6 @@ use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
-use crate::common::{parse_reference_frame, parse_time_system};
-
 
 // Import OpmCovarianceMatrix from opm module (shared type)
 use crate::opm::OpmCovarianceMatrix;
@@ -61,6 +60,63 @@ impl Omm {
             "Omm(object_name='{}')",
             self.inner.body.segment.metadata.object_name
         )
+    }
+
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_id(&self) -> Option<String> {
+        self.inner.id.clone()
+    }
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_version(&self) -> String {
+        self.inner.version.clone()
+    }
+
+    /// Validate the message against CCSDS rules.
+    ///
+    /// Parameters
+    /// ----------
+    /// strict : bool, optional
+    ///     If True (default), raises ValueError on the first error found.
+    ///     If False, returns a list of validation error messages (or None if valid).
+    #[pyo3(signature = (strict=true))]
+    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
+
+        if strict {
+            self.inner
+                .validate()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(None)
+        } else {
+            let mut issues = Vec::new();
+            let _ = ccsds_ndm::validation::with_validation_mode(
+                ccsds_ndm::validation::ValidationMode::Lenient,
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
+                    }
+                },
+            );
+
+            let warnings = ccsds_ndm::validation::take_warnings();
+            for w in warnings {
+                issues.push(w.error.to_string());
+            }
+
+            if issues.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(issues))
+            }
+        }
     }
 
     /// Orbit Mean-Elements Message (OMM).
@@ -156,20 +212,24 @@ impl Omm {
     /// format : str
     ///     Output format ('kvn' or 'xml').
     ///     (Mandatory)
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
     ///
     /// Returns
     /// -------
     /// str
     ///     The serialized string.
-    fn to_str(&self, format: &str) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true))]
+    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+        if validate {
+            self.validate(true)?;
+        }
         match format {
             "kvn" => self
                 .inner
                 .to_kvn()
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => self
-                .inner
-                .to_xml()
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
@@ -186,8 +246,11 @@ impl Omm {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
-        let data = self.to_str(format)?;
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
+    #[pyo3(signature = (path, format, validate=true))]
+    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
+        let data = self.to_str(format, validate)?;
         match fs::write(path, data) {
             Ok(_) => Ok(()),
             Err(e) => Err(PyValueError::new_err(format!(
@@ -334,8 +397,6 @@ impl OmmMetadata {
             },
         })
     }
-
-
 
     fn __repr__(&self) -> String {
         format!("OmmMetadata(object_name='{}')", self.inner.object_name)
@@ -550,7 +611,9 @@ impl MeanElements {
             inner: core_omm::MeanElements {
                 comment: vec![],
                 epoch: parse_epoch(&epoch)?,
-                eccentricity: ccsds_ndm::types::NonNegativeDouble { value: eccentricity },
+                eccentricity: ccsds_ndm::types::NonNegativeDouble {
+                    value: eccentricity,
+                },
                 inclination: Inclination {
                     angle: Angle::new(inclination, None).map_err(|e| {
                         PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
@@ -947,7 +1010,8 @@ impl TleParameters {
                 ephemeris_type,
                 classification_type,
                 norad_cat_id,
-                element_set_no: element_set_no.map(|value| ccsds_ndm::types::ElementSetNo { value }),
+                element_set_no: element_set_no
+                    .map(|value| ccsds_ndm::types::ElementSetNo { value }),
                 rev_at_epoch,
                 bstar: bstar.map(|v| BStar::new(v, Default::default())),
                 bterm: bterm.map(|v| M2kg::new(v, Default::default())),

@@ -11,7 +11,7 @@ fn test_kvn_detect_messy_preamble() {
     COMMENT This file starts with blank lines
     COMMENT And multiple comments
 
-    CCSDS_OPM_VERS = 2.0
+    CCSDS_OPM_VERS = 3.0
     CREATION_DATE = 2021-01-01T12:00:00.000
     ORIGINATOR    = NASA
 
@@ -35,7 +35,7 @@ fn test_kvn_detect_messy_preamble() {
 
 #[test]
 fn test_kvn_detect_crlf_and_tabs() {
-    let input = "\r\n\tCOMMENT Tab indented\r\n\t\t\r\nCCSDS_OPM_VERS = 2.0\r\nCREATION_DATE = 2024-01-01T00:00:00\r\nORIGINATOR=X\r\nOBJECT_NAME=Y\r\nOBJECT_ID=1\r\nCENTER_NAME=EARTH\r\nREF_FRAME=GCRF\r\nTIME_SYSTEM=UTC\r\nEPOCH=2024-01-01T00:00:00\r\nX=0\r\nY=0\r\nZ=0\r\nX_DOT=0\r\nY_DOT=0\r\nZ_DOT=0\r\n";
+    let input = "\r\n\tCOMMENT Tab indented\r\n\t\t\r\nCCSDS_OPM_VERS = 3.0\r\nCREATION_DATE = 2024-01-01T00:00:00\r\nORIGINATOR=X\r\nOBJECT_NAME=Y\r\nOBJECT_ID=1\r\nCENTER_NAME=EARTH\r\nREF_FRAME=GCRF\r\nTIME_SYSTEM=UTC\r\nEPOCH=2024-01-01T00:00:00\r\nX=0\r\nY=0\r\nZ=0\r\nX_DOT=0\r\nY_DOT=0\r\nZ_DOT=0\r\n";
     let msg = from_str(input).unwrap();
     assert!(matches!(msg, MessageType::Opm(_)));
 }
@@ -46,7 +46,7 @@ fn test_xml_detect_messy_preamble() {
     <?xml version="1.0" encoding="UTF-8"?>
     <!-- A comment before the root element -->
 
-      <opm id="1.0" version="2.0">
+      <opm id="CCSDS_OPM_VERS" version="3.0">
         <header>
           <COMMENT>This is a comment</COMMENT>
           <CREATION_DATE>2010-03-12T22:31:12.000</CREATION_DATE>

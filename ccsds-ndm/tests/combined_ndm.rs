@@ -7,7 +7,7 @@ use ccsds_ndm::{from_str, MessageType};
 #[test]
 fn test_combined_ndm_kvn() {
     let input = r#"
-CCSDS_OPM_VERS = 2.0
+CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2021-01-01T12:00:00.000
 ORIGINATOR    = NASA
 OBJECT_NAME          = SATELLITE
@@ -23,7 +23,7 @@ X_DOT                = 0.0 [km/s]
 Y_DOT                = 7.5 [km/s]
 Z_DOT                = 0.0 [km/s]
 
-CCSDS_OEM_VERS = 2.0
+CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2021-01-01T12:00:00.000
 ORIGINATOR    = NASA
 META_START
@@ -59,7 +59,7 @@ fn test_combined_ndm_xml() {
 <ndm>
     <MESSAGE_ID>TEST_ID_123</MESSAGE_ID>
     <COMMENT>Global NDM comment</COMMENT>
-    <opm id="1.0" version="2.0">
+    <opm id="CCSDS_OPM_VERS" version="3.0">
         <header>
             <CREATION_DATE>2010-03-12T22:31:12.000</CREATION_DATE>
             <ORIGINATOR>NASA</ORIGINATOR>
@@ -87,7 +87,7 @@ fn test_combined_ndm_xml() {
             </segment>
         </body>
     </opm>
-    <omm id="2.0" version="2.0">
+    <omm id="CCSDS_OMM_VERS" version="3.0">
         <header>
             <CREATION_DATE>2010-03-12T22:31:12.000</CREATION_DATE>
             <ORIGINATOR>NASA</ORIGINATOR>

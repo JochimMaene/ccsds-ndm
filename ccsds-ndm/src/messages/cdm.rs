@@ -6,7 +6,7 @@ use crate::common::OdParameters;
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -34,16 +34,22 @@ pub struct Cdm {
     pub header: CdmHeader,
     pub body: CdmBody,
     #[serde(rename = "@id")]
-    #[builder(into)]
+    #[builder(required, default = Some("CCSDS_CDM_VERS".to_string()))]
     pub id: Option<String>,
     #[serde(rename = "@version")]
-    #[builder(into)]
+    #[builder(default = "1.0".to_string(), into)]
     pub version: String,
 }
 
 impl crate::traits::Validate for Cdm {
     fn validate(&self) -> Result<()> {
-        Cdm::validate(self)
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Cdm,
+            &self.id,
+            &self.version,
+        )?;
+        self.header.validate()?;
+        self.body.validate()
     }
 }
 
@@ -147,8 +153,32 @@ impl ToKvn for Cdm {
     }
 }
 
-impl CdmHeader {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for CdmHeader {
+    fn validate(&self) -> Result<()> {
+        if self.creation_date.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Header".into(),
+                field: "CREATION_DATE".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.originator.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Header".into(),
+                field: "ORIGINATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.message_id.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Header".into(),
+                field: "MESSAGE_ID".into(),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
     }
 }
@@ -178,17 +208,8 @@ pub struct CdmBody {
     pub segments: Vec<CdmSegment>,
 }
 
-impl ToKvn for CdmBody {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        self.relative_metadata_data.write_kvn(writer);
-        for segment in &self.segments {
-            segment.write_kvn(writer);
-        }
-    }
-}
-
-impl CdmBody {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for CdmBody {
+    fn validate(&self) -> Result<()> {
         if self.segments.len() != 2 {
             return Err(ValidationError::Generic {
                 message: Cow::Borrowed("CDM Body must have exactly 2 segments"),
@@ -201,6 +222,15 @@ impl CdmBody {
             segment.validate()?;
         }
         Ok(())
+    }
+}
+
+impl ToKvn for CdmBody {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        self.relative_metadata_data.write_kvn(writer);
+        for segment in &self.segments {
+            segment.write_kvn(writer);
+        }
     }
 }
 
@@ -367,6 +397,23 @@ pub struct RelativeMetadataData {
     pub collision_probability_method: Option<String>,
 }
 
+impl crate::traits::Validate for RelativeMetadataData {
+    fn validate(&self) -> Result<()> {
+        if let Some(prob) = &self.collision_probability {
+            if prob.value < 0.0 || prob.value > 1.0 {
+                return Err(crate::error::ValidationError::OutOfRange {
+                    name: "COLLISION_PROBABILITY".into(),
+                    value: prob.value.to_string(),
+                    expected: "0.0 <= p <= 1.0".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
 impl ToKvn for RelativeMetadataData {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -415,23 +462,6 @@ impl ToKvn for RelativeMetadataData {
     }
 }
 
-impl RelativeMetadataData {
-    pub fn validate(&self) -> Result<()> {
-        if let Some(prob) = &self.collision_probability {
-            if prob.value < 0.0 || prob.value > 1.0 {
-                return Err(crate::error::ValidationError::OutOfRange {
-                    name: "COLLISION_PROBABILITY".into(),
-                    value: prob.value.to_string(),
-                    expected: "0.0 <= p <= 1.0".into(),
-                    line: None,
-                }
-                .into());
-            }
-        }
-        Ok(())
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct RelativeStateVector {
@@ -473,18 +503,18 @@ pub struct CdmSegment {
     pub data: CdmData,
 }
 
+impl crate::traits::Validate for CdmSegment {
+    fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate()?;
+        Ok(())
+    }
+}
+
 impl ToKvn for CdmSegment {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         self.metadata.write_kvn(writer);
         self.data.write_kvn(writer);
-    }
-}
-
-impl CdmSegment {
-    pub fn validate(&self) -> Result<()> {
-        self.metadata.validate()?;
-        self.data.validate()?;
-        Ok(())
     }
 }
 
@@ -773,9 +803,55 @@ impl ToKvn for CdmMetadata {
     }
 }
 
+impl crate::traits::Validate for CdmMetadata {
+    fn validate(&self) -> Result<()> {
+        if self.object_designator.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Metadata".into(),
+                field: "OBJECT_DESIGNATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.catalog_name.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Metadata".into(),
+                field: "CATALOG_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.object_name.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Metadata".into(),
+                field: "OBJECT_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.international_designator.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Metadata".into(),
+                field: "INTERNATIONAL_DESIGNATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.ephemeris_name.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Metadata".into(),
+                field: "EPHEMERIS_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 impl CdmMetadata {
     pub fn validate(&self) -> Result<()> {
-        Ok(())
+        crate::traits::Validate::validate(self)
     }
 }
 
@@ -816,9 +892,8 @@ pub struct CdmData {
     pub covariance_matrix: Option<CdmCovarianceMatrix>,
 }
 
-impl CdmData {
-    pub fn validate(&self) -> Result<()> {
-        // Covariance matrix is optional per CCSDS CDM specification
+impl crate::traits::Validate for CdmData {
+    fn validate(&self) -> Result<()> {
         Ok(())
     }
 }

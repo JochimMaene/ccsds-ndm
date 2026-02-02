@@ -8,7 +8,8 @@ use crate::types::parse_epoch;
 use ccsds_ndm::messages::oem as core_oem;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{
-    Acc, InterpolationDegree, Position, PositionCovariance, PositionVelocityCovariance, Velocity, VelocityCovariance,
+    Acc, InterpolationDegree, Position, PositionCovariance, PositionVelocityCovariance, Velocity,
+    VelocityCovariance,
 };
 use ccsds_ndm::MessageType;
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
@@ -302,6 +303,22 @@ impl Oem {
         )
     }
 
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_id(&self) -> Option<String> {
+        self.inner.id.clone()
+    }
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_version(&self) -> String {
+        self.inner.version.clone()
+    }
+
     /// The message header.
     ///
     /// :type: OdmHeader
@@ -333,6 +350,55 @@ impl Oem {
     #[setter]
     fn set_segments(&mut self, segments: Vec<OemSegment>) {
         self.inner.body.segment = segments.into_iter().map(|s| s.inner).collect();
+    }
+
+    /// Validate the message against CCSDS rules.
+    ///
+    /// Parameters
+    /// ----------
+    /// strict : bool, optional
+    ///     If True (default), raises ValueError on the first error found.
+    ///     If False, returns a list of validation error messages (or None if valid).
+    #[pyo3(signature = (strict=true))]
+    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
+        use ccsds_ndm::traits::Validate;
+
+        if strict {
+            self.inner
+                .validate()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(None)
+        } else {
+            let mut issues = Vec::new();
+            // Use with_validation_mode to capture lenient errors
+            // Note: Current Rust implementation mostly "fails fast" even in lenient mode
+            // for many checks, but this sets up the infrastructure.
+            let _ = ccsds_ndm::validation::with_validation_mode(
+                ccsds_ndm::validation::ValidationMode::Lenient,
+                || {
+                    match self.inner.validate() {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            // If validate returns Err even in lenient mode, it's a fatal error
+                            issues.push(e.to_string());
+                            Ok(())
+                        }
+                    }
+                },
+            );
+
+            // Also collect any warnings that were pushed to thread-local storage during validation
+            let warnings = ccsds_ndm::validation::take_warnings();
+            for w in warnings {
+                issues.push(w.error.to_string());
+            }
+
+            if issues.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(issues))
+            }
+        }
     }
 
     /// Create an OEM message from a string.
@@ -409,16 +475,36 @@ impl Oem {
     /// -------
     /// str
     ///     The serialized string.
-    fn to_str(&self, format: &str) -> PyResult<String> {
+    /// Serialize to string.
+    ///
+    /// Parameters
+    /// ----------
+    /// format : str
+    ///     Output format ('kvn' or 'xml').
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     The serialized string.
+    #[pyo3(signature = (format, validate=true))]
+    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+        if validate {
+            self.validate(true)?;
+        }
+
         match format {
             "kvn" => self
                 .inner
                 .to_kvn()
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => self
-                .inner
-                .to_xml()
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
+            "xml" => {
+                // If we already validated, or explicitly opted out of validation (validate=False),
+                // we use the direct XML writer to avoid a double validation penalty or forced validation.
+                ccsds_ndm::xml::to_string(&self.inner)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+            }
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
                 other
@@ -434,8 +520,19 @@ impl Oem {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
-        let data = self.to_str(format)?;
+    /// Write to file.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str
+    ///     Output file path.
+    /// format : str
+    ///     Output format ('kvn' or 'xml').
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
+    #[pyo3(signature = (path, format, validate=true))]
+    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
+        let data = self.to_str(format, validate)?;
         match fs::write(path, data) {
             Ok(_) => Ok(()),
             Err(e) => Err(PyValueError::new_err(format!(
@@ -498,6 +595,14 @@ impl OemSegment {
     fn set_data(&mut self, data: OemData) {
         self.inner.data = data.inner;
     }
+
+    /// Validate the segment against CCSDS rules.
+    fn validate(&self) -> PyResult<()> {
+        use ccsds_ndm::traits::Validate;
+        self.inner
+            .validate()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
 }
 
 #[pymethods]
@@ -557,13 +662,23 @@ impl OemMetadata {
                 useable_start_time: useable_start_time.map(|s| parse_epoch(&s)).transpose()?,
                 useable_stop_time: useable_stop_time.map(|s| parse_epoch(&s)).transpose()?,
                 interpolation,
-                interpolation_degree: interpolation_degree.and_then(NonZeroU32::new).map(InterpolationDegree),
+                interpolation_degree: interpolation_degree
+                    .and_then(NonZeroU32::new)
+                    .map(InterpolationDegree),
             },
         })
     }
 
     fn __repr__(&self) -> String {
         format!("OemMetadata(object_name='{}')", self.inner.object_name)
+    }
+
+    /// Validate the metadata against CCSDS rules.
+    fn validate(&self) -> PyResult<()> {
+        use ccsds_ndm::traits::Validate;
+        self.inner
+            .validate()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     /// Spacecraft name for which ephemeris data is provided. While there is no CCSDS-based
@@ -796,7 +911,9 @@ impl OemMetadata {
 
     #[setter]
     fn set_interpolation_degree(&mut self, interpolation_degree: Option<u32>) {
-        self.inner.interpolation_degree = interpolation_degree.and_then(NonZeroU32::new).map(InterpolationDegree);
+        self.inner.interpolation_degree = interpolation_degree
+            .and_then(NonZeroU32::new)
+            .map(InterpolationDegree);
     }
 
     /// Comments (see 7.8 for formatting rules).
@@ -816,13 +933,21 @@ impl OemMetadata {
 #[pymethods]
 impl OemData {
     #[new]
-    #[pyo3(signature = (state_vectors, comments=None))]
-    fn new(state_vectors: Vec<StateVectorAcc>, comments: Option<Vec<String>>) -> Self {
+    #[pyo3(signature = (state_vectors, covariance_matrix=None, comments=None))]
+    fn new(
+        state_vectors: Vec<StateVectorAcc>,
+        covariance_matrix: Option<Vec<OemCovarianceMatrix>>,
+        comments: Option<Vec<String>>,
+    ) -> Self {
         Self {
             inner: core_oem::OemData {
                 state_vector: state_vectors.into_iter().map(|s| s.inner).collect(),
                 comment: comments.unwrap_or_default(),
-                covariance_matrix: vec![],
+                covariance_matrix: covariance_matrix
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|cm| cm.inner)
+                    .collect(),
             },
         }
     }
@@ -833,6 +958,14 @@ impl OemData {
             self.inner.state_vector.len(),
             self.inner.covariance_matrix.len()
         )
+    }
+
+    /// Validate the data section against CCSDS rules.
+    fn validate(&self) -> PyResult<()> {
+        use ccsds_ndm::traits::Validate;
+        self.inner
+            .validate()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     #[staticmethod]
@@ -943,8 +1076,7 @@ impl OemData {
             })?;
 
             let num_matrices = cov_epochs.len();
-            let cov_ref_frames =
-                cov_ref_frames.unwrap_or_else(|| vec![None; num_matrices]);
+            let cov_ref_frames = cov_ref_frames.unwrap_or_else(|| vec![None; num_matrices]);
             if cov_ref_frames.len() != num_matrices {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                     "cov_ref_frames length must match number of covariance epochs",
@@ -1665,8 +1797,8 @@ impl OemCovarianceMatrix {
         let v: [f64; 21] = if shape.len() == 1 && shape[0] == 21 {
             let v = values.as_array();
             [
-                v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11],
-                v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[20],
+                v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12],
+                v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[20],
             ]
         } else if shape.len() == 2 && shape[0] == 6 && shape[1] == 6 {
             let v = values.as_array();

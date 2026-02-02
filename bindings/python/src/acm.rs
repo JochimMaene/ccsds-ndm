@@ -2,16 +2,15 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::common::parse_time_system;
 use crate::common::AdmHeader;
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::acm as core_acm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
-use crate::common::{parse_time_system};
-
 
 /// Attitude Comprehensive Message (ACM).
 ///
@@ -41,9 +40,73 @@ impl Acm {
                 body: core_acm::AcmBody {
                     segment: Box::new(segment.inner),
                 },
-                id: None,
+                id: Some("CCSDS_ACM_VERS".to_string()),
                 version: "2.0".to_string(),
             },
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Acm(object_name='{}')",
+            self.inner.body.segment.metadata.object_name
+        )
+    }
+
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_id(&self) -> Option<String> {
+        self.inner.id.clone()
+    }
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_version(&self) -> String {
+        self.inner.version.clone()
+    }
+
+    /// Validate the message against CCSDS rules.
+    ///
+    /// Parameters
+    /// ----------
+    /// strict : bool, optional
+    ///     If True (default), raises ValueError on the first error found.
+    ///     If False, returns a list of validation error messages (or None if valid).
+    #[pyo3(signature = (strict=true))]
+    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
+
+        if strict {
+            self.inner
+                .validate()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(None)
+        } else {
+            let mut issues = Vec::new();
+            let _ = ccsds_ndm::validation::with_validation_mode(
+                ccsds_ndm::validation::ValidationMode::Lenient,
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
+                    }
+                },
+            );
+
+            let warnings = ccsds_ndm::validation::take_warnings();
+            for w in warnings {
+                issues.push(w.error.to_string());
+            }
+
+            if issues.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(issues))
+            }
         }
     }
 
@@ -81,16 +144,28 @@ impl Acm {
         Self::from_str(&content, format)
     }
 
-    fn to_str(&self, format: &str) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true))]
+    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+        if validate {
+            self.validate(true)?;
+        }
         match format {
-            "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => self.inner.to_xml().map_err(|e| PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!("Unsupported format '{}'", other))),
+            "kvn" => self
+                .inner
+                .to_kvn()
+                .map_err(|e| PyValueError::new_err(e.to_string())),
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
+                .map_err(|e| PyValueError::new_err(e.to_string())),
+            other => Err(PyValueError::new_err(format!(
+                "Unsupported format '{}'",
+                other
+            ))),
         }
     }
 
-    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
-        let data = self.to_str(format)?;
+    #[pyo3(signature = (path, format, validate=true))]
+    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
+        let data = self.to_str(format, validate)?;
         match fs::write(path, data) {
             Ok(_) => Ok(()),
             Err(e) => Err(PyValueError::new_err(format!(
@@ -119,6 +194,11 @@ impl Acm {
         AdmHeader {
             inner: self.inner.header.clone(),
         }
+    }
+
+    #[setter]
+    fn set_header(&mut self, header: AdmHeader) {
+        self.inner.header = header.inner;
     }
 
     /// ACM Segment.
@@ -168,6 +248,13 @@ impl AcmSegment {
         AcmData {
             inner: self.inner.data.clone(),
         }
+    }
+
+    /// Validate the segment against CCSDS rules.
+    fn validate(&self, header: AdmHeader) -> PyResult<()> {
+        self.inner
+            .validate(&header.inner)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -227,7 +314,6 @@ impl AcmMetadata {
         })
     }
 
-
     /// Free-text field containing the name of the object. There is no CCSDS-based restriction on
     /// the value for this keyword, but it is recommended to use names from either the UN Office of
     /// Outer Space Affairs designator index (reference `[2]`), which include Object name and
@@ -260,6 +346,13 @@ impl AcmMetadata {
     fn get_international_designator(&self) -> Option<String> {
         self.inner.international_designator.clone()
     }
+
+    /// Validate the metadata section against CCSDS rules.
+    fn validate(&self) -> PyResult<()> {
+        self.inner
+            .validate()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
 }
 
 /// ACM Data Section.
@@ -283,10 +376,22 @@ impl AcmData {
     ) -> Self {
         Self {
             inner: core_acm::AcmData {
-                att: att.unwrap_or_default().into_iter().map(|s| s.inner).collect(),
+                att: att
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| s.inner)
+                    .collect(),
                 phys: phys.map(|p| p.inner),
-                cov: cov.unwrap_or_default().into_iter().map(|c| c.inner).collect(),
-                man: man.unwrap_or_default().into_iter().map(|m| m.inner).collect(),
+                cov: cov
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| c.inner)
+                    .collect(),
+                man: man
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|m| m.inner)
+                    .collect(),
                 ad: ad.map(|a| a.inner),
                 user: user.map(|u| u.inner),
             },
@@ -298,7 +403,10 @@ impl AcmData {
     /// :type: UserDefined | None
     #[getter]
     fn get_user(&self) -> Option<crate::types::UserDefined> {
-        self.inner.user.as_ref().map(|u| crate::types::UserDefined { inner: u.clone() })
+        self.inner
+            .user
+            .as_ref()
+            .map(|u| crate::types::UserDefined { inner: u.clone() })
     }
 
     #[setter]
@@ -312,7 +420,11 @@ impl AcmData {
     /// :type: list[AcmAttitudeState]
     #[getter]
     fn get_att(&self) -> Vec<AcmAttitudeState> {
-        self.inner.att.iter().map(|s| AcmAttitudeState { inner: s.clone() }).collect()
+        self.inner
+            .att
+            .iter()
+            .map(|s| AcmAttitudeState { inner: s.clone() })
+            .collect()
     }
 
     /// A single space object physical characteristics section.
@@ -320,7 +432,17 @@ impl AcmData {
     /// :type: AcmPhysicalDescription | None
     #[getter]
     fn get_phys(&self) -> Option<AcmPhysicalDescription> {
-        self.inner.phys.as_ref().map(|p| AcmPhysicalDescription { inner: p.clone() })
+        self.inner
+            .phys
+            .as_ref()
+            .map(|p| AcmPhysicalDescription { inner: p.clone() })
+    }
+
+    /// Validate the data section against CCSDS rules.
+    fn validate(&self, metadata: AcmMetadata) -> PyResult<()> {
+        self.inner
+            .validate_with_metadata(&metadata.inner)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -349,7 +471,10 @@ impl AcmAttitudeState {
                 ref_frame_b,
                 number_states: att_lines.len() as u32,
                 att_type,
-                att_lines: att_lines.into_iter().map(|values| core_acm::AttLine { values }).collect(),
+                att_lines: att_lines
+                    .into_iter()
+                    .map(|values| core_acm::AttLine { values })
+                    .collect(),
                 att_id: None,
                 att_prev_id: None,
                 att_basis: None,
@@ -417,7 +542,10 @@ impl AcmCovarianceMatrix {
                 cov_basis,
                 cov_ref_frame,
                 cov_type,
-                cov_lines: cov_lines.into_iter().map(|values| core_acm::CovLine { values }).collect(),
+                cov_lines: cov_lines
+                    .into_iter()
+                    .map(|values| core_acm::CovLine { values })
+                    .collect(),
                 cov_confidence: None,
             },
         }

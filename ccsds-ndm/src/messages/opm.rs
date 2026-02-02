@@ -30,15 +30,20 @@ pub struct Opm {
     pub header: OdmHeader,
     pub body: OpmBody,
     #[serde(rename = "@id")]
-    #[builder(into)]
+    #[builder(required, default = Some("CCSDS_OPM_VERS".to_string()))]
     pub id: Option<String>,
     #[serde(rename = "@version")]
-    #[builder(into)]
+    #[builder(default = "3.0".to_string(), into)]
     pub version: String,
 }
 
 impl crate::traits::Validate for Opm {
     fn validate(&self) -> Result<()> {
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Opm,
+            &self.id,
+            &self.version,
+        )?;
         self.header.validate()?;
         self.body.validate()
     }
@@ -214,7 +219,7 @@ pub struct OpmMetadata {
     pub time_system: String,
 }
 
-impl OpmMetadata {
+impl crate::traits::Validate for OpmMetadata {
     fn validate(&self) -> Result<()> {
         if self.object_id.trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
@@ -224,13 +229,15 @@ impl OpmMetadata {
             }
             .into());
         }
+        if self.time_system.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OPM Metadata".into(),
+                field: "TIME_SYSTEM".into(),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
-    }
-}
-
-impl crate::traits::Validate for OpmMetadata {
-    fn validate(&self) -> Result<()> {
-        self.validate()
     }
 }
 

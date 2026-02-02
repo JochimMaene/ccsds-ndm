@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::common::{parse_time_system, parse_yes_no};
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::tdm as core_tdm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{self as core_types};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use crate::common::{parse_time_system, parse_yes_no};
 use std::fs;
 use std::str::FromStr;
 
@@ -58,6 +58,63 @@ impl Tdm {
                 id: Some("CCSDS_TDM_VERS".to_string()),
                 version: "2.0".to_string(),
             },
+        }
+    }
+
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_id(&self) -> Option<String> {
+        self.inner.id.clone()
+    }
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_version(&self) -> String {
+        self.inner.version.clone()
+    }
+
+    /// Validate the message against CCSDS rules.
+    ///
+    /// Parameters
+    /// ----------
+    /// strict : bool, optional
+    ///     If True (default), raises ValueError on the first error found.
+    ///     If False, returns a list of validation error messages (or None if valid).
+    #[pyo3(signature = (strict=true))]
+    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
+
+        if strict {
+            self.inner
+                .validate()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(None)
+        } else {
+            let mut issues = Vec::new();
+            let _ = ccsds_ndm::validation::with_validation_mode(
+                ccsds_ndm::validation::ValidationMode::Lenient,
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
+                    }
+                },
+            );
+
+            let warnings = ccsds_ndm::validation::take_warnings();
+            for w in warnings {
+                issues.push(w.error.to_string());
+            }
+
+            if issues.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(issues))
+            }
         }
     }
 
@@ -196,20 +253,24 @@ impl Tdm {
     /// ----------
     /// format : str
     ///     Output format ('kvn' or 'xml').
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
     ///
     /// Returns
     /// -------
     /// str
     ///     The serialized string.
-    fn to_str(&self, format: &str) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true))]
+    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+        if validate {
+            self.validate(true)?;
+        }
         match format {
             "kvn" => self
                 .inner
                 .to_kvn()
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => self
-                .inner
-                .to_xml()
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
@@ -226,8 +287,11 @@ impl Tdm {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
-        let data = self.to_str(format)?;
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
+    #[pyo3(signature = (path, format, validate=true))]
+    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
+        let data = self.to_str(format, validate)?;
         match fs::write(path, data) {
             Ok(_) => Ok(()),
             Err(e) => Err(PyValueError::new_err(format!(
@@ -676,10 +740,16 @@ impl TdmMetadata {
                 mode,
                 path,
                 path_1: path_1
-                    .map(|s| core_types::TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .map(|s| {
+                        core_types::TdmPath::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
                     .transpose()?,
                 path_2: path_2
-                    .map(|s| core_types::TdmPath::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .map(|s| {
+                        core_types::TdmPath::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
                     .transpose()?,
                 transmit_band,
                 receive_band,
@@ -701,7 +771,8 @@ impl TdmMetadata {
                 freq_offset,
                 range_mode: range_mode
                     .map(|s| {
-                        core_types::TdmRangeMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+                        core_types::TdmRangeMode::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
                     })
                     .transpose()?,
                 range_modulus,
@@ -713,7 +784,8 @@ impl TdmMetadata {
                     .transpose()?,
                 angle_type: angle_type
                     .map(|s| {
-                        core_types::TdmAngleType::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+                        core_types::TdmAngleType::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
                     })
                     .transpose()?,
                 reference_frame: reference_frame
@@ -727,7 +799,10 @@ impl TdmMetadata {
                 doppler_count_bias,
                 doppler_count_scale,
                 doppler_count_rollover: doppler_count_rollover
-                    .map(|s| core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .map(|s| {
+                        core_types::YesNo::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
                     .transpose()?,
                 transmit_delay_1,
                 transmit_delay_2,
@@ -1244,9 +1319,7 @@ impl TdmMetadata {
         use ccsds_ndm::types::TdmRangeMode;
         use std::str::FromStr;
         self.inner.range_mode = value
-            .map(|s| {
-                TdmRangeMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
-            })
+            .map(|s| TdmRangeMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
             .transpose()?;
         Ok(())
     }
@@ -1285,9 +1358,7 @@ impl TdmMetadata {
         use ccsds_ndm::types::TdmRangeUnits;
         use std::str::FromStr;
         self.inner.range_units = value
-            .map(|s| {
-                TdmRangeUnits::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
-            })
+            .map(|s| TdmRangeUnits::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
             .transpose()?;
         Ok(())
     }
@@ -1307,9 +1378,7 @@ impl TdmMetadata {
         use ccsds_ndm::types::TdmAngleType;
         use std::str::FromStr;
         self.inner.angle_type = value
-            .map(|s| {
-                TdmAngleType::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
-            })
+            .map(|s| TdmAngleType::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
             .transpose()?;
         Ok(())
     }
@@ -1421,11 +1490,12 @@ impl TdmMetadata {
     fn set_doppler_count_rollover(&mut self, value: Option<String>) -> PyResult<()> {
         use std::str::FromStr;
         self.inner.doppler_count_rollover = value
-            .map(|s| core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .map(|s| {
+                core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+            })
             .transpose()?;
         Ok(())
     }
-
 
     /// The TRANSMIT_DELAY_n keyword shall specify a fixed interval of time, in seconds,
     /// required for the signal to travel from the transmitting electronics to the transmit
@@ -1599,9 +1669,7 @@ impl TdmMetadata {
         use ccsds_ndm::types::TdmDataQuality;
         use std::str::FromStr;
         self.inner.data_quality = value
-            .map(|s| {
-                TdmDataQuality::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
-            })
+            .map(|s| TdmDataQuality::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
             .transpose()?;
         Ok(())
     }
@@ -1766,7 +1834,9 @@ impl TdmMetadata {
     fn set_corrections_applied(&mut self, value: Option<String>) -> PyResult<()> {
         use std::str::FromStr;
         self.inner.corrections_applied = value
-            .map(|s| core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string())))
+            .map(|s| {
+                core_types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+            })
             .transpose()?;
         Ok(())
     }
@@ -1840,9 +1910,6 @@ impl TdmData {
     fn set_observations(&mut self, value: Vec<TdmObservation>) {
         self.inner.observations = value.into_iter().map(|o| o.inner).collect();
     }
-
-
-
 }
 
 // ============================================================================

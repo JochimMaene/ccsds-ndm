@@ -56,9 +56,6 @@ pub fn opm_version(input: &mut &str) -> KvnResult<String> {
     let _ = collect_comments.parse_next(input)?;
 
     let (value, _) = expect_key("CCSDS_OPM_VERS").parse_next(input)?;
-    if value != "3.0" && value != "2.0" {
-        return Err(cut_err(input, "3.0 or 2.0"));
-    }
     Ok(value.to_string())
 }
 
@@ -320,6 +317,7 @@ impl ParseKvn for Opm {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::traits::Ndm;
     use crate::types::NonNegativeDouble;
 
     const MINIMAL_OPM: &str = r#"CCSDS_OPM_VERS = 3.0
@@ -459,9 +457,18 @@ DRAG_COEFF = 2.5
     #[test]
     fn test_opm_errors() {
         // Version error
-        assert!(opm_version
-            .parse_next(&mut "CCSDS_OPM_VERS = BAD\n")
-            .is_err());
+        let bad_version = MINIMAL_OPM.replacen("CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = BAD", 1);
+        let err = Opm::from_kvn(&bad_version).unwrap_err();
+        match err {
+            crate::error::CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
+                crate::error::ValidationError::InvalidValue { field, value, .. } => {
+                    assert_eq!(field, "version");
+                    assert_eq!(value, "BAD");
+                }
+                _ => panic!("Expected Validation error, got {:?}", boxed_err),
+            },
+            _ => panic!("Expected Validation error, got {:?}", err),
+        }
 
         // Metadata errors
         let mut kvn_meta_err = "OBJECT_NAME = SAT\nUNKNOWN_KEY = VAL\n";

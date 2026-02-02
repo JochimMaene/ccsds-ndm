@@ -30,16 +30,22 @@ pub struct Apm {
     pub header: AdmHeader,
     pub body: ApmBody,
     #[serde(rename = "@id")]
-    #[builder(into)]
+    #[builder(required, default = Some("CCSDS_APM_VERS".to_string()))]
     pub id: Option<String>,
     #[serde(rename = "@version")]
-    #[builder(into)]
+    #[builder(default = "2.0".to_string(), into)]
     pub version: String,
 }
 
 impl crate::traits::Validate for Apm {
     fn validate(&self) -> Result<()> {
-        Apm::validate(self)
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Apm,
+            &self.id,
+            &self.version,
+        )?;
+        self.header.validate()?;
+        self.body.validate()
     }
 }
 
@@ -68,16 +74,6 @@ impl Ndm for Apm {
     }
 }
 
-impl Apm {
-    pub fn validate(&self) -> Result<()> {
-        self.header.validate()?;
-        // Validation logic can be added here
-        // E.g. check at least one logical block is present in segment
-        self.body.segment.validate()?;
-        Ok(())
-    }
-}
-
 impl ToKvn for Apm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_pair("CCSDS_APM_VERS", &self.version);
@@ -97,6 +93,12 @@ pub struct ApmBody {
     pub segment: ApmSegment,
 }
 
+impl crate::traits::Validate for ApmBody {
+    fn validate(&self) -> Result<()> {
+        self.segment.validate()
+    }
+}
+
 impl ToKvn for ApmBody {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         self.segment.write_kvn(writer);
@@ -109,9 +111,16 @@ pub struct ApmSegment {
     pub data: ApmData,
 }
 
+impl crate::traits::Validate for ApmSegment {
+    fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate()
+    }
+}
+
 impl ApmSegment {
     pub fn validate(&self) -> Result<()> {
-        self.data.validate()
+        crate::traits::Validate::validate(self)
     }
 }
 
@@ -121,19 +130,6 @@ impl ToKvn for ApmSegment {
         self.metadata.write_kvn(writer);
         writer.write_line("META_STOP");
         writer.write_line("");
-        // APM Data in KVN doesn't have "DATA_START"/"DATA_STOP" wrapper around the whole thing?
-        // Wait, APM structure in KVN:
-        // META_START ... META_STOP
-        // QUAT_START ... QUAT_STOP
-        // EULER_START ... EULER_STOP
-        // etc.
-        // It does NOT have a single DATA_START block wrapping everything usually.
-        // Let's check CCSDS 504.0-B-2 Section 3.
-        // "The APM Data Section shall follow the APM Metadata Section."
-        // Structure:
-        // Header
-        // Metadata
-        // Data (composed of logical blocks)
         self.data.write_kvn(writer);
     }
 }
@@ -199,6 +195,28 @@ pub struct ApmMetadata {
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
     #[builder(into)]
     pub time_system: String,
+}
+
+impl crate::traits::Validate for ApmMetadata {
+    fn validate(&self) -> Result<()> {
+        if self.object_id.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "APM Metadata".into(),
+                field: "OBJECT_ID".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.time_system.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "APM Metadata".into(),
+                field: "TIME_SYSTEM".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
 }
 
 impl ToKvn for ApmMetadata {
@@ -287,8 +305,8 @@ pub struct ApmData {
     pub maneuver_parameters: Vec<AttManeuverState>,
 }
 
-impl ApmData {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for ApmData {
+    fn validate(&self) -> Result<()> {
         if self.quaternion_state.is_empty()
             && self.euler_angle_state.is_empty()
             && self.angular_velocity.is_empty()
@@ -303,7 +321,16 @@ impl ApmData {
             }
             .into());
         }
+        for block in &self.quaternion_state {
+            block.quaternion.validate()?;
+        }
         Ok(())
+    }
+}
+
+impl ApmData {
+    pub fn validate(&self) -> Result<()> {
+        crate::traits::Validate::validate(self)
     }
 }
 

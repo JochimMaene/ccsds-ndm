@@ -2,16 +2,16 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::common::{
+    parse_controlled_type, parse_object_description, parse_reference_frame, parse_time_system,
+    GroundImpactParameters, OdParameters, StateVector,
+};
+use crate::opm::OpmCovarianceMatrix;
 use crate::types::parse_epoch;
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::messages::rdm as core_rdm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{self as core_types, *};
-use crate::common::{
-    GroundImpactParameters, OdParameters, StateVector,
-    parse_object_description, parse_controlled_type, parse_reference_frame, parse_time_system
-};
-use crate::opm::OpmCovarianceMatrix;
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -61,6 +61,63 @@ impl Rdm {
                 id: Some("CCSDS_RDM_VERS".to_string()),
                 version: "1.0".to_string(),
             },
+        }
+    }
+
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_id(&self) -> Option<String> {
+        self.inner.id.clone()
+    }
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_version(&self) -> String {
+        self.inner.version.clone()
+    }
+
+    /// Validate the message against CCSDS rules.
+    ///
+    /// Parameters
+    /// ----------
+    /// strict : bool, optional
+    ///     If True (default), raises ValueError on the first error found.
+    ///     If False, returns a list of validation error messages (or None if valid).
+    #[pyo3(signature = (strict=true))]
+    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
+
+        if strict {
+            self.inner
+                .validate()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(None)
+        } else {
+            let mut issues = Vec::new();
+            let _ = ccsds_ndm::validation::with_validation_mode(
+                ccsds_ndm::validation::ValidationMode::Lenient,
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
+                    }
+                },
+            );
+
+            let warnings = ccsds_ndm::validation::take_warnings();
+            for w in warnings {
+                issues.push(w.error.to_string());
+            }
+
+            if issues.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(issues))
+            }
         }
     }
 
@@ -206,15 +263,25 @@ impl Rdm {
     /// ----------
     /// format : str
     ///     Format ('kvn' or 'xml').
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
     ///
     /// Returns
     /// -------
     /// str
     ///     The serialized string.
-    fn to_str(&self, format: &str) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true))]
+    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+        if validate {
+            self.validate(true)?;
+        }
         match format {
-            "kvn" => self.to_kvn(),
-            "xml" => self.to_xml(),
+            "kvn" => self
+                .inner
+                .to_kvn()
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
                 other
@@ -230,8 +297,11 @@ impl Rdm {
     ///     Output file path.
     /// format : str
     ///     Format ('kvn' or 'xml').
-    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
-        let data = self.to_str(format)?;
+    /// validate : bool, optional
+    ///     Whether to validate the message before writing (default: True).
+    #[pyo3(signature = (path, format, validate=true))]
+    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
+        let data = self.to_str(format, validate)?;
         fs::write(path, data).map_err(|e| {
             pyo3::exceptions::PyValueError::new_err(format!("Failed to write file: {}", e))
         })
@@ -742,8 +812,8 @@ impl RdmMetadata {
     #[setter]
     fn set_controlled_reentry(&mut self, v: String) -> PyResult<()> {
         use std::str::FromStr;
-        self.inner.controlled_reentry =
-            core_types::ControlledType::from_str(&v).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        self.inner.controlled_reentry = core_types::ControlledType::from_str(&v)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
@@ -1310,9 +1380,7 @@ impl RdmData {
         self.inner
             .user_defined_parameters
             .as_ref()
-            .map(|ud| crate::types::UserDefined {
-                inner: ud.clone(),
-            })
+            .map(|ud| crate::types::UserDefined { inner: ud.clone() })
     }
     #[setter]
     fn set_user_defined_parameters(&mut self, v: Option<crate::types::UserDefined>) {
