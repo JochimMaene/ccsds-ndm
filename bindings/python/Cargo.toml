@@ -4,7 +4,7 @@
 
 [package]
 name = "ccsds-ndm-py"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Jochim Maene <jochim.maene+github@gmail.com>"]
 edition = "2021"
 description = "Python bindings for ccsds-ndm"
