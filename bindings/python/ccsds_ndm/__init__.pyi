@@ -111,17 +111,23 @@ class Acm:
 
     @segment.setter
     def segment(self, value: AcmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """ """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """ """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -617,21 +623,27 @@ class Aem:
 
     @segments.setter
     def segments(self, value: list[AemSegment]) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
         """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -1140,21 +1152,27 @@ class Apm:
 
     @segment.setter
     def segment(self, value: ApmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
         """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -1645,7 +1663,7 @@ class Cdm:
 
     @id.setter
     def id(self, value: Optional[str]) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write the CDM to a file.
 
@@ -1655,10 +1673,12 @@ class Cdm:
             The output file path.
         format : str
             The output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize the CDM to a string.
 
@@ -1666,6 +1686,8 @@ class Cdm:
         ----------
         format : str
             The output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -1674,9 +1696,15 @@ class Cdm:
         """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -4389,7 +4417,7 @@ class Ndm:
     def messages(
         self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
     ) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -4399,18 +4427,26 @@ class Ndm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to a string.
         """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the combined message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -4526,7 +4562,7 @@ class Ocm:
 
     @segment.setter
     def segment(self, value: OcmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -4536,10 +4572,12 @@ class Ocm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
 
@@ -4547,6 +4585,8 @@ class Ocm:
         ----------
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -4555,9 +4595,15 @@ class Ocm:
         """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -8391,7 +8437,7 @@ class Oem:
 
     @segments.setter
     def segments(self, value: list[OemSegment]) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -8401,10 +8447,20 @@ class Oem:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        Write to file.
+
+        Parameters
+        ----------
+        path : str
+            Output file path.
+        format : str
+            Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
 
@@ -8417,12 +8473,31 @@ class Oem:
         -------
         str
             The serialized string.
+        Serialize to string.
+
+        Parameters
+        ----------
+        format : str
+            Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
+
+        Returns
+        -------
+        str
+            The serialized string.
         """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -9279,7 +9354,7 @@ class Omm:
 
     @segment.setter
     def segment(self, value: OmmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -9289,10 +9364,12 @@ class Omm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
 
@@ -9301,6 +9378,8 @@ class Omm:
         format : str
             Output format ('kvn' or 'xml').
             (Mandatory)
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -9309,9 +9388,15 @@ class Omm:
         """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -9665,7 +9750,7 @@ class Opm:
 
     @segment.setter
     def segment(self, value: OpmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -9675,10 +9760,12 @@ class Opm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
 
@@ -9686,6 +9773,8 @@ class Opm:
         ----------
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -9694,9 +9783,15 @@ class Opm:
         """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -10514,7 +10609,7 @@ class Rdm:
 
     @segment.setter
     def segment(self, value: RdmSegment) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to a file.
 
@@ -10524,6 +10619,8 @@ class Rdm:
             Output file path.
         format : str
             Format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
@@ -10538,7 +10635,7 @@ class Rdm:
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string (generic).
 
@@ -10546,6 +10643,8 @@ class Rdm:
         ----------
         format : str
             Format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -10565,9 +10664,15 @@ class Rdm:
         """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -12402,7 +12507,7 @@ class Tdm:
 
     @segments.setter
     def segments(self, value: list[TdmSegment]) -> None: ...
-    def to_file(self, path, format):
+    def to_file(self, path, format, validate=True):
         """
         Write to file.
 
@@ -12412,10 +12517,12 @@ class Tdm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format):
+    def to_str(self, format, validate=True):
         """
         Serialize to string.
 
@@ -12423,6 +12530,8 @@ class Tdm:
         ----------
         format : str
             Output format ('kvn' or 'xml').
+        validate : bool, optional
+            Whether to validate the message before writing (default: True).
 
         Returns
         -------
@@ -12431,9 +12540,15 @@ class Tdm:
         """
         ...
 
-    def validate(self):
+    def validate(self, strict=True):
         """
         Validate the message against CCSDS rules.
+
+        Parameters
+        ----------
+        strict : bool, optional
+            If True (default), raises ValueError on the first error found.
+            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
