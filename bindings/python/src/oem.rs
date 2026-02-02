@@ -8,7 +8,8 @@ use crate::types::parse_epoch;
 use ccsds_ndm::messages::oem as core_oem;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{
-    Acc, InterpolationDegree, Position, PositionCovariance, PositionVelocityCovariance, Velocity, VelocityCovariance,
+    Acc, InterpolationDegree, Position, PositionCovariance, PositionVelocityCovariance, Velocity,
+    VelocityCovariance,
 };
 use ccsds_ndm::MessageType;
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
@@ -276,10 +277,7 @@ pub struct OemCovarianceMatrix {
 #[pymethods]
 impl Oem {
     #[new]
-    fn new(
-        header: OdmHeader,
-        segments: Vec<OemSegment>,
-    ) -> Self {
+    fn new(header: OdmHeader, segments: Vec<OemSegment>) -> Self {
         Self {
             inner: core_oem::Oem {
                 header: header.inner,
@@ -364,7 +362,7 @@ impl Oem {
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
         use ccsds_ndm::traits::Validate;
-        
+
         if strict {
             self.inner
                 .validate()
@@ -386,9 +384,9 @@ impl Oem {
                             Ok(())
                         }
                     }
-                }
+                },
             );
-            
+
             // Also collect any warnings that were pushed to thread-local storage during validation
             let warnings = ccsds_ndm::validation::take_warnings();
             for w in warnings {
@@ -664,7 +662,9 @@ impl OemMetadata {
                 useable_start_time: useable_start_time.map(|s| parse_epoch(&s)).transpose()?,
                 useable_stop_time: useable_stop_time.map(|s| parse_epoch(&s)).transpose()?,
                 interpolation,
-                interpolation_degree: interpolation_degree.and_then(NonZeroU32::new).map(InterpolationDegree),
+                interpolation_degree: interpolation_degree
+                    .and_then(NonZeroU32::new)
+                    .map(InterpolationDegree),
             },
         })
     }
@@ -911,7 +911,9 @@ impl OemMetadata {
 
     #[setter]
     fn set_interpolation_degree(&mut self, interpolation_degree: Option<u32>) {
-        self.inner.interpolation_degree = interpolation_degree.and_then(NonZeroU32::new).map(InterpolationDegree);
+        self.inner.interpolation_degree = interpolation_degree
+            .and_then(NonZeroU32::new)
+            .map(InterpolationDegree);
     }
 
     /// Comments (see 7.8 for formatting rules).
@@ -1074,8 +1076,7 @@ impl OemData {
             })?;
 
             let num_matrices = cov_epochs.len();
-            let cov_ref_frames =
-                cov_ref_frames.unwrap_or_else(|| vec![None; num_matrices]);
+            let cov_ref_frames = cov_ref_frames.unwrap_or_else(|| vec![None; num_matrices]);
             if cov_ref_frames.len() != num_matrices {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                     "cov_ref_frames length must match number of covariance epochs",
@@ -1796,8 +1797,8 @@ impl OemCovarianceMatrix {
         let v: [f64; 21] = if shape.len() == 1 && shape[0] == 21 {
             let v = values.as_array();
             [
-                v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11],
-                v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[20],
+                v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12],
+                v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[20],
             ]
         } else if shape.len() == 2 && shape[0] == 6 && shape[1] == 6 {
             let v = values.as_array();

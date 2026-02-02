@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::OdmHeader;
+use crate::common::{parse_object_description, parse_time_system};
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::ocm as core_ocm;
 use ccsds_ndm::traits::{Ndm, Validate};
@@ -11,8 +12,6 @@ use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
-use crate::common::{parse_object_description, parse_time_system};
-
 
 /// Orbit Comprehensive Message (OCM).
 ///
@@ -155,7 +154,7 @@ impl Ocm {
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
         use ccsds_ndm::traits::Validate;
-        
+
         if strict {
             self.inner
                 .validate()
@@ -165,17 +164,15 @@ impl Ocm {
             let mut issues = Vec::new();
             let _ = ccsds_ndm::validation::with_validation_mode(
                 ccsds_ndm::validation::ValidationMode::Lenient,
-                || {
-                    match self.inner.validate() {
-                        Ok(_) => Ok(()),
-                        Err(e) => {
-                            issues.push(e.to_string());
-                            Ok(())
-                        }
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
                     }
-                }
+                },
             );
-            
+
             let warnings = ccsds_ndm::validation::take_warnings();
             for w in warnings {
                 issues.push(w.error.to_string());
@@ -252,7 +249,8 @@ impl Ocm {
                 .inner
                 .to_kvn()
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
                 other
@@ -531,7 +529,6 @@ impl OcmMetadata {
         epoch_tzero: String,
         time_system: Option<Bound<'_, PyAny>>,
         object_name: Option<String>,
-
 
         international_designator: Option<String>,
         catalog_name: Option<String>,

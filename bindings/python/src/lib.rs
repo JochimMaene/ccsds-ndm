@@ -7,8 +7,13 @@ use pyo3::prelude::*;
 use pyo3::Py;
 use std::fs;
 
+pub mod acm;
+pub mod aem;
+pub mod apm;
+pub mod attitude;
 pub mod cdm;
 pub mod common;
+pub mod errors;
 pub mod ndm;
 pub mod ocm;
 pub mod oem;
@@ -17,14 +22,12 @@ pub mod opm;
 pub mod rdm;
 pub mod tdm;
 pub mod types;
-pub mod aem;
-pub mod apm;
-pub mod acm;
-pub mod attitude;
-pub mod errors;
 
 use cdm::*;
-use common::{OdmHeader, AdmHeader, StateVector, StateVectorAcc, ObjectDescription, YesNo, ControlledType, ReferenceFrame, TimeSystem};
+use common::{
+    AdmHeader, ControlledType, ObjectDescription, OdmHeader, ReferenceFrame, StateVector,
+    StateVectorAcc, TimeSystem, YesNo,
+};
 use errors::ccsds_error_to_pyerr;
 use ndm::Ndm;
 use oem::*;
@@ -113,8 +116,8 @@ fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
 ///     The parsed NDM object.
 #[pyfunction]
 fn from_file(py: Python, path: &str) -> PyResult<Py<PyAny>> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| errors::NdmIoError::new_err(e.to_string()))?;
+    let content =
+        fs::read_to_string(path).map_err(|e| errors::NdmIoError::new_err(e.to_string()))?;
     from_str(py, &content)
 }
 

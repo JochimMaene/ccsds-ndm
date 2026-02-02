@@ -2,8 +2,9 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::attitude::{AngVelState, EulerAngleState, InertiaState, QuaternionState, SpinState};
+use crate::common::parse_time_system;
 use crate::common::AdmHeader;
-use crate::attitude::{QuaternionState, EulerAngleState, AngVelState, SpinState, InertiaState};
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::apm as core_apm;
 use ccsds_ndm::traits::{Ndm, Validate};
@@ -11,8 +12,6 @@ use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
-use crate::common::{parse_time_system};
-
 
 /// Attitude Parameter Message (APM).
 ///
@@ -31,10 +30,7 @@ pub struct Apm {
 #[pymethods]
 impl Apm {
     #[new]
-    fn new(
-        header: AdmHeader,
-        segment: ApmSegment,
-    ) -> Self {
+    fn new(header: AdmHeader, segment: ApmSegment) -> Self {
         Self {
             inner: core_apm::Apm {
                 header: header.inner,
@@ -117,7 +113,7 @@ impl Apm {
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
         use ccsds_ndm::traits::Validate;
-        
+
         if strict {
             self.inner
                 .validate()
@@ -127,17 +123,15 @@ impl Apm {
             let mut issues = Vec::new();
             let _ = ccsds_ndm::validation::with_validation_mode(
                 ccsds_ndm::validation::ValidationMode::Lenient,
-                || {
-                    match self.inner.validate() {
-                        Ok(_) => Ok(()),
-                        Err(e) => {
-                            issues.push(e.to_string());
-                            Ok(())
-                        }
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
                     }
-                }
+                },
             );
-            
+
             let warnings = ccsds_ndm::validation::take_warnings();
             for w in warnings {
                 issues.push(w.error.to_string());
@@ -158,9 +152,16 @@ impl Apm {
             self.validate(true)?;
         }
         match format {
-            "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner).map_err(|e| PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!("Unsupported format '{}'", other))),
+            "kvn" => self
+                .inner
+                .to_kvn()
+                .map_err(|e| PyValueError::new_err(e.to_string())),
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
+                .map_err(|e| PyValueError::new_err(e.to_string())),
+            other => Err(PyValueError::new_err(format!(
+                "Unsupported format '{}'",
+                other
+            ))),
         }
     }
 
@@ -290,8 +291,6 @@ impl ApmMetadata {
             },
         })
     }
-
-
 
     /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
     /// restriction on the value for this keyword, it is recommended to use names from the UN
@@ -556,17 +555,23 @@ impl ManeuverParameters {
         man_delta_mass: Option<f64>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        use ccsds_ndm::types::{Torque, Duration, DeltaMassZ};
+        use ccsds_ndm::types::{DeltaMassZ, Duration, Torque};
         Ok(Self {
             inner: ccsds_ndm::common::AttManeuverState {
                 comment: comment.unwrap_or_default(),
                 man_epoch_start: parse_epoch(&man_epoch_start)?,
-                man_duration: Duration { value: man_duration, units: None },
+                man_duration: Duration {
+                    value: man_duration,
+                    units: None,
+                },
                 man_ref_frame,
                 man_tor_x: Torque::new(man_tor_1, None),
                 man_tor_y: Torque::new(man_tor_2, None),
                 man_tor_z: Torque::new(man_tor_3, None),
-                man_delta_mass: man_delta_mass.map(|v| DeltaMassZ { value: v, units: None }),
+                man_delta_mass: man_delta_mass.map(|v| DeltaMassZ {
+                    value: v,
+                    units: None,
+                }),
             },
         })
     }

@@ -2,16 +2,16 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::common::{
+    parse_controlled_type, parse_object_description, parse_reference_frame, parse_time_system,
+    GroundImpactParameters, OdParameters, StateVector,
+};
+use crate::opm::OpmCovarianceMatrix;
 use crate::types::parse_epoch;
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::messages::rdm as core_rdm;
 use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{self as core_types, *};
-use crate::common::{
-    GroundImpactParameters, OdParameters, StateVector,
-    parse_object_description, parse_controlled_type, parse_reference_frame, parse_time_system
-};
-use crate::opm::OpmCovarianceMatrix;
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -90,7 +90,7 @@ impl Rdm {
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
         use ccsds_ndm::traits::Validate;
-        
+
         if strict {
             self.inner
                 .validate()
@@ -100,17 +100,15 @@ impl Rdm {
             let mut issues = Vec::new();
             let _ = ccsds_ndm::validation::with_validation_mode(
                 ccsds_ndm::validation::ValidationMode::Lenient,
-                || {
-                    match self.inner.validate() {
-                        Ok(_) => Ok(()),
-                        Err(e) => {
-                            issues.push(e.to_string());
-                            Ok(())
-                        }
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
                     }
-                }
+                },
             );
-            
+
             let warnings = ccsds_ndm::validation::take_warnings();
             for w in warnings {
                 issues.push(w.error.to_string());
@@ -279,8 +277,12 @@ impl Rdm {
             self.validate(true)?;
         }
         match format {
-            "kvn" => self.inner.to_kvn().map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
+            "kvn" => self
+                .inner
+                .to_kvn()
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
                 other
@@ -811,8 +813,8 @@ impl RdmMetadata {
     #[setter]
     fn set_controlled_reentry(&mut self, v: String) -> PyResult<()> {
         use std::str::FromStr;
-        self.inner.controlled_reentry =
-            core_types::ControlledType::from_str(&v).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        self.inner.controlled_reentry = core_types::ControlledType::from_str(&v)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
@@ -1379,9 +1381,7 @@ impl RdmData {
         self.inner
             .user_defined_parameters
             .as_ref()
-            .map(|ud| crate::types::UserDefined {
-                inner: ud.clone(),
-            })
+            .map(|ud| crate::types::UserDefined { inner: ud.clone() })
     }
     #[setter]
     fn set_user_defined_parameters(&mut self, v: Option<crate::types::UserDefined>) {

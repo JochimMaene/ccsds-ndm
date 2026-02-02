@@ -15,24 +15,64 @@ use pyo3::prelude::*;
 
 // Base exception for all CCSDS NDM errors.
 // Inherits from Exception.
-create_exception!(ccsds_ndm, NdmError, PyException, "Base exception for all CCSDS NDM errors.");
+create_exception!(
+    ccsds_ndm,
+    NdmError,
+    PyException,
+    "Base exception for all CCSDS NDM errors."
+);
 
 // Format/parsing errors - inherit from both NdmError and ValueError for backward compat.
-create_exception!(ccsds_ndm, NdmFormatError, PyValueError, "Error during parsing of NDM data (KVN or XML).");
-create_exception!(ccsds_ndm, NdmKvnParseError, NdmFormatError, "Error during KVN parsing.");
-create_exception!(ccsds_ndm, NdmXmlError, NdmFormatError, "Error during XML parsing or serialization.");
+create_exception!(
+    ccsds_ndm,
+    NdmFormatError,
+    PyValueError,
+    "Error during parsing of NDM data (KVN or XML)."
+);
+create_exception!(
+    ccsds_ndm,
+    NdmKvnParseError,
+    NdmFormatError,
+    "Error during KVN parsing."
+);
+create_exception!(
+    ccsds_ndm,
+    NdmXmlError,
+    NdmFormatError,
+    "Error during XML parsing or serialization."
+);
 
 // Validation errors.
-create_exception!(ccsds_ndm, NdmValidationError, NdmError, "Validation error against CCSDS rules.");
+create_exception!(
+    ccsds_ndm,
+    NdmValidationError,
+    NdmError,
+    "Validation error against CCSDS rules."
+);
 
 // Epoch errors.
-create_exception!(ccsds_ndm, NdmEpochError, PyValueError, "Error parsing a CCSDS epoch string.");
+create_exception!(
+    ccsds_ndm,
+    NdmEpochError,
+    PyValueError,
+    "Error parsing a CCSDS epoch string."
+);
 
 // I/O errors - inherit from both NdmError and IOError.
-create_exception!(ccsds_ndm, NdmIoError, PyIOError, "I/O error during file operations.");
+create_exception!(
+    ccsds_ndm,
+    NdmIoError,
+    PyIOError,
+    "I/O error during file operations."
+);
 
 // Unsupported message type.
-create_exception!(ccsds_ndm, NdmUnsupportedMessageError, NdmError, "Unsupported CCSDS message type.");
+create_exception!(
+    ccsds_ndm,
+    NdmUnsupportedMessageError,
+    NdmError,
+    "Unsupported CCSDS message type."
+);
 
 /// Converts a `CcsdsNdmError` into a `PyErr`.
 ///
@@ -74,7 +114,10 @@ pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("NdmFormatError", m.py().get_type::<NdmFormatError>())?;
     m.add("NdmKvnParseError", m.py().get_type::<NdmKvnParseError>())?;
     m.add("NdmXmlError", m.py().get_type::<NdmXmlError>())?;
-    m.add("NdmValidationError", m.py().get_type::<NdmValidationError>())?;
+    m.add(
+        "NdmValidationError",
+        m.py().get_type::<NdmValidationError>(),
+    )?;
     m.add("NdmEpochError", m.py().get_type::<NdmEpochError>())?;
     m.add("NdmIoError", m.py().get_type::<NdmIoError>())?;
     m.add(

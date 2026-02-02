@@ -1045,7 +1045,9 @@ impl OdParameters {
     #[setter]
     fn set_recommended_od_span(&mut self, v: Option<f64>) -> PyResult<()> {
         use ccsds_ndm::types::DayInterval;
-        self.inner.recommended_od_span = v.map(|x| DayInterval::new(x, None).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?;
+        self.inner.recommended_od_span = v
+            .map(|x| DayInterval::new(x, None).map_err(|e| PyValueError::new_err(e.to_string())))
+            .transpose()?;
         Ok(())
     }
 
@@ -1064,7 +1066,9 @@ impl OdParameters {
     #[setter]
     fn set_actual_od_span(&mut self, v: Option<f64>) -> PyResult<()> {
         use ccsds_ndm::types::DayInterval;
-        self.inner.actual_od_span = v.map(|x| DayInterval::new(x, None).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?;
+        self.inner.actual_od_span = v
+            .map(|x| DayInterval::new(x, None).map_err(|e| PyValueError::new_err(e.to_string())))
+            .transpose()?;
         Ok(())
     }
 
@@ -1129,9 +1133,7 @@ impl OdParameters {
     fn set_residuals_accepted(&mut self, v: Option<f64>) -> PyResult<()> {
         use ccsds_ndm::types::Percentage;
         self.inner.residuals_accepted = v
-            .map(|x| {
-                Percentage::new(x, None).map_err(|e| PyValueError::new_err(e.to_string()))
-            })
+            .map(|x| Percentage::new(x, None).map_err(|e| PyValueError::new_err(e.to_string())))
             .transpose()?;
         Ok(())
     }
@@ -1293,39 +1295,124 @@ impl GroundImpactParameters {
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let comment = comment.unwrap_or_default();
-        use ccsds_ndm::types::{Probability, LongitudeRequired, LatitudeRequired, AltitudeRequired, PercentageRequired, Distance};
+        use ccsds_ndm::types::{
+            AltitudeRequired, Distance, LatitudeRequired, LongitudeRequired, PercentageRequired,
+            Probability,
+        };
         Ok(Self {
             inner: core_common::GroundImpactParameters {
                 comment,
-                probability_of_impact: probability_of_impact.map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                probability_of_burn_up: probability_of_burn_up.map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                probability_of_break_up: probability_of_break_up.map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                probability_of_land_impact: probability_of_land_impact.map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                probability_of_casualty: probability_of_casualty.map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
+                probability_of_impact: probability_of_impact
+                    .map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
+                probability_of_burn_up: probability_of_burn_up
+                    .map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
+                probability_of_break_up: probability_of_break_up
+                    .map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
+                probability_of_land_impact: probability_of_land_impact
+                    .map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
+                probability_of_casualty: probability_of_casualty
+                    .map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string())))
+                    .transpose()?,
                 nominal_impact_epoch: nominal_impact_epoch.map(|s| parse_epoch(&s)).transpose()?,
                 impact_window_start: impact_window_start.map(|s| parse_epoch(&s)).transpose()?,
                 impact_window_end: impact_window_end.map(|s| parse_epoch(&s)).transpose()?,
                 impact_ref_frame,
-                nominal_impact_lon: nominal_impact_lon.map(|v| LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                nominal_impact_lat: nominal_impact_lat.map(|v| LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                nominal_impact_alt: nominal_impact_alt.map(|v| AltitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_1_confidence: impact_1_confidence.map(|v| PercentageRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_1_start_lon: impact_1_start_lon.map(|v| LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_1_start_lat: impact_1_start_lat.map(|v| LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_1_stop_lon: impact_1_stop_lon.map(|v| LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_1_stop_lat: impact_1_stop_lat.map(|v| LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
+                nominal_impact_lon: nominal_impact_lon
+                    .map(|v| {
+                        LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                nominal_impact_lat: nominal_impact_lat
+                    .map(|v| {
+                        LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                nominal_impact_alt: nominal_impact_alt
+                    .map(|v| {
+                        AltitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_1_confidence: impact_1_confidence
+                    .map(|v| {
+                        PercentageRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_1_start_lon: impact_1_start_lon
+                    .map(|v| {
+                        LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_1_start_lat: impact_1_start_lat
+                    .map(|v| {
+                        LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_1_stop_lon: impact_1_stop_lon
+                    .map(|v| {
+                        LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_1_stop_lat: impact_1_stop_lat
+                    .map(|v| {
+                        LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
                 impact_1_cross_track: impact_1_cross_track.map(|v| Distance::new(v, None)),
-                impact_2_confidence: impact_2_confidence.map(|v| PercentageRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_2_start_lon: impact_2_start_lon.map(|v| LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_2_start_lat: impact_2_start_lat.map(|v| LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_2_stop_lon: impact_2_stop_lon.map(|v| LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_2_stop_lat: impact_2_stop_lat.map(|v| LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
+                impact_2_confidence: impact_2_confidence
+                    .map(|v| {
+                        PercentageRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_2_start_lon: impact_2_start_lon
+                    .map(|v| {
+                        LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_2_start_lat: impact_2_start_lat
+                    .map(|v| {
+                        LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_2_stop_lon: impact_2_stop_lon
+                    .map(|v| {
+                        LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_2_stop_lat: impact_2_stop_lat
+                    .map(|v| {
+                        LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
                 impact_2_cross_track: impact_2_cross_track.map(|v| Distance::new(v, None)),
-                impact_3_confidence: impact_3_confidence.map(|v| PercentageRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_3_start_lon: impact_3_start_lon.map(|v| LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_3_start_lat: impact_3_start_lat.map(|v| LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_3_stop_lon: impact_3_stop_lon.map(|v| LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
-                impact_3_stop_lat: impact_3_stop_lat.map(|v| LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?,
+                impact_3_confidence: impact_3_confidence
+                    .map(|v| {
+                        PercentageRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_3_start_lon: impact_3_start_lon
+                    .map(|v| {
+                        LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_3_start_lat: impact_3_start_lat
+                    .map(|v| {
+                        LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_3_stop_lon: impact_3_stop_lon
+                    .map(|v| {
+                        LongitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                impact_3_stop_lat: impact_3_stop_lat
+                    .map(|v| {
+                        LatitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
                 impact_3_cross_track: impact_3_cross_track.map(|v| Distance::new(v, None)),
             },
         })
@@ -1340,7 +1427,10 @@ impl GroundImpactParameters {
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
     }
-    #[setter] fn set_comment(&mut self, v: Vec<String>) { self.inner.comment = v; }
+    #[setter]
+    fn set_comment(&mut self, v: Vec<String>) {
+        self.inner.comment = v;
+    }
 
     /// Probability that any fragment will impact the Earth (either land or sea; 0 to 1).
     ///
@@ -1349,7 +1439,16 @@ impl GroundImpactParameters {
     fn get_probability_of_impact(&self) -> Option<f64> {
         self.inner.probability_of_impact.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_probability_of_impact(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.probability_of_impact = v.map(|x| ccsds_ndm::types::Probability::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_probability_of_impact(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.probability_of_impact = v
+            .map(|x| {
+                ccsds_ndm::types::Probability::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Probability that the entire object and any fragments will burn up during atmospheric
     /// re-entry (0 to 1).
@@ -1359,7 +1458,16 @@ impl GroundImpactParameters {
     fn get_probability_of_burn_up(&self) -> Option<f64> {
         self.inner.probability_of_burn_up.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_probability_of_burn_up(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.probability_of_burn_up = v.map(|x| ccsds_ndm::types::Probability::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_probability_of_burn_up(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.probability_of_burn_up = v
+            .map(|x| {
+                ccsds_ndm::types::Probability::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Probability that the object will break up during re-entry (0 to 1).
     ///
@@ -1368,16 +1476,37 @@ impl GroundImpactParameters {
     fn get_probability_of_break_up(&self) -> Option<f64> {
         self.inner.probability_of_break_up.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_probability_of_break_up(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.probability_of_break_up = v.map(|x| ccsds_ndm::types::Probability::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_probability_of_break_up(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.probability_of_break_up = v
+            .map(|x| {
+                ccsds_ndm::types::Probability::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Probability that any fragment will impact solid ground (0 to 1).
     ///
     /// :type: Optional[float]
     #[getter]
     fn get_probability_of_land_impact(&self) -> Option<f64> {
-        self.inner.probability_of_land_impact.as_ref().map(|v| v.value)
+        self.inner
+            .probability_of_land_impact
+            .as_ref()
+            .map(|v| v.value)
     }
-    #[setter] fn set_probability_of_land_impact(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.probability_of_land_impact = v.map(|x| ccsds_ndm::types::Probability::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_probability_of_land_impact(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.probability_of_land_impact = v
+            .map(|x| {
+                ccsds_ndm::types::Probability::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Probability that the re-entry event will cause any casualties (severe injuries or
     /// deaths—0 to 1).
@@ -1387,25 +1516,48 @@ impl GroundImpactParameters {
     fn get_probability_of_casualty(&self) -> Option<f64> {
         self.inner.probability_of_casualty.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_probability_of_casualty(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.probability_of_casualty = v.map(|x| ccsds_ndm::types::Probability::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_probability_of_casualty(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.probability_of_casualty = v
+            .map(|x| {
+                ccsds_ndm::types::Probability::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Epoch of the predicted impact (formatting rules specified in 5.3.3.5).
     ///
     /// :type: Optional[str]
     #[getter]
     fn get_nominal_impact_epoch(&self) -> Option<String> {
-        self.inner.nominal_impact_epoch.as_ref().map(|e| e.to_string())
+        self.inner
+            .nominal_impact_epoch
+            .as_ref()
+            .map(|e| e.to_string())
     }
-    #[setter] fn set_nominal_impact_epoch(&mut self, v: Option<String>) -> PyResult<()> { self.inner.nominal_impact_epoch = v.map(|s| parse_epoch(&s)).transpose()?; Ok(()) }
+    #[setter]
+    fn set_nominal_impact_epoch(&mut self, v: Option<String>) -> PyResult<()> {
+        self.inner.nominal_impact_epoch = v.map(|s| parse_epoch(&s)).transpose()?;
+        Ok(())
+    }
 
     /// Start epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
     /// :type: Optional[str]
     #[getter]
     fn get_impact_window_start(&self) -> Option<String> {
-        self.inner.impact_window_start.as_ref().map(|e| e.to_string())
+        self.inner
+            .impact_window_start
+            .as_ref()
+            .map(|e| e.to_string())
     }
-    #[setter] fn set_impact_window_start(&mut self, v: Option<String>) -> PyResult<()> { self.inner.impact_window_start = v.map(|s| parse_epoch(&s)).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_window_start(&mut self, v: Option<String>) -> PyResult<()> {
+        self.inner.impact_window_start = v.map(|s| parse_epoch(&s)).transpose()?;
+        Ok(())
+    }
 
     /// End epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
@@ -1414,7 +1566,11 @@ impl GroundImpactParameters {
     fn get_impact_window_end(&self) -> Option<String> {
         self.inner.impact_window_end.as_ref().map(|e| e.to_string())
     }
-    #[setter] fn set_impact_window_end(&mut self, v: Option<String>) -> PyResult<()> { self.inner.impact_window_end = v.map(|s| parse_epoch(&s)).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_window_end(&mut self, v: Option<String>) -> PyResult<()> {
+        self.inner.impact_window_end = v.map(|s| parse_epoch(&s)).transpose()?;
+        Ok(())
+    }
 
     /// Reference frame of the impact location data. The value should be taken from the keyword
     /// value name column in the SANA celestial body reference frames registry, reference `[11]`.
@@ -1426,7 +1582,10 @@ impl GroundImpactParameters {
     fn get_impact_ref_frame(&self) -> Option<String> {
         self.inner.impact_ref_frame.clone()
     }
-    #[setter] fn set_impact_ref_frame(&mut self, v: Option<String>) { self.inner.impact_ref_frame = v; }
+    #[setter]
+    fn set_impact_ref_frame(&mut self, v: Option<String>) {
+        self.inner.impact_ref_frame = v;
+    }
 
     /// Longitude of the predicted impact location with respect to the value of
     /// IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in
@@ -1439,7 +1598,16 @@ impl GroundImpactParameters {
     fn get_nominal_impact_lon(&self) -> Option<f64> {
         self.inner.nominal_impact_lon.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_nominal_impact_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.nominal_impact_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_nominal_impact_lon(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.nominal_impact_lon = v
+            .map(|x| {
+                ccsds_ndm::types::LongitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Latitude of the predicted impact location with respect to the value of
     /// IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in
@@ -1452,7 +1620,16 @@ impl GroundImpactParameters {
     fn get_nominal_impact_lat(&self) -> Option<f64> {
         self.inner.nominal_impact_lat.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_nominal_impact_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.nominal_impact_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_nominal_impact_lat(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.nominal_impact_lat = v
+            .map(|x| {
+                ccsds_ndm::types::LatitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Altitude of the impact location with respect to the value of IMPACT_REF_FRAME.
     ///
@@ -1463,7 +1640,16 @@ impl GroundImpactParameters {
     fn get_nominal_impact_alt(&self) -> Option<f64> {
         self.inner.nominal_impact_alt.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_nominal_impact_alt(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.nominal_impact_alt = v.map(|x| ccsds_ndm::types::AltitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_nominal_impact_alt(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.nominal_impact_alt = v
+            .map(|x| {
+                ccsds_ndm::types::AltitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// First (lowest) confidence interval for the impact location.
     ///
@@ -1474,7 +1660,16 @@ impl GroundImpactParameters {
     fn get_impact_1_confidence(&self) -> Option<f64> {
         self.inner.impact_1_confidence.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_1_confidence(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_1_confidence = v.map(|x| ccsds_ndm::types::PercentageRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_1_confidence(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_1_confidence = v
+            .map(|x| {
+                ccsds_ndm::types::PercentageRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Longitude of the start of the first confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1487,7 +1682,16 @@ impl GroundImpactParameters {
     fn get_impact_1_start_lon(&self) -> Option<f64> {
         self.inner.impact_1_start_lon.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_1_start_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_1_start_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_1_start_lon(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_1_start_lon = v
+            .map(|x| {
+                ccsds_ndm::types::LongitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Latitude of the start of the first confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1500,7 +1704,16 @@ impl GroundImpactParameters {
     fn get_impact_1_start_lat(&self) -> Option<f64> {
         self.inner.impact_1_start_lat.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_1_start_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_1_start_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_1_start_lat(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_1_start_lat = v
+            .map(|x| {
+                ccsds_ndm::types::LatitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Longitude of the end of the first confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1513,7 +1726,16 @@ impl GroundImpactParameters {
     fn get_impact_1_stop_lon(&self) -> Option<f64> {
         self.inner.impact_1_stop_lon.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_1_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_1_stop_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_1_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_1_stop_lon = v
+            .map(|x| {
+                ccsds_ndm::types::LongitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Latitude of the end of the first confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1526,7 +1748,16 @@ impl GroundImpactParameters {
     fn get_impact_1_stop_lat(&self) -> Option<f64> {
         self.inner.impact_1_stop_lat.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_1_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_1_stop_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_1_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_1_stop_lat = v
+            .map(|x| {
+                ccsds_ndm::types::LatitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Cross-track size of the first confidence interval.
     ///
@@ -1537,7 +1768,10 @@ impl GroundImpactParameters {
     fn get_impact_1_cross_track(&self) -> Option<f64> {
         self.inner.impact_1_cross_track.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_1_cross_track(&mut self, v: Option<f64>) { self.inner.impact_1_cross_track = v.map(|x| ccsds_ndm::types::Position::new(x, None)); }
+    #[setter]
+    fn set_impact_1_cross_track(&mut self, v: Option<f64>) {
+        self.inner.impact_1_cross_track = v.map(|x| ccsds_ndm::types::Position::new(x, None));
+    }
 
     /// Second confidence interval for the impact location. The IMPACT_1_* block must be
     /// present if IMPACT_2_* is used.
@@ -1549,7 +1783,16 @@ impl GroundImpactParameters {
     fn get_impact_2_confidence(&self) -> Option<f64> {
         self.inner.impact_2_confidence.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_2_confidence(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_2_confidence = v.map(|x| ccsds_ndm::types::PercentageRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_2_confidence(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_2_confidence = v
+            .map(|x| {
+                ccsds_ndm::types::PercentageRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Longitude of the start of the second confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1562,7 +1805,16 @@ impl GroundImpactParameters {
     fn get_impact_2_start_lon(&self) -> Option<f64> {
         self.inner.impact_2_start_lon.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_2_start_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_2_start_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_2_start_lon(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_2_start_lon = v
+            .map(|x| {
+                ccsds_ndm::types::LongitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Latitude of the start of the second confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1575,7 +1827,16 @@ impl GroundImpactParameters {
     fn get_impact_2_start_lat(&self) -> Option<f64> {
         self.inner.impact_2_start_lat.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_2_start_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_2_start_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_2_start_lat(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_2_start_lat = v
+            .map(|x| {
+                ccsds_ndm::types::LatitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Longitude of the end of the second confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1588,7 +1849,16 @@ impl GroundImpactParameters {
     fn get_impact_2_stop_lon(&self) -> Option<f64> {
         self.inner.impact_2_stop_lon.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_2_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_2_stop_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_2_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_2_stop_lon = v
+            .map(|x| {
+                ccsds_ndm::types::LongitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Latitude of the end of the second confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1601,7 +1871,16 @@ impl GroundImpactParameters {
     fn get_impact_2_stop_lat(&self) -> Option<f64> {
         self.inner.impact_2_stop_lat.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_2_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_2_stop_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_2_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_2_stop_lat = v
+            .map(|x| {
+                ccsds_ndm::types::LatitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Cross-track size of the second confidence interval.
     ///
@@ -1612,7 +1891,10 @@ impl GroundImpactParameters {
     fn get_impact_2_cross_track(&self) -> Option<f64> {
         self.inner.impact_2_cross_track.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_2_cross_track(&mut self, v: Option<f64>) { self.inner.impact_2_cross_track = v.map(|x| ccsds_ndm::types::Position::new(x, None)); }
+    #[setter]
+    fn set_impact_2_cross_track(&mut self, v: Option<f64>) {
+        self.inner.impact_2_cross_track = v.map(|x| ccsds_ndm::types::Position::new(x, None));
+    }
 
     /// Third (highest) confidence interval for the impact location. The IMPACT_2_* block must
     /// be present if IMPACT_3_* is used.
@@ -1624,7 +1906,16 @@ impl GroundImpactParameters {
     fn get_impact_3_confidence(&self) -> Option<f64> {
         self.inner.impact_3_confidence.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_3_confidence(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_3_confidence = v.map(|x| ccsds_ndm::types::PercentageRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_3_confidence(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_3_confidence = v
+            .map(|x| {
+                ccsds_ndm::types::PercentageRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Longitude of the start of the third confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1637,7 +1928,16 @@ impl GroundImpactParameters {
     fn get_impact_3_start_lon(&self) -> Option<f64> {
         self.inner.impact_3_start_lon.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_3_start_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_3_start_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_3_start_lon(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_3_start_lon = v
+            .map(|x| {
+                ccsds_ndm::types::LongitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Latitude of the start of the third confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1650,7 +1950,16 @@ impl GroundImpactParameters {
     fn get_impact_3_start_lat(&self) -> Option<f64> {
         self.inner.impact_3_start_lat.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_3_start_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_3_start_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_3_start_lat(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_3_start_lat = v
+            .map(|x| {
+                ccsds_ndm::types::LatitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Longitude of the end of the third confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1663,7 +1972,16 @@ impl GroundImpactParameters {
     fn get_impact_3_stop_lon(&self) -> Option<f64> {
         self.inner.impact_3_stop_lon.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_3_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_3_stop_lon = v.map(|x| ccsds_ndm::types::LongitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_3_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_3_stop_lon = v
+            .map(|x| {
+                ccsds_ndm::types::LongitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Latitude of the end of the third confidence interval along the ground track with
     /// respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -1676,7 +1994,16 @@ impl GroundImpactParameters {
     fn get_impact_3_stop_lat(&self) -> Option<f64> {
         self.inner.impact_3_stop_lat.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_3_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> { self.inner.impact_3_stop_lat = v.map(|x| ccsds_ndm::types::LatitudeRequired::new(x).map_err(|e| PyValueError::new_err(e.to_string()))).transpose()?; Ok(()) }
+    #[setter]
+    fn set_impact_3_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.impact_3_stop_lat = v
+            .map(|x| {
+                ccsds_ndm::types::LatitudeRequired::new(x)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            })
+            .transpose()?;
+        Ok(())
+    }
 
     /// Cross-track size of the third confidence interval.
     ///
@@ -1687,7 +2014,10 @@ impl GroundImpactParameters {
     fn get_impact_3_cross_track(&self) -> Option<f64> {
         self.inner.impact_3_cross_track.as_ref().map(|v| v.value)
     }
-    #[setter] fn set_impact_3_cross_track(&mut self, v: Option<f64>) { self.inner.impact_3_cross_track = v.map(|x| ccsds_ndm::types::Position::new(x, None)); }
+    #[setter]
+    fn set_impact_3_cross_track(&mut self, v: Option<f64>) {
+        self.inner.impact_3_cross_track = v.map(|x| ccsds_ndm::types::Position::new(x, None));
+    }
 }
 
 #[pyclass(eq, eq_int)]
@@ -1721,7 +2051,6 @@ impl FromStr for YesNo {
     }
 }
 
-
 pub fn parse_yes_no(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::YesNo> {
     use std::str::FromStr;
     if let Ok(val) = ob.extract::<YesNo>() {
@@ -1732,9 +2061,7 @@ pub fn parse_yes_no(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::YesNo> 
     } else if let Ok(s) = ob.extract::<String>() {
         ccsds_ndm::types::YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
     } else {
-        Err(PyValueError::new_err(
-            "Expected YesNo enum or string",
-        ))
+        Err(PyValueError::new_err("Expected YesNo enum or string"))
     }
 }
 
@@ -1778,8 +2105,9 @@ impl FromStr for ObjectDescription {
     }
 }
 
-
-pub fn parse_object_description(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::ObjectDescription> {
+pub fn parse_object_description(
+    ob: &Bound<'_, PyAny>,
+) -> PyResult<ccsds_ndm::types::ObjectDescription> {
     if let Ok(val) = ob.extract::<ObjectDescription>() {
         Ok(match val {
             ObjectDescription::Payload => ccsds_ndm::types::ObjectDescription::Payload,
@@ -1789,14 +2117,14 @@ pub fn parse_object_description(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::ty
             ObjectDescription::Other => ccsds_ndm::types::ObjectDescription::Other,
         })
     } else if let Ok(s) = ob.extract::<String>() {
-        ccsds_ndm::types::ObjectDescription::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+        ccsds_ndm::types::ObjectDescription::from_str(&s)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     } else {
         Err(PyValueError::new_err(
             "Expected ObjectDescription enum or string",
         ))
     }
 }
-
 
 #[pyclass(eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
@@ -1832,7 +2160,6 @@ impl FromStr for ControlledType {
     }
 }
 
-
 pub fn parse_controlled_type(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::ControlledType> {
     use std::str::FromStr;
     if let Ok(val) = ob.extract::<ControlledType>() {
@@ -1842,7 +2169,8 @@ pub fn parse_controlled_type(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types
             ControlledType::Unknown => ccsds_ndm::types::ControlledType::Unknown,
         })
     } else if let Ok(s) = ob.extract::<String>() {
-        ccsds_ndm::types::ControlledType::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
+        ccsds_ndm::types::ControlledType::from_str(&s)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     } else {
         Err(PyValueError::new_err(
             "Expected ControlledType enum or string",
@@ -1922,8 +2250,6 @@ pub fn parse_time_system(ob: &Bound<'_, PyAny>) -> PyResult<String> {
     } else if let Ok(s) = ob.extract::<String>() {
         Ok(s)
     } else {
-        Err(PyValueError::new_err(
-            "Expected TimeSystem enum or string",
-        ))
+        Err(PyValueError::new_err("Expected TimeSystem enum or string"))
     }
 }

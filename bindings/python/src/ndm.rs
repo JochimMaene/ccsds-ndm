@@ -36,7 +36,12 @@ pub struct Ndm {
 impl Ndm {
     #[new]
     #[pyo3(signature = (messages, id=None, comments=vec![]))]
-    fn new(messages: Vec<Py<PyAny>>, id: Option<String>, comments: Vec<String>, py: Python) -> PyResult<Self> {
+    fn new(
+        messages: Vec<Py<PyAny>>,
+        id: Option<String>,
+        comments: Vec<String>,
+        py: Python,
+    ) -> PyResult<Self> {
         let mut core_messages = Vec::new();
         for msg in messages {
             if let Ok(oem) = msg.extract::<Oem>(py) {
@@ -60,7 +65,9 @@ impl Ndm {
             } else if let Ok(ndm) = msg.extract::<Ndm>(py) {
                 core_messages.push(MessageType::Ndm(ndm.inner));
             } else {
-                return Err(PyValueError::new_err("Unsupported message type in NDM combined instantiation"));
+                return Err(PyValueError::new_err(
+                    "Unsupported message type in NDM combined instantiation",
+                ));
             }
         }
 
@@ -83,7 +90,7 @@ impl Ndm {
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
         use ccsds_ndm::traits::Validate;
-        
+
         if strict {
             self.inner
                 .validate()
@@ -93,17 +100,15 @@ impl Ndm {
             let mut issues = Vec::new();
             let _ = ccsds_ndm::validation::with_validation_mode(
                 ccsds_ndm::validation::ValidationMode::Lenient,
-                || {
-                    match self.inner.validate() {
-                        Ok(_) => Ok(()),
-                        Err(e) => {
-                            issues.push(e.to_string());
-                            Ok(())
-                        }
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
                     }
-                }
+                },
             );
-            
+
             let warnings = ccsds_ndm::validation::take_warnings();
             for w in warnings {
                 issues.push(w.error.to_string());
@@ -170,7 +175,8 @@ impl Ndm {
                 .inner
                 .to_kvn()
                 .map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner).map_err(|e| PyValueError::new_err(e.to_string())),
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
+                .map_err(|e| PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
                 other
@@ -216,9 +222,15 @@ impl Ndm {
                 MessageType::Rdm(m) => Py::new(py, Rdm { inner: m.clone() })?.into_any(),
                 MessageType::Tdm(m) => Py::new(py, Tdm { inner: m.clone() })?.into_any(),
                 MessageType::Ndm(m) => Py::new(py, Ndm { inner: m.clone() })?.into_any(),
-                MessageType::Aem(m) => Py::new(py, crate::aem::Aem { inner: m.clone() })?.into_any(),
-                MessageType::Apm(m) => Py::new(py, crate::apm::Apm { inner: m.clone() })?.into_any(),
-                MessageType::Acm(m) => Py::new(py, crate::acm::Acm { inner: m.clone() })?.into_any(),
+                MessageType::Aem(m) => {
+                    Py::new(py, crate::aem::Aem { inner: m.clone() })?.into_any()
+                }
+                MessageType::Apm(m) => {
+                    Py::new(py, crate::apm::Apm { inner: m.clone() })?.into_any()
+                }
+                MessageType::Acm(m) => {
+                    Py::new(py, crate::acm::Acm { inner: m.clone() })?.into_any()
+                }
             };
             py_messages.push(py_msg);
         }

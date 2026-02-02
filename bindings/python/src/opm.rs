@@ -2,14 +2,12 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::common::{parse_reference_frame, parse_time_system};
 use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_epoch;
-use crate::common::{parse_reference_frame, parse_time_system};
 use ccsds_ndm::messages::opm as core_opm;
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::types::{
-    Angle, Distance, Gm, Inclination,
-};
+use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -84,7 +82,7 @@ impl Opm {
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
         use ccsds_ndm::traits::Validate;
-        
+
         if strict {
             self.inner
                 .validate()
@@ -94,17 +92,15 @@ impl Opm {
             let mut issues = Vec::new();
             let _ = ccsds_ndm::validation::with_validation_mode(
                 ccsds_ndm::validation::ValidationMode::Lenient,
-                || {
-                    match self.inner.validate() {
-                        Ok(_) => Ok(()),
-                        Err(e) => {
-                            issues.push(e.to_string());
-                            Ok(())
-                        }
+                || match self.inner.validate() {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        issues.push(e.to_string());
+                        Ok(())
                     }
-                }
+                },
             );
-            
+
             let warnings = ccsds_ndm::validation::take_warnings();
             for w in warnings {
                 issues.push(w.error.to_string());
@@ -226,7 +222,8 @@ impl Opm {
                 .inner
                 .to_kvn()
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
+            "xml" => ccsds_ndm::xml::to_string(&self.inner)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!(
                 "Unsupported format '{}'. Use 'kvn' or 'xml'",
                 other
@@ -399,8 +396,6 @@ impl OpmMetadata {
             },
         })
     }
-
-
 
     fn __repr__(&self) -> String {
         format!("OpmMetadata(object_name='{}')", self.inner.object_name)
@@ -613,7 +608,9 @@ impl KeplerianElements {
             inner: core_opm::KeplerianElements {
                 comment: vec![],
                 semi_major_axis: Distance::new(semi_major_axis, None),
-                eccentricity: ccsds_ndm::types::NonNegativeDouble { value: eccentricity },
+                eccentricity: ccsds_ndm::types::NonNegativeDouble {
+                    value: eccentricity,
+                },
                 inclination: Inclination {
                     angle: Angle::new(inclination, None).map_err(|e| {
                         PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
