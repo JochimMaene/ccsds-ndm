@@ -6,7 +6,7 @@ use crate::common::OdmHeader;
 use crate::common::{parse_reference_frame, parse_time_system};
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::omm as core_omm;
-use ccsds_ndm::traits::{Ndm, Validate};
+use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
@@ -87,7 +87,6 @@ impl Omm {
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        use ccsds_ndm::traits::Validate;
 
         if strict {
             self.inner

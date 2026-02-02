@@ -4,7 +4,7 @@
 
 use crate::common::{parse_object_description, ObjectDescription, OdParameters};
 use ccsds_ndm::messages::cdm as core_cdm;
-use ccsds_ndm::traits::{Ndm, Validate};
+use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::MessageType;
 use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
@@ -242,7 +242,6 @@ impl Cdm {
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        use ccsds_ndm::traits::Validate;
 
         if strict {
             self.inner
@@ -1886,7 +1885,7 @@ impl CdmData {
     ) -> PyResult<Self> {
         let od_p = match od_parameters {
             Some(ob) => {
-                if let Ok(list) = ob.downcast::<pyo3::types::PyList>() {
+                if let Ok(list) = ob.cast::<pyo3::types::PyList>() {
                     if list.is_empty() {
                         None
                     } else {
@@ -1903,7 +1902,7 @@ impl CdmData {
 
         let add_p = match additional_parameters {
             Some(ob) => {
-                if let Ok(list) = ob.downcast::<pyo3::types::PyList>() {
+                if let Ok(list) = ob.cast::<pyo3::types::PyList>() {
                     if list.is_empty() {
                         None
                     } else {
