@@ -142,7 +142,7 @@ class TestNdm:
         seg2 = CdmSegment(meta2, data2)
 
         body = CdmBody(rel_meta, [seg1, seg2])
-        return Cdm(header, body, "CDM-ID", "1.0")
+        return Cdm(header, body)
 
     def test_ndm_roundtrip_xml(self):
         oem = self._create_valid_oem()

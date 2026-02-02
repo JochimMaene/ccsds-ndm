@@ -6,7 +6,7 @@ use crate::common::AdmHeader;
 use crate::attitude::{QuaternionState, EulerAngleState, AngVelState, SpinState, InertiaState};
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::apm as core_apm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -31,16 +31,149 @@ pub struct Apm {
 #[pymethods]
 impl Apm {
     #[new]
-    fn new(header: AdmHeader, segment: ApmSegment) -> Self {
+    fn new(
+        header: AdmHeader,
+        segment: ApmSegment,
+    ) -> Self {
         Self {
             inner: core_apm::Apm {
                 header: header.inner,
                 body: core_apm::ApmBody {
                     segment: segment.inner,
                 },
-                id: None,
+                id: Some("CCSDS_APM_VERS".to_string()),
                 version: "2.0".to_string(),
             },
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Apm(object_name='{}')",
+            self.inner.body.segment.metadata.object_name
+        )
+    }
+
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_id(&self) -> Option<String> {
+        self.inner.id.clone()
+    }
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_version(&self) -> String {
+        self.inner.version.clone()
+    }
+
+    /// Attitude Parameter Message (APM).
+    ///
+    /// An APM specifies the attitude state of a single object at a specified epoch. This message
+    /// is suited to interagency exchanges that involve automated interaction and/or human
+    /// interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
+    ///
+    /// The APM requires the use of a propagation technique to determine the attitude state at
+    /// times different from the specified epoch.
+    ///
+    /// :type: AdmHeader
+    #[getter]
+    fn get_header(&self) -> AdmHeader {
+        AdmHeader {
+            inner: self.inner.header.clone(),
+        }
+    }
+
+    #[setter]
+    fn set_header(&mut self, header: AdmHeader) {
+        self.inner.header = header.inner;
+    }
+
+    /// APM Segment.
+    ///
+    /// :type: ApmSegment
+    #[getter]
+    fn get_segment(&self) -> ApmSegment {
+        ApmSegment {
+            inner: self.inner.body.segment.clone(),
+        }
+    }
+
+    #[setter]
+    fn set_segment(&mut self, segment: ApmSegment) {
+        self.inner.body.segment = segment.inner;
+    }
+
+    /// Validate the message against CCSDS rules.
+    ///
+    /// Parameters
+    /// ----------
+    /// strict : bool, optional
+    ///     If True (default), raises ValueError on the first error found.
+    ///     If False, returns a list of validation error messages (or None if valid).
+    #[pyo3(signature = (strict=true))]
+    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
+        use ccsds_ndm::traits::Validate;
+        
+        if strict {
+            self.inner
+                .validate()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(None)
+        } else {
+            let mut issues = Vec::new();
+            let _ = ccsds_ndm::validation::with_validation_mode(
+                ccsds_ndm::validation::ValidationMode::Lenient,
+                || {
+                    match self.inner.validate() {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            issues.push(e.to_string());
+                            Ok(())
+                        }
+                    }
+                }
+            );
+            
+            let warnings = ccsds_ndm::validation::take_warnings();
+            for w in warnings {
+                issues.push(w.error.to_string());
+            }
+
+            if issues.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(issues))
+            }
+        }
+    }
+
+    /// Serialize to string.
+    #[pyo3(signature = (format, validate=true))]
+    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+        if validate {
+            self.validate(true)?;
+        }
+        match format {
+            "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
+            "xml" => ccsds_ndm::xml::to_string(&self.inner).map_err(|e| PyValueError::new_err(e.to_string())),
+            other => Err(PyValueError::new_err(format!("Unsupported format '{}'", other))),
+        }
+    }
+
+    /// Write to file.
+    #[pyo3(signature = (path, format, validate=true))]
+    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
+        let data = self.to_str(format, validate)?;
+        match fs::write(path, data) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Failed to write file: {}",
+                e
+            ))),
         }
     }
 
@@ -76,52 +209,6 @@ impl Apm {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
         Self::from_str(&content, format)
-    }
-
-    fn to_str(&self, format: &str) -> PyResult<String> {
-        match format {
-            "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => self.inner.to_xml().map_err(|e| PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!("Unsupported format '{}'", other))),
-        }
-    }
-
-    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
-        let data = self.to_str(format)?;
-        match fs::write(path, data) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!(
-                "Failed to write file: {}",
-                e
-            ))),
-        }
-    }
-
-    /// Attitude Parameter Message (APM).
-    ///
-    /// An APM specifies the attitude state of a single object at a specified epoch. This message
-    /// is suited to interagency exchanges that involve automated interaction and/or human
-    /// interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
-    ///
-    /// The APM requires the use of a propagation technique to determine the attitude state at
-    /// times different from the specified epoch.
-    ///
-    /// :type: AdmHeader
-    #[getter]
-    fn get_header(&self) -> AdmHeader {
-        AdmHeader {
-            inner: self.inner.header.clone(),
-        }
-    }
-
-    /// APM Segment.
-    ///
-    /// :type: ApmSegment
-    #[getter]
-    fn get_segment(&self) -> ApmSegment {
-        ApmSegment {
-            inner: self.inner.body.segment.clone(),
-        }
     }
 }
 

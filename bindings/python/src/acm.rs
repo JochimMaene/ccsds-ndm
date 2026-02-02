@@ -5,7 +5,7 @@
 use crate::common::AdmHeader;
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::acm as core_acm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -34,16 +34,90 @@ pub struct Acm {
 #[pymethods]
 impl Acm {
     #[new]
-    fn new(header: AdmHeader, segment: AcmSegment) -> Self {
+    fn new(
+        header: AdmHeader,
+        segment: AcmSegment,
+    ) -> Self {
         Self {
             inner: core_acm::Acm {
                 header: header.inner,
                 body: core_acm::AcmBody {
                     segment: Box::new(segment.inner),
                 },
-                id: None,
+                id: Some("CCSDS_ACM_VERS".to_string()),
                 version: "2.0".to_string(),
             },
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Acm(object_name='{}')",
+            self.inner
+                .body
+                .segment
+                .metadata
+                .object_name
+        )
+    }
+
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_id(&self) -> Option<String> {
+        self.inner.id.clone()
+    }
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_version(&self) -> String {
+        self.inner.version.clone()
+    }
+
+    /// Validate the message against CCSDS rules.
+    ///
+    /// Parameters
+    /// ----------
+    /// strict : bool, optional
+    ///     If True (default), raises ValueError on the first error found.
+    ///     If False, returns a list of validation error messages (or None if valid).
+    #[pyo3(signature = (strict=true))]
+    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
+        use ccsds_ndm::traits::Validate;
+        
+        if strict {
+            self.inner
+                .validate()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(None)
+        } else {
+            let mut issues = Vec::new();
+            let _ = ccsds_ndm::validation::with_validation_mode(
+                ccsds_ndm::validation::ValidationMode::Lenient,
+                || {
+                    match self.inner.validate() {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            issues.push(e.to_string());
+                            Ok(())
+                        }
+                    }
+                }
+            );
+            
+            let warnings = ccsds_ndm::validation::take_warnings();
+            for w in warnings {
+                issues.push(w.error.to_string());
+            }
+
+            if issues.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(issues))
+            }
         }
     }
 
@@ -81,16 +155,21 @@ impl Acm {
         Self::from_str(&content, format)
     }
 
-    fn to_str(&self, format: &str) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true))]
+    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+        if validate {
+            self.validate(true)?;
+        }
         match format {
             "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => self.inner.to_xml().map_err(|e| PyValueError::new_err(e.to_string())),
+            "xml" => ccsds_ndm::xml::to_string(&self.inner).map_err(|e| PyValueError::new_err(e.to_string())),
             other => Err(PyValueError::new_err(format!("Unsupported format '{}'", other))),
         }
     }
 
-    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
-        let data = self.to_str(format)?;
+    #[pyo3(signature = (path, format, validate=true))]
+    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
+        let data = self.to_str(format, validate)?;
         match fs::write(path, data) {
             Ok(_) => Ok(()),
             Err(e) => Err(PyValueError::new_err(format!(
@@ -119,6 +198,11 @@ impl Acm {
         AdmHeader {
             inner: self.inner.header.clone(),
         }
+    }
+
+    #[setter]
+    fn set_header(&mut self, header: AdmHeader) {
+        self.inner.header = header.inner;
     }
 
     /// ACM Segment.
@@ -168,6 +252,13 @@ impl AcmSegment {
         AcmData {
             inner: self.inner.data.clone(),
         }
+    }
+
+    /// Validate the segment against CCSDS rules.
+    fn validate(&self, header: AdmHeader) -> PyResult<()> {
+        self.inner
+            .validate(&header.inner)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -260,6 +351,13 @@ impl AcmMetadata {
     fn get_international_designator(&self) -> Option<String> {
         self.inner.international_designator.clone()
     }
+
+    /// Validate the metadata section against CCSDS rules.
+    fn validate(&self) -> PyResult<()> {
+        self.inner
+            .validate()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
 }
 
 /// ACM Data Section.
@@ -321,6 +419,13 @@ impl AcmData {
     #[getter]
     fn get_phys(&self) -> Option<AcmPhysicalDescription> {
         self.inner.phys.as_ref().map(|p| AcmPhysicalDescription { inner: p.clone() })
+    }
+
+    /// Validate the data section against CCSDS rules.
+    fn validate(&self, metadata: AcmMetadata) -> PyResult<()> {
+        self.inner
+            .validate_with_metadata(&metadata.inner)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 

@@ -5,7 +5,7 @@
 use crate::common::AdmHeader;
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::aem as core_aem;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::MessageType;
 use ccsds_ndm::types::{RotSeq, InterpolationDegree};
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
@@ -35,16 +35,160 @@ pub struct Aem {
 #[pymethods]
 impl Aem {
     #[new]
-    fn new(header: AdmHeader, segments: Vec<AemSegment>) -> Self {
+    fn new(
+        header: AdmHeader,
+        segments: Vec<AemSegment>,
+    ) -> Self {
         Self {
             inner: core_aem::Aem {
                 header: header.inner,
                 body: core_aem::AemBody {
                     segment: segments.into_iter().map(|s| s.inner).collect(),
                 },
-                id: None,
+                id: Some("CCSDS_AEM_VERS".to_string()),
                 version: "2.0".to_string(),
             },
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Aem(object_name='{}', segments={})",
+            self.inner
+                .body
+                .segment
+                .first()
+                .map(|s| s.metadata.object_name.clone())
+                .unwrap_or_default(),
+            self.inner.body.segment.len()
+        )
+    }
+
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_id(&self) -> Option<String> {
+        self.inner.id.clone()
+    }
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_version(&self) -> String {
+        self.inner.version.clone()
+    }
+
+    /// Attitude Ephemeris Message (AEM).
+    ///
+    /// An AEM specifies the attitude state of a single object at multiple epochs, contained within a
+    /// specified time range. The AEM is suited to interagency exchanges that involve automated
+    /// interaction and require higher fidelity or higher precision dynamic modeling than is
+    /// possible with the APM.
+    ///
+    /// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
+    /// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
+    /// the attitude state at times different from the tabular epochs.
+    ///
+    /// :type: AdmHeader
+    #[getter]
+    fn get_header(&self) -> AdmHeader {
+        AdmHeader {
+            inner: self.inner.header.clone(),
+        }
+    }
+
+    #[setter]
+    fn set_header(&mut self, header: AdmHeader) {
+        self.inner.header = header.inner;
+    }
+
+    /// AEM Segments.
+    ///
+    /// :type: list[AemSegment]
+    #[getter]
+    fn get_segments(&self) -> Vec<AemSegment> {
+        self.inner
+            .body
+            .segment
+            .iter()
+            .map(|s| AemSegment { inner: s.clone() })
+            .collect()
+    }
+
+    #[setter]
+    fn set_segments(&mut self, segments: Vec<AemSegment>) {
+        self.inner.body.segment = segments.into_iter().map(|s| s.inner).collect();
+    }
+
+    /// Validate the message against CCSDS rules.
+    ///
+    /// Parameters
+    /// ----------
+    /// strict : bool, optional
+    ///     If True (default), raises ValueError on the first error found.
+    ///     If False, returns a list of validation error messages (or None if valid).
+    #[pyo3(signature = (strict=true))]
+    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
+        use ccsds_ndm::traits::Validate;
+        
+        if strict {
+            self.inner
+                .validate()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(None)
+        } else {
+            let mut issues = Vec::new();
+            let _ = ccsds_ndm::validation::with_validation_mode(
+                ccsds_ndm::validation::ValidationMode::Lenient,
+                || {
+                    match self.inner.validate() {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            issues.push(e.to_string());
+                            Ok(())
+                        }
+                    }
+                }
+            );
+            
+            let warnings = ccsds_ndm::validation::take_warnings();
+            for w in warnings {
+                issues.push(w.error.to_string());
+            }
+
+            if issues.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(issues))
+            }
+        }
+    }
+
+    /// Serialize to string.
+    #[pyo3(signature = (format, validate=true))]
+    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+        if validate {
+            self.validate(true)?;
+        }
+        match format {
+            "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
+            "xml" => ccsds_ndm::xml::to_string(&self.inner).map_err(|e| PyValueError::new_err(e.to_string())),
+            other => Err(PyValueError::new_err(format!("Unsupported format '{}'", other))),
+        }
+    }
+
+    /// Write to file.
+    #[pyo3(signature = (path, format, validate=true))]
+    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
+        let data = self.to_str(format, validate)?;
+        match fs::write(path, data) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Failed to write file: {}",
+                e
+            ))),
         }
     }
 
@@ -80,57 +224,6 @@ impl Aem {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
         Self::from_str(&content, format)
-    }
-
-    fn to_str(&self, format: &str) -> PyResult<String> {
-        match format {
-            "kvn" => self.inner.to_kvn().map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => self.inner.to_xml().map_err(|e| PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!("Unsupported format '{}'", other))),
-        }
-    }
-
-    fn to_file(&self, path: &str, format: &str) -> PyResult<()> {
-        let data = self.to_str(format)?;
-        match fs::write(path, data) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!(
-                "Failed to write file: {}",
-                e
-            ))),
-        }
-    }
-
-    /// Attitude Ephemeris Message (AEM).
-    ///
-    /// An AEM specifies the attitude state of a single object at multiple epochs, contained within a
-    /// specified time range. The AEM is suited to interagency exchanges that involve automated
-    /// interaction and require higher fidelity or higher precision dynamic modeling than is
-    /// possible with the APM.
-    ///
-    /// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
-    /// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
-    /// the attitude state at times different from the tabular epochs.
-    ///
-    /// :type: AdmHeader
-    #[getter]
-    fn get_header(&self) -> AdmHeader {
-        AdmHeader {
-            inner: self.inner.header.clone(),
-        }
-    }
-
-    /// AEM Segments.
-    ///
-    /// :type: list[AemSegment]
-    #[getter]
-    fn get_segments(&self) -> Vec<AemSegment> {
-        self.inner
-            .body
-            .segment
-            .iter()
-            .map(|s| AemSegment { inner: s.clone() })
-            .collect()
     }
 }
 
@@ -170,6 +263,13 @@ impl AemSegment {
         AemData {
             inner: self.inner.data.clone(),
         }
+    }
+
+    /// Validate the segment against CCSDS rules.
+    fn validate(&self) -> PyResult<()> {
+        self.inner
+            .validate()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -258,6 +358,13 @@ impl AemMetadata {
                 interpolation_degree: interpolation_degree.and_then(NonZeroU32::new).map(InterpolationDegree),
             },
         })
+    }
+
+    /// Validate the metadata section against CCSDS rules.
+    fn validate(&self) -> PyResult<()> {
+        self.inner
+            .validate()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
 
@@ -494,6 +601,17 @@ impl AemData {
                 }).collect(),
             },
         }
+    }
+
+    fn __repr__(&self) -> String {
+        format!("AemData(states={})", self.inner.attitude_states.len())
+    }
+
+    /// Validate the data section against CCSDS rules.
+    fn validate(&self, attitude_type: String) -> PyResult<()> {
+        self.inner
+            .validate(&attitude_type)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     #[staticmethod]

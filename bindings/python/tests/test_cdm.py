@@ -127,7 +127,7 @@ class TestCdm:
 
         body = CdmBody(relative_metadata_data=rel_meta, segments=[seg1, seg2])
 
-        return Cdm(header=header, body=body, id="CDM-ID", version="1.0")
+        return Cdm(header=header, body=body)
 
     def test_roundtrip_kvn(self):
         try:
