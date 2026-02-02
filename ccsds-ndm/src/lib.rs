@@ -136,6 +136,7 @@ pub mod traits;
 pub mod types;
 pub mod utils;
 pub mod validation;
+pub mod versioning;
 pub mod xml;
 
 use error::{CcsdsNdmError, Result};
