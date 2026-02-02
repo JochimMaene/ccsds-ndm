@@ -30,9 +30,6 @@ pub fn aem_version(input: &mut &str) -> KvnResult<String> {
     let _ = collect_comments.parse_next(input)?;
 
     let (value, _) = expect_key("CCSDS_AEM_VERS").parse_next(input)?;
-    if value != "1.0" && value != "2.0" {
-        return Err(cut_err(input, "1.0 or 2.0"));
-    }
     Ok(value.to_string())
 }
 
@@ -471,18 +468,34 @@ META_STOP
 
     #[test]
     fn test_parse_aem_version_error() {
-        let input =
-            "CCSDS_AEM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\n";
+        let input = r#"CCSDS_AEM_VERS = 3.0
+CREATION_DATE = 2002-11-04T17:22:31
+ORIGINATOR = NASA/JPL
+META_START
+OBJECT_NAME = MARS GLOBAL SURVEYOR
+OBJECT_ID = 1996-062A
+CENTER_NAME = MARS BARYCENTER
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
+TIME_SYSTEM = UTC
+START_TIME = 2002-11-04T17:22:31
+STOP_TIME = 2002-11-04T17:25:31
+ATTITUDE_TYPE = QUATERNION
+META_STOP
+DATA_START
+2002-11-04T17:22:31 0.5 0.5 0.5 0.5
+DATA_STOP
+"#;
         let err = Aem::from_kvn(input).unwrap_err();
         match err {
-            CcsdsNdmError::Format(boxed_err) => match *boxed_err {
-                FormatError::Kvn(e) => {
-                    // Check debug output for context
-                    assert!(format!("{:?}", e).contains("1.0 or 2.0"));
+            CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
+                ValidationError::InvalidValue { field, value, .. } => {
+                    assert_eq!(field, "version");
+                    assert_eq!(value, "3.0");
                 }
-                _ => panic!("Expected Kvn format error, got {:?}", boxed_err),
+                _ => panic!("Expected Validation error, got {:?}", boxed_err),
             },
-            _ => panic!("Expected Format error, got {:?}", err),
+            _ => panic!("Expected Validation error, got {:?}", err),
         }
     }
 

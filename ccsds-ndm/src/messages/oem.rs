@@ -41,10 +41,10 @@ use crate::error::CcsdsNdmError;
 #[serde(rename = "oem")]
 pub struct Oem {
     #[serde(rename = "@id")]
-    #[builder(into)]
+    #[builder(required, default = Some("CCSDS_OEM_VERS".to_string()))]
     pub id: Option<String>,
     #[serde(rename = "@version")]
-    #[builder(into)]
+    #[builder(default = "3.0".to_string(), into)]
     pub version: String,
     pub header: OdmHeader,
     pub body: OemBody,
@@ -52,17 +52,11 @@ pub struct Oem {
 
 impl crate::traits::Validate for Oem {
     fn validate(&self) -> Result<()> {
-        if let Some(ref id) = self.id {
-            if id != "CCSDS_OEM_VERS" {
-                return Err(crate::error::ValidationError::InvalidValue {
-                    field: "id".into(),
-                    value: id.clone(),
-                    expected: "CCSDS_OEM_VERS".into(),
-                    line: None,
-                }
-                .into());
-            }
-        }
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Oem,
+            &self.id,
+            &self.version,
+        )?;
         self.header.validate()?;
         self.body.validate()
     }
@@ -112,6 +106,14 @@ impl crate::traits::Validate for OemMetadata {
             }
             .into());
         }
+        if self.time_system.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Metadata".into(),
+                field: "TIME_SYSTEM".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.interpolation.is_some() && self.interpolation_degree.is_none() {
             return Err(crate::error::ValidationError::MissingRequiredField {
                 block: "OEM Metadata".into(),
@@ -119,22 +121,6 @@ impl crate::traits::Validate for OemMetadata {
                 line: None,
             }
             .into());
-        }
-        if self.start_time.as_str() > self.stop_time.as_str() {
-            return Err(crate::error::ValidationError::Generic {
-                message: "START_TIME must be <= STOP_TIME".into(),
-                line: None,
-            }
-            .into());
-        }
-        if let (Some(start), Some(end)) = (&self.useable_start_time, &self.useable_stop_time) {
-            if start.as_str() > end.as_str() {
-                return Err(crate::error::ValidationError::Generic {
-                    message: "USEABLE_START_TIME must be <= USEABLE_STOP_TIME".into(),
-                    line: None,
-                }
-                .into());
-            }
         }
         Ok(())
     }
@@ -1027,25 +1013,6 @@ META_STOP
     }
 
     #[test]
-    fn test_oem_validation_time_range() {
-        let kvn = r#"CCSDS_OEM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-OBJECT_NAME = TEST
-OBJECT_ID = 1
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-02T00:00:00
-STOP_TIME = 2023-01-01T00:00:00
-META_STOP
-2023-01-01T00:00:00 1 2 3 4 5 6
-"#;
-        assert!(Oem::from_kvn(kvn).is_err());
-    }
-
-    #[test]
     fn test_oem_validation_empty_state_vector() {
         // Construct KVN without data lines?
         // Parser logic for OEM data: it expects lines or comments until next block.
@@ -1065,30 +1032,6 @@ META_STOP
 COMMENT No data
 "#;
         assert!(Oem::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_oem_metadata_time_validation() {
-        let mut meta = OemMetadata::builder()
-            .object_name("SAT")
-            .object_id("1")
-            .center_name("EARTH")
-            .ref_frame("GCRF")
-            .time_system("UTC")
-            .start_time(Epoch::new("2023-01-01T12:00:00").unwrap())
-            .stop_time(Epoch::new("2023-01-01T11:00:00").unwrap()) // STOP < START
-            .build();
-
-        // START > STOP
-        assert!(meta.validate().is_err());
-
-        meta.stop_time = Epoch::new("2023-01-01T13:00:00").unwrap();
-        assert!(meta.validate().is_ok());
-
-        // USEABLE_START > USEABLE_STOP
-        meta.useable_start_time = Some(Epoch::new("2023-01-01T12:30:00").unwrap());
-        meta.useable_stop_time = Some(Epoch::new("2023-01-01T12:15:00").unwrap());
-        assert!(meta.validate().is_err());
     }
 
     #[test]

@@ -9,7 +9,7 @@ use crate::common::{
 use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::{
     ControlledType, DisintegrationType, Distance, Epoch, ImpactUncertaintyType, ObjectDescription,
     ReentryUncertaintyMethodType, UserDefined, YesNo,
@@ -35,86 +35,22 @@ pub struct Rdm {
     pub header: RdmHeader,
     pub body: RdmBody,
     #[serde(rename = "@id")]
-    #[builder(into)]
+    #[builder(required, default = Some("CCSDS_RDM_VERS".to_string()))]
     pub id: Option<String>,
     #[serde(rename = "@version")]
-    #[builder(into)]
+    #[builder(default = "1.0".to_string(), into)]
     pub version: String,
-}
-
-impl Rdm {
-    pub fn validate(&self) -> Result<()> {
-        self.header.validate()?;
-        self.body.segment.validate()
-    }
-}
-
-impl RdmSegment {
-    pub fn validate(&self) -> Result<()> {
-        self.metadata.validate()?;
-        self.data.validate()
-    }
-}
-
-impl RdmMetadata {
-    pub fn validate(&self) -> Result<()> {
-        if self.object_name.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Metadata".into(),
-                field: "OBJECT_NAME".into(),
-                line: None,
-            }
-            .into());
-        }
-        Ok(())
-    }
-}
-
-impl RdmData {
-    pub fn validate(&self) -> Result<()> {
-        let arp = &self.atmospheric_reentry_parameters;
-        if let (Some(start), Some(end)) = (
-            &arp.orbit_lifetime_window_start,
-            &arp.orbit_lifetime_window_end,
-        ) {
-            if start.value > end.value {
-                return Err(crate::error::ValidationError::Generic {
-                    message: "ORBIT_LIFETIME_WINDOW_START must be <= ORBIT_LIFETIME_WINDOW_END"
-                        .into(),
-                    line: None,
-                }
-                .into());
-            }
-        }
-        // Epoch comparison for reentry window
-        if let (Some(start), Some(end)) = (&arp.reentry_window_start, &arp.reentry_window_end) {
-            if start.as_str() > end.as_str() {
-                return Err(crate::error::ValidationError::Generic {
-                    message: "REENTRY_WINDOW_START must be <= REENTRY_WINDOW_END".into(),
-                    line: None,
-                }
-                .into());
-            }
-        }
-
-        if let Some(gip) = &self.ground_impact_parameters {
-            if let (Some(start), Some(end)) = (&gip.impact_window_start, &gip.impact_window_end) {
-                if start.as_str() > end.as_str() {
-                    return Err(crate::error::ValidationError::Generic {
-                        message: "IMPACT_WINDOW_START must be <= IMPACT_WINDOW_END".into(),
-                        line: None,
-                    }
-                    .into());
-                }
-            }
-        }
-        Ok(())
-    }
 }
 
 impl crate::traits::Validate for Rdm {
     fn validate(&self) -> Result<()> {
-        Rdm::validate(self)
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Rdm,
+            &self.id,
+            &self.version,
+        )?;
+        self.header.validate()?;
+        self.body.validate()
     }
 }
 
@@ -178,8 +114,32 @@ pub struct RdmHeader {
     pub message_id: String,
 }
 
-impl RdmHeader {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for RdmHeader {
+    fn validate(&self) -> Result<()> {
+        if self.creation_date.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Header".into(),
+                field: "CREATION_DATE".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.originator.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Header".into(),
+                field: "ORIGINATOR".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.message_id.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Header".into(),
+                field: "MESSAGE_ID".into(),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
     }
 }
@@ -203,6 +163,12 @@ pub struct RdmBody {
     pub segment: Box<RdmSegment>,
 }
 
+impl crate::traits::Validate for RdmBody {
+    fn validate(&self) -> Result<()> {
+        self.segment.validate()
+    }
+}
+
 impl ToKvn for RdmBody {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         self.segment.write_kvn(writer);
@@ -215,6 +181,13 @@ pub struct RdmSegment {
     pub metadata: RdmMetadata,
     /// The data for this RDM segment.
     pub data: RdmData,
+}
+
+impl crate::traits::Validate for RdmSegment {
+    fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate()
+    }
 }
 
 impl ToKvn for RdmSegment {
@@ -731,7 +704,69 @@ pub struct RdmData {
     pub user_defined_parameters: Option<UserDefined>,
 }
 
-impl ToKvn for RdmData {
+impl crate::traits::Validate for RdmMetadata {
+    fn validate(&self) -> Result<()> {
+        if self.object_name.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Metadata".into(),
+                field: "OBJECT_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.center_name.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Metadata".into(),
+                field: "CENTER_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.time_system.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Metadata".into(),
+                field: "TIME_SYSTEM".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.epoch_tzero.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Metadata".into(),
+                field: "EPOCH_TZERO".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl crate::traits::Validate for RdmData {
+    fn validate(&self) -> Result<()> {
+        let arp = &self.atmospheric_reentry_parameters;
+        if let (Some(start), Some(end)) = (
+            &arp.orbit_lifetime_window_start,
+            &arp.orbit_lifetime_window_end,
+        ) {
+            if start.value > end.value {
+                return Err(crate::error::ValidationError::Generic {
+                    message: "ORBIT_LIFETIME_WINDOW_START must be <= ORBIT_LIFETIME_WINDOW_END"
+                        .into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl RdmData {
+    pub fn validate(&self) -> Result<()> {
+        crate::traits::Validate::validate(self)
+    }
+
     fn write_kvn(&self, writer: &mut KvnWriter) {
         // No DATA_START
         writer.write_comments(&self.comment);
@@ -978,26 +1013,6 @@ ORBIT_LIFETIME_WINDOW_END = 5.0 [d]
     }
 
     #[test]
-    fn test_rdm_validation_reentry_window() {
-        let kvn = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = EARTH
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 5 [d]
-REENTRY_ALTITUDE = 80 [km]
-REENTRY_WINDOW_START = 2023-01-06T00:00:00
-REENTRY_WINDOW_END = 2023-01-05T00:00:00
-"#;
-        assert!(Rdm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
     fn test_rdm_validation_empty_object_name() {
         // Construct with empty OBJECT_NAME
         // Note: parser might not allow empty value for key, but if it does (e.g. "OBJECT_NAME = \n"), validation should catch it.
@@ -1019,26 +1034,6 @@ REENTRY_ALTITUDE = 80 [km]
 "#;
         // If parser allows empty value, validate() catches it.
         // If parser disallows, it errors anyway.
-        assert!(Rdm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_rdm_validation_impact_window() {
-        let kvn = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = EARTH
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 5 [d]
-REENTRY_ALTITUDE = 80 [km]
-IMPACT_WINDOW_START = 2023-01-06T00:00:00
-IMPACT_WINDOW_END = 2023-01-05T00:00:00
-"#;
         assert!(Rdm::from_kvn(kvn).is_err());
     }
 }

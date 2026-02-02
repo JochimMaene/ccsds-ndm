@@ -164,16 +164,22 @@ pub struct Omm {
     pub header: OdmHeader,
     pub body: OmmBody,
     #[serde(rename = "@id")]
-    #[builder(into)]
+    #[builder(required, default = Some("CCSDS_OMM_VERS".to_string()))]
     pub id: Option<String>,
     #[serde(rename = "@version")]
-    #[builder(into)]
+    #[builder(default = "3.0".to_string(), into)]
     pub version: String,
 }
 
 impl crate::traits::Validate for Omm {
     fn validate(&self) -> Result<()> {
-        Omm::validate(self)
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Omm,
+            &self.id,
+            &self.version,
+        )?;
+        self.header.validate()?;
+        self.body.validate()
     }
 }
 
@@ -231,6 +237,12 @@ pub struct OmmBody {
     pub segment: OmmSegment,
 }
 
+impl crate::traits::Validate for OmmBody {
+    fn validate(&self) -> Result<()> {
+        self.segment.validate()
+    }
+}
+
 impl ToKvn for OmmBody {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         self.segment.write_kvn(writer);
@@ -250,10 +262,10 @@ impl ToKvn for OmmSegment {
     }
 }
 
-impl OmmSegment {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for OmmSegment {
+    fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
-        self.data.validate(&self.metadata)
+        self.data.validate_with_metadata(&self.metadata)
     }
 }
 
@@ -354,12 +366,20 @@ pub struct OmmMetadata {
     pub mean_element_theory: String,
 }
 
-impl OmmMetadata {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for OmmMetadata {
+    fn validate(&self) -> Result<()> {
         if self.object_id.trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("OMM Metadata"),
-                field: Cow::Borrowed("OBJECT_ID"),
+                block: "OMM Metadata".into(),
+                field: "OBJECT_ID".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.time_system.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OMM Metadata".into(),
+                field: "TIME_SYSTEM".into(),
                 line: None,
             }
             .into());
@@ -476,11 +496,17 @@ impl ToKvn for OmmData {
     }
 }
 
+impl crate::traits::Validate for OmmData {
+    fn validate(&self) -> Result<()> {
+        self.mean_elements.validate()
+    }
+}
+
 impl OmmData {
-    pub fn validate(&self, metadata: &OmmMetadata) -> Result<()> {
+    pub fn validate_with_metadata(&self, metadata: &OmmMetadata) -> Result<()> {
         let theory = metadata.mean_element_theory.as_str();
 
-        self.mean_elements.validate()?;
+        self.validate()?;
 
         // 1. Validate TLE Parameters presence based on theory
         match theory {
@@ -610,8 +636,8 @@ pub struct MeanElements {
     pub gm: Option<Gm>,
 }
 
-impl MeanElements {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for MeanElements {
+    fn validate(&self) -> Result<()> {
         match (self.semi_major_axis.is_some(), self.mean_motion.is_some()) {
             (true, false) | (false, true) => Ok(()),
             _ => Err(ValidationError::Generic {

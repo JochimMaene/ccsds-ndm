@@ -36,16 +36,22 @@ pub struct Ocm {
     pub header: OdmHeader,
     pub body: OcmBody,
     #[serde(rename = "@id")]
-    #[builder(into)]
+    #[builder(required, default = Some("CCSDS_OCM_VERS".to_string()))]
     pub id: Option<String>,
     #[serde(rename = "@version")]
-    #[builder(into)]
+    #[builder(default = "3.0".to_string(), into)]
     pub version: String,
 }
 
 impl crate::traits::Validate for Ocm {
     fn validate(&self) -> Result<()> {
-        Ocm::validate(self)
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Ocm,
+            &self.id,
+            &self.version,
+        )?;
+        self.header.validate()?;
+        self.body.validate()
     }
 }
 
@@ -75,10 +81,7 @@ impl Ndm for Ocm {
 }
 
 impl Ocm {
-    pub fn validate(&self) -> Result<()> {
-        self.header.validate()?;
-        self.body.segment.validate(&self.header)
-    }
+    // No inherent validate() anymore
 }
 
 impl ToKvn for Ocm {
@@ -89,14 +92,21 @@ impl ToKvn for Ocm {
     }
 }
 
-impl OcmSegment {
-    pub fn validate(&self, _header: &OdmHeader) -> Result<()> {
-        self.data.validate(&self.metadata)
+impl crate::traits::Validate for OcmSegment {
+    fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate_with_metadata(&self.metadata)
     }
 }
 
-impl OcmData {
-    pub fn validate(&self, _metadata: &OcmMetadata) -> Result<()> {
+impl OcmSegment {
+    pub fn validate(&self, _header: &OdmHeader) -> Result<()> {
+        crate::traits::Validate::validate(self)
+    }
+}
+
+impl crate::traits::Validate for OcmData {
+    fn validate(&self) -> Result<()> {
         for traj in &self.traj {
             traj.validate()?;
         }
@@ -117,6 +127,16 @@ impl OcmData {
         }
         OcmTrajState::validate_all(&self.traj)?;
         Ok(())
+    }
+}
+
+impl OcmData {
+    pub fn validate_with_metadata(&self, _metadata: &OcmMetadata) -> Result<()> {
+        crate::traits::Validate::validate(self)
+    }
+
+    pub fn validate(&self, metadata: &OcmMetadata) -> Result<()> {
+        self.validate_with_metadata(metadata)
     }
 }
 
@@ -301,6 +321,12 @@ fn is_man_time_tag(value: &str) -> bool {
 pub struct OcmBody {
     #[serde(rename = "segment")]
     pub segment: Box<OcmSegment>,
+}
+
+impl crate::traits::Validate for OcmBody {
+    fn validate(&self) -> Result<()> {
+        crate::traits::Validate::validate(self.segment.as_ref())
+    }
 }
 
 impl ToKvn for OcmBody {
@@ -957,6 +983,28 @@ pub struct OcmMetadata {
     )]
     #[builder(into)]
     pub celestial_source: Option<String>,
+}
+
+impl crate::traits::Validate for OcmMetadata {
+    fn validate(&self) -> Result<()> {
+        if self.time_system.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OCM Metadata".into(),
+                field: "TIME_SYSTEM".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.epoch_tzero.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OCM Metadata".into(),
+                field: "EPOCH_TZERO".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
 }
 
 impl ToKvn for OcmMetadata {

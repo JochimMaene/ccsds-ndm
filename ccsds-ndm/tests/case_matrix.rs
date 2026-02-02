@@ -507,7 +507,7 @@ fn acm_conflict_kvn() -> String {
 }
 
 fn minimal_aem_kvn() -> String {
-    r#"CCSDS_AEM_VERS = 1.0
+    r#"CCSDS_AEM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 META_START
@@ -748,7 +748,7 @@ fn ocm_invalid_units_kvn() -> String {
 }
 
 fn minimal_oem_kvn() -> String {
-    r#"CCSDS_OEM_VERS = 2.0
+    r#"CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 META_START
@@ -782,7 +782,7 @@ fn oem_inconsistent_time_system_kvn() -> String {
 }
 
 fn minimal_omm_kvn() -> String {
-    r#"CCSDS_OMM_VERS = 2.0
+    r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 OBJECT_NAME = TEST
@@ -818,7 +818,7 @@ fn omm_number_format_kvn() -> String {
 }
 
 fn minimal_opm_kvn() -> String {
-    r#"CCSDS_OPM_VERS = 2.0
+    r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 OBJECT_NAME = TEST
@@ -956,7 +956,7 @@ REENTRY_ALTITUDE = 80 [km]
 fn minimal_ndm_xml() -> String {
     r#"<?xml version="1.0" encoding="UTF-8"?>
 <ndm>
-  <opm id="CCSDS_OPM_VERS" version="2.0">
+  <opm id="CCSDS_OPM_VERS" version="3.0">
     <header>
       <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
       <ORIGINATOR>TEST</ORIGINATOR>
@@ -991,7 +991,7 @@ fn minimal_ndm_xml() -> String {
 
 fn minimal_oem_xml() -> String {
     r#"<?xml version="1.0" encoding="UTF-8"?>
-<oem id="CCSDS_OEM_VERS" version="2.0">
+<oem id="CCSDS_OEM_VERS" version="3.0">
   <header>
     <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
     <ORIGINATOR>TEST</ORIGINATOR>

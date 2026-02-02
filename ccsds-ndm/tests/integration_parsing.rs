@@ -251,7 +251,7 @@ NUMBER_STATES = 4
 ATT_STOP
 "#;
 
-const AEM_MINIMAL_KVN: &str = r#"CCSDS_AEM_VERS = 1.0
+const AEM_MINIMAL_KVN: &str = r#"CCSDS_AEM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 META_START
@@ -406,7 +406,7 @@ TRAJ_TYPE = CARTPV
 TRAJ_STOP
 "#;
 
-const OEM_MINIMAL_KVN: &str = r#"CCSDS_OEM_VERS = 2.0
+const OEM_MINIMAL_KVN: &str = r#"CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 META_START
@@ -421,7 +421,7 @@ META_STOP
 2023-01-01T00:00:00 1 2 3 4 5 6
 "#;
 
-const OMM_MINIMAL_KVN: &str = r#"CCSDS_OMM_VERS = 2.0
+const OMM_MINIMAL_KVN: &str = r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 OBJECT_NAME = TEST
@@ -442,7 +442,7 @@ MEAN_MOTION_DDOT = 0.0 [rev/day**3]
 BSTAR = 0.0001 [1/ER]
 "#;
 
-const OPM_MINIMAL_KVN: &str = r#"CCSDS_OPM_VERS = 2.0
+const OPM_MINIMAL_KVN: &str = r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 OBJECT_NAME = TEST
@@ -490,7 +490,7 @@ REENTRY_ALTITUDE = 80 [km]
 
 const NDM_MINIMAL_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <ndm>
-  <opm id="CCSDS_OPM_VERS" version="2.0">
+  <opm id="CCSDS_OPM_VERS" version="3.0">
     <header>
       <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
       <ORIGINATOR>TEST</ORIGINATOR>
@@ -522,7 +522,7 @@ const NDM_MINIMAL_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 "#;
 
 const OEM_MINIMAL_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
-<oem id="CCSDS_OEM_VERS" version="2.0">
+<oem id="CCSDS_OEM_VERS" version="3.0">
   <header>
     <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
     <ORIGINATOR>TEST</ORIGINATOR>

@@ -37,16 +37,22 @@ pub struct Acm {
     pub header: AdmHeader,
     pub body: AcmBody,
     #[serde(rename = "@id")]
-    #[builder(into)]
+    #[builder(required, default = Some("CCSDS_ACM_VERS".to_string()))]
     pub id: Option<String>,
     #[serde(rename = "@version")]
-    #[builder(into)]
+    #[builder(default = "2.0".to_string(), into)]
     pub version: String,
 }
 
 impl crate::traits::Validate for Acm {
     fn validate(&self) -> Result<()> {
-        Acm::validate(self)
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Acm,
+            &self.id,
+            &self.version,
+        )?;
+        self.header.validate()?;
+        self.body.validate()
     }
 }
 
@@ -75,13 +81,6 @@ impl Ndm for Acm {
     }
 }
 
-impl Acm {
-    pub fn validate(&self) -> Result<()> {
-        self.header.validate()?;
-        self.body.segment.validate(&self.header)
-    }
-}
-
 impl ToKvn for Acm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_pair("CCSDS_ACM_VERS", &self.version);
@@ -100,6 +99,12 @@ pub struct AcmBody {
     pub segment: Box<AcmSegment>,
 }
 
+impl crate::traits::Validate for AcmBody {
+    fn validate(&self) -> Result<()> {
+        crate::traits::Validate::validate(self.segment.as_ref())
+    }
+}
+
 impl ToKvn for AcmBody {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         self.segment.write_kvn(writer);
@@ -112,10 +117,16 @@ pub struct AcmSegment {
     pub data: AcmData,
 }
 
+impl crate::traits::Validate for AcmSegment {
+    fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate_with_metadata(&self.metadata)
+    }
+}
+
 impl AcmSegment {
     pub fn validate(&self, _header: &AdmHeader) -> Result<()> {
-        self.metadata.validate()?;
-        self.data.validate(&self.metadata)
+        crate::traits::Validate::validate(self)
     }
 }
 
@@ -386,7 +397,7 @@ pub struct AcmMetadata {
 
 impl AcmMetadata {
     pub fn validate(&self) -> Result<()> {
-        if self.object_name.is_empty() {
+        if self.object_name.trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Metadata".into(),
                 field: "OBJECT_NAME".into(),
@@ -394,7 +405,29 @@ impl AcmMetadata {
             }
             .into());
         }
+        if self.time_system.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Metadata".into(),
+                field: "TIME_SYSTEM".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.epoch_tzero.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Metadata".into(),
+                field: "EPOCH_TZERO".into(),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
+    }
+}
+
+impl crate::traits::Validate for AcmMetadata {
+    fn validate(&self) -> Result<()> {
+        self.validate()
     }
 }
 
@@ -517,8 +550,8 @@ pub struct AcmData {
     pub user: Option<UserDefined>,
 }
 
-impl AcmData {
-    fn validate(&self, _metadata: &AcmMetadata) -> Result<()> {
+impl crate::traits::Validate for AcmData {
+    fn validate(&self) -> Result<()> {
         if let Some(phys) = &self.phys {
             phys.validate()?;
         }
@@ -529,6 +562,16 @@ impl AcmData {
             man.validate()?;
         }
         Ok(())
+    }
+}
+
+impl AcmData {
+    pub fn validate_with_metadata(&self, _metadata: &AcmMetadata) -> Result<()> {
+        crate::traits::Validate::validate(self)
+    }
+
+    pub fn validate(&self, metadata: &AcmMetadata) -> Result<()> {
+        self.validate_with_metadata(metadata)
     }
 }
 

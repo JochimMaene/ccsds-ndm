@@ -28,9 +28,6 @@ pub fn apm_version(input: &mut &str) -> KvnResult<String> {
     let _ = collect_comments.parse_next(input)?;
 
     let (value, _) = expect_key("CCSDS_APM_VERS").parse_next(input)?;
-    if value != "1.0" && value != "2.0" {
-        return Err(cut_err(input, "1.0 or 2.0"));
-    }
     Ok(value.to_string())
 }
 
@@ -443,7 +440,7 @@ impl ParseKvn for Apm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::{CcsdsNdmError, FormatError, ValidationError};
+    use crate::error::{CcsdsNdmError, ValidationError};
     use crate::traits::Ndm;
 
     fn sample_apm_header() -> String {
@@ -475,17 +472,34 @@ META_STOP
 
     #[test]
     fn test_parse_apm_version_error() {
-        let input =
-            "CCSDS_APM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\n";
+        let input = r#"CCSDS_APM_VERS = 3.0
+CREATION_DATE = 2022-11-04T17:22:31
+ORIGINATOR = NASA/JPL
+META_START
+OBJECT_NAME = MARS GLOBAL SURVEYOR
+OBJECT_ID = 1996-062A
+TIME_SYSTEM = UTC
+META_STOP
+EPOCH = 2022-11-04T17:22:31
+QUAT_START
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
+Q1 = 0.5
+Q2 = 0.5
+Q3 = 0.5
+QC = 0.5
+QUAT_STOP
+"#;
         let err = Apm::from_kvn(input).unwrap_err();
         match err {
-            CcsdsNdmError::Format(boxed_err) => match *boxed_err {
-                FormatError::Kvn(e) => {
-                    assert!(format!("{:?}", e).contains("1.0 or 2.0"));
+            CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
+                ValidationError::InvalidValue { field, value, .. } => {
+                    assert_eq!(field, "version");
+                    assert_eq!(value, "3.0");
                 }
-                _ => panic!("Expected Kvn format error, got {:?}", boxed_err),
+                _ => panic!("Expected Validation error, got {:?}", boxed_err),
             },
-            _ => panic!("Expected Format error, got {:?}", err),
+            _ => panic!("Expected Validation error, got {:?}", err),
         }
     }
 
@@ -521,11 +535,11 @@ QUAT_STOP
 
     #[test]
     fn test_apm_quaternion_block() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nQUAT_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nQ1 = 0.1\nQ2 = 0.2\nQ3 = 0.3\nQC = 0.4\nQ1_DOT = 0.01\nQ2_DOT = 0.02\nQ3_DOT = 0.03\nQC_DOT = 0.04\nQUAT_STOP\n",
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nQUAT_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nQ1 = 0.0\nQ2 = 0.0\nQ3 = 0.0\nQC = 1.0\nQ1_DOT = 0.01\nQ2_DOT = 0.02\nQ3_DOT = 0.03\nQC_DOT = 0.04\nQUAT_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let q = &apm.body.segment.data.quaternion_state[0];
-        assert_eq!(q.quaternion.q1, 0.1);
+        assert_eq!(q.quaternion.q1, 0.0);
         assert_eq!(q.quaternion_dot.as_ref().unwrap().q1_dot.value, 0.01);
     }
 

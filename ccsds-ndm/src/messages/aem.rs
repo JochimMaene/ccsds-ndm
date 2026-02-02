@@ -33,16 +33,22 @@ pub struct Aem {
     pub header: AdmHeader,
     pub body: AemBody,
     #[serde(rename = "@id")]
-    #[builder(into)]
+    #[builder(required, default = Some("CCSDS_AEM_VERS".to_string()))]
     pub id: Option<String>,
     #[serde(rename = "@version")]
-    #[builder(into)]
+    #[builder(default = "2.0".to_string(), into)]
     pub version: String,
 }
 
 impl crate::traits::Validate for Aem {
     fn validate(&self) -> Result<()> {
-        Aem::validate(self)
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Aem,
+            &self.id,
+            &self.version,
+        )?;
+        self.header.validate()?;
+        self.body.validate()
     }
 }
 
@@ -71,15 +77,8 @@ impl Ndm for Aem {
     }
 }
 
-impl Aem {
-    pub fn validate(&self) -> Result<()> {
-        self.header.validate()?;
-        self.body.validate()
-    }
-}
-
-impl AemBody {
-    pub fn validate(&self) -> Result<()> {
+impl crate::traits::Validate for AemBody {
+    fn validate(&self) -> Result<()> {
         for segment in &self.segment {
             segment.validate()?;
         }
@@ -87,11 +86,16 @@ impl AemBody {
     }
 }
 
+impl crate::traits::Validate for AemSegment {
+    fn validate(&self) -> Result<()> {
+        self.metadata.validate()?;
+        self.data.validate_with_type(&self.metadata.attitude_type)
+    }
+}
+
 impl AemSegment {
     pub fn validate(&self) -> Result<()> {
-        self.metadata.validate()?;
-        self.data.validate(&self.metadata.attitude_type)?;
-        Ok(())
+        crate::traits::Validate::validate(self)
     }
 }
 
@@ -329,6 +333,22 @@ pub struct AemMetadata {
 
 impl AemMetadata {
     pub fn validate(&self) -> Result<()> {
+        if self.object_id.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("AEM Metadata"),
+                field: Cow::Borrowed("OBJECT_ID"),
+                line: None,
+            }
+            .into());
+        }
+        if self.time_system.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("AEM Metadata"),
+                field: Cow::Borrowed("TIME_SYSTEM"),
+                line: None,
+            }
+            .into());
+        }
         // Validation Rule: INTERPOLATION_DEGREE is required if INTERPOLATION_METHOD is used
         if self.interpolation_method.is_some() && self.interpolation_degree.is_none() {
             return Err(ValidationError::MissingRequiredField {
@@ -362,6 +382,12 @@ impl AemMetadata {
         }
 
         Ok(())
+    }
+}
+
+impl crate::traits::Validate for AemMetadata {
+    fn validate(&self) -> Result<()> {
+        self.validate()
     }
 }
 
@@ -557,8 +583,14 @@ impl crate::traits::ToKvn for AemAttitudeStateWrapper {
     }
 }
 
+impl crate::traits::Validate for AemData {
+    fn validate(&self) -> Result<()> {
+        Ok(())
+    }
+}
+
 impl AemData {
-    pub fn validate(&self, attitude_type: &str) -> Result<()> {
+    pub fn validate_with_type(&self, attitude_type: &str) -> Result<()> {
         for (idx, state) in self.attitude_states.iter().enumerate() {
             match attitude_type {
                 "QUATERNION" => {
@@ -684,6 +716,10 @@ impl AemData {
         }
         Ok(())
     }
+
+    pub fn validate(&self, attitude_type: &str) -> Result<()> {
+        self.validate_with_type(attitude_type)
+    }
 }
 
 impl ToKvn for AemData {
@@ -704,7 +740,7 @@ mod tests {
     use super::*;
 
     fn sample_aem_kvn() -> String {
-        r#"CCSDS_AEM_VERS = 1.0
+        r#"CCSDS_AEM_VERS = 2.0
 CREATION_DATE = 2002-11-04T17:22:31
 ORIGINATOR = NASA/JPL
 META_START
@@ -730,7 +766,7 @@ DATA_STOP
         let kvn = sample_aem_kvn();
         let aem = Aem::from_kvn(&kvn).expect("AEM parse failed");
 
-        assert_eq!(aem.version, "1.0");
+        assert_eq!(aem.version, "2.0");
         assert_eq!(aem.body.segment.len(), 1);
         let seg = &aem.body.segment[0];
         assert_eq!(seg.metadata.object_name, "MARS GLOBAL SURVEYOR");
@@ -739,7 +775,7 @@ DATA_STOP
 
     #[test]
     fn test_aem_missing_mandatory_metadata() {
-        let kvn = r#"CCSDS_AEM_VERS = 1.0
+        let kvn = r#"CCSDS_AEM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 META_START
@@ -773,7 +809,7 @@ DATA_STOP
 
     #[test]
     fn test_aem_validation_interpolation_reqs() {
-        let kvn = r#"CCSDS_AEM_VERS = 1.0
+        let kvn = r#"CCSDS_AEM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 META_START
@@ -797,7 +833,7 @@ DATA_STOP
 
     #[test]
     fn test_aem_validation_euler_reqs() {
-        let kvn = r#"CCSDS_AEM_VERS = 1.0
+        let kvn = r#"CCSDS_AEM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 META_START
@@ -820,7 +856,7 @@ DATA_STOP
 
     #[test]
     fn test_aem_validation_angvel_reqs() {
-        let kvn = r#"CCSDS_AEM_VERS = 1.0
+        let kvn = r#"CCSDS_AEM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 META_START
