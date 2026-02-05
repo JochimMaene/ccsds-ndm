@@ -89,7 +89,6 @@ impl Rdm {
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-
         if strict {
             self.inner
                 .validate()

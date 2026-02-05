@@ -80,6 +80,34 @@ class TestOmm:
         omm2 = Omm.from_file(str(path), format="kvn")
         assert omm2.header.originator == "TEST"
 
+    def test_tle_lines_roundtrip(self):
+        line1 = "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995"
+        line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845"
+
+        omm = Omm.from_tle_lines(
+            line1,
+            line2,
+            object_name="ISS (ZARYA)",
+            originator="18 SPCS",
+        )
+
+        out1, out2 = omm.to_tle_lines()
+        assert out1 == line1
+        assert out2 == line2
+
+    def test_from_tle_lines_defaults(self):
+        line1 = "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995"
+        line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845"
+
+        omm = Omm.from_tle_lines(line1, line2)
+        assert omm.segment.metadata.object_name == "UNKNOWN"
+        assert omm.segment.metadata.object_id == "1998-067A"
+        assert omm.segment.metadata.center_name == "EARTH"
+        assert omm.segment.metadata.ref_frame == "TEME"
+        assert omm.segment.metadata.time_system == "UTC"
+        assert omm.segment.metadata.mean_element_theory == "SGP4"
+        assert omm.segment.data.tle_parameters.norad_cat_id == 25544
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

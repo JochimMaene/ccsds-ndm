@@ -9318,6 +9318,38 @@ class Omm:
         """ """
         ...
 
+    @staticmethod
+    def from_tle_lines(
+        line1,
+        line2,
+        object_name=None,
+        object_id=None,
+        originator=None,
+        message_id=None,
+        creation_date=None,
+    ):
+        """
+        Build a minimal OMM from canonical NORAD TLE line 1 and line 2.
+
+        Parameters
+        ----------
+        line1 : str
+            TLE line 1 (69 chars including checksum).
+        line2 : str
+            TLE line 2 (69 chars including checksum).
+        object_name : str, optional
+            Metadata OBJECT_NAME override (default: "UNKNOWN").
+        object_id : str, optional
+            Metadata OBJECT_ID override (default: derived from TLE launch designator).
+        originator : str, optional
+            Header ORIGINATOR override (default: "UNKNOWN").
+        message_id : str, optional
+            Header MESSAGE_ID override.
+        creation_date : str, optional
+            Header CREATION_DATE override in CCSDS epoch format.
+        """
+        ...
+
     @property
     def header(self) -> OdmHeader:
         """
@@ -9385,6 +9417,17 @@ class Omm:
         -------
         str
             The serialized string.
+        """
+        ...
+
+    def to_tle_lines(self):
+        """
+        Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
+
+        Returns
+        -------
+        tuple[str, str]
+            `(line1, line2)` without a line 0.
         """
         ...
 
