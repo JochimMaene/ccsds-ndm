@@ -110,7 +110,9 @@ class TestOmm:
 
     def test_from_tle_lines_rejects_non_uppercase_launch_piece(self):
         line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845"
-        line1_lower = "1 25544U 98067a   20348.69171878  .00000888  00000-0  24124-4 0  9995"
+        line1_lower = (
+            "1 25544U 98067a   20348.69171878  .00000888  00000-0  24124-4 0  9995"
+        )
 
         with pytest.raises(ValueError):
             Omm.from_tle_lines(line1_lower, line2)
