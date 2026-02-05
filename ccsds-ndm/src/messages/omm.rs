@@ -734,6 +734,15 @@ fn normalize_tle_line_len(line: String, label: &'static str) -> Result<String> {
 
 fn normalize_tle_input_line(line: &str, label: &'static str) -> Result<String> {
     let trimmed = line.trim_end_matches(['\r', '\n']);
+    if !trimmed.is_ascii() {
+        return Err(ValidationError::InvalidValue {
+            field: Cow::Borrowed(label),
+            value: trimmed.to_string(),
+            expected: Cow::Borrowed("ASCII-only TLE line with fixed-width columns"),
+            line: None,
+        }
+        .into());
+    }
     if trimmed.len() != 69 {
         return Err(ValidationError::InvalidValue {
             field: Cow::Borrowed(label),
@@ -1344,8 +1353,7 @@ fn format_tle_epoch_components(epoch: &str) -> Result<(u32, String)> {
         .into());
     }
 
-    let mut frac_scaled =
-        ((utc_ns_of_day * 100_000_000 + (NS_PER_DAY / 2)) / NS_PER_DAY) as u32;
+    let mut frac_scaled = ((utc_ns_of_day * 100_000_000 + (NS_PER_DAY / 2)) / NS_PER_DAY) as u32;
     if frac_scaled == 100_000_000 {
         frac_scaled = 0;
         if doy == days_in_year(year) {
@@ -2897,6 +2905,23 @@ MEAN_MOTION_DDOT = 0.0
         // Numeric piece ('1') with corrected checksum
         let line1_digit = "1 25544U 980671   20348.69171878  .00000888  00000-0  24124-4 0  9996";
         assert!(Omm::from_tle_lines(line1_digit, line2).is_err());
+    }
+
+    #[test]
+    fn test_from_tle_lines_rejects_non_ascii_without_panic() {
+        let valid_line1 = "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995";
+        let line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845";
+
+        // Keep 69-byte length while injecting a non-ASCII multi-byte character.
+        let mut line1 = format!("{}é{}", &valid_line1[..8], &valid_line1[9..]);
+        line1.pop();
+        assert_eq!(line1.len(), 69);
+        assert!(!line1.is_ascii());
+
+        let err = Omm::from_tle_lines(&line1, line2).expect_err("non-ASCII TLE should fail");
+        assert!(err
+            .to_string()
+            .contains("ASCII-only TLE line with fixed-width columns"));
     }
 
     #[test]
