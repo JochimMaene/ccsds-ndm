@@ -108,6 +108,46 @@ class TestOmm:
         assert omm.segment.metadata.mean_element_theory == "SGP4"
         assert omm.segment.data.tle_parameters.norad_cat_id == 25544
 
+    def test_from_tle_lines_rejects_non_uppercase_launch_piece(self):
+        line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845"
+        line1_lower = "1 25544U 98067a   20348.69171878  .00000888  00000-0  24124-4 0  9995"
+
+        with pytest.raises(ValueError):
+            Omm.from_tle_lines(line1_lower, line2)
+
+    def test_to_tle_lines_accepts_sgp_slash_sgp4(self):
+        kvn = """CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2020-065T16:00:00
+ORIGINATOR = NOAA
+MESSAGE_ID = OMM 202013719185
+OBJECT_NAME = GOES 9
+OBJECT_ID = 1995-025A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP/SGP4
+EPOCH = 2020-064T10:34:41.4264
+MEAN_MOTION = 1.00273272
+ECCENTRICITY = 0.0005013
+INCLINATION = 3.0539
+RA_OF_ASC_NODE = 81.7939
+ARG_OF_PERICENTER = 249.2363
+MEAN_ANOMALY = 150.1602
+GM = 398600.8
+EPHEMERIS_TYPE = 0
+CLASSIFICATION_TYPE = U
+NORAD_CAT_ID = 23581
+ELEMENT_SET_NO = 0925
+REV_AT_EPOCH = 4316
+BSTAR = 0.0001
+MEAN_MOTION_DOT = -0.00000113
+MEAN_MOTION_DDOT = 0.0
+"""
+        omm = Omm.from_str(kvn, format="kvn")
+        line1, line2 = omm.to_tle_lines()
+        assert line1.startswith("1 23581U 95025A")
+        assert line2.startswith("2 23581")
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

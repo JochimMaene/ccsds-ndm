@@ -1248,6 +1248,7 @@ impl RdmData {
         user_defined_parameters=None,
         comment=None
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         atmospheric_reentry_parameters: AtmosphericReentryParameters,
         ground_impact_parameters: Option<GroundImpactParameters>,

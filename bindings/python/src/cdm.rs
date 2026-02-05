@@ -48,7 +48,7 @@ fn build_cdm_covariance_from_array(
         ));
     }
     let dim = shape[0];
-    if dim < 6 || dim > 9 {
+    if !(6..=9).contains(&dim) {
         return Err(PyValueError::new_err(
             "Covariance matrix must be 6x6, 7x7, 8x8, or 9x9",
         ));
@@ -786,7 +786,7 @@ impl RelativeMetadataData {
                 comment,
                 tca: parse_epoch_str(&tca)?,
                 miss_distance: Length::new(miss_distance, None),
-                relative_speed: relative_speed.map(|v| Dv::new(v)),
+                relative_speed: relative_speed.map(Dv::new),
                 relative_state_vector: rel_state,
                 start_screen_period: start_screen_period
                     .map(|s| parse_epoch_str(&s))
@@ -849,7 +849,7 @@ impl RelativeMetadataData {
     }
     #[setter]
     fn set_relative_speed(&mut self, value: Option<f64>) {
-        self.inner.relative_speed = value.map(|v| Dv::new(v));
+        self.inner.relative_speed = value.map(Dv::new);
     }
 
     /// The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will collide.
@@ -2560,10 +2560,10 @@ impl AdditionalParameters {
                 area_drg: area_drg.map(|v| core_types::Area::new(v, None).unwrap()),
                 area_srp: area_srp.map(|v| core_types::Area::new(v, None).unwrap()),
                 mass: mass.map(|v| core_types::Mass::new(v, None).unwrap()),
-                cd_area_over_mass: cd_area_over_mass.map(|v| core_types::M2kgRequired::new(v)),
-                cr_area_over_mass: cr_area_over_mass.map(|v| core_types::M2kgRequired::new(v)),
-                thrust_acceleration: thrust_acceleration.map(|v| core_types::Ms2::new(v)),
-                sedr: sedr.map(|v| core_types::Wkg::new(v)),
+                cd_area_over_mass: cd_area_over_mass.map(core_types::M2kgRequired::new),
+                cr_area_over_mass: cr_area_over_mass.map(core_types::M2kgRequired::new),
+                thrust_acceleration: thrust_acceleration.map(core_types::Ms2::new),
+                sedr: sedr.map(core_types::Wkg::new),
             },
         }
     }
@@ -2650,7 +2650,7 @@ impl AdditionalParameters {
     }
     #[setter]
     fn set_cd_area_over_mass(&mut self, v: Option<f64>) {
-        self.inner.cd_area_over_mass = v.map(|x| core_types::M2kgRequired::new(x));
+        self.inner.cd_area_over_mass = v.map(core_types::M2kgRequired::new);
     }
 
     /// The object's CR•A/m used to propagate the state vector and covariance to TCA. (See
@@ -2665,7 +2665,7 @@ impl AdditionalParameters {
     }
     #[setter]
     fn set_cr_area_over_mass(&mut self, v: Option<f64>) {
-        self.inner.cr_area_over_mass = v.map(|x| core_types::M2kgRequired::new(x));
+        self.inner.cr_area_over_mass = v.map(core_types::M2kgRequired::new);
     }
 
     /// The object's acceleration due to in-track thrust used to propagate the state vector and
@@ -2680,7 +2680,7 @@ impl AdditionalParameters {
     }
     #[setter]
     fn set_thrust_acceleration(&mut self, v: Option<f64>) {
-        self.inner.thrust_acceleration = v.map(|x| core_types::Ms2::new(x));
+        self.inner.thrust_acceleration = v.map(core_types::Ms2::new);
     }
 
     /// The amount of energy being removed from the object's orbit by atmospheric drag. This
@@ -2695,7 +2695,7 @@ impl AdditionalParameters {
     }
     #[setter]
     fn set_sedr(&mut self, v: Option<f64>) {
-        self.inner.sedr = v.map(|x| core_types::Wkg::new(x));
+        self.inner.sedr = v.map(core_types::Wkg::new);
     }
 }
 
@@ -2925,30 +2925,30 @@ impl CdmCovarianceMatrix {
                 cndot_rdot: core_types::M2s2::new(cndot_rdot),
                 cndot_tdot: core_types::M2s2::new(cndot_tdot),
                 cndot_ndot: core_types::M2s2::new(cndot_ndot),
-                cdrg_r: cdrg_r.map(|v| core_types::M3kg::new(v)),
-                cdrg_t: cdrg_t.map(|v| core_types::M3kg::new(v)),
-                cdrg_n: cdrg_n.map(|v| core_types::M3kg::new(v)),
-                cdrg_rdot: cdrg_rdot.map(|v| core_types::M3kgs::new(v)),
-                cdrg_tdot: cdrg_tdot.map(|v| core_types::M3kgs::new(v)),
-                cdrg_ndot: cdrg_ndot.map(|v| core_types::M3kgs::new(v)),
-                cdrg_drg: cdrg_drg.map(|v| core_types::M4kg2::new(v)),
-                csrp_r: csrp_r.map(|v| core_types::M3kg::new(v)),
-                csrp_t: csrp_t.map(|v| core_types::M3kg::new(v)),
-                csrp_n: csrp_n.map(|v| core_types::M3kg::new(v)),
-                csrp_rdot: csrp_rdot.map(|v| core_types::M3kgs::new(v)),
-                csrp_tdot: csrp_tdot.map(|v| core_types::M3kgs::new(v)),
-                csrp_ndot: csrp_ndot.map(|v| core_types::M3kgs::new(v)),
-                csrp_drg: csrp_drg.map(|v| core_types::M4kg2::new(v)),
-                csrp_srp: csrp_srp.map(|v| core_types::M4kg2::new(v)),
-                cthr_r: cthr_r.map(|v| core_types::M2s2::new(v)),
-                cthr_t: cthr_t.map(|v| core_types::M2s2::new(v)),
-                cthr_n: cthr_n.map(|v| core_types::M2s2::new(v)),
-                cthr_rdot: cthr_rdot.map(|v| core_types::M2s3::new(v)),
-                cthr_tdot: cthr_tdot.map(|v| core_types::M2s3::new(v)),
-                cthr_ndot: cthr_ndot.map(|v| core_types::M2s3::new(v)),
-                cthr_drg: cthr_drg.map(|v| core_types::M3kgs2::new(v)),
-                cthr_srp: cthr_srp.map(|v| core_types::M3kgs2::new(v)),
-                cthr_thr: cthr_thr.map(|v| core_types::M2s4::new(v)),
+                cdrg_r: cdrg_r.map(core_types::M3kg::new),
+                cdrg_t: cdrg_t.map(core_types::M3kg::new),
+                cdrg_n: cdrg_n.map(core_types::M3kg::new),
+                cdrg_rdot: cdrg_rdot.map(core_types::M3kgs::new),
+                cdrg_tdot: cdrg_tdot.map(core_types::M3kgs::new),
+                cdrg_ndot: cdrg_ndot.map(core_types::M3kgs::new),
+                cdrg_drg: cdrg_drg.map(core_types::M4kg2::new),
+                csrp_r: csrp_r.map(core_types::M3kg::new),
+                csrp_t: csrp_t.map(core_types::M3kg::new),
+                csrp_n: csrp_n.map(core_types::M3kg::new),
+                csrp_rdot: csrp_rdot.map(core_types::M3kgs::new),
+                csrp_tdot: csrp_tdot.map(core_types::M3kgs::new),
+                csrp_ndot: csrp_ndot.map(core_types::M3kgs::new),
+                csrp_drg: csrp_drg.map(core_types::M4kg2::new),
+                csrp_srp: csrp_srp.map(core_types::M4kg2::new),
+                cthr_r: cthr_r.map(core_types::M2s2::new),
+                cthr_t: cthr_t.map(core_types::M2s2::new),
+                cthr_n: cthr_n.map(core_types::M2s2::new),
+                cthr_rdot: cthr_rdot.map(core_types::M2s3::new),
+                cthr_tdot: cthr_tdot.map(core_types::M2s3::new),
+                cthr_ndot: cthr_ndot.map(core_types::M2s3::new),
+                cthr_drg: cthr_drg.map(core_types::M3kgs2::new),
+                cthr_srp: cthr_srp.map(core_types::M3kgs2::new),
+                cthr_thr: cthr_thr.map(core_types::M2s4::new),
             },
         }
     }
@@ -3373,7 +3373,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cdrg_r(&mut self, v: Option<f64>) {
-        self.inner.cdrg_r = v.map(|x| core_types::M3kg::new(x));
+        self.inner.cdrg_r = v.map(core_types::M3kg::new);
     }
 
     /// Object covariance matrix `[7,2]`.
@@ -3387,7 +3387,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cdrg_t(&mut self, v: Option<f64>) {
-        self.inner.cdrg_t = v.map(|x| core_types::M3kg::new(x));
+        self.inner.cdrg_t = v.map(core_types::M3kg::new);
     }
 
     /// Object covariance matrix `[7,3]`.
@@ -3401,7 +3401,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cdrg_n(&mut self, v: Option<f64>) {
-        self.inner.cdrg_n = v.map(|x| core_types::M3kg::new(x));
+        self.inner.cdrg_n = v.map(core_types::M3kg::new);
     }
 
     /// Object covariance matrix `[7,4]`.
@@ -3415,7 +3415,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cdrg_rdot(&mut self, v: Option<f64>) {
-        self.inner.cdrg_rdot = v.map(|x| core_types::M3kgs::new(x));
+        self.inner.cdrg_rdot = v.map(core_types::M3kgs::new);
     }
 
     /// Object covariance matrix `[7,5]`.
@@ -3429,7 +3429,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cdrg_tdot(&mut self, v: Option<f64>) {
-        self.inner.cdrg_tdot = v.map(|x| core_types::M3kgs::new(x));
+        self.inner.cdrg_tdot = v.map(core_types::M3kgs::new);
     }
 
     /// Object covariance matrix `[7,6]`.
@@ -3443,7 +3443,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cdrg_ndot(&mut self, v: Option<f64>) {
-        self.inner.cdrg_ndot = v.map(|x| core_types::M3kgs::new(x));
+        self.inner.cdrg_ndot = v.map(core_types::M3kgs::new);
     }
 
     /// Object covariance matrix `[7,7]`.
@@ -3457,7 +3457,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cdrg_drg(&mut self, v: Option<f64>) {
-        self.inner.cdrg_drg = v.map(|x| core_types::M4kg2::new(x));
+        self.inner.cdrg_drg = v.map(core_types::M4kg2::new);
     }
 
     /// Object covariance matrix `[8,1]`.
@@ -3471,7 +3471,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_csrp_r(&mut self, v: Option<f64>) {
-        self.inner.csrp_r = v.map(|x| core_types::M3kg::new(x));
+        self.inner.csrp_r = v.map(core_types::M3kg::new);
     }
 
     /// Object covariance matrix `[8,2]`.
@@ -3485,7 +3485,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_csrp_t(&mut self, v: Option<f64>) {
-        self.inner.csrp_t = v.map(|x| core_types::M3kg::new(x));
+        self.inner.csrp_t = v.map(core_types::M3kg::new);
     }
 
     /// Object covariance matrix `[8,3]`.
@@ -3499,7 +3499,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_csrp_n(&mut self, v: Option<f64>) {
-        self.inner.csrp_n = v.map(|x| core_types::M3kg::new(x));
+        self.inner.csrp_n = v.map(core_types::M3kg::new);
     }
 
     /// Object covariance matrix `[8,4]`.
@@ -3513,7 +3513,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_csrp_rdot(&mut self, v: Option<f64>) {
-        self.inner.csrp_rdot = v.map(|x| core_types::M3kgs::new(x));
+        self.inner.csrp_rdot = v.map(core_types::M3kgs::new);
     }
 
     /// Object covariance matrix `[8,5]`.
@@ -3527,7 +3527,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_csrp_tdot(&mut self, v: Option<f64>) {
-        self.inner.csrp_tdot = v.map(|x| core_types::M3kgs::new(x));
+        self.inner.csrp_tdot = v.map(core_types::M3kgs::new);
     }
 
     /// Object covariance matrix `[8,6]`.
@@ -3541,7 +3541,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_csrp_ndot(&mut self, v: Option<f64>) {
-        self.inner.csrp_ndot = v.map(|x| core_types::M3kgs::new(x));
+        self.inner.csrp_ndot = v.map(core_types::M3kgs::new);
     }
 
     /// Object covariance matrix `[8,7]`.
@@ -3555,7 +3555,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_csrp_drg(&mut self, v: Option<f64>) {
-        self.inner.csrp_drg = v.map(|x| core_types::M4kg2::new(x));
+        self.inner.csrp_drg = v.map(core_types::M4kg2::new);
     }
 
     /// Object covariance matrix `[8,8]`.
@@ -3569,7 +3569,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_csrp_srp(&mut self, v: Option<f64>) {
-        self.inner.csrp_srp = v.map(|x| core_types::M4kg2::new(x));
+        self.inner.csrp_srp = v.map(core_types::M4kg2::new);
     }
 
     /// Object covariance matrix `[9,1]`.
@@ -3583,7 +3583,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cthr_r(&mut self, v: Option<f64>) {
-        self.inner.cthr_r = v.map(|x| core_types::M2s2::new(x));
+        self.inner.cthr_r = v.map(core_types::M2s2::new);
     }
 
     /// Object covariance matrix `[9,2]`.
@@ -3597,7 +3597,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cthr_t(&mut self, v: Option<f64>) {
-        self.inner.cthr_t = v.map(|x| core_types::M2s2::new(x));
+        self.inner.cthr_t = v.map(core_types::M2s2::new);
     }
 
     /// Object covariance matrix `[9,3]`.
@@ -3611,7 +3611,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cthr_n(&mut self, v: Option<f64>) {
-        self.inner.cthr_n = v.map(|x| core_types::M2s2::new(x));
+        self.inner.cthr_n = v.map(core_types::M2s2::new);
     }
 
     /// Object covariance matrix `[9,4]`.
@@ -3625,7 +3625,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cthr_rdot(&mut self, v: Option<f64>) {
-        self.inner.cthr_rdot = v.map(|x| core_types::M2s3::new(x));
+        self.inner.cthr_rdot = v.map(core_types::M2s3::new);
     }
 
     /// Object covariance matrix `[9,5]`.
@@ -3639,7 +3639,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cthr_tdot(&mut self, v: Option<f64>) {
-        self.inner.cthr_tdot = v.map(|x| core_types::M2s3::new(x));
+        self.inner.cthr_tdot = v.map(core_types::M2s3::new);
     }
 
     /// Object covariance matrix `[9,6]`.
@@ -3653,7 +3653,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cthr_ndot(&mut self, v: Option<f64>) {
-        self.inner.cthr_ndot = v.map(|x| core_types::M2s3::new(x));
+        self.inner.cthr_ndot = v.map(core_types::M2s3::new);
     }
 
     /// Object covariance matrix `[9,7]`.
@@ -3667,7 +3667,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cthr_drg(&mut self, v: Option<f64>) {
-        self.inner.cthr_drg = v.map(|x| core_types::M3kgs2::new(x));
+        self.inner.cthr_drg = v.map(core_types::M3kgs2::new);
     }
 
     /// Object covariance matrix `[9,8]`.
@@ -3681,7 +3681,7 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cthr_srp(&mut self, v: Option<f64>) {
-        self.inner.cthr_srp = v.map(|x| core_types::M3kgs2::new(x));
+        self.inner.cthr_srp = v.map(core_types::M3kgs2::new);
     }
 
     /// Object covariance matrix `[9,9]`.
@@ -3695,6 +3695,6 @@ impl CdmCovarianceMatrix {
     }
     #[setter]
     fn set_cthr_thr(&mut self, v: Option<f64>) {
-        self.inner.cthr_thr = v.map(|x| core_types::M2s4::new(x));
+        self.inner.cthr_thr = v.map(core_types::M2s4::new);
     }
 }

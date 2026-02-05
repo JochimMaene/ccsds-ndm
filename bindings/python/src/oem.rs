@@ -1491,7 +1491,7 @@ impl OemData {
         for (i, existing) in self.inner.state_vector.iter().enumerate() {
             let row = array_view.row(i);
             state_vectors.push(ccsds_ndm::common::StateVectorAcc {
-                epoch: existing.epoch.clone(),
+                epoch: existing.epoch,
                 x: Position {
                     value: row[0],
                     units: None,
@@ -1772,7 +1772,7 @@ impl OemData {
 
             let current = &existing[i];
             covariance_matrices.push(build_covariance_matrix(
-                current.epoch.clone(),
+                current.epoch,
                 current.cov_ref_frame.clone(),
                 current.comment.clone(),
                 v,

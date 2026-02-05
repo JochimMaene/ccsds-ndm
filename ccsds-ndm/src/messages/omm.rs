@@ -254,11 +254,11 @@ impl Omm {
             })?;
 
         let theory = metadata.mean_element_theory.trim();
-        if !matches!(theory, "SGP" | "SGP4") {
+        if !matches!(theory, "SGP" | "SGP4" | "SGP/SGP4") {
             return Err(ValidationError::InvalidValue {
                 field: Cow::Borrowed("MEAN_ELEMENT_THEORY"),
                 value: theory.to_string(),
-                expected: Cow::Borrowed("SGP or SGP4"),
+                expected: Cow::Borrowed("SGP, SGP4, or SGP/SGP4"),
                 line: None,
             }
             .into());
@@ -468,12 +468,12 @@ impl Omm {
         let launch_number = parse_u32_strict(&line1[11..14], "LAUNCH_NUMBER")?;
         let launch_piece = line1[14..17].trim_end().to_string();
         if !launch_piece.is_empty()
-            && (!launch_piece.chars().all(|c| c.is_ascii_alphanumeric()) || launch_piece.len() > 3)
+            && (!launch_piece.chars().all(|c| c.is_ascii_uppercase()) || launch_piece.len() > 3)
         {
             return Err(ValidationError::InvalidValue {
                 field: Cow::Borrowed("LAUNCH_PIECE"),
                 value: launch_piece,
-                expected: Cow::Borrowed("1..=3 ASCII alphanumeric characters"),
+                expected: Cow::Borrowed("1..=3 uppercase ASCII letters"),
                 line: None,
             }
             .into());
@@ -689,12 +689,12 @@ fn parse_object_id_launch_designator(object_id: &str) -> Result<LaunchDesignator
     }
     if launch_piece_str.is_empty()
         || launch_piece_str.len() > 3
-        || !launch_piece_str.chars().all(|c| c.is_ascii_alphanumeric())
+        || !launch_piece_str.chars().all(|c| c.is_ascii_uppercase())
     {
         return Err(ValidationError::InvalidValue {
             field: Cow::Borrowed("OBJECT_ID"),
             value: id.to_string(),
-            expected: Cow::Borrowed("YYYY-NNNPPP (piece is 1..=3 ASCII alphanumeric chars)"),
+            expected: Cow::Borrowed("YYYY-NNNPPP (piece is 1..=3 uppercase ASCII letters)"),
             line: None,
         }
         .into());
@@ -715,7 +715,7 @@ fn parse_object_id_launch_designator(object_id: &str) -> Result<LaunchDesignator
     Ok(LaunchDesignator {
         launch_year,
         launch_number,
-        launch_piece: launch_piece_str.to_ascii_uppercase(),
+        launch_piece: launch_piece_str.to_string(),
     })
 }
 
@@ -878,7 +878,7 @@ fn format_tle_dot_term(value: f64) -> Result<String> {
         }
         .into());
     }
-    Ok(format!("{}.{}", sign, format!("{:08}", scaled as u64)))
+    Ok(format!("{}.{:08}", sign, scaled as u64))
 }
 
 fn parse_tle_dot_term(field: &str, name: &'static str) -> Result<f64> {
@@ -1334,7 +1334,7 @@ fn parse_time_to_ns_of_day(time: &str) -> Result<i128> {
 
 fn format_tle_epoch_components(epoch: &str) -> Result<(u32, String)> {
     let (mut year, mut doy, utc_ns_of_day) = parse_om_epoch_to_utc_ydns(epoch)?;
-    if year < 0 || year > 9999 {
+    if !(0..=9999).contains(&year) {
         return Err(ValidationError::OutOfRange {
             name: Cow::Borrowed("EPOCH year"),
             value: year.to_string(),
@@ -1345,7 +1345,7 @@ fn format_tle_epoch_components(epoch: &str) -> Result<(u32, String)> {
     }
 
     let mut frac_scaled =
-        ((utc_ns_of_day as i128 * 100_000_000 + (NS_PER_DAY / 2)) / NS_PER_DAY) as u32;
+        ((utc_ns_of_day * 100_000_000 + (NS_PER_DAY / 2)) / NS_PER_DAY) as u32;
     if frac_scaled == 100_000_000 {
         frac_scaled = 0;
         if doy == days_in_year(year) {
@@ -2849,6 +2849,54 @@ MEAN_MOTION_DDOT = 0.0000000000000 [rev/day**3]
 "#;
         let omm = Omm::from_kvn(kvn).expect("failed to parse OMM");
         assert!(omm.to_tle_lines().is_err());
+    }
+
+    #[test]
+    fn test_to_tle_lines_accepts_sgp_slash_sgp4() {
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2020-065T16:00:00
+ORIGINATOR = NOAA
+MESSAGE_ID = OMM 202013719185
+OBJECT_NAME = GOES 9
+OBJECT_ID = 1995-025A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP/SGP4
+EPOCH = 2020-064T10:34:41.4264
+MEAN_MOTION = 1.00273272
+ECCENTRICITY = 0.0005013
+INCLINATION = 3.0539
+RA_OF_ASC_NODE = 81.7939
+ARG_OF_PERICENTER = 249.2363
+MEAN_ANOMALY = 150.1602
+GM = 398600.8
+EPHEMERIS_TYPE = 0
+CLASSIFICATION_TYPE = U
+NORAD_CAT_ID = 23581
+ELEMENT_SET_NO = 0925
+REV_AT_EPOCH = 4316
+BSTAR = 0.0001
+MEAN_MOTION_DOT = -0.00000113
+MEAN_MOTION_DDOT = 0.0
+"#;
+        let omm = Omm::from_kvn(kvn).expect("failed to parse OMM");
+        let (line1, line2) = omm.to_tle_lines().expect("failed to generate TLE");
+        assert!(line1.starts_with("1 23581U 95025A"));
+        assert!(line2.starts_with("2 23581"));
+    }
+
+    #[test]
+    fn test_from_tle_lines_rejects_non_upper_launch_piece() {
+        let line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845";
+
+        // Lowercase piece ('a')
+        let line1_lower = "1 25544U 98067a   20348.69171878  .00000888  00000-0  24124-4 0  9995";
+        assert!(Omm::from_tle_lines(line1_lower, line2).is_err());
+
+        // Numeric piece ('1') with corrected checksum
+        let line1_digit = "1 25544U 980671   20348.69171878  .00000888  00000-0  24124-4 0  9996";
+        assert!(Omm::from_tle_lines(line1_digit, line2).is_err());
     }
 
     #[test]
