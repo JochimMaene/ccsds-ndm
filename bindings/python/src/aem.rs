@@ -128,7 +128,6 @@ impl Aem {
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-
         if strict {
             self.inner
                 .validate()
@@ -604,7 +603,7 @@ impl AemData {
                             QuaternionEphemeris {
                                 epoch: s.epoch,
                                 quaternion: Quaternion {
-                                    q1: s.values.get(0).copied().unwrap_or(0.0),
+                                    q1: s.values.first().copied().unwrap_or(0.0),
                                     q2: s.values.get(1).copied().unwrap_or(0.0),
                                     q3: s.values.get(2).copied().unwrap_or(0.0),
                                     qc: s.values.get(3).copied().unwrap_or(1.0),

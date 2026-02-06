@@ -19,6 +19,7 @@ pub struct QuaternionState {
 #[pymethods]
 impl QuaternionState {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         ref_frame_a: String,
         ref_frame_b: String,
@@ -643,6 +644,7 @@ pub struct InertiaState {
 #[pymethods]
 impl InertiaState {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         inertia_ref_frame: String,
         ixx: f64,
