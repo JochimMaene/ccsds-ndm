@@ -89,7 +89,6 @@ impl Rdm {
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-
         if strict {
             self.inner
                 .validate()
@@ -1249,6 +1248,7 @@ impl RdmData {
         user_defined_parameters=None,
         comment=None
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         atmospheric_reentry_parameters: AtmosphericReentryParameters,
         ground_impact_parameters: Option<GroundImpactParameters>,

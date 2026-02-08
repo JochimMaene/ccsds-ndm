@@ -11,6 +11,7 @@ use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::str::FromStr;
+mod tle;
 
 //----------------------------------------------------------------------
 // OMM Specific Units
@@ -171,6 +172,23 @@ pub struct Omm {
     pub version: String,
 }
 
+/// Optional overrides when constructing a minimal OMM from TLE lines.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct TleToOmmOptions {
+    /// Spacecraft name to use in generated metadata. Defaults to `UNKNOWN`.
+    pub object_name: Option<String>,
+    /// Object identifier to use in generated metadata.
+    /// Defaults to the international designator derived from TLE line 1.
+    pub object_id: Option<String>,
+    /// Originator value for the generated ODM header. Defaults to `UNKNOWN`.
+    pub originator: Option<String>,
+    /// Optional message ID for the generated ODM header.
+    pub message_id: Option<String>,
+    /// Optional creation date override for the generated ODM header.
+    /// Defaults to the parsed TLE epoch.
+    pub creation_date: Option<Epoch>,
+}
+
 impl crate::traits::Validate for Omm {
     fn validate(&self) -> Result<()> {
         crate::versioning::validate_root(
@@ -205,14 +223,6 @@ impl Ndm for Omm {
         let omm: Self = crate::xml::from_str_with_context(xml, "OMM")?;
         crate::validation::validate_with_mode(crate::validation::MessageKind::Omm, &omm)?;
         Ok(omm)
-    }
-}
-
-impl Omm {
-    /// Validates the OMM against CCSDS constraints that cannot be checked during parsing.
-    pub fn validate(&self) -> Result<()> {
-        self.header.validate()?;
-        self.body.segment.validate()
     }
 }
 
@@ -1515,6 +1525,185 @@ TLE_PARAMETERS =
             .mean_motion_dot(MeanMotionDot::new(0.0, None))
             .build();
         assert!(tle.validate("UNKNOWN").is_ok());
+    }
+
+    #[test]
+    fn test_to_tle_lines_iss_example() {
+        let kvn = r#"CCSDS_OMM_VERS = 2.0
+CREATION_DATE = 2020-12-13T17:26:09
+ORIGINATOR = 18 SPCS
+OBJECT_NAME = ISS (ZARYA)
+OBJECT_ID = 1998-067A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP4
+EPOCH = 2020-12-13T16:36:04.502592
+MEAN_MOTION = 15.49181153 [rev/day]
+ECCENTRICITY = 0.00017790
+INCLINATION = 51.6444 [deg]
+RA_OF_ASC_NODE = 180.2777 [deg]
+ARG_OF_PERICENTER = 128.5985 [deg]
+MEAN_ANOMALY = 350.1361 [deg]
+EPHEMERIS_TYPE = 0
+CLASSIFICATION_TYPE = U
+NORAD_CAT_ID = 25544
+ELEMENT_SET_NO = 999
+REV_AT_EPOCH = 25984
+BSTAR = 0.00002412400000 [1/ER]
+MEAN_MOTION_DOT = 0.00000888 [rev/day**2]
+MEAN_MOTION_DDOT = 0.0000000000000 [rev/day**3]
+"#;
+
+        let omm = Omm::from_kvn(kvn).expect("failed to parse ISS OMM sample");
+        let (line1, line2) = omm.to_tle_lines().expect("failed to generate TLE lines");
+        assert_eq!(
+            line1,
+            "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995"
+        );
+        assert_eq!(
+            line2,
+            "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845"
+        );
+    }
+
+    #[test]
+    fn test_from_tle_lines_iss_example() {
+        let line1 = "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995";
+        let line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845";
+
+        let omm = Omm::from_tle_lines(line1, line2).expect("failed to parse TLE lines");
+        assert_eq!(omm.body.segment.metadata.object_id, "1998-067A");
+        assert_eq!(omm.body.segment.metadata.object_name, "UNKNOWN");
+        assert_eq!(omm.body.segment.metadata.center_name, "EARTH");
+        assert_eq!(omm.body.segment.metadata.ref_frame, "TEME");
+        assert_eq!(omm.body.segment.metadata.time_system, "UTC");
+        assert_eq!(omm.body.segment.metadata.mean_element_theory, "SGP4");
+
+        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
+        assert_eq!(tle.norad_cat_id, Some(25544));
+        assert_eq!(tle.classification_type.as_deref(), Some("U"));
+        assert_eq!(tle.ephemeris_type, Some(0));
+        assert_eq!(tle.element_set_no.as_ref().map(|v| v.value), Some(999));
+        assert_eq!(tle.rev_at_epoch, Some(25984));
+        assert!(tle.mean_motion_ddot.is_some());
+        assert!(tle.bstar.is_some());
+        omm.validate().expect("generated OMM should validate");
+    }
+
+    #[test]
+    fn test_tle_roundtrip_with_options() {
+        let line1 = "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995";
+        let line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845";
+        let options = TleToOmmOptions {
+            object_name: Some("ISS (ZARYA)".to_string()),
+            object_id: None,
+            originator: Some("18 SPCS".to_string()),
+            message_id: None,
+            creation_date: None,
+        };
+
+        let omm = Omm::from_tle_lines_with_options(line1, line2, &options)
+            .expect("failed to parse TLE lines with options");
+        let (line1_out, line2_out) = omm.to_tle_lines().expect("failed to regenerate TLE");
+        assert_eq!(line1_out, line1);
+        assert_eq!(line2_out, line2);
+    }
+
+    #[test]
+    fn test_to_tle_lines_requires_parseable_object_id() {
+        let kvn = r#"CCSDS_OMM_VERS = 2.0
+CREATION_DATE = 2020-12-13T17:26:09
+ORIGINATOR = 18 SPCS
+OBJECT_NAME = ISS (ZARYA)
+OBJECT_ID = UNKNOWN
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP4
+EPOCH = 2020-12-13T16:36:04.502592
+MEAN_MOTION = 15.49181153 [rev/day]
+ECCENTRICITY = 0.00017790
+INCLINATION = 51.6444 [deg]
+RA_OF_ASC_NODE = 180.2777 [deg]
+ARG_OF_PERICENTER = 128.5985 [deg]
+MEAN_ANOMALY = 350.1361 [deg]
+EPHEMERIS_TYPE = 0
+CLASSIFICATION_TYPE = U
+NORAD_CAT_ID = 25544
+ELEMENT_SET_NO = 999
+REV_AT_EPOCH = 25984
+BSTAR = 0.00002412400000 [1/ER]
+MEAN_MOTION_DOT = 0.00000888 [rev/day**2]
+MEAN_MOTION_DDOT = 0.0000000000000 [rev/day**3]
+"#;
+        let omm = Omm::from_kvn(kvn).expect("failed to parse OMM");
+        assert!(omm.to_tle_lines().is_err());
+    }
+
+    #[test]
+    fn test_to_tle_lines_accepts_sgp_slash_sgp4() {
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2020-065T16:00:00
+ORIGINATOR = NOAA
+MESSAGE_ID = OMM 202013719185
+OBJECT_NAME = GOES 9
+OBJECT_ID = 1995-025A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP/SGP4
+EPOCH = 2020-064T10:34:41.4264
+MEAN_MOTION = 1.00273272
+ECCENTRICITY = 0.0005013
+INCLINATION = 3.0539
+RA_OF_ASC_NODE = 81.7939
+ARG_OF_PERICENTER = 249.2363
+MEAN_ANOMALY = 150.1602
+GM = 398600.8
+EPHEMERIS_TYPE = 0
+CLASSIFICATION_TYPE = U
+NORAD_CAT_ID = 23581
+ELEMENT_SET_NO = 0925
+REV_AT_EPOCH = 4316
+BSTAR = 0.0001
+MEAN_MOTION_DOT = -0.00000113
+MEAN_MOTION_DDOT = 0.0
+"#;
+        let omm = Omm::from_kvn(kvn).expect("failed to parse OMM");
+        let (line1, line2) = omm.to_tle_lines().expect("failed to generate TLE");
+        assert!(line1.starts_with("1 23581U 95025A"));
+        assert!(line2.starts_with("2 23581"));
+    }
+
+    #[test]
+    fn test_from_tle_lines_rejects_non_upper_launch_piece() {
+        let line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845";
+
+        // Lowercase piece ('a')
+        let line1_lower = "1 25544U 98067a   20348.69171878  .00000888  00000-0  24124-4 0  9995";
+        assert!(Omm::from_tle_lines(line1_lower, line2).is_err());
+
+        // Numeric piece ('1') with corrected checksum
+        let line1_digit = "1 25544U 980671   20348.69171878  .00000888  00000-0  24124-4 0  9996";
+        assert!(Omm::from_tle_lines(line1_digit, line2).is_err());
+    }
+
+    #[test]
+    fn test_from_tle_lines_rejects_non_ascii_without_panic() {
+        let valid_line1 = "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995";
+        let line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845";
+
+        // Keep 69-byte length while injecting a non-ASCII multi-byte character.
+        let mut line1 = format!("{}é{}", &valid_line1[..8], &valid_line1[9..]);
+        line1.pop();
+        assert_eq!(line1.len(), 69);
+        assert!(!line1.is_ascii());
+
+        let err = Omm::from_tle_lines(&line1, line2).expect_err("non-ASCII TLE should fail");
+        assert!(err
+            .to_string()
+            .contains("ASCII-only TLE line with fixed-width columns"));
     }
 
     #[test]
