@@ -1693,8 +1693,15 @@ X_DOT = 1.5 [km/s]
 Y_DOT = 2.5 [km/s]
 Z_DOT = 3.5 [km/s]
 "#;
-        let cdm = Cdm::from_kvn(cdm_no_cov).expect("should parse without covariance");
-        assert!(cdm.body.segments[0].data.covariance_matrix.is_none());
-        assert!(cdm.body.segments[1].data.covariance_matrix.is_none());
+        let err = Cdm::from_kvn(cdm_no_cov).unwrap_err();
+        match err {
+            CcsdsNdmError::Validation(val_err) => match *val_err {
+                ValidationError::MissingRequiredField { field, .. } => {
+                    assert_eq!(field, "covarianceMatrix");
+                }
+                _ => panic!("Expected missing field error, got {:?}", val_err),
+            },
+            _ => panic!("Expected Validation error, got {:?}", err),
+        }
     }
 }

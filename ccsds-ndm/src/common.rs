@@ -6,7 +6,7 @@
 //! from `ndmxml-4.0.0-common-4.0.xsd` used by OEM.
 
 use super::types::*;
-use crate::error::Result;
+use crate::error::{Result, ValidationError};
 use crate::kvn::ser::KvnWriter;
 use crate::traits::ToKvn;
 use serde::{Deserialize, Serialize};
@@ -1027,6 +1027,69 @@ pub struct SpinState {
         with = "crate::utils::nullable"
     )]
     pub nutation_vel: Option<AngleRate>,
+}
+
+impl crate::traits::Validate for SpinState {
+    fn validate(&self) -> Result<()> {
+        if self.ref_frame_a.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "Spin".into(),
+                field: "REF_FRAME_A".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.ref_frame_b.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "Spin".into(),
+                field: "REF_FRAME_B".into(),
+                line: None,
+            }
+            .into());
+        }
+
+        let nutation_present =
+            self.nutation.is_some() || self.nutation_per.is_some() || self.nutation_phase.is_some();
+        let momentum_present = self.momentum_alpha.is_some()
+            || self.momentum_delta.is_some()
+            || self.nutation_vel.is_some();
+
+        if nutation_present && momentum_present {
+            return Err(ValidationError::Conflict {
+                fields: vec!["NUTATION".into(), "MOMENTUM_ALPHA".into()],
+                line: None,
+            }
+            .into());
+        }
+
+        if nutation_present
+            && (self.nutation.is_none()
+                || self.nutation_per.is_none()
+                || self.nutation_phase.is_none())
+        {
+            return Err(ValidationError::MissingRequiredField {
+                block: "Spin".into(),
+                field: "NUTATION/NUTATION_PER/NUTATION_PHASE".into(),
+                line: None,
+            }
+            .into());
+        }
+
+        if momentum_present
+            && (self.momentum_alpha.is_none()
+                || self.momentum_delta.is_none()
+                || self.nutation_vel.is_none())
+        {
+            return Err(ValidationError::MissingRequiredField {
+                block: "Spin".into(),
+                field: "MOMENTUM_ALPHA/MOMENTUM_DELTA/NUTATION_VEL".into(),
+                line: None,
+            }
+            .into());
+        }
+
+        Ok(())
+    }
 }
 
 /// Inertia block.

@@ -196,6 +196,14 @@ pub struct TdmBody {
 
 impl crate::traits::Validate for TdmBody {
     fn validate(&self) -> Result<()> {
+        if self.segments.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Body".into(),
+                field: "segment (at least one required)".into(),
+                line: None,
+            }
+            .into());
+        }
         for segment in &self.segments {
             segment.validate()?;
         }
@@ -2449,5 +2457,11 @@ DATA_STOP
   <data><observation extra="ignore"><EPOCH>2023-01-01T00:00:00</EPOCH><RANGE>1.0</RANGE></observation></data>
   </segment></body></tdm>"#;
         assert!(Tdm::from_xml(xml_unknown).is_ok());
+    }
+
+    #[test]
+    fn test_tdm_body_requires_segment() {
+        let body = TdmBody { segments: vec![] };
+        assert!(body.validate().is_err());
     }
 }

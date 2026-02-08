@@ -7,7 +7,7 @@ use crate::common::{parse_reference_frame, parse_time_system};
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::types::{InterpolationDegree, RotSeq};
+use ccsds_ndm::types::{AttitudeTypeType, InterpolationDegree, RotSeq};
 use ccsds_ndm::MessageType;
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
@@ -339,6 +339,9 @@ impl AemMetadata {
             start_time.ok_or_else(|| PyValueError::new_err("start_time is required"))?;
         let stop_time = stop_time.ok_or_else(|| PyValueError::new_err("stop_time is required"))?;
 
+        let attitude_type = AttitudeTypeType::from_str(&attitude_type)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+
         Ok(Self {
             inner: core_aem::AemMetadata {
                 comment: comment.unwrap_or_default(),
@@ -524,7 +527,7 @@ impl AemMetadata {
     /// :type: str
     #[getter]
     fn get_attitude_type(&self) -> String {
-        self.inner.attitude_type.clone()
+        self.inner.attitude_type.to_string()
     }
 
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
@@ -624,6 +627,8 @@ impl AemData {
 
     /// Validate the data section against CCSDS rules.
     fn validate(&self, attitude_type: String) -> PyResult<()> {
+        let attitude_type =
+            AttitudeTypeType::from_str(&attitude_type).map_err(|e| PyValueError::new_err(e.to_string()))?;
         self.inner
             .validate(&attitude_type)
             .map_err(|e| PyValueError::new_err(e.to_string()))

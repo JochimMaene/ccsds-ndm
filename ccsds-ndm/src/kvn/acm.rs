@@ -150,8 +150,8 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
         "REF_FRAME_A" => val: kv_string => { ref_frame_a = Some(val); },
         "REF_FRAME_B" => val: kv_string => { ref_frame_b = Some(val); },
         "NUMBER_STATES" => val: kv_u32 => { number_states = Some(val); },
-        "ATT_TYPE" => val: kv_string => { att_type = Some(val); },
-        "RATE_TYPE" => val: kv_string => { rate_type = Some(val); },
+        "ATT_TYPE" => val: kv_enum => { att_type = Some(val); },
+        "RATE_TYPE" => val: kv_enum => { rate_type = Some(val); },
         "EULER_ROT_SEQ" => val: kv_enum => { euler_rot_seq = Some(val); },
     }, |i: &mut &str| matches!(i.trim_start().chars().next(), Some('0'..='9' | '-' | '+')) || at_block_end("ATT", i));
 
@@ -246,7 +246,7 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
     parse_block!(input, comment, {
         "COV_BASIS" => val: kv_string => { cov_basis = Some(val); },
         "COV_REF_FRAME" => val: kv_string => { cov_ref_frame = Some(val); },
-        "COV_TYPE" => val: kv_string => { cov_type = Some(val); },
+        "COV_TYPE" => val: kv_enum => { cov_type = Some(val); },
         "COV_CONFIDENCE" => val: kv_float => { cov_confidence = Some(val); },
     }, |i: &mut &str| matches!(i.trim_start().chars().next(), Some('0'..='9' | '-' | '+')) || at_block_end("COV", i));
 
@@ -309,6 +309,8 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
     let mut actuator_used = None;
     let mut target_momentum = None;
     let mut target_mom_frame = None;
+    let mut target_attitude = None;
+    let mut target_spinrate = None;
 
     expect_block_start("MAN").parse_next(input)?;
 
@@ -325,6 +327,8 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
         "TARGET_MOM_Y" => val: kv_float => { target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[1] = val; },
         "TARGET_MOM_Z" => val: kv_float => { target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[2] = val; },
         "TARGET_MOM_FRAME" => val: kv_string => { target_mom_frame = Some(val); },
+        "TARGET_ATTITUDE" => val: kv_from_kvn_value => { target_attitude = Some(val); },
+        "TARGET_SPINRATE" => val: kv_from_kvn => { target_spinrate = Some(val); },
     }, |i: &mut &str| at_block_end("MAN", i), "Unexpected ACM Maneuver key");
 
     expect_block_end("MAN").parse_next(input)?;
@@ -339,6 +343,8 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
         actuator_used,
         target_momentum,
         target_mom_frame,
+        target_attitude,
+        target_spinrate,
     })
 }
 
@@ -429,13 +435,13 @@ fn parse_ad_block(input: &mut &str) -> KvnResult<AcmAttitudeDetermination> {
         "AD_METHOD" => val: kv_string => { ad_method = Some(val); },
         "ATTITUDE_SOURCE" => val: kv_string => { attitude_source = Some(val); },
         "NUMBER_STATES" => val: kv_u32 => { number_states = Some(val); },
-        "ATTITUDE_STATES" => val: kv_string => { attitude_states = Some(val); },
-        "COV_TYPE" => val: kv_string => { cov_type = Some(val); },
+        "ATTITUDE_STATES" => val: kv_enum => { attitude_states = Some(val); },
+        "COV_TYPE" => val: kv_enum => { cov_type = Some(val); },
         "AD_EPOCH" => val: kv_epoch => { ad_epoch = Some(val); },
         "REF_FRAME_A" => val: kv_string => { ref_frame_a = Some(val); },
         "REF_FRAME_B" => val: kv_string => { ref_frame_b = Some(val); },
         "ATTITUDE_TYPE" => val: kv_string => { attitude_type = Some(val); },
-        "RATE_STATES" => val: kv_string => { rate_states = Some(val); },
+        "RATE_STATES" => val: kv_enum => { rate_states = Some(val); },
         "SIGMA_U" => val: kv_from_kvn => { sigma_u = Some(val); },
         "SIGMA_V" => val: kv_from_kvn => { sigma_v = Some(val); },
         "RATE_PROCESS_NOISE_STDDEV" => val: kv_from_kvn => { rate_process_noise_stddev = Some(val); },
@@ -582,6 +588,7 @@ mod tests {
     use super::*;
     use crate::error::{CcsdsNdmError, ValidationError};
     use crate::traits::Ndm;
+    use crate::types::AcmAttitudeType;
 
     fn sample_acm_header() -> String {
         r#"CCSDS_ACM_VERS = 2.0
@@ -685,7 +692,7 @@ ATT_STOP
         let input = format!("{}{}{}", sample_acm_header(), sample_acm_meta(), att_block);
         let acm = Acm::from_kvn(&input).unwrap();
         let att = &acm.body.segment.data.att[0];
-        assert_eq!(att.att_type, "EULER_ANGLES");
+        assert_eq!(att.att_type, AcmAttitudeType::EulerAngles);
         // Note: 321 is not a valid enum variant for RotSeq in our types, it expects ZYX etc.
         // Wait, did I fix RotSeq?
         // In types.rs: RotSeq expects "XYX", "XYZ", etc. "321" is likely ZYX.
@@ -767,6 +774,9 @@ MAN_STOP
 AD_ID = AD_001
 AD_METHOD = EKF
 ATTITUDE_SOURCE = OBC
+ATTITUDE_STATES = QUATERNION
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
 SENSOR_START
 SENSOR_NUMBER = 1
 SENSOR_USED = STAR_TRACKER
@@ -792,7 +802,7 @@ AD_STOP
         let blocks = r#"ATT_START
 REF_FRAME_A = A
 REF_FRAME_B = B
-ATT_TYPE = Q
+ATT_TYPE = QUATERNION
 NUMBER_STATES = 1
 0 0 0 0 0
 ATT_STOP
@@ -802,7 +812,7 @@ PHYS_STOP
 ATT_START
 REF_FRAME_A = A
 REF_FRAME_B = B
-ATT_TYPE = Q
+ATT_TYPE = QUATERNION
 NUMBER_STATES = 1
 10 0 0 0 0
 ATT_STOP

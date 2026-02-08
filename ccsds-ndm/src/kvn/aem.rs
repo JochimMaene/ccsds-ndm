@@ -12,7 +12,7 @@ use crate::error::InternalParserError;
 use crate::kvn::parser::*;
 use crate::messages::aem::{Aem, AemBody, AemData, AemMetadata, AemSegment};
 use crate::parse_block;
-use crate::types::{Angle, InterpolationDegree};
+use crate::types::{Angle, AttitudeTypeType, InterpolationDegree};
 use std::str::FromStr;
 use winnow::combinator::{peek, terminated};
 use winnow::error::{AddContext, ErrMode, FromExternalError};
@@ -69,7 +69,7 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
         "USEABLE_START_TIME" => useable_start_time: kv_epoch,
         "USEABLE_STOP_TIME" => useable_stop_time: kv_epoch,
         "STOP_TIME" => stop_time: kv_epoch,
-        "ATTITUDE_TYPE" => attitude_type: kv_string,
+        "ATTITUDE_TYPE" => attitude_type: kv_enum,
         "EULER_ROT_SEQ" => euler_rot_seq: kv_enum,
         "RATE_FRAME" => rate_frame: kv_string, // CCSDS 504.0-B-2 says RATE_FRAME in KVN
         "ANGVEL_FRAME" => rate_frame: kv_string, // Also support explicit XML tag if used in KVN
@@ -115,7 +115,10 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
 
 /// Parses a single data line.
 /// Parses a single data line based on ATTITUDE_TYPE.
-fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAttitudeState> {
+fn attitude_state_line(
+    input: &mut &str,
+    attitude_type: &AttitudeTypeType,
+) -> KvnResult<AemAttitudeState> {
     let line = terminated(raw_line, opt_line_ending).parse_next(input)?;
     let mut parts = line.split_whitespace();
 
@@ -143,7 +146,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
     }
 
     match attitude_type {
-        "QUATERNION" => {
+        AttitudeTypeType::Quaternion | AttitudeTypeType::QuaternionUpper => {
             if values.len() != 4 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -154,7 +157,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 quaternion: q,
             }))
         }
-        "QUATERNION/DERIVATIVE" => {
+        AttitudeTypeType::QuaternionDerivative | AttitudeTypeType::QuaternionDerivativeUpper => {
             if values.len() != 8 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -174,7 +177,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 },
             ))
         }
-        "QUATERNION/RATE" | "QUATERNION/ANGVEL" => {
+        AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::QuaternionAngVelUpper => {
             if values.len() != 7 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -191,7 +194,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 ang_vel,
             }))
         }
-        "EULER_ANGLE" => {
+        AttitudeTypeType::EulerAngle | AttitudeTypeType::EulerAngleUpper => {
             if values.len() != 3 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -208,7 +211,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 })?,
             }))
         }
-        "EULER_ANGLE/DERIVATIVE" => {
+        AttitudeTypeType::EulerAngleDerivative | AttitudeTypeType::EulerAngleDerivativeUpper => {
             if values.len() != 6 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -230,7 +233,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 },
             ))
         }
-        "EULER_ANGLE/RATE" | "EULER_ANGLE/ANGVEL" => {
+        AttitudeTypeType::EulerAngleAngVel | AttitudeTypeType::EulerAngleAngVelUpper => {
             if values.len() != 6 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -252,7 +255,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 },
             ))
         }
-        "SPIN" => {
+        AttitudeTypeType::Spin | AttitudeTypeType::SpinUpper => {
             if values.len() != 4 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -270,7 +273,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 spin_angle_vel: crate::types::AngleRate::new(values[3], None),
             }))
         }
-        "SPIN/NUTATION" => {
+        AttitudeTypeType::SpinNutation | AttitudeTypeType::SpinNutationUpper => {
             if values.len() != 7 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -299,7 +302,7 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 },
             ))
         }
-        "SPIN/NUTATION_MOM" => {
+        AttitudeTypeType::SpinNutationMom | AttitudeTypeType::SpinNutationMomUpper => {
             if values.len() != 7 {
                 return Err(ErrMode::Cut(InternalParserError::from_input(input)));
             }
@@ -326,12 +329,11 @@ fn attitude_state_line(input: &mut &str, attitude_type: &str) -> KvnResult<AemAt
                 },
             ))
         }
-        _ => Err(ErrMode::Cut(InternalParserError::from_input(input))), // Unexpected type
     }
 }
 
 /// Parses the AEM data section.
-pub fn aem_data(input: &mut &str, attitude_type: &str) -> KvnResult<AemData> {
+pub fn aem_data(input: &mut &str, attitude_type: &AttitudeTypeType) -> KvnResult<AemData> {
     expect_block_start("DATA").parse_next(input)?;
 
     let mut comment = Vec::new();
@@ -568,8 +570,10 @@ DATA_STOP
             panic!("Wrong type parsed");
         }
 
-        // QUATERNION/RATE (7 values)
-        let qr_meta = sample_aem_meta().replace("QUATERNION", "QUATERNION/RATE");
+        // QUATERNION/ANGVEL (7 values)
+        let qr_meta = sample_aem_meta()
+            .replace("QUATERNION", "QUATERNION/ANGVEL")
+            .replace("META_STOP", "ANGVEL_FRAME = SC_BODY_1\nMETA_STOP");
         let qr_input = format!(
             "{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4 0.01 0.02 0.03\nDATA_STOP\n",
             sample_aem_header(),
@@ -583,6 +587,26 @@ DATA_STOP
             assert_eq!(qa.ang_vel.angvel_z.value, 0.03);
         } else {
             panic!("Wrong type parsed");
+        }
+    }
+
+    #[test]
+    fn test_parse_aem_quaternion_angvel_requires_angvel_frame() {
+        let qr_meta = sample_aem_meta().replace("QUATERNION", "QUATERNION/ANGVEL");
+        let input = format!(
+            "{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4 0.01 0.02 0.03\nDATA_STOP\n",
+            sample_aem_header(),
+            qr_meta
+        );
+        let err = Aem::from_kvn(&input).unwrap_err();
+        match err {
+            CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
+                ValidationError::MissingRequiredField { field, .. } => {
+                    assert_eq!(field, "ANGVEL_FRAME (required for ANGVEL types)");
+                }
+                _ => panic!("Expected missing field error, got {:?}", boxed_err),
+            },
+            _ => panic!("Expected Validation error, got {:?}", err),
         }
     }
 
@@ -806,10 +830,10 @@ DATA_STOP
     #[test]
     fn test_parse_aem_rate_frame_alias() {
         let meta = sample_aem_meta()
-            .replace("QUATERNION", "QUATERNION/RATE")
+            .replace("QUATERNION", "QUATERNION/ANGVEL")
             .replace("META_STOP", "RATE_FRAME = SC_BODY_1\nMETA_STOP");
 
-        // QUATERNION/RATE needs 7 columns
+        // QUATERNION/ANGVEL needs 7 columns
         let input = format!(
             "{}{}\nDATA_START\n2023-01-01T00:00:00 0.0 0.0 0.0 1.0 0.01 0.02 0.03\nDATA_STOP\n",
             sample_aem_header(),

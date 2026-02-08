@@ -368,6 +368,14 @@ pub struct OmmMetadata {
 
 impl crate::traits::Validate for OmmMetadata {
     fn validate(&self) -> Result<()> {
+        if self.object_name.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OMM Metadata".into(),
+                field: "OBJECT_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.object_id.trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "OMM Metadata".into(),
@@ -376,10 +384,34 @@ impl crate::traits::Validate for OmmMetadata {
             }
             .into());
         }
+        if self.center_name.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OMM Metadata".into(),
+                field: "CENTER_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.ref_frame.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OMM Metadata".into(),
+                field: "REF_FRAME".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.time_system.trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "OMM Metadata".into(),
                 field: "TIME_SYSTEM".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.mean_element_theory.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OMM Metadata".into(),
+                field: "MEAN_ELEMENT_THEORY".into(),
                 line: None,
             }
             .into());

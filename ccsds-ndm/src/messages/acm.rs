@@ -552,8 +552,14 @@ pub struct AcmData {
 
 impl crate::traits::Validate for AcmData {
     fn validate(&self) -> Result<()> {
+        for att in &self.att {
+            att.validate()?;
+        }
         if let Some(phys) = &self.phys {
             phys.validate()?;
+        }
+        for cov in &self.cov {
+            cov.validate()?;
         }
         if let Some(ad) = &self.ad {
             ad.validate()?;
@@ -657,7 +663,7 @@ pub struct AcmAttitudeState {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub att_basis: Option<AttBasis>,
+    pub att_basis: Option<AttBasisType>,
     /// Free-text field containing the identification number for the telemetry dataset, attitude
     /// determination, or simulation upon which this attitude state time history block is based.
     /// When a matching attitude determination block accompanies this attitude state time history,
@@ -703,7 +709,7 @@ pub struct AcmAttitudeState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[builder(into)]
-    pub att_type: String,
+    pub att_type: AcmAttitudeType,
     /// Type of rate data, selected per annex B, subsection B4. If rate data are included,
     /// NUMBER_STATES must be at least 6 to include both attitude and rate data. The units that
     /// shall be used are given in annex B, subsection B4. If the value is ANGVEL, the reference
@@ -718,7 +724,7 @@ pub struct AcmAttitudeState {
         with = "crate::utils::nullable"
     )]
     #[builder(into)]
-    pub rate_type: Option<String>,
+    pub rate_type: Option<AttRateType>,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
     /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
     /// the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
@@ -742,6 +748,45 @@ pub struct AcmAttitudeState {
     #[serde(rename = "attLine", default)]
     #[builder(default)]
     pub att_lines: Vec<AttLine>,
+}
+
+impl AcmAttitudeState {
+    fn validate(&self) -> Result<()> {
+        if self.ref_frame_a.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Attitude State".into(),
+                field: "REF_FRAME_A".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.ref_frame_b.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Attitude State".into(),
+                field: "REF_FRAME_B".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.number_states == 0 {
+            return Err(ValidationError::OutOfRange {
+                name: "NUMBER_STATES".into(),
+                value: self.number_states.to_string(),
+                expected: "positive integer".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.att_lines.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Attitude State".into(),
+                field: "attLine".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
 }
 
 impl ToKvn for AcmAttitudeState {
@@ -774,47 +819,6 @@ impl ToKvn for AcmAttitudeState {
             writer.write_line(line.to_string());
         }
         writer.write_section("ATT_STOP");
-    }
-}
-
-// Add AttBasis enum here if not in common
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub enum AttBasis {
-    #[serde(rename = "PREDICTED")]
-    Predicted,
-    #[serde(rename = "DETERMINED_GND")]
-    DeterminedGnd,
-    #[serde(rename = "DETERMINED_OBC")]
-    DeterminedObc,
-    #[serde(rename = "SIMULATED")]
-    Simulated,
-}
-
-impl std::fmt::Display for AttBasis {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Predicted => write!(f, "PREDICTED"),
-            Self::DeterminedGnd => write!(f, "DETERMINED_GND"),
-            Self::DeterminedObc => write!(f, "DETERMINED_OBC"),
-            Self::Simulated => write!(f, "SIMULATED"),
-        }
-    }
-}
-
-impl std::str::FromStr for AttBasis {
-    type Err = crate::error::EnumParseError;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "PREDICTED" => Ok(Self::Predicted),
-            "DETERMINED_GND" => Ok(Self::DeterminedGnd),
-            "DETERMINED_OBC" => Ok(Self::DeterminedObc),
-            "SIMULATED" => Ok(Self::Simulated),
-            _ => Err(crate::error::EnumParseError {
-                field: "ATT_BASIS",
-                value: s.to_string(),
-                expected: "PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED",
-            }),
-        }
     }
 }
 
@@ -1113,7 +1117,7 @@ pub struct AcmCovarianceMatrix {
     /// **Examples**: ANGLE, ANGLE_GYROBIAS
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
-    pub cov_type: String,
+    pub cov_type: AcmCovarianceLineType,
     /// Optional confidence level of the covariance matrix.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
@@ -1129,6 +1133,20 @@ pub struct AcmCovarianceMatrix {
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
     #[serde(rename = "covLine", default)]
     pub cov_lines: Vec<CovLine>,
+}
+
+impl AcmCovarianceMatrix {
+    fn validate(&self) -> Result<()> {
+        if self.cov_lines.is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Covariance".into(),
+                field: "covLine".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
 }
 
 impl ToKvn for AcmCovarianceMatrix {
@@ -1289,13 +1307,57 @@ pub struct AcmManeuverParameters {
         with = "crate::utils::nullable"
     )]
     pub target_mom_frame: Option<String>,
+    /// Target attitude (e.g., quaternion).
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub target_attitude: Option<Vec4Double>,
+    /// Target spin rate.
+    ///
+    /// **Units**: deg/s
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub target_spinrate: Option<AngleRate>,
 }
 
 impl AcmManeuverParameters {
     fn validate(&self) -> Result<()> {
+        if self.man_purpose.as_deref().unwrap_or("").trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Maneuver".into(),
+                field: "MAN_PURPOSE".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.man_begin_time.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Maneuver".into(),
+                field: "MAN_BEGIN_TIME".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.man_end_time.is_some() && self.man_duration.is_some() {
             return Err(ValidationError::Conflict {
                 fields: vec!["MAN_END_TIME".into(), "MAN_DURATION".into()],
+                line: None,
+            }
+            .into());
+        }
+        if self.man_end_time.is_none() && self.man_duration.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Maneuver".into(),
+                field: "MAN_END_TIME or MAN_DURATION".into(),
                 line: None,
             }
             .into());
@@ -1312,6 +1374,34 @@ impl AcmManeuverParameters {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Maneuver".into(),
                 field: "TARGET_MOMENTUM".into(),
+                line: None,
+            }
+            .into());
+        }
+        if let Some(att) = &self.target_attitude {
+            if att.values.len() != 4 {
+                return Err(ValidationError::InvalidValue {
+                    field: "TARGET_ATTITUDE".into(),
+                    value: format!("{:?}", att.values),
+                    expected: "4 values".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        let has_target_momentum = self.target_momentum.is_some();
+        let has_target_attitude = self.target_attitude.is_some();
+        let has_target_spinrate = self.target_spinrate.is_some();
+        let choice_count = usize::from(has_target_momentum)
+            + usize::from(has_target_attitude)
+            + usize::from(has_target_spinrate);
+        if choice_count > 1 {
+            return Err(ValidationError::Conflict {
+                fields: vec![
+                    "TARGET_MOMENTUM".into(),
+                    "TARGET_ATTITUDE".into(),
+                    "TARGET_SPINRATE".into(),
+                ],
                 line: None,
             }
             .into());
@@ -1353,7 +1443,12 @@ impl ToKvn for AcmManeuverParameters {
         if let Some(v) = &self.target_mom_frame {
             writer.write_pair("TARGET_MOM_FRAME", v);
         }
-        // if let Some(v) = &self.target_attitude ...
+        if let Some(v) = &self.target_attitude {
+            writer.write_pair("TARGET_ATTITUDE", v);
+        }
+        if let Some(v) = &self.target_spinrate {
+            writer.write_measure("TARGET_SPINRATE", v);
+        }
         writer.write_section("MAN_STOP");
     }
 }
@@ -1448,7 +1543,7 @@ pub struct AcmAttitudeDetermination {
         with = "crate::utils::nullable"
     )]
     #[builder(into)]
-    pub attitude_states: Option<String>,
+    pub attitude_states: Option<AcmAttitudeType>,
     /// Indicates covariance composition. Select from annex B, subsection B6.
     ///
     /// **Examples**: ANGLE, ANGLE_GYROBIAS
@@ -1460,7 +1555,7 @@ pub struct AcmAttitudeDetermination {
         with = "crate::utils::nullable"
     )]
     #[builder(into)]
-    pub cov_type: Option<String>,
+    pub cov_type: Option<AcmCovarianceLineType>,
     /// Epoch of the attitude determination.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
@@ -1519,7 +1614,7 @@ pub struct AcmAttitudeDetermination {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub rate_states: Option<String>,
+    pub rate_states: Option<AttRateType>,
     /// Rate random walk if RATE_STATES=GYRO_BIAS.
     ///
     /// **Examples**: 3.7e-7
@@ -1568,6 +1663,30 @@ pub struct AcmAttitudeDetermination {
 
 impl AcmAttitudeDetermination {
     fn validate(&self) -> Result<()> {
+        if self.attitude_states.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Attitude Determination".into(),
+                field: "ATTITUDE_STATES".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.ref_frame_a.as_deref().unwrap_or("").trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Attitude Determination".into(),
+                field: "REF_FRAME_A".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.ref_frame_b.as_deref().unwrap_or("").trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Attitude Determination".into(),
+                field: "REF_FRAME_B".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.sensors.is_empty() {
             return Ok(());
         }

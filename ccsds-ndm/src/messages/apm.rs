@@ -199,6 +199,14 @@ pub struct ApmMetadata {
 
 impl crate::traits::Validate for ApmMetadata {
     fn validate(&self) -> Result<()> {
+        if self.object_name.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "APM Metadata".into(),
+                field: "OBJECT_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.object_id.trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "APM Metadata".into(),
@@ -323,6 +331,9 @@ impl crate::traits::Validate for ApmData {
         }
         for block in &self.quaternion_state {
             block.quaternion.validate()?;
+        }
+        for block in &self.spin {
+            block.validate()?;
         }
         Ok(())
     }

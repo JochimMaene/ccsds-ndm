@@ -550,10 +550,6 @@ QUAT_STOP
         let apm = Apm::from_kvn(&input).unwrap();
         let e = &apm.body.segment.data.euler_angle_state[0];
         assert_eq!(e.angle_1.value, 10.0);
-        // Note: RotSeq 321 is not valid for the enum unless we fixed it or mapped it.
-        // We learned from ACM/AEM it expects ZYX etc. But RotSeq implementation in types.rs might support digits if I checked carefully?
-        // Wait, checking types.rs again. `RotSeq` impl `FromStr` matches "XYX", "XYZ" etc.
-        // So "321" will fail. I should use "ZYX".
     }
 
     #[test]
@@ -631,12 +627,29 @@ QUAT_STOP
 
     #[test]
     fn test_parse_apm_spin_full() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nSPIN_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nSPIN_ALPHA = 10\nSPIN_DELTA = 20\nSPIN_ANGLE = 30\nSPIN_ANGLE_VEL = 0.1\nNUTATION = 5.0\nNUTATION_PER = 100.0\nNUTATION_PHASE = 45.0\nMOMENTUM_ALPHA = 1.0\nMOMENTUM_DELTA = 2.0\nNUTATION_VEL = 0.05\nSPIN_STOP\n",
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nSPIN_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nSPIN_ALPHA = 10\nSPIN_DELTA = 20\nSPIN_ANGLE = 30\nSPIN_ANGLE_VEL = 0.1\nNUTATION = 5.0\nNUTATION_PER = 100.0\nNUTATION_PHASE = 45.0\nSPIN_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let s = &apm.body.segment.data.spin[0];
         assert_eq!(s.nutation.as_ref().unwrap().value, 5.0);
-        assert_eq!(s.momentum_delta.as_ref().unwrap().value, 2.0);
+        assert!(s.momentum_delta.is_none());
+    }
+
+    #[test]
+    fn test_parse_apm_spin_conflicting_choice() {
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nSPIN_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nSPIN_ALPHA = 10\nSPIN_DELTA = 20\nSPIN_ANGLE = 30\nSPIN_ANGLE_VEL = 0.1\nNUTATION = 5.0\nNUTATION_PER = 100.0\nNUTATION_PHASE = 45.0\nMOMENTUM_ALPHA = 1.0\nMOMENTUM_DELTA = 2.0\nNUTATION_VEL = 0.05\nSPIN_STOP\n",
+            sample_apm_header(), sample_apm_meta());
+        let err = Apm::from_kvn(&input).unwrap_err();
+        match err {
+            CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
+                ValidationError::Conflict { fields, .. } => {
+                    assert!(fields.iter().any(|f| f == "NUTATION"));
+                    assert!(fields.iter().any(|f| f == "MOMENTUM_ALPHA"));
+                }
+                _ => panic!("Expected conflict error, got {:?}", boxed_err),
+            },
+            _ => panic!("Expected Validation error, got {:?}", err),
+        }
     }
 
     #[test]

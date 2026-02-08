@@ -2767,6 +2767,48 @@ pub enum AcmAttitudeType {
     GyroBiasLower,
 }
 
+impl std::str::FromStr for AcmAttitudeType {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "QUATERNION" => Ok(Self::Quaternion),
+            "quaternion" => Ok(Self::QuaternionLower),
+            "EULER_ANGLES" => Ok(Self::EulerAngles),
+            "euler_angles" => Ok(Self::EulerAnglesLower),
+            "DCM" => Ok(Self::Dcm),
+            "dcm" => Ok(Self::DcmLower),
+            "ANGVEL" => Ok(Self::AngVel),
+            "angvel" => Ok(Self::AngVelLower),
+            "Q_DOT" => Ok(Self::QDot),
+            "q_dot" => Ok(Self::QDotLower),
+            "EULER_RATE" => Ok(Self::EulerRate),
+            "euler_rate" => Ok(Self::EulerRateLower),
+            "GYRO_BIAS" => Ok(Self::GyroBias),
+            "gyro_bias" => Ok(Self::GyroBiasLower),
+            _ => Err(crate::error::EnumParseError {
+                field: "ATT_TYPE",
+                value: s.to_string(),
+                expected: "QUATERNION, EULER_ANGLES, DCM, ANGVEL, Q_DOT, EULER_RATE, or GYRO_BIAS",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for AcmAttitudeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Self::Quaternion | Self::QuaternionLower => "QUATERNION",
+            Self::EulerAngles | Self::EulerAnglesLower => "EULER_ANGLES",
+            Self::Dcm | Self::DcmLower => "DCM",
+            Self::AngVel | Self::AngVelLower => "ANGVEL",
+            Self::QDot | Self::QDotLower => "Q_DOT",
+            Self::EulerRate | Self::EulerRateLower => "EULER_RATE",
+            Self::GyroBias | Self::GyroBiasLower => "GYRO_BIAS",
+        };
+        write!(f, "{}", value)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AttRateType {
     #[serde(rename = "ANGVEL")]
@@ -2787,6 +2829,39 @@ pub enum AttRateType {
     GyroBiasLower,
 }
 
+impl std::str::FromStr for AttRateType {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "ANGVEL" => Ok(Self::AngVel),
+            "angvel" => Ok(Self::AngVelLower),
+            "Q_DOT" => Ok(Self::QDot),
+            "q_dot" => Ok(Self::QDotLower),
+            "EULER_RATE" => Ok(Self::EulerRate),
+            "euler_rate" => Ok(Self::EulerRateLower),
+            "GYRO_BIAS" => Ok(Self::GyroBias),
+            "gyro_bias" => Ok(Self::GyroBiasLower),
+            _ => Err(crate::error::EnumParseError {
+                field: "RATE_TYPE",
+                value: s.to_string(),
+                expected: "ANGVEL, Q_DOT, EULER_RATE, or GYRO_BIAS",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for AttRateType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Self::AngVel | Self::AngVelLower => "ANGVEL",
+            Self::QDot | Self::QDotLower => "Q_DOT",
+            Self::EulerRate | Self::EulerRateLower => "EULER_RATE",
+            Self::GyroBias | Self::GyroBiasLower => "GYRO_BIAS",
+        };
+        write!(f, "{}", value)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AttBasisType {
     #[serde(rename = "PREDICTED")]
@@ -2805,6 +2880,39 @@ pub enum AttBasisType {
     Simulated,
     #[serde(rename = "simulated")]
     SimulatedLower,
+}
+
+impl std::str::FromStr for AttBasisType {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "PREDICTED" => Ok(Self::Predicted),
+            "predicted" => Ok(Self::PredictedLower),
+            "DETERMINED_GND" => Ok(Self::DeterminedGnd),
+            "determined_gnd" => Ok(Self::DeterminedGndLower),
+            "DETERMINED_OBC" => Ok(Self::DeterminedObc),
+            "determined_obc" => Ok(Self::DeterminedObcLower),
+            "SIMULATED" => Ok(Self::Simulated),
+            "simulated" => Ok(Self::SimulatedLower),
+            _ => Err(crate::error::EnumParseError {
+                field: "ATT_BASIS",
+                value: s.to_string(),
+                expected: "PREDICTED, DETERMINED_GND, DETERMINED_OBC, or SIMULATED",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for AttBasisType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Self::Predicted | Self::PredictedLower => "PREDICTED",
+            Self::DeterminedGnd | Self::DeterminedGndLower => "DETERMINED_GND",
+            Self::DeterminedObc | Self::DeterminedObcLower => "DETERMINED_OBC",
+            Self::Simulated | Self::SimulatedLower => "SIMULATED",
+        };
+        write!(f, "{}", value)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -2833,6 +2941,45 @@ pub enum AcmCovarianceLineType {
     QuaternionAngVel,
     #[serde(rename = "quaternion_angvel")]
     QuaternionAngVelLower,
+}
+
+impl std::str::FromStr for AcmCovarianceLineType {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "ANGLE" => Ok(Self::Angle),
+            "angle" => Ok(Self::AngleLower),
+            "ANGLE_GYROBIAS" => Ok(Self::AngleGyroBias),
+            "angle_gyrobias" => Ok(Self::AngleGyroBiasLower),
+            "ANGLE_ANGVEL" => Ok(Self::AngleAngVel),
+            "angle_angvel" => Ok(Self::AngleAngVelLower),
+            "QUATERNION" => Ok(Self::Quaternion),
+            "quaternion" => Ok(Self::QuaternionLower),
+            "QUATERNION_GYROBIAS" => Ok(Self::QuaternionGyroBias),
+            "quaternion_gyrobias" => Ok(Self::QuaternionGyroBiasLower),
+            "QUATERNION_ANGVEL" => Ok(Self::QuaternionAngVel),
+            "quaternion_angvel" => Ok(Self::QuaternionAngVelLower),
+            _ => Err(crate::error::EnumParseError {
+                field: "COV_TYPE",
+                value: s.to_string(),
+                expected: "ANGLE, ANGLE_GYROBIAS, ANGLE_ANGVEL, QUATERNION, QUATERNION_GYROBIAS, or QUATERNION_ANGVEL",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for AcmCovarianceLineType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Self::Angle | Self::AngleLower => "ANGLE",
+            Self::AngleGyroBias | Self::AngleGyroBiasLower => "ANGLE_GYROBIAS",
+            Self::AngleAngVel | Self::AngleAngVelLower => "ANGLE_ANGVEL",
+            Self::Quaternion | Self::QuaternionLower => "QUATERNION",
+            Self::QuaternionGyroBias | Self::QuaternionGyroBiasLower => "QUATERNION_GYROBIAS",
+            Self::QuaternionAngVel | Self::QuaternionAngVelLower => "QUATERNION_ANGVEL",
+        };
+        write!(f, "{}", value)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -2873,6 +3020,56 @@ pub enum AttitudeTypeType {
     SpinNutationMom,
     #[serde(rename = "SPIN/NUTATION_MOM")]
     SpinNutationMomUpper,
+}
+
+impl std::str::FromStr for AttitudeTypeType {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "quaternion" => Ok(Self::Quaternion),
+            "QUATERNION" => Ok(Self::QuaternionUpper),
+            "quaternion/derivative" => Ok(Self::QuaternionDerivative),
+            "QUATERNION/DERIVATIVE" => Ok(Self::QuaternionDerivativeUpper),
+            "quaternion/angvel" => Ok(Self::QuaternionAngVel),
+            "QUATERNION/ANGVEL" => Ok(Self::QuaternionAngVelUpper),
+            "euler_angle" => Ok(Self::EulerAngle),
+            "EULER_ANGLE" => Ok(Self::EulerAngleUpper),
+            "euler_angle/derivative" => Ok(Self::EulerAngleDerivative),
+            "EULER_ANGLE/DERIVATIVE" => Ok(Self::EulerAngleDerivativeUpper),
+            "euler_angle/angvel" => Ok(Self::EulerAngleAngVel),
+            "EULER_ANGLE/ANGVEL" => Ok(Self::EulerAngleAngVelUpper),
+            "spin" => Ok(Self::Spin),
+            "SPIN" => Ok(Self::SpinUpper),
+            "spin/nutation" => Ok(Self::SpinNutation),
+            "SPIN/NUTATION" => Ok(Self::SpinNutationUpper),
+            "spin/nutation_mom" => Ok(Self::SpinNutationMom),
+            "SPIN/NUTATION_MOM" => Ok(Self::SpinNutationMomUpper),
+            _ => Err(crate::error::EnumParseError {
+                field: "ATTITUDE_TYPE",
+                value: s.to_string(),
+                expected: "QUATERNION, QUATERNION/DERIVATIVE, QUATERNION/ANGVEL, EULER_ANGLE, EULER_ANGLE/DERIVATIVE, EULER_ANGLE/ANGVEL, SPIN, SPIN/NUTATION, or SPIN/NUTATION_MOM",
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for AttitudeTypeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Self::Quaternion | Self::QuaternionUpper => "QUATERNION",
+            Self::QuaternionDerivative | Self::QuaternionDerivativeUpper => "QUATERNION/DERIVATIVE",
+            Self::QuaternionAngVel | Self::QuaternionAngVelUpper => "QUATERNION/ANGVEL",
+            Self::EulerAngle | Self::EulerAngleUpper => "EULER_ANGLE",
+            Self::EulerAngleDerivative | Self::EulerAngleDerivativeUpper => {
+                "EULER_ANGLE/DERIVATIVE"
+            }
+            Self::EulerAngleAngVel | Self::EulerAngleAngVelUpper => "EULER_ANGLE/ANGVEL",
+            Self::Spin | Self::SpinUpper => "SPIN",
+            Self::SpinNutation | Self::SpinNutationUpper => "SPIN/NUTATION",
+            Self::SpinNutationMom | Self::SpinNutationMomUpper => "SPIN/NUTATION_MOM",
+        };
+        write!(f, "{}", value)
+    }
 }
 
 // APM rate frame
@@ -3422,6 +3619,59 @@ impl FromKvnValue for Vec3Double {
 impl std::fmt::Display for Vec3Double {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {} {}", self.x, self.y, self.z)
+    }
+}
+
+/// A 4-element vector of doubles (XSD vec4Double)
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct Vec4Double {
+    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
+    pub values: Vec<f64>,
+}
+
+impl Vec4Double {
+    pub fn new(a: f64, b: f64, c: f64, d: f64) -> Self {
+        Self {
+            values: vec![a, b, c, d],
+        }
+    }
+}
+
+impl FromKvnValue for Vec4Double {
+    fn from_kvn_value(val: &str) -> Result<Self> {
+        let parts: Vec<&str> = val.split_whitespace().collect();
+        if parts.len() != 4 {
+            return Err(crate::error::FormatError::InvalidFormat(format!(
+                "Vec4Double requires 4 values, got {}: {}",
+                parts.len(),
+                val
+            ))
+            .into());
+        }
+        let mut values = Vec::with_capacity(4);
+        for p in parts {
+            let v = fast_float::parse(p).map_err(|_| {
+                crate::error::FormatError::InvalidFormat(format!(
+                    "Vec4Double value parse failed: {}",
+                    p
+                ))
+            })?;
+            values.push(v);
+        }
+        Ok(Self { values })
+    }
+}
+
+impl std::fmt::Display for Vec4Double {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut iter = self.values.iter();
+        if let Some(first) = iter.next() {
+            write!(f, "{}", first)?;
+        }
+        for v in iter {
+            write!(f, " {}", v)?;
+        }
+        Ok(())
     }
 }
 
