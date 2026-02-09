@@ -904,15 +904,10 @@ DATA_STOP
     }
 
     #[test]
-    fn test_aem_invalid_time_range() {
-        // Technically validation could check if STOP_TIME > START_TIME
-        // Our current validate() is empty, but we can still check parsing
+    fn test_aem_no_epoch_ordering_validation() {
+        // Epoch ordering is intentionally not validated; parsing should succeed.
         let kvn = sample_aem_kvn();
-        let aem = Aem::from_kvn(&kvn).unwrap();
-        assert!(
-            aem.body.segment[0].metadata.stop_time.as_str()
-                > aem.body.segment[0].metadata.start_time.as_str()
-        );
+        assert!(Aem::from_kvn(&kvn).is_ok());
     }
 
     #[test]

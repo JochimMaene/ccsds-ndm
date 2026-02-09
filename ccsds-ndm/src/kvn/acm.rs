@@ -486,10 +486,7 @@ fn parse_user_defined_block(input: &mut &str) -> KvnResult<crate::types::UserDef
 
     loop {
         let checkpoint = input.checkpoint();
-        let _ = collect_comments.parse_next(input)?; // Consume comments but we might want to keep them?
-                                                     // acm_data loop doesn't keep comments between blocks usually, but inside a block we might.
-                                                     // The structure UserDefined has a comment field.
-                                                     // Let's re-parse comments to store them.
+        let _ = collect_comments.parse_next(input)?;
         input.reset(&checkpoint);
         let comments = collect_comments.parse_next(input)?;
         block.comment.extend(comments);
@@ -693,10 +690,6 @@ ATT_STOP
         let acm = Acm::from_kvn(&input).unwrap();
         let att = &acm.body.segment.data.att[0];
         assert_eq!(att.att_type, AcmAttitudeType::EulerAngles);
-        // Note: 321 is not a valid enum variant for RotSeq in our types, it expects ZYX etc.
-        // Wait, did I fix RotSeq?
-        // In types.rs: RotSeq expects "XYX", "XYZ", etc. "321" is likely ZYX.
-        // Let's use ZYX to be safe and correct.
     }
 
     #[test]

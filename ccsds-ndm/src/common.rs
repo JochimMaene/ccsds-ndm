@@ -1660,15 +1660,11 @@ impl ToKvn for AngVelState {
         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
         writer.write_pair("ANGVEL_FRAME", &self.angvel_frame.0);
-        // XSD says angVelFrameType is restriction of string. Check struct definition.
         writer.write_measure("ANGVEL_X", &self.angvel_x);
         writer.write_measure("ANGVEL_Y", &self.angvel_y);
         writer.write_measure("ANGVEL_Z", &self.angvel_z);
     }
 }
-// I need `AngVelFrameType` implies Display? Or ToKvn?
-// It is empty restriction in XSD shown in view_file Step 32 line 194?
-// Ah, common.rs defines `AngVelFrameType`. I need to check its definition.
 
 impl ToKvn for SpinState {
     fn write_kvn(&self, writer: &mut KvnWriter) {

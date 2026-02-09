@@ -185,16 +185,6 @@ pub fn ang_vel_state(input: &mut &str) -> KvnResult<AngVelState> {
         "REF_FRAME_B" => ref_frame_b: kv_string,
         // KVN uses ANGVEL_FRAME
         "ANGVEL_FRAME" => val: kv_string => { angvel_frame = Some(crate::types::AngVelFrameType(val)); },
-        // Let's assume string for now if enum is problematic.
-        // Wait, common.rs defined AngVelFrameType as enum?
-        // Step 32 line 194: restriction base string, but empty enumeration? No, empty restriction means "no restrictions"? No, empty restriction block means nothing specified inside?
-        // Actually, if it's empty restriction of string, it's just string?
-        // Ah, XSD says <xsd:restriction base="xsd:string"></xsd:restriction>.
-        // This is valid, effectively string.
-        // I should check `common.rs` definition of `AngVelFrameType`.
-        // If it's an enum, I parse as enum. If struct wrapper or type alias, parse accordingly.
-        // Assuming string based on XSD.
-        // But `kv_enum` works if I added `FromStr`.
         "ANGVEL_X" => angvel_x: kv_from_kvn,
         "ANGVEL_Y" => angvel_y: kv_from_kvn,
         "ANGVEL_Z" => angvel_z: kv_from_kvn,
@@ -215,8 +205,6 @@ pub fn ang_vel_state(input: &mut &str) -> KvnResult<AngVelState> {
         angvel_z: angvel_z.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_Z"))?,
     })
 }
-// Note: `AngVelFrameType` in common might be empty enum or similar. I should check.
-// If it leads to compilation error, I'll fix it.
 
 pub fn spin_state(input: &mut &str) -> KvnResult<SpinState> {
     expect_block_start("SPIN").parse_next(input)?;

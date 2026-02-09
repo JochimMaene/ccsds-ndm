@@ -10,6 +10,8 @@ use ccsds_ndm::messages::ocm::Ocm;
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::opm::Opm;
+use ccsds_ndm::messages::rdm::Rdm;
+use ccsds_ndm::messages::tdm::Tdm;
 use ccsds_ndm::traits::Ndm;
 use tempfile::NamedTempFile;
 
@@ -75,6 +77,12 @@ fn test_xsd_schema_validation_samples() {
 
     let opm = Opm::from_xml(&load_sample("data/xml/opm_g5.xml")).unwrap();
     validate_xml(&opm.to_xml().unwrap());
+
+    let rdm = Rdm::from_xml(&load_sample("data/xml/rdm_c3.xml")).unwrap();
+    validate_xml(&rdm.to_xml().unwrap());
+
+    let tdm = Tdm::from_xml(&load_sample("data/xml/tdm_e21.xml")).unwrap();
+    validate_xml(&tdm.to_xml().unwrap());
 
     let ndm = CombinedNdm::from_xml(&load_sample("data/xml/ndm_g12.xml")).unwrap();
     validate_xml(&ndm.to_xml().unwrap());

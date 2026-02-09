@@ -800,15 +800,6 @@ DATA_STOP
     #[test]
     fn test_parse_aem_spin_momentum() {
         let meta = sample_aem_meta().replace("QUATERNION", "SPIN/NUTATION_MOM");
-        // 7 values: 3 spin (alpha, delta, angle) + 1 spin rate + 2 momentum (alpha, delta) + 1 nutation vel ???
-        // Wait, SPIN/NUTATION_MOM logic says:
-        // values[0] = spin_alpha
-        // values[1] = spin_delta
-        // values[2] = spin_angle
-        // values[3] = spin_angle_vel
-        // values[4] = momentum_alpha
-        // values[5] = momentum_delta
-        // values[6] = nutation_vel
 
         let input = format!(
             "{}{}\nDATA_START\n2023-01-01T00:00:00 10.0 20.0 30.0 0.1 5.0 6.0 0.05\nDATA_STOP\n",

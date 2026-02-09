@@ -263,15 +263,7 @@ fn test_cdm_xml_optional_nil() {
         "START_SCREEN_PERIOD should be None"
     );
 
-    // STOP_SCREEN_PERIOD was empty tag, let's see what happens.
-    // Ideally it should also be None if we want robust optional handling,
-    // or maybe it fails if not handled.
-    // Based on `nullable_value` implementation:
-    // It checks `nil="true"`.
-    // It doesn't seem to explicitly check for empty content if nil is absent,
-    // so it might try to parse empty string as Epoch and fail, OR
-    // maybe serde treats empty tag as "default" -> None?
-    // Let's assert None for now and see.
+    // STOP_SCREEN_PERIOD is an empty optional tag and should deserialize as None.
     assert!(
         cdm.body.relative_metadata_data.stop_screen_period.is_none(),
         "STOP_SCREEN_PERIOD should be None"

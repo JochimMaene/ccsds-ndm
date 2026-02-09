@@ -248,9 +248,7 @@ mod tests {
         assert_eq!(w.field, None);
 
         // Test 2: Whitespace text
-        let json = r#"{ "field": "   " }"#; // Using scalar string because Visit_str handles it?
-                                            // Wait, for JSON input "field": "   " calls visit_str? Yes.
-                                            // My visitor handles visit_str.
+        let json = r#"{ "field": "   " }"#;
         let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
         assert_eq!(w.field, None);
 
