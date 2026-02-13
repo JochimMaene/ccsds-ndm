@@ -64,6 +64,14 @@ impl crate::traits::Validate for Oem {
 
 impl crate::traits::Validate for OemBody {
     fn validate(&self) -> Result<()> {
+        if self.segment.is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Body".into(),
+                field: "segment (at least one required)".into(),
+                line: None,
+            }
+            .into());
+        }
         if let Some(first) = self.segment.first() {
             let ts = &first.metadata.time_system;
             for segment in &self.segment[1..] {
@@ -98,10 +106,34 @@ impl crate::traits::Validate for OemSegment {
 
 impl crate::traits::Validate for OemMetadata {
     fn validate(&self) -> Result<()> {
+        if self.object_name.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Metadata".into(),
+                field: "OBJECT_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.object_id.trim().is_empty() {
             return Err(crate::error::ValidationError::MissingRequiredField {
                 block: "OEM Metadata".into(),
                 field: "OBJECT_ID".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.center_name.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Metadata".into(),
+                field: "CENTER_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.ref_frame.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Metadata".into(),
+                field: "REF_FRAME".into(),
                 line: None,
             }
             .into());
@@ -1058,5 +1090,11 @@ COMMENT No data
     fn test_oem_data_empty_validation_internal() {
         let data = OemData::builder().build();
         assert!(data.validate().is_err());
+    }
+
+    #[test]
+    fn test_oem_body_requires_segment() {
+        let body = OemBody { segment: vec![] };
+        assert!(body.validate().is_err());
     }
 }

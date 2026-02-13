@@ -221,10 +221,34 @@ pub struct OpmMetadata {
 
 impl crate::traits::Validate for OpmMetadata {
     fn validate(&self) -> Result<()> {
+        if self.object_name.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OPM Metadata".into(),
+                field: "OBJECT_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.object_id.trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "OPM Metadata".into(),
                 field: "OBJECT_ID".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.center_name.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OPM Metadata".into(),
+                field: "CENTER_NAME".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.ref_frame.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "OPM Metadata".into(),
+                field: "REF_FRAME".into(),
                 line: None,
             }
             .into());

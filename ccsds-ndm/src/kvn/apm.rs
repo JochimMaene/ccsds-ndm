@@ -56,13 +56,10 @@ pub fn apm_metadata(input: &mut &str) -> KvnResult<ApmMetadata> {
 
     Ok(ApmMetadata {
         comment,
-        object_name: object_name
-            .ok_or_else(|| missing_field_err(input, "APM Metadata", "OBJECT_NAME"))?,
-        object_id: object_id
-            .ok_or_else(|| missing_field_err(input, "APM Metadata", "OBJECT_ID"))?,
+        object_name: require_field(input, "APM Metadata", "OBJECT_NAME", object_name)?,
+        object_id: require_field(input, "APM Metadata", "OBJECT_ID", object_id)?,
         center_name,
-        time_system: time_system
-            .ok_or_else(|| missing_field_err(input, "APM Metadata", "TIME_SYSTEM"))?,
+        time_system: require_field(input, "APM Metadata", "TIME_SYSTEM", time_system)?,
     })
 }
 
@@ -100,20 +97,20 @@ pub fn quaternion_state(input: &mut &str) -> KvnResult<QuaternionState> {
     expect_block_end("QUAT").parse_next(input)?;
 
     let quaternion = Quaternion::new(
-        q1.ok_or_else(|| missing_field_err(input, "QUAT", "Q1"))?,
-        q2.ok_or_else(|| missing_field_err(input, "QUAT", "Q2"))?,
-        q3.ok_or_else(|| missing_field_err(input, "QUAT", "Q3"))?,
-        qc.ok_or_else(|| missing_field_err(input, "QUAT", "QC"))?,
+        require_field(input, "QUAT", "Q1", q1)?,
+        require_field(input, "QUAT", "Q2", q2)?,
+        require_field(input, "QUAT", "Q3", q3)?,
+        require_field(input, "QUAT", "QC", qc)?,
     )
     .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
 
     let quaternion_dot =
         if q1_dot.is_some() || q2_dot.is_some() || q3_dot.is_some() || qc_dot.is_some() {
             Some(QuaternionDot {
-                q1_dot: q1_dot.ok_or_else(|| missing_field_err(input, "QUAT", "Q1_DOT"))?,
-                q2_dot: q2_dot.ok_or_else(|| missing_field_err(input, "QUAT", "Q2_DOT"))?,
-                q3_dot: q3_dot.ok_or_else(|| missing_field_err(input, "QUAT", "Q3_DOT"))?,
-                qc_dot: qc_dot.ok_or_else(|| missing_field_err(input, "QUAT", "QC_DOT"))?,
+                q1_dot: require_field(input, "QUAT", "Q1_DOT", q1_dot)?,
+                q2_dot: require_field(input, "QUAT", "Q2_DOT", q2_dot)?,
+                q3_dot: require_field(input, "QUAT", "Q3_DOT", q3_dot)?,
+                qc_dot: require_field(input, "QUAT", "QC_DOT", qc_dot)?,
             })
         } else {
             None
@@ -121,8 +118,8 @@ pub fn quaternion_state(input: &mut &str) -> KvnResult<QuaternionState> {
 
     Ok(QuaternionState {
         comment,
-        ref_frame_a: ref_frame_a.ok_or_else(|| missing_field_err(input, "QUAT", "REF_FRAME_A"))?,
-        ref_frame_b: ref_frame_b.ok_or_else(|| missing_field_err(input, "QUAT", "REF_FRAME_B"))?,
+        ref_frame_a: require_field(input, "QUAT", "REF_FRAME_A", ref_frame_a)?,
+        ref_frame_b: require_field(input, "QUAT", "REF_FRAME_B", ref_frame_b)?,
         quaternion,
         quaternion_dot,
     })
@@ -157,13 +154,12 @@ pub fn euler_angle_state(input: &mut &str) -> KvnResult<EulerAngleState> {
 
     Ok(EulerAngleState {
         comment,
-        ref_frame_a: ref_frame_a.ok_or_else(|| missing_field_err(input, "EULER", "REF_FRAME_A"))?,
-        ref_frame_b: ref_frame_b.ok_or_else(|| missing_field_err(input, "EULER", "REF_FRAME_B"))?,
-        euler_rot_seq: euler_rot_seq
-            .ok_or_else(|| missing_field_err(input, "EULER", "EULER_ROT_SEQ"))?,
-        angle_1: angle_1.ok_or_else(|| missing_field_err(input, "EULER", "ANGLE_1"))?,
-        angle_2: angle_2.ok_or_else(|| missing_field_err(input, "EULER", "ANGLE_2"))?,
-        angle_3: angle_3.ok_or_else(|| missing_field_err(input, "EULER", "ANGLE_3"))?,
+        ref_frame_a: require_field(input, "EULER", "REF_FRAME_A", ref_frame_a)?,
+        ref_frame_b: require_field(input, "EULER", "REF_FRAME_B", ref_frame_b)?,
+        euler_rot_seq: require_field(input, "EULER", "EULER_ROT_SEQ", euler_rot_seq)?,
+        angle_1: require_field(input, "EULER", "ANGLE_1", angle_1)?,
+        angle_2: require_field(input, "EULER", "ANGLE_2", angle_2)?,
+        angle_3: require_field(input, "EULER", "ANGLE_3", angle_3)?,
         angle_1_dot,
         angle_2_dot,
         angle_3_dot,
@@ -185,16 +181,6 @@ pub fn ang_vel_state(input: &mut &str) -> KvnResult<AngVelState> {
         "REF_FRAME_B" => ref_frame_b: kv_string,
         // KVN uses ANGVEL_FRAME
         "ANGVEL_FRAME" => val: kv_string => { angvel_frame = Some(crate::types::AngVelFrameType(val)); },
-        // Let's assume string for now if enum is problematic.
-        // Wait, common.rs defined AngVelFrameType as enum?
-        // Step 32 line 194: restriction base string, but empty enumeration? No, empty restriction means "no restrictions"? No, empty restriction block means nothing specified inside?
-        // Actually, if it's empty restriction of string, it's just string?
-        // Ah, XSD says <xsd:restriction base="xsd:string"></xsd:restriction>.
-        // This is valid, effectively string.
-        // I should check `common.rs` definition of `AngVelFrameType`.
-        // If it's an enum, I parse as enum. If struct wrapper or type alias, parse accordingly.
-        // Assuming string based on XSD.
-        // But `kv_enum` works if I added `FromStr`.
         "ANGVEL_X" => angvel_x: kv_from_kvn,
         "ANGVEL_Y" => angvel_y: kv_from_kvn,
         "ANGVEL_Z" => angvel_z: kv_from_kvn,
@@ -204,19 +190,14 @@ pub fn ang_vel_state(input: &mut &str) -> KvnResult<AngVelState> {
 
     Ok(AngVelState {
         comment,
-        ref_frame_a: ref_frame_a
-            .ok_or_else(|| missing_field_err(input, "ANGVEL", "REF_FRAME_A"))?,
-        ref_frame_b: ref_frame_b
-            .ok_or_else(|| missing_field_err(input, "ANGVEL", "REF_FRAME_B"))?,
-        angvel_frame: angvel_frame
-            .ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_FRAME"))?,
-        angvel_x: angvel_x.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_X"))?,
-        angvel_y: angvel_y.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_Y"))?,
-        angvel_z: angvel_z.ok_or_else(|| missing_field_err(input, "ANGVEL", "ANGVEL_Z"))?,
+        ref_frame_a: require_field(input, "ANGVEL", "REF_FRAME_A", ref_frame_a)?,
+        ref_frame_b: require_field(input, "ANGVEL", "REF_FRAME_B", ref_frame_b)?,
+        angvel_frame: require_field(input, "ANGVEL", "ANGVEL_FRAME", angvel_frame)?,
+        angvel_x: require_field(input, "ANGVEL", "ANGVEL_X", angvel_x)?,
+        angvel_y: require_field(input, "ANGVEL", "ANGVEL_Y", angvel_y)?,
+        angvel_z: require_field(input, "ANGVEL", "ANGVEL_Z", angvel_z)?,
     })
 }
-// Note: `AngVelFrameType` in common might be empty enum or similar. I should check.
-// If it leads to compilation error, I'll fix it.
 
 pub fn spin_state(input: &mut &str) -> KvnResult<SpinState> {
     expect_block_start("SPIN").parse_next(input)?;
@@ -253,13 +234,12 @@ pub fn spin_state(input: &mut &str) -> KvnResult<SpinState> {
 
     Ok(SpinState {
         comment,
-        ref_frame_a: ref_frame_a.ok_or_else(|| missing_field_err(input, "SPIN", "REF_FRAME_A"))?,
-        ref_frame_b: ref_frame_b.ok_or_else(|| missing_field_err(input, "SPIN", "REF_FRAME_B"))?,
-        spin_alpha: spin_alpha.ok_or_else(|| missing_field_err(input, "SPIN", "SPIN_ALPHA"))?,
-        spin_delta: spin_delta.ok_or_else(|| missing_field_err(input, "SPIN", "SPIN_DELTA"))?,
-        spin_angle: spin_angle.ok_or_else(|| missing_field_err(input, "SPIN", "SPIN_ANGLE"))?,
-        spin_angle_vel: spin_angle_vel
-            .ok_or_else(|| missing_field_err(input, "SPIN", "SPIN_ANGLE_VEL"))?,
+        ref_frame_a: require_field(input, "SPIN", "REF_FRAME_A", ref_frame_a)?,
+        ref_frame_b: require_field(input, "SPIN", "REF_FRAME_B", ref_frame_b)?,
+        spin_alpha: require_field(input, "SPIN", "SPIN_ALPHA", spin_alpha)?,
+        spin_delta: require_field(input, "SPIN", "SPIN_DELTA", spin_delta)?,
+        spin_angle: require_field(input, "SPIN", "SPIN_ANGLE", spin_angle)?,
+        spin_angle_vel: require_field(input, "SPIN", "SPIN_ANGLE_VEL", spin_angle_vel)?,
         nutation,
         nutation_per,
         nutation_phase,
@@ -294,14 +274,13 @@ pub fn inertia_state(input: &mut &str) -> KvnResult<InertiaState> {
 
     Ok(InertiaState {
         comment,
-        inertia_ref_frame: inertia_ref_frame
-            .ok_or_else(|| missing_field_err(input, "INERTIA", "INERTIA_REF_FRAME"))?,
-        ixx: ixx.ok_or_else(|| missing_field_err(input, "INERTIA", "IXX"))?,
-        iyy: iyy.ok_or_else(|| missing_field_err(input, "INERTIA", "IYY"))?,
-        izz: izz.ok_or_else(|| missing_field_err(input, "INERTIA", "IZZ"))?,
-        ixy: ixy.ok_or_else(|| missing_field_err(input, "INERTIA", "IXY"))?,
-        ixz: ixz.ok_or_else(|| missing_field_err(input, "INERTIA", "IXZ"))?,
-        iyz: iyz.ok_or_else(|| missing_field_err(input, "INERTIA", "IYZ"))?,
+        inertia_ref_frame: require_field(input, "INERTIA", "INERTIA_REF_FRAME", inertia_ref_frame)?,
+        ixx: require_field(input, "INERTIA", "IXX", ixx)?,
+        iyy: require_field(input, "INERTIA", "IYY", iyy)?,
+        izz: require_field(input, "INERTIA", "IZZ", izz)?,
+        ixy: require_field(input, "INERTIA", "IXY", ixy)?,
+        ixz: require_field(input, "INERTIA", "IXZ", ixz)?,
+        iyz: require_field(input, "INERTIA", "IYZ", iyz)?,
     })
 }
 
@@ -331,15 +310,12 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<AttManeuverState> {
 
     Ok(AttManeuverState {
         comment,
-        man_epoch_start: man_epoch_start
-            .ok_or_else(|| missing_field_err(input, "MAN", "MAN_EPOCH_START"))?,
-        man_duration: man_duration
-            .ok_or_else(|| missing_field_err(input, "MAN", "MAN_DURATION"))?,
-        man_ref_frame: man_ref_frame
-            .ok_or_else(|| missing_field_err(input, "MAN", "MAN_REF_FRAME"))?,
-        man_tor_x: man_tor_x.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_X"))?,
-        man_tor_y: man_tor_y.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_Y"))?,
-        man_tor_z: man_tor_z.ok_or_else(|| missing_field_err(input, "MAN", "MAN_TOR_Z"))?,
+        man_epoch_start: require_field(input, "MAN", "MAN_EPOCH_START", man_epoch_start)?,
+        man_duration: require_field(input, "MAN", "MAN_DURATION", man_duration)?,
+        man_ref_frame: require_field(input, "MAN", "MAN_REF_FRAME", man_ref_frame)?,
+        man_tor_x: require_field(input, "MAN", "MAN_TOR_X", man_tor_x)?,
+        man_tor_y: require_field(input, "MAN", "MAN_TOR_Y", man_tor_y)?,
+        man_tor_z: require_field(input, "MAN", "MAN_TOR_Z", man_tor_z)?,
         man_delta_mass,
     })
 }
@@ -550,10 +526,6 @@ QUAT_STOP
         let apm = Apm::from_kvn(&input).unwrap();
         let e = &apm.body.segment.data.euler_angle_state[0];
         assert_eq!(e.angle_1.value, 10.0);
-        // Note: RotSeq 321 is not valid for the enum unless we fixed it or mapped it.
-        // We learned from ACM/AEM it expects ZYX etc. But RotSeq implementation in types.rs might support digits if I checked carefully?
-        // Wait, checking types.rs again. `RotSeq` impl `FromStr` matches "XYX", "XYZ" etc.
-        // So "321" will fail. I should use "ZYX".
     }
 
     #[test]
@@ -631,12 +603,29 @@ QUAT_STOP
 
     #[test]
     fn test_parse_apm_spin_full() {
-        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nSPIN_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nSPIN_ALPHA = 10\nSPIN_DELTA = 20\nSPIN_ANGLE = 30\nSPIN_ANGLE_VEL = 0.1\nNUTATION = 5.0\nNUTATION_PER = 100.0\nNUTATION_PHASE = 45.0\nMOMENTUM_ALPHA = 1.0\nMOMENTUM_DELTA = 2.0\nNUTATION_VEL = 0.05\nSPIN_STOP\n",
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nSPIN_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nSPIN_ALPHA = 10\nSPIN_DELTA = 20\nSPIN_ANGLE = 30\nSPIN_ANGLE_VEL = 0.1\nNUTATION = 5.0\nNUTATION_PER = 100.0\nNUTATION_PHASE = 45.0\nSPIN_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();
         let s = &apm.body.segment.data.spin[0];
         assert_eq!(s.nutation.as_ref().unwrap().value, 5.0);
-        assert_eq!(s.momentum_delta.as_ref().unwrap().value, 2.0);
+        assert!(s.momentum_delta.is_none());
+    }
+
+    #[test]
+    fn test_parse_apm_spin_conflicting_choice() {
+        let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nSPIN_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nSPIN_ALPHA = 10\nSPIN_DELTA = 20\nSPIN_ANGLE = 30\nSPIN_ANGLE_VEL = 0.1\nNUTATION = 5.0\nNUTATION_PER = 100.0\nNUTATION_PHASE = 45.0\nMOMENTUM_ALPHA = 1.0\nMOMENTUM_DELTA = 2.0\nNUTATION_VEL = 0.05\nSPIN_STOP\n",
+            sample_apm_header(), sample_apm_meta());
+        let err = Apm::from_kvn(&input).unwrap_err();
+        match err {
+            CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
+                ValidationError::Conflict { fields, .. } => {
+                    assert!(fields.iter().any(|f| f == "NUTATION"));
+                    assert!(fields.iter().any(|f| f == "MOMENTUM_ALPHA"));
+                }
+                _ => panic!("Expected conflict error, got {:?}", boxed_err),
+            },
+            _ => panic!("Expected Validation error, got {:?}", err),
+        }
     }
 
     #[test]

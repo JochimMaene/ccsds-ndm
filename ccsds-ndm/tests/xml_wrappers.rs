@@ -46,6 +46,29 @@ fn test_parse_nested_cdm_in_message() {
                         <Y_DOT units="km/s">2.0</Y_DOT>
                         <Z_DOT units="km/s">3.0</Z_DOT>
                     </stateVector>
+                    <covarianceMatrix>
+                        <CR_R units="m**2">1.0</CR_R>
+                        <CT_R units="m**2">0.0</CT_R>
+                        <CT_T units="m**2">1.0</CT_T>
+                        <CN_R units="m**2">0.0</CN_R>
+                        <CN_T units="m**2">0.0</CN_T>
+                        <CN_N units="m**2">1.0</CN_N>
+                        <CRDOT_R units="m**2/s">0.0</CRDOT_R>
+                        <CRDOT_T units="m**2/s">0.0</CRDOT_T>
+                        <CRDOT_N units="m**2/s">0.0</CRDOT_N>
+                        <CRDOT_RDOT units="m**2/s**2">1.0</CRDOT_RDOT>
+                        <CTDOT_R units="m**2/s">0.0</CTDOT_R>
+                        <CTDOT_T units="m**2/s">0.0</CTDOT_T>
+                        <CTDOT_N units="m**2/s">0.0</CTDOT_N>
+                        <CTDOT_RDOT units="m**2/s**2">0.0</CTDOT_RDOT>
+                        <CTDOT_TDOT units="m**2/s**2">1.0</CTDOT_TDOT>
+                        <CNDOT_R units="m**2/s">0.0</CNDOT_R>
+                        <CNDOT_T units="m**2/s">0.0</CNDOT_T>
+                        <CNDOT_N units="m**2/s">0.0</CNDOT_N>
+                        <CNDOT_RDOT units="m**2/s**2">0.0</CNDOT_RDOT>
+                        <CNDOT_TDOT units="m**2/s**2">0.0</CNDOT_TDOT>
+                        <CNDOT_NDOT units="m**2/s**2">1.0</CNDOT_NDOT>
+                    </covarianceMatrix>
                 </data>
             </segment>
             <segment>
@@ -70,6 +93,29 @@ fn test_parse_nested_cdm_in_message() {
                         <Y_DOT units="km/s">2.5</Y_DOT>
                         <Z_DOT units="km/s">3.5</Z_DOT>
                     </stateVector>
+                    <covarianceMatrix>
+                        <CR_R units="m**2">1.0</CR_R>
+                        <CT_R units="m**2">0.0</CT_R>
+                        <CT_T units="m**2">1.0</CT_T>
+                        <CN_R units="m**2">0.0</CN_R>
+                        <CN_T units="m**2">0.0</CN_T>
+                        <CN_N units="m**2">1.0</CN_N>
+                        <CRDOT_R units="m**2/s">0.0</CRDOT_R>
+                        <CRDOT_T units="m**2/s">0.0</CRDOT_T>
+                        <CRDOT_N units="m**2/s">0.0</CRDOT_N>
+                        <CRDOT_RDOT units="m**2/s**2">1.0</CRDOT_RDOT>
+                        <CTDOT_R units="m**2/s">0.0</CTDOT_R>
+                        <CTDOT_T units="m**2/s">0.0</CTDOT_T>
+                        <CTDOT_N units="m**2/s">0.0</CTDOT_N>
+                        <CTDOT_RDOT units="m**2/s**2">0.0</CTDOT_RDOT>
+                        <CTDOT_TDOT units="m**2/s**2">1.0</CTDOT_TDOT>
+                        <CNDOT_R units="m**2/s">0.0</CNDOT_R>
+                        <CNDOT_T units="m**2/s">0.0</CNDOT_T>
+                        <CNDOT_N units="m**2/s">0.0</CNDOT_N>
+                        <CNDOT_RDOT units="m**2/s**2">0.0</CNDOT_RDOT>
+                        <CNDOT_TDOT units="m**2/s**2">0.0</CNDOT_TDOT>
+                        <CNDOT_NDOT units="m**2/s**2">1.0</CNDOT_NDOT>
+                    </covarianceMatrix>
                 </data>
             </segment>
         </body>
@@ -130,6 +176,29 @@ fn test_parse_wrapped_cdm_unknown_tag() {
                         <Y_DOT units="km/s">2.0</Y_DOT>
                         <Z_DOT units="km/s">3.0</Z_DOT>
                     </stateVector>
+                    <covarianceMatrix>
+                        <CR_R units="m**2">1.0</CR_R>
+                        <CT_R units="m**2">0.0</CT_R>
+                        <CT_T units="m**2">1.0</CT_T>
+                        <CN_R units="m**2">0.0</CN_R>
+                        <CN_T units="m**2">0.0</CN_T>
+                        <CN_N units="m**2">1.0</CN_N>
+                        <CRDOT_R units="m**2/s">0.0</CRDOT_R>
+                        <CRDOT_T units="m**2/s">0.0</CRDOT_T>
+                        <CRDOT_N units="m**2/s">0.0</CRDOT_N>
+                        <CRDOT_RDOT units="m**2/s**2">1.0</CRDOT_RDOT>
+                        <CTDOT_R units="m**2/s">0.0</CTDOT_R>
+                        <CTDOT_T units="m**2/s">0.0</CTDOT_T>
+                        <CTDOT_N units="m**2/s">0.0</CTDOT_N>
+                        <CTDOT_RDOT units="m**2/s**2">0.0</CTDOT_RDOT>
+                        <CTDOT_TDOT units="m**2/s**2">1.0</CTDOT_TDOT>
+                        <CNDOT_R units="m**2/s">0.0</CNDOT_R>
+                        <CNDOT_T units="m**2/s">0.0</CNDOT_T>
+                        <CNDOT_N units="m**2/s">0.0</CNDOT_N>
+                        <CNDOT_RDOT units="m**2/s**2">0.0</CNDOT_RDOT>
+                        <CNDOT_TDOT units="m**2/s**2">0.0</CNDOT_TDOT>
+                        <CNDOT_NDOT units="m**2/s**2">1.0</CNDOT_NDOT>
+                    </covarianceMatrix>
                 </data>
             </segment>
             <segment>
@@ -154,6 +223,29 @@ fn test_parse_wrapped_cdm_unknown_tag() {
                         <Y_DOT units="km/s">2.5</Y_DOT>
                         <Z_DOT units="km/s">3.5</Z_DOT>
                     </stateVector>
+                    <covarianceMatrix>
+                        <CR_R units="m**2">1.0</CR_R>
+                        <CT_R units="m**2">0.0</CT_R>
+                        <CT_T units="m**2">1.0</CT_T>
+                        <CN_R units="m**2">0.0</CN_R>
+                        <CN_T units="m**2">0.0</CN_T>
+                        <CN_N units="m**2">1.0</CN_N>
+                        <CRDOT_R units="m**2/s">0.0</CRDOT_R>
+                        <CRDOT_T units="m**2/s">0.0</CRDOT_T>
+                        <CRDOT_N units="m**2/s">0.0</CRDOT_N>
+                        <CRDOT_RDOT units="m**2/s**2">1.0</CRDOT_RDOT>
+                        <CTDOT_R units="m**2/s">0.0</CTDOT_R>
+                        <CTDOT_T units="m**2/s">0.0</CTDOT_T>
+                        <CTDOT_N units="m**2/s">0.0</CTDOT_N>
+                        <CTDOT_RDOT units="m**2/s**2">0.0</CTDOT_RDOT>
+                        <CTDOT_TDOT units="m**2/s**2">1.0</CTDOT_TDOT>
+                        <CNDOT_R units="m**2/s">0.0</CNDOT_R>
+                        <CNDOT_T units="m**2/s">0.0</CNDOT_T>
+                        <CNDOT_N units="m**2/s">0.0</CNDOT_N>
+                        <CNDOT_RDOT units="m**2/s**2">0.0</CNDOT_RDOT>
+                        <CNDOT_TDOT units="m**2/s**2">0.0</CNDOT_TDOT>
+                        <CNDOT_NDOT units="m**2/s**2">1.0</CNDOT_NDOT>
+                    </covarianceMatrix>
                 </data>
             </segment>
         </body>

@@ -207,6 +207,53 @@ pub enum ValidationError {
     },
 }
 
+impl ValidationError {
+    /// Convenience constructor for a missing required field error.
+    pub fn missing_required(
+        block: impl Into<Cow<'static, str>>,
+        field: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::MissingRequiredField {
+            block: block.into(),
+            field: field.into(),
+            line: None,
+        }
+    }
+
+    /// Convenience constructor for an invalid value error.
+    pub fn invalid_value(
+        field: impl Into<Cow<'static, str>>,
+        value: impl Into<String>,
+        expected: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::InvalidValue {
+            field: field.into(),
+            value: value.into(),
+            expected: expected.into(),
+            line: None,
+        }
+    }
+
+    /// Convenience constructor for a generic validation error.
+    pub fn generic(message: impl Into<Cow<'static, str>>) -> Self {
+        Self::Generic {
+            message: message.into(),
+            line: None,
+        }
+    }
+
+    /// Convenience constructor for conflicting fields.
+    pub fn conflict<I>(fields: I) -> Self
+    where
+        I: IntoIterator<Item = Cow<'static, str>>,
+    {
+        Self::Conflict {
+            fields: fields.into_iter().collect(),
+            line: None,
+        }
+    }
+}
+
 /// Trait for errors that can be enriched with line/column info.
 pub trait WithLocation: Sized {
     /// Adds location information to the error.

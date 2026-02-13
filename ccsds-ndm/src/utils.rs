@@ -46,7 +46,7 @@ pub mod vec_f64_space_sep {
 pub mod nullable {
     use super::*;
     use serde::de::{self, IntoDeserializer, MapAccess, Visitor};
-    use std::collections::HashMap;
+    use serde_json::{Map as JsonMap, Value as JsonValue};
     use std::marker::PhantomData;
 
     pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
@@ -124,8 +124,9 @@ pub mod nullable {
             where
                 A: MapAccess<'de>,
             {
-                // Buffer all map entries to support flexible deserialization strategies
-                let mut values = HashMap::new();
+                // Buffer all map entries to support flexible deserialization strategies.
+                // Store values as JSON so numeric-like text can be retyped for structured targets.
+                let mut values = JsonMap::new();
                 let mut nil = false;
                 let mut text_val = None;
 
@@ -138,14 +139,19 @@ pub mod nullable {
                     } else if key == "$text" || key == "$value" {
                         // Normalize content key to "$value" for UnitValue compatibility
                         let v: String = map.next_value()?;
-                        if v == "n/a" || v.trim().is_empty() {
-                            // potential null content
-                        }
                         text_val = Some(v.clone());
-                        values.insert("$value".to_string(), v);
+                        if let Ok(json_value) = serde_json::from_str::<JsonValue>(&v) {
+                            values.insert("$value".to_string(), json_value);
+                        } else {
+                            values.insert("$value".to_string(), JsonValue::String(v));
+                        }
                     } else {
                         let v: String = map.next_value()?;
-                        values.insert(key, v);
+                        if let Ok(json_value) = serde_json::from_str::<JsonValue>(&v) {
+                            values.insert(key, json_value);
+                        } else {
+                            values.insert(key, JsonValue::String(v));
+                        }
                     }
                 }
 
@@ -156,11 +162,8 @@ pub mod nullable {
                     return Ok(None);
                 }
 
-                // Strategy 1: Try to deserialize T as a Struct/Map (e.g., UnitValue)
-                // This will use the buffered attributes (like @units) and content ($value).
-                let md: de::value::MapDeserializer<'_, _, A::Error> =
-                    de::value::MapDeserializer::new(values.clone().into_iter());
-                match T::deserialize(md) {
+                // Strategy 1: Deserialize T from object representation (handles structured wrappers).
+                match serde_json::from_value::<T>(JsonValue::Object(values.clone())) {
                     Ok(val) => Ok(Some(val)),
                     Err(_) => {
                         // Strategy 2: Fallback to deserializing T as a Primitive (e.g., f64, u32)
@@ -191,6 +194,7 @@ pub mod nullable {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{Duration, TimeUnits};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -240,6 +244,12 @@ mod tests {
         u32_field: Option<u32>,
     }
 
+    #[derive(Deserialize, Debug, PartialEq)]
+    struct NullableDurationWrapper {
+        #[serde(with = "crate::utils::nullable", default)]
+        duration_field: Option<Duration>,
+    }
+
     #[test]
     fn test_nullable_deserialization() {
         // Test 1: Explicit nil="true"
@@ -248,9 +258,7 @@ mod tests {
         assert_eq!(w.field, None);
 
         // Test 2: Whitespace text
-        let json = r#"{ "field": "   " }"#; // Using scalar string because Visit_str handles it?
-                                            // Wait, for JSON input "field": "   " calls visit_str? Yes.
-                                            // My visitor handles visit_str.
+        let json = r#"{ "field": "   " }"#;
         let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
         assert_eq!(w.field, None);
 
@@ -269,5 +277,18 @@ mod tests {
         let json = r#"{ "u32_field": { "$text": "23581" } }"#;
         let w: NullableTestWrapper = serde_json::from_str(json).unwrap();
         assert_eq!(w.u32_field, Some(23581));
+    }
+
+    #[test]
+    fn test_nullable_structured_numeric_value() {
+        let json = r#"{ "duration_field": { "$value": "1", "@units": "s" } }"#;
+        let w: NullableDurationWrapper = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            w.duration_field,
+            Some(Duration {
+                value: 1.0,
+                units: Some(TimeUnits::Seconds),
+            })
+        );
     }
 }

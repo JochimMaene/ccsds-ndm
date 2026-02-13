@@ -714,6 +714,14 @@ impl crate::traits::Validate for RdmMetadata {
             }
             .into());
         }
+        if self.international_designator.trim().is_empty() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Metadata".into(),
+                field: "INTERNATIONAL_DESIGNATOR".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.center_name.trim().is_empty() {
             return Err(crate::error::ValidationError::MissingRequiredField {
                 block: "RDM Metadata".into(),

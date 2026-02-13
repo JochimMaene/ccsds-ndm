@@ -159,6 +159,30 @@ impl OcmPhysicalDescription {
 
 impl OcmTrajState {
     fn validate(&self) -> Result<()> {
+        if self.center_name.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("TRAJ"),
+                field: Cow::Borrowed("CENTER_NAME"),
+                line: None,
+            }
+            .into());
+        }
+        if self.traj_ref_frame.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("TRAJ"),
+                field: Cow::Borrowed("TRAJ_REF_FRAME"),
+                line: None,
+            }
+            .into());
+        }
+        if self.traj_type.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("TRAJ"),
+                field: Cow::Borrowed("TRAJ_TYPE"),
+                line: None,
+            }
+            .into());
+        }
         if self.traj_lines.is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: Cow::Borrowed("TRAJ"),
@@ -223,6 +247,22 @@ impl OcmTrajState {
 
 impl OcmCovarianceMatrix {
     fn validate(&self) -> Result<()> {
+        if self.cov_ref_frame.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("COV"),
+                field: Cow::Borrowed("COV_REF_FRAME"),
+                line: None,
+            }
+            .into());
+        }
+        if self.cov_type.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("COV"),
+                field: Cow::Borrowed("COV_TYPE"),
+                line: None,
+            }
+            .into());
+        }
         if self.cov_lines.is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: Cow::Borrowed("COV"),
@@ -237,6 +277,30 @@ impl OcmCovarianceMatrix {
 
 impl OcmManeuverParameters {
     fn validate(&self) -> Result<()> {
+        if self.man_id.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("MAN"),
+                field: Cow::Borrowed("MAN_ID"),
+                line: None,
+            }
+            .into());
+        }
+        if self.man_device_id.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("MAN"),
+                field: Cow::Borrowed("MAN_DEVICE_ID"),
+                line: None,
+            }
+            .into());
+        }
+        if self.man_ref_frame.trim().is_empty() {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("MAN"),
+                field: Cow::Borrowed("MAN_REF_FRAME"),
+                line: None,
+            }
+            .into());
+        }
         if self.man_lines.is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: Cow::Borrowed("MAN"),

@@ -79,6 +79,13 @@ impl Ndm for Aem {
 
 impl crate::traits::Validate for AemBody {
     fn validate(&self) -> Result<()> {
+        if self.segment.is_empty() {
+            return Err(ValidationError::missing_required(
+                "AEM Body",
+                "segment (at least one required)",
+            )
+            .into());
+        }
         for segment in &self.segment {
             segment.validate()?;
         }
@@ -89,6 +96,7 @@ impl crate::traits::Validate for AemBody {
 impl crate::traits::Validate for AemSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
+        crate::traits::Validate::validate(&self.data)?;
         self.data.validate_with_type(&self.metadata.attitude_type)
     }
 }
@@ -271,7 +279,7 @@ pub struct AemMetadata {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[builder(into)]
-    pub attitude_type: String,
+    pub attitude_type: AttitudeTypeType,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
     /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
     /// the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
@@ -333,51 +341,62 @@ pub struct AemMetadata {
 
 impl AemMetadata {
     pub fn validate(&self) -> Result<()> {
+        if self.object_name.trim().is_empty() {
+            return Err(ValidationError::missing_required("AEM Metadata", "OBJECT_NAME").into());
+        }
         if self.object_id.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("OBJECT_ID"),
-                line: None,
-            }
-            .into());
+            return Err(ValidationError::missing_required("AEM Metadata", "OBJECT_ID").into());
         }
         if self.time_system.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("TIME_SYSTEM"),
-                line: None,
-            }
-            .into());
+            return Err(ValidationError::missing_required("AEM Metadata", "TIME_SYSTEM").into());
+        }
+        if self.ref_frame_a.trim().is_empty() {
+            return Err(ValidationError::missing_required("AEM Metadata", "REF_FRAME_A").into());
+        }
+        if self.ref_frame_b.trim().is_empty() {
+            return Err(ValidationError::missing_required("AEM Metadata", "REF_FRAME_B").into());
         }
         // Validation Rule: INTERPOLATION_DEGREE is required if INTERPOLATION_METHOD is used
         if self.interpolation_method.is_some() && self.interpolation_degree.is_none() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed(
-                    "INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)",
-                ),
-                line: None,
-            }
+            return Err(ValidationError::missing_required(
+                "AEM Metadata",
+                "INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)",
+            )
             .into());
         }
 
+        let requires_euler_rot_seq = matches!(
+            self.attitude_type,
+            AttitudeTypeType::EulerAngle
+                | AttitudeTypeType::EulerAngleUpper
+                | AttitudeTypeType::EulerAngleDerivative
+                | AttitudeTypeType::EulerAngleDerivativeUpper
+                | AttitudeTypeType::EulerAngleAngVel
+                | AttitudeTypeType::EulerAngleAngVelUpper
+        );
+        let requires_angvel_frame = matches!(
+            self.attitude_type,
+            AttitudeTypeType::QuaternionAngVel
+                | AttitudeTypeType::QuaternionAngVelUpper
+                | AttitudeTypeType::EulerAngleAngVel
+                | AttitudeTypeType::EulerAngleAngVelUpper
+        );
+
         // Validation Rule: EULER_ROT_SEQ is required if ATTITUDE_TYPE includes EULER_ANGLE
-        if self.attitude_type.contains("EULER_ANGLE") && self.euler_rot_seq.is_none() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("EULER_ROT_SEQ (required for EULER_ANGLE types)"),
-                line: None,
-            }
+        if requires_euler_rot_seq && self.euler_rot_seq.is_none() {
+            return Err(ValidationError::missing_required(
+                "AEM Metadata",
+                "EULER_ROT_SEQ (required for EULER_ANGLE types)",
+            )
             .into());
         }
 
         // Validation Rule: ANGVEL_FRAME is required if ATTITUDE_TYPE includes ANGVEL
-        if self.attitude_type.contains("ANGVEL") && self.angvel_frame.is_none() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("ANGVEL_FRAME (required for ANGVEL types)"),
-                line: None,
-            }
+        if requires_angvel_frame && self.angvel_frame.is_none() {
+            return Err(ValidationError::missing_required(
+                "AEM Metadata",
+                "ANGVEL_FRAME (required for ANGVEL types)",
+            )
             .into());
         }
 
@@ -585,139 +604,165 @@ impl crate::traits::ToKvn for AemAttitudeStateWrapper {
 
 impl crate::traits::Validate for AemData {
     fn validate(&self) -> Result<()> {
+        if self.attitude_states.is_empty() {
+            return Err(ValidationError::missing_required(
+                "AEM Data",
+                "attitudeState (at least one required)",
+            )
+            .into());
+        }
+        for (idx, state) in self.attitude_states.iter().enumerate() {
+            let mut fields = Vec::new();
+            if state.quaternion_ephemeris.is_some() {
+                fields.push(Cow::Borrowed("quaternionEphemeris"));
+            }
+            if state.quaternion_derivative.is_some() {
+                fields.push(Cow::Borrowed("quaternionDerivative"));
+            }
+            if state.quaternion_ang_vel.is_some() {
+                fields.push(Cow::Borrowed("quaternionAngVel"));
+            }
+            if state.euler_angle.is_some() {
+                fields.push(Cow::Borrowed("eulerAngle"));
+            }
+            if state.euler_angle_derivative.is_some() {
+                fields.push(Cow::Borrowed("eulerAngleDerivative"));
+            }
+            if state.euler_angle_ang_vel.is_some() {
+                fields.push(Cow::Borrowed("eulerAngleAngVel"));
+            }
+            if state.spin.is_some() {
+                fields.push(Cow::Borrowed("spin"));
+            }
+            if state.spin_nutation.is_some() {
+                fields.push(Cow::Borrowed("spinNutation"));
+            }
+            if state.spin_nutation_mom.is_some() {
+                fields.push(Cow::Borrowed("spinNutationMom"));
+            }
+
+            match fields.len() {
+                0 => {
+                    return Err(ValidationError::missing_required(
+                        "AEM Data",
+                        format!("attitudeState[{}] (exactly one choice required)", idx + 1),
+                    )
+                    .into());
+                }
+                1 => {}
+                _ => {
+                    return Err(ValidationError::conflict(fields).into());
+                }
+            }
+        }
         Ok(())
     }
 }
 
 impl AemData {
-    pub fn validate_with_type(&self, attitude_type: &str) -> Result<()> {
+    pub fn validate_with_type(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
         for (idx, state) in self.attitude_states.iter().enumerate() {
+            let expected = attitude_type.to_string();
             match attitude_type {
-                "QUATERNION" => {
+                AttitudeTypeType::Quaternion | AttitudeTypeType::QuaternionUpper => {
                     if state.quaternion_ephemeris.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected QUATERNION data",
-                                idx + 1
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
-                "QUATERNION/DERIVATIVE" => {
+                AttitudeTypeType::QuaternionDerivative
+                | AttitudeTypeType::QuaternionDerivativeUpper => {
                     if state.quaternion_derivative.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected QUATERNION/DERIVATIVE data",
-                                idx + 1
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
-                "QUATERNION/ANGVEL" | "QUATERNION/RATE" => {
+                AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::QuaternionAngVelUpper => {
                     if state.quaternion_ang_vel.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected QUATERNION/ANGVEL data",
-                                idx + 1
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
-                "EULER_ANGLE" => {
+                AttitudeTypeType::EulerAngle | AttitudeTypeType::EulerAngleUpper => {
                     if state.euler_angle.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected EULER_ANGLE data",
-                                idx + 1
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
-                "EULER_ANGLE/DERIVATIVE" => {
+                AttitudeTypeType::EulerAngleDerivative
+                | AttitudeTypeType::EulerAngleDerivativeUpper => {
                     if state.euler_angle_derivative.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected EULER_ANGLE/DERIVATIVE data",
-                                idx + 1
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
-                "EULER_ANGLE/ANGVEL" | "EULER_ANGLE/RATE" => {
+                AttitudeTypeType::EulerAngleAngVel | AttitudeTypeType::EulerAngleAngVelUpper => {
                     if state.euler_angle_ang_vel.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected EULER_ANGLE/ANGVEL data",
-                                idx + 1
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
-                "SPIN" => {
+                AttitudeTypeType::Spin | AttitudeTypeType::SpinUpper => {
                     if state.spin.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected SPIN data",
-                                idx + 1
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
-                "SPIN/NUTATION" => {
+                AttitudeTypeType::SpinNutation | AttitudeTypeType::SpinNutationUpper => {
                     if state.spin_nutation.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected SPIN/NUTATION data",
-                                idx + 1
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
-                "SPIN/NUTATION_MOM" => {
+                AttitudeTypeType::SpinNutationMom | AttitudeTypeType::SpinNutationMomUpper => {
                     if state.spin_nutation_mom.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected SPIN/NUTATION_MOM data",
-                                idx + 1
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
-                }
-                _ => {
-                    // Unknown type, or maybe user defined.
-                    // For now, we strictly validate against known types if possible,
-                    // but since the string is open-ended in some contexts, we might warn.
-                    // However, XSD lists these as enumerations.
-                    return Err(ValidationError::Generic {
-                        message: Cow::Owned(format!("Unknown ATTITUDE_TYPE: {}", attitude_type)),
-                        line: None,
-                    }
-                    .into());
                 }
             }
         }
         Ok(())
     }
 
-    pub fn validate(&self, attitude_type: &str) -> Result<()> {
+    pub fn validate(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
+        crate::traits::Validate::validate(self)?;
         self.validate_with_type(attitude_type)
     }
 }
@@ -796,15 +841,10 @@ DATA_STOP
     }
 
     #[test]
-    fn test_aem_invalid_time_range() {
-        // Technically validation could check if STOP_TIME > START_TIME
-        // Our current validate() is empty, but we can still check parsing
+    fn test_aem_no_epoch_ordering_validation() {
+        // Epoch ordering is intentionally not validated; parsing should succeed.
         let kvn = sample_aem_kvn();
-        let aem = Aem::from_kvn(&kvn).unwrap();
-        assert!(
-            aem.body.segment[0].metadata.stop_time.as_str()
-                > aem.body.segment[0].metadata.start_time.as_str()
-        );
+        assert!(Aem::from_kvn(&kvn).is_ok());
     }
 
     #[test]
@@ -899,36 +939,76 @@ DATA_STOP
             comment: vec![],
             attitude_states: vec![valid_euler.clone()],
         };
-        assert!(data.validate("QUATERNION").is_err());
+        assert!(data.validate(&AttitudeTypeType::QuaternionUpper).is_err());
 
         // Type mismatch: Expects EULER_ANGLE, gets QUATERNION
         let data_q = AemData {
             comment: vec![],
             attitude_states: vec![valid_q.clone()],
         };
-        assert!(data_q.validate("EULER_ANGLE").is_err());
+        assert!(data_q.validate(&AttitudeTypeType::EulerAngleUpper).is_err());
 
         // Check all other variants against a wrong type declaration
         let cases = vec![
-            ("QUATERNION/DERIVATIVE", valid_q.clone()),
-            ("QUATERNION/ANGVEL", valid_q.clone()),
-            ("EULER_ANGLE/DERIVATIVE", valid_q.clone()),
-            ("EULER_ANGLE/ANGVEL", valid_q.clone()),
-            ("SPIN", valid_q.clone()),
-            ("SPIN/NUTATION", valid_q.clone()),
-            ("SPIN/NUTATION_MOM", valid_q.clone()),
+            AttitudeTypeType::QuaternionDerivativeUpper,
+            AttitudeTypeType::QuaternionAngVelUpper,
+            AttitudeTypeType::EulerAngleDerivativeUpper,
+            AttitudeTypeType::EulerAngleAngVelUpper,
+            AttitudeTypeType::SpinUpper,
+            AttitudeTypeType::SpinNutationUpper,
+            AttitudeTypeType::SpinNutationMomUpper,
         ];
 
-        for (type_str, state) in cases {
+        for attitude_type in cases {
             let d = AemData {
                 comment: vec![],
-                attitude_states: vec![state],
+                attitude_states: vec![valid_q.clone()],
             };
             assert!(
-                d.validate(type_str).is_err(),
+                d.validate(&attitude_type).is_err(),
                 "Expected error for type {}",
-                type_str
+                attitude_type
             );
         }
+    }
+
+    #[test]
+    fn test_aem_data_requires_attitude_state() {
+        let data = AemData {
+            comment: vec![],
+            attitude_states: vec![],
+        };
+        assert!(crate::traits::Validate::validate(&data).is_err());
+    }
+
+    #[test]
+    fn test_aem_data_state_choice_conflict() {
+        use crate::common::*;
+
+        let mut wrapper = AemAttitudeStateWrapper::from(AemAttitudeState::QuaternionEphemeris(
+            QuaternionEphemeris {
+                epoch: "2023-01-01T00:00:00".parse().unwrap(),
+                quaternion: Quaternion::new(0.0, 0.0, 0.0, 1.0).unwrap(),
+            },
+        ));
+
+        wrapper.euler_angle = Some(EulerAngle {
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
+            angle_1: Angle::new(10.0, None).unwrap(),
+            angle_2: Angle::new(20.0, None).unwrap(),
+            angle_3: Angle::new(30.0, None).unwrap(),
+        });
+
+        let data = AemData {
+            comment: vec![],
+            attitude_states: vec![wrapper],
+        };
+        assert!(crate::traits::Validate::validate(&data).is_err());
+    }
+
+    #[test]
+    fn test_aem_body_requires_segment() {
+        let body = AemBody { segment: vec![] };
+        assert!(body.validate().is_err());
     }
 }

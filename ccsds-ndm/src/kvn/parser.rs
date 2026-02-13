@@ -159,6 +159,16 @@ pub fn missing_field_err(
     })
 }
 
+/// Extracts a required field from an optional parser result.
+pub fn require_field<T>(
+    input: &mut &str,
+    block: &'static str,
+    field: &'static str,
+    value: Option<T>,
+) -> KvnResult<T> {
+    value.ok_or_else(|| missing_field_err(input, block, field))
+}
+
 //----------------------------------------------------------------------
 // Low-level Token Parsers
 //----------------------------------------------------------------------
@@ -1440,5 +1450,28 @@ mod tests {
     fn test_broken_unit() {
         let mut input = "KEY = value [unit\n"; // Missing closing bracket
         assert!(key_value_line.parse_next(&mut input).is_err());
+    }
+
+    #[test]
+    fn test_require_field_success() {
+        let mut input = "";
+        let value = require_field(&mut input, "TestBlock", "TEST_FIELD", Some(42_u32)).unwrap();
+        assert_eq!(value, 42);
+    }
+
+    #[test]
+    fn test_require_field_missing() {
+        let mut input = "";
+        let err = require_field::<u32>(&mut input, "TestBlock", "TEST_FIELD", None).unwrap_err();
+        match err {
+            ErrMode::Cut(inner) => match *inner.kind {
+                crate::error::ParserErrorKind::MissingRequiredField { block, field } => {
+                    assert_eq!(block, "TestBlock");
+                    assert_eq!(field, "TEST_FIELD");
+                }
+                _ => panic!("Expected MissingRequiredField"),
+            },
+            _ => panic!("Expected cut error"),
+        }
     }
 }

@@ -10,6 +10,7 @@ import pytest
 from ccsds_ndm import (
     Acm,
     AcmAttitudeState,
+    AcmCovarianceMatrix,
     AcmData,
     AcmMetadata,
     AcmSegment,
@@ -30,6 +31,26 @@ class TestAcm:
         )
         assert meta.object_name == "SAT1"
         assert meta.international_designator == "2023-001A"
+
+    def test_acm_attitude_state_invalid_att_type_raises(self):
+        with pytest.raises(ValueError):
+            AcmAttitudeState(
+                ref_frame_a="EME2000",
+                ref_frame_b="SC_BODY_1",
+                att_type="NOT_IN_XSD_ENUM",
+                att_lines=[[0.0, 0.0, 0.0, 1.0]],
+                comment=[],
+            )
+
+    def test_acm_covariance_matrix_invalid_cov_type_raises(self):
+        with pytest.raises(ValueError):
+            AcmCovarianceMatrix(
+                cov_basis="SIMULATION",
+                cov_ref_frame="EME2000",
+                cov_type="NOT_IN_XSD_ENUM",
+                cov_lines=[[1.0]],
+                comment=[],
+            )
 
     def _create_valid_acm(self):
         # Create a minimal valid ACM

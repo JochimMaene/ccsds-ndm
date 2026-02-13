@@ -894,6 +894,14 @@ pub struct CdmData {
 
 impl crate::traits::Validate for CdmData {
     fn validate(&self) -> Result<()> {
+        if self.covariance_matrix.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "CDM Data".into(),
+                field: "covarianceMatrix".into(),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
     }
 }

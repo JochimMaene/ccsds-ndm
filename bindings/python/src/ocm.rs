@@ -144,6 +144,16 @@ impl Ocm {
         self.inner.version.clone()
     }
 
+    #[setter]
+    fn set_version(&mut self, value: String) -> PyResult<()> {
+        crate::common::validate_version(
+            ccsds_ndm::validation::MessageKind::Ocm,
+            &value,
+        )?;
+        self.inner.version = value;
+        Ok(())
+    }
+
     /// Validate the message against CCSDS rules.
     ///
     /// Parameters

@@ -7,10 +7,12 @@ use crate::common::AdmHeader;
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::acm as core_acm;
 use ccsds_ndm::traits::{Ndm, Validate};
+use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
+use std::str::FromStr;
 
 /// Attitude Comprehensive Message (ACM).
 ///
@@ -67,6 +69,16 @@ impl Acm {
     #[getter]
     fn get_version(&self) -> String {
         self.inner.version.clone()
+    }
+
+    #[setter]
+    fn set_version(&mut self, value: String) -> PyResult<()> {
+        crate::common::validate_version(
+            ccsds_ndm::validation::MessageKind::Acm,
+            &value,
+        )?;
+        self.inner.version = value;
+        Ok(())
     }
 
     /// Validate the message against CCSDS rules.
@@ -462,8 +474,10 @@ impl AcmAttitudeState {
         att_type: String,
         att_lines: Vec<Vec<f64>>,
         comment: Option<Vec<String>>,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        let att_type =
+            AcmAttitudeType::from_str(&att_type).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(Self {
             inner: core_acm::AcmAttitudeState {
                 comment: comment.unwrap_or_default(),
                 ref_frame_a,
@@ -481,7 +495,7 @@ impl AcmAttitudeState {
                 rate_type: None,
                 euler_rot_seq: None,
             },
-        }
+        })
     }
 }
 
@@ -534,8 +548,10 @@ impl AcmCovarianceMatrix {
         cov_type: String,
         cov_lines: Vec<Vec<f64>>,
         comment: Option<Vec<String>>,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        let cov_type = AcmCovarianceLineType::from_str(&cov_type)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(Self {
             inner: core_acm::AcmCovarianceMatrix {
                 comment: comment.unwrap_or_default(),
                 cov_basis,
@@ -547,7 +563,7 @@ impl AcmCovarianceMatrix {
                     .collect(),
                 cov_confidence: None,
             },
-        }
+        })
     }
 }
 
@@ -575,6 +591,8 @@ impl AcmManeuverParameters {
                 actuator_used: None,
                 target_momentum: None,
                 target_mom_frame: None,
+                target_attitude: None,
+                target_spinrate: None,
             },
         }
     }
