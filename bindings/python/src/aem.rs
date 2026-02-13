@@ -77,6 +77,16 @@ impl Aem {
         self.inner.version.clone()
     }
 
+    #[setter]
+    fn set_version(&mut self, value: String) -> PyResult<()> {
+        crate::common::validate_version(
+            ccsds_ndm::validation::MessageKind::Aem,
+            &value,
+        )?;
+        self.inner.version = value;
+        Ok(())
+    }
+
     /// Attitude Ephemeris Message (AEM).
     ///
     /// An AEM specifies the attitude state of a single object at multiple epochs, contained within a

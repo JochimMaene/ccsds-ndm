@@ -66,6 +66,16 @@ impl Apm {
         self.inner.version.clone()
     }
 
+    #[setter]
+    fn set_version(&mut self, value: String) -> PyResult<()> {
+        crate::common::validate_version(
+            ccsds_ndm::validation::MessageKind::Apm,
+            &value,
+        )?;
+        self.inner.version = value;
+        Ok(())
+    }
+
     /// Attitude Parameter Message (APM).
     ///
     /// An APM specifies the attitude state of a single object at a specified epoch. This message

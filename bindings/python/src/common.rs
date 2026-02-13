@@ -2253,3 +2253,19 @@ pub fn parse_time_system(ob: &Bound<'_, PyAny>) -> PyResult<String> {
         Err(PyValueError::new_err("Expected TimeSystem enum or string"))
     }
 }
+
+pub fn validate_version(
+    kind: ccsds_ndm::validation::MessageKind,
+    value: &str,
+) -> PyResult<()> {
+    if let Some(spec) = ccsds_ndm::versioning::spec(kind) {
+        if !spec.supported_versions.contains(&value) {
+            return Err(PyValueError::new_err(format!(
+                "Invalid version '{}'; expected one of: {}",
+                value,
+                spec.supported_versions.join(", ")
+            )));
+        }
+    }
+    Ok(())
+}
