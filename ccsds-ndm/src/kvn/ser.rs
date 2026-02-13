@@ -41,9 +41,18 @@ impl Default for KvnWriter {
 }
 
 impl KvnWriter {
+    fn normalize_inline_value(value: &str) -> std::borrow::Cow<'_, str> {
+        if value.contains('\n') || value.contains('\r') || value.contains('\t') {
+            return std::borrow::Cow::Owned(value.split_whitespace().collect::<Vec<_>>().join(" "));
+        }
+        std::borrow::Cow::Borrowed(value)
+    }
+
     /// Writes a simple `KEY = value` line.
     pub fn write_pair<V: Display>(&mut self, key: &str, value: V) {
-        let _ = writeln!(self, "{:<20} = {}", key, value);
+        let raw = value.to_string();
+        let normalized = Self::normalize_inline_value(&raw);
+        let _ = writeln!(self, "{:<20} = {}", key, normalized);
     }
 
     /// Writes `KEY = value [unit]`.
@@ -64,7 +73,10 @@ impl KvnWriter {
     /// Writes comment lines.
     pub fn write_comments(&mut self, comments: &[String]) {
         for c in comments {
-            let _ = writeln!(self, "COMMENT {}", c);
+            for line in c.lines() {
+                let normalized = Self::normalize_inline_value(line);
+                let _ = writeln!(self, "COMMENT {}", normalized);
+            }
         }
     }
 
@@ -91,5 +103,34 @@ impl KvnWriter {
     /// Returns the accumulated KVN content.
     pub fn finish(self) -> String {
         self.output
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::KvnWriter;
+
+    #[test]
+    fn write_comments_splits_multiline_entries() {
+        let mut writer = KvnWriter::new();
+        writer.write_comments(&[String::from("line1\nline2"), String::from("line3")]);
+        let out = writer.finish();
+
+        assert_eq!(out, "COMMENT line1\nCOMMENT line2\nCOMMENT line3\n");
+    }
+
+    #[test]
+    fn write_pair_normalizes_multiline_value() {
+        let mut writer = KvnWriter::new();
+        writer.write_pair(
+            "ORIGINATOR_POSITION",
+            "Flight Dynamics Mission Design\nLead",
+        );
+        let out = writer.finish();
+
+        assert_eq!(
+            out,
+            "ORIGINATOR_POSITION  = Flight Dynamics Mission Design Lead\n"
+        );
     }
 }

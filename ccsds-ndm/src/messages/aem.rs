@@ -80,11 +80,10 @@ impl Ndm for Aem {
 impl crate::traits::Validate for AemBody {
     fn validate(&self) -> Result<()> {
         if self.segment.is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Body"),
-                field: Cow::Borrowed("segment (at least one required)"),
-                line: None,
-            }
+            return Err(ValidationError::missing_required(
+                "AEM Body",
+                "segment (at least one required)",
+            )
             .into());
         }
         for segment in &self.segment {
@@ -343,54 +342,26 @@ pub struct AemMetadata {
 impl AemMetadata {
     pub fn validate(&self) -> Result<()> {
         if self.object_name.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("OBJECT_NAME"),
-                line: None,
-            }
-            .into());
+            return Err(ValidationError::missing_required("AEM Metadata", "OBJECT_NAME").into());
         }
         if self.object_id.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("OBJECT_ID"),
-                line: None,
-            }
-            .into());
+            return Err(ValidationError::missing_required("AEM Metadata", "OBJECT_ID").into());
         }
         if self.time_system.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("TIME_SYSTEM"),
-                line: None,
-            }
-            .into());
+            return Err(ValidationError::missing_required("AEM Metadata", "TIME_SYSTEM").into());
         }
         if self.ref_frame_a.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("REF_FRAME_A"),
-                line: None,
-            }
-            .into());
+            return Err(ValidationError::missing_required("AEM Metadata", "REF_FRAME_A").into());
         }
         if self.ref_frame_b.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("REF_FRAME_B"),
-                line: None,
-            }
-            .into());
+            return Err(ValidationError::missing_required("AEM Metadata", "REF_FRAME_B").into());
         }
         // Validation Rule: INTERPOLATION_DEGREE is required if INTERPOLATION_METHOD is used
         if self.interpolation_method.is_some() && self.interpolation_degree.is_none() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed(
-                    "INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)",
-                ),
-                line: None,
-            }
+            return Err(ValidationError::missing_required(
+                "AEM Metadata",
+                "INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)",
+            )
             .into());
         }
 
@@ -413,21 +384,19 @@ impl AemMetadata {
 
         // Validation Rule: EULER_ROT_SEQ is required if ATTITUDE_TYPE includes EULER_ANGLE
         if requires_euler_rot_seq && self.euler_rot_seq.is_none() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("EULER_ROT_SEQ (required for EULER_ANGLE types)"),
-                line: None,
-            }
+            return Err(ValidationError::missing_required(
+                "AEM Metadata",
+                "EULER_ROT_SEQ (required for EULER_ANGLE types)",
+            )
             .into());
         }
 
         // Validation Rule: ANGVEL_FRAME is required if ATTITUDE_TYPE includes ANGVEL
         if requires_angvel_frame && self.angvel_frame.is_none() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Metadata"),
-                field: Cow::Borrowed("ANGVEL_FRAME (required for ANGVEL types)"),
-                line: None,
-            }
+            return Err(ValidationError::missing_required(
+                "AEM Metadata",
+                "ANGVEL_FRAME (required for ANGVEL types)",
+            )
             .into());
         }
 
@@ -636,11 +605,10 @@ impl crate::traits::ToKvn for AemAttitudeStateWrapper {
 impl crate::traits::Validate for AemData {
     fn validate(&self) -> Result<()> {
         if self.attitude_states.is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("AEM Data"),
-                field: Cow::Borrowed("attitudeState (at least one required)"),
-                line: None,
-            }
+            return Err(ValidationError::missing_required(
+                "AEM Data",
+                "attitudeState (at least one required)",
+            )
             .into());
         }
         for (idx, state) in self.attitude_states.iter().enumerate() {
@@ -675,19 +643,15 @@ impl crate::traits::Validate for AemData {
 
             match fields.len() {
                 0 => {
-                    return Err(ValidationError::MissingRequiredField {
-                        block: Cow::Borrowed("AEM Data"),
-                        field: Cow::Owned(format!(
-                            "attitudeState[{}] (exactly one choice required)",
-                            idx + 1
-                        )),
-                        line: None,
-                    }
+                    return Err(ValidationError::missing_required(
+                        "AEM Data",
+                        format!("attitudeState[{}] (exactly one choice required)", idx + 1),
+                    )
                     .into());
                 }
                 1 => {}
                 _ => {
-                    return Err(ValidationError::Conflict { fields, line: None }.into());
+                    return Err(ValidationError::conflict(fields).into());
                 }
             }
         }
@@ -702,120 +666,93 @@ impl AemData {
             match attitude_type {
                 AttitudeTypeType::Quaternion | AttitudeTypeType::QuaternionUpper => {
                     if state.quaternion_ephemeris.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected {} data",
-                                idx + 1,
-                                expected
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
                 AttitudeTypeType::QuaternionDerivative
                 | AttitudeTypeType::QuaternionDerivativeUpper => {
                     if state.quaternion_derivative.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected {} data",
-                                idx + 1,
-                                expected
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
                 AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::QuaternionAngVelUpper => {
                     if state.quaternion_ang_vel.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected {} data",
-                                idx + 1,
-                                expected
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
                 AttitudeTypeType::EulerAngle | AttitudeTypeType::EulerAngleUpper => {
                     if state.euler_angle.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected {} data",
-                                idx + 1,
-                                expected
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
                 AttitudeTypeType::EulerAngleDerivative
                 | AttitudeTypeType::EulerAngleDerivativeUpper => {
                     if state.euler_angle_derivative.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected {} data",
-                                idx + 1,
-                                expected
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
                 AttitudeTypeType::EulerAngleAngVel | AttitudeTypeType::EulerAngleAngVelUpper => {
                     if state.euler_angle_ang_vel.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected {} data",
-                                idx + 1,
-                                expected
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
                 AttitudeTypeType::Spin | AttitudeTypeType::SpinUpper => {
                     if state.spin.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected {} data",
-                                idx + 1,
-                                expected
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
                 AttitudeTypeType::SpinNutation | AttitudeTypeType::SpinNutationUpper => {
                     if state.spin_nutation.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected {} data",
-                                idx + 1,
-                                expected
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }
                 AttitudeTypeType::SpinNutationMom | AttitudeTypeType::SpinNutationMomUpper => {
                     if state.spin_nutation_mom.is_none() {
-                        return Err(ValidationError::Generic {
-                            message: Cow::Owned(format!(
-                                "Data line {} expected {} data",
-                                idx + 1,
-                                expected
-                            )),
-                            line: None,
-                        }
+                        return Err(ValidationError::generic(format!(
+                            "Data line {} expected {} data",
+                            idx + 1,
+                            expected
+                        ))
                         .into());
                     }
                 }

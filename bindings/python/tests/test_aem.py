@@ -37,6 +37,18 @@ class TestAem:
         assert meta.interpolation_method == "LINEAR"
         assert meta.interpolation_degree == 1
 
+    def test_aem_metadata_invalid_attitude_type_raises(self):
+        with pytest.raises(ValueError):
+            AemMetadata(
+                object_name="SAT1",
+                object_id="2023-001A",
+                ref_frame_a="EME2000",
+                ref_frame_b="SC_BODY_1",
+                start_time="2023-01-01T00:00:00",
+                stop_time="2023-01-01T01:00:00",
+                attitude_type="NOT_IN_XSD_ENUM",
+            )
+
     def test_aem_data_numpy(self):
         # Create data using python list of states
         state1 = AttitudeState("2023-01-01T00:00:00", [0.0, 0.0, 0.0, 1.0])

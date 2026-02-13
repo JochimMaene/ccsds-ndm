@@ -85,8 +85,7 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
 
     Ok(AcmMetadata {
         comment,
-        object_name: object_name
-            .ok_or_else(|| missing_field_err(input, "ACM Metadata", "OBJECT_NAME"))?,
+        object_name: require_field(input, "ACM Metadata", "OBJECT_NAME", object_name)?,
         international_designator,
         catalog_name,
         object_designator,
@@ -97,10 +96,8 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
         originator_address,
         odm_msg_link,
         center_name,
-        time_system: time_system
-            .ok_or_else(|| missing_field_err(input, "ACM Metadata", "TIME_SYSTEM"))?,
-        epoch_tzero: epoch_tzero
-            .ok_or_else(|| missing_field_err(input, "ACM Metadata", "EPOCH_TZERO"))?,
+        time_system: require_field(input, "ACM Metadata", "TIME_SYSTEM", time_system)?,
+        epoch_tzero: require_field(input, "ACM Metadata", "EPOCH_TZERO", epoch_tzero)?,
         taimutc_at_tzero,
         next_leap_epoch,
         next_leap_taimutc,
@@ -182,13 +179,10 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
         att_prev_id,
         att_basis,
         att_basis_id,
-        ref_frame_a: ref_frame_a
-            .ok_or_else(|| missing_field_err(input, "ACM ATT", "REF_FRAME_A"))?,
-        ref_frame_b: ref_frame_b
-            .ok_or_else(|| missing_field_err(input, "ACM ATT", "REF_FRAME_B"))?,
-        number_states: number_states
-            .ok_or_else(|| missing_field_err(input, "ACM ATT", "NUMBER_STATES"))?,
-        att_type: att_type.ok_or_else(|| missing_field_err(input, "ACM ATT", "ATT_TYPE"))?,
+        ref_frame_a: require_field(input, "ACM ATT", "REF_FRAME_A", ref_frame_a)?,
+        ref_frame_b: require_field(input, "ACM ATT", "REF_FRAME_B", ref_frame_b)?,
+        number_states: require_field(input, "ACM ATT", "NUMBER_STATES", number_states)?,
+        att_type: require_field(input, "ACM ATT", "ATT_TYPE", att_type)?,
         rate_type,
         euler_rot_seq,
         att_lines,

@@ -81,25 +81,17 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
 
     Ok(AemMetadata {
         comment,
-        object_name: object_name
-            .ok_or_else(|| missing_field_err(input, "AEM Metadata", "OBJECT_NAME"))?,
-        object_id: object_id
-            .ok_or_else(|| missing_field_err(input, "AEM Metadata", "OBJECT_ID"))?,
+        object_name: require_field(input, "AEM Metadata", "OBJECT_NAME", object_name)?,
+        object_id: require_field(input, "AEM Metadata", "OBJECT_ID", object_id)?,
         center_name,
-        ref_frame_a: ref_frame_a
-            .ok_or_else(|| missing_field_err(input, "AEM Metadata", "REF_FRAME_A"))?,
-        ref_frame_b: ref_frame_b
-            .ok_or_else(|| missing_field_err(input, "AEM Metadata", "REF_FRAME_B"))?,
-        time_system: time_system
-            .ok_or_else(|| missing_field_err(input, "AEM Metadata", "TIME_SYSTEM"))?,
-        start_time: start_time
-            .ok_or_else(|| missing_field_err(input, "AEM Metadata", "START_TIME"))?,
+        ref_frame_a: require_field(input, "AEM Metadata", "REF_FRAME_A", ref_frame_a)?,
+        ref_frame_b: require_field(input, "AEM Metadata", "REF_FRAME_B", ref_frame_b)?,
+        time_system: require_field(input, "AEM Metadata", "TIME_SYSTEM", time_system)?,
+        start_time: require_field(input, "AEM Metadata", "START_TIME", start_time)?,
         useable_start_time,
         useable_stop_time,
-        stop_time: stop_time
-            .ok_or_else(|| missing_field_err(input, "AEM Metadata", "STOP_TIME"))?,
-        attitude_type: attitude_type
-            .ok_or_else(|| missing_field_err(input, "AEM Metadata", "ATTITUDE_TYPE"))?,
+        stop_time: require_field(input, "AEM Metadata", "STOP_TIME", stop_time)?,
+        attitude_type: require_field(input, "AEM Metadata", "ATTITUDE_TYPE", attitude_type)?,
         euler_rot_seq,
         angvel_frame: rate_frame,
         interpolation_method,
