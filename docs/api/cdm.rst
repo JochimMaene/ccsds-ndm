@@ -30,6 +30,12 @@ Conjunction Data Message (CDM)
 .. autoclass:: RelativeMetadataData
    :members:
    :undoc-members:
+.. autoclass:: AdditionalParameters
+   :members:
+   :undoc-members:
+.. autoclass:: OdParameters
+   :members:
+   :undoc-members:
 
 Enums
 -----
