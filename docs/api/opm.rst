@@ -1,5 +1,5 @@
 Orbit Parameter Message (OPM)
-===========================
+=============================
 
 .. currentmodule:: ccsds_ndm
 

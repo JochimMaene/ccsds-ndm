@@ -6,6 +6,9 @@ Python API
    :caption: Modules
 
    core
+   aem
+   apm
+   acm
    opm
    oem
    omm

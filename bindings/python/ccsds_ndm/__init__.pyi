@@ -661,7 +661,7 @@ class AemData:
     """
     AEM Data Section.
     """
-    def __init__(attitude_states, comment=None) -> None: ...
+    def __init__(attitude_states, attitude_type=None, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -693,7 +693,7 @@ class AemData:
 
         Use `attitude_states_epochs` for the corresponding epochs.
 
-        Currently only supports Quaternion Ephemeris states.
+        Supports all AEM attitude state types, but all rows must be of the same type.
         """
         ...
 
@@ -710,7 +710,7 @@ class AemData:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @staticmethod
-    def from_numpy(epochs, array, comment=None):
+    def from_numpy(epochs, array, attitude_type=None, comment=None):
         """ """
         ...
 

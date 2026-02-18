@@ -53,7 +53,11 @@ class TestAem:
         # Create data using python list of states
         state1 = AttitudeState("2023-01-01T00:00:00", [0.0, 0.0, 0.0, 1.0])
         state2 = AttitudeState("2023-01-01T00:01:00", [0.0, 0.0, 0.0, 1.0])
-        data = AemData(attitude_states=[state1, state2], comment=[])
+        data = AemData(
+            attitude_states=[state1, state2],
+            attitude_type="QUATERNION",
+            comment=[],
+        )
 
         # Test getting as numpy
         epochs = data.attitude_states_epochs  # Note: Property access
@@ -75,7 +79,9 @@ class TestAem:
         assert abs(states[0].values[0] - 0.5) < 1e-9
 
         # Test from_numpy constructor
-        data2 = AemData.from_numpy(new_epochs, new_array, comment=[])
+        data2 = AemData.from_numpy(
+            new_epochs, new_array, attitude_type="QUATERNION", comment=[]
+        )
         assert len(data2.attitude_states) == 2
 
     def _create_valid_aem(self):
@@ -96,9 +102,43 @@ class TestAem:
             attitude_type="QUATERNION",
         )
         state1 = AttitudeState("2023-01-01T00:00:00", [0.0, 0.0, 0.0, 1.0])
-        data = AemData(attitude_states=[state1], comment=[])
+        data = AemData(attitude_states=[state1], attitude_type="QUATERNION", comment=[])
         segment = AemSegment(meta, data)
         return Aem(header, [segment])
+
+    def test_aem_from_numpy_requires_explicit_type_for_ambiguous_width(self):
+        epochs = ["2023-01-01T00:00:00"]
+        values = np.array([[0.0, 0.0, 0.0, 1.0]])
+
+        with pytest.raises(ValueError, match="Ambiguous 4-column AEM data"):
+            AemData.from_numpy(epochs, values, comment=[])
+
+        values_6 = np.array([[1.0, 2.0, 3.0, 0.1, 0.2, 0.3]])
+        with pytest.raises(ValueError, match="Ambiguous 6-column AEM data"):
+            AemData.from_numpy(epochs, values_6, comment=[])
+
+    def test_aem_from_numpy_rejects_wrong_width_without_defaults(self):
+        epochs = ["2023-01-01T00:00:00"]
+        values = np.array([[0.1, 0.2]])
+
+        with pytest.raises(ValueError, match="requires 4 columns"):
+            AemData.from_numpy(epochs, values, attitude_type="QUATERNION", comment=[])
+
+    def test_aem_from_numpy_spin_supported(self):
+        epochs = ["2023-01-01T00:00:00"]
+        # SPIN: SPIN_ALPHA, SPIN_DELTA, SPIN_ANGLE, SPIN_ANGLE_VEL
+        values = np.array([[10.0, 20.0, 30.0, 0.5]])
+
+        data = AemData.from_numpy(epochs, values, attitude_type="SPIN", comment=[])
+        states = data.attitude_states
+        assert len(states) == 1
+        assert states[0].epoch == "2023-01-01T00:00:00"
+        assert states[0].values == [10.0, 20.0, 30.0, 0.5]
+
+    def test_aem_set_epochs_without_states_raises(self):
+        data = AemData(attitude_states=[], comment=[])
+        with pytest.raises(ValueError, match="Cannot set epochs"):
+            data.attitude_states_epochs = ["2023-01-01T00:00:00"]
 
     def test_roundtrip_kvn(self):
         aem = self._create_valid_aem()
