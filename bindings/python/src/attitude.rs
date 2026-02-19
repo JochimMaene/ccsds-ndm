@@ -277,8 +277,8 @@ impl EulerAngleState {
     }
     #[setter]
     fn set_angle_1(&mut self, value: f64) -> PyResult<()> {
-        self.inner.angle_1 =
-            Angle::new(value, None).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        self.inner.angle_1 = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
@@ -293,8 +293,8 @@ impl EulerAngleState {
     }
     #[setter]
     fn set_angle_2(&mut self, value: f64) -> PyResult<()> {
-        self.inner.angle_2 =
-            Angle::new(value, None).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        self.inner.angle_2 = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
@@ -309,8 +309,8 @@ impl EulerAngleState {
     }
     #[setter]
     fn set_angle_3(&mut self, value: f64) -> PyResult<()> {
-        self.inner.angle_3 =
-            Angle::new(value, None).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        self.inner.angle_3 = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
@@ -472,10 +472,7 @@ impl AngVelState {
     }
     #[setter]
     fn set_angvel_x(&mut self, value: f64) {
-        self.inner.angvel_x = AngleRate {
-            value,
-            units: None,
-        };
+        self.inner.angvel_x = AngleRate { value, units: None };
     }
 
     /// Component of the angular velocity vector on the Y axis.
@@ -489,10 +486,7 @@ impl AngVelState {
     }
     #[setter]
     fn set_angvel_y(&mut self, value: f64) {
-        self.inner.angvel_y = AngleRate {
-            value,
-            units: None,
-        };
+        self.inner.angvel_y = AngleRate { value, units: None };
     }
 
     /// Component of the angular velocity vector on the Z axis.
@@ -506,10 +500,7 @@ impl AngVelState {
     }
     #[setter]
     fn set_angvel_z(&mut self, value: f64) {
-        self.inner.angvel_z = AngleRate {
-            value,
-            units: None,
-        };
+        self.inner.angvel_z = AngleRate { value, units: None };
     }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
@@ -634,8 +625,8 @@ impl SpinState {
     }
     #[setter]
     fn set_spin_alpha(&mut self, value: f64) -> PyResult<()> {
-        self.inner.spin_alpha =
-            Angle::new(value, None).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        self.inner.spin_alpha = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
@@ -650,8 +641,8 @@ impl SpinState {
     }
     #[setter]
     fn set_spin_delta(&mut self, value: f64) -> PyResult<()> {
-        self.inner.spin_delta =
-            Angle::new(value, None).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        self.inner.spin_delta = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
@@ -666,8 +657,8 @@ impl SpinState {
     }
     #[setter]
     fn set_spin_angle(&mut self, value: f64) -> PyResult<()> {
-        self.inner.spin_angle =
-            Angle::new(value, None).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        self.inner.spin_angle = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(())
     }
 
@@ -682,10 +673,7 @@ impl SpinState {
     }
     #[setter]
     fn set_spin_angle_vel(&mut self, value: f64) {
-        self.inner.spin_angle_vel = AngleRate {
-            value,
-            units: None,
-        };
+        self.inner.spin_angle_vel = AngleRate { value, units: None };
     }
 
     /// Nutation angle of spin axis.
@@ -887,10 +875,7 @@ impl InertiaState {
     }
     #[setter]
     fn set_ixx(&mut self, value: f64) {
-        self.inner.ixx = Moment {
-            value,
-            units: None,
-        };
+        self.inner.ixx = Moment { value, units: None };
     }
 
     /// Moment of Inertia about the Y-axis.
@@ -904,10 +889,7 @@ impl InertiaState {
     }
     #[setter]
     fn set_iyy(&mut self, value: f64) {
-        self.inner.iyy = Moment {
-            value,
-            units: None,
-        };
+        self.inner.iyy = Moment { value, units: None };
     }
 
     /// Moment of Inertia about the Z-axis.
@@ -921,10 +903,7 @@ impl InertiaState {
     }
     #[setter]
     fn set_izz(&mut self, value: f64) {
-        self.inner.izz = Moment {
-            value,
-            units: None,
-        };
+        self.inner.izz = Moment { value, units: None };
     }
 
     /// Inertia Cross Product of the X and Y axes.
@@ -938,10 +917,7 @@ impl InertiaState {
     }
     #[setter]
     fn set_ixy(&mut self, value: f64) {
-        self.inner.ixy = Moment {
-            value,
-            units: None,
-        };
+        self.inner.ixy = Moment { value, units: None };
     }
 
     /// Inertia Cross Product of the X and Z axes.
@@ -955,10 +931,7 @@ impl InertiaState {
     }
     #[setter]
     fn set_ixz(&mut self, value: f64) {
-        self.inner.ixz = Moment {
-            value,
-            units: None,
-        };
+        self.inner.ixz = Moment { value, units: None };
     }
 
     /// Inertia Cross Product of the Y and Z axes.
@@ -972,10 +945,7 @@ impl InertiaState {
     }
     #[setter]
     fn set_iyz(&mut self, value: f64) {
-        self.inner.iyz = Moment {
-            value,
-            units: None,
-        };
+        self.inner.iyz = Moment { value, units: None };
     }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.

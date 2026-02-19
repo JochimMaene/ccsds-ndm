@@ -101,9 +101,9 @@ def _extract_annotation(doc: str | None, tag: str) -> str | None:
     """Extract type from :type: or :rtype: annotation in docstring."""
     if not doc:
         return None
-    match = re.search(rf":{tag}:\s*", doc)
+    match = re.search(rf":{tag}:\s*([^\n\r]+)", doc)
     if match:
-        result = _extract_bracketed_type(doc, match.end())
+        result = match.group(1).strip()
         return result or None
     return None
 

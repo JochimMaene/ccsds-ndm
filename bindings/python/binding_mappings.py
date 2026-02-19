@@ -144,19 +144,6 @@ PYTHON_ONLY_FIELDS: dict[str, list[str]] = {
 READ_ONLY_FIELDS: dict[str, dict[str, str]] = {
     "Acm": {
         "id": "protocol_managed",
-        "segment": "partial_binding",
-    },
-    "AcmSegment": {
-        "metadata": "partial_binding",
-        "data": "partial_binding",
-    },
-    "AcmMetadata": {
-        "object_name": "partial_binding",
-        "international_designator": "partial_binding",
-    },
-    "AcmData": {
-        "att": "partial_binding",
-        "phys": "partial_binding",
     },
     "AttitudeState": {
         "epoch": "immutable_view",
@@ -211,14 +198,6 @@ READ_ONLY_FIELDS: dict[str, dict[str, str]] = {
     "OcmOdParameters": {
         "days_since_first_obs": "derived_projection",
         "days_since_last_obs": "derived_projection",
-    },
-    "OcmCovarianceMatrix": {
-        "cov_basis": "partial_binding",
-        "cov_confidence": "partial_binding",
-        "cov_ordering": "partial_binding",
-    },
-    "OcmManeuverParameters": {
-        "man_basis": "partial_binding",
     },
 }
 

@@ -73,10 +73,7 @@ impl Acm {
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
-        crate::common::validate_version(
-            ccsds_ndm::validation::MessageKind::Acm,
-            &value,
-        )?;
+        crate::common::validate_version(ccsds_ndm::validation::MessageKind::Acm, &value)?;
         self.inner.version = value;
         Ok(())
     }
@@ -221,6 +218,11 @@ impl Acm {
             inner: (*self.inner.body.segment).clone(),
         }
     }
+
+    #[setter]
+    fn set_segment(&mut self, value: AcmSegment) {
+        self.inner.body.segment = Box::new(value.inner);
+    }
 }
 
 #[pyclass]
@@ -251,6 +253,11 @@ impl AcmSegment {
         }
     }
 
+    #[setter]
+    fn set_metadata(&mut self, value: AcmMetadata) {
+        self.inner.metadata = value.inner;
+    }
+
     /// ACM Data Section.
     ///
     /// :type: AcmData
@@ -259,6 +266,11 @@ impl AcmSegment {
         AcmData {
             inner: self.inner.data.clone(),
         }
+    }
+
+    #[setter]
+    fn set_data(&mut self, value: AcmData) {
+        self.inner.data = value.inner;
     }
 
     /// Validate the segment against CCSDS rules.
@@ -341,6 +353,11 @@ impl AcmMetadata {
         self.inner.object_name.clone()
     }
 
+    #[setter]
+    fn set_object_name(&mut self, value: String) {
+        self.inner.object_name = value;
+    }
+
     /// Free text field containing an international designator for the object as assigned by the UN
     /// Committee on Space Research (COSPAR) and the US National Space Science Data Center (NSSDC).
     /// Such designator values have the following COSPAR format: YYYY-NNNP{PP}, where: YYYY = Year
@@ -356,6 +373,11 @@ impl AcmMetadata {
     #[getter]
     fn get_international_designator(&self) -> Option<String> {
         self.inner.international_designator.clone()
+    }
+
+    #[setter]
+    fn set_international_designator(&mut self, value: Option<String>) {
+        self.inner.international_designator = value;
     }
 
     /// Validate the metadata section against CCSDS rules.
@@ -438,6 +460,11 @@ impl AcmData {
             .collect()
     }
 
+    #[setter]
+    fn set_att(&mut self, value: Vec<AcmAttitudeState>) {
+        self.inner.att = value.into_iter().map(|s| s.inner).collect();
+    }
+
     /// A single space object physical characteristics section.
     ///
     /// :type: AcmPhysicalDescription | None
@@ -447,6 +474,11 @@ impl AcmData {
             .phys
             .as_ref()
             .map(|p| AcmPhysicalDescription { inner: p.clone() })
+    }
+
+    #[setter]
+    fn set_phys(&mut self, value: Option<AcmPhysicalDescription>) {
+        self.inner.phys = value.map(|p| p.inner);
     }
 
     /// Validate the data section against CCSDS rules.
@@ -475,8 +507,8 @@ impl AcmAttitudeState {
         att_lines: Vec<Vec<f64>>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let att_type =
-            AcmAttitudeType::from_str(&att_type).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let att_type = AcmAttitudeType::from_str(&att_type)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(Self {
             inner: core_acm::AcmAttitudeState {
                 comment: comment.unwrap_or_default(),

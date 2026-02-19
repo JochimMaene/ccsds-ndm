@@ -58,7 +58,9 @@ fn parse_attitude_type_or_infer(
     values_len: usize,
 ) -> PyResult<AttitudeTypeType> {
     match attitude_type {
-        Some(raw) => AttitudeTypeType::from_str(raw).map_err(|e| PyValueError::new_err(e.to_string())),
+        Some(raw) => {
+            AttitudeTypeType::from_str(raw).map_err(|e| PyValueError::new_err(e.to_string()))
+        }
         None => infer_attitude_type_from_values_len(values_len),
     }
 }
@@ -321,7 +323,12 @@ fn values_from_content(
     match content {
         ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) => (
             v.epoch,
-            vec![v.quaternion.q1, v.quaternion.q2, v.quaternion.q3, v.quaternion.qc],
+            vec![
+                v.quaternion.q1,
+                v.quaternion.q2,
+                v.quaternion.q3,
+                v.quaternion.qc,
+            ],
         ),
         ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(v) => (
             v.epoch,
@@ -348,9 +355,10 @@ fn values_from_content(
                 v.ang_vel.angvel_z.value,
             ],
         ),
-        ccsds_ndm::common::AemAttitudeState::EulerAngle(v) => {
-            (v.epoch, vec![v.angle_1.value, v.angle_2.value, v.angle_3.value])
-        }
+        ccsds_ndm::common::AemAttitudeState::EulerAngle(v) => (
+            v.epoch,
+            vec![v.angle_1.value, v.angle_2.value, v.angle_3.value],
+        ),
         ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(v) => (
             v.epoch,
             vec![
@@ -503,10 +511,7 @@ impl Aem {
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
-        crate::common::validate_version(
-            ccsds_ndm::validation::MessageKind::Aem,
-            &value,
-        )?;
+        crate::common::validate_version(ccsds_ndm::validation::MessageKind::Aem, &value)?;
         self.inner.version = value;
         Ok(())
     }
@@ -1173,8 +1178,8 @@ impl AemData {
 
     /// Validate the data section against CCSDS rules.
     fn validate(&self, attitude_type: String) -> PyResult<()> {
-        let attitude_type =
-            AttitudeTypeType::from_str(&attitude_type).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let attitude_type = AttitudeTypeType::from_str(&attitude_type)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         self.inner
             .validate(&attitude_type)
             .map_err(|e| PyValueError::new_err(e.to_string()))
@@ -1498,11 +1503,7 @@ impl AemData {
 
             let row = array_view.row(i);
             let row_values: Vec<f64> = row.iter().copied().collect();
-            attitude_states.push(build_state_from_values(
-                epoch,
-                &row_values,
-                &resolved_type,
-            )?);
+            attitude_states.push(build_state_from_values(epoch, &row_values, &resolved_type)?);
         }
         self.inner.attitude_states = attitude_states;
         Ok(())

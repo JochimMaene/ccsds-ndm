@@ -79,10 +79,7 @@ impl Tdm {
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
-        crate::common::validate_version(
-            ccsds_ndm::validation::MessageKind::Tdm,
-            &value,
-        )?;
+        crate::common::validate_version(ccsds_ndm::validation::MessageKind::Tdm, &value)?;
         self.inner.version = value;
         Ok(())
     }

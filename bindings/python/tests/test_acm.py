@@ -13,6 +13,7 @@ from ccsds_ndm import (
     AcmCovarianceMatrix,
     AcmData,
     AcmMetadata,
+    AcmPhysicalDescription,
     AcmSegment,
     AdmHeader,
 )
@@ -113,6 +114,53 @@ class TestAcm:
         # Test from_file
         acm2 = Acm.from_file(str(kvn_path), format="kvn")
         assert acm2.header.originator == "TEST"
+
+    def test_acm_setter_parity_for_nested_sections(self):
+        acm = self._create_valid_acm()
+
+        replacement_meta = AcmMetadata(
+            object_name="SAT2",
+            epoch_tzero="2023-02-01T00:00:00",
+            time_system="UTC",
+            international_designator="2023-002A",
+        )
+        replacement_data = AcmData(
+            att=[], phys=None, cov=None, man=None, ad=None, user=None
+        )
+        replacement_segment = AcmSegment(
+            metadata=replacement_meta, data=replacement_data
+        )
+
+        acm.segment = replacement_segment
+        assert acm.segment.metadata.object_name == "SAT2"
+
+        segment = acm.segment
+        metadata = segment.metadata
+        metadata.object_name = "SAT3"
+        metadata.international_designator = None
+        segment.metadata = metadata
+        assert segment.metadata.object_name == "SAT3"
+        assert segment.metadata.international_designator is None
+
+        state = AcmAttitudeState(
+            ref_frame_a="EME2000",
+            ref_frame_b="SC_BODY_1",
+            att_type="QUATERNION",
+            att_lines=[[0.0, 0.0, 0.0, 1.0]],
+            comment=[],
+        )
+        data = segment.data
+        data.att = [state]
+        assert len(data.att) == 1
+
+        data.phys = AcmPhysicalDescription(comment=["shape"])
+        assert data.phys is not None
+        data.phys = None
+        assert data.phys is None
+
+        segment.data = data
+        acm.segment = segment
+        assert len(acm.segment.data.att) == 1
 
 
 if __name__ == "__main__":

@@ -107,6 +107,8 @@ class Acm:
         """
         ...
 
+    @segment.setter
+    def segment(self, value: AcmSegment) -> None: ...
     def to_file(self, path, format, validate=True):
         """ """
         ...
@@ -195,22 +197,26 @@ class AcmData:
         """
         ...
 
+    @att.setter
+    def att(self, value: list[AcmAttitudeState]) -> None: ...
     @property
-    def phys(self) -> AcmPhysicalDescription:
+    def phys(self) -> AcmPhysicalDescription | None:
         """
         A single space object physical characteristics section.
         """
         ...
 
+    @phys.setter
+    def phys(self, value: AcmPhysicalDescription | None) -> None: ...
     @property
-    def user(self) -> UserDefined:
+    def user(self) -> UserDefined | None:
         """
         A single user-defined Data section.
         """
         ...
 
     @user.setter
-    def user(self, value: UserDefined) -> None: ...
+    def user(self, value: UserDefined | None) -> None: ...
     def validate(self, metadata):
         """
         Validate the data section against CCSDS rules.
@@ -246,7 +252,7 @@ class AcmMetadata:
         ...
 
     @property
-    def international_designator(self) -> str:
+    def international_designator(self) -> str | None:
         """
         Free text field containing an international designator for the object as assigned by the UN
         Committee on Space Research (COSPAR) and the US National Space Science Data Center (NSSDC).
@@ -261,6 +267,8 @@ class AcmMetadata:
         """
         ...
 
+    @international_designator.setter
+    def international_designator(self, value: str | None) -> None: ...
     @property
     def object_name(self) -> str:
         """
@@ -276,6 +284,8 @@ class AcmMetadata:
         """
         ...
 
+    @object_name.setter
+    def object_name(self, value: str) -> None: ...
     def validate(self):
         """
         Validate the metadata section against CCSDS rules.
@@ -308,6 +318,8 @@ class AcmSegment:
         """
         ...
 
+    @data.setter
+    def data(self, value: AcmData) -> None: ...
     @property
     def metadata(self) -> AcmMetadata:
         """
@@ -315,6 +327,8 @@ class AcmSegment:
         """
         ...
 
+    @metadata.setter
+    def metadata(self, value: AcmMetadata) -> None: ...
     def validate(self, header):
         """
         Validate the segment against CCSDS rules.
@@ -733,7 +747,7 @@ class AemMetadata:
         ...
 
     @property
-    def angvel_frame(self) -> str:
+    def angvel_frame(self) -> str | None:
         """
         The frame of reference in which angular velocity data are specified. The set of allowed
         values is described in annex B, subsection B3. This keyword is applicable only if
@@ -745,7 +759,7 @@ class AemMetadata:
         ...
 
     @angvel_frame.setter
-    def angvel_frame(self, value: str) -> None: ...
+    def angvel_frame(self, value: str | None) -> None: ...
     @property
     def attitude_type(self) -> str:
         """
@@ -760,7 +774,7 @@ class AemMetadata:
     @attitude_type.setter
     def attitude_type(self, value: str) -> None: ...
     @property
-    def center_name(self) -> str:
+    def center_name(self) -> str | None:
         """
         Celestial body orbited by the object, which may be a natural solar system body (planets,
         asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -771,7 +785,7 @@ class AemMetadata:
         ...
 
     @center_name.setter
-    def center_name(self, value: str) -> None: ...
+    def center_name(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -785,7 +799,7 @@ class AemMetadata:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def euler_rot_seq(self) -> str:
+    def euler_rot_seq(self) -> str | None:
         """
         Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
         the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
@@ -799,9 +813,9 @@ class AemMetadata:
         ...
 
     @euler_rot_seq.setter
-    def euler_rot_seq(self, value: str) -> None: ...
+    def euler_rot_seq(self, value: str | None) -> None: ...
     @property
-    def interpolation_degree(self) -> int:
+    def interpolation_degree(self) -> int | None:
         """
         Recommended interpolation degree for attitude ephemeris data in the block immediately
         following this metadata block. It must be an integer value. This keyword must be used if
@@ -812,9 +826,9 @@ class AemMetadata:
         ...
 
     @interpolation_degree.setter
-    def interpolation_degree(self, value: int) -> None: ...
+    def interpolation_degree(self, value: int | None) -> None: ...
     @property
-    def interpolation_method(self) -> str:
+    def interpolation_method(self) -> str | None:
         """
         Recommended interpolation method for attitude ephemeris data in the block immediately
         following this metadata block.
@@ -824,7 +838,7 @@ class AemMetadata:
         ...
 
     @interpolation_method.setter
-    def interpolation_method(self, value: str) -> None: ...
+    def interpolation_method(self, value: str | None) -> None: ...
     @property
     def object_id(self) -> str:
         """
@@ -920,7 +934,7 @@ class AemMetadata:
     @time_system.setter
     def time_system(self, value: str) -> None: ...
     @property
-    def useable_start_time(self) -> str:
+    def useable_start_time(self) -> str | None:
         """
         Optional start of USEABLE time span covered by attitude ephemeris data immediately
         following this metadata block. To allow for proper interpolation near the beginning/end of
@@ -934,9 +948,9 @@ class AemMetadata:
         ...
 
     @useable_start_time.setter
-    def useable_start_time(self, value: str) -> None: ...
+    def useable_start_time(self, value: str | None) -> None: ...
     @property
-    def useable_stop_time(self) -> str:
+    def useable_stop_time(self) -> str | None:
         """
         Optional stop of USEABLE time span covered by attitude ephemeris data immediately following
         this metadata block. (See also USEABLE_START_TIME.)
@@ -946,7 +960,7 @@ class AemMetadata:
         ...
 
     @useable_stop_time.setter
-    def useable_stop_time(self, value: str) -> None: ...
+    def useable_stop_time(self, value: str | None) -> None: ...
     def validate(self):
         """
         Validate the metadata section against CCSDS rules.
@@ -1281,7 +1295,7 @@ class ApmMetadata:
         ...
 
     @property
-    def center_name(self) -> str:
+    def center_name(self) -> str | None:
         """
         Celestial body orbited by the object, which may be a natural solar system body (planets,
         asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -1292,7 +1306,7 @@ class ApmMetadata:
         ...
 
     @center_name.setter
-    def center_name(self, value: str) -> None: ...
+    def center_name(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -4664,6 +4678,8 @@ class OcmCovarianceMatrix:
         """
         ...
 
+    @cov_basis.setter
+    def cov_basis(self, value: Optional[str]) -> None: ...
     @property
     def cov_basis_id(self) -> Optional[str]:
         """
@@ -4691,6 +4707,8 @@ class OcmCovarianceMatrix:
         """
         ...
 
+    @cov_confidence.setter
+    def cov_confidence(self, value: Optional[float]) -> None: ...
     @property
     def cov_frame_epoch(self) -> Optional[str]:
         """
@@ -4751,6 +4769,8 @@ class OcmCovarianceMatrix:
         """
         ...
 
+    @cov_ordering.setter
+    def cov_ordering(self, value: str) -> None: ...
     @property
     def cov_prev_id(self) -> Optional[str]:
         """
@@ -4902,14 +4922,14 @@ class OcmData:
     @traj.setter
     def traj(self, value: list[OcmTrajState]) -> None: ...
     @property
-    def user(self) -> UserDefined:
+    def user(self) -> UserDefined | None:
         """
         User-defined parameters.
         """
         ...
 
     @user.setter
-    def user(self, value: UserDefined) -> None: ...
+    def user(self, value: UserDefined | None) -> None: ...
 
 class OcmManeuverParameters:
     """
@@ -5227,6 +5247,8 @@ class OcmManeuverParameters:
         """
         ...
 
+    @man_basis.setter
+    def man_basis(self, value: Optional[str]) -> None: ...
     @property
     def man_basis_id(self) -> Optional[str]:
         """
@@ -9444,14 +9466,14 @@ class OmmData:
     @tle_parameters.setter
     def tle_parameters(self, value: Optional[TleParameters]) -> None: ...
     @property
-    def user_defined_parameters(self) -> UserDefined:
+    def user_defined_parameters(self) -> UserDefined | None:
         """
         User-Defined Parameters.
         """
         ...
 
     @user_defined_parameters.setter
-    def user_defined_parameters(self, value: UserDefined) -> None: ...
+    def user_defined_parameters(self, value: UserDefined | None) -> None: ...
 
 class OmmMetadata:
     """
@@ -10193,14 +10215,14 @@ class OpmData:
     @state_vector.setter
     def state_vector(self, value: StateVector) -> None: ...
     @property
-    def user_defined_parameters(self) -> UserDefined:
+    def user_defined_parameters(self) -> UserDefined | None:
         """
         User defined parameters.
         """
         ...
 
     @user_defined_parameters.setter
-    def user_defined_parameters(self, value: UserDefined) -> None: ...
+    def user_defined_parameters(self, value: UserDefined | None) -> None: ...
 
 class OpmMetadata:
     """
@@ -10769,14 +10791,14 @@ class RdmData:
     @state_vector.setter
     def state_vector(self, value: Optional[StateVector]) -> None: ...
     @property
-    def user_defined_parameters(self) -> UserDefined:
+    def user_defined_parameters(self) -> UserDefined | None:
         """
         User defined parameters.
         """
         ...
 
     @user_defined_parameters.setter
-    def user_defined_parameters(self, value: UserDefined) -> None: ...
+    def user_defined_parameters(self, value: UserDefined | None) -> None: ...
 
 class RdmHeader:
     """

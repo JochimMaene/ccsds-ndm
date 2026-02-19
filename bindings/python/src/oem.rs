@@ -321,10 +321,7 @@ impl Oem {
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
-        crate::common::validate_version(
-            ccsds_ndm::validation::MessageKind::Oem,
-            &value,
-        )?;
+        crate::common::validate_version(ccsds_ndm::validation::MessageKind::Oem, &value)?;
         self.inner.version = value;
         Ok(())
     }

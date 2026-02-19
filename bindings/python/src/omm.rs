@@ -80,10 +80,7 @@ impl Omm {
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
-        crate::common::validate_version(
-            ccsds_ndm::validation::MessageKind::Omm,
-            &value,
-        )?;
+        crate::common::validate_version(ccsds_ndm::validation::MessageKind::Omm, &value)?;
         self.inner.version = value;
         Ok(())
     }
