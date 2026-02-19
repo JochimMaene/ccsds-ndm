@@ -380,7 +380,10 @@ impl AcmMetadata {
         self.inner.international_designator = value;
     }
 
-    /// Comments (allowed only at the beginning of the ACM Metadata).
+    /// Comments (allowed only at the beginning of the ACM Metadata). Each comment line shall begin
+    /// with this keyword.
+    ///
+    /// Examples: This is a comment.
     ///
     /// :type: list[str]
     #[getter]
@@ -510,7 +513,10 @@ impl AcmMetadata {
         self.inner.center_name = value;
     }
 
-    /// Time system used in this metadata section.
+    /// Time system used for metadata, attitude data, covariance data. The set of allowed values is
+    /// described in annex B, subsection B2.
+    ///
+    /// Examples: UTC, TAI
     ///
     /// :type: str
     #[getter]
@@ -524,7 +530,11 @@ impl AcmMetadata {
         Ok(())
     }
 
-    /// Reference epoch for relative times.
+    /// Epoch from which all ACM relative times are referenced. (For format specification, see
+    /// 6.8.9.) The time scale for EPOCH_TZERO is the one specified by ‘TIME_SYSTEM’ keyword in the
+    /// Metadata section.
+    ///
+    /// Examples: 2016-11-10T00:00:00
     ///
     /// :type: str
     #[getter]
@@ -737,7 +747,8 @@ impl AcmData {
         self.inner.phys = value.map(|p| p.inner);
     }
 
-    /// One or more optional covariance time histories.
+    /// One or more optional covariance time histories (each consisting of one or more covariance
+    /// matrix diagonals).
     ///
     /// :type: list[AcmCovarianceMatrix]
     #[getter]
@@ -754,7 +765,7 @@ impl AcmData {
         self.inner.cov = value.into_iter().map(|c| c.inner).collect();
     }
 
-    /// One or more optional maneuver specification sections.
+    /// One or more optional maneuver specification section(s).
     ///
     /// :type: list[AcmManeuverParameters]
     #[getter]
@@ -836,7 +847,9 @@ impl AcmAttitudeState {
         })
     }
 
-    /// Comments for this attitude state section.
+    /// Comments allowed only immediately after the ATT_START keyword.
+    ///
+    /// Examples: This is a comment.
     ///
     /// :type: list[str]
     #[getter]
@@ -905,7 +918,10 @@ impl AcmAttitudeState {
         self.inner.att_basis_id = value;
     }
 
-    /// Source reference frame.
+    /// Name of the reference frame that defines the starting point of the transformation. The set
+    /// of allowed values is described in annex B, subsection B3.
+    ///
+    /// Examples: J2000
     ///
     /// :type: str
     #[getter]
@@ -918,7 +934,10 @@ impl AcmAttitudeState {
         self.inner.ref_frame_a = value;
     }
 
-    /// Destination reference frame.
+    /// Name of the reference frame that defines the end point of the transformation. The set of
+    /// allowed values is described in annex B, subsection B3.
+    ///
+    /// Examples: SC_BODY_1
     ///
     /// :type: str
     #[getter]
@@ -931,7 +950,10 @@ impl AcmAttitudeState {
         self.inner.ref_frame_b = value;
     }
 
-    /// Number of states in each attitude line.
+    /// Number of data states included. States to be included are attitude states and optional rate
+    /// states.
+    ///
+    /// Examples: 3, 4, 7
     ///
     /// :type: int
     #[getter]
@@ -944,7 +966,10 @@ impl AcmAttitudeState {
         self.inner.number_states = value;
     }
 
-    /// Attitude state type.
+    /// Type of attitude data, selected per annex B, subsection B4. Attitude data must always be
+    /// listed before rate data. The units that shall be used are given in annex B, subsection B4.
+    ///
+    /// Examples: QUATERNION, EULER_ANGLES, DCM
     ///
     /// :type: str
     #[getter]
@@ -993,7 +1018,8 @@ impl AcmAttitudeState {
         Ok(())
     }
 
-    /// Attitude state lines.
+    /// Data lines that consist of attitude data followed by rate data. (For the data units, see
+    /// above [ATT_TYPE and RATE_TYPE keywords]).
     ///
     /// :type: list[list[float]]
     #[getter]
@@ -1045,7 +1071,9 @@ impl AcmPhysicalDescription {
         }
     }
 
-    /// Comments for this physical description section.
+    /// Comments allowed only immediately after the PHYS_START keyword.
+    ///
+    /// Examples: This is a comment.
     ///
     /// :type: list[str]
     #[getter]
@@ -1290,7 +1318,9 @@ impl AcmCovarianceMatrix {
         })
     }
 
-    /// Comments for this covariance section.
+    /// Comments allowed only immediately after the COV_START keyword.
+    ///
+    /// Examples: THIS is a comment.
     ///
     /// :type: list[str]
     #[getter]
@@ -1303,7 +1333,9 @@ impl AcmCovarianceMatrix {
         self.inner.comment = value;
     }
 
-    /// Covariance basis identifier.
+    /// Basis of this covariance time history data.
+    ///
+    /// Examples: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
     ///
     /// :type: str
     #[getter]
@@ -1316,7 +1348,10 @@ impl AcmCovarianceMatrix {
         self.inner.cov_basis = value;
     }
 
-    /// Covariance reference frame.
+    /// Reference frame of the covariance time history. The full set of values is enumerated in
+    /// annex B, subsection B3.
+    ///
+    /// Examples: SC_BODY_1
     ///
     /// :type: str
     #[getter]
@@ -1329,7 +1364,9 @@ impl AcmCovarianceMatrix {
         self.inner.cov_ref_frame = value;
     }
 
-    /// Covariance line type.
+    /// Indicates covariance composition. Select from annex B, subsection B6.
+    ///
+    /// Examples: ANGLE, ANGLE_GYROBIAS
     ///
     /// :type: str
     #[getter]
@@ -1357,7 +1394,8 @@ impl AcmCovarianceMatrix {
         self.inner.cov_confidence = value;
     }
 
-    /// Covariance data lines.
+    /// Covariance data lines (diagonal terms only). (For the data units, see annex B, subsection
+    /// B6.)
     ///
     /// :type: list[list[float]]
     #[getter]
@@ -1408,7 +1446,9 @@ impl AcmManeuverParameters {
         }
     }
 
-    /// Comments for this maneuver section.
+    /// Comments allowed only immediately after the MAN_START keyword.
+    ///
+    /// Examples: This is a comment.
     ///
     /// :type: list[str]
     #[getter]
@@ -1644,7 +1684,9 @@ impl AcmSensor {
         }
     }
 
-    /// Sensor section comments.
+    /// Comments allowed only immediately after the SENSOR_START keyword.
+    ///
+    /// Examples: This is a comment.
     ///
     /// :type: list[str]
     #[getter]
@@ -1657,7 +1699,10 @@ impl AcmSensor {
         self.inner.comment = value;
     }
 
-    /// Sensor number (unique in AD section).
+    /// Sensor number. Multiple sensors may be included, with each having a unique, ascending
+    /// number.
+    ///
+    /// Examples: 1, 2, 3
     ///
     /// :type: int
     #[getter]
@@ -1751,7 +1796,9 @@ impl AcmAttitudeDetermination {
         }
     }
 
-    /// Comments for this attitude determination section.
+    /// Comments allowed only immediately after the AD_START keyword.
+    ///
+    /// Examples: This is a comment.
     ///
     /// :type: list[str]
     #[getter]
@@ -1984,7 +2031,7 @@ impl AcmAttitudeDetermination {
         });
     }
 
-    /// Sensor blocks.
+    /// Sensor data blocks.
     ///
     /// :type: list[AcmSensor]
     #[getter]
