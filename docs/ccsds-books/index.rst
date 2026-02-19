@@ -11,7 +11,6 @@ CCSDS BOOKS
    adm
    cdm
    odm
-   prm
    rdm
    tdm
    xml

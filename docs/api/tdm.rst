@@ -24,3 +24,13 @@ Tracking Data Message (TDM)
 .. autoclass:: TdmObservation
    :members:
    :undoc-members:
+
+Enums
+-----
+
+.. autoclass:: TdmMode
+   :members:
+   :undoc-members:
+.. autoclass:: TdmPath
+   :members:
+   :undoc-members:

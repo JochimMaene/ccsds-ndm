@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Literal
 
 from binding_mappings import (
+    get_read_only_reason,
     get_rust_path,
     get_rust_struct_name,
     is_python_helper_class,
@@ -69,6 +70,7 @@ class PythonClass:
 
     name: str
     getters: dict[str, PythonGetter] = field(default_factory=dict)
+    setters: set[str] = field(default_factory=set)
     has_docstring: bool = False
 
 
@@ -84,6 +86,8 @@ class AuditIssue:
         "missing_type_annotation",  # Python getter lacks :type:
         "missing_rust_docstring",  # Rust field lacks docstring
         "struct_not_found",  # Python class has no matching Rust struct
+        "missing_setter",  # Getter exists but setter is missing and no read-only reason
+        "setter_without_getter",  # Setter exists without matching getter
     ]
     message: str
 
@@ -279,6 +283,15 @@ def parse_python_binding_file(filepath: Path) -> dict[str, PythonClass]:
                 has_type_annotation=has_type_annotation,
             )
 
+        # Find setters in this impl block
+        setter_pattern = re.compile(
+            r"#\[setter\]\s*\n(?:\s*#\[[^\]]*\]\s*\n)*\s*fn\s+(set_)?(\w+)\s*\(",
+            re.MULTILINE,
+        )
+        for setter_match in setter_pattern.finditer(impl_body):
+            func_name_part = setter_match.group(2)
+            classes[class_name].setters.add(func_name_part)
+
     return classes
 
 
@@ -303,6 +316,8 @@ def collect_python_classes(binding_dir: Path) -> dict[str, PythonClass]:
 def audit_bindings(
     rust_structs: dict[str, RustStruct],
     python_classes: dict[str, PythonClass],
+    *,
+    check_setters: bool = False,
 ) -> AuditResult:
     """Audit Python bindings against Rust structs."""
     result = AuditResult()
@@ -314,9 +329,53 @@ def audit_bindings(
         "missing_docstring": 0,
         "missing_type_annotation": 0,
         "python_only_fields": 0,
+        "readonly_documented": 0,
+        "missing_setter": 0,
+        "setter_without_getter": 0,
     }
 
     for class_name, py_class in python_classes.items():
+        if check_setters:
+            for py_field in py_class.getters:
+                if is_python_only(class_name, py_field):
+                    continue
+                if py_field in py_class.setters:
+                    continue
+
+                reason = get_read_only_reason(class_name, py_field)
+                if reason is None:
+                    result.stats["missing_setter"] += 1
+                    result.issues.append(
+                        AuditIssue(
+                            struct_name=class_name,
+                            field_name=py_field,
+                            issue_type="missing_setter",
+                            message=(
+                                f"Python getter '{class_name}.{py_field}' has no setter and no "
+                                "documented read-only rationale"
+                            ),
+                        )
+                    )
+                else:
+                    result.stats["readonly_documented"] += 1
+
+            for py_field in py_class.setters:
+                if py_field in py_class.getters:
+                    continue
+                if is_python_only(class_name, py_field):
+                    continue
+                result.stats["setter_without_getter"] += 1
+                result.issues.append(
+                    AuditIssue(
+                        struct_name=class_name,
+                        field_name=py_field,
+                        issue_type="setter_without_getter",
+                        message=(
+                            f"Python setter '{class_name}.{py_field}' exists without matching getter"
+                        ),
+                    )
+                )
+
         # Check if this is a Python-only helper class (no matching Rust struct)
         if is_python_helper_class(class_name):
             result.stats["python_only_fields"] += 1  # Count as OK
@@ -432,6 +491,8 @@ def print_report(result: AuditResult, verbose: bool = False) -> None:
                     "missing_type_annotation": "⚠",
                     "missing_rust_docstring": "ℹ",
                     "struct_not_found": "✗",
+                    "missing_setter": "✗",
+                    "setter_without_getter": "✗",
                 }[issue.issue_type]
                 print(f"  {icon} {issue.message}")
             print()
@@ -446,6 +507,14 @@ def print_report(result: AuditResult, verbose: bool = False) -> None:
     print(f"  Missing docstrings: {result.stats['missing_docstring']}")
     print(f"  Missing :type: annotations: {result.stats['missing_type_annotation']}")
     print(f"  Python-only fields: {result.stats['python_only_fields']} (OK)")
+    if "readonly_documented" in result.stats:
+        print(
+            f"  Read-only fields with rationale: {result.stats['readonly_documented']}"
+        )
+    if "missing_setter" in result.stats:
+        print(f"  Getters missing setter rationale: {result.stats['missing_setter']}")
+    if "setter_without_getter" in result.stats:
+        print(f"  Setters without getter: {result.stats['setter_without_getter']}")
 
     if result.issues:
         print(f"\n❌ {len(result.issues)} issues found")
@@ -507,6 +576,11 @@ def main() -> int:
         action="store_true",
         help="Output as JSON",
     )
+    parser.add_argument(
+        "--check-setters",
+        action="store_true",
+        help="Also validate getter/setter parity and read-only rationale coverage",
+    )
 
     args = parser.parse_args()
 
@@ -543,7 +617,11 @@ def main() -> int:
     # Run audit
     if not args.json:
         print("\nAuditing bindings...")
-    result = audit_bindings(rust_structs, python_classes)
+    result = audit_bindings(
+        rust_structs,
+        python_classes,
+        check_setters=args.check_setters,
+    )
 
     # Output
     if args.json:

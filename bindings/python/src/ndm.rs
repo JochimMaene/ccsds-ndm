@@ -32,6 +32,41 @@ pub struct Ndm {
     pub inner: core_ndm::CombinedNdm,
 }
 
+fn py_message_to_core(py: Python<'_>, msg: &Py<PyAny>) -> PyResult<MessageType> {
+    if let Ok(oem) = msg.extract::<Oem>(py) {
+        Ok(MessageType::Oem(oem.inner))
+    } else if let Ok(cdm) = msg.extract::<Cdm>(py) {
+        Ok(MessageType::Cdm(cdm.inner))
+    } else if let Ok(opm) = msg.extract::<Opm>(py) {
+        Ok(MessageType::Opm(opm.inner))
+    } else if let Ok(omm) = msg.extract::<Omm>(py) {
+        Ok(MessageType::Omm(omm.inner))
+    } else if let Ok(ocm) = msg.extract::<Ocm>(py) {
+        Ok(MessageType::Ocm(ocm.inner))
+    } else if let Ok(rdm) = msg.extract::<Rdm>(py) {
+        Ok(MessageType::Rdm(rdm.inner))
+    } else if let Ok(aem) = msg.extract::<crate::aem::Aem>(py) {
+        Ok(MessageType::Aem(aem.inner))
+    } else if let Ok(apm) = msg.extract::<crate::apm::Apm>(py) {
+        Ok(MessageType::Apm(apm.inner))
+    } else if let Ok(acm) = msg.extract::<crate::acm::Acm>(py) {
+        Ok(MessageType::Acm(acm.inner))
+    } else if let Ok(ndm) = msg.extract::<Ndm>(py) {
+        Ok(MessageType::Ndm(ndm.inner))
+    } else {
+        Err(PyValueError::new_err(
+            "Unsupported message type in NDM combined instantiation",
+        ))
+    }
+}
+
+fn py_messages_to_core(py: Python<'_>, messages: &[Py<PyAny>]) -> PyResult<Vec<MessageType>> {
+    messages
+        .iter()
+        .map(|msg| py_message_to_core(py, msg))
+        .collect()
+}
+
 #[pymethods]
 impl Ndm {
     #[new]
@@ -42,34 +77,7 @@ impl Ndm {
         comments: Vec<String>,
         py: Python,
     ) -> PyResult<Self> {
-        let mut core_messages = Vec::new();
-        for msg in messages {
-            if let Ok(oem) = msg.extract::<Oem>(py) {
-                core_messages.push(MessageType::Oem(oem.inner));
-            } else if let Ok(cdm) = msg.extract::<Cdm>(py) {
-                core_messages.push(MessageType::Cdm(cdm.inner));
-            } else if let Ok(opm) = msg.extract::<Opm>(py) {
-                core_messages.push(MessageType::Opm(opm.inner));
-            } else if let Ok(omm) = msg.extract::<Omm>(py) {
-                core_messages.push(MessageType::Omm(omm.inner));
-            } else if let Ok(ocm) = msg.extract::<Ocm>(py) {
-                core_messages.push(MessageType::Ocm(ocm.inner));
-            } else if let Ok(rdm) = msg.extract::<Rdm>(py) {
-                core_messages.push(MessageType::Rdm(rdm.inner));
-            } else if let Ok(aem) = msg.extract::<crate::aem::Aem>(py) {
-                core_messages.push(MessageType::Aem(aem.inner));
-            } else if let Ok(apm) = msg.extract::<crate::apm::Apm>(py) {
-                core_messages.push(MessageType::Apm(apm.inner));
-            } else if let Ok(acm) = msg.extract::<crate::acm::Acm>(py) {
-                core_messages.push(MessageType::Acm(acm.inner));
-            } else if let Ok(ndm) = msg.extract::<Ndm>(py) {
-                core_messages.push(MessageType::Ndm(ndm.inner));
-            } else {
-                return Err(PyValueError::new_err(
-                    "Unsupported message type in NDM combined instantiation",
-                ));
-            }
-        }
+        let core_messages = py_messages_to_core(py, &messages)?;
 
         Ok(Self {
             inner: core_ndm::CombinedNdm {
@@ -235,6 +243,12 @@ impl Ndm {
         Ok(py_messages)
     }
 
+    #[setter]
+    fn set_messages(&mut self, py: Python, messages: Vec<Py<PyAny>>) -> PyResult<()> {
+        self.inner.messages = py_messages_to_core(py, &messages)?;
+        Ok(())
+    }
+
     /// Message Identifier (optional).
     ///
     /// :type: Optional[str]
@@ -249,6 +263,11 @@ impl Ndm {
     #[getter]
     fn comments(&self) -> Vec<String> {
         self.inner.comments.clone()
+    }
+
+    #[setter]
+    fn set_comments(&mut self, comments: Vec<String>) {
+        self.inner.comments = comments;
     }
 
     fn __repr__(&self) -> String {

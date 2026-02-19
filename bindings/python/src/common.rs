@@ -2254,10 +2254,7 @@ pub fn parse_time_system(ob: &Bound<'_, PyAny>) -> PyResult<String> {
     }
 }
 
-pub fn validate_version(
-    kind: ccsds_ndm::validation::MessageKind,
-    value: &str,
-) -> PyResult<()> {
+pub fn validate_version(kind: ccsds_ndm::validation::MessageKind, value: &str) -> PyResult<()> {
     if let Some(spec) = ccsds_ndm::versioning::spec(kind) {
         if !spec.supported_versions.contains(&value) {
             return Err(PyValueError::new_err(format!(

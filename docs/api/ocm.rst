@@ -24,3 +24,21 @@ Orbit Comprehensive Message (OCM)
 .. autoclass:: OcmPhysicalDescription
    :members:
    :undoc-members:
+.. autoclass:: OcmManeuverParameters
+   :members:
+   :undoc-members:
+.. autoclass:: ManLine
+   :members:
+   :undoc-members:
+.. autoclass:: OcmCovarianceMatrix
+   :members:
+   :undoc-members:
+.. autoclass:: CovLine
+   :members:
+   :undoc-members:
+.. autoclass:: OcmPerturbations
+   :members:
+   :undoc-members:
+.. autoclass:: OcmOdParameters
+   :members:
+   :undoc-members:

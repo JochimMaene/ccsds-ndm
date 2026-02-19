@@ -169,6 +169,20 @@ class TestNdm:
         ndm2 = Ndm.from_file(str(path), format="xml")
         assert len(ndm2.messages) == 1
 
+    def test_ndm_message_and_comment_setters(self):
+        oem = self._create_valid_oem()
+        cdm = self._create_valid_cdm()
+
+        ndm = Ndm(messages=[oem], comments=["initial"])
+        assert len(ndm.messages) == 1
+        assert ndm.comments == ["initial"]
+
+        ndm.messages = [oem, cdm]
+        ndm.comments = ["updated", "suite"]
+
+        assert len(ndm.messages) == 2
+        assert ndm.comments == ["updated", "suite"]
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

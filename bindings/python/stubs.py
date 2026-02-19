@@ -12,9 +12,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import functools
 import inspect
 import re
 import subprocess
+from collections import defaultdict
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -26,6 +28,52 @@ from typing import Optional, Union
 import numpy
 
 """
+
+
+def _extract_pymethod_bodies(content: str) -> list[tuple[str, str]]:
+    """Extract (class_name, impl_body) from #[pymethods] impl blocks."""
+    impls: list[tuple[str, str]] = []
+    impl_pattern = re.compile(r"#\[pymethods\]\s*impl\s+(\w+)\s*\{", re.MULTILINE)
+
+    for match in impl_pattern.finditer(content):
+        class_name = match.group(1)
+        start = match.end()
+        pos = start
+        depth = 1
+        while pos < len(content) and depth > 0:
+            if content[pos] == "{":
+                depth += 1
+            elif content[pos] == "}":
+                depth -= 1
+            pos += 1
+        impls.append((class_name, content[start : pos - 1]))
+    return impls
+
+
+def _collect_property_setters(binding_src_dir: Path) -> dict[str, set[str]]:
+    """Collect writable properties from Rust #[setter] definitions."""
+    setters_by_class: dict[str, set[str]] = defaultdict(set)
+    setter_pattern = re.compile(
+        r"#\[setter\]\s*\n(?:\s*#\[[^\]]*\]\s*\n)*\s*fn\s+(\w+)(?:<[^>]*>)?\s*\(",
+        re.MULTILINE,
+    )
+
+    for file in binding_src_dir.glob("*.rs"):
+        content = file.read_text()
+        for class_name, body in _extract_pymethod_bodies(content):
+            for setter in setter_pattern.finditer(body):
+                func_name = setter.group(1)
+                prop_name = func_name[4:] if func_name.startswith("set_") else func_name
+                setters_by_class[class_name].add(prop_name)
+
+    return dict(setters_by_class)
+
+
+@functools.cache
+def _property_setters() -> dict[str, set[str]]:
+    """Cached writable property mapping derived from Rust binding sources."""
+    root = Path(__file__).resolve().parent
+    return _collect_property_setters(root / "src")
 
 
 def _extract_bracketed_type(text: str, start_pos: int) -> str:
@@ -53,9 +101,9 @@ def _extract_annotation(doc: str | None, tag: str) -> str | None:
     """Extract type from :type: or :rtype: annotation in docstring."""
     if not doc:
         return None
-    match = re.search(rf":{tag}:\s*", doc)
+    match = re.search(rf":{tag}:\s*([^\n\r]+)", doc)
     if match:
-        result = _extract_bracketed_type(doc, match.end())
+        result = match.group(1).strip()
         return result or None
     return None
 
@@ -113,8 +161,8 @@ def _generate_function(obj: Any, indent: str) -> str:
     )
 
 
-def _generate_property(obj: Any, indent: str) -> str:
-    """Generate stub for a property (getter and setter)."""
+def _generate_property(obj: Any, indent: str, *, has_setter: bool) -> str:
+    """Generate stub for a property."""
     name = obj.__name__
     doc = obj.__doc__ or ""
     prop_type = _extract_annotation(doc, "type")
@@ -132,16 +180,16 @@ def _generate_property(obj: Any, indent: str) -> str:
         )
     lines.extend([f"{inner_indent}...", ""])
 
-    # Setter
-    value_type = prop_type or "object"
-    lines.extend(
-        [
-            f"{indent}@{name}.setter",
-            f"{indent}def {name}(self, value: {value_type}) -> None:",
-            f"{inner_indent}...",
-            "",
-        ]
-    )
+    if has_setter:
+        value_type = prop_type or "object"
+        lines.extend(
+            [
+                f"{indent}@{name}.setter",
+                f"{indent}def {name}(self, value: {value_type}) -> None:",
+                f"{inner_indent}...",
+                "",
+            ]
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -193,9 +241,20 @@ def _generate_class(cls: type, indent: str) -> str:
             ]
         )
 
+    class_setters = _property_setters().get(cls.__name__, set())
+
     # Collect member stubs
     member_stubs: list[str] = []
-    for _, member in inspect.getmembers(cls, _should_include_member):
+    for member_name, member in inspect.getmembers(cls, _should_include_member):
+        if inspect.isgetsetdescriptor(member):
+            member_stubs.append(
+                _generate_property(
+                    member,
+                    inner_indent,
+                    has_setter=member_name in class_setters,
+                )
+            )
+            continue
         member_stubs.append(_generate_stub(member, inner_indent))
 
     # Add members or ellipsis if empty
@@ -232,7 +291,8 @@ def _generate_stub(obj: Any, indent: str = "") -> str:
         return _generate_function(obj, indent)
 
     if inspect.isgetsetdescriptor(obj):
-        return _generate_property(obj, indent)
+        # Property setter information is only available in class context.
+        return _generate_property(obj, indent, has_setter=False)
 
     raise ValueError(f"Unsupported object type: {type(obj).__name__}")
 

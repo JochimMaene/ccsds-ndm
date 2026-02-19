@@ -100,8 +100,6 @@ class Acm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> AcmSegment:
         """
@@ -152,6 +150,162 @@ class AcmAttitudeDetermination:
         """
         ...
 
+    @property
+    def ad_epoch(self) -> str | None:
+        """
+        Attitude determination epoch.
+        """
+        ...
+
+    @ad_epoch.setter
+    def ad_epoch(self, value: str | None) -> None: ...
+    @property
+    def ad_id(self) -> str | None:
+        """
+        Attitude determination block identifier.
+        """
+        ...
+
+    @ad_id.setter
+    def ad_id(self, value: str | None) -> None: ...
+    @property
+    def ad_method(self) -> str | None:
+        """
+        Attitude determination method.
+        """
+        ...
+
+    @ad_method.setter
+    def ad_method(self, value: str | None) -> None: ...
+    @property
+    def ad_prev_id(self) -> str | None:
+        """
+        Previous attitude determination block identifier.
+        """
+        ...
+
+    @ad_prev_id.setter
+    def ad_prev_id(self, value: str | None) -> None: ...
+    @property
+    def attitude_source(self) -> str | None:
+        """
+        Source of attitude estimate.
+        """
+        ...
+
+    @attitude_source.setter
+    def attitude_source(self, value: str | None) -> None: ...
+    @property
+    def attitude_states(self) -> str | None:
+        """
+        Attitude state type for estimator.
+        """
+        ...
+
+    @attitude_states.setter
+    def attitude_states(self, value: str | None) -> None: ...
+    @property
+    def attitude_type(self) -> str | None:
+        """
+        Attitude type keyword.
+        """
+        ...
+
+    @attitude_type.setter
+    def attitude_type(self, value: str | None) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments allowed only immediately after the AD_START keyword.
+
+        Examples: This is a comment.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def cov_type(self) -> str | None:
+        """
+        Covariance type for estimator.
+        """
+        ...
+
+    @cov_type.setter
+    def cov_type(self, value: str | None) -> None: ...
+    @property
+    def number_states(self) -> int | None:
+        """
+        Number of estimator states.
+        """
+        ...
+
+    @number_states.setter
+    def number_states(self, value: int | None) -> None: ...
+    @property
+    def rate_process_noise_stddev(self) -> float | None:
+        """
+        Rate process noise standard deviation.
+        """
+        ...
+
+    @rate_process_noise_stddev.setter
+    def rate_process_noise_stddev(self, value: float | None) -> None: ...
+    @property
+    def rate_states(self) -> str | None:
+        """
+        Rate states type.
+        """
+        ...
+
+    @rate_states.setter
+    def rate_states(self, value: str | None) -> None: ...
+    @property
+    def ref_frame_a(self) -> str | None:
+        """
+        Source reference frame.
+        """
+        ...
+
+    @ref_frame_a.setter
+    def ref_frame_a(self, value: str | None) -> None: ...
+    @property
+    def ref_frame_b(self) -> str | None:
+        """
+        Destination reference frame.
+        """
+        ...
+
+    @ref_frame_b.setter
+    def ref_frame_b(self, value: str | None) -> None: ...
+    @property
+    def sensors(self) -> list[AcmSensor]:
+        """
+        Sensor data blocks.
+        """
+        ...
+
+    @sensors.setter
+    def sensors(self, value: list[AcmSensor]) -> None: ...
+    @property
+    def sigma_u(self) -> float | None:
+        """
+        Rate random walk sigma_u.
+        """
+        ...
+
+    @sigma_u.setter
+    def sigma_u(self, value: float | None) -> None: ...
+    @property
+    def sigma_v(self) -> float | None:
+        """
+        Angle random walk sigma_v.
+        """
+        ...
+
+    @sigma_v.setter
+    def sigma_v(self, value: float | None) -> None: ...
+
 class AcmAttitudeState:
     """
     ACM Data: Attitude State Time History Section.
@@ -165,6 +319,130 @@ class AcmAttitudeState:
         """
         ...
 
+    @property
+    def att_basis(self) -> str | None:
+        """
+        Basis of this attitude state data.
+        """
+        ...
+
+    @att_basis.setter
+    def att_basis(self, value: str | None) -> None: ...
+    @property
+    def att_basis_id(self) -> str | None:
+        """
+        Basis dataset identifier.
+        """
+        ...
+
+    @att_basis_id.setter
+    def att_basis_id(self, value: str | None) -> None: ...
+    @property
+    def att_id(self) -> str | None:
+        """
+        Attitude state block identifier.
+        """
+        ...
+
+    @att_id.setter
+    def att_id(self, value: str | None) -> None: ...
+    @property
+    def att_lines(self) -> list[list[float]]:
+        """
+        Data lines that consist of attitude data followed by rate data. (For the data units, see
+        above [ATT_TYPE and RATE_TYPE keywords]).
+        """
+        ...
+
+    @att_lines.setter
+    def att_lines(self, value: list[list[float]]) -> None: ...
+    @property
+    def att_prev_id(self) -> str | None:
+        """
+        Previous attitude state block identifier.
+        """
+        ...
+
+    @att_prev_id.setter
+    def att_prev_id(self, value: str | None) -> None: ...
+    @property
+    def att_type(self) -> str:
+        """
+        Type of attitude data, selected per annex B, subsection B4. Attitude data must always be
+        listed before rate data. The units that shall be used are given in annex B, subsection B4.
+
+        Examples: QUATERNION, EULER_ANGLES, DCM
+        """
+        ...
+
+    @att_type.setter
+    def att_type(self, value: str) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments allowed only immediately after the ATT_START keyword.
+
+        Examples: This is a comment.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def euler_rot_seq(self) -> str | None:
+        """
+        Optional Euler rotation sequence.
+        """
+        ...
+
+    @euler_rot_seq.setter
+    def euler_rot_seq(self, value: str | None) -> None: ...
+    @property
+    def number_states(self) -> int:
+        """
+        Number of data states included. States to be included are attitude states and optional rate
+        states.
+
+        Examples: 3, 4, 7
+        """
+        ...
+
+    @number_states.setter
+    def number_states(self, value: int) -> None: ...
+    @property
+    def rate_type(self) -> str | None:
+        """
+        Optional rate state type.
+        """
+        ...
+
+    @rate_type.setter
+    def rate_type(self, value: str | None) -> None: ...
+    @property
+    def ref_frame_a(self) -> str:
+        """
+        Name of the reference frame that defines the starting point of the transformation. The set
+        of allowed values is described in annex B, subsection B3.
+
+        Examples: J2000
+        """
+        ...
+
+    @ref_frame_a.setter
+    def ref_frame_a(self, value: str) -> None: ...
+    @property
+    def ref_frame_b(self) -> str:
+        """
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+
+        Examples: SC_BODY_1
+        """
+        ...
+
+    @ref_frame_b.setter
+    def ref_frame_b(self, value: str) -> None: ...
+
 class AcmCovarianceMatrix:
     """
     ACM Data: Covariance Time History Section.
@@ -177,6 +455,71 @@ class AcmCovarianceMatrix:
         Helper for pickle.
         """
         ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments allowed only immediately after the COV_START keyword.
+
+        Examples: THIS is a comment.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def cov_basis(self) -> str:
+        """
+        Basis of this covariance time history data.
+
+        Examples: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
+        """
+        ...
+
+    @cov_basis.setter
+    def cov_basis(self, value: str) -> None: ...
+    @property
+    def cov_confidence(self) -> float | None:
+        """
+        Optional covariance confidence.
+        """
+        ...
+
+    @cov_confidence.setter
+    def cov_confidence(self, value: float | None) -> None: ...
+    @property
+    def cov_lines(self) -> list[list[float]]:
+        """
+        Covariance data lines (diagonal terms only). (For the data units, see annex B, subsection
+        B6.)
+        """
+        ...
+
+    @cov_lines.setter
+    def cov_lines(self, value: list[list[float]]) -> None: ...
+    @property
+    def cov_ref_frame(self) -> str:
+        """
+        Reference frame of the covariance time history. The full set of values is enumerated in
+        annex B, subsection B3.
+
+        Examples: SC_BODY_1
+        """
+        ...
+
+    @cov_ref_frame.setter
+    def cov_ref_frame(self, value: str) -> None: ...
+    @property
+    def cov_type(self) -> str:
+        """
+        Indicates covariance composition. Select from annex B, subsection B6.
+
+        Examples: ANGLE, ANGLE_GYROBIAS
+        """
+        ...
+
+    @cov_type.setter
+    def cov_type(self, value: str) -> None: ...
 
 class AcmData:
     """
@@ -192,6 +535,15 @@ class AcmData:
         ...
 
     @property
+    def ad(self) -> AcmAttitudeDetermination | None:
+        """
+        A single optional attitude determination section.
+        """
+        ...
+
+    @ad.setter
+    def ad(self, value: AcmAttitudeDetermination | None) -> None: ...
+    @property
     def att(self) -> list[AcmAttitudeState]:
         """
         One or more optional attitude state time histories (each consisting of one or more attitude
@@ -202,23 +554,42 @@ class AcmData:
     @att.setter
     def att(self, value: list[AcmAttitudeState]) -> None: ...
     @property
-    def phys(self) -> AcmPhysicalDescription:
+    def cov(self) -> list[AcmCovarianceMatrix]:
+        """
+        One or more optional covariance time histories (each consisting of one or more covariance
+        matrix diagonals).
+        """
+        ...
+
+    @cov.setter
+    def cov(self, value: list[AcmCovarianceMatrix]) -> None: ...
+    @property
+    def man(self) -> list[AcmManeuverParameters]:
+        """
+        One or more optional maneuver specification section(s).
+        """
+        ...
+
+    @man.setter
+    def man(self, value: list[AcmManeuverParameters]) -> None: ...
+    @property
+    def phys(self) -> AcmPhysicalDescription | None:
         """
         A single space object physical characteristics section.
         """
         ...
 
     @phys.setter
-    def phys(self, value: AcmPhysicalDescription) -> None: ...
+    def phys(self, value: AcmPhysicalDescription | None) -> None: ...
     @property
-    def user(self) -> UserDefined:
+    def user(self) -> UserDefined | None:
         """
         A single user-defined Data section.
         """
         ...
 
     @user.setter
-    def user(self, value: UserDefined) -> None: ...
+    def user(self, value: UserDefined | None) -> None: ...
     def validate(self, metadata):
         """
         Validate the data section against CCSDS rules.
@@ -235,6 +606,117 @@ class AcmManeuverParameters:
         Helper for pickle.
         """
         ...
+
+    @property
+    def actuator_used(self) -> str | None:
+        """
+        Actuator used for this maneuver.
+        """
+        ...
+
+    @actuator_used.setter
+    def actuator_used(self, value: str | None) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments allowed only immediately after the MAN_START keyword.
+
+        Examples: This is a comment.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def man_begin_time(self) -> str | None:
+        """
+        Maneuver begin time (relative or absolute epoch string).
+        """
+        ...
+
+    @man_begin_time.setter
+    def man_begin_time(self, value: str | None) -> None: ...
+    @property
+    def man_duration(self) -> float | None:
+        """
+        Maneuver duration in seconds.
+        """
+        ...
+
+    @man_duration.setter
+    def man_duration(self, value: float | None) -> None: ...
+    @property
+    def man_end_time(self) -> str | None:
+        """
+        Maneuver end time (relative or absolute epoch string).
+        """
+        ...
+
+    @man_end_time.setter
+    def man_end_time(self, value: str | None) -> None: ...
+    @property
+    def man_id(self) -> str | None:
+        """
+        Maneuver block identifier.
+        """
+        ...
+
+    @man_id.setter
+    def man_id(self, value: str | None) -> None: ...
+    @property
+    def man_prev_id(self) -> str | None:
+        """
+        Previous maneuver block identifier.
+        """
+        ...
+
+    @man_prev_id.setter
+    def man_prev_id(self, value: str | None) -> None: ...
+    @property
+    def man_purpose(self) -> str | None:
+        """
+        Maneuver purpose.
+        """
+        ...
+
+    @man_purpose.setter
+    def man_purpose(self, value: str | None) -> None: ...
+    @property
+    def target_attitude(self) -> list[float] | None:
+        """
+        Target attitude quaternion-like 4-vector.
+        """
+        ...
+
+    @target_attitude.setter
+    def target_attitude(self, value: list[float] | None) -> None: ...
+    @property
+    def target_mom_frame(self) -> str | None:
+        """
+        Reference frame of target momentum.
+        """
+        ...
+
+    @target_mom_frame.setter
+    def target_mom_frame(self, value: str | None) -> None: ...
+    @property
+    def target_momentum(self) -> list[float] | None:
+        """
+        Target momentum vector [x, y, z].
+        """
+        ...
+
+    @target_momentum.setter
+    def target_momentum(self, value: list[float] | None) -> None: ...
+    @property
+    def target_spinrate(self) -> float | None:
+        """
+        Target spin rate (deg/s).
+        """
+        ...
+
+    @target_spinrate.setter
+    def target_spinrate(self, value: float | None) -> None: ...
 
 class AcmMetadata:
     """
@@ -254,7 +736,59 @@ class AcmMetadata:
         ...
 
     @property
-    def international_designator(self) -> str:
+    def acm_data_elements(self) -> str | None:
+        """
+        Included ACM data block elements.
+        """
+        ...
+
+    @acm_data_elements.setter
+    def acm_data_elements(self, value: str | None) -> None: ...
+    @property
+    def catalog_name(self) -> str | None:
+        """
+        Satellite catalog source.
+        """
+        ...
+
+    @catalog_name.setter
+    def catalog_name(self, value: str | None) -> None: ...
+    @property
+    def center_name(self) -> str | None:
+        """
+        Central body name.
+        """
+        ...
+
+    @center_name.setter
+    def center_name(self, value: str | None) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments (allowed only at the beginning of the ACM Metadata). Each comment line shall begin
+        with this keyword.
+
+        Examples: This is a comment.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def epoch_tzero(self) -> str:
+        """
+        Epoch from which all ACM relative times are referenced. (For format specification, see
+        6.8.9.) The time scale for EPOCH_TZERO is the one specified by ‘TIME_SYSTEM’ keyword in the
+        Metadata section.
+
+        Examples: 2016-11-10T00:00:00
+        """
+        ...
+
+    @epoch_tzero.setter
+    def epoch_tzero(self, value: str) -> None: ...
+    @property
+    def international_designator(self) -> str | None:
         """
         Free text field containing an international designator for the object as assigned by the UN
         Committee on Space Research (COSPAR) and the US National Space Science Data Center (NSSDC).
@@ -270,7 +804,34 @@ class AcmMetadata:
         ...
 
     @international_designator.setter
-    def international_designator(self, value: str) -> None: ...
+    def international_designator(self, value: str | None) -> None: ...
+    @property
+    def next_leap_epoch(self) -> str | None:
+        """
+        Epoch of the next leap second.
+        """
+        ...
+
+    @next_leap_epoch.setter
+    def next_leap_epoch(self, value: str | None) -> None: ...
+    @property
+    def next_leap_taimutc(self) -> float | None:
+        """
+        Difference (TAI - UTC) at NEXT_LEAP_EPOCH, seconds.
+        """
+        ...
+
+    @next_leap_taimutc.setter
+    def next_leap_taimutc(self, value: float | None) -> None: ...
+    @property
+    def object_designator(self) -> str | None:
+        """
+        Unique object designator in the source catalog.
+        """
+        ...
+
+    @object_designator.setter
+    def object_designator(self, value: str | None) -> None: ...
     @property
     def object_name(self) -> str:
         """
@@ -288,6 +849,99 @@ class AcmMetadata:
 
     @object_name.setter
     def object_name(self, value: str) -> None: ...
+    @property
+    def odm_msg_link(self) -> str | None:
+        """
+        Linked Orbit Data Message identifier.
+        """
+        ...
+
+    @odm_msg_link.setter
+    def odm_msg_link(self, value: str | None) -> None: ...
+    @property
+    def originator_address(self) -> str | None:
+        """
+        Originator point-of-contact address.
+        """
+        ...
+
+    @originator_address.setter
+    def originator_address(self, value: str | None) -> None: ...
+    @property
+    def originator_email(self) -> str | None:
+        """
+        Originator point-of-contact email.
+        """
+        ...
+
+    @originator_email.setter
+    def originator_email(self, value: str | None) -> None: ...
+    @property
+    def originator_phone(self) -> str | None:
+        """
+        Originator point-of-contact phone.
+        """
+        ...
+
+    @originator_phone.setter
+    def originator_phone(self, value: str | None) -> None: ...
+    @property
+    def originator_poc(self) -> str | None:
+        """
+        Originator point-of-contact.
+        """
+        ...
+
+    @originator_poc.setter
+    def originator_poc(self, value: str | None) -> None: ...
+    @property
+    def originator_position(self) -> str | None:
+        """
+        Originator point-of-contact position.
+        """
+        ...
+
+    @originator_position.setter
+    def originator_position(self, value: str | None) -> None: ...
+    @property
+    def start_time(self) -> str | None:
+        """
+        Earliest data time in this ACM.
+        """
+        ...
+
+    @start_time.setter
+    def start_time(self, value: str | None) -> None: ...
+    @property
+    def stop_time(self) -> str | None:
+        """
+        Latest data time in this ACM.
+        """
+        ...
+
+    @stop_time.setter
+    def stop_time(self, value: str | None) -> None: ...
+    @property
+    def taimutc_at_tzero(self) -> float | None:
+        """
+        Difference (TAI - UTC) at EPOCH_TZERO, seconds.
+        """
+        ...
+
+    @taimutc_at_tzero.setter
+    def taimutc_at_tzero(self, value: float | None) -> None: ...
+    @property
+    def time_system(self) -> str:
+        """
+        Time system used for metadata, attitude data, covariance data. The set of allowed values is
+        described in annex B, subsection B2.
+
+        Examples: UTC, TAI
+        """
+        ...
+
+    @time_system.setter
+    def time_system(self, value: str) -> None: ...
     def validate(self):
         """
         Validate the metadata section against CCSDS rules.
@@ -304,6 +958,126 @@ class AcmPhysicalDescription:
         Helper for pickle.
         """
         ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments allowed only immediately after the PHYS_START keyword.
+
+        Examples: This is a comment.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def cp(self) -> list[float] | None:
+        """
+        Center-of-pressure vector [x, y, z] in meters.
+        """
+        ...
+
+    @cp.setter
+    def cp(self, value: list[float] | None) -> None: ...
+    @property
+    def cp_ref_frame(self) -> str | None:
+        """
+        Center-of-pressure reference frame.
+        """
+        ...
+
+    @cp_ref_frame.setter
+    def cp_ref_frame(self, value: str | None) -> None: ...
+    @property
+    def drag_coeff(self) -> float | None:
+        """
+        Drag coefficient.
+        """
+        ...
+
+    @drag_coeff.setter
+    def drag_coeff(self, value: float | None) -> None: ...
+    @property
+    def dry_mass(self) -> float | None:
+        """
+        Dry mass (kg).
+        """
+        ...
+
+    @dry_mass.setter
+    def dry_mass(self, value: float | None) -> None: ...
+    @property
+    def inertia_ref_frame(self) -> str | None:
+        """
+        Inertia reference frame.
+        """
+        ...
+
+    @inertia_ref_frame.setter
+    def inertia_ref_frame(self, value: str | None) -> None: ...
+    @property
+    def ixx(self) -> float | None:
+        """
+        Moment of inertia IXX.
+        """
+        ...
+
+    @ixx.setter
+    def ixx(self, value: float | None) -> None: ...
+    @property
+    def ixy(self) -> float | None:
+        """
+        Product of inertia IXY.
+        """
+        ...
+
+    @ixy.setter
+    def ixy(self, value: float | None) -> None: ...
+    @property
+    def ixz(self) -> float | None:
+        """
+        Product of inertia IXZ.
+        """
+        ...
+
+    @ixz.setter
+    def ixz(self, value: float | None) -> None: ...
+    @property
+    def iyy(self) -> float | None:
+        """
+        Moment of inertia IYY.
+        """
+        ...
+
+    @iyy.setter
+    def iyy(self, value: float | None) -> None: ...
+    @property
+    def iyz(self) -> float | None:
+        """
+        Product of inertia IYZ.
+        """
+        ...
+
+    @iyz.setter
+    def iyz(self, value: float | None) -> None: ...
+    @property
+    def izz(self) -> float | None:
+        """
+        Moment of inertia IZZ.
+        """
+        ...
+
+    @izz.setter
+    def izz(self, value: float | None) -> None: ...
+    @property
+    def wet_mass(self) -> float | None:
+        """
+        Wet mass (kg).
+        """
+        ...
+
+    @wet_mass.setter
+    def wet_mass(self, value: float | None) -> None: ...
 
 class AcmSegment:
     def __init__(metadata, data) -> None: ...
@@ -336,6 +1110,74 @@ class AcmSegment:
         Validate the segment against CCSDS rules.
         """
         ...
+
+class AcmSensor:
+    """
+    ACM Data: Sensor Data Section.
+    """
+    def __init__(
+        sensor_number,
+        sensor_used=None,
+        sensor_noise_stddev=None,
+        sensor_frequency=None,
+        comment=None,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments allowed only immediately after the SENSOR_START keyword.
+
+        Examples: This is a comment.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def sensor_frequency(self) -> float | None:
+        """
+        Sensor frequency in Hz.
+        """
+        ...
+
+    @sensor_frequency.setter
+    def sensor_frequency(self, value: float | None) -> None: ...
+    @property
+    def sensor_noise_stddev(self) -> list[float] | None:
+        """
+        Sensor noise standard deviation values.
+        """
+        ...
+
+    @sensor_noise_stddev.setter
+    def sensor_noise_stddev(self, value: list[float] | None) -> None: ...
+    @property
+    def sensor_number(self) -> int:
+        """
+        Sensor number. Multiple sensors may be included, with each having a unique, ascending
+        number.
+
+        Examples: 1, 2, 3
+        """
+        ...
+
+    @sensor_number.setter
+    def sensor_number(self, value: int) -> None: ...
+    @property
+    def sensor_used(self) -> str | None:
+        """
+        Sensor type identifier.
+        """
+        ...
+
+    @sensor_used.setter
+    def sensor_used(self, value: str | None) -> None: ...
 
 class AdditionalParameters:
     """
@@ -380,7 +1222,7 @@ class AdditionalParameters:
         ...
 
     @property
-    def area_drg(self) -> float:
+    def area_drg(self) -> Optional[float]:
         """
         The effective area of the object exposed to atmospheric drag. (See annex E for
         definition.)
@@ -390,9 +1232,9 @@ class AdditionalParameters:
         ...
 
     @area_drg.setter
-    def area_drg(self, value: float) -> None: ...
+    def area_drg(self, value: Optional[float]) -> None: ...
     @property
-    def area_pc(self) -> float:
+    def area_pc(self) -> Optional[float]:
         """
         The actual area of the object. (See annex E for definition.)
 
@@ -401,9 +1243,9 @@ class AdditionalParameters:
         ...
 
     @area_pc.setter
-    def area_pc(self, value: float) -> None: ...
+    def area_pc(self, value: Optional[float]) -> None: ...
     @property
-    def area_srp(self) -> float:
+    def area_srp(self) -> Optional[float]:
         """
         The effective area of the object exposed to solar radiation pressure. (See annex E for
         definition.)
@@ -413,9 +1255,9 @@ class AdditionalParameters:
         ...
 
     @area_srp.setter
-    def area_srp(self, value: float) -> None: ...
+    def area_srp(self, value: Optional[float]) -> None: ...
     @property
-    def cd_area_over_mass(self) -> float:
+    def cd_area_over_mass(self) -> Optional[float]:
         """
         The object's CD•A/m used to propagate the state vector and covariance to TCA. (See
         annex E for definition.)
@@ -425,7 +1267,7 @@ class AdditionalParameters:
         ...
 
     @cd_area_over_mass.setter
-    def cd_area_over_mass(self, value: float) -> None: ...
+    def cd_area_over_mass(self, value: Optional[float]) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -436,7 +1278,7 @@ class AdditionalParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def cr_area_over_mass(self) -> float:
+    def cr_area_over_mass(self) -> Optional[float]:
         """
         The object's CR•A/m used to propagate the state vector and covariance to TCA. (See
         annex E for definition.)
@@ -446,9 +1288,9 @@ class AdditionalParameters:
         ...
 
     @cr_area_over_mass.setter
-    def cr_area_over_mass(self, value: float) -> None: ...
+    def cr_area_over_mass(self, value: Optional[float]) -> None: ...
     @property
-    def mass(self) -> float:
+    def mass(self) -> Optional[float]:
         """
         The mass of the object.
 
@@ -457,9 +1299,9 @@ class AdditionalParameters:
         ...
 
     @mass.setter
-    def mass(self, value: float) -> None: ...
+    def mass(self, value: Optional[float]) -> None: ...
     @property
-    def sedr(self) -> float:
+    def sedr(self) -> Optional[float]:
         """
         The amount of energy being removed from the object's orbit by atmospheric drag. This
         value is an average calculated during the OD.
@@ -469,9 +1311,9 @@ class AdditionalParameters:
         ...
 
     @sedr.setter
-    def sedr(self, value: float) -> None: ...
+    def sedr(self, value: Optional[float]) -> None: ...
     @property
-    def thrust_acceleration(self) -> float:
+    def thrust_acceleration(self) -> Optional[float]:
         """
         The object's acceleration due to in-track thrust used to propagate the state vector and
         covariance to TCA. (See annex E for definition.)
@@ -481,7 +1323,7 @@ class AdditionalParameters:
         ...
 
     @thrust_acceleration.setter
-    def thrust_acceleration(self, value: float) -> None: ...
+    def thrust_acceleration(self, value: Optional[float]) -> None: ...
 
 class AdmHeader:
     """
@@ -661,7 +1503,7 @@ class AemData:
     """
     AEM Data Section.
     """
-    def __init__(attitude_states, comment=None) -> None: ...
+    def __init__(attitude_states, attitude_type=None, comment=None) -> None: ...
     def __getstate__(self, /):
         """
         Helper for pickle.
@@ -693,7 +1535,7 @@ class AemData:
 
         Use `attitude_states_epochs` for the corresponding epochs.
 
-        Currently only supports Quaternion Ephemeris states.
+        Supports all AEM attitude state types, but all rows must be of the same type.
         """
         ...
 
@@ -710,7 +1552,7 @@ class AemData:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @staticmethod
-    def from_numpy(epochs, array, comment=None):
+    def from_numpy(epochs, array, attitude_type=None, comment=None):
         """ """
         ...
 
@@ -749,7 +1591,7 @@ class AemMetadata:
         ...
 
     @property
-    def angvel_frame(self) -> str:
+    def angvel_frame(self) -> str | None:
         """
         The frame of reference in which angular velocity data are specified. The set of allowed
         values is described in annex B, subsection B3. This keyword is applicable only if
@@ -761,7 +1603,7 @@ class AemMetadata:
         ...
 
     @angvel_frame.setter
-    def angvel_frame(self, value: str) -> None: ...
+    def angvel_frame(self, value: str | None) -> None: ...
     @property
     def attitude_type(self) -> str:
         """
@@ -776,7 +1618,7 @@ class AemMetadata:
     @attitude_type.setter
     def attitude_type(self, value: str) -> None: ...
     @property
-    def center_name(self) -> str:
+    def center_name(self) -> str | None:
         """
         Celestial body orbited by the object, which may be a natural solar system body (planets,
         asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -787,7 +1629,7 @@ class AemMetadata:
         ...
 
     @center_name.setter
-    def center_name(self, value: str) -> None: ...
+    def center_name(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -801,7 +1643,7 @@ class AemMetadata:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def euler_rot_seq(self) -> str:
+    def euler_rot_seq(self) -> str | None:
         """
         Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
         the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
@@ -815,9 +1657,9 @@ class AemMetadata:
         ...
 
     @euler_rot_seq.setter
-    def euler_rot_seq(self, value: str) -> None: ...
+    def euler_rot_seq(self, value: str | None) -> None: ...
     @property
-    def interpolation_degree(self) -> int:
+    def interpolation_degree(self) -> int | None:
         """
         Recommended interpolation degree for attitude ephemeris data in the block immediately
         following this metadata block. It must be an integer value. This keyword must be used if
@@ -828,9 +1670,9 @@ class AemMetadata:
         ...
 
     @interpolation_degree.setter
-    def interpolation_degree(self, value: int) -> None: ...
+    def interpolation_degree(self, value: int | None) -> None: ...
     @property
-    def interpolation_method(self) -> str:
+    def interpolation_method(self) -> str | None:
         """
         Recommended interpolation method for attitude ephemeris data in the block immediately
         following this metadata block.
@@ -840,7 +1682,7 @@ class AemMetadata:
         ...
 
     @interpolation_method.setter
-    def interpolation_method(self, value: str) -> None: ...
+    def interpolation_method(self, value: str | None) -> None: ...
     @property
     def object_id(self) -> str:
         """
@@ -936,7 +1778,7 @@ class AemMetadata:
     @time_system.setter
     def time_system(self, value: str) -> None: ...
     @property
-    def useable_start_time(self) -> str:
+    def useable_start_time(self) -> str | None:
         """
         Optional start of USEABLE time span covered by attitude ephemeris data immediately
         following this metadata block. To allow for proper interpolation near the beginning/end of
@@ -950,9 +1792,9 @@ class AemMetadata:
         ...
 
     @useable_start_time.setter
-    def useable_start_time(self, value: str) -> None: ...
+    def useable_start_time(self, value: str | None) -> None: ...
     @property
-    def useable_stop_time(self) -> str:
+    def useable_stop_time(self) -> str | None:
         """
         Optional stop of USEABLE time span covered by attitude ephemeris data immediately following
         this metadata block. (See also USEABLE_START_TIME.)
@@ -962,7 +1804,7 @@ class AemMetadata:
         ...
 
     @useable_stop_time.setter
-    def useable_stop_time(self, value: str) -> None: ...
+    def useable_stop_time(self, value: str | None) -> None: ...
     def validate(self):
         """
         Validate the metadata section against CCSDS rules.
@@ -1297,7 +2139,7 @@ class ApmMetadata:
         ...
 
     @property
-    def center_name(self) -> str:
+    def center_name(self) -> str | None:
         """
         Celestial body orbited by the object, which may be a natural solar system body (planets,
         asteroids, comets, and natural satellites), including any planet barycenter or the solar
@@ -1308,7 +2150,7 @@ class ApmMetadata:
         ...
 
     @center_name.setter
-    def center_name(self, value: str) -> None: ...
+    def center_name(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -1661,8 +2503,6 @@ class Cdm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     def to_file(self, path, format, validate=True):
         """
         Write the CDM to a file.
@@ -1912,7 +2752,7 @@ class CdmCovarianceMatrix:
         ...
 
     @property
-    def cdrg_drg(self) -> float:
+    def cdrg_drg(self) -> Optional[float]:
         """
         Object covariance matrix `[7,7]`.
 
@@ -1921,9 +2761,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_drg.setter
-    def cdrg_drg(self, value: float) -> None: ...
+    def cdrg_drg(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_n(self) -> float:
+    def cdrg_n(self) -> Optional[float]:
         """
         Object covariance matrix `[7,3]`.
 
@@ -1932,9 +2772,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_n.setter
-    def cdrg_n(self, value: float) -> None: ...
+    def cdrg_n(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_ndot(self) -> float:
+    def cdrg_ndot(self) -> Optional[float]:
         """
         Object covariance matrix `[7,6]`.
 
@@ -1943,9 +2783,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_ndot.setter
-    def cdrg_ndot(self, value: float) -> None: ...
+    def cdrg_ndot(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_r(self) -> float:
+    def cdrg_r(self) -> Optional[float]:
         """
         Object covariance matrix `[7,1]`.
 
@@ -1954,9 +2794,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_r.setter
-    def cdrg_r(self, value: float) -> None: ...
+    def cdrg_r(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_rdot(self) -> float:
+    def cdrg_rdot(self) -> Optional[float]:
         """
         Object covariance matrix `[7,4]`.
 
@@ -1965,9 +2805,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_rdot.setter
-    def cdrg_rdot(self, value: float) -> None: ...
+    def cdrg_rdot(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_t(self) -> float:
+    def cdrg_t(self) -> Optional[float]:
         """
         Object covariance matrix `[7,2]`.
 
@@ -1976,9 +2816,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_t.setter
-    def cdrg_t(self, value: float) -> None: ...
+    def cdrg_t(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_tdot(self) -> float:
+    def cdrg_tdot(self) -> Optional[float]:
         """
         Object covariance matrix `[7,5]`.
 
@@ -1987,7 +2827,7 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_tdot.setter
-    def cdrg_tdot(self, value: float) -> None: ...
+    def cdrg_tdot(self, value: Optional[float]) -> None: ...
     @property
     def cn_n(self) -> float:
         """
@@ -2152,7 +2992,7 @@ class CdmCovarianceMatrix:
     @crdot_t.setter
     def crdot_t(self, value: float) -> None: ...
     @property
-    def csrp_drg(self) -> float:
+    def csrp_drg(self) -> Optional[float]:
         """
         Object covariance matrix `[8,7]`.
 
@@ -2161,9 +3001,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_drg.setter
-    def csrp_drg(self, value: float) -> None: ...
+    def csrp_drg(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_n(self) -> float:
+    def csrp_n(self) -> Optional[float]:
         """
         Object covariance matrix `[8,3]`.
 
@@ -2172,9 +3012,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_n.setter
-    def csrp_n(self, value: float) -> None: ...
+    def csrp_n(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_ndot(self) -> float:
+    def csrp_ndot(self) -> Optional[float]:
         """
         Object covariance matrix `[8,6]`.
 
@@ -2183,9 +3023,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_ndot.setter
-    def csrp_ndot(self, value: float) -> None: ...
+    def csrp_ndot(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_r(self) -> float:
+    def csrp_r(self) -> Optional[float]:
         """
         Object covariance matrix `[8,1]`.
 
@@ -2194,9 +3034,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_r.setter
-    def csrp_r(self, value: float) -> None: ...
+    def csrp_r(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_rdot(self) -> float:
+    def csrp_rdot(self) -> Optional[float]:
         """
         Object covariance matrix `[8,4]`.
 
@@ -2205,9 +3045,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_rdot.setter
-    def csrp_rdot(self, value: float) -> None: ...
+    def csrp_rdot(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_srp(self) -> float:
+    def csrp_srp(self) -> Optional[float]:
         """
         Object covariance matrix `[8,8]`.
 
@@ -2216,9 +3056,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_srp.setter
-    def csrp_srp(self, value: float) -> None: ...
+    def csrp_srp(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_t(self) -> float:
+    def csrp_t(self) -> Optional[float]:
         """
         Object covariance matrix `[8,2]`.
 
@@ -2227,9 +3067,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_t.setter
-    def csrp_t(self, value: float) -> None: ...
+    def csrp_t(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_tdot(self) -> float:
+    def csrp_tdot(self) -> Optional[float]:
         """
         Object covariance matrix `[8,5]`.
 
@@ -2238,7 +3078,7 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_tdot.setter
-    def csrp_tdot(self, value: float) -> None: ...
+    def csrp_tdot(self, value: Optional[float]) -> None: ...
     @property
     def ct_r(self) -> float:
         """
@@ -2317,7 +3157,7 @@ class CdmCovarianceMatrix:
     @ctdot_tdot.setter
     def ctdot_tdot(self, value: float) -> None: ...
     @property
-    def cthr_drg(self) -> float:
+    def cthr_drg(self) -> Optional[float]:
         """
         Object covariance matrix `[9,7]`.
 
@@ -2326,9 +3166,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_drg.setter
-    def cthr_drg(self, value: float) -> None: ...
+    def cthr_drg(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_n(self) -> float:
+    def cthr_n(self) -> Optional[float]:
         """
         Object covariance matrix `[9,3]`.
 
@@ -2337,9 +3177,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_n.setter
-    def cthr_n(self, value: float) -> None: ...
+    def cthr_n(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_ndot(self) -> float:
+    def cthr_ndot(self) -> Optional[float]:
         """
         Object covariance matrix `[9,6]`.
 
@@ -2348,9 +3188,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_ndot.setter
-    def cthr_ndot(self, value: float) -> None: ...
+    def cthr_ndot(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_r(self) -> float:
+    def cthr_r(self) -> Optional[float]:
         """
         Object covariance matrix `[9,1]`.
 
@@ -2359,9 +3199,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_r.setter
-    def cthr_r(self, value: float) -> None: ...
+    def cthr_r(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_rdot(self) -> float:
+    def cthr_rdot(self) -> Optional[float]:
         """
         Object covariance matrix `[9,4]`.
 
@@ -2370,9 +3210,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_rdot.setter
-    def cthr_rdot(self, value: float) -> None: ...
+    def cthr_rdot(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_srp(self) -> float:
+    def cthr_srp(self) -> Optional[float]:
         """
         Object covariance matrix `[9,8]`.
 
@@ -2381,9 +3221,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_srp.setter
-    def cthr_srp(self, value: float) -> None: ...
+    def cthr_srp(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_t(self) -> float:
+    def cthr_t(self) -> Optional[float]:
         """
         Object covariance matrix `[9,2]`.
 
@@ -2392,9 +3232,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_t.setter
-    def cthr_t(self, value: float) -> None: ...
+    def cthr_t(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_tdot(self) -> float:
+    def cthr_tdot(self) -> Optional[float]:
         """
         Object covariance matrix `[9,5]`.
 
@@ -2403,9 +3243,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_tdot.setter
-    def cthr_tdot(self, value: float) -> None: ...
+    def cthr_tdot(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_thr(self) -> float:
+    def cthr_thr(self) -> Optional[float]:
         """
         Object covariance matrix `[9,9]`.
 
@@ -2414,7 +3254,7 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_thr.setter
-    def cthr_thr(self, value: float) -> None: ...
+    def cthr_thr(self, value: Optional[float]) -> None: ...
     @staticmethod
     def from_numpy(array, comment=None):
         """ """
@@ -4404,8 +5244,6 @@ class Ndm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def messages(self) -> list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]:
         """
@@ -4551,8 +5389,6 @@ class Ocm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> OcmSegment:
         """
@@ -4958,14 +5794,14 @@ class OcmData:
     @traj.setter
     def traj(self, value: list[OcmTrajState]) -> None: ...
     @property
-    def user(self) -> UserDefined:
+    def user(self) -> UserDefined | None:
         """
         User-defined parameters.
         """
         ...
 
     @user.setter
-    def user(self, value: UserDefined) -> None: ...
+    def user(self, value: UserDefined | None) -> None: ...
 
 class OcmManeuverParameters:
     """
@@ -8426,8 +9262,6 @@ class Oem:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segments(self) -> list[OemSegment]:
         """
@@ -9375,8 +10209,6 @@ class Omm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> OmmSegment:
         """
@@ -9510,14 +10342,14 @@ class OmmData:
     @tle_parameters.setter
     def tle_parameters(self, value: Optional[TleParameters]) -> None: ...
     @property
-    def user_defined_parameters(self) -> UserDefined:
+    def user_defined_parameters(self) -> UserDefined | None:
         """
         User-Defined Parameters.
         """
         ...
 
     @user_defined_parameters.setter
-    def user_defined_parameters(self, value: UserDefined) -> None: ...
+    def user_defined_parameters(self, value: UserDefined | None) -> None: ...
 
 class OmmMetadata:
     """
@@ -9782,8 +10614,6 @@ class Opm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> OpmSegment:
         """
@@ -10261,14 +11091,14 @@ class OpmData:
     @state_vector.setter
     def state_vector(self, value: StateVector) -> None: ...
     @property
-    def user_defined_parameters(self) -> UserDefined:
+    def user_defined_parameters(self) -> UserDefined | None:
         """
         User defined parameters.
         """
         ...
 
     @user_defined_parameters.setter
-    def user_defined_parameters(self, value: UserDefined) -> None: ...
+    def user_defined_parameters(self, value: UserDefined | None) -> None: ...
 
 class OpmMetadata:
     """
@@ -10525,6 +11355,17 @@ class QuaternionState:
     @qc.setter
     def qc(self, value: float) -> None: ...
     @property
+    def quaternion_dot(self) -> list[float] | None:
+        """
+        Quaternion derivative components [Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT].
+
+        Units: 1/s
+        """
+        ...
+
+    @quaternion_dot.setter
+    def quaternion_dot(self, value: list[float] | None) -> None: ...
+    @property
     def ref_frame_a(self) -> str:
         """
         Name of the reference frame that defines the starting point of the transformation. The set
@@ -10641,8 +11482,6 @@ class Rdm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> RdmSegment:
         """
@@ -10839,14 +11678,14 @@ class RdmData:
     @state_vector.setter
     def state_vector(self, value: Optional[StateVector]) -> None: ...
     @property
-    def user_defined_parameters(self) -> UserDefined:
+    def user_defined_parameters(self) -> UserDefined | None:
         """
         User defined parameters.
         """
         ...
 
     @user_defined_parameters.setter
-    def user_defined_parameters(self, value: UserDefined) -> None: ...
+    def user_defined_parameters(self, value: UserDefined | None) -> None: ...
 
 class RdmHeader:
     """
@@ -11706,7 +12545,7 @@ class RelativeMetadataData:
     @screen_volume_shape.setter
     def screen_volume_shape(self, value: Optional[ScreenVolumeShapeType]) -> None: ...
     @property
-    def screen_volume_x(self) -> float:
+    def screen_volume_x(self) -> Optional[float]:
         """
         The R or T (depending on if RTN or TVN is selected) component size of the screening
         volume in the SCREEN_VOLUME_FRAME. Data type = double.
@@ -11716,9 +12555,9 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_x.setter
-    def screen_volume_x(self, value: float) -> None: ...
+    def screen_volume_x(self, value: Optional[float]) -> None: ...
     @property
-    def screen_volume_y(self) -> float:
+    def screen_volume_y(self) -> Optional[float]:
         """
         The T or V (depending on if RTN or TVN is selected) component size of the screening
         volume in the SCREEN_VOLUME_FRAME. Data type = double.
@@ -11728,9 +12567,9 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_y.setter
-    def screen_volume_y(self, value: float) -> None: ...
+    def screen_volume_y(self, value: Optional[float]) -> None: ...
     @property
-    def screen_volume_z(self) -> float:
+    def screen_volume_z(self) -> Optional[float]:
         """
         The N component size of the screening volume in the SCREEN_VOLUME_FRAME. Data type =
         double.
@@ -11740,7 +12579,7 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_z.setter
-    def screen_volume_z(self, value: float) -> None: ...
+    def screen_volume_z(self, value: Optional[float]) -> None: ...
     @property
     def start_screen_period(self) -> Optional[str]:
         """
@@ -12539,8 +13378,6 @@ class Tdm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segments(self) -> list[TdmSegment]:
         """
@@ -12548,8 +13385,6 @@ class Tdm:
         """
         ...
 
-    @segments.setter
-    def segments(self, value: list[TdmSegment]) -> None: ...
     def to_file(self, path, format, validate=True):
         """
         Write to file.
@@ -13614,8 +14449,6 @@ class TdmObservation:
         """
         ...
 
-    @keyword.setter
-    def keyword(self, value: str) -> None: ...
     @property
     def value(self) -> Optional[float]:
         """
@@ -13625,8 +14458,6 @@ class TdmObservation:
         """
         ...
 
-    @value.setter
-    def value(self, value: Optional[float]) -> None: ...
     @property
     def value_str(self) -> str:
         """
@@ -13635,9 +14466,6 @@ class TdmObservation:
         Useful for phase counts which may require high precision.
         """
         ...
-
-    @value_str.setter
-    def value_str(self, value: str) -> None: ...
 
 class TdmPath:
     def __getstate__(self, /):
@@ -13966,8 +14794,6 @@ class NdmError(Exception):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmEpochError(ValueError):
     """
@@ -13985,8 +14811,6 @@ class NdmEpochError(ValueError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmFormatError(ValueError):
     """
@@ -14004,8 +14828,6 @@ class NdmFormatError(ValueError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmIoError(OSError):
     """
@@ -14023,12 +14845,8 @@ class NdmIoError(OSError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
     @property
     def characters_written(self): ...
-    @characters_written.setter
-    def characters_written(self, value: object) -> None: ...
 
 class NdmUnsupportedMessageError(NdmError):
     """
@@ -14046,8 +14864,6 @@ class NdmUnsupportedMessageError(NdmError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmValidationError(NdmError):
     """
@@ -14065,8 +14881,6 @@ class NdmValidationError(NdmError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmKvnParseError(NdmFormatError):
     """
@@ -14084,8 +14898,6 @@ class NdmKvnParseError(NdmFormatError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmXmlError(NdmFormatError):
     """
@@ -14103,5 +14915,3 @@ class NdmXmlError(NdmFormatError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...

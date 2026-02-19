@@ -8,9 +8,14 @@ Unit tests for Orbit Comprehensive Message (OCM) Python bindings.
 
 import pytest
 from ccsds_ndm import (
+    CovLine,
+    ManLine,
     Ocm,
+    OcmCovarianceMatrix,
     OcmData,
+    OcmManeuverParameters,
     OcmMetadata,
+    OcmOdParameters,
     OcmSegment,
     OcmTrajState,
     OdmHeader,
@@ -86,6 +91,64 @@ class TestOcm:
 
         ocm2 = Ocm.from_file(str(path), format="kvn")
         assert ocm2.header.originator == "TEST"
+
+    def test_ocm_covariance_and_maneuver_setters(self):
+        cov = OcmCovarianceMatrix(
+            cov_ref_frame="EME2000",
+            cov_type="CARTPV",
+            cov_ordering="LTM",
+            cov_lines=[CovLine(epoch="0.0", values=[1.0])],
+        )
+        cov.cov_basis = "PREDICTED"
+        assert cov.cov_basis is not None
+        assert cov.cov_basis.lower().startswith("pred")
+
+        cov.cov_confidence = 42.5
+        assert cov.cov_confidence == pytest.approx(42.5)
+
+        cov.cov_ordering = "UTM"
+        assert cov.cov_ordering.lower().startswith("utm")
+
+        with pytest.raises(ValueError):
+            cov.cov_basis = "NOT_A_BASIS"
+        with pytest.raises(ValueError):
+            cov.cov_ordering = "NOT_A_ORDERING"
+
+        man = OcmManeuverParameters(
+            man_id="MAN-1",
+            man_device_id="THR-1",
+            man_composition="VECTOR",
+            man_ref_frame="EME2000",
+            man_lines=[
+                ManLine(epoch="2023-01-01T00:00:00", values=["0.1", "0.0", "0.0"])
+            ],
+        )
+        man.man_basis = "PLANNED"
+        assert man.man_basis is not None
+        assert man.man_basis.lower().startswith("plan")
+
+        with pytest.raises(ValueError):
+            man.man_basis = "NOT_A_BASIS"
+
+    def test_ocm_od_parameters_days_since_setters(self):
+        od = OcmOdParameters(
+            od_id="OD-1",
+            od_method="LEAST_SQUARES",
+            od_epoch="2023-01-01T00:00:00",
+        )
+
+        assert od.days_since_first_obs is None
+        assert od.days_since_last_obs is None
+
+        od.days_since_first_obs = 2.5
+        od.days_since_last_obs = -0.75
+        assert od.days_since_first_obs == pytest.approx(2.5)
+        assert od.days_since_last_obs == pytest.approx(-0.75)
+
+        od.days_since_first_obs = None
+        od.days_since_last_obs = None
+        assert od.days_since_first_obs is None
+        assert od.days_since_last_obs is None
 
 
 if __name__ == "__main__":

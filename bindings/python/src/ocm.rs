@@ -146,10 +146,7 @@ impl Ocm {
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
-        crate::common::validate_version(
-            ccsds_ndm::validation::MessageKind::Ocm,
-            &value,
-        )?;
+        crate::common::validate_version(ccsds_ndm::validation::MessageKind::Ocm, &value)?;
         self.inner.version = value;
         Ok(())
     }
@@ -3600,6 +3597,17 @@ impl OcmCovarianceMatrix {
     fn get_cov_basis(&self) -> Option<String> {
         self.inner.cov_basis.as_ref().map(|b| format!("{:?}", b))
     }
+    #[setter]
+    fn set_cov_basis(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.cov_basis = value
+            .map(|s| {
+                s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| {
+                    PyValueError::new_err(e.to_string())
+                })
+            })
+            .transpose()?;
+        Ok(())
+    }
     /// Free-text field containing the identification number for the orbit determination,
     /// navigation solution, or simulation upon which this covariance time history block is
     /// based. When a matching orbit determination block accompanies this covariance time
@@ -3691,6 +3699,13 @@ impl OcmCovarianceMatrix {
     fn get_cov_confidence(&self) -> Option<f64> {
         self.inner.cov_confidence.as_ref().map(|p| p.value)
     }
+    #[setter]
+    fn set_cov_confidence(&mut self, value: Option<f64>) {
+        self.inner.cov_confidence = value.map(|v| ccsds_ndm::types::Percentage {
+            value: v,
+            units: None,
+        });
+    }
     /// Indicates covariance composition. Select from annex B, subsections B7 and B8.
     ///
     /// Examples: CARTP, CARTPV, ADBARV
@@ -3716,6 +3731,13 @@ impl OcmCovarianceMatrix {
     #[getter]
     fn get_cov_ordering(&self) -> String {
         format!("{:?}", self.inner.cov_ordering)
+    }
+    #[setter]
+    fn set_cov_ordering(&mut self, value: String) -> PyResult<()> {
+        self.inner.cov_ordering = value
+            .parse()
+            .map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?;
+        Ok(())
     }
 
     /// A comma-delimited set of SI unit designations for each element of the covariance time
@@ -4112,6 +4134,17 @@ impl OcmManeuverParameters {
     #[getter]
     fn get_man_basis(&self) -> Option<String> {
         self.inner.man_basis.as_ref().map(|b| format!("{:?}", b))
+    }
+    #[setter]
+    fn set_man_basis(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.man_basis = value
+            .map(|s| {
+                s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| {
+                    PyValueError::new_err(e.to_string())
+                })
+            })
+            .transpose()?;
+        Ok(())
     }
 
     /// Free-text field containing the identification number for the orbit determination,
@@ -5339,6 +5372,14 @@ impl OcmOdParameters {
     fn get_days_since_first_obs(&self) -> Option<f64> {
         self.inner.days_since_first_obs.as_ref().map(|d| d.value)
     }
+    #[setter]
+    fn set_days_since_first_obs(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::{DayInterval, DayIntervalUnits};
+        self.inner.days_since_first_obs = value.map(|v| DayInterval {
+            value: v,
+            units: Some(DayIntervalUnits::D),
+        });
+    }
     /// Days elapsed between last accepted observation and OD_EPOCH. NOTE—May be positive or
     /// negative.
     ///
@@ -5348,6 +5389,14 @@ impl OcmOdParameters {
     #[getter]
     fn get_days_since_last_obs(&self) -> Option<f64> {
         self.inner.days_since_last_obs.as_ref().map(|d| d.value)
+    }
+    #[setter]
+    fn set_days_since_last_obs(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::{DayInterval, DayIntervalUnits};
+        self.inner.days_since_last_obs = value.map(|v| DayInterval {
+            value: v,
+            units: Some(DayIntervalUnits::D),
+        });
     }
     /// Number of days of observations recommended for the OD of the object (useful only for
     /// Batch OD systems).

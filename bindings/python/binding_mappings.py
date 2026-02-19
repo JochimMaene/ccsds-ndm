@@ -130,6 +130,54 @@ PYTHON_ONLY_FIELDS: dict[str, list[str]] = {
 }
 
 # ---------------------------------------------------------------------------
+# Read-Only Python Fields
+# ---------------------------------------------------------------------------
+# Fields intentionally exposed as getter-only in Python bindings.
+# Values are short reason tags used by audit reporting.
+#
+# Common reason tags:
+# - protocol_managed: Message-level/system-managed value
+# - derived_projection: Computed/derived projection of internal representation
+# - immutable_view: Immutable wrapper/view by design
+# - partial_binding: Temporarily read-only due partial implementation
+
+READ_ONLY_FIELDS: dict[str, dict[str, str]] = {
+    "Acm": {
+        "id": "protocol_managed",
+    },
+    "Cdm": {
+        "id": "protocol_managed",
+    },
+    "Ndm": {
+        "id": "protocol_managed",
+    },
+    "Oem": {
+        "id": "protocol_managed",
+    },
+    "Omm": {
+        "id": "protocol_managed",
+    },
+    "Opm": {
+        "id": "protocol_managed",
+    },
+    "Ocm": {
+        "id": "protocol_managed",
+    },
+    "Rdm": {
+        "id": "protocol_managed",
+    },
+    "Tdm": {
+        "id": "protocol_managed",
+        "segments": "derived_projection",
+    },
+    "TdmObservation": {
+        "keyword": "derived_projection",
+        "value": "derived_projection",
+        "value_str": "derived_projection",
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Rust Fields to Skip
 # ---------------------------------------------------------------------------
 # Fields that exist in Rust but are intentionally NOT exposed in Python.
@@ -146,7 +194,6 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
     "Omm": ["id", "version", "body"],
     "Opm": ["id", "version", "body"],
     "Ocm": ["id", "version", "body"],
-    "Cdm": [],  # CDM exposes body directly
     "Tdm": ["id", "version", "body"],
     "Rdm": ["id", "version", "body"],
     "Aem": ["id", "version", "body"],
@@ -163,16 +210,6 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
     "AemBody": ["*"],
     "ApmBody": ["*"],
     "AcmBody": ["*"],
-    # Partially implemented or legacy
-    "AcmAttitudeDetermination": ["*"],
-    "AcmAttitudeState": ["*"],
-    "AcmCovarianceMatrix": ["*"],
-    "AcmData": ["*"],
-    "AcmManeuverParameters": ["*"],
-    "AcmMetadata": ["*"],
-    "AcmPhysicalDescription": ["*"],
-    "AcmSegment": ["*"],
-    "QuaternionState": ["quaternion_dot"],
 }
 
 # ---------------------------------------------------------------------------
@@ -237,3 +274,8 @@ def should_skip_rust_field(rust_struct: str, rust_field: str) -> bool:
 def get_rust_struct_name(python_class: str) -> str:
     """Get the Rust struct name for a Python class."""
     return STRUCT_MAPPINGS.get(python_class, python_class)
+
+
+def get_read_only_reason(python_class: str, python_field: str) -> str | None:
+    """Get reason tag for an intentionally read-only Python field."""
+    return READ_ONLY_FIELDS.get(python_class, {}).get(python_field)

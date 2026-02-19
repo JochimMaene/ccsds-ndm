@@ -125,6 +125,55 @@ impl QuaternionState {
         self.inner.quaternion.qc = value;
     }
 
+    /// Quaternion derivative components [Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT].
+    ///
+    /// Units: 1/s
+    ///
+    /// :type: list[float] | None
+    #[getter]
+    fn get_quaternion_dot(&self) -> Option<Vec<f64>> {
+        self.inner.quaternion_dot.as_ref().map(|qd| {
+            vec![
+                qd.q1_dot.value,
+                qd.q2_dot.value,
+                qd.q3_dot.value,
+                qd.qc_dot.value,
+            ]
+        })
+    }
+
+    #[setter]
+    fn set_quaternion_dot(&mut self, value: Option<Vec<f64>>) -> PyResult<()> {
+        self.inner.quaternion_dot = if let Some(v) = value {
+            if v.len() != 4 {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "quaternion_dot must have exactly 4 elements",
+                ));
+            }
+            Some(ccsds_ndm::common::QuaternionDot {
+                q1_dot: ccsds_ndm::types::QuaternionDotComponent {
+                    value: v[0],
+                    units: None,
+                },
+                q2_dot: ccsds_ndm::types::QuaternionDotComponent {
+                    value: v[1],
+                    units: None,
+                },
+                q3_dot: ccsds_ndm::types::QuaternionDotComponent {
+                    value: v[2],
+                    units: None,
+                },
+                qc_dot: ccsds_ndm::types::QuaternionDotComponent {
+                    value: v[3],
+                    units: None,
+                },
+            })
+        } else {
+            None
+        };
+        Ok(())
+    }
+
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
@@ -133,7 +182,6 @@ impl QuaternionState {
     fn get_ref_frame_a(&self) -> String {
         self.inner.ref_frame_a.clone()
     }
-
     #[setter]
     fn set_ref_frame_a(&mut self, value: String) {
         self.inner.ref_frame_a = value;
@@ -147,7 +195,6 @@ impl QuaternionState {
     fn get_ref_frame_b(&self) -> String {
         self.inner.ref_frame_b.clone()
     }
-
     #[setter]
     fn set_ref_frame_b(&mut self, value: String) {
         self.inner.ref_frame_b = value;
@@ -231,6 +278,10 @@ impl EulerAngleState {
     fn get_ref_frame_a(&self) -> String {
         self.inner.ref_frame_a.clone()
     }
+    #[setter]
+    fn set_ref_frame_a(&mut self, value: String) {
+        self.inner.ref_frame_a = value;
+    }
 
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
@@ -239,6 +290,10 @@ impl EulerAngleState {
     #[getter]
     fn get_ref_frame_b(&self) -> String {
         self.inner.ref_frame_b.clone()
+    }
+    #[setter]
+    fn set_ref_frame_b(&mut self, value: String) {
+        self.inner.ref_frame_b = value;
     }
 
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
@@ -252,6 +307,13 @@ impl EulerAngleState {
     fn get_euler_rot_seq(&self) -> String {
         self.inner.euler_rot_seq.to_string()
     }
+    #[setter]
+    fn set_euler_rot_seq(&mut self, value: String) -> PyResult<()> {
+        use std::str::FromStr;
+        self.inner.euler_rot_seq = ccsds_ndm::types::RotSeq::from_str(&value)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
 
     /// Angle of the first rotation.
     ///
@@ -261,6 +323,12 @@ impl EulerAngleState {
     #[getter]
     fn get_angle_1(&self) -> f64 {
         self.inner.angle_1.value
+    }
+    #[setter]
+    fn set_angle_1(&mut self, value: f64) -> PyResult<()> {
+        self.inner.angle_1 = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
     }
 
     /// Angle of the second rotation.
@@ -272,6 +340,12 @@ impl EulerAngleState {
     fn get_angle_2(&self) -> f64 {
         self.inner.angle_2.value
     }
+    #[setter]
+    fn set_angle_2(&mut self, value: f64) -> PyResult<()> {
+        self.inner.angle_2 = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
 
     /// Angle of the third rotation.
     ///
@@ -281,6 +355,12 @@ impl EulerAngleState {
     #[getter]
     fn get_angle_3(&self) -> f64 {
         self.inner.angle_3.value
+    }
+    #[setter]
+    fn set_angle_3(&mut self, value: f64) -> PyResult<()> {
+        self.inner.angle_3 = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
     }
 
     /// Time derivative of angle of the first rotation.
@@ -292,6 +372,13 @@ impl EulerAngleState {
     fn get_angle_1_dot(&self) -> Option<f64> {
         self.inner.angle_1_dot.as_ref().map(|v| v.value)
     }
+    #[setter]
+    fn set_angle_1_dot(&mut self, value: Option<f64>) {
+        self.inner.angle_1_dot = value.map(|v| AngleRate {
+            value: v,
+            units: None,
+        });
+    }
 
     /// Time derivative of angle of the second rotation.
     ///
@@ -301,6 +388,13 @@ impl EulerAngleState {
     #[getter]
     fn get_angle_2_dot(&self) -> Option<f64> {
         self.inner.angle_2_dot.as_ref().map(|v| v.value)
+    }
+    #[setter]
+    fn set_angle_2_dot(&mut self, value: Option<f64>) {
+        self.inner.angle_2_dot = value.map(|v| AngleRate {
+            value: v,
+            units: None,
+        });
     }
 
     /// Time derivative of angle of the third rotation.
@@ -312,6 +406,13 @@ impl EulerAngleState {
     fn get_angle_3_dot(&self) -> Option<f64> {
         self.inner.angle_3_dot.as_ref().map(|v| v.value)
     }
+    #[setter]
+    fn set_angle_3_dot(&mut self, value: Option<f64>) {
+        self.inner.angle_3_dot = value.map(|v| AngleRate {
+            value: v,
+            units: None,
+        });
+    }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
@@ -319,6 +420,10 @@ impl EulerAngleState {
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
+    }
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 }
 
@@ -374,6 +479,10 @@ impl AngVelState {
     fn get_ref_frame_a(&self) -> String {
         self.inner.ref_frame_a.clone()
     }
+    #[setter]
+    fn set_ref_frame_a(&mut self, value: String) {
+        self.inner.ref_frame_a = value;
+    }
 
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
@@ -383,6 +492,10 @@ impl AngVelState {
     fn get_ref_frame_b(&self) -> String {
         self.inner.ref_frame_b.clone()
     }
+    #[setter]
+    fn set_ref_frame_b(&mut self, value: String) {
+        self.inner.ref_frame_b = value;
+    }
 
     /// Reference frame in which the components of the angular velocity vector are given. The set
     /// of allowed values is described in annex B, subsection B3.
@@ -391,6 +504,10 @@ impl AngVelState {
     #[getter]
     fn get_angvel_frame(&self) -> String {
         self.inner.angvel_frame.0.clone()
+    }
+    #[setter]
+    fn set_angvel_frame(&mut self, value: String) {
+        self.inner.angvel_frame = ccsds_ndm::types::AngVelFrameType(value);
     }
 
     /// Component of the angular velocity vector on the X axis.
@@ -402,6 +519,10 @@ impl AngVelState {
     fn get_angvel_x(&self) -> f64 {
         self.inner.angvel_x.value
     }
+    #[setter]
+    fn set_angvel_x(&mut self, value: f64) {
+        self.inner.angvel_x = AngleRate { value, units: None };
+    }
 
     /// Component of the angular velocity vector on the Y axis.
     ///
@@ -411,6 +532,10 @@ impl AngVelState {
     #[getter]
     fn get_angvel_y(&self) -> f64 {
         self.inner.angvel_y.value
+    }
+    #[setter]
+    fn set_angvel_y(&mut self, value: f64) {
+        self.inner.angvel_y = AngleRate { value, units: None };
     }
 
     /// Component of the angular velocity vector on the Z axis.
@@ -422,6 +547,10 @@ impl AngVelState {
     fn get_angvel_z(&self) -> f64 {
         self.inner.angvel_z.value
     }
+    #[setter]
+    fn set_angvel_z(&mut self, value: f64) {
+        self.inner.angvel_z = AngleRate { value, units: None };
+    }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
@@ -429,6 +558,10 @@ impl AngVelState {
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
+    }
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 }
 
@@ -512,6 +645,10 @@ impl SpinState {
     fn get_ref_frame_a(&self) -> String {
         self.inner.ref_frame_a.clone()
     }
+    #[setter]
+    fn set_ref_frame_a(&mut self, value: String) {
+        self.inner.ref_frame_a = value;
+    }
 
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
@@ -520,6 +657,10 @@ impl SpinState {
     #[getter]
     fn get_ref_frame_b(&self) -> String {
         self.inner.ref_frame_b.clone()
+    }
+    #[setter]
+    fn set_ref_frame_b(&mut self, value: String) {
+        self.inner.ref_frame_b = value;
     }
 
     /// Right ascension of spin axis vector in frame A.
@@ -531,6 +672,12 @@ impl SpinState {
     fn get_spin_alpha(&self) -> f64 {
         self.inner.spin_alpha.value
     }
+    #[setter]
+    fn set_spin_alpha(&mut self, value: f64) -> PyResult<()> {
+        self.inner.spin_alpha = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
 
     /// Declination of the spin axis vector in frame A.
     ///
@@ -540,6 +687,12 @@ impl SpinState {
     #[getter]
     fn get_spin_delta(&self) -> f64 {
         self.inner.spin_delta.value
+    }
+    #[setter]
+    fn set_spin_delta(&mut self, value: f64) -> PyResult<()> {
+        self.inner.spin_delta = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
     }
 
     /// Phase of the satellite about the spin axis.
@@ -551,6 +704,12 @@ impl SpinState {
     fn get_spin_angle(&self) -> f64 {
         self.inner.spin_angle.value
     }
+    #[setter]
+    fn set_spin_angle(&mut self, value: f64) -> PyResult<()> {
+        self.inner.spin_angle = Angle::new(value, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
 
     /// Angular velocity of satellite around spin axis.
     ///
@@ -560,6 +719,10 @@ impl SpinState {
     #[getter]
     fn get_spin_angle_vel(&self) -> f64 {
         self.inner.spin_angle_vel.value
+    }
+    #[setter]
+    fn set_spin_angle_vel(&mut self, value: f64) {
+        self.inner.spin_angle_vel = AngleRate { value, units: None };
     }
 
     /// Nutation angle of spin axis.
@@ -571,6 +734,14 @@ impl SpinState {
     fn get_nutation(&self) -> Option<f64> {
         self.inner.nutation.as_ref().map(|v| v.value)
     }
+    #[setter]
+    fn set_nutation(&mut self, value: Option<f64>) -> PyResult<()> {
+        self.inner.nutation = value
+            .map(|v| Angle::new(v, None))
+            .transpose()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
 
     /// Body nutation period of the spin axis.
     ///
@@ -580,6 +751,13 @@ impl SpinState {
     #[getter]
     fn get_nutation_per(&self) -> Option<f64> {
         self.inner.nutation_per.as_ref().map(|v| v.value)
+    }
+    #[setter]
+    fn set_nutation_per(&mut self, value: Option<f64>) {
+        self.inner.nutation_per = value.map(|v| Duration {
+            value: v,
+            units: None,
+        });
     }
 
     /// Inertial nutation phase.
@@ -591,6 +769,14 @@ impl SpinState {
     fn get_nutation_phase(&self) -> Option<f64> {
         self.inner.nutation_phase.as_ref().map(|v| v.value)
     }
+    #[setter]
+    fn set_nutation_phase(&mut self, value: Option<f64>) -> PyResult<()> {
+        self.inner.nutation_phase = value
+            .map(|v| Angle::new(v, None))
+            .transpose()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
 
     /// Right ascension of angular momentum vector in frame A.
     ///
@@ -600,6 +786,14 @@ impl SpinState {
     #[getter]
     fn get_momentum_alpha(&self) -> Option<f64> {
         self.inner.momentum_alpha.as_ref().map(|v| v.value)
+    }
+    #[setter]
+    fn set_momentum_alpha(&mut self, value: Option<f64>) -> PyResult<()> {
+        self.inner.momentum_alpha = value
+            .map(|v| Angle::new(v, None))
+            .transpose()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
     }
 
     /// Declination of angular momentum vector in frame A.
@@ -611,6 +805,14 @@ impl SpinState {
     fn get_momentum_delta(&self) -> Option<f64> {
         self.inner.momentum_delta.as_ref().map(|v| v.value)
     }
+    #[setter]
+    fn set_momentum_delta(&mut self, value: Option<f64>) -> PyResult<()> {
+        self.inner.momentum_delta = value
+            .map(|v| Angle::new(v, None))
+            .transpose()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
 
     /// Angular velocity of spin vector around the angular momentum vector.
     ///
@@ -621,6 +823,13 @@ impl SpinState {
     fn get_nutation_vel(&self) -> Option<f64> {
         self.inner.nutation_vel.as_ref().map(|v| v.value)
     }
+    #[setter]
+    fn set_nutation_vel(&mut self, value: Option<f64>) {
+        self.inner.nutation_vel = value.map(|v| AngleRate {
+            value: v,
+            units: None,
+        });
+    }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
@@ -628,6 +837,10 @@ impl SpinState {
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
+    }
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 }
 
@@ -695,6 +908,10 @@ impl InertiaState {
     fn get_inertia_ref_frame(&self) -> String {
         self.inner.inertia_ref_frame.clone()
     }
+    #[setter]
+    fn set_inertia_ref_frame(&mut self, value: String) {
+        self.inner.inertia_ref_frame = value;
+    }
 
     /// Moment of Inertia about the X-axis.
     ///
@@ -704,6 +921,10 @@ impl InertiaState {
     #[getter]
     fn get_ixx(&self) -> f64 {
         self.inner.ixx.value
+    }
+    #[setter]
+    fn set_ixx(&mut self, value: f64) {
+        self.inner.ixx = Moment { value, units: None };
     }
 
     /// Moment of Inertia about the Y-axis.
@@ -715,6 +936,10 @@ impl InertiaState {
     fn get_iyy(&self) -> f64 {
         self.inner.iyy.value
     }
+    #[setter]
+    fn set_iyy(&mut self, value: f64) {
+        self.inner.iyy = Moment { value, units: None };
+    }
 
     /// Moment of Inertia about the Z-axis.
     ///
@@ -724,6 +949,10 @@ impl InertiaState {
     #[getter]
     fn get_izz(&self) -> f64 {
         self.inner.izz.value
+    }
+    #[setter]
+    fn set_izz(&mut self, value: f64) {
+        self.inner.izz = Moment { value, units: None };
     }
 
     /// Inertia Cross Product of the X and Y axes.
@@ -735,6 +964,10 @@ impl InertiaState {
     fn get_ixy(&self) -> f64 {
         self.inner.ixy.value
     }
+    #[setter]
+    fn set_ixy(&mut self, value: f64) {
+        self.inner.ixy = Moment { value, units: None };
+    }
 
     /// Inertia Cross Product of the X and Z axes.
     ///
@@ -744,6 +977,10 @@ impl InertiaState {
     #[getter]
     fn get_ixz(&self) -> f64 {
         self.inner.ixz.value
+    }
+    #[setter]
+    fn set_ixz(&mut self, value: f64) {
+        self.inner.ixz = Moment { value, units: None };
     }
 
     /// Inertia Cross Product of the Y and Z axes.
@@ -755,6 +992,10 @@ impl InertiaState {
     fn get_iyz(&self) -> f64 {
         self.inner.iyz.value
     }
+    #[setter]
+    fn set_iyz(&mut self, value: f64) {
+        self.inner.iyz = Moment { value, units: None };
+    }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
@@ -762,5 +1003,9 @@ impl InertiaState {
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
+    }
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 }

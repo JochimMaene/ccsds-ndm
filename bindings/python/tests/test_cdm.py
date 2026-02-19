@@ -8,6 +8,7 @@ Unit tests for Conjunction Data Message (CDM) Python bindings.
 
 import pathlib
 
+import numpy as np
 import pytest
 from ccsds_ndm import (
     Cdm,
@@ -165,6 +166,103 @@ class TestCdm:
         # Test from_file
         cdm2 = Cdm.from_file(str(kvn_path), format="kvn")
         assert cdm2.header.originator == "TEST"
+
+    def test_cdm_data_numpy_api(self):
+        state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0], dtype=float)
+        cov = np.eye(6, dtype=float)
+
+        data = CdmData.from_numpy(
+            state_vector=state,
+            covariance_matrix=cov,
+            comments=[],
+        )
+
+        assert data.state_vector_numpy.shape == (6,)
+        assert data.covariance_matrix_numpy.shape == (6, 6)
+        assert np.allclose(data.state_vector_numpy, state)
+
+        new_state = state + 1.0
+        data.state_vector_numpy = new_state
+        assert np.allclose(data.state_vector_numpy, new_state)
+
+        # Allow clearing covariance matrix through numpy setter.
+        data.covariance_matrix_numpy = None
+        with pytest.raises(ValueError, match="COVARIANCE_MATRIX is missing"):
+            _ = data.covariance_matrix_numpy
+
+    def test_cdm_data_numpy_shape_validation(self):
+        with pytest.raises(ValueError, match="State vector must be shape"):
+            CdmData.from_numpy(
+                state_vector=np.zeros((2, 6), dtype=float),
+                covariance_matrix=None,
+                comments=[],
+            )
+
+        data = CdmData.from_numpy(
+            state_vector=np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0], dtype=float),
+            covariance_matrix=None,
+            comments=[],
+        )
+        with pytest.raises(ValueError, match="Covariance matrix must be"):
+            data.covariance_matrix_numpy = np.zeros((5, 5), dtype=float)
+
+    def test_relative_metadata_screen_volume_setters(self):
+        rel = RelativeMetadataData(
+            tca="2023-01-01T12:00:00",
+            miss_distance=100.0,
+        )
+        assert rel.screen_volume_x is None
+        assert rel.screen_volume_y is None
+        assert rel.screen_volume_z is None
+
+    def test_cdm_nested_setter_parity(self):
+        cdm = self._create_valid_cdm()
+
+        header = cdm.header
+        header.originator = "UPDATED"
+        cdm.header = header
+        assert cdm.header.originator == "UPDATED"
+
+        body = cdm.body
+        rel = body.relative_metadata_data
+        rel.miss_distance = 150.0
+        body.relative_metadata_data = rel
+        assert body.relative_metadata_data.miss_distance == pytest.approx(150.0)
+
+        segments = body.segments
+        seg0 = segments[0]
+        meta0 = seg0.metadata
+        meta0.object_name = "SAT1-UPDATED"
+        seg0.metadata = meta0
+
+        data0 = seg0.data
+        sv0 = data0.state_vector
+        sv0.x = 7050.0
+        data0.state_vector = sv0
+        data0.covariance_matrix = None
+        seg0.data = data0
+
+        segments[0] = seg0
+        body.segments = segments
+        cdm.body = body
+
+        assert cdm.body.segments[0].metadata.object_name == "SAT1-UPDATED"
+        assert cdm.body.segments[0].data.state_vector.x == pytest.approx(7050.0)
+        assert cdm.body.segments[0].data.covariance_matrix is None
+
+        rel.screen_volume_x = 10.0
+        rel.screen_volume_y = 20.0
+        rel.screen_volume_z = 30.0
+        assert rel.screen_volume_x == 10.0
+        assert rel.screen_volume_y == 20.0
+        assert rel.screen_volume_z == 30.0
+
+        rel.screen_volume_x = None
+        rel.screen_volume_y = None
+        rel.screen_volume_z = None
+        assert rel.screen_volume_x is None
+        assert rel.screen_volume_y is None
+        assert rel.screen_volume_z is None
 
 
 if __name__ == "__main__":
