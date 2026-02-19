@@ -15,6 +15,7 @@ from ccsds_ndm import (
     OcmData,
     OcmManeuverParameters,
     OcmMetadata,
+    OcmOdParameters,
     OcmSegment,
     OcmTrajState,
     OdmHeader,
@@ -128,6 +129,26 @@ class TestOcm:
 
         with pytest.raises(ValueError):
             man.man_basis = "NOT_A_BASIS"
+
+    def test_ocm_od_parameters_days_since_setters(self):
+        od = OcmOdParameters(
+            od_id="OD-1",
+            od_method="LEAST_SQUARES",
+            od_epoch="2023-01-01T00:00:00",
+        )
+
+        assert od.days_since_first_obs is None
+        assert od.days_since_last_obs is None
+
+        od.days_since_first_obs = 2.5
+        od.days_since_last_obs = -0.75
+        assert od.days_since_first_obs == pytest.approx(2.5)
+        assert od.days_since_last_obs == pytest.approx(-0.75)
+
+        od.days_since_first_obs = None
+        od.days_since_last_obs = None
+        assert od.days_since_first_obs is None
+        assert od.days_since_last_obs is None
 
 
 if __name__ == "__main__":

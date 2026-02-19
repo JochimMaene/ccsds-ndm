@@ -5372,6 +5372,14 @@ impl OcmOdParameters {
     fn get_days_since_first_obs(&self) -> Option<f64> {
         self.inner.days_since_first_obs.as_ref().map(|d| d.value)
     }
+    #[setter]
+    fn set_days_since_first_obs(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::{DayInterval, DayIntervalUnits};
+        self.inner.days_since_first_obs = value.map(|v| DayInterval {
+            value: v,
+            units: Some(DayIntervalUnits::D),
+        });
+    }
     /// Days elapsed between last accepted observation and OD_EPOCH. NOTE—May be positive or
     /// negative.
     ///
@@ -5381,6 +5389,14 @@ impl OcmOdParameters {
     #[getter]
     fn get_days_since_last_obs(&self) -> Option<f64> {
         self.inner.days_since_last_obs.as_ref().map(|d| d.value)
+    }
+    #[setter]
+    fn set_days_since_last_obs(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::{DayInterval, DayIntervalUnits};
+        self.inner.days_since_last_obs = value.map(|v| DayInterval {
+            value: v,
+            units: Some(DayIntervalUnits::D),
+        });
     }
     /// Number of days of observations recommended for the OD of the object (useful only for
     /// Batch OD systems).

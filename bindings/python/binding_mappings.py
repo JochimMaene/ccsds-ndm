@@ -145,31 +145,11 @@ READ_ONLY_FIELDS: dict[str, dict[str, str]] = {
     "Acm": {
         "id": "protocol_managed",
     },
-    "AttitudeState": {
-        "epoch": "immutable_view",
-        "values": "immutable_view",
-    },
     "Cdm": {
         "id": "protocol_managed",
-        "header": "immutable_view",
-        "body": "immutable_view",
-    },
-    "CdmBody": {
-        "relative_metadata_data": "immutable_view",
-        "segments": "immutable_view",
-    },
-    "CdmSegment": {
-        "metadata": "immutable_view",
-        "data": "immutable_view",
-    },
-    "CdmData": {
-        "state_vector": "immutable_view",
-        "covariance_matrix": "immutable_view",
     },
     "Ndm": {
         "id": "protocol_managed",
-        "messages": "immutable_view",
-        "comments": "immutable_view",
     },
     "Oem": {
         "id": "protocol_managed",
@@ -195,10 +175,6 @@ READ_ONLY_FIELDS: dict[str, dict[str, str]] = {
         "value": "derived_projection",
         "value_str": "derived_projection",
     },
-    "OcmOdParameters": {
-        "days_since_first_obs": "derived_projection",
-        "days_since_last_obs": "derived_projection",
-    },
 }
 
 # ---------------------------------------------------------------------------
@@ -218,7 +194,6 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
     "Omm": ["id", "version", "body"],
     "Opm": ["id", "version", "body"],
     "Ocm": ["id", "version", "body"],
-    "Cdm": [],  # CDM exposes body directly
     "Tdm": ["id", "version", "body"],
     "Rdm": ["id", "version", "body"],
     "Aem": ["id", "version", "body"],
@@ -235,16 +210,6 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
     "AemBody": ["*"],
     "ApmBody": ["*"],
     "AcmBody": ["*"],
-    # Partially implemented or legacy
-    "AcmAttitudeDetermination": ["*"],
-    "AcmAttitudeState": ["*"],
-    "AcmCovarianceMatrix": ["*"],
-    "AcmData": ["*"],
-    "AcmManeuverParameters": ["*"],
-    "AcmMetadata": ["*"],
-    "AcmPhysicalDescription": ["*"],
-    "AcmSegment": ["*"],
-    "QuaternionState": ["quaternion_dot"],
 }
 
 # ---------------------------------------------------------------------------

@@ -234,6 +234,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<acm::AcmPhysicalDescription>()?;
     m.add_class::<acm::AcmCovarianceMatrix>()?;
     m.add_class::<acm::AcmManeuverParameters>()?;
+    m.add_class::<acm::AcmSensor>()?;
     m.add_class::<acm::AcmAttitudeDetermination>()?;
 
     // Register CDM wrapper classes

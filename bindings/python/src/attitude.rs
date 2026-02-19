@@ -125,6 +125,55 @@ impl QuaternionState {
         self.inner.quaternion.qc = value;
     }
 
+    /// Quaternion derivative components [Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT].
+    ///
+    /// Units: 1/s
+    ///
+    /// :type: list[float] | None
+    #[getter]
+    fn get_quaternion_dot(&self) -> Option<Vec<f64>> {
+        self.inner.quaternion_dot.as_ref().map(|qd| {
+            vec![
+                qd.q1_dot.value,
+                qd.q2_dot.value,
+                qd.q3_dot.value,
+                qd.qc_dot.value,
+            ]
+        })
+    }
+
+    #[setter]
+    fn set_quaternion_dot(&mut self, value: Option<Vec<f64>>) -> PyResult<()> {
+        self.inner.quaternion_dot = if let Some(v) = value {
+            if v.len() != 4 {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "quaternion_dot must have exactly 4 elements",
+                ));
+            }
+            Some(ccsds_ndm::common::QuaternionDot {
+                q1_dot: ccsds_ndm::types::QuaternionDotComponent {
+                    value: v[0],
+                    units: None,
+                },
+                q2_dot: ccsds_ndm::types::QuaternionDotComponent {
+                    value: v[1],
+                    units: None,
+                },
+                q3_dot: ccsds_ndm::types::QuaternionDotComponent {
+                    value: v[2],
+                    units: None,
+                },
+                qc_dot: ccsds_ndm::types::QuaternionDotComponent {
+                    value: v[3],
+                    units: None,
+                },
+            })
+        } else {
+            None
+        };
+        Ok(())
+    }
+
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///

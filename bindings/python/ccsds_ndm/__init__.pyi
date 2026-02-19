@@ -150,6 +150,160 @@ class AcmAttitudeDetermination:
         """
         ...
 
+    @property
+    def ad_epoch(self) -> str | None:
+        """
+        Attitude determination epoch.
+        """
+        ...
+
+    @ad_epoch.setter
+    def ad_epoch(self, value: str | None) -> None: ...
+    @property
+    def ad_id(self) -> str | None:
+        """
+        Attitude determination block identifier.
+        """
+        ...
+
+    @ad_id.setter
+    def ad_id(self, value: str | None) -> None: ...
+    @property
+    def ad_method(self) -> str | None:
+        """
+        Attitude determination method.
+        """
+        ...
+
+    @ad_method.setter
+    def ad_method(self, value: str | None) -> None: ...
+    @property
+    def ad_prev_id(self) -> str | None:
+        """
+        Previous attitude determination block identifier.
+        """
+        ...
+
+    @ad_prev_id.setter
+    def ad_prev_id(self, value: str | None) -> None: ...
+    @property
+    def attitude_source(self) -> str | None:
+        """
+        Source of attitude estimate.
+        """
+        ...
+
+    @attitude_source.setter
+    def attitude_source(self, value: str | None) -> None: ...
+    @property
+    def attitude_states(self) -> str | None:
+        """
+        Attitude state type for estimator.
+        """
+        ...
+
+    @attitude_states.setter
+    def attitude_states(self, value: str | None) -> None: ...
+    @property
+    def attitude_type(self) -> str | None:
+        """
+        Attitude type keyword.
+        """
+        ...
+
+    @attitude_type.setter
+    def attitude_type(self, value: str | None) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments for this attitude determination section.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def cov_type(self) -> str | None:
+        """
+        Covariance type for estimator.
+        """
+        ...
+
+    @cov_type.setter
+    def cov_type(self, value: str | None) -> None: ...
+    @property
+    def number_states(self) -> int | None:
+        """
+        Number of estimator states.
+        """
+        ...
+
+    @number_states.setter
+    def number_states(self, value: int | None) -> None: ...
+    @property
+    def rate_process_noise_stddev(self) -> float | None:
+        """
+        Rate process noise standard deviation.
+        """
+        ...
+
+    @rate_process_noise_stddev.setter
+    def rate_process_noise_stddev(self, value: float | None) -> None: ...
+    @property
+    def rate_states(self) -> str | None:
+        """
+        Rate states type.
+        """
+        ...
+
+    @rate_states.setter
+    def rate_states(self, value: str | None) -> None: ...
+    @property
+    def ref_frame_a(self) -> str | None:
+        """
+        Source reference frame.
+        """
+        ...
+
+    @ref_frame_a.setter
+    def ref_frame_a(self, value: str | None) -> None: ...
+    @property
+    def ref_frame_b(self) -> str | None:
+        """
+        Destination reference frame.
+        """
+        ...
+
+    @ref_frame_b.setter
+    def ref_frame_b(self, value: str | None) -> None: ...
+    @property
+    def sensors(self) -> list[AcmSensor]:
+        """
+        Sensor blocks.
+        """
+        ...
+
+    @sensors.setter
+    def sensors(self, value: list[AcmSensor]) -> None: ...
+    @property
+    def sigma_u(self) -> float | None:
+        """
+        Rate random walk sigma_u.
+        """
+        ...
+
+    @sigma_u.setter
+    def sigma_u(self, value: float | None) -> None: ...
+    @property
+    def sigma_v(self) -> float | None:
+        """
+        Angle random walk sigma_v.
+        """
+        ...
+
+    @sigma_v.setter
+    def sigma_v(self, value: float | None) -> None: ...
+
 class AcmAttitudeState:
     """
     ACM Data: Attitude State Time History Section.
@@ -163,6 +317,115 @@ class AcmAttitudeState:
         """
         ...
 
+    @property
+    def att_basis(self) -> str | None:
+        """
+        Basis of this attitude state data.
+        """
+        ...
+
+    @att_basis.setter
+    def att_basis(self, value: str | None) -> None: ...
+    @property
+    def att_basis_id(self) -> str | None:
+        """
+        Basis dataset identifier.
+        """
+        ...
+
+    @att_basis_id.setter
+    def att_basis_id(self, value: str | None) -> None: ...
+    @property
+    def att_id(self) -> str | None:
+        """
+        Attitude state block identifier.
+        """
+        ...
+
+    @att_id.setter
+    def att_id(self, value: str | None) -> None: ...
+    @property
+    def att_lines(self) -> list[list[float]]:
+        """
+        Attitude state lines.
+        """
+        ...
+
+    @att_lines.setter
+    def att_lines(self, value: list[list[float]]) -> None: ...
+    @property
+    def att_prev_id(self) -> str | None:
+        """
+        Previous attitude state block identifier.
+        """
+        ...
+
+    @att_prev_id.setter
+    def att_prev_id(self, value: str | None) -> None: ...
+    @property
+    def att_type(self) -> str:
+        """
+        Attitude state type.
+        """
+        ...
+
+    @att_type.setter
+    def att_type(self, value: str) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments for this attitude state section.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def euler_rot_seq(self) -> str | None:
+        """
+        Optional Euler rotation sequence.
+        """
+        ...
+
+    @euler_rot_seq.setter
+    def euler_rot_seq(self, value: str | None) -> None: ...
+    @property
+    def number_states(self) -> int:
+        """
+        Number of states in each attitude line.
+        """
+        ...
+
+    @number_states.setter
+    def number_states(self, value: int) -> None: ...
+    @property
+    def rate_type(self) -> str | None:
+        """
+        Optional rate state type.
+        """
+        ...
+
+    @rate_type.setter
+    def rate_type(self, value: str | None) -> None: ...
+    @property
+    def ref_frame_a(self) -> str:
+        """
+        Source reference frame.
+        """
+        ...
+
+    @ref_frame_a.setter
+    def ref_frame_a(self, value: str) -> None: ...
+    @property
+    def ref_frame_b(self) -> str:
+        """
+        Destination reference frame.
+        """
+        ...
+
+    @ref_frame_b.setter
+    def ref_frame_b(self, value: str) -> None: ...
+
 class AcmCovarianceMatrix:
     """
     ACM Data: Covariance Time History Section.
@@ -175,6 +438,61 @@ class AcmCovarianceMatrix:
         Helper for pickle.
         """
         ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments for this covariance section.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def cov_basis(self) -> str:
+        """
+        Covariance basis identifier.
+        """
+        ...
+
+    @cov_basis.setter
+    def cov_basis(self, value: str) -> None: ...
+    @property
+    def cov_confidence(self) -> float | None:
+        """
+        Optional covariance confidence.
+        """
+        ...
+
+    @cov_confidence.setter
+    def cov_confidence(self, value: float | None) -> None: ...
+    @property
+    def cov_lines(self) -> list[list[float]]:
+        """
+        Covariance data lines.
+        """
+        ...
+
+    @cov_lines.setter
+    def cov_lines(self, value: list[list[float]]) -> None: ...
+    @property
+    def cov_ref_frame(self) -> str:
+        """
+        Covariance reference frame.
+        """
+        ...
+
+    @cov_ref_frame.setter
+    def cov_ref_frame(self, value: str) -> None: ...
+    @property
+    def cov_type(self) -> str:
+        """
+        Covariance line type.
+        """
+        ...
+
+    @cov_type.setter
+    def cov_type(self, value: str) -> None: ...
 
 class AcmData:
     """
@@ -190,6 +508,15 @@ class AcmData:
         ...
 
     @property
+    def ad(self) -> AcmAttitudeDetermination | None:
+        """
+        A single optional attitude determination section.
+        """
+        ...
+
+    @ad.setter
+    def ad(self, value: AcmAttitudeDetermination | None) -> None: ...
+    @property
     def att(self) -> list[AcmAttitudeState]:
         """
         One or more optional attitude state time histories (each consisting of one or more attitude
@@ -199,6 +526,24 @@ class AcmData:
 
     @att.setter
     def att(self, value: list[AcmAttitudeState]) -> None: ...
+    @property
+    def cov(self) -> list[AcmCovarianceMatrix]:
+        """
+        One or more optional covariance time histories.
+        """
+        ...
+
+    @cov.setter
+    def cov(self, value: list[AcmCovarianceMatrix]) -> None: ...
+    @property
+    def man(self) -> list[AcmManeuverParameters]:
+        """
+        One or more optional maneuver specification sections.
+        """
+        ...
+
+    @man.setter
+    def man(self, value: list[AcmManeuverParameters]) -> None: ...
     @property
     def phys(self) -> AcmPhysicalDescription | None:
         """
@@ -234,6 +579,115 @@ class AcmManeuverParameters:
         """
         ...
 
+    @property
+    def actuator_used(self) -> str | None:
+        """
+        Actuator used for this maneuver.
+        """
+        ...
+
+    @actuator_used.setter
+    def actuator_used(self, value: str | None) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments for this maneuver section.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def man_begin_time(self) -> str | None:
+        """
+        Maneuver begin time (relative or absolute epoch string).
+        """
+        ...
+
+    @man_begin_time.setter
+    def man_begin_time(self, value: str | None) -> None: ...
+    @property
+    def man_duration(self) -> float | None:
+        """
+        Maneuver duration in seconds.
+        """
+        ...
+
+    @man_duration.setter
+    def man_duration(self, value: float | None) -> None: ...
+    @property
+    def man_end_time(self) -> str | None:
+        """
+        Maneuver end time (relative or absolute epoch string).
+        """
+        ...
+
+    @man_end_time.setter
+    def man_end_time(self, value: str | None) -> None: ...
+    @property
+    def man_id(self) -> str | None:
+        """
+        Maneuver block identifier.
+        """
+        ...
+
+    @man_id.setter
+    def man_id(self, value: str | None) -> None: ...
+    @property
+    def man_prev_id(self) -> str | None:
+        """
+        Previous maneuver block identifier.
+        """
+        ...
+
+    @man_prev_id.setter
+    def man_prev_id(self, value: str | None) -> None: ...
+    @property
+    def man_purpose(self) -> str | None:
+        """
+        Maneuver purpose.
+        """
+        ...
+
+    @man_purpose.setter
+    def man_purpose(self, value: str | None) -> None: ...
+    @property
+    def target_attitude(self) -> list[float] | None:
+        """
+        Target attitude quaternion-like 4-vector.
+        """
+        ...
+
+    @target_attitude.setter
+    def target_attitude(self, value: list[float] | None) -> None: ...
+    @property
+    def target_mom_frame(self) -> str | None:
+        """
+        Reference frame of target momentum.
+        """
+        ...
+
+    @target_mom_frame.setter
+    def target_mom_frame(self, value: str | None) -> None: ...
+    @property
+    def target_momentum(self) -> list[float] | None:
+        """
+        Target momentum vector [x, y, z].
+        """
+        ...
+
+    @target_momentum.setter
+    def target_momentum(self, value: list[float] | None) -> None: ...
+    @property
+    def target_spinrate(self) -> float | None:
+        """
+        Target spin rate (deg/s).
+        """
+        ...
+
+    @target_spinrate.setter
+    def target_spinrate(self, value: float | None) -> None: ...
+
 class AcmMetadata:
     """
     ACM Metadata Section.
@@ -251,6 +705,51 @@ class AcmMetadata:
         """
         ...
 
+    @property
+    def acm_data_elements(self) -> str | None:
+        """
+        Included ACM data block elements.
+        """
+        ...
+
+    @acm_data_elements.setter
+    def acm_data_elements(self, value: str | None) -> None: ...
+    @property
+    def catalog_name(self) -> str | None:
+        """
+        Satellite catalog source.
+        """
+        ...
+
+    @catalog_name.setter
+    def catalog_name(self, value: str | None) -> None: ...
+    @property
+    def center_name(self) -> str | None:
+        """
+        Central body name.
+        """
+        ...
+
+    @center_name.setter
+    def center_name(self, value: str | None) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments (allowed only at the beginning of the ACM Metadata).
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def epoch_tzero(self) -> str:
+        """
+        Reference epoch for relative times.
+        """
+        ...
+
+    @epoch_tzero.setter
+    def epoch_tzero(self, value: str) -> None: ...
     @property
     def international_designator(self) -> str | None:
         """
@@ -270,6 +769,33 @@ class AcmMetadata:
     @international_designator.setter
     def international_designator(self, value: str | None) -> None: ...
     @property
+    def next_leap_epoch(self) -> str | None:
+        """
+        Epoch of the next leap second.
+        """
+        ...
+
+    @next_leap_epoch.setter
+    def next_leap_epoch(self, value: str | None) -> None: ...
+    @property
+    def next_leap_taimutc(self) -> float | None:
+        """
+        Difference (TAI - UTC) at NEXT_LEAP_EPOCH, seconds.
+        """
+        ...
+
+    @next_leap_taimutc.setter
+    def next_leap_taimutc(self, value: float | None) -> None: ...
+    @property
+    def object_designator(self) -> str | None:
+        """
+        Unique object designator in the source catalog.
+        """
+        ...
+
+    @object_designator.setter
+    def object_designator(self, value: str | None) -> None: ...
+    @property
     def object_name(self) -> str:
         """
         Free-text field containing the name of the object. There is no CCSDS-based restriction on
@@ -286,6 +812,96 @@ class AcmMetadata:
 
     @object_name.setter
     def object_name(self, value: str) -> None: ...
+    @property
+    def odm_msg_link(self) -> str | None:
+        """
+        Linked Orbit Data Message identifier.
+        """
+        ...
+
+    @odm_msg_link.setter
+    def odm_msg_link(self, value: str | None) -> None: ...
+    @property
+    def originator_address(self) -> str | None:
+        """
+        Originator point-of-contact address.
+        """
+        ...
+
+    @originator_address.setter
+    def originator_address(self, value: str | None) -> None: ...
+    @property
+    def originator_email(self) -> str | None:
+        """
+        Originator point-of-contact email.
+        """
+        ...
+
+    @originator_email.setter
+    def originator_email(self, value: str | None) -> None: ...
+    @property
+    def originator_phone(self) -> str | None:
+        """
+        Originator point-of-contact phone.
+        """
+        ...
+
+    @originator_phone.setter
+    def originator_phone(self, value: str | None) -> None: ...
+    @property
+    def originator_poc(self) -> str | None:
+        """
+        Originator point-of-contact.
+        """
+        ...
+
+    @originator_poc.setter
+    def originator_poc(self, value: str | None) -> None: ...
+    @property
+    def originator_position(self) -> str | None:
+        """
+        Originator point-of-contact position.
+        """
+        ...
+
+    @originator_position.setter
+    def originator_position(self, value: str | None) -> None: ...
+    @property
+    def start_time(self) -> str | None:
+        """
+        Earliest data time in this ACM.
+        """
+        ...
+
+    @start_time.setter
+    def start_time(self, value: str | None) -> None: ...
+    @property
+    def stop_time(self) -> str | None:
+        """
+        Latest data time in this ACM.
+        """
+        ...
+
+    @stop_time.setter
+    def stop_time(self, value: str | None) -> None: ...
+    @property
+    def taimutc_at_tzero(self) -> float | None:
+        """
+        Difference (TAI - UTC) at EPOCH_TZERO, seconds.
+        """
+        ...
+
+    @taimutc_at_tzero.setter
+    def taimutc_at_tzero(self, value: float | None) -> None: ...
+    @property
+    def time_system(self) -> str:
+        """
+        Time system used in this metadata section.
+        """
+        ...
+
+    @time_system.setter
+    def time_system(self, value: str) -> None: ...
     def validate(self):
         """
         Validate the metadata section against CCSDS rules.
@@ -302,6 +918,124 @@ class AcmPhysicalDescription:
         Helper for pickle.
         """
         ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments for this physical description section.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def cp(self) -> list[float] | None:
+        """
+        Center-of-pressure vector [x, y, z] in meters.
+        """
+        ...
+
+    @cp.setter
+    def cp(self, value: list[float] | None) -> None: ...
+    @property
+    def cp_ref_frame(self) -> str | None:
+        """
+        Center-of-pressure reference frame.
+        """
+        ...
+
+    @cp_ref_frame.setter
+    def cp_ref_frame(self, value: str | None) -> None: ...
+    @property
+    def drag_coeff(self) -> float | None:
+        """
+        Drag coefficient.
+        """
+        ...
+
+    @drag_coeff.setter
+    def drag_coeff(self, value: float | None) -> None: ...
+    @property
+    def dry_mass(self) -> float | None:
+        """
+        Dry mass (kg).
+        """
+        ...
+
+    @dry_mass.setter
+    def dry_mass(self, value: float | None) -> None: ...
+    @property
+    def inertia_ref_frame(self) -> str | None:
+        """
+        Inertia reference frame.
+        """
+        ...
+
+    @inertia_ref_frame.setter
+    def inertia_ref_frame(self, value: str | None) -> None: ...
+    @property
+    def ixx(self) -> float | None:
+        """
+        Moment of inertia IXX.
+        """
+        ...
+
+    @ixx.setter
+    def ixx(self, value: float | None) -> None: ...
+    @property
+    def ixy(self) -> float | None:
+        """
+        Product of inertia IXY.
+        """
+        ...
+
+    @ixy.setter
+    def ixy(self, value: float | None) -> None: ...
+    @property
+    def ixz(self) -> float | None:
+        """
+        Product of inertia IXZ.
+        """
+        ...
+
+    @ixz.setter
+    def ixz(self, value: float | None) -> None: ...
+    @property
+    def iyy(self) -> float | None:
+        """
+        Moment of inertia IYY.
+        """
+        ...
+
+    @iyy.setter
+    def iyy(self, value: float | None) -> None: ...
+    @property
+    def iyz(self) -> float | None:
+        """
+        Product of inertia IYZ.
+        """
+        ...
+
+    @iyz.setter
+    def iyz(self, value: float | None) -> None: ...
+    @property
+    def izz(self) -> float | None:
+        """
+        Moment of inertia IZZ.
+        """
+        ...
+
+    @izz.setter
+    def izz(self, value: float | None) -> None: ...
+    @property
+    def wet_mass(self) -> float | None:
+        """
+        Wet mass (kg).
+        """
+        ...
+
+    @wet_mass.setter
+    def wet_mass(self, value: float | None) -> None: ...
 
 class AcmSegment:
     def __init__(metadata, data) -> None: ...
@@ -334,6 +1068,69 @@ class AcmSegment:
         Validate the segment against CCSDS rules.
         """
         ...
+
+class AcmSensor:
+    """
+    ACM Data: Sensor Data Section.
+    """
+    def __init__(
+        sensor_number,
+        sensor_used=None,
+        sensor_noise_stddev=None,
+        sensor_frequency=None,
+        comment=None,
+    ) -> None: ...
+    def __getstate__(self, /):
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        Sensor section comments.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def sensor_frequency(self) -> float | None:
+        """
+        Sensor frequency in Hz.
+        """
+        ...
+
+    @sensor_frequency.setter
+    def sensor_frequency(self, value: float | None) -> None: ...
+    @property
+    def sensor_noise_stddev(self) -> list[float] | None:
+        """
+        Sensor noise standard deviation values.
+        """
+        ...
+
+    @sensor_noise_stddev.setter
+    def sensor_noise_stddev(self, value: list[float] | None) -> None: ...
+    @property
+    def sensor_number(self) -> int:
+        """
+        Sensor number (unique in AD section).
+        """
+        ...
+
+    @sensor_number.setter
+    def sensor_number(self, value: int) -> None: ...
+    @property
+    def sensor_used(self) -> str | None:
+        """
+        Sensor type identifier.
+        """
+        ...
+
+    @sensor_used.setter
+    def sensor_used(self, value: str | None) -> None: ...
 
 class AdditionalParameters:
     """
@@ -1541,8 +2338,12 @@ class AttitudeState:
 
     @property
     def epoch(self): ...
+    @epoch.setter
+    def epoch(self, value: object) -> None: ...
     @property
     def values(self): ...
+    @values.setter
+    def values(self, value: object) -> None: ...
 
 class Cdm:
     """
@@ -1572,6 +2373,8 @@ class Cdm:
         """
         ...
 
+    @body.setter
+    def body(self, value: CdmBody) -> None: ...
     @staticmethod
     def from_file(path, format=None):
         """
@@ -1644,6 +2447,8 @@ class Cdm:
         """
         ...
 
+    @header.setter
+    def header(self, value: CdmHeader) -> None: ...
     @property
     def id(self) -> Optional[str]:
         """
@@ -1734,12 +2539,17 @@ class CdmBody:
         """
         ...
 
+    @relative_metadata_data.setter
+    def relative_metadata_data(self, value: RelativeMetadataData) -> None: ...
     @property
     def segments(self) -> list[CdmSegment]:
         """
         The segments containing specific data for each object.
         """
         ...
+
+    @segments.setter
+    def segments(self, value: list[CdmSegment]) -> None: ...
 
 class CdmCovarianceMatrix:
     """
@@ -2463,6 +3273,8 @@ class CdmData:
         """
         ...
 
+    @covariance_matrix.setter
+    def covariance_matrix(self, value: Optional[CdmCovarianceMatrix]) -> None: ...
     @property
     def covariance_matrix_numpy(self) -> numpy.ndarray:
         """
@@ -2502,6 +3314,8 @@ class CdmData:
         """
         ...
 
+    @state_vector.setter
+    def state_vector(self, value: CdmStateVector) -> None: ...
     @property
     def state_vector_numpy(self) -> numpy.ndarray:
         """
@@ -2979,12 +3793,17 @@ class CdmSegment:
         """
         ...
 
+    @data.setter
+    def data(self, value: CdmData) -> None: ...
     @property
     def metadata(self) -> CdmMetadata:
         """
         Metadata for the object.
         """
         ...
+
+    @metadata.setter
+    def metadata(self, value: CdmMetadata) -> None: ...
 
 class CdmStateVector:
     """
@@ -4355,6 +5174,8 @@ class Ndm:
         """
         ...
 
+    @comments.setter
+    def comments(self, value: list[str]) -> None: ...
     @staticmethod
     def from_file(path, format=None):
         """
@@ -4383,6 +5204,10 @@ class Ndm:
         """
         ...
 
+    @messages.setter
+    def messages(
+        self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
+    ) -> None: ...
     def to_file(self, path, format, validate=True):
         """
         Write to file.
@@ -10478,6 +11303,17 @@ class QuaternionState:
 
     @qc.setter
     def qc(self, value: float) -> None: ...
+    @property
+    def quaternion_dot(self) -> list[float] | None:
+        """
+        Quaternion derivative components [Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT].
+
+        Units: 1/s
+        """
+        ...
+
+    @quaternion_dot.setter
+    def quaternion_dot(self, value: list[float] | None) -> None: ...
     @property
     def ref_frame_a(self) -> str:
         """

@@ -7,7 +7,7 @@ use crate::common::AdmHeader;
 use crate::types::parse_epoch;
 use ccsds_ndm::messages::acm as core_acm;
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType};
+use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, AttBasisType, AttRateType, RotSeq};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -380,6 +380,262 @@ impl AcmMetadata {
         self.inner.international_designator = value;
     }
 
+    /// Comments (allowed only at the beginning of the ACM Metadata).
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
+
+    /// Satellite catalog source.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_catalog_name(&self) -> Option<String> {
+        self.inner.catalog_name.clone()
+    }
+
+    #[setter]
+    fn set_catalog_name(&mut self, value: Option<String>) {
+        self.inner.catalog_name = value;
+    }
+
+    /// Unique object designator in the source catalog.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_object_designator(&self) -> Option<String> {
+        self.inner.object_designator.clone()
+    }
+
+    #[setter]
+    fn set_object_designator(&mut self, value: Option<String>) {
+        self.inner.object_designator = value;
+    }
+
+    /// Originator point-of-contact.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_originator_poc(&self) -> Option<String> {
+        self.inner.originator_poc.clone()
+    }
+
+    #[setter]
+    fn set_originator_poc(&mut self, value: Option<String>) {
+        self.inner.originator_poc = value;
+    }
+
+    /// Originator point-of-contact position.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_originator_position(&self) -> Option<String> {
+        self.inner.originator_position.clone()
+    }
+
+    #[setter]
+    fn set_originator_position(&mut self, value: Option<String>) {
+        self.inner.originator_position = value;
+    }
+
+    /// Originator point-of-contact phone.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_originator_phone(&self) -> Option<String> {
+        self.inner.originator_phone.clone()
+    }
+
+    #[setter]
+    fn set_originator_phone(&mut self, value: Option<String>) {
+        self.inner.originator_phone = value;
+    }
+
+    /// Originator point-of-contact email.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_originator_email(&self) -> Option<String> {
+        self.inner.originator_email.clone()
+    }
+
+    #[setter]
+    fn set_originator_email(&mut self, value: Option<String>) {
+        self.inner.originator_email = value;
+    }
+
+    /// Originator point-of-contact address.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_originator_address(&self) -> Option<String> {
+        self.inner.originator_address.clone()
+    }
+
+    #[setter]
+    fn set_originator_address(&mut self, value: Option<String>) {
+        self.inner.originator_address = value;
+    }
+
+    /// Linked Orbit Data Message identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_odm_msg_link(&self) -> Option<String> {
+        self.inner.odm_msg_link.clone()
+    }
+
+    #[setter]
+    fn set_odm_msg_link(&mut self, value: Option<String>) {
+        self.inner.odm_msg_link = value;
+    }
+
+    /// Central body name.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_center_name(&self) -> Option<String> {
+        self.inner.center_name.clone()
+    }
+
+    #[setter]
+    fn set_center_name(&mut self, value: Option<String>) {
+        self.inner.center_name = value;
+    }
+
+    /// Time system used in this metadata section.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_time_system(&self) -> String {
+        self.inner.time_system.clone()
+    }
+
+    #[setter]
+    fn set_time_system(&mut self, value: Bound<'_, PyAny>) -> PyResult<()> {
+        self.inner.time_system = parse_time_system(&value)?;
+        Ok(())
+    }
+
+    /// Reference epoch for relative times.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_epoch_tzero(&self) -> String {
+        self.inner.epoch_tzero.as_str().to_string()
+    }
+
+    #[setter]
+    fn set_epoch_tzero(&mut self, value: String) -> PyResult<()> {
+        self.inner.epoch_tzero = parse_epoch(&value)?;
+        Ok(())
+    }
+
+    /// Included ACM data block elements.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_acm_data_elements(&self) -> Option<String> {
+        self.inner.acm_data_elements.clone()
+    }
+
+    #[setter]
+    fn set_acm_data_elements(&mut self, value: Option<String>) {
+        self.inner.acm_data_elements = value;
+    }
+
+    /// Earliest data time in this ACM.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_start_time(&self) -> Option<String> {
+        self.inner
+            .start_time
+            .as_ref()
+            .map(|e| e.as_str().to_string())
+    }
+
+    #[setter]
+    fn set_start_time(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.start_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        Ok(())
+    }
+
+    /// Latest data time in this ACM.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_stop_time(&self) -> Option<String> {
+        self.inner
+            .stop_time
+            .as_ref()
+            .map(|e| e.as_str().to_string())
+    }
+
+    #[setter]
+    fn set_stop_time(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.stop_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        Ok(())
+    }
+
+    /// Difference (TAI - UTC) at EPOCH_TZERO, seconds.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_taimutc_at_tzero(&self) -> Option<f64> {
+        self.inner.taimutc_at_tzero.as_ref().map(|t| t.value)
+    }
+
+    #[setter]
+    fn set_taimutc_at_tzero(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::TimeOffset;
+        self.inner.taimutc_at_tzero = value.map(|v| TimeOffset {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Epoch of the next leap second.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_next_leap_epoch(&self) -> Option<String> {
+        self.inner
+            .next_leap_epoch
+            .as_ref()
+            .map(|e| e.as_str().to_string())
+    }
+
+    #[setter]
+    fn set_next_leap_epoch(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.next_leap_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        Ok(())
+    }
+
+    /// Difference (TAI - UTC) at NEXT_LEAP_EPOCH, seconds.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_next_leap_taimutc(&self) -> Option<f64> {
+        self.inner.next_leap_taimutc.as_ref().map(|t| t.value)
+    }
+
+    #[setter]
+    fn set_next_leap_taimutc(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::TimeOffset;
+        self.inner.next_leap_taimutc = value.map(|v| TimeOffset {
+            value: v,
+            units: None,
+        });
+    }
+
     /// Validate the metadata section against CCSDS rules.
     fn validate(&self) -> PyResult<()> {
         self.inner
@@ -481,6 +737,56 @@ impl AcmData {
         self.inner.phys = value.map(|p| p.inner);
     }
 
+    /// One or more optional covariance time histories.
+    ///
+    /// :type: list[AcmCovarianceMatrix]
+    #[getter]
+    fn get_cov(&self) -> Vec<AcmCovarianceMatrix> {
+        self.inner
+            .cov
+            .iter()
+            .map(|c| AcmCovarianceMatrix { inner: c.clone() })
+            .collect()
+    }
+
+    #[setter]
+    fn set_cov(&mut self, value: Vec<AcmCovarianceMatrix>) {
+        self.inner.cov = value.into_iter().map(|c| c.inner).collect();
+    }
+
+    /// One or more optional maneuver specification sections.
+    ///
+    /// :type: list[AcmManeuverParameters]
+    #[getter]
+    fn get_man(&self) -> Vec<AcmManeuverParameters> {
+        self.inner
+            .man
+            .iter()
+            .map(|m| AcmManeuverParameters { inner: m.clone() })
+            .collect()
+    }
+
+    #[setter]
+    fn set_man(&mut self, value: Vec<AcmManeuverParameters>) {
+        self.inner.man = value.into_iter().map(|m| m.inner).collect();
+    }
+
+    /// A single optional attitude determination section.
+    ///
+    /// :type: AcmAttitudeDetermination | None
+    #[getter]
+    fn get_ad(&self) -> Option<AcmAttitudeDetermination> {
+        self.inner
+            .ad
+            .as_ref()
+            .map(|a| AcmAttitudeDetermination { inner: a.clone() })
+    }
+
+    #[setter]
+    fn set_ad(&mut self, value: Option<AcmAttitudeDetermination>) {
+        self.inner.ad = value.map(|a| a.inner);
+    }
+
     /// Validate the data section against CCSDS rules.
     fn validate(&self, metadata: AcmMetadata) -> PyResult<()> {
         self.inner
@@ -529,6 +835,183 @@ impl AcmAttitudeState {
             },
         })
     }
+
+    /// Comments for this attitude state section.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
+
+    /// Attitude state block identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_att_id(&self) -> Option<String> {
+        self.inner.att_id.clone()
+    }
+
+    #[setter]
+    fn set_att_id(&mut self, value: Option<String>) {
+        self.inner.att_id = value;
+    }
+
+    /// Previous attitude state block identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_att_prev_id(&self) -> Option<String> {
+        self.inner.att_prev_id.clone()
+    }
+
+    #[setter]
+    fn set_att_prev_id(&mut self, value: Option<String>) {
+        self.inner.att_prev_id = value;
+    }
+
+    /// Basis of this attitude state data.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_att_basis(&self) -> Option<String> {
+        self.inner.att_basis.as_ref().map(|v| v.to_string())
+    }
+
+    #[setter]
+    fn set_att_basis(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.att_basis = value
+            .map(|s| AttBasisType::from_str(&s))
+            .transpose()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Basis dataset identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_att_basis_id(&self) -> Option<String> {
+        self.inner.att_basis_id.clone()
+    }
+
+    #[setter]
+    fn set_att_basis_id(&mut self, value: Option<String>) {
+        self.inner.att_basis_id = value;
+    }
+
+    /// Source reference frame.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_ref_frame_a(&self) -> String {
+        self.inner.ref_frame_a.clone()
+    }
+
+    #[setter]
+    fn set_ref_frame_a(&mut self, value: String) {
+        self.inner.ref_frame_a = value;
+    }
+
+    /// Destination reference frame.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_ref_frame_b(&self) -> String {
+        self.inner.ref_frame_b.clone()
+    }
+
+    #[setter]
+    fn set_ref_frame_b(&mut self, value: String) {
+        self.inner.ref_frame_b = value;
+    }
+
+    /// Number of states in each attitude line.
+    ///
+    /// :type: int
+    #[getter]
+    fn get_number_states(&self) -> u32 {
+        self.inner.number_states
+    }
+
+    #[setter]
+    fn set_number_states(&mut self, value: u32) {
+        self.inner.number_states = value;
+    }
+
+    /// Attitude state type.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_att_type(&self) -> String {
+        self.inner.att_type.to_string()
+    }
+
+    #[setter]
+    fn set_att_type(&mut self, value: String) -> PyResult<()> {
+        self.inner.att_type =
+            AcmAttitudeType::from_str(&value).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Optional rate state type.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_rate_type(&self) -> Option<String> {
+        self.inner.rate_type.as_ref().map(|v| v.to_string())
+    }
+
+    #[setter]
+    fn set_rate_type(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.rate_type = value
+            .map(|s| AttRateType::from_str(&s))
+            .transpose()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Optional Euler rotation sequence.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_euler_rot_seq(&self) -> Option<String> {
+        self.inner.euler_rot_seq.as_ref().map(|v| v.to_string())
+    }
+
+    #[setter]
+    fn set_euler_rot_seq(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.euler_rot_seq = value
+            .map(|s| RotSeq::from_str(&s))
+            .transpose()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Attitude state lines.
+    ///
+    /// :type: list[list[float]]
+    #[getter]
+    fn get_att_lines(&self) -> Vec<Vec<f64>> {
+        self.inner
+            .att_lines
+            .iter()
+            .map(|l| l.values.clone())
+            .collect()
+    }
+
+    #[setter]
+    fn set_att_lines(&mut self, value: Vec<Vec<f64>>) {
+        self.inner.att_lines = value
+            .into_iter()
+            .map(|values| core_acm::AttLine { values })
+            .collect();
+    }
 }
 
 /// ACM Data: Space Object Physical Characteristics Section.
@@ -560,6 +1043,215 @@ impl AcmPhysicalDescription {
                 iyz: None,
             },
         }
+    }
+
+    /// Comments for this physical description section.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
+
+    /// Drag coefficient.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_drag_coeff(&self) -> Option<f64> {
+        self.inner.drag_coeff
+    }
+
+    #[setter]
+    fn set_drag_coeff(&mut self, value: Option<f64>) {
+        self.inner.drag_coeff = value;
+    }
+
+    /// Wet mass (kg).
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_wet_mass(&self) -> Option<f64> {
+        self.inner.wet_mass.as_ref().map(|m| m.value)
+    }
+
+    #[setter]
+    fn set_wet_mass(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::Mass;
+        self.inner.wet_mass = value.map(|v| Mass {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Dry mass (kg).
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_dry_mass(&self) -> Option<f64> {
+        self.inner.dry_mass.as_ref().map(|m| m.value)
+    }
+
+    #[setter]
+    fn set_dry_mass(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::Mass;
+        self.inner.dry_mass = value.map(|v| Mass {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Center-of-pressure reference frame.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_cp_ref_frame(&self) -> Option<String> {
+        self.inner.cp_ref_frame.clone()
+    }
+
+    #[setter]
+    fn set_cp_ref_frame(&mut self, value: Option<String>) {
+        self.inner.cp_ref_frame = value;
+    }
+
+    /// Center-of-pressure vector [x, y, z] in meters.
+    ///
+    /// :type: list[float] | None
+    #[getter]
+    fn get_cp(&self) -> Option<Vec<f64>> {
+        self.inner.cp.as_ref().map(|v| v.elements.to_vec())
+    }
+
+    #[setter]
+    fn set_cp(&mut self, value: Option<Vec<f64>>) -> PyResult<()> {
+        self.inner.cp = if let Some(v) = value {
+            if v.len() != 3 {
+                return Err(PyValueError::new_err("cp must have exactly 3 elements"));
+            }
+            Some(ccsds_ndm::types::Vector3::new([v[0], v[1], v[2]], None))
+        } else {
+            None
+        };
+        Ok(())
+    }
+
+    /// Inertia reference frame.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_inertia_ref_frame(&self) -> Option<String> {
+        self.inner.inertia_ref_frame.clone()
+    }
+
+    #[setter]
+    fn set_inertia_ref_frame(&mut self, value: Option<String>) {
+        self.inner.inertia_ref_frame = value;
+    }
+
+    /// Moment of inertia IXX.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_ixx(&self) -> Option<f64> {
+        self.inner.ixx.as_ref().map(|m| m.value)
+    }
+
+    #[setter]
+    fn set_ixx(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::Moment;
+        self.inner.ixx = value.map(|v| Moment {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Moment of inertia IYY.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_iyy(&self) -> Option<f64> {
+        self.inner.iyy.as_ref().map(|m| m.value)
+    }
+
+    #[setter]
+    fn set_iyy(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::Moment;
+        self.inner.iyy = value.map(|v| Moment {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Moment of inertia IZZ.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_izz(&self) -> Option<f64> {
+        self.inner.izz.as_ref().map(|m| m.value)
+    }
+
+    #[setter]
+    fn set_izz(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::Moment;
+        self.inner.izz = value.map(|v| Moment {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Product of inertia IXY.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_ixy(&self) -> Option<f64> {
+        self.inner.ixy.as_ref().map(|m| m.value)
+    }
+
+    #[setter]
+    fn set_ixy(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::Moment;
+        self.inner.ixy = value.map(|v| Moment {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Product of inertia IXZ.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_ixz(&self) -> Option<f64> {
+        self.inner.ixz.as_ref().map(|m| m.value)
+    }
+
+    #[setter]
+    fn set_ixz(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::Moment;
+        self.inner.ixz = value.map(|v| Moment {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Product of inertia IYZ.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_iyz(&self) -> Option<f64> {
+        self.inner.iyz.as_ref().map(|m| m.value)
+    }
+
+    #[setter]
+    fn set_iyz(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::Moment;
+        self.inner.iyz = value.map(|v| Moment {
+            value: v,
+            units: None,
+        });
     }
 }
 
@@ -597,6 +1289,93 @@ impl AcmCovarianceMatrix {
             },
         })
     }
+
+    /// Comments for this covariance section.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
+
+    /// Covariance basis identifier.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_cov_basis(&self) -> String {
+        self.inner.cov_basis.clone()
+    }
+
+    #[setter]
+    fn set_cov_basis(&mut self, value: String) {
+        self.inner.cov_basis = value;
+    }
+
+    /// Covariance reference frame.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_cov_ref_frame(&self) -> String {
+        self.inner.cov_ref_frame.clone()
+    }
+
+    #[setter]
+    fn set_cov_ref_frame(&mut self, value: String) {
+        self.inner.cov_ref_frame = value;
+    }
+
+    /// Covariance line type.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_cov_type(&self) -> String {
+        format!("{}", self.inner.cov_type)
+    }
+
+    #[setter]
+    fn set_cov_type(&mut self, value: String) -> PyResult<()> {
+        self.inner.cov_type = AcmCovarianceLineType::from_str(&value)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Optional covariance confidence.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_cov_confidence(&self) -> Option<f64> {
+        self.inner.cov_confidence
+    }
+
+    #[setter]
+    fn set_cov_confidence(&mut self, value: Option<f64>) {
+        self.inner.cov_confidence = value;
+    }
+
+    /// Covariance data lines.
+    ///
+    /// :type: list[list[float]]
+    #[getter]
+    fn get_cov_lines(&self) -> Vec<Vec<f64>> {
+        self.inner
+            .cov_lines
+            .iter()
+            .map(|l| l.values.clone())
+            .collect()
+    }
+
+    #[setter]
+    fn set_cov_lines(&mut self, value: Vec<Vec<f64>>) {
+        self.inner.cov_lines = value
+            .into_iter()
+            .map(|values| core_acm::CovLine { values })
+            .collect();
+    }
 }
 
 /// ACM Data: Maneuver Specification Section.
@@ -627,6 +1406,313 @@ impl AcmManeuverParameters {
                 target_spinrate: None,
             },
         }
+    }
+
+    /// Comments for this maneuver section.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
+
+    /// Maneuver block identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_man_id(&self) -> Option<String> {
+        self.inner.man_id.clone()
+    }
+
+    #[setter]
+    fn set_man_id(&mut self, value: Option<String>) {
+        self.inner.man_id = value;
+    }
+
+    /// Previous maneuver block identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_man_prev_id(&self) -> Option<String> {
+        self.inner.man_prev_id.clone()
+    }
+
+    #[setter]
+    fn set_man_prev_id(&mut self, value: Option<String>) {
+        self.inner.man_prev_id = value;
+    }
+
+    /// Maneuver purpose.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_man_purpose(&self) -> Option<String> {
+        self.inner.man_purpose.clone()
+    }
+
+    #[setter]
+    fn set_man_purpose(&mut self, value: Option<String>) {
+        self.inner.man_purpose = value;
+    }
+
+    /// Maneuver begin time (relative or absolute epoch string).
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_man_begin_time(&self) -> Option<String> {
+        self.inner
+            .man_begin_time
+            .as_ref()
+            .map(|e| e.as_str().to_string())
+    }
+
+    #[setter]
+    fn set_man_begin_time(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.man_begin_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        Ok(())
+    }
+
+    /// Maneuver end time (relative or absolute epoch string).
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_man_end_time(&self) -> Option<String> {
+        self.inner
+            .man_end_time
+            .as_ref()
+            .map(|e| e.as_str().to_string())
+    }
+
+    #[setter]
+    fn set_man_end_time(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.man_end_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        Ok(())
+    }
+
+    /// Maneuver duration in seconds.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_man_duration(&self) -> Option<f64> {
+        self.inner.man_duration.as_ref().map(|d| d.value)
+    }
+
+    #[setter]
+    fn set_man_duration(&mut self, value: Option<f64>) {
+        self.inner.man_duration = value.map(|v| ccsds_ndm::types::Duration {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Actuator used for this maneuver.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_actuator_used(&self) -> Option<String> {
+        self.inner.actuator_used.clone()
+    }
+
+    #[setter]
+    fn set_actuator_used(&mut self, value: Option<String>) {
+        self.inner.actuator_used = value;
+    }
+
+    /// Target momentum vector [x, y, z].
+    ///
+    /// :type: list[float] | None
+    #[getter]
+    fn get_target_momentum(&self) -> Option<Vec<f64>> {
+        self.inner
+            .target_momentum
+            .as_ref()
+            .map(|v| v.elements.clone())
+    }
+
+    #[setter]
+    fn set_target_momentum(&mut self, value: Option<Vec<f64>>) -> PyResult<()> {
+        self.inner.target_momentum = if let Some(v) = value {
+            if v.len() != 3 {
+                return Err(PyValueError::new_err(
+                    "target_momentum must have exactly 3 elements",
+                ));
+            }
+            Some(ccsds_ndm::types::TargetMomentum::new(
+                [v[0], v[1], v[2]],
+                None,
+            ))
+        } else {
+            None
+        };
+        Ok(())
+    }
+
+    /// Reference frame of target momentum.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_target_mom_frame(&self) -> Option<String> {
+        self.inner.target_mom_frame.clone()
+    }
+
+    #[setter]
+    fn set_target_mom_frame(&mut self, value: Option<String>) {
+        self.inner.target_mom_frame = value;
+    }
+
+    /// Target attitude quaternion-like 4-vector.
+    ///
+    /// :type: list[float] | None
+    #[getter]
+    fn get_target_attitude(&self) -> Option<Vec<f64>> {
+        self.inner
+            .target_attitude
+            .as_ref()
+            .map(|v| v.values.clone())
+    }
+
+    #[setter]
+    fn set_target_attitude(&mut self, value: Option<Vec<f64>>) -> PyResult<()> {
+        self.inner.target_attitude = if let Some(v) = value {
+            if v.len() != 4 {
+                return Err(PyValueError::new_err(
+                    "target_attitude must have exactly 4 elements",
+                ));
+            }
+            Some(ccsds_ndm::types::Vec4Double {
+                values: vec![v[0], v[1], v[2], v[3]],
+            })
+        } else {
+            None
+        };
+        Ok(())
+    }
+
+    /// Target spin rate (deg/s).
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_target_spinrate(&self) -> Option<f64> {
+        self.inner.target_spinrate.as_ref().map(|r| r.value)
+    }
+
+    #[setter]
+    fn set_target_spinrate(&mut self, value: Option<f64>) {
+        self.inner.target_spinrate = value.map(|v| ccsds_ndm::types::AngleRate {
+            value: v,
+            units: None,
+        });
+    }
+}
+
+/// ACM Data: Sensor Data Section.
+#[pyclass]
+#[derive(Clone)]
+pub struct AcmSensor {
+    pub inner: core_acm::AcmSensor,
+}
+
+#[pymethods]
+impl AcmSensor {
+    #[new]
+    #[pyo3(signature = (sensor_number, sensor_used=None, sensor_noise_stddev=None, sensor_frequency=None, comment=None))]
+    fn new(
+        sensor_number: u32,
+        sensor_used: Option<String>,
+        sensor_noise_stddev: Option<Vec<f64>>,
+        sensor_frequency: Option<f64>,
+        comment: Option<Vec<String>>,
+    ) -> Self {
+        Self {
+            inner: core_acm::AcmSensor {
+                comment: comment.unwrap_or_default(),
+                sensor_number,
+                sensor_used,
+                sensor_noise_stddev: sensor_noise_stddev.map(|values| {
+                    ccsds_ndm::types::SensorNoise {
+                        values,
+                        units: None,
+                    }
+                }),
+                sensor_frequency,
+            },
+        }
+    }
+
+    /// Sensor section comments.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
+
+    /// Sensor number (unique in AD section).
+    ///
+    /// :type: int
+    #[getter]
+    fn get_sensor_number(&self) -> u32 {
+        self.inner.sensor_number
+    }
+
+    #[setter]
+    fn set_sensor_number(&mut self, value: u32) {
+        self.inner.sensor_number = value;
+    }
+
+    /// Sensor type identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_sensor_used(&self) -> Option<String> {
+        self.inner.sensor_used.clone()
+    }
+
+    #[setter]
+    fn set_sensor_used(&mut self, value: Option<String>) {
+        self.inner.sensor_used = value;
+    }
+
+    /// Sensor noise standard deviation values.
+    ///
+    /// :type: list[float] | None
+    #[getter]
+    fn get_sensor_noise_stddev(&self) -> Option<Vec<f64>> {
+        self.inner
+            .sensor_noise_stddev
+            .as_ref()
+            .map(|v| v.values.clone())
+    }
+
+    #[setter]
+    fn set_sensor_noise_stddev(&mut self, value: Option<Vec<f64>>) {
+        self.inner.sensor_noise_stddev = value.map(|values| ccsds_ndm::types::SensorNoise {
+            values,
+            units: None,
+        });
+    }
+
+    /// Sensor frequency in Hz.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_sensor_frequency(&self) -> Option<f64> {
+        self.inner.sensor_frequency
+    }
+
+    #[setter]
+    fn set_sensor_frequency(&mut self, value: Option<f64>) {
+        self.inner.sensor_frequency = value;
     }
 }
 
@@ -663,5 +1749,255 @@ impl AcmAttitudeDetermination {
                 sensors: vec![],
             },
         }
+    }
+
+    /// Comments for this attitude determination section.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
+    }
+
+    /// Attitude determination block identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_ad_id(&self) -> Option<String> {
+        self.inner.ad_id.clone()
+    }
+
+    #[setter]
+    fn set_ad_id(&mut self, value: Option<String>) {
+        self.inner.ad_id = value;
+    }
+
+    /// Previous attitude determination block identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_ad_prev_id(&self) -> Option<String> {
+        self.inner.ad_prev_id.clone()
+    }
+
+    #[setter]
+    fn set_ad_prev_id(&mut self, value: Option<String>) {
+        self.inner.ad_prev_id = value;
+    }
+
+    /// Attitude determination method.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_ad_method(&self) -> Option<String> {
+        self.inner.ad_method.clone()
+    }
+
+    #[setter]
+    fn set_ad_method(&mut self, value: Option<String>) {
+        self.inner.ad_method = value;
+    }
+
+    /// Source of attitude estimate.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_attitude_source(&self) -> Option<String> {
+        self.inner.attitude_source.clone()
+    }
+
+    #[setter]
+    fn set_attitude_source(&mut self, value: Option<String>) {
+        self.inner.attitude_source = value;
+    }
+
+    /// Number of estimator states.
+    ///
+    /// :type: int | None
+    #[getter]
+    fn get_number_states(&self) -> Option<u32> {
+        self.inner.number_states
+    }
+
+    #[setter]
+    fn set_number_states(&mut self, value: Option<u32>) {
+        self.inner.number_states = value;
+    }
+
+    /// Attitude state type for estimator.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_attitude_states(&self) -> Option<String> {
+        self.inner.attitude_states.as_ref().map(|v| v.to_string())
+    }
+
+    #[setter]
+    fn set_attitude_states(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.attitude_states = value
+            .map(|s| AcmAttitudeType::from_str(&s))
+            .transpose()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Covariance type for estimator.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_cov_type(&self) -> Option<String> {
+        self.inner.cov_type.as_ref().map(|v| v.to_string())
+    }
+
+    #[setter]
+    fn set_cov_type(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.cov_type = value
+            .map(|s| AcmCovarianceLineType::from_str(&s))
+            .transpose()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Attitude determination epoch.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_ad_epoch(&self) -> Option<String> {
+        self.inner.ad_epoch.as_ref().map(|e| e.as_str().to_string())
+    }
+
+    #[setter]
+    fn set_ad_epoch(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.ad_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        Ok(())
+    }
+
+    /// Source reference frame.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_ref_frame_a(&self) -> Option<String> {
+        self.inner.ref_frame_a.clone()
+    }
+
+    #[setter]
+    fn set_ref_frame_a(&mut self, value: Option<String>) {
+        self.inner.ref_frame_a = value;
+    }
+
+    /// Destination reference frame.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_ref_frame_b(&self) -> Option<String> {
+        self.inner.ref_frame_b.clone()
+    }
+
+    #[setter]
+    fn set_ref_frame_b(&mut self, value: Option<String>) {
+        self.inner.ref_frame_b = value;
+    }
+
+    /// Attitude type keyword.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_attitude_type(&self) -> Option<String> {
+        self.inner.attitude_type.clone()
+    }
+
+    #[setter]
+    fn set_attitude_type(&mut self, value: Option<String>) {
+        self.inner.attitude_type = value;
+    }
+
+    /// Rate states type.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_rate_states(&self) -> Option<String> {
+        self.inner.rate_states.as_ref().map(|v| v.to_string())
+    }
+
+    #[setter]
+    fn set_rate_states(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.rate_states = value
+            .map(|s| AttRateType::from_str(&s))
+            .transpose()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Rate random walk sigma_u.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_sigma_u(&self) -> Option<f64> {
+        self.inner.sigma_u.as_ref().map(|v| v.value)
+    }
+
+    #[setter]
+    fn set_sigma_u(&mut self, value: Option<f64>) {
+        self.inner.sigma_u = value.map(|v| ccsds_ndm::types::SigmaU {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Angle random walk sigma_v.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_sigma_v(&self) -> Option<f64> {
+        self.inner.sigma_v.as_ref().map(|v| v.value)
+    }
+
+    #[setter]
+    fn set_sigma_v(&mut self, value: Option<f64>) {
+        self.inner.sigma_v = value.map(|v| ccsds_ndm::types::SigmaV {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Rate process noise standard deviation.
+    ///
+    /// :type: float | None
+    #[getter]
+    fn get_rate_process_noise_stddev(&self) -> Option<f64> {
+        self.inner
+            .rate_process_noise_stddev
+            .as_ref()
+            .map(|v| v.value)
+    }
+
+    #[setter]
+    fn set_rate_process_noise_stddev(&mut self, value: Option<f64>) {
+        self.inner.rate_process_noise_stddev = value.map(|v| ccsds_ndm::types::SigmaU {
+            value: v,
+            units: None,
+        });
+    }
+
+    /// Sensor blocks.
+    ///
+    /// :type: list[AcmSensor]
+    #[getter]
+    fn get_sensors(&self) -> Vec<AcmSensor> {
+        self.inner
+            .sensors
+            .iter()
+            .map(|s| AcmSensor { inner: s.clone() })
+            .collect()
+    }
+
+    #[setter]
+    fn set_sensors(&mut self, value: Vec<AcmSensor>) {
+        self.inner.sensors = value.into_iter().map(|s| s.inner).collect();
     }
 }

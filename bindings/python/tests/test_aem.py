@@ -49,6 +49,19 @@ class TestAem:
                 attitude_type="NOT_IN_XSD_ENUM",
             )
 
+    def test_attitude_state_setters(self):
+        state = AttitudeState("2023-01-01T00:00:00", [0.0, 0.0, 0.0, 1.0])
+        assert state.epoch == "2023-01-01T00:00:00"
+        assert state.values == [0.0, 0.0, 0.0, 1.0]
+
+        state.epoch = "2023-01-01T00:01:00"
+        state.values = [0.1, 0.2, 0.3, 0.4]
+        assert state.epoch == "2023-01-01T00:01:00"
+        assert state.values == [0.1, 0.2, 0.3, 0.4]
+
+        with pytest.raises(ValueError):
+            state.epoch = "not-an-epoch"
+
     def test_aem_data_numpy(self):
         # Create data using python list of states
         state1 = AttitudeState("2023-01-01T00:00:00", [0.0, 0.0, 0.0, 1.0])

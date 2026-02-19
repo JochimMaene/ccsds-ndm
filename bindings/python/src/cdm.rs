@@ -418,6 +418,11 @@ impl Cdm {
         }
     }
 
+    #[setter]
+    fn set_header(&mut self, value: CdmHeader) {
+        self.inner.header = value.inner;
+    }
+
     /// The message body containing relative metadata/data and object segments.
     ///
     /// :type: CdmBody
@@ -426,6 +431,11 @@ impl Cdm {
         CdmBody {
             inner: self.inner.body.clone(),
         }
+    }
+
+    #[setter]
+    fn set_body(&mut self, value: CdmBody) {
+        self.inner.body = value.inner;
     }
 
     /// Unique ID for this message.
@@ -647,6 +657,11 @@ impl CdmBody {
         }
     }
 
+    #[setter]
+    fn set_relative_metadata_data(&mut self, value: RelativeMetadataData) {
+        self.inner.relative_metadata_data = value.inner;
+    }
+
     /// The segments containing specific data for each object.
     ///
     /// :type: list[CdmSegment]
@@ -657,6 +672,11 @@ impl CdmBody {
             .iter()
             .map(|s| CdmSegment { inner: s.clone() })
             .collect()
+    }
+
+    #[setter]
+    fn set_segments(&mut self, value: Vec<CdmSegment>) {
+        self.inner.segments = value.into_iter().map(|s| s.inner).collect();
     }
 }
 
@@ -1263,6 +1283,11 @@ impl CdmSegment {
         }
     }
 
+    #[setter]
+    fn set_metadata(&mut self, value: CdmMetadata) {
+        self.inner.metadata = value.inner;
+    }
+
     /// Data section for the object.
     ///
     /// :type: CdmData
@@ -1271,6 +1296,11 @@ impl CdmSegment {
         CdmData {
             inner: self.inner.data.clone(),
         }
+    }
+
+    #[setter]
+    fn set_data(&mut self, value: CdmData) {
+        self.inner.data = value.inner;
     }
 
     fn __repr__(&self) -> String {
@@ -1989,6 +2019,11 @@ impl CdmData {
         }
     }
 
+    #[setter]
+    fn set_state_vector(&mut self, value: CdmStateVector) {
+        self.inner.state_vector = value.inner;
+    }
+
     /// Covariance Matrix.
     ///
     /// :type: Optional[CdmCovarianceMatrix]
@@ -1998,6 +2033,11 @@ impl CdmData {
             .covariance_matrix
             .as_ref()
             .map(|cov| CdmCovarianceMatrix { inner: cov.clone() })
+    }
+
+    #[setter]
+    fn set_covariance_matrix(&mut self, value: Option<CdmCovarianceMatrix>) {
+        self.inner.covariance_matrix = value.map(|cov| cov.inner);
     }
 
     /// Comments.

@@ -1532,8 +1532,19 @@ impl AttitudeState {
         self.epoch.as_str().to_string()
     }
 
+    #[setter]
+    fn set_epoch(&mut self, value: String) -> PyResult<()> {
+        self.epoch = parse_epoch(&value)?;
+        Ok(())
+    }
+
     #[getter]
     fn get_values(&self) -> Vec<f64> {
         self.values.clone()
+    }
+
+    #[setter]
+    fn set_values(&mut self, value: Vec<f64>) {
+        self.values = value;
     }
 }

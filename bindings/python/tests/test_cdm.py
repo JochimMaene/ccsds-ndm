@@ -215,6 +215,41 @@ class TestCdm:
         assert rel.screen_volume_y is None
         assert rel.screen_volume_z is None
 
+    def test_cdm_nested_setter_parity(self):
+        cdm = self._create_valid_cdm()
+
+        header = cdm.header
+        header.originator = "UPDATED"
+        cdm.header = header
+        assert cdm.header.originator == "UPDATED"
+
+        body = cdm.body
+        rel = body.relative_metadata_data
+        rel.miss_distance = 150.0
+        body.relative_metadata_data = rel
+        assert body.relative_metadata_data.miss_distance == pytest.approx(150.0)
+
+        segments = body.segments
+        seg0 = segments[0]
+        meta0 = seg0.metadata
+        meta0.object_name = "SAT1-UPDATED"
+        seg0.metadata = meta0
+
+        data0 = seg0.data
+        sv0 = data0.state_vector
+        sv0.x = 7050.0
+        data0.state_vector = sv0
+        data0.covariance_matrix = None
+        seg0.data = data0
+
+        segments[0] = seg0
+        body.segments = segments
+        cdm.body = body
+
+        assert cdm.body.segments[0].metadata.object_name == "SAT1-UPDATED"
+        assert cdm.body.segments[0].data.state_vector.x == pytest.approx(7050.0)
+        assert cdm.body.segments[0].data.covariance_matrix is None
+
         rel.screen_volume_x = 10.0
         rel.screen_volume_y = 20.0
         rel.screen_volume_z = 30.0

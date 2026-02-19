@@ -38,6 +38,13 @@ class TestAttitudeStates:
         # Setters
         qs.q1 = 0.9
         assert qs.q1 == 0.9
+        assert qs.quaternion_dot == [0.01, 0.02, 0.03, 0.04]
+        qs.quaternion_dot = [0.11, 0.12, 0.13, 0.14]
+        assert qs.quaternion_dot == [0.11, 0.12, 0.13, 0.14]
+        qs.quaternion_dot = None
+        assert qs.quaternion_dot is None
+        with pytest.raises(ValueError):
+            qs.quaternion_dot = [0.1, 0.2, 0.3]
         assert qs.comment == ["Test Quaternion"]
 
     def test_euler_angle_state(self):
