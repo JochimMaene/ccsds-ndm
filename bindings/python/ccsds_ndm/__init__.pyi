@@ -100,8 +100,6 @@ class Acm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> AcmSegment:
         """
@@ -109,8 +107,6 @@ class Acm:
         """
         ...
 
-    @segment.setter
-    def segment(self, value: AcmSegment) -> None: ...
     def to_file(self, path, format, validate=True):
         """ """
         ...
@@ -199,8 +195,6 @@ class AcmData:
         """
         ...
 
-    @att.setter
-    def att(self, value: list[AcmAttitudeState]) -> None: ...
     @property
     def phys(self) -> AcmPhysicalDescription:
         """
@@ -208,8 +202,6 @@ class AcmData:
         """
         ...
 
-    @phys.setter
-    def phys(self, value: AcmPhysicalDescription) -> None: ...
     @property
     def user(self) -> UserDefined:
         """
@@ -269,8 +261,6 @@ class AcmMetadata:
         """
         ...
 
-    @international_designator.setter
-    def international_designator(self, value: str) -> None: ...
     @property
     def object_name(self) -> str:
         """
@@ -286,8 +276,6 @@ class AcmMetadata:
         """
         ...
 
-    @object_name.setter
-    def object_name(self, value: str) -> None: ...
     def validate(self):
         """
         Validate the metadata section against CCSDS rules.
@@ -320,8 +308,6 @@ class AcmSegment:
         """
         ...
 
-    @data.setter
-    def data(self, value: AcmData) -> None: ...
     @property
     def metadata(self) -> AcmMetadata:
         """
@@ -329,8 +315,6 @@ class AcmSegment:
         """
         ...
 
-    @metadata.setter
-    def metadata(self, value: AcmMetadata) -> None: ...
     def validate(self, header):
         """
         Validate the segment against CCSDS rules.
@@ -380,7 +364,7 @@ class AdditionalParameters:
         ...
 
     @property
-    def area_drg(self) -> float:
+    def area_drg(self) -> Optional[float]:
         """
         The effective area of the object exposed to atmospheric drag. (See annex E for
         definition.)
@@ -390,9 +374,9 @@ class AdditionalParameters:
         ...
 
     @area_drg.setter
-    def area_drg(self, value: float) -> None: ...
+    def area_drg(self, value: Optional[float]) -> None: ...
     @property
-    def area_pc(self) -> float:
+    def area_pc(self) -> Optional[float]:
         """
         The actual area of the object. (See annex E for definition.)
 
@@ -401,9 +385,9 @@ class AdditionalParameters:
         ...
 
     @area_pc.setter
-    def area_pc(self, value: float) -> None: ...
+    def area_pc(self, value: Optional[float]) -> None: ...
     @property
-    def area_srp(self) -> float:
+    def area_srp(self) -> Optional[float]:
         """
         The effective area of the object exposed to solar radiation pressure. (See annex E for
         definition.)
@@ -413,9 +397,9 @@ class AdditionalParameters:
         ...
 
     @area_srp.setter
-    def area_srp(self, value: float) -> None: ...
+    def area_srp(self, value: Optional[float]) -> None: ...
     @property
-    def cd_area_over_mass(self) -> float:
+    def cd_area_over_mass(self) -> Optional[float]:
         """
         The object's CD•A/m used to propagate the state vector and covariance to TCA. (See
         annex E for definition.)
@@ -425,7 +409,7 @@ class AdditionalParameters:
         ...
 
     @cd_area_over_mass.setter
-    def cd_area_over_mass(self, value: float) -> None: ...
+    def cd_area_over_mass(self, value: Optional[float]) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -436,7 +420,7 @@ class AdditionalParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def cr_area_over_mass(self) -> float:
+    def cr_area_over_mass(self) -> Optional[float]:
         """
         The object's CR•A/m used to propagate the state vector and covariance to TCA. (See
         annex E for definition.)
@@ -446,9 +430,9 @@ class AdditionalParameters:
         ...
 
     @cr_area_over_mass.setter
-    def cr_area_over_mass(self, value: float) -> None: ...
+    def cr_area_over_mass(self, value: Optional[float]) -> None: ...
     @property
-    def mass(self) -> float:
+    def mass(self) -> Optional[float]:
         """
         The mass of the object.
 
@@ -457,9 +441,9 @@ class AdditionalParameters:
         ...
 
     @mass.setter
-    def mass(self, value: float) -> None: ...
+    def mass(self, value: Optional[float]) -> None: ...
     @property
-    def sedr(self) -> float:
+    def sedr(self) -> Optional[float]:
         """
         The amount of energy being removed from the object's orbit by atmospheric drag. This
         value is an average calculated during the OD.
@@ -469,9 +453,9 @@ class AdditionalParameters:
         ...
 
     @sedr.setter
-    def sedr(self, value: float) -> None: ...
+    def sedr(self, value: Optional[float]) -> None: ...
     @property
-    def thrust_acceleration(self) -> float:
+    def thrust_acceleration(self) -> Optional[float]:
         """
         The object's acceleration due to in-track thrust used to propagate the state vector and
         covariance to TCA. (See annex E for definition.)
@@ -481,7 +465,7 @@ class AdditionalParameters:
         ...
 
     @thrust_acceleration.setter
-    def thrust_acceleration(self, value: float) -> None: ...
+    def thrust_acceleration(self, value: Optional[float]) -> None: ...
 
 class AdmHeader:
     """
@@ -1543,12 +1527,8 @@ class AttitudeState:
 
     @property
     def epoch(self): ...
-    @epoch.setter
-    def epoch(self, value: object) -> None: ...
     @property
     def values(self): ...
-    @values.setter
-    def values(self, value: object) -> None: ...
 
 class Cdm:
     """
@@ -1578,8 +1558,6 @@ class Cdm:
         """
         ...
 
-    @body.setter
-    def body(self, value: CdmBody) -> None: ...
     @staticmethod
     def from_file(path, format=None):
         """
@@ -1652,8 +1630,6 @@ class Cdm:
         """
         ...
 
-    @header.setter
-    def header(self, value: CdmHeader) -> None: ...
     @property
     def id(self) -> Optional[str]:
         """
@@ -1661,8 +1637,6 @@ class Cdm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     def to_file(self, path, format, validate=True):
         """
         Write the CDM to a file.
@@ -1746,17 +1720,12 @@ class CdmBody:
         """
         ...
 
-    @relative_metadata_data.setter
-    def relative_metadata_data(self, value: RelativeMetadataData) -> None: ...
     @property
     def segments(self) -> list[CdmSegment]:
         """
         The segments containing specific data for each object.
         """
         ...
-
-    @segments.setter
-    def segments(self, value: list[CdmSegment]) -> None: ...
 
 class CdmCovarianceMatrix:
     """
@@ -1912,7 +1881,7 @@ class CdmCovarianceMatrix:
         ...
 
     @property
-    def cdrg_drg(self) -> float:
+    def cdrg_drg(self) -> Optional[float]:
         """
         Object covariance matrix `[7,7]`.
 
@@ -1921,9 +1890,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_drg.setter
-    def cdrg_drg(self, value: float) -> None: ...
+    def cdrg_drg(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_n(self) -> float:
+    def cdrg_n(self) -> Optional[float]:
         """
         Object covariance matrix `[7,3]`.
 
@@ -1932,9 +1901,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_n.setter
-    def cdrg_n(self, value: float) -> None: ...
+    def cdrg_n(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_ndot(self) -> float:
+    def cdrg_ndot(self) -> Optional[float]:
         """
         Object covariance matrix `[7,6]`.
 
@@ -1943,9 +1912,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_ndot.setter
-    def cdrg_ndot(self, value: float) -> None: ...
+    def cdrg_ndot(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_r(self) -> float:
+    def cdrg_r(self) -> Optional[float]:
         """
         Object covariance matrix `[7,1]`.
 
@@ -1954,9 +1923,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_r.setter
-    def cdrg_r(self, value: float) -> None: ...
+    def cdrg_r(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_rdot(self) -> float:
+    def cdrg_rdot(self) -> Optional[float]:
         """
         Object covariance matrix `[7,4]`.
 
@@ -1965,9 +1934,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_rdot.setter
-    def cdrg_rdot(self, value: float) -> None: ...
+    def cdrg_rdot(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_t(self) -> float:
+    def cdrg_t(self) -> Optional[float]:
         """
         Object covariance matrix `[7,2]`.
 
@@ -1976,9 +1945,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_t.setter
-    def cdrg_t(self, value: float) -> None: ...
+    def cdrg_t(self, value: Optional[float]) -> None: ...
     @property
-    def cdrg_tdot(self) -> float:
+    def cdrg_tdot(self) -> Optional[float]:
         """
         Object covariance matrix `[7,5]`.
 
@@ -1987,7 +1956,7 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_tdot.setter
-    def cdrg_tdot(self, value: float) -> None: ...
+    def cdrg_tdot(self, value: Optional[float]) -> None: ...
     @property
     def cn_n(self) -> float:
         """
@@ -2152,7 +2121,7 @@ class CdmCovarianceMatrix:
     @crdot_t.setter
     def crdot_t(self, value: float) -> None: ...
     @property
-    def csrp_drg(self) -> float:
+    def csrp_drg(self) -> Optional[float]:
         """
         Object covariance matrix `[8,7]`.
 
@@ -2161,9 +2130,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_drg.setter
-    def csrp_drg(self, value: float) -> None: ...
+    def csrp_drg(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_n(self) -> float:
+    def csrp_n(self) -> Optional[float]:
         """
         Object covariance matrix `[8,3]`.
 
@@ -2172,9 +2141,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_n.setter
-    def csrp_n(self, value: float) -> None: ...
+    def csrp_n(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_ndot(self) -> float:
+    def csrp_ndot(self) -> Optional[float]:
         """
         Object covariance matrix `[8,6]`.
 
@@ -2183,9 +2152,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_ndot.setter
-    def csrp_ndot(self, value: float) -> None: ...
+    def csrp_ndot(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_r(self) -> float:
+    def csrp_r(self) -> Optional[float]:
         """
         Object covariance matrix `[8,1]`.
 
@@ -2194,9 +2163,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_r.setter
-    def csrp_r(self, value: float) -> None: ...
+    def csrp_r(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_rdot(self) -> float:
+    def csrp_rdot(self) -> Optional[float]:
         """
         Object covariance matrix `[8,4]`.
 
@@ -2205,9 +2174,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_rdot.setter
-    def csrp_rdot(self, value: float) -> None: ...
+    def csrp_rdot(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_srp(self) -> float:
+    def csrp_srp(self) -> Optional[float]:
         """
         Object covariance matrix `[8,8]`.
 
@@ -2216,9 +2185,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_srp.setter
-    def csrp_srp(self, value: float) -> None: ...
+    def csrp_srp(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_t(self) -> float:
+    def csrp_t(self) -> Optional[float]:
         """
         Object covariance matrix `[8,2]`.
 
@@ -2227,9 +2196,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_t.setter
-    def csrp_t(self, value: float) -> None: ...
+    def csrp_t(self, value: Optional[float]) -> None: ...
     @property
-    def csrp_tdot(self) -> float:
+    def csrp_tdot(self) -> Optional[float]:
         """
         Object covariance matrix `[8,5]`.
 
@@ -2238,7 +2207,7 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_tdot.setter
-    def csrp_tdot(self, value: float) -> None: ...
+    def csrp_tdot(self, value: Optional[float]) -> None: ...
     @property
     def ct_r(self) -> float:
         """
@@ -2317,7 +2286,7 @@ class CdmCovarianceMatrix:
     @ctdot_tdot.setter
     def ctdot_tdot(self, value: float) -> None: ...
     @property
-    def cthr_drg(self) -> float:
+    def cthr_drg(self) -> Optional[float]:
         """
         Object covariance matrix `[9,7]`.
 
@@ -2326,9 +2295,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_drg.setter
-    def cthr_drg(self, value: float) -> None: ...
+    def cthr_drg(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_n(self) -> float:
+    def cthr_n(self) -> Optional[float]:
         """
         Object covariance matrix `[9,3]`.
 
@@ -2337,9 +2306,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_n.setter
-    def cthr_n(self, value: float) -> None: ...
+    def cthr_n(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_ndot(self) -> float:
+    def cthr_ndot(self) -> Optional[float]:
         """
         Object covariance matrix `[9,6]`.
 
@@ -2348,9 +2317,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_ndot.setter
-    def cthr_ndot(self, value: float) -> None: ...
+    def cthr_ndot(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_r(self) -> float:
+    def cthr_r(self) -> Optional[float]:
         """
         Object covariance matrix `[9,1]`.
 
@@ -2359,9 +2328,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_r.setter
-    def cthr_r(self, value: float) -> None: ...
+    def cthr_r(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_rdot(self) -> float:
+    def cthr_rdot(self) -> Optional[float]:
         """
         Object covariance matrix `[9,4]`.
 
@@ -2370,9 +2339,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_rdot.setter
-    def cthr_rdot(self, value: float) -> None: ...
+    def cthr_rdot(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_srp(self) -> float:
+    def cthr_srp(self) -> Optional[float]:
         """
         Object covariance matrix `[9,8]`.
 
@@ -2381,9 +2350,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_srp.setter
-    def cthr_srp(self, value: float) -> None: ...
+    def cthr_srp(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_t(self) -> float:
+    def cthr_t(self) -> Optional[float]:
         """
         Object covariance matrix `[9,2]`.
 
@@ -2392,9 +2361,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_t.setter
-    def cthr_t(self, value: float) -> None: ...
+    def cthr_t(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_tdot(self) -> float:
+    def cthr_tdot(self) -> Optional[float]:
         """
         Object covariance matrix `[9,5]`.
 
@@ -2403,9 +2372,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_tdot.setter
-    def cthr_tdot(self, value: float) -> None: ...
+    def cthr_tdot(self, value: Optional[float]) -> None: ...
     @property
-    def cthr_thr(self) -> float:
+    def cthr_thr(self) -> Optional[float]:
         """
         Object covariance matrix `[9,9]`.
 
@@ -2414,7 +2383,7 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_thr.setter
-    def cthr_thr(self, value: float) -> None: ...
+    def cthr_thr(self, value: Optional[float]) -> None: ...
     @staticmethod
     def from_numpy(array, comment=None):
         """ """
@@ -2480,8 +2449,6 @@ class CdmData:
         """
         ...
 
-    @covariance_matrix.setter
-    def covariance_matrix(self, value: Optional[CdmCovarianceMatrix]) -> None: ...
     @property
     def covariance_matrix_numpy(self) -> numpy.ndarray:
         """
@@ -2521,8 +2488,6 @@ class CdmData:
         """
         ...
 
-    @state_vector.setter
-    def state_vector(self, value: CdmStateVector) -> None: ...
     @property
     def state_vector_numpy(self) -> numpy.ndarray:
         """
@@ -3000,17 +2965,12 @@ class CdmSegment:
         """
         ...
 
-    @data.setter
-    def data(self, value: CdmData) -> None: ...
     @property
     def metadata(self) -> CdmMetadata:
         """
         Metadata for the object.
         """
         ...
-
-    @metadata.setter
-    def metadata(self, value: CdmMetadata) -> None: ...
 
 class CdmStateVector:
     """
@@ -4381,8 +4341,6 @@ class Ndm:
         """
         ...
 
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
     @staticmethod
     def from_file(path, format=None):
         """
@@ -4404,8 +4362,6 @@ class Ndm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def messages(self) -> list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]:
         """
@@ -4413,10 +4369,6 @@ class Ndm:
         """
         ...
 
-    @messages.setter
-    def messages(
-        self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
-    ) -> None: ...
     def to_file(self, path, format, validate=True):
         """
         Write to file.
@@ -4551,8 +4503,6 @@ class Ocm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> OcmSegment:
         """
@@ -4714,8 +4664,6 @@ class OcmCovarianceMatrix:
         """
         ...
 
-    @cov_basis.setter
-    def cov_basis(self, value: Optional[str]) -> None: ...
     @property
     def cov_basis_id(self) -> Optional[str]:
         """
@@ -4743,8 +4691,6 @@ class OcmCovarianceMatrix:
         """
         ...
 
-    @cov_confidence.setter
-    def cov_confidence(self, value: Optional[float]) -> None: ...
     @property
     def cov_frame_epoch(self) -> Optional[str]:
         """
@@ -4805,8 +4751,6 @@ class OcmCovarianceMatrix:
         """
         ...
 
-    @cov_ordering.setter
-    def cov_ordering(self, value: str) -> None: ...
     @property
     def cov_prev_id(self) -> Optional[str]:
         """
@@ -5283,8 +5227,6 @@ class OcmManeuverParameters:
         """
         ...
 
-    @man_basis.setter
-    def man_basis(self, value: Optional[str]) -> None: ...
     @property
     def man_basis_id(self) -> Optional[str]:
         """
@@ -6319,8 +6261,6 @@ class OcmOdParameters:
         """
         ...
 
-    @days_since_first_obs.setter
-    def days_since_first_obs(self, value: Optional[float]) -> None: ...
     @property
     def days_since_last_obs(self) -> Optional[float]:
         """
@@ -6331,8 +6271,6 @@ class OcmOdParameters:
         """
         ...
 
-    @days_since_last_obs.setter
-    def days_since_last_obs(self, value: Optional[float]) -> None: ...
     @property
     def gdop(self) -> Optional[float]:
         """
@@ -8426,8 +8364,6 @@ class Oem:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segments(self) -> list[OemSegment]:
         """
@@ -9375,8 +9311,6 @@ class Omm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> OmmSegment:
         """
@@ -9782,8 +9716,6 @@ class Opm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> OpmSegment:
         """
@@ -10641,8 +10573,6 @@ class Rdm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> RdmSegment:
         """
@@ -11706,7 +11636,7 @@ class RelativeMetadataData:
     @screen_volume_shape.setter
     def screen_volume_shape(self, value: Optional[ScreenVolumeShapeType]) -> None: ...
     @property
-    def screen_volume_x(self) -> float:
+    def screen_volume_x(self) -> Optional[float]:
         """
         The R or T (depending on if RTN or TVN is selected) component size of the screening
         volume in the SCREEN_VOLUME_FRAME. Data type = double.
@@ -11716,9 +11646,9 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_x.setter
-    def screen_volume_x(self, value: float) -> None: ...
+    def screen_volume_x(self, value: Optional[float]) -> None: ...
     @property
-    def screen_volume_y(self) -> float:
+    def screen_volume_y(self) -> Optional[float]:
         """
         The T or V (depending on if RTN or TVN is selected) component size of the screening
         volume in the SCREEN_VOLUME_FRAME. Data type = double.
@@ -11728,9 +11658,9 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_y.setter
-    def screen_volume_y(self, value: float) -> None: ...
+    def screen_volume_y(self, value: Optional[float]) -> None: ...
     @property
-    def screen_volume_z(self) -> float:
+    def screen_volume_z(self) -> Optional[float]:
         """
         The N component size of the screening volume in the SCREEN_VOLUME_FRAME. Data type =
         double.
@@ -11740,7 +11670,7 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_z.setter
-    def screen_volume_z(self, value: float) -> None: ...
+    def screen_volume_z(self, value: Optional[float]) -> None: ...
     @property
     def start_screen_period(self) -> Optional[str]:
         """
@@ -12539,8 +12469,6 @@ class Tdm:
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segments(self) -> list[TdmSegment]:
         """
@@ -12548,8 +12476,6 @@ class Tdm:
         """
         ...
 
-    @segments.setter
-    def segments(self, value: list[TdmSegment]) -> None: ...
     def to_file(self, path, format, validate=True):
         """
         Write to file.
@@ -13614,8 +13540,6 @@ class TdmObservation:
         """
         ...
 
-    @keyword.setter
-    def keyword(self, value: str) -> None: ...
     @property
     def value(self) -> Optional[float]:
         """
@@ -13625,8 +13549,6 @@ class TdmObservation:
         """
         ...
 
-    @value.setter
-    def value(self, value: Optional[float]) -> None: ...
     @property
     def value_str(self) -> str:
         """
@@ -13635,9 +13557,6 @@ class TdmObservation:
         Useful for phase counts which may require high precision.
         """
         ...
-
-    @value_str.setter
-    def value_str(self, value: str) -> None: ...
 
 class TdmPath:
     def __getstate__(self, /):
@@ -13966,8 +13885,6 @@ class NdmError(Exception):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmEpochError(ValueError):
     """
@@ -13985,8 +13902,6 @@ class NdmEpochError(ValueError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmFormatError(ValueError):
     """
@@ -14004,8 +13919,6 @@ class NdmFormatError(ValueError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmIoError(OSError):
     """
@@ -14023,12 +13936,8 @@ class NdmIoError(OSError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
     @property
     def characters_written(self): ...
-    @characters_written.setter
-    def characters_written(self, value: object) -> None: ...
 
 class NdmUnsupportedMessageError(NdmError):
     """
@@ -14046,8 +13955,6 @@ class NdmUnsupportedMessageError(NdmError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmValidationError(NdmError):
     """
@@ -14065,8 +13972,6 @@ class NdmValidationError(NdmError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmKvnParseError(NdmFormatError):
     """
@@ -14084,8 +13989,6 @@ class NdmKvnParseError(NdmFormatError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...
 
 class NdmXmlError(NdmFormatError):
     """
@@ -14103,5 +14006,3 @@ class NdmXmlError(NdmFormatError):
 
     @property
     def args(self): ...
-    @args.setter
-    def args(self, value: object) -> None: ...

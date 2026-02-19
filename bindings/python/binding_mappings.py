@@ -130,6 +130,99 @@ PYTHON_ONLY_FIELDS: dict[str, list[str]] = {
 }
 
 # ---------------------------------------------------------------------------
+# Read-Only Python Fields
+# ---------------------------------------------------------------------------
+# Fields intentionally exposed as getter-only in Python bindings.
+# Values are short reason tags used by audit reporting.
+#
+# Common reason tags:
+# - protocol_managed: Message-level/system-managed value
+# - derived_projection: Computed/derived projection of internal representation
+# - immutable_view: Immutable wrapper/view by design
+# - partial_binding: Temporarily read-only due partial implementation
+
+READ_ONLY_FIELDS: dict[str, dict[str, str]] = {
+    "Acm": {
+        "id": "protocol_managed",
+        "segment": "partial_binding",
+    },
+    "AcmSegment": {
+        "metadata": "partial_binding",
+        "data": "partial_binding",
+    },
+    "AcmMetadata": {
+        "object_name": "partial_binding",
+        "international_designator": "partial_binding",
+    },
+    "AcmData": {
+        "att": "partial_binding",
+        "phys": "partial_binding",
+    },
+    "AttitudeState": {
+        "epoch": "immutable_view",
+        "values": "immutable_view",
+    },
+    "Cdm": {
+        "id": "protocol_managed",
+        "header": "immutable_view",
+        "body": "immutable_view",
+    },
+    "CdmBody": {
+        "relative_metadata_data": "immutable_view",
+        "segments": "immutable_view",
+    },
+    "CdmSegment": {
+        "metadata": "immutable_view",
+        "data": "immutable_view",
+    },
+    "CdmData": {
+        "state_vector": "immutable_view",
+        "covariance_matrix": "immutable_view",
+    },
+    "Ndm": {
+        "id": "protocol_managed",
+        "messages": "immutable_view",
+        "comments": "immutable_view",
+    },
+    "Oem": {
+        "id": "protocol_managed",
+    },
+    "Omm": {
+        "id": "protocol_managed",
+    },
+    "Opm": {
+        "id": "protocol_managed",
+    },
+    "Ocm": {
+        "id": "protocol_managed",
+    },
+    "Rdm": {
+        "id": "protocol_managed",
+    },
+    "Tdm": {
+        "id": "protocol_managed",
+        "segments": "derived_projection",
+    },
+    "TdmObservation": {
+        "keyword": "derived_projection",
+        "value": "derived_projection",
+        "value_str": "derived_projection",
+    },
+    "OcmOdParameters": {
+        "days_since_first_obs": "derived_projection",
+        "days_since_last_obs": "derived_projection",
+    },
+    "OcmCovarianceMatrix": {
+        "cov_basis": "partial_binding",
+        "cov_confidence": "partial_binding",
+        "cov_ordering": "partial_binding",
+    },
+    "OcmManeuverParameters": {
+        "man_basis": "partial_binding",
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Rust Fields to Skip
 # ---------------------------------------------------------------------------
 # Fields that exist in Rust but are intentionally NOT exposed in Python.
@@ -237,3 +330,8 @@ def should_skip_rust_field(rust_struct: str, rust_field: str) -> bool:
 def get_rust_struct_name(python_class: str) -> str:
     """Get the Rust struct name for a Python class."""
     return STRUCT_MAPPINGS.get(python_class, python_class)
+
+
+def get_read_only_reason(python_class: str, python_field: str) -> str | None:
+    """Get reason tag for an intentionally read-only Python field."""
+    return READ_ONLY_FIELDS.get(python_class, {}).get(python_field)

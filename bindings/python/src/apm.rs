@@ -58,6 +58,11 @@ impl Apm {
         self.inner.id.clone()
     }
 
+    #[setter]
+    fn set_id(&mut self, value: Option<String>) {
+        self.inner.id = value;
+    }
+
     /// The message version.
     ///
     /// :type: str
@@ -249,6 +254,11 @@ impl ApmSegment {
         }
     }
 
+    #[setter]
+    fn set_metadata(&mut self, metadata: ApmMetadata) {
+        self.inner.metadata = metadata.inner;
+    }
+
     /// APM Data Section.
     ///
     /// :type: ApmData
@@ -257,6 +267,11 @@ impl ApmSegment {
         ApmData {
             inner: self.inner.data.clone(),
         }
+    }
+
+    #[setter]
+    fn set_data(&mut self, data: ApmData) {
+        self.inner.data = data.inner;
     }
 }
 
@@ -314,6 +329,11 @@ impl ApmMetadata {
         self.inner.object_name.clone()
     }
 
+    #[setter]
+    fn set_object_name(&mut self, value: String) {
+        self.inner.object_name = value;
+    }
+
     /// Spacecraft identifier of the object corresponding to the attitude data to be given. While
     /// there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
     /// international designators from the UN Office of Outer Space Affairs (reference [ADM-2]).
@@ -332,6 +352,11 @@ impl ApmMetadata {
         self.inner.object_id.clone()
     }
 
+    #[setter]
+    fn set_object_id(&mut self, value: String) {
+        self.inner.object_id = value;
+    }
+
     /// Comments (allowed only at the beginning of the APM Metadata before OBJECT_NAME). Each
     /// comment line shall begin with this keyword.
     ///
@@ -341,6 +366,11 @@ impl ApmMetadata {
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 
     /// Celestial body orbited by the object, which may be a natural solar system body (planets,
@@ -355,6 +385,11 @@ impl ApmMetadata {
         self.inner.center_name.clone()
     }
 
+    #[setter]
+    fn set_center_name(&mut self, value: Option<String>) {
+        self.inner.center_name = value;
+    }
+
     /// Time system used for attitude and maneuver data. The set of allowed values is described in
     /// annex B, subsection B2.
     ///
@@ -364,6 +399,12 @@ impl ApmMetadata {
     #[getter]
     fn get_time_system(&self) -> String {
         self.inner.time_system.clone()
+    }
+
+    #[setter]
+    fn set_time_system(&mut self, value: Bound<'_, PyAny>) -> PyResult<()> {
+        self.inner.time_system = parse_time_system(&value)?;
+        Ok(())
     }
 }
 
@@ -449,6 +490,11 @@ impl ApmData {
             .collect()
     }
 
+    #[setter]
+    fn set_quaternion_state(&mut self, value: Vec<QuaternionState>) {
+        self.inner.quaternion_state = value.into_iter().map(|s| s.inner).collect();
+    }
+
     /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
     /// block is present. (See annex F for conventions and further detail.)
     ///
@@ -462,6 +508,11 @@ impl ApmData {
             .collect()
     }
 
+    #[setter]
+    fn set_euler_angle_state(&mut self, value: Vec<EulerAngleState>) {
+        self.inner.euler_angle_state = value.into_iter().map(|s| s.inner).collect();
+    }
+
     /// Angular velocity vector.
     ///
     /// :type: list[AngVelState]
@@ -472,6 +523,11 @@ impl ApmData {
             .iter()
             .map(|s| AngVelState { inner: s.clone() })
             .collect()
+    }
+
+    #[setter]
+    fn set_angular_velocity(&mut self, value: Vec<AngVelState>) {
+        self.inner.angular_velocity = value.into_iter().map(|s| s.inner).collect();
     }
 
     /// Spin. All mandatory elements are to be provided if the block is present. (See annex F for
@@ -487,6 +543,11 @@ impl ApmData {
             .collect()
     }
 
+    #[setter]
+    fn set_spin(&mut self, value: Vec<SpinState>) {
+        self.inner.spin = value.into_iter().map(|s| s.inner).collect();
+    }
+
     /// Inertia. All mandatory elements are to be provided if the block is present. (See annex F
     /// for conventions and further detail.)
     ///
@@ -498,6 +559,11 @@ impl ApmData {
             .iter()
             .map(|s| InertiaState { inner: s.clone() })
             .collect()
+    }
+
+    #[setter]
+    fn set_inertia(&mut self, value: Vec<InertiaState>) {
+        self.inner.inertia = value.into_iter().map(|s| s.inner).collect();
     }
 
     /// Maneuver Parameters.
@@ -512,6 +578,11 @@ impl ApmData {
             .collect()
     }
 
+    #[setter]
+    fn set_maneuver_parameters(&mut self, value: Vec<ManeuverParameters>) {
+        self.inner.maneuver_parameters = value.into_iter().map(|m| m.inner).collect();
+    }
+
     /// Epoch of the attitude elements and optional logical blocks.
     ///
     /// :type: str
@@ -520,12 +591,23 @@ impl ApmData {
         self.inner.epoch.as_str().to_string()
     }
 
+    #[setter]
+    fn set_epoch(&mut self, value: String) -> PyResult<()> {
+        self.inner.epoch = parse_epoch(&value)?;
+        Ok(())
+    }
+
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 }
 
@@ -592,6 +674,12 @@ impl ManeuverParameters {
         self.inner.man_epoch_start.as_str().to_string()
     }
 
+    #[setter]
+    fn set_man_epoch_start(&mut self, value: String) -> PyResult<()> {
+        self.inner.man_epoch_start = parse_epoch(&value)?;
+        Ok(())
+    }
+
     /// Maneuver duration (If = 0, impulsive maneuver)
     ///
     /// Units: s
@@ -602,6 +690,11 @@ impl ManeuverParameters {
         self.inner.man_duration.value
     }
 
+    #[setter]
+    fn set_man_duration(&mut self, value: f64) {
+        self.inner.man_duration.value = value;
+    }
+
     /// Reference frame in which the velocity increment vector data are given. The user must
     /// select from the accepted set of values indicated in 3.2.4.11.
     ///
@@ -609,6 +702,11 @@ impl ManeuverParameters {
     #[getter]
     fn get_man_ref_frame(&self) -> String {
         self.inner.man_ref_frame.clone()
+    }
+
+    #[setter]
+    fn set_man_ref_frame(&mut self, value: String) {
+        self.inner.man_ref_frame = value;
     }
 
     /// Torque X component.
@@ -621,6 +719,11 @@ impl ManeuverParameters {
         self.inner.man_tor_x.value
     }
 
+    #[setter]
+    fn set_man_tor_x(&mut self, value: f64) {
+        self.inner.man_tor_x.value = value;
+    }
+
     /// Torque Y component.
     ///
     /// Units: N*m
@@ -631,6 +734,11 @@ impl ManeuverParameters {
         self.inner.man_tor_y.value
     }
 
+    #[setter]
+    fn set_man_tor_y(&mut self, value: f64) {
+        self.inner.man_tor_y.value = value;
+    }
+
     /// Torque Z component.
     ///
     /// Units: N*m
@@ -639,6 +747,11 @@ impl ManeuverParameters {
     #[getter]
     fn get_man_tor_z(&self) -> f64 {
         self.inner.man_tor_z.value
+    }
+
+    #[setter]
+    fn set_man_tor_z(&mut self, value: f64) {
+        self.inner.man_tor_z.value = value;
     }
 
     /// Mass change during maneuver (value is < 0)
@@ -655,11 +768,25 @@ impl ManeuverParameters {
         self.inner.man_delta_mass.as_ref().map(|v| v.value)
     }
 
+    #[setter]
+    fn set_man_delta_mass(&mut self, value: Option<f64>) {
+        use ccsds_ndm::types::DeltaMassZ;
+        self.inner.man_delta_mass = value.map(|v| DeltaMassZ {
+            value: v,
+            units: None,
+        });
+    }
+
     /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 }

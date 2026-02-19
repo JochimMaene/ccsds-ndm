@@ -8,6 +8,7 @@ Unit tests for Conjunction Data Message (CDM) Python bindings.
 
 import pathlib
 
+import numpy as np
 import pytest
 from ccsds_ndm import (
     Cdm,
@@ -165,6 +166,68 @@ class TestCdm:
         # Test from_file
         cdm2 = Cdm.from_file(str(kvn_path), format="kvn")
         assert cdm2.header.originator == "TEST"
+
+    def test_cdm_data_numpy_api(self):
+        state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0], dtype=float)
+        cov = np.eye(6, dtype=float)
+
+        data = CdmData.from_numpy(
+            state_vector=state,
+            covariance_matrix=cov,
+            comments=[],
+        )
+
+        assert data.state_vector_numpy.shape == (6,)
+        assert data.covariance_matrix_numpy.shape == (6, 6)
+        assert np.allclose(data.state_vector_numpy, state)
+
+        new_state = state + 1.0
+        data.state_vector_numpy = new_state
+        assert np.allclose(data.state_vector_numpy, new_state)
+
+        # Allow clearing covariance matrix through numpy setter.
+        data.covariance_matrix_numpy = None
+        with pytest.raises(ValueError, match="COVARIANCE_MATRIX is missing"):
+            _ = data.covariance_matrix_numpy
+
+    def test_cdm_data_numpy_shape_validation(self):
+        with pytest.raises(ValueError, match="State vector must be shape"):
+            CdmData.from_numpy(
+                state_vector=np.zeros((2, 6), dtype=float),
+                covariance_matrix=None,
+                comments=[],
+            )
+
+        data = CdmData.from_numpy(
+            state_vector=np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0], dtype=float),
+            covariance_matrix=None,
+            comments=[],
+        )
+        with pytest.raises(ValueError, match="Covariance matrix must be"):
+            data.covariance_matrix_numpy = np.zeros((5, 5), dtype=float)
+
+    def test_relative_metadata_screen_volume_setters(self):
+        rel = RelativeMetadataData(
+            tca="2023-01-01T12:00:00",
+            miss_distance=100.0,
+        )
+        assert rel.screen_volume_x is None
+        assert rel.screen_volume_y is None
+        assert rel.screen_volume_z is None
+
+        rel.screen_volume_x = 10.0
+        rel.screen_volume_y = 20.0
+        rel.screen_volume_z = 30.0
+        assert rel.screen_volume_x == 10.0
+        assert rel.screen_volume_y == 20.0
+        assert rel.screen_volume_z == 30.0
+
+        rel.screen_volume_x = None
+        rel.screen_volume_y = None
+        rel.screen_volume_z = None
+        assert rel.screen_volume_x is None
+        assert rel.screen_volume_y is None
+        assert rel.screen_volume_z is None
 
 
 if __name__ == "__main__":

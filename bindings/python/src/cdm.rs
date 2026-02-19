@@ -960,10 +960,14 @@ impl RelativeMetadataData {
     ///
     /// Units: m
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn screen_volume_x(&self) -> Option<f64> {
         self.inner.screen_volume_x.as_ref().map(|v| v.value)
+    }
+    #[setter]
+    fn set_screen_volume_x(&mut self, value: Option<f64>) {
+        self.inner.screen_volume_x = value.map(|v| Length::new(v, None));
     }
 
     /// The T or V (depending on if RTN or TVN is selected) component size of the screening
@@ -971,10 +975,14 @@ impl RelativeMetadataData {
     ///
     /// Units: m
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn screen_volume_y(&self) -> Option<f64> {
         self.inner.screen_volume_y.as_ref().map(|v| v.value)
+    }
+    #[setter]
+    fn set_screen_volume_y(&mut self, value: Option<f64>) {
+        self.inner.screen_volume_y = value.map(|v| Length::new(v, None));
     }
 
     /// The N component size of the screening volume in the SCREEN_VOLUME_FRAME. Data type =
@@ -982,10 +990,14 @@ impl RelativeMetadataData {
     ///
     /// Units: m
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn screen_volume_z(&self) -> Option<f64> {
         self.inner.screen_volume_z.as_ref().map(|v| v.value)
+    }
+    #[setter]
+    fn set_screen_volume_z(&mut self, value: Option<f64>) {
+        self.inner.screen_volume_z = value.map(|v| Length::new(v, None));
     }
 
     /// Comments (see 6.3.4 for formatting rules).
@@ -2595,7 +2607,7 @@ impl AdditionalParameters {
     ///
     /// Units: m²
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_area_pc(&self) -> Option<f64> {
         self.inner.area_pc.as_ref().map(|v| v.value)
@@ -2610,7 +2622,7 @@ impl AdditionalParameters {
     ///
     /// Units: m²
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_area_drg(&self) -> Option<f64> {
         self.inner.area_drg.as_ref().map(|v| v.value)
@@ -2625,7 +2637,7 @@ impl AdditionalParameters {
     ///
     /// Units: m²
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_area_srp(&self) -> Option<f64> {
         self.inner.area_srp.as_ref().map(|v| v.value)
@@ -2639,7 +2651,7 @@ impl AdditionalParameters {
     ///
     /// Units: kg
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_mass(&self) -> Option<f64> {
         self.inner.mass.as_ref().map(|v| v.value)
@@ -2654,7 +2666,7 @@ impl AdditionalParameters {
     ///
     /// Units: m²/kg
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cd_area_over_mass(&self) -> Option<f64> {
         self.inner.cd_area_over_mass.as_ref().map(|v| v.value)
@@ -2669,7 +2681,7 @@ impl AdditionalParameters {
     ///
     /// Units: m²/kg
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cr_area_over_mass(&self) -> Option<f64> {
         self.inner.cr_area_over_mass.as_ref().map(|v| v.value)
@@ -2684,7 +2696,7 @@ impl AdditionalParameters {
     ///
     /// Units: m/s²
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_thrust_acceleration(&self) -> Option<f64> {
         self.inner.thrust_acceleration.as_ref().map(|v| v.value)
@@ -2699,7 +2711,7 @@ impl AdditionalParameters {
     ///
     /// Units: W/kg
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_sedr(&self) -> Option<f64> {
         self.inner.sedr.as_ref().map(|v| v.value)
@@ -3377,7 +3389,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/kg
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cdrg_r(&self) -> Option<f64> {
         self.inner.cdrg_r.as_ref().map(|v| v.value)
@@ -3391,7 +3403,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/kg
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cdrg_t(&self) -> Option<f64> {
         self.inner.cdrg_t.as_ref().map(|v| v.value)
@@ -3405,7 +3417,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/kg
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cdrg_n(&self) -> Option<f64> {
         self.inner.cdrg_n.as_ref().map(|v| v.value)
@@ -3419,7 +3431,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/(kg*s)
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cdrg_rdot(&self) -> Option<f64> {
         self.inner.cdrg_rdot.as_ref().map(|v| v.value)
@@ -3433,7 +3445,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/(kg*s)
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cdrg_tdot(&self) -> Option<f64> {
         self.inner.cdrg_tdot.as_ref().map(|v| v.value)
@@ -3447,7 +3459,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/(kg*s)
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cdrg_ndot(&self) -> Option<f64> {
         self.inner.cdrg_ndot.as_ref().map(|v| v.value)
@@ -3461,7 +3473,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m⁴/kg²
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cdrg_drg(&self) -> Option<f64> {
         self.inner.cdrg_drg.as_ref().map(|v| v.value)
@@ -3475,7 +3487,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/kg
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_csrp_r(&self) -> Option<f64> {
         self.inner.csrp_r.as_ref().map(|v| v.value)
@@ -3489,7 +3501,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/kg
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_csrp_t(&self) -> Option<f64> {
         self.inner.csrp_t.as_ref().map(|v| v.value)
@@ -3503,7 +3515,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/kg
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_csrp_n(&self) -> Option<f64> {
         self.inner.csrp_n.as_ref().map(|v| v.value)
@@ -3517,7 +3529,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/(kg*s)
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_csrp_rdot(&self) -> Option<f64> {
         self.inner.csrp_rdot.as_ref().map(|v| v.value)
@@ -3531,7 +3543,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/(kg*s)
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_csrp_tdot(&self) -> Option<f64> {
         self.inner.csrp_tdot.as_ref().map(|v| v.value)
@@ -3545,7 +3557,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/(kg*s)
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_csrp_ndot(&self) -> Option<f64> {
         self.inner.csrp_ndot.as_ref().map(|v| v.value)
@@ -3559,7 +3571,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m⁴/kg²
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_csrp_drg(&self) -> Option<f64> {
         self.inner.csrp_drg.as_ref().map(|v| v.value)
@@ -3573,7 +3585,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m⁴/kg²
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_csrp_srp(&self) -> Option<f64> {
         self.inner.csrp_srp.as_ref().map(|v| v.value)
@@ -3587,7 +3599,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m²/s²
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cthr_r(&self) -> Option<f64> {
         self.inner.cthr_r.as_ref().map(|v| v.value)
@@ -3601,7 +3613,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m²/s²
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cthr_t(&self) -> Option<f64> {
         self.inner.cthr_t.as_ref().map(|v| v.value)
@@ -3615,7 +3627,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m²/s²
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cthr_n(&self) -> Option<f64> {
         self.inner.cthr_n.as_ref().map(|v| v.value)
@@ -3629,7 +3641,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m²/s³
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cthr_rdot(&self) -> Option<f64> {
         self.inner.cthr_rdot.as_ref().map(|v| v.value)
@@ -3643,7 +3655,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m²/s³
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cthr_tdot(&self) -> Option<f64> {
         self.inner.cthr_tdot.as_ref().map(|v| v.value)
@@ -3657,7 +3669,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m²/s³
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cthr_ndot(&self) -> Option<f64> {
         self.inner.cthr_ndot.as_ref().map(|v| v.value)
@@ -3671,7 +3683,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/(kg*s²)
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cthr_drg(&self) -> Option<f64> {
         self.inner.cthr_drg.as_ref().map(|v| v.value)
@@ -3685,7 +3697,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m³/(kg*s²)
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cthr_srp(&self) -> Option<f64> {
         self.inner.cthr_srp.as_ref().map(|v| v.value)
@@ -3699,7 +3711,7 @@ impl CdmCovarianceMatrix {
     ///
     /// Units: m²/s⁴
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
     fn get_cthr_thr(&self) -> Option<f64> {
         self.inner.cthr_thr.as_ref().map(|v| v.value)
