@@ -278,7 +278,7 @@ impl Omm {
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    /// Build a minimal OMM from canonical NORAD TLE line 1 and line 2.
+    /// Build a minimal OMM from NORAD TLE line 1 and line 2.
     ///
     /// Parameters
     /// ----------
