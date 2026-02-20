@@ -1611,7 +1611,7 @@ MEAN_MOTION_DDOT = 0.0000000000000 [rev/day**3]
     }
 
     #[test]
-    fn test_to_tle_lines_requires_parseable_object_id() {
+    fn test_to_tle_lines_accepts_unknown_object_id() {
         let kvn = r#"CCSDS_OMM_VERS = 2.0
 CREATION_DATE = 2020-12-13T17:26:09
 ORIGINATOR = 18 SPCS
@@ -1638,7 +1638,10 @@ MEAN_MOTION_DOT = 0.00000888 [rev/day**2]
 MEAN_MOTION_DDOT = 0.0000000000000 [rev/day**3]
 "#;
         let omm = Omm::from_kvn(kvn).expect("failed to parse OMM");
-        assert!(omm.to_tle_lines().is_err());
+        let (line1, line2) = omm.to_tle_lines().expect("failed to generate TLE");
+        assert_eq!(line1[9..17].to_string(), "        ");
+        assert!(line1.starts_with("1 25544U"));
+        assert!(line2.starts_with("2 25544"));
     }
 
     #[test]
@@ -1687,6 +1690,48 @@ MEAN_MOTION_DDOT = 0.0
         // Numeric piece ('1') with corrected checksum
         let line1_digit = "1 25544U 980671   20348.69171878  .00000888  00000-0  24124-4 0  9996";
         assert!(Omm::from_tle_lines(line1_digit, line2).is_err());
+    }
+
+    #[test]
+    fn test_from_tle_lines_accepts_space_padded_sat_number() {
+        let line1 = "1    47U 60007C   26036.27771152  .00000811  00000-0  19320-3 0  9991";
+        let line2 = "2    47  66.6644  41.0753 0225093 235.9156 122.0408 14.45156735431744";
+
+        let omm = Omm::from_tle_lines(line1, line2).expect("failed to parse space-padded sat num");
+        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
+        assert_eq!(tle.norad_cat_id, Some(47));
+
+        // Output is canonicalized to 5-digit satellite number.
+        let (out1, out2) = omm.to_tle_lines().expect("failed to regenerate TLE");
+        assert!(out1.starts_with("1 00047U"));
+        assert!(out2.starts_with("2 00047"));
+    }
+
+    #[test]
+    fn test_from_tle_lines_accepts_alpha5_sat_number() {
+        let line1 = "1 T0330U          26034.73987184  .00001758  00000-0  31883-2 0  9994";
+        let line2 = "2 T0330 100.3052 214.4660 0046156 188.8072 171.2250 13.42128068254585";
+
+        let omm = Omm::from_tle_lines(line1, line2).expect("failed to parse Alpha-5 sat num");
+        let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
+        assert_eq!(tle.norad_cat_id, Some(270330));
+        assert_eq!(omm.body.segment.metadata.object_id, "UNKNOWN");
+
+        let (out1, out2) = omm.to_tle_lines().expect("failed to regenerate TLE");
+        assert_eq!(out1, line1);
+        assert_eq!(out2, line2);
+    }
+
+    #[test]
+    fn test_from_tle_lines_accepts_blank_launch_designator() {
+        let line1 = "1 81052U          26035.58850631 +.00006010 +00000+0 +15745-2 0  9998";
+        let line2 = "2 81052  65.7690 253.2830 0562908 281.9235  71.9278 13.83808833607769";
+
+        let omm =
+            Omm::from_tle_lines(line1, line2).expect("failed to parse blank launch designator");
+        assert_eq!(omm.body.segment.metadata.object_id, "UNKNOWN");
+        let (out1, _out2) = omm.to_tle_lines().expect("failed to regenerate TLE");
+        assert_eq!(out1[9..17].to_string(), "        ");
     }
 
     #[test]
