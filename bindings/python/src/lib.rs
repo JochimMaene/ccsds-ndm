@@ -43,7 +43,7 @@ use opm::*;
 ///
 /// Returns
 /// -------
-/// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm]
+/// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
 ///     The parsed NDM object.
 ///
 /// Raises
@@ -112,7 +112,7 @@ fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
 ///
 /// Returns
 /// -------
-/// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm]
+/// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
 ///     The parsed NDM object.
 #[pyfunction]
 fn from_file(py: Python, path: &str) -> PyResult<Py<PyAny>> {

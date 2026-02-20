@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
 import functools
 import inspect
 import re
@@ -108,6 +109,248 @@ def _extract_annotation(doc: str | None, tag: str) -> str | None:
     return None
 
 
+def _extract_numpy_returns_type(doc: str | None) -> str | None:
+    """Extract return type from a NumPy-style ``Returns`` section."""
+    if not doc:
+        return None
+    lines = doc.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() != "Returns":
+            continue
+
+        j = i + 1
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+
+        if j < len(lines):
+            sep = lines[j].strip()
+            if sep and set(sep) == {"-"}:
+                j += 1
+
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+
+        if j < len(lines):
+            type_line = lines[j].strip()
+            if type_line:
+                return type_line
+
+    return None
+
+
+def _normalize_type_hint(raw: str) -> str:
+    """Normalize docstring type text into a Python type hint."""
+    hint = raw.strip().strip(".").replace("`", "")
+
+    optional = False
+    parts = _split_signature_items(hint)
+    if len(parts) > 1 and any(p.strip().lower() == "optional" for p in parts[1:]):
+        optional = True
+        hint = parts[0].strip()
+
+    lower = hint.lower()
+    if lower in {"string"}:
+        hint = "str"
+    elif lower in {"integer"}:
+        hint = "int"
+    elif lower in {"boolean"}:
+        hint = "bool"
+    elif lower in {"array", "array-like", "array_like", "ndarray"}:
+        hint = "numpy.ndarray"
+    elif lower in {"any"}:
+        hint = "object"
+
+    list_match = re.match(r"^list of (.+)$", hint, flags=re.IGNORECASE)
+    if list_match:
+        inner = _normalize_type_hint(list_match.group(1).strip())
+        hint = f"list[{inner}]"
+
+    tuple_match = re.match(r"^tuple of (.+)$", hint, flags=re.IGNORECASE)
+    if tuple_match:
+        inner = _normalize_type_hint(tuple_match.group(1).strip())
+        hint = f"tuple[{inner}]"
+
+    dict_match = re.match(r"^dict(?:ionary)? of (.+) to (.+)$", hint, flags=re.IGNORECASE)
+    if dict_match:
+        key = _normalize_type_hint(dict_match.group(1).strip())
+        value = _normalize_type_hint(dict_match.group(2).strip())
+        hint = f"dict[{key}, {value}]"
+
+    hint = hint.replace("array-like", "numpy.ndarray").replace("array_like", "numpy.ndarray")
+
+    if optional and "None" not in hint and not hint.startswith("Optional[") and "|" not in hint:
+        hint = f"Optional[{hint}]"
+
+    try:
+        ast.parse(f"def _f(x: {hint}):\n    pass\n")
+    except SyntaxError:
+        hint = "object"
+
+    return hint
+
+
+def _extract_numpy_parameter_types(doc: str | None) -> dict[str, str]:
+    """Extract parameter type hints from a NumPy-style ``Parameters`` section."""
+    if not doc:
+        return {}
+
+    lines = doc.splitlines()
+    param_types: dict[str, str] = {}
+
+    i = 0
+    while i < len(lines):
+        if lines[i].strip() != "Parameters":
+            i += 1
+            continue
+
+        j = i + 1
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+        if j < len(lines):
+            sep = lines[j].strip()
+            if sep and set(sep) == {"-"}:
+                j += 1
+
+        while j < len(lines):
+            line = lines[j]
+            stripped = line.strip()
+            if not stripped:
+                j += 1
+                continue
+
+            # Next section header in NumPy docs, e.g. "Returns" + dashed underline.
+            if ":" not in stripped and j + 1 < len(lines):
+                next_line = lines[j + 1].strip()
+                if next_line and set(next_line) == {"-"}:
+                    break
+
+            match = re.match(r"^([*A-Za-z_][A-Za-z0-9_,\s*]*)\s*:\s*(.+)$", stripped)
+            if match:
+                names_text, type_text = match.group(1), match.group(2)
+                hint = _normalize_type_hint(type_text)
+                for name in [n.strip() for n in names_text.split(",")]:
+                    if name:
+                        param_types[name.lstrip("*")] = hint
+
+            j += 1
+
+        i = j
+
+    return param_types
+
+
+def _split_signature_items(signature_inner: str) -> list[str]:
+    """Split a function signature parameter list by commas with bracket awareness."""
+    items: list[str] = []
+    current: list[str] = []
+    paren_depth = 0
+    bracket_depth = 0
+    brace_depth = 0
+    quote: str | None = None
+    escaped = False
+
+    for char in signature_inner:
+        if quote is not None:
+            current.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+            continue
+
+        if char in {"'", '"'}:
+            quote = char
+            current.append(char)
+            continue
+
+        if char == "(":
+            paren_depth += 1
+        elif char == ")":
+            paren_depth -= 1
+        elif char == "[":
+            bracket_depth += 1
+        elif char == "]":
+            bracket_depth -= 1
+        elif char == "{":
+            brace_depth += 1
+        elif char == "}":
+            brace_depth -= 1
+
+        if (
+            char == ","
+            and paren_depth == 0
+            and bracket_depth == 0
+            and brace_depth == 0
+        ):
+            items.append("".join(current).strip())
+            current = []
+        else:
+            current.append(char)
+
+    tail = "".join(current).strip()
+    if tail:
+        items.append(tail)
+    return items
+
+
+def _annotate_signature(sig: str, param_types: dict[str, str]) -> str:
+    """Apply parameter annotations to a ``(param, ...)`` signature string."""
+    if not sig.startswith("(") or not sig.endswith(")") or not param_types:
+        return sig
+
+    inner = sig[1:-1]
+    if not inner.strip():
+        return sig
+
+    items = _split_signature_items(inner)
+    out: list[str] = []
+
+    for item in items:
+        token = item.strip()
+        if token in {"", "/", "*"}:
+            out.append(token)
+            continue
+
+        prefix = ""
+        rest = token
+        if rest.startswith("**"):
+            prefix = "**"
+            rest = rest[2:]
+        elif rest.startswith("*"):
+            prefix = "*"
+            rest = rest[1:]
+
+        if "=" in rest:
+            left, default = rest.split("=", 1)
+            default = "=" + default
+        else:
+            left, default = rest, ""
+        left = left.strip()
+
+        if ":" in left:
+            name, annotation = left.split(":", 1)
+            name = name.strip()
+            annotation = annotation.strip()
+        else:
+            name = left
+            annotation = ""
+
+        if not annotation:
+            inferred = param_types.get(name)
+            if inferred:
+                left = f"{name}: {inferred}"
+            else:
+                left = name
+        else:
+            left = f"{name}: {annotation}"
+
+        out.append(f"{prefix}{left}{default}")
+
+    return f"({', '.join(out)})"
+
+
 def _clean_docstring(doc: str | None) -> str:
     """Remove :type: and :rtype: lines from docstring for cleaner output."""
     if not doc:
@@ -133,7 +376,7 @@ def _format_docstring(doc: str | None, indent: str) -> str:
     return f'{indent}"""\n{indent}{_indent_text(cleaned, indent)}\n{indent}"""\n'
 
 
-def _generate_function(obj: Any, indent: str) -> str:
+def _generate_function(obj: Any, indent: str, owner_class: str | None = None) -> str:
     """Generate stub for a function or method."""
     name = obj.__name__
     sig = getattr(obj, "__text_signature__", None)
@@ -148,9 +391,31 @@ def _generate_function(obj: Any, indent: str) -> str:
         sig = "(self, key)"
     elif name == "__setitem__":
         sig = "(self, key, value)"
+    elif name == "__setstate__":
+        sig = "(self, state)"
 
     doc = obj.__doc__ or ""
+    param_types = _extract_numpy_parameter_types(doc)
+    sig = _annotate_signature(sig, param_types)
+
     return_type = _extract_annotation(doc, "rtype") or _extract_annotation(doc, "type")
+    if not return_type:
+        return_type = _extract_numpy_returns_type(doc)
+    if not return_type:
+        if name in {"to_file", "__setstate__"}:
+            return_type = "None"
+        elif name == "to_str":
+            return_type = "str"
+        elif name == "to_numpy":
+            return_type = "numpy.ndarray"
+        elif name == "__getstate__":
+            return_type = "object"
+        elif name == "validate":
+            return_type = "Optional[list[str]]" if "strict" in sig else "None"
+    if not return_type and owner_class and name.startswith("from_"):
+        # PyO3 static factory methods usually expose no runtime return annotation.
+        # Use class context so type checkers infer `Cdm.from_str(...) -> Cdm`, etc.
+        return_type = owner_class
     return_annotation = f" -> {return_type}" if return_type else ""
 
     inner_indent = indent + INDENT
@@ -233,6 +498,12 @@ def _generate_class(cls: type, indent: str) -> str:
     # __init__ if it has a signature
     if cls.__text_signature__:
         init_sig = cls.__text_signature__.replace("$self", "self").replace(" /,", "")
+        if not init_sig.startswith("(self"):
+            if init_sig == "()":
+                init_sig = "(self)"
+            else:
+                init_sig = f"(self, {init_sig[1:]}"
+        init_sig = _annotate_signature(init_sig, _extract_numpy_parameter_types(cls.__doc__))
         lines.extend(
             [
                 f"{inner_indent}def __init__{init_sig} -> None:",
@@ -255,7 +526,7 @@ def _generate_class(cls: type, indent: str) -> str:
                 )
             )
             continue
-        member_stubs.append(_generate_stub(member, inner_indent))
+        member_stubs.append(_generate_stub(member, inner_indent, owner_class=cls.__name__))
 
     # Add members or ellipsis if empty
     if member_stubs:
@@ -267,7 +538,7 @@ def _generate_class(cls: type, indent: str) -> str:
     return "\n".join(lines)
 
 
-def _generate_stub(obj: Any, indent: str = "") -> str:
+def _generate_stub(obj: Any, indent: str = "", owner_class: str | None = None) -> str:
     """Generate stub for any supported object type."""
     if inspect.ismodule(obj):
         members = [
@@ -285,10 +556,13 @@ def _generate_stub(obj: Any, indent: str = "") -> str:
         return _generate_class(obj, indent)
 
     if inspect.isbuiltin(obj):
-        return f"{indent}@staticmethod\n{_generate_function(obj, indent)}"
+        fn = _generate_function(obj, indent, owner_class=owner_class)
+        if owner_class:
+            return f"{indent}@staticmethod\n{fn}"
+        return fn
 
     if inspect.ismethoddescriptor(obj):
-        return _generate_function(obj, indent)
+        return _generate_function(obj, indent, owner_class=owner_class)
 
     if inspect.isgetsetdescriptor(obj):
         # Property setter information is only available in class context.
