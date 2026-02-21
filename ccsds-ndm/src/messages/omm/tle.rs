@@ -578,11 +578,17 @@ fn normalize_tle_input_line(line: &str, label: &'static str) -> Result<String> {
         }
         .into());
     }
+    if trimmed.len() == 68 {
+        // Some real-world feeds omit the checksum character. Accept and normalize by
+        // computing/appending checksum so downstream parsing remains deterministic.
+        let checksum = tle_checksum(trimmed);
+        return Ok(format!("{}{}", trimmed, checksum));
+    }
     if trimmed.len() != 69 {
         return Err(ValidationError::InvalidValue {
             field: Cow::Borrowed(label),
             value: trimmed.to_string(),
-            expected: Cow::Borrowed("exactly 69 characters including checksum"),
+            expected: Cow::Borrowed("exactly 68 (no checksum) or 69 (with checksum) characters"),
             line: None,
         }
         .into());

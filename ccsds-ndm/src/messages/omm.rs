@@ -1752,6 +1752,38 @@ MEAN_MOTION_DDOT = 0.0
     }
 
     #[test]
+    fn test_from_tle_lines_accepts_missing_checksums() {
+        let line1_no_checksum =
+            "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  999";
+        let line2_no_checksum =
+            "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.4918115325984";
+        assert_eq!(line1_no_checksum.len(), 68);
+        assert_eq!(line2_no_checksum.len(), 68);
+
+        let omm = Omm::from_tle_lines(line1_no_checksum, line2_no_checksum)
+            .expect("missing-checksum TLE should parse");
+        let (line1, line2) = omm.to_tle_lines().expect("failed to regenerate TLE");
+        assert_eq!(
+            line1,
+            "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995"
+        );
+        assert_eq!(
+            line2,
+            "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845"
+        );
+    }
+
+    #[test]
+    fn test_from_tle_lines_rejects_invalid_length() {
+        let line1_short = "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  99";
+        let line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845";
+        let err = Omm::from_tle_lines(line1_short, line2).expect_err("short TLE must fail");
+        assert!(err
+            .to_string()
+            .contains("exactly 68 (no checksum) or 69 (with checksum) characters"));
+    }
+
+    #[test]
     fn test_rev_per_day_units_display_all() {
         assert_eq!(format!("{}", RevPerDayUnits::RevPerDayUpper), "REV/DAY");
         assert_eq!(

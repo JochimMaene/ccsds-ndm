@@ -117,6 +117,17 @@ class TestOmm:
         with pytest.raises(ValueError):
             Omm.from_tle_lines(line1_lower, line2)
 
+    def test_from_tle_lines_accepts_missing_checksums(self):
+        line1 = "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  999"
+        line2 = "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.4918115325984"
+        assert len(line1) == 68
+        assert len(line2) == 68
+
+        omm = Omm.from_tle_lines(line1, line2)
+        out1, out2 = omm.to_tle_lines()
+        assert out1 == "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995"
+        assert out2 == "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845"
+
     def test_to_tle_lines_accepts_sgp_slash_sgp4(self):
         kvn = """CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2020-065T16:00:00

@@ -756,8 +756,9 @@ impl ManeuverParameters {
     /// Units: kg
     ///
     ///
-    /// **Note**: The CCSDS standard requires this value to be strictly negative (`< 0`).
-    /// However, this implementation allows non-negative values to support non-standard use cases.
+    /// **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
+    /// This implementation follows the schema type and allows non-positive values (`<= 0`)
+    /// for interoperability.
     ///
     /// :type: Optional[float]
     #[getter]

@@ -542,8 +542,9 @@ pub struct ManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     ///
-    /// **Note**: The CCSDS standard requires this value to be strictly negative (`< 0`).
-    /// However, this implementation allows non-negative values to support non-standard use cases.
+    /// **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
+    /// This implementation follows the underlying schema type and allows non-positive values
+    /// (`<= 0`) for interoperability.
     pub man_delta_mass: DeltaMassZ,
     /// Reference frame in which the velocity increment vector data are given. The user must
     /// select from the accepted set of values indicated in 3.2.4.11.

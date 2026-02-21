@@ -4984,8 +4984,9 @@ class ManeuverParameters:
         Units: kg
 
 
-        **Note**: The CCSDS standard requires this value to be strictly negative (`< 0`).
-        However, this implementation allows non-negative values to support non-standard use cases.
+        **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
+        This implementation follows the schema type and allows non-positive values (`<= 0`)
+        for interoperability.
         """
         ...
 
@@ -10234,9 +10235,9 @@ class Omm:
         Parameters
         ----------
         line1 : str
-            TLE line 1 (69 chars including checksum).
+            TLE line 1 (69 chars including checksum, or 68 chars without checksum).
         line2 : str
-            TLE line 2 (69 chars including checksum).
+            TLE line 2 (69 chars including checksum, or 68 chars without checksum).
         object_name : str, optional
             Metadata OBJECT_NAME override (default: "UNKNOWN").
         object_id : str, optional

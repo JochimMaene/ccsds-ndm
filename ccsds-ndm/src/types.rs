@@ -3943,10 +3943,10 @@ impl std::str::FromStr for TdmReferenceFrame {
         match s.to_uppercase().as_str() {
             "EME2000" => Ok(Self::Eme2000),
             "ICRF" => Ok(Self::Icrf),
-            "ITRF2000" => Ok(Self::Itrf2000),
-            "ITRF-93" => Ok(Self::Itrf93),
+            "ITRF2000" | "ITRF-2000" => Ok(Self::Itrf2000),
+            "ITRF-93" | "ITRF1993" | "ITRF93" => Ok(Self::Itrf93),
             "ITRF-97" => Ok(Self::Itrf97),
-            "TOD" => Ok(Self::Tod),
+            "TOD" | "TOD_EARTH" => Ok(Self::Tod),
             _ => Err(crate::error::EnumParseError {
                 field: "REFERENCE_FRAME",
                 value: s.to_string(),
@@ -4028,6 +4028,15 @@ impl std::str::FromStr for TdmPath {
                     field: "PATH".into(),
                     value: s.to_string(),
                     expected: "single digit participant indices separated by commas".into(),
+                    line: None,
+                });
+            }
+            let idx = part.parse::<u8>().unwrap();
+            if !(1..=5).contains(&idx) {
+                return Err(crate::error::ValidationError::InvalidValue {
+                    field: "PATH".into(),
+                    value: s.to_string(),
+                    expected: "participant indices in range 1..5".into(),
                     line: None,
                 });
             }
@@ -4287,5 +4296,19 @@ mod extra_tests {
         test_enum_from_str!(AngleRateUnits, "deg/s", "INVALID");
         test_enum_from_str!(MomentUnits, "kg*m**2", "INVALID");
         test_enum_from_str!(QuaternionDotUnits, "1/s", "INVALID");
+    }
+
+    #[test]
+    fn test_tdm_reference_frame_aliases() {
+        assert!("ITRF1993".parse::<TdmReferenceFrame>().is_ok());
+        assert!("ITRF93".parse::<TdmReferenceFrame>().is_ok());
+        assert!("TOD_EARTH".parse::<TdmReferenceFrame>().is_ok());
+    }
+
+    #[test]
+    fn test_tdm_path_index_range_validation() {
+        assert!("1,2,1".parse::<TdmPath>().is_ok());
+        assert!("1,6".parse::<TdmPath>().is_err());
+        assert!("0,2".parse::<TdmPath>().is_err());
     }
 }

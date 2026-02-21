@@ -283,9 +283,9 @@ impl Omm {
     /// Parameters
     /// ----------
     /// line1 : str
-    ///     TLE line 1 (69 chars including checksum).
+    ///     TLE line 1 (69 chars including checksum, or 68 chars without checksum).
     /// line2 : str
-    ///     TLE line 2 (69 chars including checksum).
+    ///     TLE line 2 (69 chars including checksum, or 68 chars without checksum).
     /// object_name : str, optional
     ///     Metadata OBJECT_NAME override (default: "UNKNOWN").
     /// object_id : str, optional
