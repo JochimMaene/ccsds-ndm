@@ -111,6 +111,9 @@ test: test-rust test-python
 # Run all quality checks (lint, audit, stubs-check, sync-docs-check, license, test)
 check: lint audit-strict stubs-check sync-docs-check license test
 
+# Run CI quality checks (excludes license gate; use `check` locally for full compliance)
+check-ci: lint audit-strict stubs-check sync-docs-check test
+
 # --- Benchmarking -----------------------------------------------------------
 
 # Run Rust benchmarks

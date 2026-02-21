@@ -64,12 +64,12 @@ class Acm:
         ...
 
     @staticmethod
-    def from_file(path, format) -> Acm:
+    def from_file(path, format=None) -> Acm:
         """ """
         ...
 
     @staticmethod
-    def from_str(data, format) -> Acm:
+    def from_str(data, format=None) -> Acm:
         """ """
         ...
 
@@ -1428,12 +1428,12 @@ class Aem:
         ...
 
     @staticmethod
-    def from_file(path, format) -> Aem:
+    def from_file(path, format=None) -> Aem:
         """ """
         ...
 
     @staticmethod
-    def from_str(data, format) -> Aem:
+    def from_str(data, format=None) -> Aem:
         """ """
         ...
 
@@ -1967,12 +1967,12 @@ class Apm:
         ...
 
     @staticmethod
-    def from_file(path, format) -> Apm:
+    def from_file(path, format=None) -> Apm:
         """ """
         ...
 
     @staticmethod
-    def from_str(data, format) -> Apm:
+    def from_str(data, format=None) -> Apm:
         """ """
         ...
 
@@ -4985,8 +4985,8 @@ class ManeuverParameters:
 
 
         **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
-        This implementation follows the schema type and allows non-positive values (`<= 0`)
-        for interoperability.
+        This implementation follows the underlying schema type and allows non-positive values
+        (`<= 0`) for interoperability.
         """
         ...
 
@@ -5363,7 +5363,7 @@ class Ocm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str]) -> Ocm:
+    def from_file(path: str, format: Optional[str] = None) -> Ocm:
         """
         Create an OCM message from a file.
 
@@ -5382,7 +5382,7 @@ class Ocm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str]) -> Ocm:
+    def from_str(data: str, format: Optional[str] = None) -> Ocm:
         """
         Create an OCM message from a string.
 
@@ -9262,7 +9262,7 @@ class Oem:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str]) -> Oem:
+    def from_file(path: str, format: Optional[str] = None) -> Oem:
         """
         Create an OEM message from a file.
 
@@ -9282,7 +9282,7 @@ class Oem:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str]) -> Oem:
+    def from_str(data: str, format: Optional[str] = None) -> Oem:
         """
         Create an OEM message from a string.
 
@@ -10196,7 +10196,7 @@ class Omm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str]) -> Omm:
+    def from_file(path: str, format: Optional[str] = None) -> Omm:
         """
         Create an OMM message from a file.
 
@@ -10215,7 +10215,7 @@ class Omm:
         ...
 
     @staticmethod
-    def from_str(data, format) -> Omm:
+    def from_str(data, format=None) -> Omm:
         """ """
         ...
 
@@ -10635,7 +10635,7 @@ class Opm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str]) -> Opm:
+    def from_file(path: str, format: Optional[str] = None) -> Opm:
         """
         Create an OPM message from a file.
 
@@ -10654,7 +10654,7 @@ class Opm:
         ...
 
     @staticmethod
-    def from_str(data, format) -> Opm:
+    def from_str(data, format=None) -> Opm:
         """
         Create an OPM message from a string.
         """

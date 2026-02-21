@@ -52,9 +52,12 @@ If you know the file type (e.g., OPM), you can parse it directly into the struct
    .. code-tab:: rust
 
         use ccsds_ndm::messages::opm::Opm;
+        use ccsds_ndm::traits::Ndm;
+        use std::fs;
 
-        // Returns an Opm struct directly
-        let opm = Opm::from_file("example.opm")?;
+        let text = fs::read_to_string("example.opm")?;
+        // Parses strict KVN for OPM
+        let opm = Opm::from_kvn(&text)?;
 
 Data Access
 -----------
@@ -71,19 +74,21 @@ Once parsed, you can access the nested data structures.
             meta = segment.metadata
             print(f"Object: {meta.object_name} ({meta.object_id})")
 
-            # State vectors are in segment.data.state_vectors
-            for sv in segment.data.state_vectors:
+            # State vectors are in segment.data.state_vector
+            for sv in segment.data.state_vector:
                 print(f"Epoch: {sv.epoch}, X: {sv.x}")
 
    .. code-tab:: rust
 
+        use ccsds_ndm::MessageType;
+
         if let MessageType::Oem(oem) = ndm {
-            for segment in oem.segments {
+            for segment in oem.body.segment {
                 let meta = segment.metadata;
                 println!("Object: {} ({})", meta.object_name, meta.object_id);
 
-                // State vectors are in segment.data.state_vectors
-                for sv in segment.data.state_vectors {
+                // State vectors are in segment.data.state_vector
+                for sv in segment.data.state_vector {
                     println!("Epoch: {}, X: {}", sv.epoch, sv.x);
                 }
             }

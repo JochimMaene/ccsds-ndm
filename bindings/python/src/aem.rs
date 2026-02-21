@@ -632,6 +632,7 @@ impl Aem {
     }
 
     #[staticmethod]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
         let inner = match format {
             Some("kvn") => ccsds_ndm::messages::aem::Aem::from_kvn(data)
@@ -659,6 +660,7 @@ impl Aem {
     }
 
     #[staticmethod]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
