@@ -64,10 +64,36 @@ jobs:
           files: ccsds-ndm/codecov.json
           fail_ci_if_error: true
 
+  bindings:
+    name: Python Bindings Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v5
+      - uses: taiki-e/install-action@just
+      - name: Set up Python environment
+        run: just setup-dev
+      - name: Build Python extension
+        run: just dev
+      - name: Lint Python
+        run: just lint-python
+      - name: Audit bindings
+        run: just audit-strict
+      - name: Check stubs
+        run: just stubs-check
+      - name: Check synced docstrings
+        run: just sync-docs-check
+      - name: Run Python tests
+        run: just test-python
+
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [test, fmt, coverage]
+    needs: [test, fmt, coverage, bindings]
     if: github.ref_type == 'tag'
     steps:
       - name: Checkout sources
