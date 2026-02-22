@@ -2644,6 +2644,32 @@ DATA_STOP
     }
 
     #[test]
+    fn test_rhumidity_xml_roundtrip_omits_empty_units_attr() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-10
+META_STOP
+DATA_START
+RHUMIDITY = 2023-01-01T00:03:00 12
+DATA_STOP
+"#;
+
+        let tdm = Tdm::from_kvn(kvn).expect("failed to parse TDM KVN");
+        let xml = tdm.to_xml().expect("failed to serialize TDM XML");
+        assert!(!xml.contains(r#"RHUMIDITY units="""#));
+        assert!(xml.contains("<RHUMIDITY>12</RHUMIDITY>"));
+
+        let parsed = Tdm::from_xml(&xml).expect("failed to parse TDM XML");
+        match &parsed.body.segments[0].data.observations[0].data {
+            TdmObservationData::Rhumidity(v) => assert_eq!(v.value, 12.0),
+            other => panic!("expected RHUMIDITY observation, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn test_tdm_body_requires_segment() {
         let body = TdmBody { segments: vec![] };
         assert!(body.validate().is_err());

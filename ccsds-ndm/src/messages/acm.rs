@@ -531,12 +531,7 @@ pub struct AcmData {
     /// A single attitude determination Data section.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        rename = "ad",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "ad", default, skip_serializing_if = "Option::is_none")]
     pub ad: Option<AcmAttitudeDetermination>,
     /// A single user-defined Data section.
     ///
@@ -1973,5 +1968,39 @@ PHYS_STOP
         let acm = Acm::from_kvn(kvn).unwrap();
         let phys = acm.body.segment.data.phys.as_ref().unwrap();
         assert_eq!(phys.wet_mass.as_ref().unwrap().value, 1000.0);
+    }
+
+    #[test]
+    fn test_acm_sensor_xml_roundtrip() {
+        let kvn = r#"CCSDS_ACM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+AD_START
+ATTITUDE_STATES = QUATERNION
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY_1
+SENSOR_START
+SENSOR_NUMBER = 1
+SENSOR_USED = AST
+SENSOR_STOP
+AD_STOP
+"#;
+
+        let acm = Acm::from_kvn(kvn).expect("failed to parse ACM KVN");
+        let xml = acm.to_xml().expect("failed to serialize ACM XML");
+        let parsed = Acm::from_xml(&xml).expect("failed to parse ACM XML");
+        assert_eq!(
+            parsed.body.segment.data.ad.as_ref().unwrap().sensors.len(),
+            1
+        );
+        assert_eq!(
+            parsed.body.segment.data.ad.as_ref().unwrap().sensors[0].sensor_number,
+            1
+        );
     }
 }

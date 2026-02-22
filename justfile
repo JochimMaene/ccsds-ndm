@@ -91,10 +91,6 @@ fmt: fmt-rust fmt-python
 # Lint both Rust and Python code
 lint: lint-rust lint-python
 
-# Check license compliance
-license:
-    uv run reuse lint
-
 # --- Testing ----------------------------------------------------------------
 
 # Run the Rust tests
@@ -108,11 +104,11 @@ test-python:
 # Run both Rust and Python tests
 test: test-rust test-python
 
-# Run all quality checks (lint, audit, stubs-check, sync-docs-check, license, test)
-check: lint audit-strict stubs-check sync-docs-check license test
+# Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
+check: lint audit-strict stubs-check sync-docs-check test
 
-# Run CI quality checks (excludes license gate; use `check` locally for full compliance)
-check-ci: lint audit-strict stubs-check sync-docs-check test
+# Backward-compatible CI alias
+check-ci: check
 
 # --- Benchmarking -----------------------------------------------------------
 

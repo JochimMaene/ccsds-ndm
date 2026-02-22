@@ -564,7 +564,9 @@ impl OmmData {
                 tle.validate(theory)?;
             }
             _ => {
-                // Not strictly required for other theories
+                if let Some(tle) = &self.tle_parameters {
+                    tle.validate(theory)?;
+                }
             }
         }
 
@@ -880,6 +882,21 @@ impl ToKvn for TleParameters {
 
 impl TleParameters {
     pub fn validate(&self, theory: &str) -> Result<()> {
+        if self.bstar.is_some() && self.bterm.is_some() {
+            return Err(ValidationError::Conflict {
+                fields: vec![Cow::Borrowed("BSTAR"), Cow::Borrowed("BTERM")],
+                line: None,
+            }
+            .into());
+        }
+        if self.mean_motion_ddot.is_some() && self.agom.is_some() {
+            return Err(ValidationError::Conflict {
+                fields: vec![Cow::Borrowed("MEAN_MOTION_DDOT"), Cow::Borrowed("AGOM")],
+                line: None,
+            }
+            .into());
+        }
+
         match theory {
             "SGP" | "PPT3" => {
                 if self.mean_motion_ddot.is_none() {
@@ -1266,6 +1283,92 @@ ARG_OF_PERICENTER = 10.0 [deg]
 MEAN_ANOMALY = 10.0 [deg]
 "#;
         assert!(Omm::from_kvn(kvn_both).is_err());
+    }
+
+    #[test]
+    fn test_omm_tle_conflicting_bstar_bterm_strict() {
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP4
+EPOCH = 2023-01-01T00:00:00
+MEAN_MOTION = 15.0 [rev/day]
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+BSTAR = 0.0001 [1/ER]
+BTERM = 0.01 [m**2/kg]
+MEAN_MOTION_DOT = 0.0 [rev/day**2]
+"#;
+
+        assert!(Omm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_omm_tle_conflicting_ddot_agom_strict() {
+        let kvn = r#"CCSDS_OMM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT
+OBJECT_ID = 2023-001A
+CENTER_NAME = EARTH
+REF_FRAME = TEME
+TIME_SYSTEM = UTC
+MEAN_ELEMENT_THEORY = SGP
+EPOCH = 2023-01-01T00:00:00
+MEAN_MOTION = 15.0 [rev/day]
+ECCENTRICITY = 0.001
+INCLINATION = 10.0 [deg]
+RA_OF_ASC_NODE = 10.0 [deg]
+ARG_OF_PERICENTER = 10.0 [deg]
+MEAN_ANOMALY = 10.0 [deg]
+BSTAR = 0.0001 [1/ER]
+MEAN_MOTION_DOT = 0.0 [rev/day**2]
+MEAN_MOTION_DDOT = 0.0 [rev/day**3]
+AGOM = 0.0001 [m**2/kg]
+"#;
+        assert!(Omm::from_kvn(kvn).is_err());
+
+        let _ = crate::validation::take_warnings();
+        let _omm = crate::validation::with_validation_mode(
+            crate::validation::ValidationMode::Lenient,
+            || Omm::from_kvn(kvn),
+        )
+        .expect("lenient parse should succeed");
+        let warnings = crate::validation::take_warnings();
+        assert!(!warnings.is_empty());
+    }
+
+    #[test]
+    fn test_tle_parameters_validate_conflicts() {
+        let mut tle = TleParameters::builder()
+            .mean_motion_dot(MeanMotionDot::new(0.0, None))
+            .build();
+        tle.bstar = Some(BStar::new(0.0001, None));
+        tle.bterm = Some(M2kg::new(0.01, None));
+
+        let err = tle.validate("SGP4").unwrap_err();
+        assert!(err.as_validation_error().is_some_and(|e| {
+            matches!(e, ValidationError::Conflict { fields, .. } if fields.iter().any(|f| f.as_ref() == "BSTAR") && fields.iter().any(|f| f.as_ref() == "BTERM"))
+        }));
+
+        let mut tle = TleParameters::builder()
+            .mean_motion_dot(MeanMotionDot::new(0.0, None))
+            .build();
+        tle.mean_motion_ddot = Some(MeanMotionDDot::new(0.0, None));
+        tle.agom = Some(M2kg::new(0.001, None));
+
+        let err = tle.validate("SGP").unwrap_err();
+        assert!(err.as_validation_error().is_some_and(|e| {
+            matches!(e, ValidationError::Conflict { fields, .. } if fields.iter().any(|f| f.as_ref() == "MEAN_MOTION_DDOT") && fields.iter().any(|f| f.as_ref() == "AGOM"))
+        }));
     }
 
     #[test]

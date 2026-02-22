@@ -96,20 +96,6 @@ pub fn mean_elements(input: &mut &str) -> KvnResult<(Vec<String>, MeanElements)>
         "GM" => gm: kv_from_kvn,
     }, |_| false);
 
-    if semi_major_axis.is_some() && mean_motion.is_some() {
-        return Err(cut_err(
-            input,
-            "Cannot have both SEMI_MAJOR_AXIS and MEAN_MOTION",
-        ));
-    }
-
-    if semi_major_axis.is_none() && mean_motion.is_none() {
-        return Err(cut_err(
-            input,
-            "Either SEMI_MAJOR_AXIS or MEAN_MOTION must be present",
-        ));
-    }
-
     Ok((
         comment,
         MeanElements {
@@ -175,14 +161,6 @@ pub fn tle_parameters(input: &mut &str) -> KvnResult<Option<TleParameters>> {
         && agom.is_none()
     {
         return Ok(None);
-    }
-
-    if bstar.is_some() && bterm.is_some() {
-        return Err(cut_err(input, "Cannot have both BSTAR and BTERM"));
-    }
-
-    if mean_motion_ddot.is_some() && agom.is_some() {
-        return Err(cut_err(input, "Cannot have both MEAN_MOTION_DDOT and AGOM"));
     }
 
     Ok(Some(TleParameters {
@@ -443,13 +421,17 @@ AGOM = 0.0001 [m**2/kg]
             );
         }
 
-        // Both SEMI_MAJOR_AXIS and MEAN_MOTION
-        let mut input = "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nMEAN_MOTION = 1.0\nECCENTRICITY = 0.1\n";
-        assert!(mean_elements.parse_next(&mut input).is_err());
+        // Both SEMI_MAJOR_AXIS and MEAN_MOTION parse; semantic check is in validation
+        let mut input = "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nMEAN_MOTION = 1.0\nECCENTRICITY = 0.1\nINCLINATION = 0\nRA_OF_ASC_NODE = 0\nARG_OF_PERICENTER = 0\nMEAN_ANOMALY = 0\n";
+        let (_, me_both) = mean_elements.parse_next(&mut input).unwrap();
+        assert!(me_both.semi_major_axis.is_some());
+        assert!(me_both.mean_motion.is_some());
 
-        // Neither SEMI_MAJOR_AXIS nor MEAN_MOTION
-        let mut input = "EPOCH = 2000-06-28T11:59:28\nECCENTRICITY = 0.1\n";
-        assert!(mean_elements.parse_next(&mut input).is_err());
+        // Neither SEMI_MAJOR_AXIS nor MEAN_MOTION parses; semantic check is in validation
+        let mut input = "EPOCH = 2000-06-28T11:59:28\nECCENTRICITY = 0.1\nINCLINATION = 0\nRA_OF_ASC_NODE = 0\nARG_OF_PERICENTER = 0\nMEAN_ANOMALY = 0\n";
+        let (_, me_none) = mean_elements.parse_next(&mut input).unwrap();
+        assert!(me_none.semi_major_axis.is_none());
+        assert!(me_none.mean_motion.is_none());
 
         // Negative eccentricity
         let mut input =
@@ -480,14 +462,18 @@ AGOM = 0.0001 [m**2/kg]
             );
         }
 
-        // TLE: both BSTAR and BTERM
+        // TLE: both BSTAR and BTERM parses; semantic check is in validation
         let mut input =
             "MEAN_MOTION_DOT = 0.000001\nMEAN_MOTION_DDOT = 0.0\nBSTAR = 0.0001\nBTERM = 0.0001\n";
-        assert!(tle_parameters.parse_next(&mut input).is_err());
+        let tle = tle_parameters.parse_next(&mut input).unwrap().unwrap();
+        assert!(tle.bstar.is_some());
+        assert!(tle.bterm.is_some());
 
-        // TLE: neither BSTAR nor BTERM (Now allowed in parser, but this input has both DDOT and AGOM)
+        // TLE: DDOT + AGOM parses; semantic check is in validation
         let mut input = "MEAN_MOTION_DOT = 0.000001\nMEAN_MOTION_DDOT = 0.0\nAGOM = 0.0001\n";
-        assert!(tle_parameters.parse_next(&mut input).is_err()); // Error due to DDOT + AGOM
+        let tle = tle_parameters.parse_next(&mut input).unwrap().unwrap();
+        assert!(tle.mean_motion_ddot.is_some());
+        assert!(tle.agom.is_some());
 
         // TLE: independent checks for format
 
@@ -495,10 +481,12 @@ AGOM = 0.0001 [m**2/kg]
         let mut input = "BSTAR = 0.0001\nMEAN_MOTION_DDOT = 0.0\n";
         assert!(tle_parameters.parse_next(&mut input).is_err());
 
-        // TLE: both MEAN_MOTION_DDOT and AGOM (Still Error - mutex)
+        // TLE: both MEAN_MOTION_DDOT and AGOM parses; semantic check is in validation
         let mut input =
             "MEAN_MOTION_DOT = 0.000001\nBSTAR = 0.0001\nMEAN_MOTION_DDOT = 0.0\nAGOM = 0.0001\n";
-        assert!(tle_parameters.parse_next(&mut input).is_err());
+        let tle = tle_parameters.parse_next(&mut input).unwrap().unwrap();
+        assert!(tle.mean_motion_ddot.is_some());
+        assert!(tle.agom.is_some());
 
         // TLE: neither MEAN_MOTION_DDOT nor AGOM (Allowed in parser)
         let mut input = "MEAN_MOTION_DOT = 0.000001\nBSTAR = 0.0001\n";

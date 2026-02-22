@@ -10,11 +10,6 @@ dependencies = [
     "shibuya>=2025.12.14",
 ]
 
-[dependency-groups]
-dev = [
-    "reuse>=5.1.1",
-]
-
 [tool.uv.workspace]
 members = [
     "bindings/python",

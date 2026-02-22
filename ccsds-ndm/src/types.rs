@@ -730,7 +730,7 @@ impl std::fmt::Display for DayInterval {
 pub struct Percentage {
     #[serde(rename = "$value")]
     pub value: f64,
-    #[serde(rename = "@units")]
+    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<PercentageUnits>,
 }
 
@@ -1985,7 +1985,7 @@ define_unit_type!(Torque, TorqueUnits, Nm, { Nm => "N*m" });
 // Vector helper for cpType / targetMomentumType
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Vector3 {
-    #[serde(rename = "$value")]
+    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
     pub elements: Vec<f64>, // Expect length 3
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<LengthUnits>,
@@ -2002,7 +2002,7 @@ impl Vector3 {
 // Target momentum vector (uses angular momentum units)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TargetMomentum {
-    #[serde(rename = "$value")]
+    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
     pub elements: Vec<f64>, // length 3
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<AngMomentumUnits>,
