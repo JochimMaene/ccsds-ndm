@@ -8,6 +8,12 @@ on:
       - "v*"
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -38,23 +44,16 @@ jobs:
 
       - name: Linting
         run: just lint-rust
-
-
-
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest
     if: github.actor != 'dependabot[bot]'
-    env:
-      UV_PROJECT: ccsds-ndm
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
       - uses: taiki-e/install-action@just
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
       - name: Generate code coverage
         run: just coverage
       - name: Upload coverage to Codecov
@@ -64,17 +63,43 @@ jobs:
           files: ccsds-ndm/codecov.json
           fail_ci_if_error: true
 
+  bindings:
+    name: Python Bindings Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v5
+      - uses: taiki-e/install-action@just
+      - name: Set up Python environment
+        run: just setup-dev
+      - name: Build Python extension
+        run: just dev
+      - name: Lint Python
+        run: just lint-python
+      - name: Audit bindings
+        run: just audit-strict
+      - name: Check stubs
+        run: just stubs-check
+      - name: Check synced docstrings
+        run: just sync-docs-check
+      - name: Run Python tests
+        run: just test-python
+
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [test, fmt, coverage]
+    needs: [test, fmt, coverage, bindings]
     if: github.ref_type == 'tag'
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
 
       - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: rustfmt, clippy

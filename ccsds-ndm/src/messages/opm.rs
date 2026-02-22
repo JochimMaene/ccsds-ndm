@@ -343,6 +343,20 @@ impl Validate for OpmData {
         if let Some(ke) = &self.keplerian_elements {
             ke.validate()?;
         }
+        if !self.maneuver_parameters.is_empty()
+            && self
+                .spacecraft_parameters
+                .as_ref()
+                .and_then(|sp| sp.mass.as_ref())
+                .is_none()
+        {
+            return Err(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("Spacecraft Parameters"),
+                field: Cow::Borrowed("MASS"),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
     }
 }
@@ -542,8 +556,9 @@ pub struct ManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     ///
-    /// **Note**: The CCSDS standard requires this value to be strictly negative (`< 0`).
-    /// However, this implementation allows non-negative values to support non-standard use cases.
+    /// **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
+    /// This implementation follows the underlying schema type and allows non-positive values
+    /// (`<= 0`) for interoperability.
     pub man_delta_mass: DeltaMassZ,
     /// Reference frame in which the velocity increment vector data are given. The user must
     /// select from the accepted set of values indicated in 3.2.4.11.
@@ -689,6 +704,86 @@ MAN_DV_3 = 0.0 [km/s]
             opm.body.segment.data.maneuver_parameters[1].man_dv_1.value,
             -10.5
         );
+    }
+
+    #[test]
+    fn test_opm_maneuver_requires_mass_in_strict_mode() {
+        let kvn = r#"CCSDS_OPM_VERS = 3.0
+CREATION_DATE = 2022-11-06T09:23:57
+ORIGINATOR = JAXA
+OBJECT_NAME = SAT
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+EPOCH = 2022-12-18T14:28:15.1172
+X = 6503.514
+Y = 1239.647
+Z = -717.490
+X_DOT = -0.873160
+Y_DOT = 8.740420
+Z_DOT = -4.191076
+MAN_EPOCH_IGNITION = 2023-01-01T00:00:00
+MAN_DURATION = 10.0
+MAN_DELTA_MASS = -1.0
+MAN_REF_FRAME = RSW
+MAN_DV_1 = 0.1
+MAN_DV_2 = 0.0
+MAN_DV_3 = 0.0
+"#;
+        let err = Opm::from_kvn(kvn).unwrap_err();
+        let ok = err.as_validation_error().is_some_and(|e| {
+            matches!(
+                e,
+                ValidationError::MissingRequiredField { block, field, .. }
+                if block.as_ref() == "Spacecraft Parameters" && field.as_ref() == "MASS"
+            )
+        });
+        assert!(ok, "expected MASS missing validation error, got {err}");
+    }
+
+    #[test]
+    fn test_opm_maneuver_without_mass_lenient_warns() {
+        let kvn = r#"CCSDS_OPM_VERS = 3.0
+CREATION_DATE = 2022-11-06T09:23:57
+ORIGINATOR = JAXA
+OBJECT_NAME = SAT
+OBJECT_ID = 1
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+EPOCH = 2022-12-18T14:28:15.1172
+X = 6503.514
+Y = 1239.647
+Z = -717.490
+X_DOT = -0.873160
+Y_DOT = 8.740420
+Z_DOT = -4.191076
+MAN_EPOCH_IGNITION = 2023-01-01T00:00:00
+MAN_DURATION = 10.0
+MAN_DELTA_MASS = -1.0
+MAN_REF_FRAME = RSW
+MAN_DV_1 = 0.1
+MAN_DV_2 = 0.0
+MAN_DV_3 = 0.0
+"#;
+        let _ = crate::validation::take_warnings();
+        let opm = crate::validation::with_validation_mode(
+            crate::validation::ValidationMode::Lenient,
+            || Opm::from_kvn(kvn),
+        )
+        .expect("lenient parse should succeed");
+        assert_eq!(opm.body.segment.data.maneuver_parameters.len(), 1);
+
+        let warnings = crate::validation::take_warnings();
+        assert!(warnings.iter().any(|w| {
+            w.message_kind == crate::validation::MessageKind::Opm
+                && matches!(
+                    w.error,
+                    ValidationError::MissingRequiredField { ref block, ref field, .. }
+                    if block.as_ref() == "Spacecraft Parameters" && field.as_ref() == "MASS"
+                )
+        }));
     }
 
     // =========================================================================

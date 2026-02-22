@@ -186,6 +186,21 @@ pub struct RdmSegment {
 impl crate::traits::Validate for RdmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
+        if self.data.state_vector.is_some()
+            && self
+                .metadata
+                .ref_frame
+                .as_deref()
+                .map(str::trim)
+                .is_none_or(str::is_empty)
+        {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Metadata".into(),
+                field: "REF_FRAME (required when state vector is provided)".into(),
+                line: None,
+            }
+            .into());
+        }
         self.data.validate()
     }
 }
@@ -752,6 +767,14 @@ impl crate::traits::Validate for RdmMetadata {
 
 impl crate::traits::Validate for RdmData {
     fn validate(&self) -> Result<()> {
+        if self.covariance_matrix.is_some() && self.state_vector.is_none() {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Data".into(),
+                field: "stateVector (required when covarianceMatrix is provided)".into(),
+                line: None,
+            }
+            .into());
+        }
         let arp = &self.atmospheric_reentry_parameters;
         if let (Some(start), Some(end)) = (
             &arp.orbit_lifetime_window_start,
@@ -892,6 +915,7 @@ CONTROLLED_REENTRY = YES
 CENTER_NAME = EARTH
 TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-01-01T09:00:00
+REF_FRAME = EME2000
 ORBIT_LIFETIME = 5.5 [d]
 REENTRY_ALTITUDE = 80.0 [km]
 NOMINAL_REENTRY_EPOCH = 2023-01-06T19:45:33
@@ -1016,6 +1040,71 @@ ORBIT_LIFETIME = 5 [d]
 REENTRY_ALTITUDE = 80 [km]
 ORBIT_LIFETIME_WINDOW_START = 6.0 [d]
 ORBIT_LIFETIME_WINDOW_END = 5.0 [d]
+"#;
+        assert!(Rdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_rdm_validation_missing_ref_frame_when_state_vector_present() {
+        let kvn = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+EPOCH = 2023-01-01T12:00:00
+X = 7000 [km]
+Y = 0 [km]
+Z = 0 [km]
+X_DOT = 0 [km/s]
+Y_DOT = 7.5 [km/s]
+Z_DOT = 1.0 [km/s]
+"#;
+        assert!(Rdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_rdm_validation_covariance_requires_state_vector() {
+        let kvn = r#"CCSDS_RDM_VERS = 1.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
+OBJECT_NAME = TEST
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CONTROLLED_REENTRY = NO
+CENTER_NAME = EARTH
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+REF_FRAME = EME2000
+ORBIT_LIFETIME = 5 [d]
+REENTRY_ALTITUDE = 80 [km]
+CX_X = 0.1 [km**2]
+CY_X = 0.0 [km**2]
+CY_Y = 0.1 [km**2]
+CZ_X = 0.0 [km**2]
+CZ_Y = 0.0 [km**2]
+CZ_Z = 0.1 [km**2]
+CX_DOT_X = 0.0 [km**2/s]
+CX_DOT_Y = 0.0 [km**2/s]
+CX_DOT_Z = 0.0 [km**2/s]
+CX_DOT_X_DOT = 0.01 [km**2/s**2]
+CY_DOT_X = 0.0 [km**2/s]
+CY_DOT_Y = 0.0 [km**2/s]
+CY_DOT_Z = 0.0 [km**2/s]
+CY_DOT_X_DOT = 0.0 [km**2/s**2]
+CY_DOT_Y_DOT = 0.01 [km**2/s**2]
+CZ_DOT_X = 0.0 [km**2/s]
+CZ_DOT_Y = 0.0 [km**2/s]
+CZ_DOT_Z = 0.0 [km**2/s]
+CZ_DOT_X_DOT = 0.0 [km**2/s**2]
+CZ_DOT_Y_DOT = 0.0 [km**2/s**2]
+CZ_DOT_Z_DOT = 0.01 [km**2/s**2]
 "#;
         assert!(Rdm::from_kvn(kvn).is_err());
     }

@@ -137,20 +137,6 @@ pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElement
         return Ok(None);
     }
 
-    if true_anomaly.is_some() && mean_anomaly.is_some() {
-        return Err(cut_err(
-            input,
-            "Cannot have both TRUE_ANOMALY and MEAN_ANOMALY",
-        ));
-    }
-
-    if true_anomaly.is_none() && mean_anomaly.is_none() {
-        return Err(cut_err(
-            input,
-            "Either TRUE_ANOMALY or MEAN_ANOMALY must be present in Keplerian Elements",
-        ));
-    }
-
     Ok(Some(KeplerianElements {
         comment,
         semi_major_axis: semi_major_axis
@@ -251,19 +237,6 @@ pub fn opm_data(input: &mut &str) -> KvnResult<OpmData> {
     let covariance_matrix = covariance_matrix.parse_next(input)?;
     let maneuver_parameters = all_maneuvers.parse_next(input)?;
     let user_defined_parameters = user_defined_parameters.parse_next(input)?;
-
-    if !maneuver_parameters.is_empty() {
-        let has_mass = spacecraft_parameters
-            .as_ref()
-            .and_then(|sp| sp.mass.as_ref())
-            .is_some();
-        if !has_mass {
-            return Err(cut_err(
-                input,
-                "MASS must be provided if maneuvers are specified",
-            ));
-        }
-    }
 
     Ok(OpmData {
         comment: sv_comment,
@@ -481,15 +454,25 @@ DRAG_COEFF = 2.5
         let mut kvn_kep_err = "SEMI_MAJOR_AXIS = 7000.0\n"; // Missing others
         assert!(keplerian_elements.parse_next(&mut kvn_kep_err).is_err());
 
-        // Keplerian: both TRUE_ANOMALY and MEAN_ANOMALY
+        // Keplerian: both TRUE_ANOMALY and MEAN_ANOMALY parses; semantic check is in validation
         let mut kvn_kep_both = "SEMI_MAJOR_AXIS = 7000.0\nECCENTRICITY = 0.0\nINCLINATION = 0.0\nRA_OF_ASC_NODE = 0.0\nARG_OF_PERICENTER = 0.0\nTRUE_ANOMALY = 0.0\nMEAN_ANOMALY = 0.0\nGM = 398600.44\n";
-        assert!(keplerian_elements.parse_next(&mut kvn_kep_both).is_err());
+        let ke_both = keplerian_elements
+            .parse_next(&mut kvn_kep_both)
+            .unwrap()
+            .unwrap();
+        assert!(ke_both.true_anomaly.is_some());
+        assert!(ke_both.mean_anomaly.is_some());
 
-        // Keplerian: neither TRUE_ANOMALY nor MEAN_ANOMALY
+        // Keplerian: neither TRUE_ANOMALY nor MEAN_ANOMALY parses; semantic check is in validation
         let mut kvn_kep_none = "SEMI_MAJOR_AXIS = 7000.0\nECCENTRICITY = 0.0\nINCLINATION = 0.0\nRA_OF_ASC_NODE = 0.0\nARG_OF_PERICENTER = 0.0\nGM = 398600.44\n";
-        assert!(keplerian_elements.parse_next(&mut kvn_kep_none).is_err());
+        let ke_none = keplerian_elements
+            .parse_next(&mut kvn_kep_none)
+            .unwrap()
+            .unwrap();
+        assert!(ke_none.true_anomaly.is_none());
+        assert!(ke_none.mean_anomaly.is_none());
 
-        // Maneuver without MASS
+        // Maneuver without MASS should parse (mass is optional in OPM spacecraft parameters)
         let kvn_man_no_mass = r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2022-11-06T09:23:57
 ORIGINATOR = JAXA
@@ -513,7 +496,16 @@ MAN_DV_1 = 0.1
 MAN_DV_2 = 0.0
 MAN_DV_3 = 0.0
 "#;
-        assert!(Opm::from_kvn_str(kvn_man_no_mass).is_err());
+        let opm = Opm::from_kvn_str(kvn_man_no_mass).expect("maneuver without MASS should parse");
+        assert!(opm
+            .body
+            .segment
+            .data
+            .spacecraft_parameters
+            .as_ref()
+            .and_then(|sp| sp.mass.as_ref())
+            .is_none());
+        assert_eq!(opm.body.segment.data.maneuver_parameters.len(), 1);
 
         let mut input = "SEMI_MAJOR_AXIS = BAD\n";
         assert!(keplerian_elements.parse_next(&mut input).is_err());

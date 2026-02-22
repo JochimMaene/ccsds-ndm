@@ -158,6 +158,7 @@ impl Opm {
     /// Create an OPM message from a string.
 
     #[staticmethod]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
         let inner = match format {
             Some("kvn") => ccsds_ndm::messages::opm::Opm::from_kvn(data)
@@ -198,6 +199,7 @@ impl Opm {
     /// Opm
     ///     The parsed OPM object.
     #[staticmethod]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
@@ -1552,8 +1554,9 @@ impl ManeuverParameters {
     /// Units: kg
     ///
     ///
-    /// **Note**: The CCSDS standard requires this value to be strictly negative (`< 0`).
-    /// However, this implementation allows non-negative values to support non-standard use cases.
+    /// **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
+    /// This implementation follows the underlying schema type and allows non-positive values
+    /// (`<= 0`) for interoperability.
     ///
     /// :type: float
     #[getter]

@@ -943,6 +943,81 @@ impl crate::traits::Validate for TdmMetadata {
             }
             .into());
         }
+        match self.mode {
+            Some(TdmMode::Sequential) => {
+                if self.path.is_none() {
+                    return Err(ValidationError::MissingRequiredField {
+                        block: "TDM Metadata".into(),
+                        field: "PATH (required when MODE=SEQUENTIAL)".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+                if self.path_1.is_some() || self.path_2.is_some() {
+                    return Err(ValidationError::Generic {
+                        message: Cow::Borrowed(
+                            "TDM Metadata cannot use PATH_1/PATH_2 when MODE=SEQUENTIAL",
+                        ),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+            Some(TdmMode::SingleDiff) => {
+                if self.path.is_some() {
+                    return Err(ValidationError::Generic {
+                        message: Cow::Borrowed(
+                            "TDM Metadata cannot use PATH when MODE=SINGLE_DIFF",
+                        ),
+                        line: None,
+                    }
+                    .into());
+                }
+                if self.path_1.is_none() || self.path_2.is_none() {
+                    return Err(ValidationError::MissingRequiredField {
+                        block: "TDM Metadata".into(),
+                        field: "PATH_1 and PATH_2 (required when MODE=SINGLE_DIFF)".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+            None => {}
+        }
+        if self.angle_type == Some(TdmAngleType::Radec) && self.reference_frame.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Metadata".into(),
+                field: "REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.interpolation.is_some() && self.interpolation_degree.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Metadata".into(),
+                field: "INTERPOLATION_DEGREE (required when INTERPOLATION is used)".into(),
+                line: None,
+            }
+            .into());
+        }
+        let has_correction = self.correction_angle_1.is_some()
+            || self.correction_angle_2.is_some()
+            || self.correction_doppler.is_some()
+            || self.correction_mag.is_some()
+            || self.correction_range.is_some()
+            || self.correction_rcs.is_some()
+            || self.correction_receive.is_some()
+            || self.correction_transmit.is_some()
+            || self.correction_aberration_yearly.is_some()
+            || self.correction_aberration_diurnal.is_some();
+        if has_correction && self.corrections_applied.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Metadata".into(),
+                field: "CORRECTIONS_APPLIED (required when CORRECTION_* keywords are used)".into(),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
     }
 }
@@ -2043,6 +2118,115 @@ DATA_STOP
     }
 
     #[test]
+    fn test_tdm_validation_mode_sequential_requires_path() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+MODE = SEQUENTIAL
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_tdm_validation_mode_single_diff_requires_paths() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+MODE = SINGLE_DIFF
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_tdm_validation_interpolation_requires_degree() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+MODE = SEQUENTIAL
+PATH = 1,2
+INTERPOLATION = LAGRANGE
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_tdm_validation_corrections_applied_required() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+MODE = SEQUENTIAL
+PATH = 1,2
+CORRECTION_RANGE = 0.5
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_tdm_validation_radec_requires_reference_frame() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+MODE = SEQUENTIAL
+PATH = 1,2
+ANGLE_TYPE = RADEC
+META_STOP
+DATA_START
+ANGLE_1 = 2023-01-01T00:00:00 100.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
+    fn test_tdm_validation_path_indices_range() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = P1
+MODE = SEQUENTIAL
+PATH = 1,6
+META_STOP
+DATA_START
+RANGE = 2023-01-01T00:00:00 1000.0
+DATA_STOP
+"#;
+        assert!(Tdm::from_kvn(kvn).is_err());
+    }
+
+    #[test]
     fn test_exhaustive_observation_data() {
         // Exercise every variant of TdmObservationData
         use crate::types::Percentage;
@@ -2457,6 +2641,32 @@ DATA_STOP
   <data><observation extra="ignore"><EPOCH>2023-01-01T00:00:00</EPOCH><RANGE>1.0</RANGE></observation></data>
   </segment></body></tdm>"#;
         assert!(Tdm::from_xml(xml_unknown).is_ok());
+    }
+
+    #[test]
+    fn test_rhumidity_xml_roundtrip_omits_empty_units_attr() {
+        let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-10
+META_STOP
+DATA_START
+RHUMIDITY = 2023-01-01T00:03:00 12
+DATA_STOP
+"#;
+
+        let tdm = Tdm::from_kvn(kvn).expect("failed to parse TDM KVN");
+        let xml = tdm.to_xml().expect("failed to serialize TDM XML");
+        assert!(!xml.contains(r#"RHUMIDITY units="""#));
+        assert!(xml.contains("<RHUMIDITY>12</RHUMIDITY>"));
+
+        let parsed = Tdm::from_xml(&xml).expect("failed to parse TDM XML");
+        match &parsed.body.segments[0].data.observations[0].data {
+            TdmObservationData::Rhumidity(v) => assert_eq!(v.value, 12.0),
+            other => panic!("expected RHUMIDITY observation, got {:?}", other),
+        }
     }
 
     #[test]

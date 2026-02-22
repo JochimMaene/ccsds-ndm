@@ -14,11 +14,11 @@ python_dir := "bindings/python"
 
 # Set up the Python development environment
 setup-dev:
-    uv sync --dev -p {{python_dir}}/pyproject.toml
+    cd {{python_dir}} && uv sync --dev
 
 # Set up the Python documentation environment
 setup-docs:
-    uv sync -p pyproject.toml
+    uv sync
 
 # Set up both the development and documentation environments
 setup: setup-dev setup-docs
@@ -37,15 +37,15 @@ prek:
 
 # Install the Python bindings in development mode
 dev:
-    cd {{python_dir}} && uv run maturin develop
+    cd {{python_dir}} && uv run --with maturin maturin develop
 
 # Generate Python type stubs (.pyi)
 stubs:
-    cd {{python_dir}} && uv run python stubs.py
+    cd {{python_dir}} && uv run --with ruff python stubs.py
 
 # Check if Python type stubs are up to date
 stubs-check:
-    cd {{python_dir}} && uv run python stubs.py --check
+    cd {{python_dir}} && uv run --with ruff python stubs.py --check
 
 # Sync docstrings from Rust to Python
 sync-docs:
@@ -79,21 +79,17 @@ lint-rust:
 
 # Format the Python code
 fmt-python:
-    cd {{python_dir}} && uv run ruff format .
+    cd {{python_dir}} && uv run --with ruff ruff format .
 
 # Lint the Python code
 lint-python:
-    cd {{python_dir}} && uv run ruff check .
+    cd {{python_dir}} && uv run --with ruff ruff check .
 
 # Format both Rust and Python code
 fmt: fmt-rust fmt-python
 
 # Lint both Rust and Python code
 lint: lint-rust lint-python
-
-# Check license compliance
-license:
-    uv run reuse lint
 
 # --- Testing ----------------------------------------------------------------
 
@@ -108,8 +104,11 @@ test-python:
 # Run both Rust and Python tests
 test: test-rust test-python
 
-# Run all quality checks (lint, audit, stubs-check, sync-docs-check, license, test)
-check: lint audit-strict stubs-check sync-docs-check license test
+# Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
+check: lint audit-strict stubs-check sync-docs-check test
+
+# Backward-compatible CI alias
+check-ci: check
 
 # --- Benchmarking -----------------------------------------------------------
 

@@ -165,6 +165,7 @@ impl Omm {
     }
 
     #[staticmethod]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
         let inner = match format {
             Some("kvn") => ccsds_ndm::messages::omm::Omm::from_kvn(data)
@@ -205,6 +206,7 @@ impl Omm {
     /// Omm
     ///     The parsed OMM object.
     #[staticmethod]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
@@ -278,14 +280,14 @@ impl Omm {
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    /// Build a minimal OMM from canonical NORAD TLE line 1 and line 2.
+    /// Build a minimal OMM from NORAD TLE line 1 and line 2.
     ///
     /// Parameters
     /// ----------
     /// line1 : str
-    ///     TLE line 1 (69 chars including checksum).
+    ///     TLE line 1 (69 chars including checksum, or 68 chars without checksum).
     /// line2 : str
-    ///     TLE line 2 (69 chars including checksum).
+    ///     TLE line 2 (69 chars including checksum, or 68 chars without checksum).
     /// object_name : str, optional
     ///     Metadata OBJECT_NAME override (default: "UNKNOWN").
     /// object_id : str, optional

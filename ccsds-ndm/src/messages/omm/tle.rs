@@ -16,7 +16,7 @@ impl Omm {
     /// This method requires:
     /// - `MEAN_ELEMENT_THEORY` to be `SGP` or `SGP4`
     /// - presence of `TLE_PARAMETERS`
-    /// - presence of launch designator fields in `OBJECT_ID` (`YYYY-NNNPPP`)
+    /// - either a launch designator in `OBJECT_ID` (`YYYY-NNN[PPP]`) or `OBJECT_ID=UNKNOWN`
     /// - strict field-width compliance for NORAD fixed-width line formats
     pub fn to_tle_lines(&self) -> Result<(String, String)> {
         self.validate()?;
@@ -55,15 +55,7 @@ impl Omm {
 
         let launch = parse_object_id_launch_designator(&metadata.object_id)?;
         let norad_cat_id = require_tle_field(tle.norad_cat_id, "NORAD_CAT_ID")?;
-        if norad_cat_id > 99_999 {
-            return Err(ValidationError::OutOfRange {
-                name: Cow::Borrowed("NORAD_CAT_ID"),
-                value: norad_cat_id.to_string(),
-                expected: Cow::Borrowed("[0, 99999]"),
-                line: None,
-            }
-            .into());
-        }
+        let norad_cat_id_field = format_tle_satellite_number(norad_cat_id)?;
 
         let classification =
             tle.classification_type
@@ -171,12 +163,21 @@ impl Omm {
         }
 
         let mut line1_no_checksum = format!(
-            "1 {:05}{} {:02}{:03}{:<3} {:02}{} {} {} {} {} {:>4}",
-            norad_cat_id,
+            "1 {}{} {}{}{} {:02}{} {} {} {} {} {:>4}",
+            &norad_cat_id_field,
             classification_char,
-            launch.launch_year % 100,
-            launch.launch_number,
-            launch.launch_piece,
+            launch
+                .as_ref()
+                .map(|v| format!("{:02}", v.launch_year % 100))
+                .unwrap_or_else(|| "  ".to_string()),
+            launch
+                .as_ref()
+                .map(|v| format!("{:03}", v.launch_number))
+                .unwrap_or_else(|| "   ".to_string()),
+            launch
+                .as_ref()
+                .map(|v| format!("{:<3}", v.launch_piece))
+                .unwrap_or_else(|| "   ".to_string()),
             epoch_year_2,
             epoch_day_field,
             mean_motion_dot_field,
@@ -190,8 +191,8 @@ impl Omm {
         let line1 = format!("{}{}", line1_no_checksum, checksum1);
 
         let mut line2_no_checksum = format!(
-            "2 {:05} {:8.4} {:8.4} {:07} {:8.4} {:8.4} {:11.8}{:5}",
-            norad_cat_id,
+            "2 {} {:8.4} {:8.4} {:07} {:8.4} {:8.4} {:11.8}{:5}",
+            &norad_cat_id_field,
             inclination,
             raan,
             ecc_scaled as u32,
@@ -207,12 +208,12 @@ impl Omm {
         Ok((line1, line2))
     }
 
-    /// Parse canonical NORAD TLE line 1/2 into a minimal OMM.
+    /// Parse NORAD TLE line 1/2 into a minimal OMM.
     pub fn from_tle_lines(line1: &str, line2: &str) -> Result<Self> {
         Self::from_tle_lines_with_options(line1, line2, &TleToOmmOptions::default())
     }
 
-    /// Parse canonical NORAD TLE line 1/2 into a minimal OMM with metadata/header overrides.
+    /// Parse NORAD TLE line 1/2 into a minimal OMM with metadata/header overrides.
     pub fn from_tle_lines_with_options(
         line1: &str,
         line2: &str,
@@ -227,8 +228,8 @@ impl Omm {
         ensure_tle_line_structure(&line1, '1')?;
         ensure_tle_line_structure(&line2, '2')?;
 
-        let norad_cat_id_l1 = parse_u32_strict(&line1[2..7], "NORAD_CAT_ID")?;
-        let norad_cat_id_l2 = parse_u32_strict(&line2[2..7], "NORAD_CAT_ID")?;
+        let norad_cat_id_l1 = parse_tle_satellite_number(&line1[2..7], "NORAD_CAT_ID")?;
+        let norad_cat_id_l2 = parse_tle_satellite_number(&line2[2..7], "NORAD_CAT_ID")?;
         if norad_cat_id_l1 != norad_cat_id_l2 {
             return Err(ValidationError::Conflict {
                 fields: vec![
@@ -243,20 +244,8 @@ impl Omm {
         let classification_type = (l1[7] as char).to_string();
         parse_classification_char(&classification_type)?;
 
-        let launch_year_2 = parse_u32_strict(&line1[9..11], "LAUNCH_YEAR")?;
-        let launch_number = parse_u32_strict(&line1[11..14], "LAUNCH_NUMBER")?;
-        let launch_piece = line1[14..17].trim_end().to_string();
-        if !launch_piece.is_empty()
-            && (!launch_piece.chars().all(|c| c.is_ascii_uppercase()) || launch_piece.len() > 3)
-        {
-            return Err(ValidationError::InvalidValue {
-                field: Cow::Borrowed("LAUNCH_PIECE"),
-                value: launch_piece,
-                expected: Cow::Borrowed("1..=3 uppercase ASCII letters"),
-                line: None,
-            }
-            .into());
-        }
+        let launch_designator =
+            parse_tle_launch_designator_fields(&line1[9..11], &line1[11..14], &line1[14..17])?;
 
         let epoch_year_2 = parse_u32_strict(&line1[18..20], "EPOCH_YEAR")?;
         let epoch = parse_tle_epoch_field(epoch_year_2, &line1[20..32])?;
@@ -284,8 +273,16 @@ impl Omm {
         let mean_motion = parse_f64_trimmed(&line2[52..63], "MEAN_MOTION")?;
         let rev_at_epoch = parse_u32_trimmed(&line2[63..68], "REV_AT_EPOCH")?;
 
-        let derived_object_id =
-            format_launch_designator_object_id(launch_year_2, launch_number, &line1[14..17]);
+        let derived_object_id = launch_designator
+            .as_ref()
+            .map(|v| {
+                format_launch_designator_object_id(
+                    v.launch_year_2,
+                    v.launch_number,
+                    &v.launch_piece,
+                )
+            })
+            .unwrap_or_else(|| "UNKNOWN".to_string());
 
         let object_name = options
             .object_name
@@ -366,6 +363,13 @@ struct LaunchDesignator {
     launch_piece: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParsedTleLaunchDesignator {
+    launch_year_2: u32,
+    launch_number: u32,
+    launch_piece: String,
+}
+
 const NS_PER_DAY: i128 = 86_400_000_000_000;
 
 fn require_tle_field<T: Copy>(value: Option<T>, field: &'static str) -> Result<T> {
@@ -425,14 +429,17 @@ fn validate_angle_for_tle(name: &'static str, value: f64, allow_wrap: bool) -> R
     Ok(())
 }
 
-fn parse_object_id_launch_designator(object_id: &str) -> Result<LaunchDesignator> {
+fn parse_object_id_launch_designator(object_id: &str) -> Result<Option<LaunchDesignator>> {
     let id = object_id.trim();
+    if id.is_empty() || id.eq_ignore_ascii_case("UNKNOWN") {
+        return Ok(None);
+    }
     let (year_str, rest) = id
         .split_once('-')
         .ok_or_else(|| ValidationError::InvalidValue {
             field: Cow::Borrowed("OBJECT_ID"),
             value: id.to_string(),
-            expected: Cow::Borrowed("YYYY-NNNPPP"),
+            expected: Cow::Borrowed("YYYY-NNN[PPP] or UNKNOWN"),
             line: None,
         })?;
 
@@ -440,16 +447,16 @@ fn parse_object_id_launch_designator(object_id: &str) -> Result<LaunchDesignator
         return Err(ValidationError::InvalidValue {
             field: Cow::Borrowed("OBJECT_ID"),
             value: id.to_string(),
-            expected: Cow::Borrowed("YYYY-NNNPPP (4-digit year)"),
+            expected: Cow::Borrowed("YYYY-NNN[PPP] (4-digit year)"),
             line: None,
         }
         .into());
     }
-    if rest.len() < 4 {
+    if rest.len() < 3 {
         return Err(ValidationError::InvalidValue {
             field: Cow::Borrowed("OBJECT_ID"),
             value: id.to_string(),
-            expected: Cow::Borrowed("YYYY-NNNPPP"),
+            expected: Cow::Borrowed("YYYY-NNN[PPP]"),
             line: None,
         }
         .into());
@@ -461,19 +468,18 @@ fn parse_object_id_launch_designator(object_id: &str) -> Result<LaunchDesignator
         return Err(ValidationError::InvalidValue {
             field: Cow::Borrowed("OBJECT_ID"),
             value: id.to_string(),
-            expected: Cow::Borrowed("YYYY-NNNPPP (3-digit launch number)"),
+            expected: Cow::Borrowed("YYYY-NNN[PPP] (3-digit launch number)"),
             line: None,
         }
         .into());
     }
-    if launch_piece_str.is_empty()
-        || launch_piece_str.len() > 3
-        || !launch_piece_str.chars().all(|c| c.is_ascii_uppercase())
+    if launch_piece_str.len() > 3
+        || !launch_piece_str.is_empty() && !launch_piece_str.chars().all(|c| c.is_ascii_uppercase())
     {
         return Err(ValidationError::InvalidValue {
             field: Cow::Borrowed("OBJECT_ID"),
             value: id.to_string(),
-            expected: Cow::Borrowed("YYYY-NNNPPP (piece is 1..=3 uppercase ASCII letters)"),
+            expected: Cow::Borrowed("YYYY-NNN[PPP] (piece is 0..=3 uppercase ASCII letters)"),
             line: None,
         }
         .into());
@@ -491,11 +497,61 @@ fn parse_object_id_launch_designator(object_id: &str) -> Result<LaunchDesignator
         .into());
     }
 
-    Ok(LaunchDesignator {
+    Ok(Some(LaunchDesignator {
         launch_year,
         launch_number,
         launch_piece: launch_piece_str.to_string(),
-    })
+    }))
+}
+
+fn parse_tle_launch_designator_fields(
+    launch_year_field: &str,
+    launch_number_field: &str,
+    launch_piece_field: &str,
+) -> Result<Option<ParsedTleLaunchDesignator>> {
+    let year_is_blank = launch_year_field.trim().is_empty();
+    let number_is_blank = launch_number_field.trim().is_empty();
+    let piece_trimmed = launch_piece_field.trim_end();
+    let piece_is_blank = piece_trimmed.is_empty();
+
+    if year_is_blank && number_is_blank && piece_is_blank {
+        return Ok(None);
+    }
+    if year_is_blank || number_is_blank {
+        return Err(ValidationError::InvalidValue {
+            field: Cow::Borrowed("LAUNCH_DESIGNATOR"),
+            value: format!(
+                "{}{}{}",
+                launch_year_field, launch_number_field, launch_piece_field
+            ),
+            expected: Cow::Borrowed(
+                "all launch-designator columns populated or all blank for unknown",
+            ),
+            line: None,
+        }
+        .into());
+    }
+
+    let launch_year_2 = parse_u32_strict(launch_year_field, "LAUNCH_YEAR")?;
+    let launch_number = parse_u32_strict(launch_number_field, "LAUNCH_NUMBER")?;
+
+    if !piece_trimmed.is_empty()
+        && (!piece_trimmed.chars().all(|c| c.is_ascii_uppercase()) || piece_trimmed.len() > 3)
+    {
+        return Err(ValidationError::InvalidValue {
+            field: Cow::Borrowed("LAUNCH_PIECE"),
+            value: piece_trimmed.to_string(),
+            expected: Cow::Borrowed("0..=3 uppercase ASCII letters"),
+            line: None,
+        }
+        .into());
+    }
+
+    Ok(Some(ParsedTleLaunchDesignator {
+        launch_year_2,
+        launch_number,
+        launch_piece: piece_trimmed.to_string(),
+    }))
 }
 
 fn normalize_tle_line_len(line: String, label: &'static str) -> Result<String> {
@@ -522,11 +578,17 @@ fn normalize_tle_input_line(line: &str, label: &'static str) -> Result<String> {
         }
         .into());
     }
+    if trimmed.len() == 68 {
+        // Some real-world feeds omit the checksum character. Accept and normalize by
+        // computing/appending checksum so downstream parsing remains deterministic.
+        let checksum = tle_checksum(trimmed);
+        return Ok(format!("{}{}", trimmed, checksum));
+    }
     if trimmed.len() != 69 {
         return Err(ValidationError::InvalidValue {
             field: Cow::Borrowed(label),
             value: trimmed.to_string(),
-            expected: Cow::Borrowed("exactly 69 characters including checksum"),
+            expected: Cow::Borrowed("exactly 68 (no checksum) or 69 (with checksum) characters"),
             line: None,
         }
         .into());
@@ -609,6 +671,91 @@ fn parse_u32_strict(s: &str, field: &'static str) -> Result<u32> {
         .into());
     }
     Ok(s.parse::<u32>()?)
+}
+
+fn alpha5_prefix_to_value(c: char) -> Option<u32> {
+    match c {
+        'A'..='H' => Some(10 + (c as u32 - 'A' as u32)),
+        'J'..='N' => Some(18 + (c as u32 - 'J' as u32)),
+        'P'..='Z' => Some(23 + (c as u32 - 'P' as u32)),
+        _ => None,
+    }
+}
+
+fn value_to_alpha5_prefix(value: u32) -> Option<char> {
+    match value {
+        10..=17 => Some(char::from_u32('A' as u32 + (value - 10)).expect("ASCII range")),
+        18..=22 => Some(char::from_u32('J' as u32 + (value - 18)).expect("ASCII range")),
+        23..=33 => Some(char::from_u32('P' as u32 + (value - 23)).expect("ASCII range")),
+        _ => None,
+    }
+}
+
+fn parse_tle_satellite_number(field: &str, name: &'static str) -> Result<u32> {
+    if field.chars().all(|c| c.is_ascii_digit()) {
+        return field.parse::<u32>().map_err(Into::into);
+    }
+
+    let bytes = field.as_bytes();
+    if bytes.len() == 5
+        && (bytes[0] as char).is_ascii_uppercase()
+        && field[1..].chars().all(|c| c.is_ascii_digit())
+    {
+        let prefix = alpha5_prefix_to_value(bytes[0] as char).ok_or_else(|| {
+            ValidationError::InvalidValue {
+                field: Cow::Borrowed(name),
+                value: field.to_string(),
+                expected: Cow::Borrowed(
+                    "5-digit number, right-aligned number, or Alpha-5 ID (A-Z excluding I/O)",
+                ),
+                line: None,
+            }
+        })?;
+        let suffix = field[1..].parse::<u32>()?;
+        return Ok(prefix * 10_000 + suffix);
+    }
+
+    let trimmed = field.trim();
+    if !trimmed.is_empty() && trimmed.chars().all(|c| c.is_ascii_digit()) {
+        return trimmed.parse::<u32>().map_err(Into::into);
+    }
+
+    Err(ValidationError::InvalidValue {
+        field: Cow::Borrowed(name),
+        value: field.to_string(),
+        expected: Cow::Borrowed(
+            "5-digit number, right-aligned number, or Alpha-5 ID (A-Z excluding I/O)",
+        ),
+        line: None,
+    }
+    .into())
+}
+
+fn format_tle_satellite_number(norad_cat_id: u32) -> Result<String> {
+    if norad_cat_id <= 99_999 {
+        return Ok(format!("{:05}", norad_cat_id));
+    }
+
+    if norad_cat_id > 339_999 {
+        return Err(ValidationError::OutOfRange {
+            name: Cow::Borrowed("NORAD_CAT_ID"),
+            value: norad_cat_id.to_string(),
+            expected: Cow::Borrowed("[0, 339999] encodable as TLE 5-char sat number"),
+            line: None,
+        }
+        .into());
+    }
+
+    let prefix = norad_cat_id / 10_000;
+    let suffix = norad_cat_id % 10_000;
+    let prefix_char =
+        value_to_alpha5_prefix(prefix).ok_or_else(|| ValidationError::OutOfRange {
+            name: Cow::Borrowed("NORAD_CAT_ID"),
+            value: norad_cat_id.to_string(),
+            expected: Cow::Borrowed("[0, 339999] with Alpha-5 prefix"),
+            line: None,
+        })?;
+    Ok(format!("{}{:04}", prefix_char, suffix))
 }
 
 fn parse_u32_trimmed(s: &str, field: &'static str) -> Result<u32> {

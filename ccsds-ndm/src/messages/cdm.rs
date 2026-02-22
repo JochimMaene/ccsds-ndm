@@ -217,6 +217,25 @@ impl crate::traits::Validate for CdmBody {
             }
             .into());
         }
+        let object1_count = self
+            .segments
+            .iter()
+            .filter(|s| s.metadata.object == CdmObjectType::Object1)
+            .count();
+        let object2_count = self
+            .segments
+            .iter()
+            .filter(|s| s.metadata.object == CdmObjectType::Object2)
+            .count();
+        if object1_count != 1 || object2_count != 1 {
+            return Err(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "CDM Body segments must contain exactly one OBJECT1 and one OBJECT2",
+                ),
+                line: None,
+            }
+            .into());
+        }
         self.relative_metadata_data.validate()?;
         for segment in &self.segments {
             segment.validate()?;
@@ -1964,6 +1983,13 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         cdm.body.segments.push(seg.clone());
         cdm.body.segments.push(seg); // Now 3
         assert_eq!(cdm.body.segments.len(), 3);
+        assert!(cdm.validate().is_err());
+    }
+
+    #[test]
+    fn test_cdm_validation_requires_object1_and_object2() {
+        let mut cdm = Cdm::from_kvn(&sample_cdm_kvn()).unwrap();
+        cdm.body.segments[1].metadata.object = CdmObjectType::Object1;
         assert!(cdm.validate().is_err());
     }
 }
