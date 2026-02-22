@@ -37,7 +37,7 @@ prek:
 
 # Install the Python bindings in development mode
 dev:
-    cd {{python_dir}} && uv run maturin develop
+    cd {{python_dir}} && uv run --with maturin maturin develop
 
 # Generate Python type stubs (.pyi)
 stubs:
