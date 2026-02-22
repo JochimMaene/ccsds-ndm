@@ -537,7 +537,7 @@ class AcmData:
     @property
     def ad(self) -> AcmAttitudeDetermination | None:
         """
-        A single optional attitude determination section.
+        A single attitude determination Data section.
         """
         ...
 

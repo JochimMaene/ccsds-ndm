@@ -784,7 +784,7 @@ impl AcmData {
         self.inner.man = value.into_iter().map(|m| m.inner).collect();
     }
 
-    /// A single optional attitude determination section.
+    /// A single attitude determination Data section.
     ///
     /// :type: AcmAttitudeDetermination | None
     #[getter]

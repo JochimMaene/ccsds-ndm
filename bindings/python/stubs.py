@@ -170,15 +170,24 @@ def _normalize_type_hint(raw: str) -> str:
         inner = _normalize_type_hint(tuple_match.group(1).strip())
         hint = f"tuple[{inner}]"
 
-    dict_match = re.match(r"^dict(?:ionary)? of (.+) to (.+)$", hint, flags=re.IGNORECASE)
+    dict_match = re.match(
+        r"^dict(?:ionary)? of (.+) to (.+)$", hint, flags=re.IGNORECASE
+    )
     if dict_match:
         key = _normalize_type_hint(dict_match.group(1).strip())
         value = _normalize_type_hint(dict_match.group(2).strip())
         hint = f"dict[{key}, {value}]"
 
-    hint = hint.replace("array-like", "numpy.ndarray").replace("array_like", "numpy.ndarray")
+    hint = hint.replace("array-like", "numpy.ndarray").replace(
+        "array_like", "numpy.ndarray"
+    )
 
-    if optional and "None" not in hint and not hint.startswith("Optional[") and "|" not in hint:
+    if (
+        optional
+        and "None" not in hint
+        and not hint.startswith("Optional[")
+        and "|" not in hint
+    ):
         hint = f"Optional[{hint}]"
 
     try:
@@ -278,12 +287,7 @@ def _split_signature_items(signature_inner: str) -> list[str]:
         elif char == "}":
             brace_depth -= 1
 
-        if (
-            char == ","
-            and paren_depth == 0
-            and bracket_depth == 0
-            and brace_depth == 0
-        ):
+        if char == "," and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
             items.append("".join(current).strip())
             current = []
         else:
@@ -503,7 +507,9 @@ def _generate_class(cls: type, indent: str) -> str:
                 init_sig = "(self)"
             else:
                 init_sig = f"(self, {init_sig[1:]}"
-        init_sig = _annotate_signature(init_sig, _extract_numpy_parameter_types(cls.__doc__))
+        init_sig = _annotate_signature(
+            init_sig, _extract_numpy_parameter_types(cls.__doc__)
+        )
         lines.extend(
             [
                 f"{inner_indent}def __init__{init_sig} -> None:",
@@ -526,7 +532,9 @@ def _generate_class(cls: type, indent: str) -> str:
                 )
             )
             continue
-        member_stubs.append(_generate_stub(member, inner_indent, owner_class=cls.__name__))
+        member_stubs.append(
+            _generate_stub(member, inner_indent, owner_class=cls.__name__)
+        )
 
     # Add members or ellipsis if empty
     if member_stubs:
