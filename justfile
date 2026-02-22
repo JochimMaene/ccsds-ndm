@@ -14,11 +14,11 @@ python_dir := "bindings/python"
 
 # Set up the Python development environment
 setup-dev:
-    uv sync --dev -p {{python_dir}}/pyproject.toml
+    cd {{python_dir}} && uv sync --dev
 
 # Set up the Python documentation environment
 setup-docs:
-    uv sync -p pyproject.toml
+    uv sync
 
 # Set up both the development and documentation environments
 setup: setup-dev setup-docs
