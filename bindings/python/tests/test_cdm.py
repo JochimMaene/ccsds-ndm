@@ -6,8 +6,6 @@
 Unit tests for Conjunction Data Message (CDM) Python bindings.
 """
 
-import pathlib
-
 import numpy as np
 import pytest
 from ccsds_ndm import (
@@ -21,13 +19,6 @@ from ccsds_ndm import (
     CdmStateVector,
     RelativeMetadataData,
 )
-
-
-def test_cdm():
-    cdm = Cdm.from_file(
-        str(pathlib.Path(__file__).parent / "cdm_spacetrack1.xml"), format="xml"
-    )
-    print(cdm)
 
 
 class TestCdm:
