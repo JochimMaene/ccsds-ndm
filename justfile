@@ -79,11 +79,11 @@ lint-rust:
 
 # Format the Python code
 fmt-python:
-    cd {{python_dir}} && uv run ruff format .
+    cd {{python_dir}} && uv run --with ruff ruff format .
 
 # Lint the Python code
 lint-python:
-    cd {{python_dir}} && uv run ruff check .
+    cd {{python_dir}} && uv run --with ruff ruff check .
 
 # Format both Rust and Python code
 fmt: fmt-rust fmt-python
