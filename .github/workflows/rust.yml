@@ -8,13 +8,19 @@ on:
       - "v*"
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@just
       - uses: Swatinem/rust-cache@v2
@@ -27,7 +33,7 @@ jobs:
     name: Linting - Format check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -38,23 +44,16 @@ jobs:
 
       - name: Linting
         run: just lint-rust
-
-
-
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest
     if: github.actor != 'dependabot[bot]'
-    env:
-      UV_PROJECT: ccsds-ndm
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
       - uses: taiki-e/install-action@just
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
       - name: Generate code coverage
         run: just coverage
       - name: Upload coverage to Codecov
@@ -68,7 +67,7 @@ jobs:
     name: Python Bindings Quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-python@v5
         with:
@@ -100,7 +99,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: rustfmt, clippy
