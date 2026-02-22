@@ -41,11 +41,11 @@ dev:
 
 # Generate Python type stubs (.pyi)
 stubs:
-    cd {{python_dir}} && uv run python stubs.py
+    cd {{python_dir}} && uv run --with ruff python stubs.py
 
 # Check if Python type stubs are up to date
 stubs-check:
-    cd {{python_dir}} && uv run python stubs.py --check
+    cd {{python_dir}} && uv run --with ruff python stubs.py --check
 
 # Sync docstrings from Rust to Python
 sync-docs:
