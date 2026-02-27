@@ -210,7 +210,7 @@ def collect_rust_structs(core_dir: Path) -> dict[str, RustStruct]:
     # Parse messages/*.rs
     messages_dir = core_dir / "messages"
     if messages_dir.exists():
-        for rs_file in messages_dir.glob("*.rs"):
+        for rs_file in sorted(messages_dir.glob("*.rs"), key=lambda p: p.name):
             if rs_file.name != "mod.rs":
                 all_structs.update(parse_rust_file(rs_file))
 
@@ -299,7 +299,7 @@ def collect_python_classes(binding_dir: Path) -> dict[str, PythonClass]:
     """Collect all Python classes from binding files."""
     all_classes: dict[str, PythonClass] = {}
 
-    for rs_file in binding_dir.glob("*.rs"):
+    for rs_file in sorted(binding_dir.glob("*.rs"), key=lambda p: p.name):
         if rs_file.name in ("lib.rs", "mod.rs"):
             continue
         classes = parse_python_binding_file(rs_file)
