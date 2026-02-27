@@ -487,9 +487,20 @@ impl ToKvn for OemData {
         for sv in &self.state_vector {
             sv.write_kvn(writer);
         }
-        for cov in &self.covariance_matrix {
+        if !self.covariance_matrix.is_empty() {
             writer.write_empty();
-            cov.write_kvn(writer);
+            writer.write_section("COVARIANCE_START");
+
+            // OEM comments are only permitted at the beginning of the covariance section.
+            for cov in &self.covariance_matrix {
+                writer.write_comments(&cov.comment);
+            }
+
+            for cov in &self.covariance_matrix {
+                cov.write_kvn_matrix_lines(writer, false);
+            }
+
+            writer.write_section("COVARIANCE_STOP");
         }
     }
 }
@@ -664,8 +675,15 @@ pub struct OemCovarianceMatrix {
 
 impl ToKvn for OemCovarianceMatrix {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_section("COVARIANCE_START");
-        writer.write_comments(&self.comment);
+        self.write_kvn_matrix_lines(writer, true);
+    }
+}
+
+impl OemCovarianceMatrix {
+    fn write_kvn_matrix_lines(&self, writer: &mut KvnWriter, write_comments: bool) {
+        if write_comments {
+            writer.write_comments(&self.comment);
+        }
         writer.write_pair("EPOCH", self.epoch);
         if let Some(rf) = &self.cov_ref_frame {
             writer.write_pair("COV_REF_FRAME", rf);
@@ -715,8 +733,6 @@ impl ToKvn for OemCovarianceMatrix {
         let _ = writer.write_str(b.format_finite(self.cz_dot_y_dot.value));
         let _ = writer.write_str(" ");
         writer.write_line(b.format_finite(self.cz_dot_z_dot.value));
-
-        writer.write_section("COVARIANCE_STOP");
     }
 }
 
@@ -937,6 +953,18 @@ COVARIANCE_STOP
             assert_eq!(seg1.metadata.object_name, seg2.metadata.object_name);
             assert_eq!(seg1.data.state_vector.len(), seg2.data.state_vector.len());
         }
+    }
+
+    #[test]
+    fn test_multiple_covariance_matrices_emit_single_covariance_block() {
+        let kvn = include_str!("../../../data/kvn/oem_g13.kvn");
+        let oem = Oem::from_kvn(kvn).expect("parse oem_g13");
+        assert_eq!(oem.body.segment[0].data.covariance_matrix.len(), 2);
+
+        let out = oem.to_kvn().expect("serialize oem_g13");
+        assert_eq!(out.matches("COVARIANCE_START").count(), 1);
+        assert_eq!(out.matches("COVARIANCE_STOP").count(), 1);
+        assert_eq!(out.matches("EPOCH").count(), 2);
     }
 
     #[test]
