@@ -51,7 +51,6 @@ build-backend = "maturin"
 features = ["pyo3/extension-module"]
 python-source = "."
 module-name = "ccsds_ndm"
-strip = true
 
 [tool.uv]
 # Rebuild package when any rust files change
