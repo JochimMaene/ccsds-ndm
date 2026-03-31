@@ -60,16 +60,20 @@ fn parse_kvn_kind(input: &mut &str) -> PResult<NdmKind> {
 
     // Check for CCSDS_..._VERS header
     alt((
-        "CCSDS_OPM_VERS".value(NdmKind::Opm),
-        "CCSDS_OMM_VERS".value(NdmKind::Omm),
-        "CCSDS_OEM_VERS".value(NdmKind::Oem),
-        "CCSDS_OCM_VERS".value(NdmKind::Ocm),
-        "CCSDS_ACM_VERS".value(NdmKind::Acm),
-        "CCSDS_CDM_VERS".value(NdmKind::Cdm),
-        "CCSDS_TDM_VERS".value(NdmKind::Tdm),
-        "CCSDS_RDM_VERS".value(NdmKind::Rdm),
-        "CCSDS_AEM_VERS".value(NdmKind::Aem),
-        "CCSDS_APM_VERS".value(NdmKind::Apm),
+        alt((
+            "CCSDS_OPM_VERS".value(NdmKind::Opm),
+            "CCSDS_OMM_VERS".value(NdmKind::Omm),
+            "CCSDS_OEM_VERS".value(NdmKind::Oem),
+            "CCSDS_OCM_VERS".value(NdmKind::Ocm),
+            "CCSDS_ACM_VERS".value(NdmKind::Acm),
+        )),
+        alt((
+            "CCSDS_CDM_VERS".value(NdmKind::Cdm),
+            "CCSDS_TDM_VERS".value(NdmKind::Tdm),
+            "CCSDS_RDM_VERS".value(NdmKind::Rdm),
+            "CCSDS_AEM_VERS".value(NdmKind::Aem),
+            "CCSDS_APM_VERS".value(NdmKind::Apm),
+        )),
     ))
     .parse_next(input)
 }
