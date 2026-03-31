@@ -136,7 +136,7 @@ bench-run:
 
 # Build the Python bindings
 build:
-    cd {{python_dir}} && uv run maturin build --release --out ../../dist
+    cd {{python_dir}} && uv run maturin build --release --strip --out ../../dist
 
 # Build the documentation
 docs:
