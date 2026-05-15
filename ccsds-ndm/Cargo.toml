@@ -15,7 +15,7 @@ documentation = "https://docs.rs/ccsds-ndm"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
-quick-xml = { version = "0.39", features = ["serialize"] }
+quick-xml = { version = "0.40", features = ["serialize"] }
 winnow = "1.0.0"
 zmij = "1.0.14"
 fast-float = "0.2"
