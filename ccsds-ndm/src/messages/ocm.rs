@@ -6,7 +6,9 @@ use crate::common::OdmHeader;
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn, Validate};
+#[cfg(test)]
+use crate::traits::Validate;
+use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use fast_float;
 use serde::{Deserialize, Serialize};
@@ -53,10 +55,26 @@ impl crate::traits::Validate for Ocm {
         self.header.validate()?;
         self.body.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::collect_message_validation_errors(
+            crate::validation::MessageKind::Ocm,
+            &self.id,
+            &self.version,
+            &self.header,
+            &self.body,
+        )
+    }
 }
 
 impl Ndm for Ocm {
     fn to_kvn(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Ocm,
+            &self.version,
+            crate::generation::OutputFormat::Kvn,
+            self,
+        )?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
@@ -69,7 +87,12 @@ impl Ndm for Ocm {
     }
 
     fn to_xml(&self) -> Result<String> {
-        self.validate()?;
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Ocm,
+            &self.version,
+            crate::generation::OutputFormat::Xml,
+            self,
+        )?;
         crate::xml::to_string(self)
     }
 
@@ -79,6 +102,8 @@ impl Ndm for Ocm {
         Ok(ocm)
     }
 }
+
+crate::impl_versioned_ndm!(Ocm, Ocm);
 
 impl Ocm {
     // No inherent validate() anymore
@@ -96,6 +121,12 @@ impl crate::traits::Validate for OcmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate_with_metadata(&self.metadata)
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = self.metadata.validation_errors()?;
+        errors.extend(self.data.validation_errors()?);
+        Ok(errors)
     }
 }
 
@@ -127,6 +158,36 @@ impl crate::traits::Validate for OcmData {
         }
         OcmTrajState::validate_all(&self.traj)?;
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        for trajectory in &self.traj {
+            crate::validation::collect_validation_result(&mut errors, trajectory.validate())?;
+        }
+        if let Some(physical) = &self.phys {
+            crate::validation::collect_validation_result(&mut errors, physical.validate())?;
+        }
+        for covariance in &self.cov {
+            crate::validation::collect_validation_result(&mut errors, covariance.validate())?;
+        }
+        for maneuver in &self.man {
+            crate::validation::collect_validation_result(&mut errors, maneuver.validate())?;
+        }
+        if let Some(perturbations) = &self.pert {
+            crate::validation::collect_validation_result(&mut errors, perturbations.validate())?;
+        }
+        if let Some(orbit_determination) = &self.od {
+            crate::validation::collect_validation_result(
+                &mut errors,
+                orbit_determination.validate(),
+            )?;
+        }
+        crate::validation::collect_validation_result(
+            &mut errors,
+            OcmTrajState::validate_all(&self.traj),
+        )?;
+        Ok(errors)
     }
 }
 
@@ -390,6 +451,10 @@ pub struct OcmBody {
 impl crate::traits::Validate for OcmBody {
     fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self.segment.as_ref())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        self.segment.validation_errors()
     }
 }
 
@@ -1068,6 +1133,16 @@ impl crate::traits::Validate for OcmMetadata {
             .into());
         }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "OCM Metadata",
+            [
+                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
+                ("EPOCH_TZERO", self.epoch_tzero.is_empty()),
+            ],
+        ))
     }
 }
 

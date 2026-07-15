@@ -5,7 +5,9 @@
 use crate::error::{CcsdsNdmError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn, Validate};
+#[cfg(test)]
+use crate::traits::Validate;
+use crate::traits::{Ndm, ToKvn};
 use crate::types::{
     Epoch, Percentage, TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath,
     TdmRangeMode, TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
@@ -57,10 +59,26 @@ impl crate::traits::Validate for Tdm {
         self.header.validate()?;
         self.body.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::collect_message_validation_errors(
+            crate::validation::MessageKind::Tdm,
+            &self.id,
+            &self.version,
+            &self.header,
+            &self.body,
+        )
+    }
 }
 
 impl Ndm for Tdm {
     fn to_kvn(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Tdm,
+            &self.version,
+            crate::generation::OutputFormat::Kvn,
+            self,
+        )?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
@@ -73,13 +91,18 @@ impl Ndm for Tdm {
     }
 
     fn to_xml(&self) -> Result<String> {
-        self.validate()?;
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Tdm,
+            &self.version,
+            crate::generation::OutputFormat::Xml,
+            self,
+        )?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
         if crate::validation::current_mode() == crate::validation::ValidationMode::Strict
-            || crate::validation::current_mode() == crate::validation::ValidationMode::Lenient
+            || crate::validation::current_mode() == crate::validation::ValidationMode::Permissive
         {
             if let Err(err) = validate_tdm_xml_metadata(xml) {
                 crate::validation::handle_validation_error(
@@ -93,6 +116,8 @@ impl Ndm for Tdm {
         Ok(tdm)
     }
 }
+
+crate::impl_versioned_ndm!(Tdm, Tdm);
 
 impl ToKvn for Tdm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
@@ -169,6 +194,16 @@ impl crate::traits::Validate for TdmHeader {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "TDM Header",
+            [
+                ("CREATION_DATE", self.creation_date.is_empty()),
+                ("ORIGINATOR", self.originator.trim().is_empty()),
+            ],
+        ))
+    }
 }
 
 impl ToKvn for TdmHeader {
@@ -209,6 +244,21 @@ impl crate::traits::Validate for TdmBody {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        if self.segments.is_empty() {
+            errors.push(ValidationError::MissingRequiredField {
+                block: "TDM Body".into(),
+                field: "segment (at least one required)".into(),
+                line: None,
+            });
+        }
+        for segment in &self.segments {
+            errors.extend(segment.validation_errors()?);
+        }
+        Ok(errors)
+    }
 }
 
 impl ToKvn for TdmBody {
@@ -231,6 +281,12 @@ impl crate::traits::Validate for TdmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate()
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = self.metadata.validation_errors()?;
+        errors.extend(self.data.validation_errors()?);
+        Ok(errors)
     }
 }
 
@@ -409,6 +465,46 @@ pub struct TdmMetadata {
         with = "crate::utils::nullable"
     )]
     pub path_2: Option<TdmPath>,
+    /// Unique name of the external ephemeris file used for participant 1.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    #[builder(into)]
+    pub ephemeris_name_1: Option<String>,
+    /// Unique name of the external ephemeris file used for participant 2.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    #[builder(into)]
+    pub ephemeris_name_2: Option<String>,
+    /// Unique name of the external ephemeris file used for participant 3.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    #[builder(into)]
+    pub ephemeris_name_3: Option<String>,
+    /// Unique name of the external ephemeris file used for participant 4.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    #[builder(into)]
+    pub ephemeris_name_4: Option<String>,
+    /// Unique name of the external ephemeris file used for participant 5.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    #[builder(into)]
+    pub ephemeris_name_5: Option<String>,
     /// The TRANSMIT_BAND keyword shall indicate the frequency band for transmitted
     /// frequencies. The frequency ranges associated with each band should be specified in the
     /// ICD.
@@ -854,56 +950,6 @@ pub struct TdmMetadata {
         with = "crate::utils::nullable"
     )]
     pub corrections_applied: Option<YesNo>,
-    /// Unique name of the external ephemeris file used for participant 1.
-    ///
-    /// Examples: SATELLITE_A_EPHEM27
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
-    #[builder(into)]
-    pub ephemeris_name_1: Option<String>,
-    /// Unique name of the external ephemeris file used for participant 2.
-    ///
-    /// Examples: SATELLITE_A_EPHEM27
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
-    #[builder(into)]
-    pub ephemeris_name_2: Option<String>,
-    /// Unique name of the external ephemeris file used for participant 3.
-    ///
-    /// Examples: SATELLITE_A_EPHEMERIS
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
-    #[builder(into)]
-    pub ephemeris_name_3: Option<String>,
-    /// Unique name of the external ephemeris file used for participant 4.
-    ///
-    /// Examples: SATELLITE_A_EPHEMERIS
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
-    #[builder(into)]
-    pub ephemeris_name_4: Option<String>,
-    /// Unique name of the external ephemeris file used for participant 5.
-    ///
-    /// Examples: SATELLITE_A_EPHEMERIS
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
-    #[builder(into)]
-    pub ephemeris_name_5: Option<String>,
 }
 
 impl crate::traits::Validate for TdmMetadata {
@@ -1019,6 +1065,101 @@ impl crate::traits::Validate for TdmMetadata {
             .into());
         }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "TDM Metadata",
+            [
+                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
+                ("PARTICIPANT_1", self.participant_1.trim().is_empty()),
+            ],
+        );
+        if self.path.is_some() && (self.path_1.is_some() || self.path_2.is_some()) {
+            errors.push(ValidationError::Generic {
+                message: Cow::Borrowed("TDM Metadata cannot have both PATH and PATH_1/PATH_2"),
+                line: None,
+            });
+        }
+        if (self.path_1.is_some() && self.path_2.is_none())
+            || (self.path_1.is_none() && self.path_2.is_some())
+        {
+            errors.push(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "TDM Metadata must have both PATH_1 and PATH_2 if one is present",
+                ),
+                line: None,
+            });
+        }
+        match self.mode {
+            Some(TdmMode::Sequential) => {
+                if self.path.is_none() {
+                    errors.push(ValidationError::MissingRequiredField {
+                        block: "TDM Metadata".into(),
+                        field: "PATH (required when MODE=SEQUENTIAL)".into(),
+                        line: None,
+                    });
+                }
+                if self.path_1.is_some() || self.path_2.is_some() {
+                    errors.push(ValidationError::Generic {
+                        message: Cow::Borrowed(
+                            "TDM Metadata cannot use PATH_1/PATH_2 when MODE=SEQUENTIAL",
+                        ),
+                        line: None,
+                    });
+                }
+            }
+            Some(TdmMode::SingleDiff) => {
+                if self.path.is_some() {
+                    errors.push(ValidationError::Generic {
+                        message: Cow::Borrowed(
+                            "TDM Metadata cannot use PATH when MODE=SINGLE_DIFF",
+                        ),
+                        line: None,
+                    });
+                }
+                if self.path_1.is_none() || self.path_2.is_none() {
+                    errors.push(ValidationError::MissingRequiredField {
+                        block: "TDM Metadata".into(),
+                        field: "PATH_1 and PATH_2 (required when MODE=SINGLE_DIFF)".into(),
+                        line: None,
+                    });
+                }
+            }
+            None => {}
+        }
+        if self.angle_type == Some(TdmAngleType::Radec) && self.reference_frame.is_none() {
+            errors.push(ValidationError::MissingRequiredField {
+                block: "TDM Metadata".into(),
+                field: "REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)".into(),
+                line: None,
+            });
+        }
+        if self.interpolation.is_some() && self.interpolation_degree.is_none() {
+            errors.push(ValidationError::MissingRequiredField {
+                block: "TDM Metadata".into(),
+                field: "INTERPOLATION_DEGREE (required when INTERPOLATION is used)".into(),
+                line: None,
+            });
+        }
+        let has_correction = self.correction_angle_1.is_some()
+            || self.correction_angle_2.is_some()
+            || self.correction_doppler.is_some()
+            || self.correction_mag.is_some()
+            || self.correction_range.is_some()
+            || self.correction_rcs.is_some()
+            || self.correction_receive.is_some()
+            || self.correction_transmit.is_some()
+            || self.correction_aberration_yearly.is_some()
+            || self.correction_aberration_diurnal.is_some();
+        if has_correction && self.corrections_applied.is_none() {
+            errors.push(ValidationError::MissingRequiredField {
+                block: "TDM Metadata".into(),
+                field: "CORRECTIONS_APPLIED (required when CORRECTION_* keywords are used)".into(),
+                line: None,
+            });
+        }
+        Ok(errors)
     }
 }
 
@@ -1355,7 +1496,24 @@ impl crate::traits::Validate for TdmData {
             }
             .into());
         }
+        for observation in &self.observations {
+            observation.data.validate()?;
+        }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "TDM Data",
+            [(
+                "observation (at least one required)",
+                self.observations.is_empty(),
+            )],
+        );
+        for observation in &self.observations {
+            errors.extend(observation.data.validation_errors());
+        }
+        Ok(errors)
     }
 }
 
@@ -1788,6 +1946,79 @@ pub enum TdmObservationData {
 }
 
 impl TdmObservationData {
+    fn value(&self) -> f64 {
+        match self {
+            Self::Rhumidity(value) => value.value,
+            Self::Angle1(value)
+            | Self::Angle2(value)
+            | Self::CarrierPower(value)
+            | Self::ClockBias(value)
+            | Self::ClockDrift(value)
+            | Self::DopplerCount(value)
+            | Self::DopplerInstantaneous(value)
+            | Self::DopplerIntegrated(value)
+            | Self::Dor(value)
+            | Self::Mag(value)
+            | Self::PcN0(value)
+            | Self::PrN0(value)
+            | Self::Pressure(value)
+            | Self::Range(value)
+            | Self::Rcs(value)
+            | Self::ReceiveFreq(value)
+            | Self::ReceiveFreq1(value)
+            | Self::ReceiveFreq2(value)
+            | Self::ReceiveFreq3(value)
+            | Self::ReceiveFreq4(value)
+            | Self::ReceiveFreq5(value)
+            | Self::ReceivePhaseCt1(value)
+            | Self::ReceivePhaseCt2(value)
+            | Self::ReceivePhaseCt3(value)
+            | Self::ReceivePhaseCt4(value)
+            | Self::ReceivePhaseCt5(value)
+            | Self::Stec(value)
+            | Self::Temperature(value)
+            | Self::TransmitFreq1(value)
+            | Self::TransmitFreq2(value)
+            | Self::TransmitFreq3(value)
+            | Self::TransmitFreq4(value)
+            | Self::TransmitFreq5(value)
+            | Self::TransmitFreqRate1(value)
+            | Self::TransmitFreqRate2(value)
+            | Self::TransmitFreqRate3(value)
+            | Self::TransmitFreqRate4(value)
+            | Self::TransmitFreqRate5(value)
+            | Self::TransmitPhaseCt1(value)
+            | Self::TransmitPhaseCt2(value)
+            | Self::TransmitPhaseCt3(value)
+            | Self::TransmitPhaseCt4(value)
+            | Self::TransmitPhaseCt5(value)
+            | Self::TropoDry(value)
+            | Self::TropoWet(value)
+            | Self::VlbiDelay(value) => *value,
+        }
+    }
+
+    fn validation_errors(&self) -> Vec<ValidationError> {
+        let value = self.value();
+        if value.is_finite() {
+            Vec::new()
+        } else {
+            vec![ValidationError::InvalidValue {
+                field: self.key().into(),
+                value: value.to_string(),
+                expected: "a finite number".into(),
+                line: None,
+            }]
+        }
+    }
+
+    fn validate(&self) -> Result<()> {
+        match self.validation_errors().into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
+    }
+
     pub fn key(&self) -> &'static str {
         match self {
             Self::Angle1(_) => "ANGLE_1",

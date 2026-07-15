@@ -433,14 +433,10 @@ DRAG_COEFF = 2.5
         let bad_version = MINIMAL_OPM.replacen("CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = BAD", 1);
         let err = Opm::from_kvn(&bad_version).unwrap_err();
         match err {
-            crate::error::CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
-                crate::error::ValidationError::InvalidValue { field, value, .. } => {
-                    assert_eq!(field, "version");
-                    assert_eq!(value, "BAD");
-                }
-                _ => panic!("Expected Validation error, got {:?}", boxed_err),
-            },
-            _ => panic!("Expected Validation error, got {:?}", err),
+            crate::error::CcsdsNdmError::UnsupportedInputVersion { version, .. } => {
+                assert_eq!(version, "BAD");
+            }
+            _ => panic!("Expected unsupported input version, got {:?}", err),
         }
 
         // Metadata errors

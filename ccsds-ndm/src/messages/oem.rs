@@ -6,13 +6,15 @@ use crate::common::{OdmHeader, StateVectorAcc};
 use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn, Validate};
+use crate::traits::{Ndm, ToKvn};
 use crate::types::{
     Epoch, InterpolationDegree, PositionCovariance, PositionVelocityCovariance, VelocityCovariance,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 
+#[cfg(test)]
+use crate::traits::Validate;
 #[cfg(test)]
 use std::num::NonZeroU32;
 
@@ -60,6 +62,16 @@ impl crate::traits::Validate for Oem {
         self.header.validate()?;
         self.body.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        crate::validation::collect_message_validation_errors(
+            crate::validation::MessageKind::Oem,
+            &self.id,
+            &self.version,
+            &self.header,
+            &self.body,
+        )
+    }
 }
 
 impl crate::traits::Validate for OemBody {
@@ -95,12 +107,49 @@ impl crate::traits::Validate for OemBody {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        let mut errors = Vec::new();
+        if self.segment.is_empty() {
+            errors.push(crate::error::ValidationError::MissingRequiredField {
+                block: "OEM Body".into(),
+                field: "segment (at least one required)".into(),
+                line: None,
+            });
+        }
+        if let Some(first) = self.segment.first() {
+            let time_system = &first.metadata.time_system;
+            for segment in &self.segment[1..] {
+                if segment.metadata.time_system != *time_system {
+                    errors.push(crate::error::ValidationError::InvalidValue {
+                        field: "TIME_SYSTEM".into(),
+                        value: segment.metadata.time_system.clone(),
+                        expected: format!(
+                            "consistent TIME_SYSTEM across OEM segments (expected {time_system})"
+                        )
+                        .into(),
+                        line: None,
+                    });
+                }
+            }
+        }
+        for segment in &self.segment {
+            errors.extend(segment.validation_errors()?);
+        }
+        Ok(errors)
+    }
 }
 
 impl crate::traits::Validate for OemSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate()
+    }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        let mut errors = self.metadata.validation_errors()?;
+        errors.extend(self.data.validation_errors()?);
+        Ok(errors)
     }
 }
 
@@ -156,6 +205,23 @@ impl crate::traits::Validate for OemMetadata {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "OEM Metadata",
+            [
+                ("OBJECT_NAME", self.object_name.trim().is_empty()),
+                ("OBJECT_ID", self.object_id.trim().is_empty()),
+                ("CENTER_NAME", self.center_name.trim().is_empty()),
+                ("REF_FRAME", self.ref_frame.trim().is_empty()),
+                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
+                (
+                    "INTERPOLATION_DEGREE (required when INTERPOLATION is present)",
+                    self.interpolation.is_some() && self.interpolation_degree.is_none(),
+                ),
+            ],
+        ))
+    }
 }
 
 impl crate::traits::Validate for OemData {
@@ -168,12 +234,41 @@ impl crate::traits::Validate for OemData {
             }
             .into());
         }
+        for state_vector in &self.state_vector {
+            state_vector.validate()?;
+        }
+        for covariance in &self.covariance_matrix {
+            covariance.validate()?;
+        }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "OEM Data",
+            [(
+                "stateVector (at least one required)",
+                self.state_vector.is_empty(),
+            )],
+        );
+        for state_vector in &self.state_vector {
+            errors.extend(state_vector.validation_errors()?);
+        }
+        for covariance in &self.covariance_matrix {
+            errors.extend(covariance.validation_errors()?);
+        }
+        Ok(errors)
     }
 }
 
 impl Ndm for Oem {
     fn to_kvn(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Oem,
+            &self.version,
+            crate::generation::OutputFormat::Kvn,
+            self,
+        )?;
         // Estimate capacity: header + (metadata + state vectors + covariance) for each segment
         let mut total_records = 0;
         for seg in &self.body.segment {
@@ -193,7 +288,12 @@ impl Ndm for Oem {
     }
 
     fn to_xml(&self) -> Result<String> {
-        self.validate()?;
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Oem,
+            &self.version,
+            crate::generation::OutputFormat::Xml,
+            self,
+        )?;
         crate::xml::to_string(self)
     }
 
@@ -203,6 +303,8 @@ impl Ndm for Oem {
         Ok(oem)
     }
 }
+
+crate::impl_versioned_ndm!(Oem, Oem);
 
 impl ToKvn for Oem {
     fn write_kvn(&self, writer: &mut KvnWriter) {
@@ -679,7 +781,66 @@ impl ToKvn for OemCovarianceMatrix {
     }
 }
 
+impl crate::traits::Validate for OemCovarianceMatrix {
+    fn validate(&self) -> Result<()> {
+        for (field, value) in self.values() {
+            if !value.is_finite() {
+                return Err(crate::error::ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        Ok(self
+            .values()
+            .into_iter()
+            .filter(|(_, value)| !value.is_finite())
+            .map(
+                |(field, value)| crate::error::ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                },
+            )
+            .collect())
+    }
+}
+
 impl OemCovarianceMatrix {
+    fn values(&self) -> [(&'static str, f64); 21] {
+        [
+            ("CX_X", self.cx_x.value),
+            ("CY_X", self.cy_x.value),
+            ("CY_Y", self.cy_y.value),
+            ("CZ_X", self.cz_x.value),
+            ("CZ_Y", self.cz_y.value),
+            ("CZ_Z", self.cz_z.value),
+            ("CX_DOT_X", self.cx_dot_x.value),
+            ("CX_DOT_Y", self.cx_dot_y.value),
+            ("CX_DOT_Z", self.cx_dot_z.value),
+            ("CX_DOT_X_DOT", self.cx_dot_x_dot.value),
+            ("CY_DOT_X", self.cy_dot_x.value),
+            ("CY_DOT_Y", self.cy_dot_y.value),
+            ("CY_DOT_Z", self.cy_dot_z.value),
+            ("CY_DOT_X_DOT", self.cy_dot_x_dot.value),
+            ("CY_DOT_Y_DOT", self.cy_dot_y_dot.value),
+            ("CZ_DOT_X", self.cz_dot_x.value),
+            ("CZ_DOT_Y", self.cz_dot_y.value),
+            ("CZ_DOT_Z", self.cz_dot_z.value),
+            ("CZ_DOT_X_DOT", self.cz_dot_x_dot.value),
+            ("CZ_DOT_Y_DOT", self.cz_dot_y_dot.value),
+            ("CZ_DOT_Z_DOT", self.cz_dot_z_dot.value),
+        ]
+    }
+
     fn write_kvn_matrix_lines(&self, writer: &mut KvnWriter, write_comments: bool) {
         if write_comments {
             writer.write_comments(&self.comment);
@@ -692,47 +853,47 @@ impl OemCovarianceMatrix {
         let mut b = zmij::Buffer::new();
 
         // Lower triangular formatting strict compliance (1, 2, 3, 4, 5, 6 items per line)
-        writer.write_line(b.format_finite(self.cx_x.value));
+        writer.write_line(b.format(self.cx_x.value));
 
-        let _ = writer.write_str(b.format_finite(self.cy_x.value));
+        let _ = writer.write_str(b.format(self.cy_x.value));
         let _ = writer.write_str(" ");
-        writer.write_line(b.format_finite(self.cy_y.value));
+        writer.write_line(b.format(self.cy_y.value));
 
-        let _ = writer.write_str(b.format_finite(self.cz_x.value));
+        let _ = writer.write_str(b.format(self.cz_x.value));
         let _ = writer.write_str(" ");
-        let _ = writer.write_str(b.format_finite(self.cz_y.value));
+        let _ = writer.write_str(b.format(self.cz_y.value));
         let _ = writer.write_str(" ");
-        writer.write_line(b.format_finite(self.cz_z.value));
+        writer.write_line(b.format(self.cz_z.value));
 
-        let _ = writer.write_str(b.format_finite(self.cx_dot_x.value));
+        let _ = writer.write_str(b.format(self.cx_dot_x.value));
         let _ = writer.write_str(" ");
-        let _ = writer.write_str(b.format_finite(self.cx_dot_y.value));
+        let _ = writer.write_str(b.format(self.cx_dot_y.value));
         let _ = writer.write_str(" ");
-        let _ = writer.write_str(b.format_finite(self.cx_dot_z.value));
+        let _ = writer.write_str(b.format(self.cx_dot_z.value));
         let _ = writer.write_str(" ");
-        writer.write_line(b.format_finite(self.cx_dot_x_dot.value));
+        writer.write_line(b.format(self.cx_dot_x_dot.value));
 
-        let _ = writer.write_str(b.format_finite(self.cy_dot_x.value));
+        let _ = writer.write_str(b.format(self.cy_dot_x.value));
         let _ = writer.write_str(" ");
-        let _ = writer.write_str(b.format_finite(self.cy_dot_y.value));
+        let _ = writer.write_str(b.format(self.cy_dot_y.value));
         let _ = writer.write_str(" ");
-        let _ = writer.write_str(b.format_finite(self.cy_dot_z.value));
+        let _ = writer.write_str(b.format(self.cy_dot_z.value));
         let _ = writer.write_str(" ");
-        let _ = writer.write_str(b.format_finite(self.cy_dot_x_dot.value));
+        let _ = writer.write_str(b.format(self.cy_dot_x_dot.value));
         let _ = writer.write_str(" ");
-        writer.write_line(b.format_finite(self.cy_dot_y_dot.value));
+        writer.write_line(b.format(self.cy_dot_y_dot.value));
 
-        let _ = writer.write_str(b.format_finite(self.cz_dot_x.value));
+        let _ = writer.write_str(b.format(self.cz_dot_x.value));
         let _ = writer.write_str(" ");
-        let _ = writer.write_str(b.format_finite(self.cz_dot_y.value));
+        let _ = writer.write_str(b.format(self.cz_dot_y.value));
         let _ = writer.write_str(" ");
-        let _ = writer.write_str(b.format_finite(self.cz_dot_z.value));
+        let _ = writer.write_str(b.format(self.cz_dot_z.value));
         let _ = writer.write_str(" ");
-        let _ = writer.write_str(b.format_finite(self.cz_dot_x_dot.value));
+        let _ = writer.write_str(b.format(self.cz_dot_x_dot.value));
         let _ = writer.write_str(" ");
-        let _ = writer.write_str(b.format_finite(self.cz_dot_y_dot.value));
+        let _ = writer.write_str(b.format(self.cz_dot_y_dot.value));
         let _ = writer.write_str(" ");
-        writer.write_line(b.format_finite(self.cz_dot_z_dot.value));
+        writer.write_line(b.format(self.cz_dot_z_dot.value));
     }
 }
 

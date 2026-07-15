@@ -342,6 +342,27 @@ pub enum CcsdsNdmError {
     #[error("Unsupported message type: {0}")]
     UnsupportedMessage(String),
 
+    /// Error for a CCSDS edition that this library cannot interpret safely.
+    #[error(
+        "Unsupported input version {version} for {message_type}; supported versions: {supported}"
+    )]
+    UnsupportedInputVersion {
+        message_type: &'static str,
+        version: String,
+        supported: String,
+    },
+
+    /// Error for a CCSDS edition that has no conforming writer implementation.
+    #[error(
+        "Unsupported {format} output version {version} for {message_type}; supported versions: {supported}"
+    )]
+    UnsupportedOutputVersion {
+        message_type: &'static str,
+        format: &'static str,
+        version: String,
+        supported: String,
+    },
+
     /// Error when an unexpected end of input is reached.
     #[error("Unexpected end of input: {context}")]
     UnexpectedEof { context: String },

@@ -8,7 +8,7 @@ use crate::error::{Result, ValidationError};
 use crate::kvn::parser::KvnResult;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn, Validate};
+use crate::traits::{Ndm, ToKvn};
 use crate::types::SensorNoise;
 use crate::types::*;
 use serde::{Deserialize, Serialize};
@@ -54,10 +54,26 @@ impl crate::traits::Validate for Acm {
         self.header.validate()?;
         self.body.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::collect_message_validation_errors(
+            crate::validation::MessageKind::Acm,
+            &self.id,
+            &self.version,
+            &self.header,
+            &self.body,
+        )
+    }
 }
 
 impl Ndm for Acm {
     fn to_kvn(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Acm,
+            &self.version,
+            crate::generation::OutputFormat::Kvn,
+            self,
+        )?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
@@ -70,7 +86,12 @@ impl Ndm for Acm {
     }
 
     fn to_xml(&self) -> Result<String> {
-        self.validate()?;
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Acm,
+            &self.version,
+            crate::generation::OutputFormat::Xml,
+            self,
+        )?;
         crate::xml::to_string(self)
     }
 
@@ -80,6 +101,8 @@ impl Ndm for Acm {
         Ok(acm)
     }
 }
+
+crate::impl_versioned_ndm!(Acm, Acm);
 
 impl ToKvn for Acm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
@@ -103,6 +126,10 @@ impl crate::traits::Validate for AcmBody {
     fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self.segment.as_ref())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        self.segment.validation_errors()
+    }
 }
 
 impl ToKvn for AcmBody {
@@ -121,6 +148,12 @@ impl crate::traits::Validate for AcmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate_with_metadata(&self.metadata)
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = self.metadata.validation_errors()?;
+        errors.extend(self.data.validation_errors()?);
+        Ok(errors)
     }
 }
 
@@ -429,6 +462,17 @@ impl crate::traits::Validate for AcmMetadata {
     fn validate(&self) -> Result<()> {
         self.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "ACM Metadata",
+            [
+                ("OBJECT_NAME", self.object_name.trim().is_empty()),
+                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
+                ("EPOCH_TZERO", self.epoch_tzero.is_empty()),
+            ],
+        ))
+    }
 }
 
 impl ToKvn for AcmMetadata {
@@ -563,6 +607,26 @@ impl crate::traits::Validate for AcmData {
             man.validate()?;
         }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        for attitude in &self.att {
+            crate::validation::collect_validation_result(&mut errors, attitude.validate())?;
+        }
+        if let Some(physical) = &self.phys {
+            crate::validation::collect_validation_result(&mut errors, physical.validate())?;
+        }
+        for covariance in &self.cov {
+            crate::validation::collect_validation_result(&mut errors, covariance.validate())?;
+        }
+        if let Some(determination) = &self.ad {
+            crate::validation::collect_validation_result(&mut errors, determination.validate())?;
+        }
+        for maneuver in &self.man {
+            crate::validation::collect_validation_result(&mut errors, maneuver.validate())?;
+        }
+        Ok(errors)
     }
 }
 
@@ -1652,7 +1716,7 @@ pub struct AcmAttitudeDetermination {
     /// Sensor data blocks.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(rename = "sensor", default)]
+    #[serde(rename = "sensorData", default)]
     pub sensors: Vec<AcmSensor>,
 }
 

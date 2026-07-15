@@ -7,8 +7,9 @@
 //! This module defines the primary traits used for parsing and serializing
 //! NDM messages in both KVN and XML formats.
 
-use crate::error::Result;
+use crate::error::{Result, ValidationError};
 use crate::kvn::ser::KvnWriter;
+use crate::options::{ParseMode, ParseReport};
 
 /// Core trait for NDM message types.
 ///
@@ -40,6 +41,14 @@ pub trait Validate {
     fn validate(&self) -> Result<()> {
         Ok(())
     }
+
+    /// Return every semantic validation error found on the object.
+    ///
+    /// Strict parsing and generation use [`Validate::validate`] to fail fast. Permissive parsing
+    /// uses this method to produce a complete audit trail. Implementations must explicitly define
+    /// exhaustive reporting so adding new validation rules cannot silently fall back to returning
+    /// only the first error.
+    fn validation_errors(&self) -> Result<Vec<ValidationError>>;
 }
 
 /// Core trait for NDM message types.
@@ -74,6 +83,11 @@ pub trait Ndm: Sized + serde::Serialize + Validate {
     /// * `kvn` - The KVN content as a string
     fn from_kvn(kvn: &str) -> Result<Self>;
 
+    /// Parse KVN with an explicit compliance mode.
+    fn from_kvn_with_mode(kvn: &str, mode: ParseMode) -> Result<ParseReport<Self>> {
+        crate::options::parse_with_mode(mode, || Self::from_kvn(kvn))
+    }
+
     /// Serialize the message to XML format.
     ///
     /// # Returns
@@ -87,6 +101,11 @@ pub trait Ndm: Sized + serde::Serialize + Validate {
     ///
     /// * `xml` - The XML content as a string
     fn from_xml(xml: &str) -> Result<Self>;
+
+    /// Parse XML with an explicit compliance mode.
+    fn from_xml_with_mode(xml: &str, mode: ParseMode) -> Result<ParseReport<Self>> {
+        crate::options::parse_with_mode(mode, || Self::from_xml(xml))
+    }
 }
 
 /// Trait for types that can be parsed from a KVN value string.
@@ -153,5 +172,5 @@ pub trait ToKvn {
     /// # Arguments
     ///
     /// * `writer` - The KVN writer to output to
-    fn write_kvn(&self, writer: &mut KvnWriter);
+    fn write_kvn(&self, writer: &mut KvnWriter<'_>);
 }

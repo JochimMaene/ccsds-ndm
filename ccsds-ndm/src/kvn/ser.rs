@@ -3,44 +3,79 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::types::UnitValue;
-use std::fmt::{Display, Write};
+use std::fmt::{Display, Write as FmtWrite};
+use std::io::Write as IoWrite;
+
+enum KvnOutput<'a> {
+    String(String),
+    Io(&'a mut dyn IoWrite),
+}
 
 /// A helper for writing Key-Value Notation (KVN) for CCSDS NDM messages.
-pub struct KvnWriter {
-    output: String,
+pub struct KvnWriter<'a> {
+    output: KvnOutput<'a>,
+    io_error: Option<std::io::Error>,
+    line_buffer: String,
 }
 
-impl Write for KvnWriter {
+impl FmtWrite for KvnWriter<'_> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.output.write_str(s)
-    }
-
-    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> std::fmt::Result {
-        self.output.write_fmt(args)
+        match &mut self.output {
+            KvnOutput::String(output) => output.write_str(s),
+            KvnOutput::Io(output) => output.write_all(s.as_bytes()).map_err(|error| {
+                if self.io_error.is_none() {
+                    self.io_error = Some(error);
+                }
+                std::fmt::Error
+            }),
+        }
     }
 }
 
-impl KvnWriter {
+impl KvnWriter<'static> {
     pub fn new() -> Self {
         Self {
-            output: String::new(),
+            output: KvnOutput::String(String::new()),
+            io_error: None,
+            line_buffer: String::new(),
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            output: String::with_capacity(capacity),
+            output: KvnOutput::String(String::with_capacity(capacity)),
+            io_error: None,
+            line_buffer: String::new(),
         }
     }
 }
 
-impl Default for KvnWriter {
+impl Default for KvnWriter<'static> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl KvnWriter {
+impl<'a> KvnWriter<'a> {
+    /// Create a writer that writes directly to an I/O sink.
+    pub(crate) fn from_io<W: IoWrite>(output: &'a mut W) -> Self {
+        Self {
+            output: KvnOutput::Io(output),
+            io_error: None,
+            line_buffer: String::new(),
+        }
+    }
+
+    /// Builds and writes one raw line using a reusable growable buffer.
+    pub(crate) fn write_built_line(&mut self, build: impl FnOnce(&mut String)) {
+        let mut line = std::mem::take(&mut self.line_buffer);
+        line.clear();
+        build(&mut line);
+        line.push('\n');
+        let _ = self.write_str(&line);
+        self.line_buffer = line;
+    }
+
     fn normalize_inline_value(value: &str) -> std::borrow::Cow<'_, str> {
         if value.contains('\n') || value.contains('\r') || value.contains('\t') {
             return std::borrow::Cow::Owned(value.split_whitespace().collect::<Vec<_>>().join(" "));
@@ -102,7 +137,18 @@ impl KvnWriter {
 
     /// Returns the accumulated KVN content.
     pub fn finish(self) -> String {
-        self.output
+        match self.output {
+            KvnOutput::String(output) => output,
+            KvnOutput::Io(_) => unreachable!("finish is only valid for string-backed writers"),
+        }
+    }
+
+    /// Finish writing to an I/O sink and return any deferred write error.
+    pub(crate) fn finish_io(self) -> std::io::Result<()> {
+        match self.io_error {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
     }
 }
 

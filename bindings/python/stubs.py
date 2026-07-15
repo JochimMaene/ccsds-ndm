@@ -30,6 +30,33 @@ import numpy
 
 """
 
+PUBLIC_API_PARAMETER_TYPES = {
+    "from_file": {
+        "format": "str",
+        "path": "str",
+        "strict": "bool",
+    },
+    "from_str": {
+        "data": "str",
+        "format": "str",
+        "strict": "bool",
+    },
+    "to_file": {
+        "format": "str",
+        "path": "str",
+        "validate": "bool",
+        "version": "Optional[str]",
+    },
+    "to_kvn": {"version": "Optional[str]"},
+    "to_str": {
+        "format": "str",
+        "validate": "bool",
+        "version": "Optional[str]",
+    },
+    "to_xml": {"version": "Optional[str]"},
+    "validate": {"strict": "bool"},
+}
+
 
 def _extract_pymethod_bodies(content: str) -> list[tuple[str, str]]:
     """Extract (class_name, impl_body) from #[pymethods] impl blocks."""
@@ -344,6 +371,12 @@ def _annotate_signature(sig: str, param_types: dict[str, str]) -> str:
         if not annotation:
             inferred = param_types.get(name)
             if inferred:
+                if (
+                    default == "=None"
+                    and not inferred.startswith("Optional[")
+                    and "None" not in inferred
+                ):
+                    inferred = f"Optional[{inferred}]"
                 left = f"{name}: {inferred}"
             else:
                 left = name
@@ -400,6 +433,7 @@ def _generate_function(obj: Any, indent: str, owner_class: str | None = None) ->
 
     doc = obj.__doc__ or ""
     param_types = _extract_numpy_parameter_types(doc)
+    param_types.update(PUBLIC_API_PARAMETER_TYPES.get(name, {}))
     sig = _annotate_signature(sig, param_types)
 
     return_type = _extract_annotation(doc, "rtype") or _extract_annotation(doc, "type")
@@ -408,7 +442,7 @@ def _generate_function(obj: Any, indent: str, owner_class: str | None = None) ->
     if not return_type:
         if name in {"to_file", "__setstate__"}:
             return_type = "None"
-        elif name == "to_str":
+        elif name in {"to_kvn", "to_str", "to_xml"}:
             return_type = "str"
         elif name == "to_numpy":
             return_type = "numpy.ndarray"

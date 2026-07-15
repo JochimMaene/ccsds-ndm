@@ -47,10 +47,32 @@ impl crate::traits::Validate for Opm {
         self.header.validate()?;
         self.body.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        match crate::versioning::validate_root(
+            crate::validation::MessageKind::Opm,
+            &self.id,
+            &self.version,
+        ) {
+            Ok(()) => {}
+            Err(crate::error::CcsdsNdmError::Validation(error)) => errors.push(*error),
+            Err(error) => return Err(error),
+        }
+        errors.extend(self.header.validation_errors()?);
+        errors.extend(self.body.validation_errors()?);
+        Ok(errors)
+    }
 }
 
 impl Ndm for Opm {
     fn to_kvn(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Opm,
+            &self.version,
+            crate::generation::OutputFormat::Kvn,
+            self,
+        )?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
@@ -63,7 +85,12 @@ impl Ndm for Opm {
     }
 
     fn to_xml(&self) -> Result<String> {
-        self.validate()?;
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Opm,
+            &self.version,
+            crate::generation::OutputFormat::Xml,
+            self,
+        )?;
         crate::xml::to_string(self)
     }
 
@@ -73,6 +100,8 @@ impl Ndm for Opm {
         Ok(opm)
     }
 }
+
+crate::impl_versioned_ndm!(Opm, Opm);
 
 impl Opm {
     // No inherent validate() anymore
@@ -104,6 +133,10 @@ impl crate::traits::Validate for OpmBody {
     fn validate(&self) -> Result<()> {
         self.segment.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        self.segment.validation_errors()
+    }
 }
 
 impl ToKvn for OpmBody {
@@ -125,6 +158,12 @@ impl crate::traits::Validate for OpmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate()
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = self.metadata.validation_errors()?;
+        errors.extend(self.data.validation_errors()?);
+        Ok(errors)
     }
 }
 
@@ -263,6 +302,26 @@ impl crate::traits::Validate for OpmMetadata {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        for (field, value) in [
+            ("OBJECT_NAME", self.object_name.as_str()),
+            ("OBJECT_ID", self.object_id.as_str()),
+            ("CENTER_NAME", self.center_name.as_str()),
+            ("REF_FRAME", self.ref_frame.as_str()),
+            ("TIME_SYSTEM", self.time_system.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                errors.push(ValidationError::MissingRequiredField {
+                    block: "OPM Metadata".into(),
+                    field: field.into(),
+                    line: None,
+                });
+            }
+        }
+        Ok(errors)
+    }
 }
 
 impl ToKvn for OpmMetadata {
@@ -340,6 +399,7 @@ pub struct OpmData {
 
 impl Validate for OpmData {
     fn validate(&self) -> Result<()> {
+        self.state_vector.validate()?;
         if let Some(ke) = &self.keplerian_elements {
             ke.validate()?;
         }
@@ -358,6 +418,28 @@ impl Validate for OpmData {
             .into());
         }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = self.state_vector.validation_errors()?;
+        errors.extend(match &self.keplerian_elements {
+            Some(elements) => elements.validation_errors()?,
+            None => Vec::new(),
+        });
+        if !self.maneuver_parameters.is_empty()
+            && self
+                .spacecraft_parameters
+                .as_ref()
+                .and_then(|parameters| parameters.mass.as_ref())
+                .is_none()
+        {
+            errors.push(ValidationError::MissingRequiredField {
+                block: Cow::Borrowed("Spacecraft Parameters"),
+                field: Cow::Borrowed("MASS"),
+                line: None,
+            });
+        }
+        Ok(errors)
     }
 }
 
@@ -502,6 +584,10 @@ impl crate::traits::Validate for KeplerianElements {
             }
             .into()),
         }
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::validation_errors_from(self.validate())
     }
 }
 
@@ -769,7 +855,7 @@ MAN_DV_3 = 0.0
 "#;
         let _ = crate::validation::take_warnings();
         let opm = crate::validation::with_validation_mode(
-            crate::validation::ValidationMode::Lenient,
+            crate::validation::ValidationMode::Permissive,
             || Opm::from_kvn(kvn),
         )
         .expect("lenient parse should succeed");

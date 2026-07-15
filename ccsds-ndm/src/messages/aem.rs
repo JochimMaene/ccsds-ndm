@@ -6,7 +6,9 @@ use crate::common::AdmHeader;
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn, Validate};
+#[cfg(test)]
+use crate::traits::Validate;
+use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -50,10 +52,26 @@ impl crate::traits::Validate for Aem {
         self.header.validate()?;
         self.body.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::collect_message_validation_errors(
+            crate::validation::MessageKind::Aem,
+            &self.id,
+            &self.version,
+            &self.header,
+            &self.body,
+        )
+    }
 }
 
 impl Ndm for Aem {
     fn to_kvn(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Aem,
+            &self.version,
+            crate::generation::OutputFormat::Kvn,
+            self,
+        )?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
@@ -66,7 +84,12 @@ impl Ndm for Aem {
     }
 
     fn to_xml(&self) -> Result<String> {
-        self.validate()?;
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Aem,
+            &self.version,
+            crate::generation::OutputFormat::Xml,
+            self,
+        )?;
         crate::xml::to_string(self)
     }
 
@@ -76,6 +99,8 @@ impl Ndm for Aem {
         Ok(aem)
     }
 }
+
+crate::impl_versioned_ndm!(Aem, Aem);
 
 impl crate::traits::Validate for AemBody {
     fn validate(&self) -> Result<()> {
@@ -91,6 +116,20 @@ impl crate::traits::Validate for AemBody {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        if self.segment.is_empty() {
+            errors.push(ValidationError::missing_required(
+                "AEM Body",
+                "segment (at least one required)",
+            ));
+        }
+        for segment in &self.segment {
+            errors.extend(segment.validation_errors()?);
+        }
+        Ok(errors)
+    }
 }
 
 impl crate::traits::Validate for AemSegment {
@@ -98,6 +137,16 @@ impl crate::traits::Validate for AemSegment {
         self.metadata.validate()?;
         crate::traits::Validate::validate(&self.data)?;
         self.data.validate_with_type(&self.metadata.attitude_type)
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = self.metadata.validation_errors()?;
+        errors.extend(self.data.validation_errors()?);
+        errors.extend(
+            self.data
+                .validation_errors_with_type(&self.metadata.attitude_type),
+        );
+        Ok(errors)
     }
 }
 
@@ -408,6 +457,47 @@ impl crate::traits::Validate for AemMetadata {
     fn validate(&self) -> Result<()> {
         self.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let requires_euler_rot_seq = matches!(
+            self.attitude_type,
+            AttitudeTypeType::EulerAngle
+                | AttitudeTypeType::EulerAngleUpper
+                | AttitudeTypeType::EulerAngleDerivative
+                | AttitudeTypeType::EulerAngleDerivativeUpper
+                | AttitudeTypeType::EulerAngleAngVel
+                | AttitudeTypeType::EulerAngleAngVelUpper
+        );
+        let requires_angvel_frame = matches!(
+            self.attitude_type,
+            AttitudeTypeType::QuaternionAngVel
+                | AttitudeTypeType::QuaternionAngVelUpper
+                | AttitudeTypeType::EulerAngleAngVel
+                | AttitudeTypeType::EulerAngleAngVelUpper
+        );
+        Ok(crate::validation::missing_required_fields(
+            "AEM Metadata",
+            [
+                ("OBJECT_NAME", self.object_name.trim().is_empty()),
+                ("OBJECT_ID", self.object_id.trim().is_empty()),
+                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
+                ("REF_FRAME_A", self.ref_frame_a.trim().is_empty()),
+                ("REF_FRAME_B", self.ref_frame_b.trim().is_empty()),
+                (
+                    "INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)",
+                    self.interpolation_method.is_some() && self.interpolation_degree.is_none(),
+                ),
+                (
+                    "EULER_ROT_SEQ (required for EULER_ANGLE types)",
+                    requires_euler_rot_seq && self.euler_rot_seq.is_none(),
+                ),
+                (
+                    "ANGVEL_FRAME (required for ANGVEL types)",
+                    requires_angvel_frame && self.angvel_frame.is_none(),
+                ),
+            ],
+        ))
+    }
 }
 
 impl ToKvn for AemMetadata {
@@ -592,6 +682,57 @@ impl AemAttitudeStateWrapper {
         }
         None
     }
+
+    fn populated_fields(&self) -> Vec<Cow<'static, str>> {
+        let mut fields = Vec::new();
+        for (field, populated) in [
+            ("quaternionEphemeris", self.quaternion_ephemeris.is_some()),
+            ("quaternionDerivative", self.quaternion_derivative.is_some()),
+            ("quaternionAngVel", self.quaternion_ang_vel.is_some()),
+            ("eulerAngle", self.euler_angle.is_some()),
+            (
+                "eulerAngleDerivative",
+                self.euler_angle_derivative.is_some(),
+            ),
+            ("eulerAngleAngVel", self.euler_angle_ang_vel.is_some()),
+            ("spin", self.spin.is_some()),
+            ("spinNutation", self.spin_nutation.is_some()),
+            ("spinNutationMom", self.spin_nutation_mom.is_some()),
+        ] {
+            if populated {
+                fields.push(Cow::Borrowed(field));
+            }
+        }
+        fields
+    }
+
+    fn matches_type(&self, attitude_type: &AttitudeTypeType) -> bool {
+        match attitude_type {
+            AttitudeTypeType::Quaternion | AttitudeTypeType::QuaternionUpper => {
+                self.quaternion_ephemeris.is_some()
+            }
+            AttitudeTypeType::QuaternionDerivative
+            | AttitudeTypeType::QuaternionDerivativeUpper => self.quaternion_derivative.is_some(),
+            AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::QuaternionAngVelUpper => {
+                self.quaternion_ang_vel.is_some()
+            }
+            AttitudeTypeType::EulerAngle | AttitudeTypeType::EulerAngleUpper => {
+                self.euler_angle.is_some()
+            }
+            AttitudeTypeType::EulerAngleDerivative
+            | AttitudeTypeType::EulerAngleDerivativeUpper => self.euler_angle_derivative.is_some(),
+            AttitudeTypeType::EulerAngleAngVel | AttitudeTypeType::EulerAngleAngVelUpper => {
+                self.euler_angle_ang_vel.is_some()
+            }
+            AttitudeTypeType::Spin | AttitudeTypeType::SpinUpper => self.spin.is_some(),
+            AttitudeTypeType::SpinNutation | AttitudeTypeType::SpinNutationUpper => {
+                self.spin_nutation.is_some()
+            }
+            AttitudeTypeType::SpinNutationMom | AttitudeTypeType::SpinNutationMomUpper => {
+                self.spin_nutation_mom.is_some()
+            }
+        }
+    }
 }
 
 impl crate::traits::ToKvn for AemAttitudeStateWrapper {
@@ -656,6 +797,28 @@ impl crate::traits::Validate for AemData {
             }
         }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "AEM Data",
+            [(
+                "attitudeState (at least one required)",
+                self.attitude_states.is_empty(),
+            )],
+        );
+        for (index, state) in self.attitude_states.iter().enumerate() {
+            let fields = state.populated_fields();
+            match fields.len() {
+                0 => errors.push(ValidationError::missing_required(
+                    "AEM Data",
+                    format!("attitudeState[{}] (exactly one choice required)", index + 1),
+                )),
+                1 => {}
+                _ => errors.push(ValidationError::conflict(fields)),
+            }
+        }
+        Ok(errors)
     }
 }
 
@@ -759,6 +922,25 @@ impl AemData {
             }
         }
         Ok(())
+    }
+
+    fn validation_errors_with_type(
+        &self,
+        attitude_type: &AttitudeTypeType,
+    ) -> Vec<ValidationError> {
+        let expected = attitude_type.to_string();
+        self.attitude_states
+            .iter()
+            .enumerate()
+            .filter(|(_, state)| !state.matches_type(attitude_type))
+            .map(|(index, _)| {
+                ValidationError::generic(format!(
+                    "Data line {} expected {} data",
+                    index + 1,
+                    expected
+                ))
+            })
+            .collect()
     }
 
     pub fn validate(&self, attitude_type: &AttitudeTypeType) -> Result<()> {

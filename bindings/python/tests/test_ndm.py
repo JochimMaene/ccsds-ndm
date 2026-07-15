@@ -6,7 +6,10 @@
 Unit tests for Navigation Data Message (NDM) Python bindings.
 """
 
+from pathlib import Path
+
 import pytest
+
 from ccsds_ndm import (
     Cdm,
     CdmBody,
@@ -24,6 +27,7 @@ from ccsds_ndm import (
     OemSegment,
     RelativeMetadataData,
     StateVectorAcc,  # Verified class name
+    Tdm,
 )
 
 
@@ -144,6 +148,23 @@ class TestNdm:
         body = CdmBody(rel_meta, [seg1, seg2])
         return Cdm(header, body)
 
+    def test_accepts_tdm_message(self):
+        root = Path(__file__).parents[3]
+        tdm = Tdm.from_file(str(root / "data/xml/tdm_e21.xml"), format="xml")
+
+        combined = Ndm([tdm])
+
+        assert isinstance(combined.messages[0], Tdm)
+
+    def test_auto_detection_rejects_single_message_kvn(self):
+        root = Path(__file__).parents[3]
+        opm = (root / "data/kvn/opm_g1.kvn").read_text()
+
+        with pytest.raises(ValueError, match="not an NDM combined instantiation"):
+            Ndm.from_str(opm)
+
+        assert isinstance(Ndm.from_str(opm, format="kvn"), Ndm)
+
     def test_ndm_roundtrip_xml(self):
         oem = self._create_valid_oem()
         cdm = self._create_valid_cdm()
@@ -168,6 +189,18 @@ class TestNdm:
 
         ndm2 = Ndm.from_file(str(path), format="xml")
         assert len(ndm2.messages) == 1
+
+    def test_failed_file_generation_preserves_existing_file(self, tmp_path):
+        oem = self._create_valid_oem()
+        oem.version = "1.0"
+        ndm = Ndm([oem])
+        path = tmp_path / "test.ndm"
+        path.write_text("keep me")
+
+        with pytest.raises(ValueError, match="output version 1.0"):
+            ndm.to_file(str(path), format="xml")
+
+        assert path.read_text() == "keep me"
 
     def test_ndm_message_and_comment_setters(self):
         oem = self._create_valid_oem()

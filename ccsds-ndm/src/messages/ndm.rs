@@ -61,10 +61,34 @@ impl crate::traits::Validate for CombinedNdm {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        let mut errors = Vec::new();
+        for message in &self.messages {
+            errors.extend(match message {
+                MessageType::Opm(message) => message.validation_errors()?,
+                MessageType::Omm(message) => message.validation_errors()?,
+                MessageType::Oem(message) => message.validation_errors()?,
+                MessageType::Ocm(message) => message.validation_errors()?,
+                MessageType::Acm(message) => message.validation_errors()?,
+                MessageType::Cdm(message) => message.validation_errors()?,
+                MessageType::Tdm(message) => message.validation_errors()?,
+                MessageType::Rdm(message) => message.validation_errors()?,
+                MessageType::Aem(message) => message.validation_errors()?,
+                MessageType::Apm(message) => message.validation_errors()?,
+                MessageType::Ndm(message) => message.validation_errors()?,
+            });
+        }
+        Ok(errors)
+    }
 }
 
 impl Ndm for CombinedNdm {
     fn to_kvn(&self) -> Result<String> {
+        crate::traits::Validate::validate(self)?;
+        for message in &self.messages {
+            message.validate_for_generation(crate::generation::OutputFormat::Kvn)?;
+        }
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
@@ -128,6 +152,10 @@ impl Ndm for CombinedNdm {
     }
 
     fn to_xml(&self) -> Result<String> {
+        crate::traits::Validate::validate(self)?;
+        for message in &self.messages {
+            message.validate_for_generation(crate::generation::OutputFormat::Xml)?;
+        }
         crate::xml::to_string(self)
     }
 

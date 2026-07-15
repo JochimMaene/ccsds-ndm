@@ -468,14 +468,10 @@ QUAT_STOP
 "#;
         let err = Apm::from_kvn(input).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
-                ValidationError::InvalidValue { field, value, .. } => {
-                    assert_eq!(field, "version");
-                    assert_eq!(value, "3.0");
-                }
-                _ => panic!("Expected Validation error, got {:?}", boxed_err),
-            },
-            _ => panic!("Expected Validation error, got {:?}", err),
+            CcsdsNdmError::UnsupportedInputVersion { version, .. } => {
+                assert_eq!(version, "3.0");
+            }
+            _ => panic!("Expected unsupported input version, got {:?}", err),
         }
     }
 

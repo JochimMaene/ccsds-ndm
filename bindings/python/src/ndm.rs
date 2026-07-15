@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::ndm as core_ndm;
-use ccsds_ndm::traits::{Ndm as _, Validate};
+use ccsds_ndm::traits::Ndm as _;
 use ccsds_ndm::MessageType;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::*;
 use std::fs;
+use std::io::Write;
 
 use crate::cdm::Cdm;
 use crate::ocm::Ocm;
@@ -45,6 +46,8 @@ fn py_message_to_core(py: Python<'_>, msg: &Py<PyAny>) -> PyResult<MessageType> 
         Ok(MessageType::Ocm(ocm.inner))
     } else if let Ok(rdm) = msg.extract::<Rdm>(py) {
         Ok(MessageType::Rdm(rdm.inner))
+    } else if let Ok(tdm) = msg.extract::<Tdm>(py) {
+        Ok(MessageType::Tdm(tdm.inner))
     } else if let Ok(aem) = msg.extract::<crate::aem::Aem>(py) {
         Ok(MessageType::Aem(aem.inner))
     } else if let Ok(apm) = msg.extract::<crate::apm::Apm>(py) {
@@ -65,6 +68,22 @@ fn py_messages_to_core(py: Python<'_>, messages: &[Py<PyAny>]) -> PyResult<Vec<M
         .iter()
         .map(|msg| py_message_to_core(py, msg))
         .collect()
+}
+
+fn message_type_name(message: &MessageType) -> &'static str {
+    match message {
+        MessageType::Opm(_) => "OPM",
+        MessageType::Omm(_) => "OMM",
+        MessageType::Oem(_) => "OEM",
+        MessageType::Ocm(_) => "OCM",
+        MessageType::Acm(_) => "ACM",
+        MessageType::Cdm(_) => "CDM",
+        MessageType::Tdm(_) => "TDM",
+        MessageType::Rdm(_) => "RDM",
+        MessageType::Aem(_) => "AEM",
+        MessageType::Apm(_) => "APM",
+        MessageType::Ndm(_) => "NDM",
+    }
 }
 
 #[pymethods]
@@ -97,96 +116,79 @@ impl Ndm {
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        if strict {
-            self.inner
-                .validate()
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
-            Ok(None)
-        } else {
-            let mut issues = Vec::new();
-            let _ = ccsds_ndm::validation::with_validation_mode(
-                ccsds_ndm::validation::ValidationMode::Lenient,
-                || match self.inner.validate() {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        issues.push(e.to_string());
-                        Ok(())
-                    }
-                },
-            );
-
-            let warnings = ccsds_ndm::validation::take_warnings();
-            for w in warnings {
-                issues.push(w.error.to_string());
-            }
-
-            if issues.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(issues))
-            }
-        }
+        crate::api::validate_message(&self.inner, strict)
     }
 
     /// Parse an NDM combined instantiation from a string.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
+    #[pyo3(signature = (data, format=None, strict=true))]
+    fn from_str(
+        py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        strict: bool,
+    ) -> PyResult<Self> {
         let inner = match format {
-            Some("kvn") => core_ndm::CombinedNdm::from_kvn(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some("xml") => core_ndm::CombinedNdm::from_xml(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some(other) => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                    other
-                )))
-            }
             None => {
-                // For NDM, we need to be careful with auto-detection if it's not clearly XML <ndm>
-                // The core's from_str might return MessageType::Ndm
-                match ccsds_ndm::from_str(data) {
-                    Ok(MessageType::Ndm(ndm)) => ndm,
-                    Ok(other) => {
+                let report = ccsds_ndm::from_str_with_mode(
+                    data,
+                    crate::api::parse_mode(strict),
+                )
+                .map_err(crate::errors::ccsds_error_to_pyerr)?;
+                match report.message {
+                    MessageType::Ndm(inner) => {
+                        crate::api::emit_diagnostics(py, &report.diagnostics)?;
+                        inner
+                    }
+                    message => {
                         return Err(PyValueError::new_err(format!(
-                            "Parsed message is not an NDM combined instantiation (got {:?})",
-                            other
+                            "Parsed message is not an NDM combined instantiation (got {})",
+                            message_type_name(&message),
                         )))
                     }
-                    Err(e) => return Err(PyValueError::new_err(e.to_string())),
                 }
             }
+            Some(_) => crate::api::parse_typed(py, data, format, strict)?,
         };
         Ok(Self { inner })
     }
 
     /// Parse an NDM combined instantiation from a file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None, strict=true))]
+    fn from_file(
+        py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        strict: bool,
+    ) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(&content, format)
+        Self::from_str(py, &content, format, strict)
+    }
+
+    /// Serialize the contained messages to KVN using their source versions.
+    fn to_kvn(&self) -> PyResult<String> {
+        self.inner
+            .to_kvn()
+            .map_err(|error| PyValueError::new_err(error.to_string()))
+    }
+
+    /// Serialize the contained messages to XML using their source versions.
+    fn to_xml(&self) -> PyResult<String> {
+        self.inner
+            .to_xml()
+            .map_err(|error| PyValueError::new_err(error.to_string()))
     }
 
     /// Serialize to a string.
     #[pyo3(signature = (format, validate=true))]
     fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
-        if validate {
-            self.validate(true)?;
-        }
+        crate::api::require_checked_generation(validate)?;
         match format {
-            "kvn" => self
-                .inner
-                .to_kvn()
-                .map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner)
-                .map_err(|e| PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!(
-                "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                other
-            ))),
+            "kvn" => self.to_kvn(),
+            "xml" => self.to_xml(),
+            other => Err(crate::api::unsupported_format(other)),
         }
     }
 
@@ -203,13 +205,11 @@ impl Ndm {
     #[pyo3(signature = (path, format, validate=true))]
     fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
         let data = self.to_str(format, validate)?;
-        match fs::write(path, data) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!(
-                "Failed to write file: {}",
-                e
-            ))),
-        }
+        crate::api::atomic_write(path, |output| {
+            output
+                .write_all(data.as_bytes())
+                .map_err(|error| PyOSError::new_err(error.to_string()))
+        })
     }
 
     /// List of contained navigation messages.

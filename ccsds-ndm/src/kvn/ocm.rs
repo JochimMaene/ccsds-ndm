@@ -13,7 +13,7 @@ use crate::messages::ocm::*;
 use crate::parse_block;
 use crate::types::*;
 use winnow::ascii::{space1, till_line_ending};
-use winnow::combinator::repeat;
+use winnow::combinator::{peek, repeat};
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
 use winnow::stream::Offset;
@@ -273,26 +273,33 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
     }, |i| at_block_end("TRAJ", i), "Unexpected OCM Trajectory key");
 
     loop {
-        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
+        comment.extend(comments);
 
         if at_block_end("TRAJ", input) {
-            comment.extend(comments);
             expect_block_end("TRAJ").parse_next(input)?;
             break;
         }
+        if input.is_empty() {
+            return Err(cut_err(input, "Missing TRAJ_STOP before end of input"));
+        }
 
+        let checkpoint = input.checkpoint();
         if let Ok(line) = ocm_traj_line.parse_next(input) {
             traj_lines.push(line);
             continue;
         }
 
-        // Otherwise, skip the line (handles continuations) or break
+        input.reset(&checkpoint);
+        let raw = peek(till_line_ending).parse_next(input)?;
+        if !raw.trim().is_empty() {
+            return Err(cut_err(input, "Malformed OCM trajectory record"));
+        }
+        let remaining = input.len();
         let _ = till_line_ending.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
-
-        if input.offset_from(&checkpoint) == 0 {
-            break;
+        if input.len() == remaining {
+            return Err(cut_err(input, "OCM trajectory parser made no progress"));
         }
     }
 
@@ -609,6 +616,29 @@ pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
     })
 }
 
+fn kv_man_composition(input: &mut &str) -> KvnResult<String> {
+    let mut composition = kv_string.parse_next(input)?;
+    loop {
+        let trimmed = composition.trim_end();
+        if !trimmed.ends_with(',') && !trimmed.ends_with("<cont.>") {
+            break;
+        }
+
+        let continuation = peek(till_line_ending).parse_next(input)?.trim();
+        if continuation.is_empty() || continuation.contains('=') || at_block_end("MAN", input) {
+            return Err(cut_err(input, "Malformed MAN_COMPOSITION continuation"));
+        }
+        let _ = till_line_ending.parse_next(input)?;
+        opt_line_ending.parse_next(input)?;
+        let prefix = trimmed
+            .strip_suffix("<cont.>")
+            .unwrap_or(trimmed)
+            .trim_end();
+        composition = format!("{prefix} {continuation}");
+    }
+    Ok(composition)
+}
+
 pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
     ws.parse_next(input)?;
     expect_block_start("MAN").parse_next(input)?;
@@ -675,31 +705,38 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         "DC_BODY_TRIGGER" => dc_body_trigger: kv_from_kvn_value,
         "DC_PA_START_ANGLE" => dc_pa_start_angle: kv_from_kvn,
         "DC_PA_STOP_ANGLE" => dc_pa_stop_angle: kv_from_kvn,
-        "MAN_COMPOSITION" => man_composition: kv_string,
+        "MAN_COMPOSITION" => man_composition: kv_man_composition,
         "MAN_UNITS" => man_units: kv_string,
     }, |i| at_block_end("MAN", i), "Unexpected OCM Maneuver key");
 
     loop {
-        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
+        comment.extend(comments);
 
         if at_block_end("MAN", input) {
-            comment.extend(comments);
             expect_block_end("MAN").parse_next(input)?;
             break;
         }
+        if input.is_empty() {
+            return Err(cut_err(input, "Missing MAN_STOP before end of input"));
+        }
 
+        let checkpoint = input.checkpoint();
         if let Ok(line) = ocm_man_line.parse_next(input) {
             man_lines.push(line);
             continue;
         }
 
-        // Otherwise, skip the line (handles continuations like in G17) or break
+        input.reset(&checkpoint);
+        let raw = peek(till_line_ending).parse_next(input)?;
+        if !raw.trim().is_empty() {
+            return Err(cut_err(input, "Malformed OCM maneuver record"));
+        }
+        let remaining = input.len();
         let _ = till_line_ending.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
-
-        if input.offset_from(&checkpoint) == 0 {
-            break;
+        if input.len() == remaining {
+            return Err(cut_err(input, "OCM maneuver parser made no progress"));
         }
     }
 

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::{from_str, from_str_with_mode, take_validation_warnings, ValidationMode};
+use ccsds_ndm::{from_str, from_str_with_mode, ParseMode};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -87,19 +87,17 @@ fn test_parse_data_samples() {
             .is_some_and(|name| name.eq_ignore_ascii_case("ndm_g22.xml"));
 
         if is_lenient_only {
-            let _ = take_validation_warnings();
-            match from_str_with_mode(&content, ValidationMode::Lenient) {
-                Ok(_) => {
-                    let warnings = take_validation_warnings();
-                    if warnings.is_empty() {
+            match from_str_with_mode(&content, ParseMode::Permissive) {
+                Ok(report) => {
+                    if report.diagnostics.is_empty() {
                         failures.push(format!(
-                            "{} parsed in lenient mode but emitted no warnings",
+                            "{} parsed in permissive mode but emitted no diagnostics",
                             file.display()
                         ));
                     }
                 }
                 Err(e) => failures.push(format!(
-                    "{} failed to parse in lenient mode: {}",
+                    "{} failed to parse in permissive mode: {}",
                     file.display(),
                     e
                 )),
@@ -122,16 +120,15 @@ fn test_parse_data_samples() {
 fn test_roundtrip_known_edge_samples() {
     let data_root = data_dir();
     let samples = [
-        ("kvn/acm_g7.kvn", true, ValidationMode::Strict),
-        ("kvn/acm_g8.kvn", true, ValidationMode::Strict),
-        ("kvn/acm_g9.kvn", true, ValidationMode::Strict),
-        ("kvn/tdm_e14.kvn", true, ValidationMode::Strict),
-        ("xml/ndm_g22.xml", false, ValidationMode::Lenient),
+        ("kvn/acm_g7.kvn", true),
+        ("kvn/acm_g8.kvn", true),
+        ("kvn/acm_g9.kvn", true),
+        ("kvn/tdm_e14.kvn", true),
     ];
 
     let mut failures = Vec::new();
 
-    for (rel_path, is_kvn, mode) in samples {
+    for (rel_path, is_kvn) in samples {
         let path = data_root.join(rel_path);
         let content = match fs::read_to_string(&path) {
             Ok(content) => content,
@@ -141,52 +138,19 @@ fn test_roundtrip_known_edge_samples() {
             }
         };
 
-        let msg = match mode {
-            ValidationMode::Strict => from_str(&content),
-            ValidationMode::Lenient => {
-                let _ = take_validation_warnings();
-                from_str_with_mode(&content, ValidationMode::Lenient)
-            }
-        };
-        let msg = match msg {
+        let msg = match from_str(&content) {
             Ok(msg) => msg,
             Err(e) => {
                 failures.push(format!("{} failed to parse: {}", path.display(), e));
                 continue;
             }
         };
-        if mode == ValidationMode::Lenient && take_validation_warnings().is_empty() {
-            failures.push(format!(
-                "{} parsed in lenient mode but emitted no warnings",
-                path.display()
-            ));
-            continue;
-        }
 
         let roundtrip = if is_kvn {
-            msg.to_xml().and_then(|xml| match mode {
-                ValidationMode::Strict => from_str(&xml).map(|_| ()),
-                ValidationMode::Lenient => {
-                    let _ = take_validation_warnings();
-                    from_str_with_mode(&xml, ValidationMode::Lenient).map(|_| ())
-                }
-            })
+            msg.to_xml().and_then(|xml| from_str(&xml).map(|_| ()))
         } else {
-            msg.to_kvn().and_then(|kvn| match mode {
-                ValidationMode::Strict => from_str(&kvn).map(|_| ()),
-                ValidationMode::Lenient => {
-                    let _ = take_validation_warnings();
-                    from_str_with_mode(&kvn, ValidationMode::Lenient).map(|_| ())
-                }
-            })
+            msg.to_kvn().and_then(|kvn| from_str(&kvn).map(|_| ()))
         };
-
-        if mode == ValidationMode::Lenient && take_validation_warnings().is_empty() {
-            failures.push(format!(
-                "{} lenient round-trip parse emitted no warnings",
-                path.display()
-            ));
-        }
 
         if let Err(err) = roundtrip {
             let label = if is_kvn {

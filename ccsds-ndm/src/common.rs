@@ -66,6 +66,16 @@ impl crate::traits::Validate for NdmHeader {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "NDM Header",
+            [
+                ("ORIGINATOR", self.originator.trim().is_empty()),
+                ("CREATION_DATE", self.creation_date.is_empty()),
+            ],
+        ))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
@@ -155,6 +165,16 @@ impl crate::traits::Validate for AdmHeader {
             .into());
         }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "ADM Header",
+            [
+                ("ORIGINATOR", self.originator.trim().is_empty()),
+                ("CREATION_DATE", self.creation_date.is_empty()),
+            ],
+        ))
     }
 }
 
@@ -247,6 +267,16 @@ impl crate::traits::Validate for OdmHeader {
             .into());
         }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "ODM Header",
+            [
+                ("ORIGINATOR", self.originator.trim().is_empty()),
+                ("CREATION_DATE", self.creation_date.is_empty()),
+            ],
+        ))
     }
 }
 
@@ -547,48 +577,108 @@ pub struct StateVectorAcc {
 impl ToKvn for StateVectorAcc {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         let mut buffer = zmij::Buffer::new();
-        let mut line_buf = [0u8; 256];
-        let mut cursor = 0;
+        writer.write_built_line(|line| {
+            line.push_str(self.epoch.as_str());
+            for value in [
+                self.x.value,
+                self.y.value,
+                self.z.value,
+                self.x_dot.value,
+                self.y_dot.value,
+                self.z_dot.value,
+            ] {
+                line.push(' ');
+                line.push_str(buffer.format(value));
+            }
+            for acceleration in [&self.x_ddot, &self.y_ddot, &self.z_ddot]
+                .into_iter()
+                .flatten()
+            {
+                line.push(' ');
+                line.push_str(buffer.format(acceleration.value));
+            }
+        });
+    }
+}
 
-        macro_rules! append {
-            ($s:expr) => {
-                let bytes = $s.as_bytes();
-                line_buf[cursor..cursor + bytes.len()].copy_from_slice(bytes);
-                cursor += bytes.len();
+impl crate::traits::Validate for StateVectorAcc {
+    fn validate(&self) -> Result<()> {
+        for (field, value) in [
+            ("X", self.x.value),
+            ("Y", self.y.value),
+            ("Z", self.z.value),
+            ("X_DOT", self.x_dot.value),
+            ("Y_DOT", self.y_dot.value),
+            ("Z_DOT", self.z_dot.value),
+        ] {
+            if !value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        for (field, acceleration) in [
+            ("X_DDOT", &self.x_ddot),
+            ("Y_DDOT", &self.y_ddot),
+            ("Z_DDOT", &self.z_ddot),
+        ] {
+            let Some(acceleration) = acceleration else {
+                continue;
             };
+            if !acceleration.value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: acceleration.value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                }
+                .into());
+            }
         }
+        Ok(())
+    }
 
-        append!(self.epoch.as_str());
-        append!(" ");
-        append!(buffer.format_finite(self.x.value));
-        append!(" ");
-        append!(buffer.format_finite(self.y.value));
-        append!(" ");
-        append!(buffer.format_finite(self.z.value));
-        append!(" ");
-        append!(buffer.format_finite(self.x_dot.value));
-        append!(" ");
-        append!(buffer.format_finite(self.y_dot.value));
-        append!(" ");
-        append!(buffer.format_finite(self.z_dot.value));
-
-        if let Some(acc) = &self.x_ddot {
-            append!(" ");
-            append!(buffer.format_finite(acc.value));
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        for (field, value) in [
+            ("X", self.x.value),
+            ("Y", self.y.value),
+            ("Z", self.z.value),
+            ("X_DOT", self.x_dot.value),
+            ("Y_DOT", self.y_dot.value),
+            ("Z_DOT", self.z_dot.value),
+        ] {
+            if !value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            }
         }
-        if let Some(acc) = &self.y_ddot {
-            append!(" ");
-            append!(buffer.format_finite(acc.value));
+        for (field, acceleration) in [
+            ("X_DDOT", &self.x_ddot),
+            ("Y_DDOT", &self.y_ddot),
+            ("Z_DDOT", &self.z_ddot),
+        ] {
+            let Some(acceleration) = acceleration else {
+                continue;
+            };
+            if !acceleration.value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: acceleration.value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            }
         }
-        if let Some(acc) = &self.z_ddot {
-            append!(" ");
-            append!(buffer.format_finite(acc.value));
-        }
-
-        // We only append valid UTF-8 fragments (epoch, float digits, spaces)
-        let line = std::str::from_utf8(&line_buf[..cursor])
-            .expect("Formatted KVN line must be valid UTF-8");
-        writer.write_line(line);
+        Ok(errors)
     }
 }
 
@@ -630,6 +720,10 @@ impl crate::traits::Validate for Quaternion {
             .into());
         }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::validation_errors_from(self.validate())
     }
 }
 
@@ -727,7 +821,50 @@ impl crate::traits::Validate for StateVector {
             }
             .into());
         }
+        for (field, value) in [
+            ("X", self.x.value),
+            ("Y", self.y.value),
+            ("Z", self.z.value),
+            ("X_DOT", self.x_dot.value),
+            ("Y_DOT", self.y_dot.value),
+            ("Z_DOT", self.z_dot.value),
+        ] {
+            if !value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "State Vector",
+            [("EPOCH", self.epoch.is_empty())],
+        );
+        for (field, value) in [
+            ("X", self.x.value),
+            ("Y", self.y.value),
+            ("Z", self.z.value),
+            ("X_DOT", self.x_dot.value),
+            ("Y_DOT", self.y_dot.value),
+            ("Z_DOT", self.z_dot.value),
+        ] {
+            if !value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            }
+        }
+        Ok(errors)
     }
 }
 
@@ -1089,6 +1226,50 @@ impl crate::traits::Validate for SpinState {
         }
 
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "Spin",
+            [
+                ("REF_FRAME_A", self.ref_frame_a.trim().is_empty()),
+                ("REF_FRAME_B", self.ref_frame_b.trim().is_empty()),
+            ],
+        );
+        let nutation_present =
+            self.nutation.is_some() || self.nutation_per.is_some() || self.nutation_phase.is_some();
+        let momentum_present = self.momentum_alpha.is_some()
+            || self.momentum_delta.is_some()
+            || self.nutation_vel.is_some();
+        if nutation_present && momentum_present {
+            errors.push(ValidationError::Conflict {
+                fields: vec!["NUTATION".into(), "MOMENTUM_ALPHA".into()],
+                line: None,
+            });
+        }
+        if nutation_present
+            && (self.nutation.is_none()
+                || self.nutation_per.is_none()
+                || self.nutation_phase.is_none())
+        {
+            errors.push(ValidationError::MissingRequiredField {
+                block: "Spin".into(),
+                field: "NUTATION/NUTATION_PER/NUTATION_PHASE".into(),
+                line: None,
+            });
+        }
+        if momentum_present
+            && (self.momentum_alpha.is_none()
+                || self.momentum_delta.is_none()
+                || self.nutation_vel.is_none())
+        {
+            errors.push(ValidationError::MissingRequiredField {
+                block: "Spin".into(),
+                field: "MOMENTUM_ALPHA/MOMENTUM_DELTA/NUTATION_VEL".into(),
+                line: None,
+            });
+        }
+        Ok(errors)
     }
 }
 

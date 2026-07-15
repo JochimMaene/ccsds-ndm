@@ -61,6 +61,19 @@
 //! let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
 //! ```
 //!
+//! Strict parsing is the default. To accept supported real-world deviations while retaining an
+//! audit trail, request permissive parsing and inspect its diagnostics:
+//!
+//! ```no_run
+//! use ccsds_ndm::{from_str_with_mode, ParseMode};
+//!
+//! let report = from_str_with_mode("CCSDS_OPM_VERS = 3.0\n...", ParseMode::Permissive)?;
+//! for diagnostic in &report.diagnostics {
+//!     eprintln!("{}", diagnostic.error);
+//! }
+//! # Ok::<(), ccsds_ndm::error::CcsdsNdmError>(())
+//! ```
+//!
 //! ### 3. Generate a message using the Builder Pattern
 //!
 //! Creating messages from scratch is safe and verbose-free using the `builder()` methods.
@@ -105,6 +118,18 @@
 //! println!("{}", opm.to_kvn().unwrap());
 //! ```
 //!
+//! Generation validates output and preserves the source edition by default. An explicit target
+//! can be selected without mutating the parsed message:
+//!
+//! ```no_run
+//! use ccsds_ndm::{GenerateOptions, VersionedNdm};
+//! # use ccsds_ndm::messages::opm::Opm;
+//! # use ccsds_ndm::traits::Ndm;
+//! # let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...")?;
+//! let xml = opm.to_xml_with(&GenerateOptions::latest())?;
+//! # Ok::<(), ccsds_ndm::error::CcsdsNdmError>(())
+//! ```
+//!
 //! ### 4. Serialize to KVN or XML
 //!
 //! ```no_run
@@ -130,8 +155,10 @@
 pub mod common;
 pub mod detect;
 pub mod error;
+pub mod generation;
 pub mod kvn;
 pub mod messages;
+pub mod options;
 pub mod traits;
 pub mod types;
 pub mod utils;
@@ -140,9 +167,10 @@ pub mod versioning;
 pub mod xml;
 
 use error::{CcsdsNdmError, Result};
+pub use generation::VersionedNdm;
+pub use options::{GenerateOptions, ParseMode, ParseReport, TargetVersion};
 use std::fs;
 use std::path::Path;
-pub use validation::{take_warnings as take_validation_warnings, ValidationMode};
 
 /// A generic container for any parsed NDM message.
 ///
@@ -200,6 +228,77 @@ pub enum MessageType {
 }
 
 impl MessageType {
+    pub(crate) fn validate_for_generation(&self, format: generation::OutputFormat) -> Result<()> {
+        match self {
+            MessageType::Oem(msg) => generation::validate_for_generation(
+                validation::MessageKind::Oem,
+                &msg.version,
+                format,
+                msg,
+            ),
+            MessageType::Cdm(msg) => generation::validate_for_generation(
+                validation::MessageKind::Cdm,
+                &msg.version,
+                format,
+                msg,
+            ),
+            MessageType::Opm(msg) => generation::validate_for_generation(
+                validation::MessageKind::Opm,
+                &msg.version,
+                format,
+                msg,
+            ),
+            MessageType::Omm(msg) => generation::validate_for_generation(
+                validation::MessageKind::Omm,
+                &msg.version,
+                format,
+                msg,
+            ),
+            MessageType::Rdm(msg) => generation::validate_for_generation(
+                validation::MessageKind::Rdm,
+                &msg.version,
+                format,
+                msg,
+            ),
+            MessageType::Tdm(msg) => generation::validate_for_generation(
+                validation::MessageKind::Tdm,
+                &msg.version,
+                format,
+                msg,
+            ),
+            MessageType::Ocm(msg) => generation::validate_for_generation(
+                validation::MessageKind::Ocm,
+                &msg.version,
+                format,
+                msg,
+            ),
+            MessageType::Acm(msg) => generation::validate_for_generation(
+                validation::MessageKind::Acm,
+                &msg.version,
+                format,
+                msg,
+            ),
+            MessageType::Aem(msg) => generation::validate_for_generation(
+                validation::MessageKind::Aem,
+                &msg.version,
+                format,
+                msg,
+            ),
+            MessageType::Apm(msg) => generation::validate_for_generation(
+                validation::MessageKind::Apm,
+                &msg.version,
+                format,
+                msg,
+            ),
+            MessageType::Ndm(msg) => {
+                for message in &msg.messages {
+                    message.validate_for_generation(format)?;
+                }
+                Ok(())
+            }
+        }
+    }
+
     /// Serialize NDM to a KVN string.
     pub fn to_kvn(&self) -> Result<String> {
         match self {
@@ -231,6 +330,50 @@ impl MessageType {
             MessageType::Aem(msg) => crate::traits::Ndm::to_xml(msg),
             MessageType::Apm(msg) => crate::traits::Ndm::to_xml(msg),
             MessageType::Ndm(msg) => crate::traits::Ndm::to_xml(msg),
+        }
+    }
+
+    /// Serialize NDM to KVN with explicit generation options.
+    pub fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        match self {
+            MessageType::Oem(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
+            MessageType::Cdm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
+            MessageType::Opm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
+            MessageType::Omm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
+            MessageType::Rdm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
+            MessageType::Tdm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
+            MessageType::Ocm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
+            MessageType::Acm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
+            MessageType::Aem(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
+            MessageType::Apm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
+            MessageType::Ndm(msg) => match &options.target_version {
+                TargetVersion::Source => crate::traits::Ndm::to_kvn(msg),
+                _ => Err(CcsdsNdmError::UnsupportedMessage(
+                    "A combined NDM has no single target version".into(),
+                )),
+            },
+        }
+    }
+
+    /// Serialize NDM to XML with explicit generation options.
+    pub fn to_xml_with(&self, options: &GenerateOptions) -> Result<String> {
+        match self {
+            MessageType::Oem(msg) => generation::VersionedNdm::to_xml_with(msg, options),
+            MessageType::Cdm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
+            MessageType::Opm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
+            MessageType::Omm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
+            MessageType::Rdm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
+            MessageType::Tdm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
+            MessageType::Ocm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
+            MessageType::Acm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
+            MessageType::Aem(msg) => generation::VersionedNdm::to_xml_with(msg, options),
+            MessageType::Apm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
+            MessageType::Ndm(msg) => match &options.target_version {
+                TargetVersion::Source => crate::traits::Ndm::to_xml(msg),
+                _ => Err(CcsdsNdmError::UnsupportedMessage(
+                    "A combined NDM has no single target version".into(),
+                )),
+            },
         }
     }
 
@@ -274,9 +417,9 @@ pub fn from_str(s: &str) -> Result<MessageType> {
     detect::detect_message_type(s)
 }
 
-/// Parse an NDM from a string with explicit validation mode.
-pub fn from_str_with_mode(s: &str, mode: ValidationMode) -> Result<MessageType> {
-    validation::with_validation_mode(mode, || detect::detect_message_type(s))
+/// Parse an NDM from a string with an explicit compliance mode.
+pub fn from_str_with_mode(s: &str, mode: ParseMode) -> Result<ParseReport<MessageType>> {
+    options::parse_with_mode(mode, || detect::detect_message_type(s))
 }
 
 /// Parse an NDM from a file path, auto-detecting the message format (KVN or XML) and type.
@@ -304,8 +447,11 @@ pub fn from_file<P: AsRef<Path>>(path: P) -> Result<MessageType> {
     from_str(&content)
 }
 
-/// Parse an NDM from a file with explicit validation mode.
-pub fn from_file_with_mode<P: AsRef<Path>>(path: P, mode: ValidationMode) -> Result<MessageType> {
+/// Parse an NDM file with an explicit compliance mode.
+pub fn from_file_with_mode<P: AsRef<Path>>(
+    path: P,
+    mode: ParseMode,
+) -> Result<ParseReport<MessageType>> {
     let content = fs::read_to_string(path).map_err(CcsdsNdmError::from)?;
     from_str_with_mode(&content, mode)
 }

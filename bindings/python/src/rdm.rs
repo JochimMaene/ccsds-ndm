@@ -10,9 +10,7 @@ use crate::opm::OpmCovarianceMatrix;
 use crate::types::parse_epoch;
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::messages::rdm as core_rdm;
-use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{self as core_types, *};
-use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
@@ -96,35 +94,7 @@ impl Rdm {
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
     fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        if strict {
-            self.inner
-                .validate()
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
-            Ok(None)
-        } else {
-            let mut issues = Vec::new();
-            let _ = ccsds_ndm::validation::with_validation_mode(
-                ccsds_ndm::validation::ValidationMode::Lenient,
-                || match self.inner.validate() {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        issues.push(e.to_string());
-                        Ok(())
-                    }
-                },
-            );
-
-            let warnings = ccsds_ndm::validation::take_warnings();
-            for w in warnings {
-                issues.push(w.error.to_string());
-            }
-
-            if issues.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(issues))
-            }
-        }
+        crate::api::validate_message(&self.inner, strict)
     }
 
     fn __repr__(&self) -> String {
@@ -189,31 +159,14 @@ impl Rdm {
     /// Rdm
     ///     The parsed RDM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner =
-            match format {
-                Some("kvn") => core_rdm::Rdm::from_kvn(data)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
-                Some("xml") => core_rdm::Rdm::from_xml(data)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
-                Some(other) => {
-                    return Err(PyValueError::new_err(format!(
-                        "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                        other
-                    )))
-                }
-                None => match ccsds_ndm::from_str(data) {
-                    Ok(MessageType::Rdm(rdm)) => rdm,
-                    Ok(other) => {
-                        return Err(PyValueError::new_err(format!(
-                            "Parsed message is not RDM (got {:?})",
-                            other
-                        )))
-                    }
-                    Err(e) => return Err(PyValueError::new_err(e.to_string())),
-                },
-            };
+    #[pyo3(signature = (data, format=None, strict=true))]
+    fn from_str(
+        py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        strict: bool,
+    ) -> PyResult<Self> {
+        let inner = crate::api::parse_typed(py, data, format, strict)?;
         Ok(Self { inner })
     }
 
@@ -232,35 +185,38 @@ impl Rdm {
     /// Rdm
     ///     The parsed RDM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None, strict=true))]
+    fn from_file(
+        py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        strict: bool,
+    ) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(&content, format)
+        Self::from_str(py, &content, format, strict)
     }
 
-    /// Serialize to KVN string.
+    /// Serialize to KVN, preserving the source version by default.
     ///
     /// Returns
     /// -------
     /// str
     ///     The serialized KVN string.
-    fn to_kvn(&self) -> PyResult<String> {
-        self.inner
-            .to_kvn()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    #[pyo3(signature = (version=None))]
+    fn to_kvn(&self, version: Option<&str>) -> PyResult<String> {
+        crate::api::generate_string(&self.inner, "kvn", version)
     }
 
-    /// Serialize to XML string.
+    /// Serialize to XML, preserving the source version by default.
     ///
     /// Returns
     /// -------
     /// str
     ///     The serialized XML string.
-    fn to_xml(&self) -> PyResult<String> {
-        self.inner
-            .to_xml()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    #[pyo3(signature = (version=None))]
+    fn to_xml(&self, version: Option<&str>) -> PyResult<String> {
+        crate::api::generate_string(&self.inner, "xml", version)
     }
 
     /// Serialize to string (generic).
@@ -276,23 +232,11 @@ impl Rdm {
     /// -------
     /// str
     ///     The serialized string.
-    #[pyo3(signature = (format, validate=true))]
-    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
-        if validate {
-            self.validate(true)?;
-        }
-        match format {
-            "kvn" => self
-                .inner
-                .to_kvn()
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!(
-                "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                other
-            ))),
-        }
+    /// ``version`` preserves the source version unless explicitly overridden.
+    #[pyo3(signature = (format, validate=true, version=None))]
+    fn to_str(&self, format: &str, validate: bool, version: Option<&str>) -> PyResult<String> {
+        crate::api::require_checked_generation(validate)?;
+        crate::api::generate_string(&self.inner, format, version)
     }
 
     /// Write to a file.
@@ -304,13 +248,19 @@ impl Rdm {
     /// format : str
     ///     Format ('kvn' or 'xml').
     /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    #[pyo3(signature = (path, format, validate=true))]
-    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
-        let data = self.to_str(format, validate)?;
-        fs::write(path, data).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Failed to write file: {}", e))
-        })
+    ///     Must remain True; unchecked generation is not supported.
+    /// version : str, optional
+    ///     Source version by default, ``"latest"``, or an exact supported version.
+    #[pyo3(signature = (path, format, validate=true, version=None))]
+    fn to_file(
+        &self,
+        path: &str,
+        format: &str,
+        validate: bool,
+        version: Option<&str>,
+    ) -> PyResult<()> {
+        crate::api::require_checked_generation(validate)?;
+        crate::api::generate_file(&self.inner, path, format, version)
     }
 }
 

@@ -20,8 +20,9 @@
 
 use crate::error::{FormatError, Result};
 use quick_xml::de::from_str as from_xml_str;
-use quick_xml::se::to_string as to_xml_string;
 use serde::{de::DeserializeOwned, Serialize};
+use std::fmt::Write as FmtWrite;
+use std::io::Write as IoWrite;
 
 /// Header for CCSDS XML messages.
 const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
@@ -53,8 +54,43 @@ pub fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &str) -> R
 ///
 /// Includes the standard XML declaration.
 pub fn to_string<T: Serialize>(t: &T) -> Result<String> {
-    let xml_body = to_xml_string(t)?;
-    Ok(format!("{}\n{}", XML_HEADER, xml_body))
+    let mut output = String::with_capacity(1024);
+    output.push_str(XML_HEADER);
+    output.push('\n');
+    quick_xml::se::to_writer(&mut output, t)?;
+    Ok(output)
+}
+
+struct IoFmtWriter<'a, W> {
+    output: &'a mut W,
+    error: Option<std::io::Error>,
+}
+
+impl<W: IoWrite> FmtWrite for IoFmtWriter<'_, W> {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        self.output.write_all(value.as_bytes()).map_err(|error| {
+            if self.error.is_none() {
+                self.error = Some(error);
+            }
+            std::fmt::Error
+        })
+    }
+}
+
+pub(crate) fn to_writer<W: IoWrite, T: Serialize>(output: &mut W, value: &T) -> Result<()> {
+    output.write_all(XML_HEADER.as_bytes())?;
+    output.write_all(b"\n")?;
+
+    let mut adapter = IoFmtWriter {
+        output,
+        error: None,
+    };
+    let serialization = quick_xml::se::to_writer(&mut adapter, value);
+    if let Some(error) = adapter.error {
+        return Err(error.into());
+    }
+    serialization?;
+    Ok(())
 }
 
 #[cfg(test)]

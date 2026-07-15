@@ -51,10 +51,26 @@ impl crate::traits::Validate for Cdm {
         self.header.validate()?;
         self.body.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::collect_message_validation_errors(
+            crate::validation::MessageKind::Cdm,
+            &self.id,
+            &self.version,
+            &self.header,
+            &self.body,
+        )
+    }
 }
 
 impl Ndm for Cdm {
     fn to_kvn(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Cdm,
+            &self.version,
+            crate::generation::OutputFormat::Kvn,
+            self,
+        )?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
@@ -67,6 +83,12 @@ impl Ndm for Cdm {
     }
 
     fn to_xml(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Cdm,
+            &self.version,
+            crate::generation::OutputFormat::Xml,
+            self,
+        )?;
         crate::xml::to_string(self)
     }
 
@@ -76,6 +98,8 @@ impl Ndm for Cdm {
         Ok(cdm)
     }
 }
+
+crate::impl_versioned_ndm!(Cdm, Cdm);
 
 //----------------------------------------------------------------------
 // Header
@@ -181,6 +205,17 @@ impl crate::traits::Validate for CdmHeader {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "CDM Header",
+            [
+                ("CREATION_DATE", self.creation_date.is_empty()),
+                ("ORIGINATOR", self.originator.trim().is_empty()),
+                ("MESSAGE_ID", self.message_id.trim().is_empty()),
+            ],
+        ))
+    }
 }
 
 impl ToKvn for CdmHeader {
@@ -241,6 +276,39 @@ impl crate::traits::Validate for CdmBody {
             segment.validate()?;
         }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        if self.segments.len() != 2 {
+            errors.push(ValidationError::Generic {
+                message: Cow::Borrowed("CDM Body must have exactly 2 segments"),
+                line: None,
+            });
+        }
+        let object1_count = self
+            .segments
+            .iter()
+            .filter(|segment| segment.metadata.object == CdmObjectType::Object1)
+            .count();
+        let object2_count = self
+            .segments
+            .iter()
+            .filter(|segment| segment.metadata.object == CdmObjectType::Object2)
+            .count();
+        if object1_count != 1 || object2_count != 1 {
+            errors.push(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "CDM Body segments must contain exactly one OBJECT1 and one OBJECT2",
+                ),
+                line: None,
+            });
+        }
+        errors.extend(self.relative_metadata_data.validation_errors()?);
+        for segment in &self.segments {
+            errors.extend(segment.validation_errors()?);
+        }
+        Ok(errors)
     }
 }
 
@@ -431,6 +499,10 @@ impl crate::traits::Validate for RelativeMetadataData {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::validation_errors_from(self.validate())
+    }
 }
 
 impl ToKvn for RelativeMetadataData {
@@ -527,6 +599,12 @@ impl crate::traits::Validate for CdmSegment {
         self.metadata.validate()?;
         self.data.validate()?;
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = self.metadata.validation_errors()?;
+        errors.extend(self.data.validation_errors()?);
+        Ok(errors)
     }
 }
 
@@ -866,6 +944,25 @@ impl crate::traits::Validate for CdmMetadata {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "CDM Metadata",
+            [
+                (
+                    "OBJECT_DESIGNATOR",
+                    self.object_designator.trim().is_empty(),
+                ),
+                ("CATALOG_NAME", self.catalog_name.trim().is_empty()),
+                ("OBJECT_NAME", self.object_name.trim().is_empty()),
+                (
+                    "INTERNATIONAL_DESIGNATOR",
+                    self.international_designator.trim().is_empty(),
+                ),
+                ("EPHEMERIS_NAME", self.ephemeris_name.trim().is_empty()),
+            ],
+        ))
+    }
 }
 
 impl CdmMetadata {
@@ -921,7 +1018,23 @@ impl crate::traits::Validate for CdmData {
             }
             .into());
         }
+        self.state_vector.validate()?;
+        if let Some(covariance_matrix) = &self.covariance_matrix {
+            covariance_matrix.validate()?;
+        }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "CDM Data",
+            [("covarianceMatrix", self.covariance_matrix.is_none())],
+        );
+        errors.extend(self.state_vector.validation_errors()?);
+        if let Some(covariance_matrix) = &self.covariance_matrix {
+            errors.extend(covariance_matrix.validation_errors()?);
+        }
+        Ok(errors)
     }
 }
 
@@ -1138,6 +1251,47 @@ pub struct CdmStateVector {
     ///
     /// Units: km/s
     pub z_dot: VelocityRequired,
+}
+
+fn non_finite_error(field: &'static str, value: f64) -> Option<ValidationError> {
+    (!value.is_finite()).then(|| ValidationError::InvalidValue {
+        field: field.into(),
+        value: value.to_string(),
+        expected: "a finite number".into(),
+        line: None,
+    })
+}
+
+impl Validate for CdmStateVector {
+    fn validate(&self) -> Result<()> {
+        for (field, value) in self.values() {
+            if let Some(error) = non_finite_error(field, value) {
+                return Err(error.into());
+            }
+        }
+        Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(self
+            .values()
+            .filter_map(|(field, value)| non_finite_error(field, value))
+            .collect())
+    }
+}
+
+impl CdmStateVector {
+    fn values(&self) -> impl Iterator<Item = (&'static str, f64)> {
+        [
+            ("X", self.x.value),
+            ("Y", self.y.value),
+            ("Z", self.z.value),
+            ("X_DOT", self.x_dot.value),
+            ("Y_DOT", self.y_dot.value),
+            ("Z_DOT", self.z_dot.value),
+        ]
+        .into_iter()
+    }
 }
 
 impl ToKvn for CdmStateVector {
@@ -1460,6 +1614,111 @@ pub struct CdmCovarianceMatrix {
         with = "crate::utils::nullable"
     )]
     pub cthr_thr: Option<M2s4>,
+}
+
+impl Validate for CdmCovarianceMatrix {
+    fn validate(&self) -> Result<()> {
+        for (field, value) in self.values() {
+            if let Some(error) = non_finite_error(field, value) {
+                return Err(error.into());
+            }
+        }
+        Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(self
+            .values()
+            .filter_map(|(field, value)| non_finite_error(field, value))
+            .collect())
+    }
+}
+
+impl CdmCovarianceMatrix {
+    fn values(&self) -> impl Iterator<Item = (&'static str, f64)> + '_ {
+        let required = [
+            ("CR_R", self.cr_r.value),
+            ("CT_R", self.ct_r.value),
+            ("CT_T", self.ct_t.value),
+            ("CN_R", self.cn_r.value),
+            ("CN_T", self.cn_t.value),
+            ("CN_N", self.cn_n.value),
+            ("CRDOT_R", self.crdot_r.value),
+            ("CRDOT_T", self.crdot_t.value),
+            ("CRDOT_N", self.crdot_n.value),
+            ("CRDOT_RDOT", self.crdot_rdot.value),
+            ("CTDOT_R", self.ctdot_r.value),
+            ("CTDOT_T", self.ctdot_t.value),
+            ("CTDOT_N", self.ctdot_n.value),
+            ("CTDOT_RDOT", self.ctdot_rdot.value),
+            ("CTDOT_TDOT", self.ctdot_tdot.value),
+            ("CNDOT_R", self.cndot_r.value),
+            ("CNDOT_T", self.cndot_t.value),
+            ("CNDOT_N", self.cndot_n.value),
+            ("CNDOT_RDOT", self.cndot_rdot.value),
+            ("CNDOT_TDOT", self.cndot_tdot.value),
+            ("CNDOT_NDOT", self.cndot_ndot.value),
+        ];
+        let optional = [
+            ("CDRG_R", self.cdrg_r.as_ref().map(|value| value.value)),
+            ("CDRG_T", self.cdrg_t.as_ref().map(|value| value.value)),
+            ("CDRG_N", self.cdrg_n.as_ref().map(|value| value.value)),
+            (
+                "CDRG_RDOT",
+                self.cdrg_rdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CDRG_TDOT",
+                self.cdrg_tdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CDRG_NDOT",
+                self.cdrg_ndot.as_ref().map(|value| value.value),
+            ),
+            ("CDRG_DRG", self.cdrg_drg.as_ref().map(|value| value.value)),
+            ("CSRP_R", self.csrp_r.as_ref().map(|value| value.value)),
+            ("CSRP_T", self.csrp_t.as_ref().map(|value| value.value)),
+            ("CSRP_N", self.csrp_n.as_ref().map(|value| value.value)),
+            (
+                "CSRP_RDOT",
+                self.csrp_rdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CSRP_TDOT",
+                self.csrp_tdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CSRP_NDOT",
+                self.csrp_ndot.as_ref().map(|value| value.value),
+            ),
+            ("CSRP_DRG", self.csrp_drg.as_ref().map(|value| value.value)),
+            ("CSRP_SRP", self.csrp_srp.as_ref().map(|value| value.value)),
+            ("CTHR_R", self.cthr_r.as_ref().map(|value| value.value)),
+            ("CTHR_T", self.cthr_t.as_ref().map(|value| value.value)),
+            ("CTHR_N", self.cthr_n.as_ref().map(|value| value.value)),
+            (
+                "CTHR_RDOT",
+                self.cthr_rdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CTHR_TDOT",
+                self.cthr_tdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CTHR_NDOT",
+                self.cthr_ndot.as_ref().map(|value| value.value),
+            ),
+            ("CTHR_DRG", self.cthr_drg.as_ref().map(|value| value.value)),
+            ("CTHR_SRP", self.cthr_srp.as_ref().map(|value| value.value)),
+            ("CTHR_THR", self.cthr_thr.as_ref().map(|value| value.value)),
+        ];
+
+        required.into_iter().chain(
+            optional
+                .into_iter()
+                .filter_map(|(field, value)| value.map(|value| (field, value))),
+        )
+    }
 }
 
 impl ToKvn for CdmCovarianceMatrix {
