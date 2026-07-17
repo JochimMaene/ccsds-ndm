@@ -37,6 +37,22 @@ def test_unchecked_generation_is_rejected():
         message.to_str("kvn", validate=False)
 
 
+def test_python_opm_validation_exposes_strict_and_aggregate_core_results():
+    message = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn")
+    header = message.header
+    header.originator = ""
+    message.header = header
+
+    with pytest.raises(ccsds_ndm.NdmValidationError) as strict:
+        message.validate()
+    assert strict.value.code == "validation.missing_required_field"
+    assert strict.value.field_path == "header.originator"
+
+    errors = message.validate(strict=False)
+    assert errors is not None
+    assert any("originator" in error.lower() for error in errors)
+
+
 def test_unsupported_file_format_has_no_side_effect(tmp_path):
     message = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn")
     output = tmp_path / "output.ndm"
@@ -109,9 +125,11 @@ def test_python_opm_file_parsing_applies_limits_in_the_rust_core(tmp_path):
 
 def test_python_opm_conversion_delegates_to_strict_rust_core(tmp_path):
     xml = ccsds_ndm.convert_opm(OPM_KVN, "kvn", "xml")
-    assert ccsds_ndm.Opm.from_str(xml, format="xml").to_kvn() == ccsds_ndm.Opm.from_str(
-        OPM_KVN, format="kvn"
-    ).to_kvn()
+    expected_kvn = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn").to_kvn()
+    assert ccsds_ndm.Opm.from_str(xml, format="xml").to_kvn() == expected_kvn
+
+    kvn = ccsds_ndm.convert_opm(xml, "xml", "kvn")
+    assert ccsds_ndm.Opm.from_str(kvn, format="kvn").to_kvn() == expected_kvn
 
     source = tmp_path / "source.kvn"
     destination = tmp_path / "destination.xml"

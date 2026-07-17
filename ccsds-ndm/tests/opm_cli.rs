@@ -56,6 +56,15 @@ fn validate_has_stable_exit_and_json_diagnostic_contracts() {
     );
     assert_eq!(limited.status.code(), Some(4));
     assert!(limited.stdout.is_empty());
+
+    let xml = Opm::from_kvn(KVN)
+        .expect("KVN fixture should parse")
+        .to_xml()
+        .expect("fixture should generate as XML");
+    let valid_xml = cli(&["validate", "--format", "xml", "-"], Some(&xml));
+    assert_eq!(valid_xml.status.code(), Some(0));
+    assert!(valid_xml.stdout.is_empty());
+    assert!(valid_xml.stderr.is_empty());
 }
 
 #[test]
@@ -64,7 +73,23 @@ fn convert_keeps_document_bytes_separate_and_protects_destination_files() {
     assert_eq!(output.status.code(), Some(0));
     assert!(output.stderr.is_empty());
     let xml = String::from_utf8(output.stdout).expect("stdout should be UTF-8 XML");
-    Opm::from_xml(&xml).expect("stdout should contain only the converted document");
+    let expected = Opm::from_kvn(KVN).expect("fixture should parse");
+    assert_eq!(
+        Opm::from_xml(&xml).expect("stdout should contain only the converted document"),
+        expected
+    );
+
+    let reverse = cli(
+        &["convert", "--from", "xml", "--to", "kvn", "-"],
+        Some(&xml),
+    );
+    assert_eq!(reverse.status.code(), Some(0));
+    assert!(reverse.stderr.is_empty());
+    let kvn = String::from_utf8(reverse.stdout).expect("stdout should be UTF-8 KVN");
+    assert_eq!(
+        Opm::from_kvn(&kvn).expect("reverse-converted KVN should parse"),
+        expected
+    );
 
     let directory = tempfile::tempdir().expect("temporary directory should be created");
     let destination = directory.path().join("output.xml");

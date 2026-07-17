@@ -140,6 +140,24 @@ conformance-opm-conversion:
 conformance-opm-cli:
     cargo test --manifest-path {{rust_manifest}} --test opm_cli
 
+conformance-opm-python:
+    cd {{python_dir}} && uv run pytest tests/test_opm.py tests/test_parse_and_generation_options.py
+
+# Reproduce the complete OPM 3.0 technical verification and artifact evidence
+verify-opm:
+    just check
+    just conformance-opm-xml
+    just conformance-opm-kvn
+    just conformance-opm-parse
+    just conformance-opm-validation
+    just conformance-opm-conversion
+    just conformance-opm-cli
+    just conformance-opm-python
+    cargo check --manifest-path {{rust_manifest}} --all-features --benches
+    just docs
+    just package-rust
+    just package-python
+
 # Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
 check: lint audit-strict stubs-check sync-docs-check test
 

@@ -136,13 +136,29 @@ An operation-specific capability is advertised only when every applicable criter
 - stable diagnostic codes, exit behavior, and structured output have compatibility tests;
 - representative benchmarks demonstrate advertised scale and performance properties;
 - release artifacts install and run on every advertised platform; and
-- compatibility, security, migration, and reproducible-release policies are maintained for the public surface.
+- compatibility, security-reporting scope, migration, and reproducible-release policies are
+  maintained for the public surface.
 
 The matrix records capability-level evidence and surface/release evidence separately. Requirements
 about message behavior, diagnostics, notation, semantic preservation, and resource safety apply to
 the exact capability cell. Requirements about artifacts, platforms, compatibility, documentation,
 security, migration, and reproducible releases apply to the public surface and release containing
 that cell. A cell is `verified` only when both sets of applicable gates are green.
+
+### Proportionate pre-1.0 verification
+
+`verified` is a technical conformance status, not a claim of project maturity or broad adoption.
+Before 1.0, an exact capability can be verified from normative mapping, deterministic executable
+evidence, documented resource behavior, and installation of the release artifact in its explicitly
+tested environment. Verification does not require an independent reviewer or adopter, a private
+vulnerability-intake channel, or a hard wall-clock regression threshold.
+
+Those are useful maturity signals and remain part of the separate
+[reference-status scorecard](reference-status.md). A pre-1.0 security policy may accurately state
+that only public reporting is available. Timing benchmarks remain reproducible evidence of the
+workload and scaling behavior; hard timing gates are introduced only when a stable runner and
+sufficient history make their thresholds meaningful. Deterministic correctness, allocation,
+input, output, depth, and line-length limits remain enforceable regression gates.
 
 ## Performance Contract
 
@@ -157,4 +173,8 @@ Performance claims include the corpus, hardware, software versions, commands, an
 - deterministic failure behavior for configured input, line, record, and document limits; and
 - fair comparisons with relevant independent implementations on identical public inputs.
 
-The project does not claim to be the fastest implementation without reproducible evidence. Its durable promise is native performance with explicit, regression-tested resource behavior while preserving the same conformance decisions on every advertised surface.
+The project does not claim to be the fastest implementation without reproducible evidence. Timing
+results are informational unless a capability explicitly publishes a stable benchmark environment
+and threshold. Its durable promise is native performance with reproducible representative
+workloads and explicit, regression-tested resource behavior while preserving the same conformance
+decisions on every advertised surface.

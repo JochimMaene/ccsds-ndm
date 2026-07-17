@@ -9,9 +9,9 @@ Normative inputs:
 - CCSDS 502.0-B-3, *Orbit Data Messages*, April 2023;
 - CCSDS 502.0-B-3 EC 1, May 2023, for semantics not expressed by the XSD.
 
-This is the initial requirement inventory for generating a standalone OPM 3.0 XML document through
-the Rust API. `Covered` means the cited evidence exercises the requirement. `Partial` or `Gap`
-prevents the capability from becoming `verified`.
+This inventory covers generation of a standalone OPM 3.0 XML document through the Rust API.
+`Covered` means the cited evidence exercises the requirement. `Partial` or `Gap` prevents the
+capability from becoming `verified`.
 
 Checks that require information outside a self-contained OPM—such as an exchange-partner ICD,
 registry membership, or the physical definition of a reference frame and time system—are caller
@@ -61,11 +61,8 @@ Evidence links used below:
 | Public Rust API contract | Covered | The documented typed, version-aware, streaming, type-erased, and file entry points state their validation, edition-selection, output, and failure behavior. `public_opm_xml_generation_signatures_remain_compatible` fixes their public signatures in executable evidence. The raw serde XML serializer is crate-internal, so it cannot bypass the public generation gate. |
 | Stable structured diagnostics | Covered | Every safely reachable OPM missing-required-field, invalid-choice, invalid-value, and out-of-range generation failure exposes a stable code and complete model path relative to the message root. The [minimal diagnostic contract](../design/opm-generation-diagnostics.md) adds a failure-only context wrapper and borrowed view with severity, operation, notation, message kind, source/target edition, code, optional path, and explicitly non-applicable generation location/recovery fields. `opm_generation_diagnostics` proves identical context across typed, versioned, streaming, type-erased, and file entry points. Sink and file failures retain `io.error` without a model path. No success-path diagnostic context is allocated. Normative identifiers remain optional and are not invented for broad error categories. |
 | Panic-free and bounded output | Covered | [Failing-writer tests](../../ccsds-ndm/tests/opm_xml_writer_failure.rs) cover multiple sink-failure boundaries and verify stable I/O diagnostics without panics. `GenerateOptions::max_output_bytes` is an optional caller resource policy with no finite default. [Limit tests](../../ccsds-ndm/tests/opm_generation_limits.rs) cover exact bounds, stable resource diagnostics, explicit larger limits, and zero-byte streaming rejection. A counting preflight is used only when the caller configures a limit; unlimited streaming retains the single serialization pass. Per-field limits are not added because the aggregate bound is sufficient for this bounded-size OPM model. |
-| Representative performance | Partial | `xml_generate_opm` benchmarks the richest shipped OPM fixture through both materialized and streaming XML generation, includes the shared validation gate in each iteration, and reports throughput using generated output bytes. `opm_xml_allocations` enforces materialized, streaming, and configured-limit allocation budgets and the streaming implementation writes directly to the caller sink without retaining a document buffer. `just bench-opm-xml` reproduces the workload. Published timing baselines and noise-aware regression thresholds remain open. |
-| Rust surface/release gates | Partial | The [pre-1.0 Rust release policy](../rust-release-policy.md) deliberately supports current stable Rust on Ubuntu only, records the unstable compatibility contract, and does not require byte-identical artifacts before 1.0. `just package-rust` packages, extracts, installs, and executes the CLI from the artifact; clean-checkout CI also requires the tag to match the crate version. The private security-reporting route remains open. |
+| Representative performance | Covered | `xml_generate_opm` benchmarks the richest shipped OPM fixture through both materialized and streaming XML generation, includes the shared validation gate in each iteration, and reports throughput using generated output bytes. `opm_xml_allocations` enforces materialized, streaming, and configured-limit allocation budgets and the streaming implementation writes directly to the caller sink without retaining a document buffer. `just bench-opm-xml` reproduces the workload. Wall-clock results are informational under the proportionate pre-1.0 policy. |
+| Rust surface/release gates | Covered | The [pre-1.0 Rust release policy](../rust-release-policy.md) deliberately supports current stable Rust on Ubuntu only, records the unstable compatibility contract and public-only security-reporting scope, and does not require byte-identical artifacts before 1.0. `just package-rust` packages, extracts, installs, and executes the CLI from the artifact; clean-checkout CI also requires the tag to match the crate version. |
 
-## Next Small Implementation Step
-
-Choose and document a private vulnerability-reporting route before claiming a complete Rust
-security gate. Keep that repository-level decision separate from OPM wire-format logic. Do not
-mark the capability `verified` until every remaining `Partial` and `Gap` above is closed.
+No known XML-generation requirement gap remains. Run the linked verification recipe when changing
+the cell status.

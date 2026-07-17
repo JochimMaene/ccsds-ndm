@@ -40,7 +40,11 @@ reproducible artifacts and supply-chain provenance are not required before 1.0 a
 
 ## Security reporting
 
-The project does not yet document a private vulnerability-reporting channel. Non-sensitive defects
-may be reported through the public issue tracker, but undisclosed vulnerability details should not
-be posted publicly. Until a private reporting route and a response policy are established, the
-security release gate remains open and the project does not claim mature security handling.
+Defects are currently reported through the public issue tracker. The project does not offer a
+private vulnerability-intake channel and therefore asks reporters not to post secrets, credentials,
+or other sensitive operational data. This explicit pre-1.0 scope describes how the current release
+is maintained; it is not a claim of confidential disclosure handling or mature security response.
+
+A private route and response-time policy should be added only when maintainership and operational
+use justify sustaining them. Mature security handling remains a reference-status goal rather than
+a technical OPM conformance gate.

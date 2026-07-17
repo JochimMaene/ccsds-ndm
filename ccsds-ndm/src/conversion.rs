@@ -82,7 +82,11 @@ fn read_input(
         .read_to_end(&mut bytes)?;
     if bytes.len() > limit {
         let notation = source_hint.unwrap_or_else(|| {
-            if bytes.iter().copied().find(|byte| !byte.is_ascii_whitespace()) == Some(b'<')
+            if bytes
+                .iter()
+                .copied()
+                .find(|byte| !byte.is_ascii_whitespace())
+                == Some(b'<')
             {
                 Notation::Xml
             } else {

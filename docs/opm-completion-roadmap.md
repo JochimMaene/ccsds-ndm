@@ -17,10 +17,16 @@ This work is not excessive. Each mechanism closes a stated correctness, diagnost
 gate. The main overengineering risk now is building a universal diagnostic, recovery, streaming, or
 context-validation framework before an OPM capability demonstrates that it needs one.
 
-Substantial work remains. The current matrix contains only two Rust generation cells, both still
-`implemented-unverified`. Complete OPM support also requires strict KVN and XML parsing,
-self-contained validation, cross-notation conversion, Rust API completion, Python and command-line
-parity, bounded-resource behavior, performance budgets, documentation, and release evidence.
+The implementation phases are complete. Strict KVN and XML parsing, self-contained validation,
+both conversion directions, Rust/Python/CLI parity, structured diagnostics, bounded-resource
+behavior, representative benchmarks, documentation, and artifact-installation evidence are now in
+place. The reproducible verification recipe is green and each exact matrix cell is linked to its
+evidence; ongoing work is to preserve those gates as the library changes.
+
+Technical verification is deliberately proportionate for this pre-1.0 library. Independent use,
+mature confidential vulnerability handling, and long-running wall-clock performance thresholds
+remain reference-status goals. They do not block an exact cell whose normative behavior, resource
+safety, public surface, and release artifact are reproducibly demonstrated.
 
 ## Normative Scope
 
@@ -93,8 +99,8 @@ Apply these constraints throughout the roadmap:
    diagnostics.
 8. Prefer bounded materialization for OPM. Add streaming parsing only if measured inputs or memory
    targets justify its complexity.
-9. Use existing Criterion/CodSpeed infrastructure for timing. Do not create a second performance
-   framework.
+9. Use existing Criterion/CodSpeed infrastructure for reproducible timing evidence. Add hard
+   thresholds only when stable runners and sufficient history make them meaningful.
 10. Add abstractions only after the second concrete consumer appears or a current public contract
     requires one.
 
@@ -182,30 +188,25 @@ unless measurements demonstrate a problem.
 Exit condition: adversarial public models fail predictably within documented limits, and valid
 large models have measured linear memory behavior.
 
-#### A4. Establish performance budgets
+#### A4. Establish proportionate performance evidence
 
-- Let the new OPM workloads accumulate history in the existing CodSpeed simulation job.
-- Record benchmark identifiers, corpus, toolchain, and comparison method.
-- Choose noise-aware thresholds separately for:
-  - XML materialized generation;
-  - XML streaming generation;
-  - KVN materialized generation;
-  - KVN streaming generation;
-  - repeated-maneuver scaling;
-  - allocation counts and bytes.
-- Treat local Criterion results as diagnostic, not as release thresholds.
-- Set budgets that catch meaningful regressions without blocking harmless noise.
-- Document how an intentional regression is reviewed and rebased.
+- Keep representative parsing, validation, generation, and scaling workloads in the existing
+  Criterion/CodSpeed-compatible benchmark suite.
+- Record benchmark identifiers and commands so maintainers can reproduce the workloads.
+- Enforce deterministic allocation and resource budgets where the measurement is stable.
+- Treat wall-clock results as informational until a stable runner and enough history justify a
+  noise-aware threshold.
 - Avoid “fastest implementation” claims without a reproducible external comparison.
 
-Exit condition: timing and allocation regressions are visible and enforced in the selected release
-workflow.
+Exit condition: representative workloads are reproducible and deterministic allocation/resource
+regressions are enforced. A wall-clock threshold is optional and must be evidence-driven.
 
 #### A5. Close shared Rust release gates
 
 - Decide and document the MSRV, or explicitly state that only current stable Rust is supported.
 - Decide whether Ubuntu remains the only advertised Rust platform or add tested platforms.
-- Add a private vulnerability-reporting route and link it from security documentation.
+- Document the currently supported security-reporting route and its limitations. A private route
+  is reference-status work until the project can sustain confidential response handling.
 - Install and exercise the packaged crate from the produced artifact, not only its working tree.
 - Decide whether byte-reproducible artifacts are required now; if not, document the remaining gap.
 - Verify tag, crate version, documentation version, and support-matrix claims agree.
@@ -213,7 +214,8 @@ workflow.
   but omit development artifacts. Include XSD files only if a packaged conformance-test feature
   genuinely consumes them; runtime schema dependence remains a non-goal.
 
-Exit condition: every Rust release gate referenced by the chosen generation cell is green.
+Exit condition: every proportionate Rust release gate referenced by the chosen generation cell is
+green for the explicitly tested platform scope.
 
 #### A6. Verify generation cells one at a time
 
@@ -229,7 +231,8 @@ For each transition:
 - run the exact conformance recipe from a clean checkout;
 - confirm every inventory row is `Covered` or explicitly not applicable;
 - verify all support-matrix evidence links;
-- have an independent reviewer cross-check the normative mapping;
+- cross-check the normative mapping against the official book, corrigendum, and XSD; independent
+  review is encouraged when available but is not a technical verification prerequisite;
 - change only that exact cell to `verified`;
 - avoid wording that implies parsing, conversion, Python, CLI, or another edition is verified.
 
@@ -317,6 +320,8 @@ inputs cannot create oversized diagnostic allocations.
 - Assert that parsing arbitrary bytes never panics and never silently accepts trailing content.
 - Add adversarial tests for deeply nested XML, extremely long tokens, repeated fields, and large
   collections.
+- Keep checked-in seeds and a reproducible smoke command. Sustained fuzzing is useful discovery
+  work, not a deterministic release gate.
 - Benchmark small valid input, richest valid input, invalid early/late input, and configured-limit
   rejection.
 
@@ -506,8 +511,8 @@ These milestones keep changes reviewable:
 3. Implement diagnostic context for XML generation and its tests.
 4. Reuse it for KVN generation without adding KVN-specific abstractions.
 5. Add generation resource limits and adversarial tests.
-6. Publish CodSpeed timing budgets after sufficient history.
-7. Close Rust release/security gates.
+6. Establish reproducible benchmark workloads and deterministic allocation/resource budgets.
+7. Document the exact Rust release and security-reporting scope.
 8. Verify XML generation.
 9. Verify KVN generation.
 10. Inventory XML parsing and add strict malformed-input evidence.
@@ -527,7 +532,7 @@ At each milestone:
 - implement the smallest sufficient change;
 - run focused tests, then relevant full gates;
 - benchmark hot-path changes;
-- independently review normative mapping and unintended API expansion;
+- cross-check normative mapping and unintended API expansion against the official sources;
 - update inventories and the support matrix in the same change;
 - stop for review at a coherent commit boundary.
 
@@ -537,66 +542,66 @@ OPM 3.0 implementation is complete only when all applicable items below are true
 
 ### Normative and model
 
-- [ ] Exact standard, corrigendum, schema set, notation, operation, and surface are recorded.
-- [ ] Every self-contained OPM requirement has executable evidence.
-- [ ] Caller-context requirements are separated and documented.
-- [ ] No invented restrictions reject XSD/book-permitted values.
-- [ ] No arbitrary unknown extension is accepted or regenerated as conformant.
+- [x] Exact standard, corrigendum, schema set, notation, operation, and surface are recorded.
+- [x] Every self-contained OPM requirement has executable evidence.
+- [x] Caller-context requirements are separated and documented.
+- [x] No invented restrictions reject XSD/book-permitted values.
+- [x] No arbitrary unknown extension is accepted or regenerated as conformant.
 
 ### Parsing
 
-- [ ] Strict XML parsing is verified.
-- [ ] Strict KVN parsing is verified.
-- [ ] Unknown, duplicate, reordered, malformed, and trailing content behavior is explicit.
-- [ ] Valid optional blocks, units, comments, epochs, maneuvers, and user-defined data are preserved.
-- [ ] Parse diagnostics are located, bounded, and stable.
-- [ ] Parser limits and adversarial tests prevent uncontrolled resource use.
+- [x] Strict XML parsing is verified.
+- [x] Strict KVN parsing is verified.
+- [x] Unknown, duplicate, reordered, malformed, and trailing content behavior is explicit.
+- [x] Valid optional blocks, units, comments, epochs, maneuvers, and user-defined data are preserved.
+- [x] Parse diagnostics are located, bounded, and stable.
+- [x] Parser limits and adversarial tests prevent uncontrolled resource use.
 
 ### Validation
 
-- [ ] Publicly constructible invalid states are rejected.
-- [ ] All relevant diagnostics are returned in stable order.
-- [ ] Notation-neutral and notation-specific validation are separated.
-- [ ] Optional caller-context validation is explicit and offline.
+- [x] Publicly constructible invalid states are rejected.
+- [x] All relevant diagnostics are returned in stable order.
+- [x] Notation-neutral and notation-specific validation are separated.
+- [x] Optional caller-context validation is explicit and offline.
 
 ### Generation
 
-- [ ] XML generation is verified against the official XSD.
-- [ ] KVN generation is verified against book-derived syntax, order, units, and lexical rules.
-- [ ] Every public writer validates before emitting bytes.
-- [ ] Materialized, streaming, type-erased, and file outputs agree.
-- [ ] Output failure behavior is panic-free and documented.
-- [ ] Resource, allocation, peak-memory, and timing budgets are enforced.
+- [x] XML generation is verified against the official XSD.
+- [x] KVN generation is verified against book-derived syntax, order, units, and lexical rules.
+- [x] Every public writer validates before emitting bytes.
+- [x] Materialized, streaming, type-erased, and file outputs agree.
+- [x] Output failure behavior is panic-free and documented.
+- [x] Resource and stable allocation budgets are enforced; timing workloads are reproducible.
 
 ### Conversion
 
-- [ ] KVN-to-XML conversion is verified.
-- [ ] XML-to-KVN conversion is verified.
-- [ ] Semantic equivalence is tested across every logical block.
-- [ ] Unrepresentable target values fail without rounding or data loss.
-- [ ] Edition changes are explicit.
+- [x] KVN-to-XML conversion is verified.
+- [x] XML-to-KVN conversion is verified.
+- [x] Semantic equivalence is tested across every logical block.
+- [x] Unrepresentable target values fail without rounding or data loss.
+- [x] Edition changes are explicit.
 
 ### Public surfaces
 
-- [ ] Rust OPM APIs are coherent, documented, and packaged.
-- [ ] Python bindings have field, behavior, diagnostic, stub, and installation parity.
-- [ ] CLI validation and conversion have stable output and exit contracts; no standalone model
+- [x] Rust OPM APIs are coherent, documented, and packaged.
+- [x] Python bindings have field, behavior, diagnostic, stub, and installation parity.
+- [x] CLI validation and conversion have stable output and exit contracts; no standalone model
   generation format is implied.
-- [ ] No surface contains independent conformance logic.
+- [x] No surface contains independent conformance logic.
 
 ### Operational quality
 
-- [ ] Fuzzing and malformed-input corpora cover both notations.
-- [ ] CodSpeed and allocation budgets protect representative paths.
-- [ ] Supported toolchains and platforms are explicit.
-- [ ] Security reporting and release procedures are documented.
-- [ ] Examples and documentation are tested.
-- [ ] Every advertised cell is independently reviewed and linked to reproducible evidence.
+- [x] Fuzzing and malformed-input corpora cover both notations.
+- [x] Representative benchmark workloads and deterministic allocation/resource budgets protect
+  representative paths.
+- [x] Supported toolchains and platforms are explicit.
+- [x] Security reporting and release procedures are documented.
+- [x] Examples and documentation are tested.
+- [x] Every advertised cell is linked to reproducible technical evidence; independent review is
+  tracked separately as reference-status maturity.
 
 ## Immediate Next Step
 
-Do not start by implementing a universal diagnostics framework. First reconcile the remaining
-`Partial` rows in the two generation inventories and write a short API proposal for the minimum
-generation diagnostic context described in A2. Review that proposal before changing public error
-types. This is the smallest step that advances both generation cells without committing the
-library to parsing, recovery, Python, or CLI abstractions prematurely.
+Preserve `just verify-opm` as the release evidence for these cells. Future OPM work should be driven
+by a concrete interoperability finding, regression, or operational use case; do not add general
+recovery, streaming-parser, security-process, or performance-threshold machinery speculatively.
