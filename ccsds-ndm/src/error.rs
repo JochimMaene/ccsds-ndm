@@ -224,6 +224,7 @@ impl ValidationError {
         match self {
             Self::MissingRequiredField { .. } => Some("validation.missing_required_field"),
             Self::InvalidValue { .. } => Some("validation.invalid_value"),
+            Self::OutOfRange { .. } => Some("validation.out_of_range"),
             Self::AtPath { source, .. } => source.code(),
             _ => None,
         }

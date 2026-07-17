@@ -137,61 +137,114 @@ fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
 
 #[test]
 fn xml_generation_enforces_keplerian_xsd_ranges_after_mutation() {
-    let mut message = opm();
-    message
-        .body
-        .segment
-        .data
-        .keplerian_elements
-        .as_mut()
-        .unwrap()
-        .eccentricity
-        .value = -0.1;
-    assert!(message.to_xml().is_err());
+    type Mutation = (&'static str, fn(&mut Opm));
+    let mutations: [Mutation; 7] = [
+        ("ECCENTRICITY", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .eccentricity
+                .value = -0.1
+        }),
+        ("INCLINATION", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .inclination
+                .angle
+                .value = 180.1
+        }),
+        ("RA_OF_ASC_NODE", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .ra_of_asc_node
+                .value = 360.0
+        }),
+        ("ARG_OF_PERICENTER", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .arg_of_pericenter
+                .value = -360.1
+        }),
+        ("TRUE_ANOMALY", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .true_anomaly
+                .as_mut()
+                .unwrap()
+                .value = 360.0
+        }),
+        ("MEAN_ANOMALY", |message| {
+            let elements = message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap();
+            elements.true_anomaly = None;
+            elements.mean_anomaly = Some(ccsds_ndm::types::Angle::new(0.0, None).unwrap());
+            elements.mean_anomaly.as_mut().unwrap().value = -360.1;
+        }),
+        ("GM", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .gm
+                .value = 0.0
+        }),
+    ];
 
-    for inclination in [-0.1, 180.1] {
+    for (field, mutate) in mutations {
         let mut message = opm();
-        message
-            .body
-            .segment
-            .data
-            .keplerian_elements
-            .as_mut()
-            .unwrap()
-            .inclination
-            .angle
-            .value = inclination;
-        assert!(
-            message.to_xml().is_err(),
-            "accepted inclination {inclination}"
+        mutate(&mut message);
+        let path = format!(
+            "body.segment.data.keplerian_elements.{}",
+            field.to_ascii_lowercase()
         );
+        assert_out_of_range_diagnostic(field, message.to_xml(), &path);
     }
+}
 
-    for angle in [-360.1, 360.0] {
-        let mut message = opm();
-        message
-            .body
-            .segment
-            .data
-            .keplerian_elements
-            .as_mut()
-            .unwrap()
-            .ra_of_asc_node
-            .value = angle;
-        assert!(message.to_xml().is_err(), "accepted angle {angle}");
+fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
+    field: &str,
+    result: Result<T>,
+    expected_path: &str,
+) {
+    match result.expect_err(field) {
+        CcsdsNdmError::Validation(error) => {
+            assert_eq!(error.code(), Some("validation.out_of_range"));
+            assert_eq!(error.field_path().as_deref(), Some(expected_path));
+        }
+        error => panic!("{field} returned a non-validation error: {error}"),
     }
-
-    let mut message = opm();
-    message
-        .body
-        .segment
-        .data
-        .keplerian_elements
-        .as_mut()
-        .unwrap()
-        .gm
-        .value = 0.0;
-    assert!(message.to_xml().is_err());
 }
 
 #[test]

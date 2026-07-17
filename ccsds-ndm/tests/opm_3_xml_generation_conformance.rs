@@ -498,7 +498,19 @@ fn opm_3_xml_generation_rejects_every_non_finite_state_vector_component() {
 #[test]
 fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
     type Mutation = (&'static str, bool, fn(&mut Opm));
-    let mutations: [Mutation; 5] = [
+    let mutations: [Mutation; 10] = [
+        ("MASS", false, |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .mass
+                .as_mut()
+                .unwrap()
+                .value = -1.0
+        }),
         ("MASS", true, |opm| {
             opm.body
                 .segment
@@ -519,6 +531,30 @@ fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
                 .as_mut()
                 .unwrap()
                 .solar_rad_area
+                .as_mut()
+                .unwrap()
+                .value = -1.0
+        }),
+        ("SOLAR_RAD_AREA", true, |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .solar_rad_area
+                .as_mut()
+                .unwrap()
+                .value = f64::NAN
+        }),
+        ("SOLAR_RAD_COEFF", false, |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .solar_rad_coeff
                 .as_mut()
                 .unwrap()
                 .value = -1.0
@@ -547,6 +583,30 @@ fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
                 .unwrap()
                 .value = -1.0
         }),
+        ("DRAG_AREA", true, |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .drag_area
+                .as_mut()
+                .unwrap()
+                .value = f64::NAN
+        }),
+        ("DRAG_COEFF", false, |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .drag_coeff
+                .as_mut()
+                .unwrap()
+                .value = -1.0
+        }),
         ("DRAG_COEFF", true, |opm| {
             opm.body
                 .segment
@@ -564,14 +624,14 @@ fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
     for (field, is_invalid_value, mutate) in mutations {
         let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
         mutate(&mut opm);
+        let path = format!(
+            "body.segment.data.spacecraft_parameters.{}",
+            field.to_ascii_lowercase()
+        );
         if is_invalid_value {
-            let path = format!(
-                "body.segment.data.spacecraft_parameters.{}",
-                field.to_ascii_lowercase()
-            );
             assert_invalid_value_diagnostic(field, opm.to_xml(), &path);
         } else {
-            assert!(opm.to_xml().is_err(), "generation accepted invalid {field}");
+            assert_out_of_range_diagnostic(field, opm.to_xml(), &path);
         }
     }
 }
@@ -678,7 +738,11 @@ fn opm_3_xml_generation_validates_maneuver_boundaries() {
     maneuver.body.segment.data.maneuver_parameters[0]
         .man_duration
         .value = -1.0;
-    assert!(maneuver.to_xml().is_err());
+    assert_out_of_range_diagnostic(
+        "MAN_DURATION",
+        maneuver.to_xml(),
+        "body.segment.data.maneuver_parameters.man_duration",
+    );
 
     let mut zero_delta_mass =
         Opm::from_kvn(OPM_3_KVN_FIXTURES[1].1).expect("failed to parse maneuver fixture");
@@ -693,7 +757,11 @@ fn opm_3_xml_generation_validates_maneuver_boundaries() {
     zero_delta_mass.body.segment.data.maneuver_parameters[0]
         .man_delta_mass
         .value = 1.0;
-    assert!(zero_delta_mass.to_xml().is_err());
+    assert_out_of_range_diagnostic(
+        "MAN_DELTA_MASS",
+        zero_delta_mass.to_xml(),
+        "body.segment.data.maneuver_parameters.man_delta_mass",
+    );
 }
 
 fn assert_non_finite_rejected<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
@@ -727,6 +795,28 @@ fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
             assert_eq!(
                 error.code(),
                 Some("validation.invalid_value"),
+                "{surface} returned an unstable diagnostic code"
+            );
+            assert_eq!(
+                error.field_path().as_deref(),
+                Some(expected_path),
+                "{surface} returned an incomplete field path"
+            );
+        }
+        error => panic!("{surface} returned a non-validation error: {error}"),
+    }
+}
+
+fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
+    surface: &str,
+    result: Result<T>,
+    expected_path: &str,
+) {
+    match result.expect_err(surface) {
+        CcsdsNdmError::Validation(error) => {
+            assert_eq!(
+                error.code(),
+                Some("validation.out_of_range"),
                 "{surface} returned an unstable diagnostic code"
             );
             assert_eq!(

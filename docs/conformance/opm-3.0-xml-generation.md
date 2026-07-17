@@ -23,7 +23,9 @@ Evidence links used below:
 - [OPM model and generation validation](../../ccsds-ndm/src/messages/opm.rs);
 - [shared OPM data types and validation](../../ccsds-ndm/src/common.rs);
 - [XML serializer](../../ccsds-ndm/src/xml.rs); and
-- [focused OPM 3.0 XML-generation tests](../../ccsds-ndm/tests/opm_3_xml_generation_conformance.rs).
+- [focused OPM 3.0 XML-generation tests](../../ccsds-ndm/tests/opm_3_xml_generation_conformance.rs);
+- [Keplerian mutation and boundary tests](../../ccsds-ndm/tests/opm_keplerian_xml_generation.rs);
+- [maneuver duration-unit tests](../../ccsds-ndm/tests/opm_maneuver_duration_units.rs).
 
 ## Inventory
 
@@ -52,13 +54,13 @@ Evidence links used below:
 | Deterministic output | Covered | Repeated, versioned, streaming, and generic Rust entry points produce identical bytes for the representative OPM fixture. |
 | Invalid-model rejection | Covered | Public Rust XML generation rejects invalid self-contained public model states before writing: required text, XML-forbidden characters, epochs, units, and every state-vector, Keplerian, spacecraft, covariance, and maneuver number have focused mutation evidence. |
 | XSD-valid generated XML | Covered | All five shipped OPM fixtures pass the official schema after generation, with adversarial coverage of the schema-constrained public fields and XML text positions. |
-| Stable structured diagnostics | Partial | Every safely reachable OPM missing-required-field and invalid-value generation failure exposes a stable code and complete model path relative to the message root through `ValidationError::code` and `ValidationError::field_path`. Focused mutations cover required fields, XML text positions, every public numeric block, and maneuver duration units. Empty required epochs and invalid epoch text are unrepresentable through the public `CalendarEpoch` type. `every_opm_3_xml_generation_entry_point_rejects_an_invalid_model` compatibility-tests one diagnostic across every Rust XML-generation entry point. Path context is attached only when validation fails, avoiding success-path allocation. Other diagnostic categories, including range and field-conflict errors, are not yet stabilized. |
+| Stable structured diagnostics | Partial | Every safely reachable OPM missing-required-field, invalid-value, and out-of-range generation failure exposes a stable code and complete model path relative to the message root through `ValidationError::code` and `ValidationError::field_path`. Focused mutations cover required fields, XML text positions, every public numeric block, maneuver duration units, all five spacecraft ranges, all seven Keplerian ranges, and both maneuver ranges. Empty required epochs and invalid epoch text are unrepresentable through the public `CalendarEpoch` type. `every_opm_3_xml_generation_entry_point_rejects_an_invalid_model` compatibility-tests one diagnostic across every Rust XML-generation entry point. Path context is attached only when validation fails, avoiding success-path allocation. The anomaly-choice, unsupported-version, serialization, and output-error categories are not yet stabilized. |
 | Panic-free and bounded output | Partial | [Failing-writer tests](../../ccsds-ndm/tests/opm_xml_writer_failure.rs) cover multiple sink-failure boundaries and verify I/O error propagation without panics. Broader adversarial-model and resource-bound evidence remains open. |
 | Rust surface/release gates | Gap | Installation, platform, API compatibility, security, migration, and reproducible-release evidence is not yet linked to this cell. |
 
 ## Next Small Implementation Step
 
-Stabilize `validation.out_of_range` using the canonical path context already attached by OPM
-validation, and add focused range-boundary assertions without introducing another diagnostic
-hierarchy. Do not mark the capability `verified` until every remaining `Partial` and `Gap` above is
-closed.
+Resolve the remaining Keplerian anomaly-choice diagnostic with existing error concepts if they can
+represent both the missing-choice and conflicting-choice cases clearly; do not add a one-off error
+hierarchy just to assign a code. Do not mark the capability `verified` until every remaining
+`Partial` and `Gap` above is closed.

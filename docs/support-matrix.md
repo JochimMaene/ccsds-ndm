@@ -57,12 +57,14 @@ Available evidence:
 - Implementation: [`Opm` parsing and generation](../ccsds-ndm/src/messages/opm.rs), shared
   [generation gate](../ccsds-ndm/src/generation.rs), and [XML writer](../ccsds-ndm/src/xml.rs).
 - Executable evidence:
-  [`opm_3_xml_generation_conformance.rs`](../ccsds-ndm/tests/opm_3_xml_generation_conformance.rs)
-  checks every shipped OPM 3.0 KVN and XML fixture against the official schema, checks exact output
-  determinism across the Rust generation entry points, and uses public-model mutations to check
-  rejection of invalid self-contained states. It also covers every safely reachable OPM
-  missing-required-field and invalid-value diagnostic path and compatibility-tests one such
-  diagnostic across every Rust generation entry point. Run it with `just conformance-opm-xml`.
+  [`opm_3_xml_generation_conformance.rs`](../ccsds-ndm/tests/opm_3_xml_generation_conformance.rs),
+  [`opm_keplerian_xml_generation.rs`](../ccsds-ndm/tests/opm_keplerian_xml_generation.rs), and
+  [`opm_maneuver_duration_units.rs`](../ccsds-ndm/tests/opm_maneuver_duration_units.rs) check every
+  shipped OPM 3.0 KVN and XML fixture against the official schema, exact output determinism across
+  the Rust generation entry points, and rejection of invalid self-contained public-model states.
+  Together they cover every safely reachable OPM missing-required-field, invalid-value, and
+  out-of-range diagnostic path and compatibility-test one such diagnostic across every Rust
+  generation entry point. Run the main cell with `just conformance-opm-xml`.
 - Requirement inventory:
   [`opm-3.0-xml-generation.md`](conformance/opm-3.0-xml-generation.md) maps the applicable ODM and
   project quality requirements to current evidence and explicit gaps.
