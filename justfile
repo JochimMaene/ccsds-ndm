@@ -112,12 +112,33 @@ conformance-opm-xml:
     cargo test --manifest-path {{rust_manifest}} --test opm_maneuver_duration_units
     cargo test --manifest-path {{rust_manifest}} --test opm_xml_root_envelope
     cargo test --manifest-path {{rust_manifest}} --test opm_xml_writer_failure
+    cargo test --manifest-path {{rust_manifest}} --test opm_generation_diagnostics
+    cargo test --manifest-path {{rust_manifest}} --test opm_generation_limits
+    cargo test --manifest-path {{rust_manifest}} --test opm_xml_allocations
 
 # Run the OPM 3.0 Rust KVN-generation conformance slice
 conformance-opm-kvn:
     cargo test --manifest-path {{rust_manifest}} --test opm_3_kvn_generation_conformance
     cargo test --manifest-path {{rust_manifest}} --test opm_kvn_writer_failure
     cargo test --manifest-path {{rust_manifest}} --test opm_kvn_allocations
+    cargo test --manifest-path {{rust_manifest}} --test opm_generation_diagnostics
+    cargo test --manifest-path {{rust_manifest}} --test opm_generation_limits
+
+# Run strict OPM parsing, validation, and conversion evidence
+conformance-opm-parse:
+    cargo test --manifest-path {{rust_manifest}} --test opm_strict_kvn_parsing
+    cargo test --manifest-path {{rust_manifest}} --test opm_strict_xml_parsing
+    cargo test --manifest-path {{rust_manifest}} --test opm_parse_diagnostics
+    cargo test --manifest-path {{rust_manifest}} --test opm_parse_limits
+
+conformance-opm-validation:
+    cargo test --manifest-path {{rust_manifest}} --test opm_validation
+
+conformance-opm-conversion:
+    cargo test --manifest-path {{rust_manifest}} --test opm_conversion
+
+conformance-opm-cli:
+    cargo test --manifest-path {{rust_manifest}} --test opm_cli
 
 # Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
 check: lint audit-strict stubs-check sync-docs-check test
@@ -138,6 +159,14 @@ bench-opm-xml:
 # Benchmark materialized and streaming OPM KVN generation
 bench-opm-kvn:
     cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_generate_opm
+
+# Benchmark OPM strict parsing and typed validation
+bench-opm-parse:
+    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_parse_opm
+    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_parse_opm
+
+bench-opm-validation:
+    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- opm_validate
 
 # --- Coverage ---------------------------------------------------------------
 
@@ -161,9 +190,13 @@ bench-run:
 build:
     cd {{python_dir}} && uv run maturin build --release --strip --out ../../dist
 
-# Build and verify the publishable Rust crate from a clean working tree
+# Build and import the wheel in an isolated environment
+package-python: build
+    bash scripts/verify-python-package.sh
+
+# Build and verify the publishable Rust crate artifact (CI supplies a clean checkout)
 package-rust:
-    cargo package --manifest-path {{rust_manifest}} --locked
+    bash scripts/verify-rust-package.sh
 
 # Build the documentation
 docs:

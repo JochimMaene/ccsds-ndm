@@ -2,6 +2,33 @@
 from typing import Optional, Union
 import numpy
 
+def convert_opm(
+    data: str,
+    from_format: str,
+    to_format: str,
+    max_input_bytes: Optional[int] = None,
+    max_xml_depth: Optional[int] = None,
+    max_output_bytes: Optional[int] = None,
+):
+    """
+    Strictly convert a standalone OPM between KVN and XML.
+    """
+    ...
+
+def convert_opm_file(
+    source_path: str,
+    destination_path: str,
+    from_format: str,
+    to_format: str,
+    max_input_bytes: Optional[int] = None,
+    max_xml_depth: Optional[int] = None,
+    max_output_bytes: Optional[int] = None,
+):
+    """
+    Strictly convert an OPM file and atomically replace the destination.
+    """
+    ...
+
 def from_file(
     path: str,
 ) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
@@ -10733,7 +10760,12 @@ class Opm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Opm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+    ) -> Opm:
         """
         Create an OPM message from a file.
 
@@ -10752,7 +10784,12 @@ class Opm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Opm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+    ) -> Opm:
         """
         Create an OPM message from a string.
         """
@@ -10795,6 +10832,7 @@ class Opm:
         format: str,
         validate: bool = True,
         version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> None:
         """
         Write to file.
@@ -10812,7 +10850,9 @@ class Opm:
         """
         ...
 
-    def to_kvn(self, version: Optional[str] = None) -> str:
+    def to_kvn(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to KVN, preserving the source version by default.
 
@@ -10821,14 +10861,20 @@ class Opm:
         ...
 
     def to_str(
-        self, format: str, validate: bool = True, version: Optional[str] = None
+        self,
+        format: str,
+        validate: bool = True,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> str:
         """
         Serialize to KVN or XML. ``validate`` must remain true.
         """
         ...
 
-    def to_xml(self, version: Optional[str] = None) -> str:
+    def to_xml(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to XML, preserving the source version by default.
         """

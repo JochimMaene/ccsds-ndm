@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::{from_str, MessageType};
+use ccsds_ndm::from_str;
 
 #[test]
-fn test_kvn_detect_messy_preamble() {
+fn test_kvn_detection_does_not_bypass_strict_preamble_rules() {
     let input = r#"
 
     COMMENT This file starts with blank lines
@@ -29,19 +29,19 @@ fn test_kvn_detect_messy_preamble() {
     Y_DOT = 7.5 [km/s]
     Z_DOT = 0.0 [km/s]
 "#;
-    let msg = from_str(input).unwrap();
-    assert!(matches!(msg, MessageType::Opm(_)));
+    let error = from_str(input).expect_err("leading comments would be lost");
+    assert_eq!(error.code(), Some("parse.kvn.syntax"));
 }
 
 #[test]
-fn test_kvn_detect_crlf_and_tabs() {
+fn test_kvn_detection_does_not_bypass_printable_ascii_rules() {
     let input = "\r\n\tCOMMENT Tab indented\r\n\t\t\r\nCCSDS_OPM_VERS = 3.0\r\nCREATION_DATE = 2024-01-01T00:00:00\r\nORIGINATOR=X\r\nOBJECT_NAME=Y\r\nOBJECT_ID=1\r\nCENTER_NAME=EARTH\r\nREF_FRAME=GCRF\r\nTIME_SYSTEM=UTC\r\nEPOCH=2024-01-01T00:00:00\r\nX=0\r\nY=0\r\nZ=0\r\nX_DOT=0\r\nY_DOT=0\r\nZ_DOT=0\r\n";
-    let msg = from_str(input).unwrap();
-    assert!(matches!(msg, MessageType::Opm(_)));
+    let error = from_str(input).expect_err("tabs are not printable ASCII");
+    assert_eq!(error.code(), Some("parse.kvn.syntax"));
 }
 
 #[test]
-fn test_xml_detect_messy_preamble() {
+fn test_xml_detection_does_not_bypass_declaration_placement() {
     let input = r#"
     <?xml version="1.0" encoding="UTF-8"?>
     <!-- A comment before the root element -->
@@ -76,8 +76,8 @@ fn test_xml_detect_messy_preamble() {
         </body>
       </opm>
 "#;
-    let msg = from_str(input).unwrap();
-    assert!(matches!(msg, MessageType::Opm(_)));
+    let error = from_str(input).expect_err("the XML declaration is not first");
+    assert_eq!(error.code(), Some("parse.xml.syntax"));
 }
 
 #[test]

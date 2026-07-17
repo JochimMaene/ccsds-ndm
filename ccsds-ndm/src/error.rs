@@ -8,6 +8,67 @@ use thiserror::Error;
 use winnow::error::{AddContext, ParserError, StrContext};
 use winnow::stream::Stream;
 
+/// Severity of a structured diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticSeverity {
+    Error,
+}
+
+/// Public operation that produced a diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticOperation {
+    Generate,
+    Parse,
+}
+
+/// Wire notation selected for an operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticNotation {
+    Kvn,
+    Xml,
+}
+
+/// Context stored only when generation fails.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GenerationErrorContext {
+    pub notation: DiagnosticNotation,
+    pub message_kind: crate::validation::MessageKind,
+    pub source_edition: String,
+    pub target_edition: String,
+}
+
+/// Context stored only when strict parsing fails.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseErrorContext {
+    pub notation: DiagnosticNotation,
+    pub message_kind: crate::validation::MessageKind,
+    pub source_edition: Option<String>,
+    pub byte_offset: Option<usize>,
+    pub line: Option<usize>,
+    pub column: Option<usize>,
+    pub original_token: Option<String>,
+    pub expected: Option<&'static str>,
+}
+
+/// Borrowed, machine-readable diagnostic information.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Diagnostic<'a> {
+    pub severity: DiagnosticSeverity,
+    pub operation: DiagnosticOperation,
+    pub notation: DiagnosticNotation,
+    pub message_kind: crate::validation::MessageKind,
+    pub source_edition: Option<&'a str>,
+    pub target_edition: Option<&'a str>,
+    pub code: Option<&'static str>,
+    pub field_path: Option<String>,
+    pub requirement: Option<&'static str>,
+    pub source_location: Option<(usize, usize)>,
+    pub byte_offset: Option<usize>,
+    pub original_token: Option<&'a str>,
+    pub expected: Option<&'static str>,
+    pub recovery: Option<&'static str>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseDiagnostic {
     pub line: usize,
@@ -414,6 +475,22 @@ impl WithLocation for ValidationError {
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum CcsdsNdmError {
+    /// An existing error enriched with public generation context.
+    #[error("{source}")]
+    Generation {
+        context: Box<GenerationErrorContext>,
+        #[source]
+        source: Box<CcsdsNdmError>,
+    },
+
+    /// An existing error enriched with strict parsing context.
+    #[error("{source}")]
+    Parsing {
+        context: Box<ParseErrorContext>,
+        #[source]
+        source: Box<CcsdsNdmError>,
+    },
+
     /// Errors occurring during I/O operations.
     #[error("I/O error: {0}")]
     Io(
@@ -461,6 +538,14 @@ pub enum CcsdsNdmError {
         format: &'static str,
         version: String,
         supported: String,
+    },
+
+    /// A caller-selected resource policy was exceeded.
+    #[error("Resource limit exceeded for {resource}: {actual} (limit: {limit})")]
+    ResourceLimitExceeded {
+        resource: &'static str,
+        limit: usize,
+        actual: usize,
     },
 
     /// Error when an unexpected end of input is reached.
@@ -729,15 +814,157 @@ impl AddContext<&str, StrContext> for CcsdsNdmError {
 }
 
 impl CcsdsNdmError {
+    pub(crate) fn with_generation_context(
+        self,
+        message_kind: crate::validation::MessageKind,
+        notation: DiagnosticNotation,
+        source_edition: &str,
+        target_edition: &str,
+    ) -> Self {
+        let source = match self {
+            Self::Generation { source, .. } | Self::Parsing { source, .. } => source,
+            error => Box::new(error),
+        };
+        Self::Generation {
+            context: Box::new(GenerationErrorContext {
+                notation,
+                message_kind,
+                source_edition: source_edition.to_owned(),
+                target_edition: target_edition.to_owned(),
+            }),
+            source,
+        }
+    }
+
+    pub(crate) fn with_parse_context(
+        self,
+        message_kind: crate::validation::MessageKind,
+        notation: DiagnosticNotation,
+        input: &str,
+        source_edition: Option<&str>,
+    ) -> Self {
+        let source = match self {
+            Self::Generation { source, .. } | Self::Parsing { source, .. } => source,
+            error => Box::new(error),
+        };
+        let kvn = source.as_kvn_parse_error();
+        let (byte_offset, line, column, original_token, expected) = match kvn {
+            Some(error) => {
+                let excerpt = input
+                    .get(error.offset..)
+                    .and_then(|tail| tail.lines().next())
+                    .map(|token| token.chars().take(128).collect());
+                (
+                    Some(error.offset),
+                    Some(error.line),
+                    Some(error.column),
+                    excerpt,
+                    error.contexts.last().copied(),
+                )
+            }
+            None => (None, None, None, None, None),
+        };
+        Self::Parsing {
+            context: Box::new(ParseErrorContext {
+                notation,
+                message_kind,
+                source_edition: source_edition.map(str::to_owned),
+                byte_offset,
+                line,
+                column,
+                original_token,
+                expected,
+            }),
+            source,
+        }
+    }
+
+    /// Return structured context for a public generation failure.
+    pub fn diagnostic(&self) -> Option<Diagnostic<'_>> {
+        match self {
+            Self::Generation { context, source } => Some(Diagnostic {
+                severity: DiagnosticSeverity::Error,
+                operation: DiagnosticOperation::Generate,
+                notation: context.notation,
+                message_kind: context.message_kind,
+                source_edition: Some(&context.source_edition),
+                target_edition: Some(&context.target_edition),
+                code: source.code(),
+                field_path: source.field_path(),
+                requirement: None,
+                source_location: None,
+                byte_offset: None,
+                original_token: None,
+                expected: None,
+                recovery: None,
+            }),
+            Self::Parsing { context, source } => Some(Diagnostic {
+                severity: DiagnosticSeverity::Error,
+                operation: DiagnosticOperation::Parse,
+                notation: context.notation,
+                message_kind: context.message_kind,
+                source_edition: context.source_edition.as_deref(),
+                target_edition: None,
+                code: if matches!(
+                    source.as_format_error(),
+                    Some(FormatError::InvalidFormat(_))
+                ) {
+                    Some(match context.notation {
+                        DiagnosticNotation::Kvn => "parse.kvn.syntax",
+                        DiagnosticNotation::Xml => "parse.xml.syntax",
+                    })
+                } else {
+                    source.code()
+                },
+                field_path: source.field_path(),
+                requirement: None,
+                source_location: context.line.zip(context.column),
+                byte_offset: context.byte_offset,
+                original_token: context.original_token.as_deref(),
+                expected: context.expected,
+                recovery: None,
+            }),
+            _ => None,
+        }
+    }
+
     /// Stable machine-readable code, when this diagnostic category has been stabilized.
     ///
     /// Validation codes are delegated to the underlying [`ValidationError`]. Categories return
     /// `None` until their compatibility behavior is covered by conformance tests.
     pub fn code(&self) -> Option<&'static str> {
         match self {
+            Self::Generation { source, .. } => source.code(),
+            Self::Parsing { context, source } => {
+                if matches!(
+                    source.as_format_error(),
+                    Some(FormatError::InvalidFormat(_))
+                ) {
+                    return Some(match context.notation {
+                        DiagnosticNotation::Kvn => "parse.kvn.syntax",
+                        DiagnosticNotation::Xml => "parse.xml.syntax",
+                    });
+                }
+                source.code()
+            }
             Self::Validation(error) => error.code(),
+            Self::Format(error) => match error.as_ref() {
+                FormatError::Kvn(_) => Some("parse.kvn.syntax"),
+                FormatError::Xml(_)
+                | FormatError::XmlDe(_)
+                | FormatError::XmlWithContext { .. } => Some("parse.xml.syntax"),
+                _ => None,
+            },
             Self::Io(_) => Some("io.error"),
+            Self::UnsupportedInputVersion { .. } => Some("parse.unsupported_input_version"),
+            Self::UnexpectedEof { .. } => Some("parse.unexpected_eof"),
             Self::UnsupportedOutputVersion { .. } => Some("generation.unsupported_output_version"),
+            Self::ResourceLimitExceeded { resource, .. } => match *resource {
+                "generated_document" => Some("resource.output_limit_exceeded"),
+                "input_document" => Some("resource.input_limit_exceeded"),
+                "xml_depth" => Some("resource.xml_depth_limit_exceeded"),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -748,6 +975,7 @@ impl CcsdsNdmError {
     /// concern a model field and therefore return `None`.
     pub fn field_path(&self) -> Option<String> {
         match self {
+            Self::Generation { source, .. } | Self::Parsing { source, .. } => source.field_path(),
             Self::Validation(error) => error.field_path(),
             _ => None,
         }
@@ -756,6 +984,9 @@ impl CcsdsNdmError {
     /// Returns the inner KVN parse error if this is a FormatError::Kvn.
     pub fn as_kvn_parse_error(&self) -> Option<&KvnParseError> {
         match self {
+            CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
+                source.as_kvn_parse_error()
+            }
             CcsdsNdmError::Format(e) => match **e {
                 FormatError::Kvn(ref err) => Some(err),
                 _ => None,
@@ -767,6 +998,9 @@ impl CcsdsNdmError {
     /// Returns the inner validation error if this is a ValidationError.
     pub fn as_validation_error(&self) -> Option<&ValidationError> {
         match self {
+            CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
+                source.as_validation_error()
+            }
             CcsdsNdmError::Validation(e) => Some(e),
             _ => None,
         }
@@ -775,6 +1009,9 @@ impl CcsdsNdmError {
     /// Returns the inner format error if this is a FormatError.
     pub fn as_format_error(&self) -> Option<&FormatError> {
         match self {
+            CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
+                source.as_format_error()
+            }
             CcsdsNdmError::Format(e) => Some(e),
             _ => None,
         }
@@ -783,6 +1020,9 @@ impl CcsdsNdmError {
     /// Returns the inner epoch error if this is an EpochError.
     pub fn as_epoch_error(&self) -> Option<&EpochError> {
         match self {
+            CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
+                source.as_epoch_error()
+            }
             CcsdsNdmError::Epoch(e) => Some(e),
             _ => None,
         }
@@ -791,6 +1031,9 @@ impl CcsdsNdmError {
     /// Returns the inner I/O error if this is an IoError.
     pub fn as_io_error(&self) -> Option<&std::io::Error> {
         match self {
+            CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
+                source.as_io_error()
+            }
             CcsdsNdmError::Io(e) => Some(e),
             _ => None,
         }
@@ -799,6 +1042,9 @@ impl CcsdsNdmError {
     /// Returns the inner XML error if this is an XmlError.
     pub fn as_xml_error(&self) -> Option<&quick_xml::Error> {
         match self {
+            CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
+                source.as_xml_error()
+            }
             CcsdsNdmError::Format(e) => match **e {
                 FormatError::Xml(ref xe) => Some(xe),
                 _ => None,
@@ -904,6 +1150,11 @@ pub type Result<T> = std::result::Result<T, CcsdsNdmError>;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn public_error_stays_compact_when_diagnostics_are_enriched() {
+        assert!(std::mem::size_of::<CcsdsNdmError>() <= 96);
+    }
 
     #[test]
     fn test_kvn_parse_error_display() {

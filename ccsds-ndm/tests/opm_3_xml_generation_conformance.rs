@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::error::{CcsdsNdmError, Result, ValidationError};
+use ccsds_ndm::error::{Result, ValidationError};
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::{GenerateOptions, MessageType, VersionedNdm};
@@ -74,19 +74,17 @@ fn assert_missing_required<T: std::fmt::Debug>(
         Some(expected_path),
         "{surface} returned an incomplete top-level field path"
     );
-    match error {
-        CcsdsNdmError::Validation(error) => {
-            assert!(
-                matches!(
-                    *error,
-                    ValidationError::MissingRequiredField { ref field, .. }
-                        if field.as_ref() == expected_field
-                ),
-                "{surface} returned the wrong validation error: {error}"
-            );
-        }
-        error => panic!("{surface} returned a non-validation error: {error}"),
-    }
+    let validation = error
+        .as_validation_error()
+        .unwrap_or_else(|| panic!("{surface} returned a non-validation error: {error}"));
+    assert!(
+        matches!(
+            validation,
+            ValidationError::MissingRequiredField { field, .. }
+                if field.as_ref() == expected_field
+        ),
+        "{surface} returned the wrong validation error: {validation}"
+    );
 }
 
 fn assert_missing_object_name<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
@@ -204,12 +202,17 @@ fn opm_3_xml_generation_reports_unsupported_editions_across_rust_entry_points() 
     };
     let options = GenerateOptions::version("2.0");
 
-    assert_unsupported_output_version("Ndm::to_xml", historical.to_xml());
-    assert_unsupported_output_version("VersionedNdm::to_xml_with", opm.to_xml_with(&options));
+    assert_unsupported_output_version("Ndm::to_xml", "2.0", historical.to_xml());
+    assert_unsupported_output_version(
+        "VersionedNdm::to_xml_with",
+        "3.0",
+        opm.to_xml_with(&options),
+    );
 
     let mut streamed = Vec::new();
     assert_unsupported_output_version(
         "VersionedNdm::write_xml_to",
+        "3.0",
         opm.write_xml_to(&mut streamed, &options),
     );
     assert!(
@@ -218,15 +221,20 @@ fn opm_3_xml_generation_reports_unsupported_editions_across_rust_entry_points() 
     );
 
     let historical = MessageType::Opm(historical);
-    assert_unsupported_output_version("MessageType::to_xml", historical.to_xml());
+    assert_unsupported_output_version("MessageType::to_xml", "2.0", historical.to_xml());
     assert_unsupported_output_version(
         "MessageType::to_xml_with",
+        "3.0",
         MessageType::Opm(opm).to_xml_with(&options),
     );
 
     let directory = tempfile::tempdir().expect("failed to create temporary directory");
     let path = directory.path().join("unsupported-opm.xml");
-    assert_unsupported_output_version("MessageType::to_xml_file", historical.to_xml_file(&path));
+    assert_unsupported_output_version(
+        "MessageType::to_xml_file",
+        "2.0",
+        historical.to_xml_file(&path),
+    );
     assert!(
         !path.exists(),
         "unsupported file generation created an output file"
@@ -920,17 +928,18 @@ fn opm_3_xml_generation_validates_maneuver_boundaries() {
 }
 
 fn assert_non_finite_rejected<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
-    match result.expect_err(surface) {
-        CcsdsNdmError::Validation(error) => assert!(
-            matches!(
-                validation_error_source(&error),
-                ValidationError::InvalidValue { ref expected, .. }
-                    if expected.as_ref() == "a finite number"
-            ),
-            "{surface} returned the wrong validation error: {error}"
+    let error = result.expect_err(surface);
+    let validation = error
+        .as_validation_error()
+        .unwrap_or_else(|| panic!("{surface} returned a non-validation error: {error}"));
+    assert!(
+        matches!(
+            validation_error_source(validation),
+            ValidationError::InvalidValue { expected, .. }
+                if expected.as_ref() == "a finite number"
         ),
-        error => panic!("{surface} returned a non-validation error: {error}"),
-    }
+        "{surface} returned the wrong validation error: {validation}"
+    );
 }
 
 fn validation_error_source(error: &ValidationError) -> &ValidationError {
@@ -956,10 +965,7 @@ fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
         Some(expected_path),
         "{surface} returned an incomplete top-level field path"
     );
-    assert!(
-        matches!(&error, CcsdsNdmError::Validation(_)),
-        "{surface} returned a non-validation error: {error}"
-    );
+    assert!(error.as_validation_error().is_some());
 }
 
 fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
@@ -978,13 +984,14 @@ fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
         Some(expected_path),
         "{surface} returned an incomplete top-level field path"
     );
-    assert!(
-        matches!(&error, CcsdsNdmError::Validation(_)),
-        "{surface} returned a non-validation error: {error}"
-    );
+    assert!(error.as_validation_error().is_some());
 }
 
-fn assert_unsupported_output_version<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
+fn assert_unsupported_output_version<T: std::fmt::Debug>(
+    surface: &str,
+    expected_source: &str,
+    result: Result<T>,
+) {
     let error = result.expect_err(surface);
     assert_eq!(
         error.code(),
@@ -996,16 +1003,17 @@ fn assert_unsupported_output_version<T: std::fmt::Debug>(surface: &str, result: 
         None,
         "{surface} invented a field path for an operation-level failure"
     );
-    assert!(
-        matches!(
-            &error,
-            CcsdsNdmError::UnsupportedOutputVersion {
-                message_type: "OPM",
-                format: "XML",
-                version,
-                supported,
-            } if version == "2.0" && supported == "3.0"
-        ),
-        "{surface} returned the wrong unsupported-version details: {error}"
+    let diagnostic = error
+        .diagnostic()
+        .unwrap_or_else(|| panic!("{surface} omitted generation context: {error}"));
+    assert_eq!(
+        diagnostic.message_kind,
+        ccsds_ndm::validation::MessageKind::Opm
     );
+    assert_eq!(
+        diagnostic.notation,
+        ccsds_ndm::error::DiagnosticNotation::Xml
+    );
+    assert_eq!(diagnostic.source_edition, Some(expected_source));
+    assert_eq!(diagnostic.target_edition, Some("2.0"));
 }

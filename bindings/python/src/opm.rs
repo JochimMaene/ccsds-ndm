@@ -6,10 +6,10 @@ use crate::common::{parse_reference_frame, parse_time_system};
 use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::opm as core_opm;
+use ccsds_ndm::options::ParseOptions;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
 
 /// Orbit Parameter Message (OPM).
 ///
@@ -128,9 +128,33 @@ impl Opm {
     /// Create an OPM message from a string.
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format)?;
+    #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None))]
+    fn from_str(
+        _py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_xml_depth: Option<usize>,
+    ) -> PyResult<Self> {
+        let mut options = ParseOptions::default();
+        options.max_input_bytes = max_input_bytes;
+        if let Some(depth) = max_xml_depth {
+            options.max_xml_depth = depth;
+        }
+        let parsed = match format {
+            Some("kvn") => core_opm::Opm::from_kvn_with_options(data, &options),
+            Some("xml") => core_opm::Opm::from_xml_with_options(data, &options),
+            Some(other) => {
+                return Err(PyValueError::new_err(format!(
+                    "Unsupported format '{other}'. Use 'kvn' or 'xml'"
+                )))
+            }
+            None if data.trim_start().starts_with('<') => {
+                core_opm::Opm::from_xml_with_options(data, &options)
+            }
+            None => core_opm::Opm::from_kvn_with_options(data, &options),
+        };
+        let inner = parsed.map_err(crate::errors::ccsds_error_to_pyerr)?;
         Ok(Self { inner })
     }
 
@@ -148,32 +172,61 @@ impl Opm {
     /// Opm
     ///     The parsed OPM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format)
+    #[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None))]
+    fn from_file(
+        _py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_xml_depth: Option<usize>,
+    ) -> PyResult<Self> {
+        let source = match format {
+            Some("kvn") => Some(ccsds_ndm::Notation::Kvn),
+            Some("xml") => Some(ccsds_ndm::Notation::Xml),
+            Some(other) => {
+                return Err(PyValueError::new_err(format!(
+                    "Unsupported format '{other}'. Use 'kvn' or 'xml'"
+                )))
+            }
+            None => None,
+        };
+        let mut options = ParseOptions {
+            max_input_bytes,
+            ..ParseOptions::default()
+        };
+        if let Some(depth) = max_xml_depth {
+            options.max_xml_depth = depth;
+        }
+        ccsds_ndm::parse_opm_file(path, source, &options)
+            .map(|inner| Self { inner })
+            .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 
     /// Serialize to KVN, preserving the source version by default.
     ///
     /// Pass ``version="latest"`` or an exact supported version to override it.
-    #[pyo3(signature = (version=None))]
-    fn to_kvn(&self, version: Option<&str>) -> PyResult<String> {
-        crate::api::generate_string(&self.inner, "kvn", version)
+    #[pyo3(signature = (version=None, max_output_bytes=None))]
+    fn to_kvn(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.inner, "kvn", version, max_output_bytes)
     }
 
     /// Serialize to XML, preserving the source version by default.
-    #[pyo3(signature = (version=None))]
-    fn to_xml(&self, version: Option<&str>) -> PyResult<String> {
-        crate::api::generate_string(&self.inner, "xml", version)
+    #[pyo3(signature = (version=None, max_output_bytes=None))]
+    fn to_xml(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
     }
 
     /// Serialize to KVN or XML. ``validate`` must remain true.
-    #[pyo3(signature = (format, validate=true, version=None))]
-    fn to_str(&self, format: &str, validate: bool, version: Option<&str>) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true, version=None, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        format: &str,
+        validate: bool,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
         crate::api::require_checked_generation(validate)?;
-        crate::api::generate_string(&self.inner, format, version)
+        crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
     }
 
     /// Write to file.
@@ -188,16 +241,17 @@ impl Opm {
     ///     Must remain True; unchecked generation is not supported.
     /// version : str, optional
     ///     Source version by default, ``"latest"``, or an exact supported version.
-    #[pyo3(signature = (path, format, validate=true, version=None))]
+    #[pyo3(signature = (path, format, validate=true, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
         path: &str,
         format: &str,
         validate: bool,
         version: Option<&str>,
+        max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
         crate::api::require_checked_generation(validate)?;
-        crate::api::generate_file(&self.inner, path, format, version)
+        crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
     }
 }
 
@@ -460,9 +514,7 @@ impl OpmMetadata {
 
     #[setter]
     fn set_ref_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.ref_frame_epoch = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.ref_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 

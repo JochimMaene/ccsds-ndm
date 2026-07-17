@@ -1218,9 +1218,7 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_previous_message_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.previous_message_epoch = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.previous_message_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
     /// Anticipated (or actual) epoch of the next message from this originator for this space
@@ -1239,9 +1237,7 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_next_message_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.next_message_epoch = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.next_message_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
     /// Time of the earliest data contained in the OCM, specified as either a relative or
@@ -1331,9 +1327,7 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_next_leap_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.next_leap_epoch = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.next_leap_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
     /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since
@@ -1941,9 +1935,7 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_traj_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.traj_frame_epoch = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.traj_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1967,9 +1959,7 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_useable_start_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.useable_start_time = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.useable_start_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1993,9 +1983,7 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_useable_stop_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.useable_stop_time = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.useable_stop_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -2712,9 +2700,7 @@ impl OcmPhysicalDescription {
     }
     #[setter]
     fn set_oeb_parent_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.oeb_parent_frame_epoch = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.oeb_parent_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
     /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
@@ -3626,9 +3612,7 @@ impl OcmCovarianceMatrix {
     }
     #[setter]
     fn set_cov_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.cov_frame_epoch = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.cov_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -4242,9 +4226,7 @@ impl OcmManeuverParameters {
     }
     #[setter]
     fn set_man_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.man_frame_epoch = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.man_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 

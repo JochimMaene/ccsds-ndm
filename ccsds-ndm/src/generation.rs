@@ -4,12 +4,28 @@
 
 //! Version-aware, validated generation helpers.
 
-use crate::error::{CcsdsNdmError, Result};
+use crate::error::{CcsdsNdmError, DiagnosticNotation, Result};
 use crate::options::{GenerateOptions, TargetVersion};
 use crate::traits::{Ndm, ToKvn, Validate};
 use crate::validation::MessageKind;
 use std::borrow::Cow;
 use std::io::Write;
+
+#[derive(Default)]
+struct CountingWriter {
+    bytes: usize,
+}
+
+impl Write for CountingWriter {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.bytes = self.bytes.saturating_add(buffer.len());
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
 
 /// Output notation used when checking edition support.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,6 +41,56 @@ impl OutputFormat {
             Self::Xml => "XML",
         }
     }
+
+    fn diagnostic(self) -> DiagnosticNotation {
+        match self {
+            Self::Kvn => DiagnosticNotation::Kvn,
+            Self::Xml => DiagnosticNotation::Xml,
+        }
+    }
+}
+
+fn generation_error(
+    error: CcsdsNdmError,
+    kind: MessageKind,
+    format: OutputFormat,
+    source_edition: &str,
+    target_edition: &str,
+) -> CcsdsNdmError {
+    error.with_generation_context(kind, format.diagnostic(), source_edition, target_edition)
+}
+
+fn enforce_output_limit(actual: usize, options: &GenerateOptions) -> Result<()> {
+    if let Some(limit) = options.max_output_bytes {
+        if actual > limit {
+            return Err(CcsdsNdmError::ResourceLimitExceeded {
+                resource: "generated_document",
+                limit,
+                actual,
+            });
+        }
+    }
+    Ok(())
+}
+
+fn preflight_xml_limit<T: serde::Serialize>(value: &T, options: &GenerateOptions) -> Result<()> {
+    if options.max_output_bytes.is_none() {
+        return Ok(());
+    }
+    let mut counter = CountingWriter::default();
+    crate::xml::to_writer(&mut counter, value)?;
+    enforce_output_limit(counter.bytes, options)
+}
+
+fn preflight_kvn_limit<T: ToKvn>(value: &T, options: &GenerateOptions) -> Result<()> {
+    if options.max_output_bytes.is_none() {
+        return Ok(());
+    }
+    let mut counter = CountingWriter::default();
+    let mut writer = crate::kvn::ser::KvnWriter::from_io(&mut counter);
+    value.write_kvn(&mut writer);
+    writer.finish_io().map_err(CcsdsNdmError::from)?;
+    enforce_output_limit(counter.bytes, options)
 }
 
 pub(crate) fn validate_for_generation(
@@ -66,6 +132,15 @@ pub trait VersionedNdm: Ndm + Clone {
     /// Update the edition stored on a cloned message before generation.
     fn set_version(&mut self, version: String);
 
+    /// Apply message-specific XML lexical checks before serialization.
+    ///
+    /// Most message models need no additional check. OPM uses this hook to keep XML character
+    /// rules out of notation-neutral model validation while retaining one shared writer path.
+    #[doc(hidden)]
+    fn validate_xml_output(&self) -> Result<()> {
+        Ok(())
+    }
+
     /// Generate a complete KVN document using an explicit target-edition policy.
     ///
     /// [`TargetVersion::Source`] preserves the stored edition. A different supported target is
@@ -91,12 +166,42 @@ pub trait VersionedNdm: Ndm + Clone {
     fn to_xml_with(&self, options: &GenerateOptions) -> Result<String> {
         let version = self.target_version(options)?;
         if version.as_ref() == self.version() {
-            return self.to_xml();
+            return self
+                .to_xml()
+                .and_then(|output| {
+                    enforce_output_limit(output.len(), options)?;
+                    Ok(output)
+                })
+                .map_err(|error| {
+                    generation_error(
+                        error,
+                        Self::KIND,
+                        OutputFormat::Xml,
+                        self.version(),
+                        version.as_ref(),
+                    )
+                });
         }
 
+        let source_version = self.version();
         let mut message = self.clone();
-        message.set_version(version.into_owned());
-        message.to_xml()
+        let target_version = version.into_owned();
+        message.set_version(target_version);
+        message
+            .to_xml()
+            .and_then(|output| {
+                enforce_output_limit(output.len(), options)?;
+                Ok(output)
+            })
+            .map_err(|error| {
+                generation_error(
+                    error,
+                    Self::KIND,
+                    OutputFormat::Xml,
+                    source_version,
+                    message.version(),
+                )
+            })
     }
 
     /// Stream KVN to an I/O sink using an explicit target-edition policy.
@@ -122,14 +227,42 @@ pub trait VersionedNdm: Ndm + Clone {
     fn write_xml_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
         let version = self.target_version(options)?;
         if version.as_ref() == self.version() {
-            validate_for_generation(Self::KIND, self.version(), OutputFormat::Xml, self)?;
-            return crate::xml::to_writer(output, self);
+            return (|| {
+                validate_for_generation(Self::KIND, self.version(), OutputFormat::Xml, self)?;
+                self.validate_xml_output()?;
+                preflight_xml_limit(self, options)?;
+                crate::xml::to_writer(output, self)
+            })()
+            .map_err(|error| {
+                generation_error(
+                    error,
+                    Self::KIND,
+                    OutputFormat::Xml,
+                    self.version(),
+                    version.as_ref(),
+                )
+            });
         }
 
+        let source_version = self.version();
         let mut message = self.clone();
-        message.set_version(version.into_owned());
-        validate_for_generation(Self::KIND, message.version(), OutputFormat::Xml, &message)?;
-        crate::xml::to_writer(output, &message)
+        let target_version = version.into_owned();
+        message.set_version(target_version);
+        (|| {
+            validate_for_generation(Self::KIND, message.version(), OutputFormat::Xml, &message)?;
+            message.validate_xml_output()?;
+            preflight_xml_limit(&message, options)?;
+            crate::xml::to_writer(output, &message)
+        })()
+        .map_err(|error| {
+            generation_error(
+                error,
+                Self::KIND,
+                OutputFormat::Xml,
+                source_version,
+                message.version(),
+            )
+        })
     }
 
     fn target_version<'a>(&'a self, options: &'a GenerateOptions) -> Result<Cow<'a, str>> {
@@ -156,12 +289,42 @@ where
 {
     let version = message.target_version(options)?;
     if version.as_ref() == message.version() {
-        return message.to_kvn();
+        return message
+            .to_kvn()
+            .and_then(|output| {
+                enforce_output_limit(output.len(), options)?;
+                Ok(output)
+            })
+            .map_err(|error| {
+                generation_error(
+                    error,
+                    T::KIND,
+                    OutputFormat::Kvn,
+                    message.version(),
+                    version.as_ref(),
+                )
+            });
     }
 
+    let source_version = message.version();
     let mut selected = message.clone();
-    selected.set_version(version.into_owned());
-    selected.to_kvn()
+    let target_version = version.into_owned();
+    selected.set_version(target_version);
+    selected
+        .to_kvn()
+        .and_then(|output| {
+            enforce_output_limit(output.len(), options)?;
+            Ok(output)
+        })
+        .map_err(|error| {
+            generation_error(
+                error,
+                T::KIND,
+                OutputFormat::Kvn,
+                source_version,
+                selected.version(),
+            )
+        })
 }
 
 fn stream_kvn<T, W>(message: &T, output: &mut W, options: &GenerateOptions) -> Result<()>
@@ -171,20 +334,46 @@ where
 {
     let version = message.target_version(options)?;
     if version.as_ref() == message.version() {
-        validate_for_generation(T::KIND, message.version(), OutputFormat::Kvn, message)?;
-        ToKvn::validate_kvn(message)?;
-        let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
-        ToKvn::write_kvn(message, &mut writer);
-        return writer.finish_io().map_err(CcsdsNdmError::from);
+        return (|| {
+            validate_for_generation(T::KIND, message.version(), OutputFormat::Kvn, message)?;
+            ToKvn::validate_kvn(message)?;
+            preflight_kvn_limit(message, options)?;
+            let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
+            ToKvn::write_kvn(message, &mut writer);
+            writer.finish_io().map_err(CcsdsNdmError::from)
+        })()
+        .map_err(|error| {
+            generation_error(
+                error,
+                T::KIND,
+                OutputFormat::Kvn,
+                message.version(),
+                version.as_ref(),
+            )
+        });
     }
 
+    let source_version = message.version();
     let mut selected = message.clone();
-    selected.set_version(version.into_owned());
-    validate_for_generation(T::KIND, selected.version(), OutputFormat::Kvn, &selected)?;
-    ToKvn::validate_kvn(&selected)?;
-    let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
-    ToKvn::write_kvn(&selected, &mut writer);
-    writer.finish_io().map_err(CcsdsNdmError::from)
+    let target_version = version.into_owned();
+    selected.set_version(target_version);
+    (|| {
+        validate_for_generation(T::KIND, selected.version(), OutputFormat::Kvn, &selected)?;
+        ToKvn::validate_kvn(&selected)?;
+        preflight_kvn_limit(&selected, options)?;
+        let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
+        ToKvn::write_kvn(&selected, &mut writer);
+        writer.finish_io().map_err(CcsdsNdmError::from)
+    })()
+    .map_err(|error| {
+        generation_error(
+            error,
+            T::KIND,
+            OutputFormat::Kvn,
+            source_version,
+            selected.version(),
+        )
+    })
 }
 
 macro_rules! impl_versioned_ndm {
@@ -222,9 +411,32 @@ impl_versioned_ndm!(crate::messages::cdm::Cdm, Cdm);
 impl_versioned_ndm!(crate::messages::ocm::Ocm, Ocm);
 impl_versioned_ndm!(crate::messages::oem::Oem, Oem);
 impl_versioned_ndm!(crate::messages::omm::Omm, Omm);
-impl_versioned_ndm!(crate::messages::opm::Opm, Opm);
 impl_versioned_ndm!(crate::messages::rdm::Rdm, Rdm);
 impl_versioned_ndm!(crate::messages::tdm::Tdm, Tdm);
+
+impl VersionedNdm for crate::messages::opm::Opm {
+    const KIND: MessageKind = MessageKind::Opm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    fn validate_xml_output(&self) -> Result<()> {
+        self.validate_xml_text()
+    }
+
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        generate_kvn(self, options)
+    }
+
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+        stream_kvn(self, output, options)
+    }
+}
 
 #[cfg(test)]
 mod tests {

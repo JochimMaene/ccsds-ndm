@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::error::{CcsdsNdmError, Result, ValidationError};
+use ccsds_ndm::error::{Result, ValidationError};
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 
@@ -126,13 +126,10 @@ fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
     result: Result<T>,
     expected_path: &str,
 ) {
-    match result.expect_err(field) {
-        CcsdsNdmError::Validation(error) => {
-            assert_eq!(error.code(), Some("validation.invalid_value"));
-            assert_eq!(error.field_path().as_deref(), Some(expected_path));
-        }
-        error => panic!("{field} returned a non-validation error: {error}"),
-    }
+    let error = result.expect_err(field);
+    assert!(error.as_validation_error().is_some());
+    assert_eq!(error.code(), Some("validation.invalid_value"));
+    assert_eq!(error.field_path().as_deref(), Some(expected_path));
 }
 
 #[test]
@@ -238,13 +235,10 @@ fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
     result: Result<T>,
     expected_path: &str,
 ) {
-    match result.expect_err(field) {
-        CcsdsNdmError::Validation(error) => {
-            assert_eq!(error.code(), Some("validation.out_of_range"));
-            assert_eq!(error.field_path().as_deref(), Some(expected_path));
-        }
-        error => panic!("{field} returned a non-validation error: {error}"),
-    }
+    let error = result.expect_err(field);
+    assert!(error.as_validation_error().is_some());
+    assert_eq!(error.code(), Some("validation.out_of_range"));
+    assert_eq!(error.field_path().as_deref(), Some(expected_path));
 }
 
 #[test]
@@ -276,28 +270,26 @@ fn assert_invalid_choice_diagnostic<T: std::fmt::Debug>(
         error.field_path().as_deref(),
         Some("body.segment.data.keplerian_elements")
     );
-    match error {
-        CcsdsNdmError::Validation(error) => {
-            let ValidationError::AtPath { source, .. } = *error else {
-                panic!("choice diagnostic did not carry its containing model path");
-            };
-            let ValidationError::InvalidChoice {
-                fields, selected, ..
-            } = *source
-            else {
-                panic!("choice diagnostic wrapped the wrong validation error");
-            };
-            assert_eq!(
-                fields.iter().map(AsRef::as_ref).collect::<Vec<&str>>(),
-                ["TRUE_ANOMALY", "MEAN_ANOMALY"]
-            );
-            assert_eq!(
-                selected.iter().map(AsRef::as_ref).collect::<Vec<&str>>(),
-                expected_selected
-            );
-        }
-        error => panic!("anomaly choice returned a non-validation error: {error}"),
-    }
+    let validation = error
+        .as_validation_error()
+        .expect("anomaly choice returned a non-validation error");
+    let ValidationError::AtPath { source, .. } = validation else {
+        panic!("choice diagnostic did not carry its containing model path");
+    };
+    let ValidationError::InvalidChoice {
+        fields, selected, ..
+    } = source.as_ref()
+    else {
+        panic!("choice diagnostic wrapped the wrong validation error");
+    };
+    assert_eq!(
+        fields.iter().map(AsRef::as_ref).collect::<Vec<&str>>(),
+        ["TRUE_ANOMALY", "MEAN_ANOMALY"]
+    );
+    assert_eq!(
+        selected.iter().map(AsRef::as_ref).collect::<Vec<&str>>(),
+        expected_selected
+    );
 }
 
 #[test]

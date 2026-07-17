@@ -546,9 +546,7 @@ impl OmmMetadata {
 
     #[setter]
     fn set_ref_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.ref_frame_epoch = value
-            .map(|s| parse_calendar_epoch(&s))
-            .transpose()?;
+        self.inner.ref_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 

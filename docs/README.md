@@ -9,6 +9,8 @@ The project-direction documents are maintained separately in Markdown:
 - `conformance-policy.md` — behavioral contract and capability quality bar;
 - `support-matrix.md` — authoritative capability statuses and their evidence;
 - `reference-status.md` — adoption targets and the scorecard for earning reference status;
+- `opm-completion-roadmap.md` — ordered work from the current OPM tracer bullet to complete OPM 3.0
+  support across Rust, Python, and CLI surfaces;
 - `epoch-handling-plan.md` — measured architecture and incremental epoch migration plan;
 - `conformance/time-ordering-contract.md` — normative ordering/duplicate rules and comparator gates;
 - `conformance/epoch-field-inventory-oem-ocm.md` — XSD/book inventory for the first epoch slice;

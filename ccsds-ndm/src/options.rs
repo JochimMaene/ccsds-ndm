@@ -21,6 +21,11 @@ pub enum TargetVersion {
 pub struct GenerateOptions {
     /// Target CCSDS edition.
     pub target_version: TargetVersion,
+    /// Maximum complete generated document size in bytes.
+    ///
+    /// `None` keeps generation unlimited. This is a caller resource policy, not a CCSDS validity
+    /// rule. Streaming writers preflight a configured limit before emitting any bytes.
+    pub max_output_bytes: Option<usize>,
 }
 
 impl GenerateOptions {
@@ -28,6 +33,7 @@ impl GenerateOptions {
     pub const fn source() -> Self {
         Self {
             target_version: TargetVersion::Source,
+            max_output_bytes: None,
         }
     }
 
@@ -35,6 +41,7 @@ impl GenerateOptions {
     pub const fn latest() -> Self {
         Self {
             target_version: TargetVersion::Latest,
+            max_output_bytes: None,
         }
     }
 
@@ -42,6 +49,46 @@ impl GenerateOptions {
     pub fn version(version: impl Into<String>) -> Self {
         Self {
             target_version: TargetVersion::Exact(version.into()),
+            max_output_bytes: None,
         }
+    }
+
+    /// Apply a caller-selected total generated-document limit.
+    pub const fn with_max_output_bytes(mut self, max_output_bytes: usize) -> Self {
+        self.max_output_bytes = Some(max_output_bytes);
+        self
+    }
+}
+
+/// Resource policy for parsing a complete NDM document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseOptions {
+    /// Maximum input document size in bytes. `None` keeps the aggregate size unlimited.
+    pub max_input_bytes: Option<usize>,
+    /// Maximum XML element nesting depth.
+    ///
+    /// OPM 3.0 has a small fixed schema depth; the default leaves generous headroom while
+    /// bounding adversarial nesting.
+    pub max_xml_depth: usize,
+}
+
+impl Default for ParseOptions {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: None,
+            max_xml_depth: 16,
+        }
+    }
+}
+
+impl ParseOptions {
+    pub fn with_max_input_bytes(mut self, max_input_bytes: usize) -> Self {
+        self.max_input_bytes = Some(max_input_bytes);
+        self
+    }
+
+    pub fn with_max_xml_depth(mut self, max_xml_depth: usize) -> Self {
+        self.max_xml_depth = max_xml_depth;
+        self
     }
 }

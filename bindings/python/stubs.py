@@ -31,29 +31,52 @@ import numpy
 """
 
 PUBLIC_API_PARAMETER_TYPES = {
+    "convert_opm": {
+        "data": "str",
+        "from_format": "str",
+        "to_format": "str",
+        "max_input_bytes": "Optional[int]",
+        "max_xml_depth": "Optional[int]",
+        "max_output_bytes": "Optional[int]",
+    },
+    "convert_opm_file": {
+        "source_path": "str",
+        "destination_path": "str",
+        "from_format": "str",
+        "to_format": "str",
+        "max_input_bytes": "Optional[int]",
+        "max_xml_depth": "Optional[int]",
+        "max_output_bytes": "Optional[int]",
+    },
     "from_file": {
         "format": "str",
+        "max_input_bytes": "Optional[int]",
+        "max_xml_depth": "Optional[int]",
         "path": "str",
         "strict": "bool",
     },
     "from_str": {
         "data": "str",
         "format": "str",
+        "max_input_bytes": "Optional[int]",
+        "max_xml_depth": "Optional[int]",
         "strict": "bool",
     },
     "to_file": {
         "format": "str",
         "path": "str",
+        "max_output_bytes": "Optional[int]",
         "validate": "bool",
         "version": "Optional[str]",
     },
-    "to_kvn": {"version": "Optional[str]"},
+    "to_kvn": {"version": "Optional[str]", "max_output_bytes": "Optional[int]"},
     "to_str": {
         "format": "str",
+        "max_output_bytes": "Optional[int]",
         "validate": "bool",
         "version": "Optional[str]",
     },
-    "to_xml": {"version": "Optional[str]"},
+    "to_xml": {"version": "Optional[str]", "max_output_bytes": "Optional[int]"},
     "validate": {"strict": "bool"},
 }
 

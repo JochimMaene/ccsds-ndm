@@ -154,7 +154,9 @@ fn detect_xml_type(s: &str) -> Result<MessageType> {
                 match name.as_str() {
                     "oem" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Oem),
                     "cdm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Cdm),
-                    "opm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Opm),
+                    // OPM's strict envelope validator must see the complete document; slicing at
+                    // the root would silently discard an invalid declaration or preamble.
+                    "opm" => return crate::traits::Ndm::from_xml(s).map(MessageType::Opm),
                     "omm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Omm),
                     "rdm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Rdm),
                     "tdm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Tdm),

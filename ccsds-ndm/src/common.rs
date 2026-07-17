@@ -180,7 +180,7 @@ impl crate::traits::Validate for AdmHeader {
 
 /// Represents the `odmHeader` complex type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OdmHeader {
     /// Comments (allowed in the ODM Header only immediately after the ODM version number).
     /// (See 7.8 for formatting rules.)
@@ -285,7 +285,7 @@ impl crate::traits::Validate for OdmHeader {
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct SpacecraftParameters {
     /// Comments (see 7.8 for formatting rules).
     ///
@@ -817,7 +817,7 @@ pub struct AngularVelocity {
 
 /// State Vector Components in the Specified Coordinate System.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct StateVector {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
@@ -2023,7 +2023,7 @@ impl ToKvn for InertiaState {
 /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. None or all parameters of the
 /// matrix must be given. COV_REF_FRAME may be omitted if it is the same as REF_FRAME.)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OpmCovarianceMatrix {
     /// Comments (see 7.8 for formatting rules).
     ///

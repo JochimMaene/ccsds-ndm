@@ -596,7 +596,9 @@ impl RdmMetadata {
                 time_system,
                 epoch_tzero: parse_calendar_epoch(&epoch_tzero)?,
                 ref_frame,
-                ref_frame_epoch: ref_frame_epoch.map(|s| parse_calendar_epoch(&s)).transpose()?,
+                ref_frame_epoch: ref_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 ephemeris_name,
                 gravity_model,
                 atmospheric_model,

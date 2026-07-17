@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::error::CcsdsNdmError;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::TimeUnits;
@@ -24,10 +23,7 @@ fn opm_xml_generation_rejects_day_as_maneuver_duration_unit() {
         error.field_path().as_deref(),
         Some("body.segment.data.maneuver_parameters.man_duration.units")
     );
-    match error {
-        CcsdsNdmError::Validation(_) => {}
-        error => panic!("expected a validation error, got: {error}"),
-    }
+    assert!(error.as_validation_error().is_some());
 }
 
 #[test]

@@ -7,6 +7,10 @@ exact capability cell below has status `verified`.
 There are currently **no advertised conformant capabilities**. The first cell is being developed as
 a tracer bullet for the evidence model.
 
+The [OPM 3.0 completion roadmap](opm-completion-roadmap.md) records the ordered work from the
+current generation tracer bullet to complete OPM parsing, validation, generation, and conversion
+across the intended public surfaces. It does not alter the statuses below.
+
 ## Status Vocabulary
 
 - `unsupported` — the capability is intentionally unavailable on this surface.
@@ -45,6 +49,42 @@ notations and editions.
 | --- | --- | --- | --- | --- | --- | --- |
 | `OPM-3.0-XML-GENERATE-RUST` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML; NDM/XML schema set 4.0.0, OPM schema 3.0 | Generate OPM 3.0 XML | Rust | `implemented-unverified` |
 | `OPM-3.0-KVN-GENERATE-RUST` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN | Generate OPM 3.0 KVN | Rust | `implemented-unverified` |
+| `OPM-3.0-XML-PARSE-RUST` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML; NDM/XML schema set 4.0.0, OPM schema 3.0 | Strict parse and self-contained validation | Rust | `implemented-unverified` |
+| `OPM-3.0-KVN-PARSE-RUST` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN | Strict parse and self-contained validation | Rust | `implemented-unverified` |
+| `OPM-3.0-VALIDATE-RUST` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | N/A | Validate typed OPM model | Rust | `implemented-unverified` |
+| `OPM-3.0-KVN-TO-XML-RUST` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN → XML 4.0.0 / OPM 3.0 | Convert, preserving edition and meaning | Rust | `implemented-unverified` |
+| `OPM-3.0-XML-TO-KVN-RUST` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML 4.0.0 / OPM 3.0 → KVN | Convert, preserving edition and meaning | Rust | `implemented-unverified` |
+| `OPM-3.0-XML-PARSE-PYTHON` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML; NDM/XML schema set 4.0.0, OPM schema 3.0 | Strict parse and self-contained validation | Python | `implemented-unverified` |
+| `OPM-3.0-KVN-PARSE-PYTHON` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN | Strict parse and self-contained validation | Python | `implemented-unverified` |
+| `OPM-3.0-XML-GENERATE-PYTHON` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML; NDM/XML schema set 4.0.0, OPM schema 3.0 | Generate OPM 3.0 XML | Python | `implemented-unverified` |
+| `OPM-3.0-KVN-GENERATE-PYTHON` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN | Generate OPM 3.0 KVN | Python | `implemented-unverified` |
+| `OPM-3.0-VALIDATE-PYTHON` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | N/A | Validate typed OPM model | Python | `implemented-unverified` |
+| `OPM-3.0-KVN-TO-XML-PYTHON` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN → XML 4.0.0 / OPM 3.0 | Convert | Python | `implemented-unverified` |
+| `OPM-3.0-XML-TO-KVN-PYTHON` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML 4.0.0 / OPM 3.0 → KVN | Convert | Python | `implemented-unverified` |
+| `OPM-3.0-VALIDATE-CLI` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN or XML 4.0.0 / OPM 3.0 | Validate input | CLI | `implemented-unverified` |
+| `OPM-3.0-KVN-TO-XML-CLI` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN → XML 4.0.0 / OPM 3.0 | Convert | CLI | `implemented-unverified` |
+| `OPM-3.0-XML-TO-KVN-CLI` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML 4.0.0 / OPM 3.0 → KVN | Convert | CLI | `implemented-unverified` |
+
+### Parsing, validation, conversion, Python, and CLI evidence
+
+- [KVN parsing inventory](conformance/opm-3.0-kvn-parsing.md) and
+  [XML parsing inventory](conformance/opm-3.0-xml-parsing.md) map strict syntax, preservation,
+  diagnostics, and resource behavior.
+- The [typed-model validation inventory](conformance/opm-3.0-validation.md) separates
+  self-contained model rules, notation-boundary rules, and caller-context semantics.
+- `opm_conversion`, `opm_parse_diagnostics`, `opm_parse_limits`, `opm_strict_kvn_parsing`, and
+  `opm_strict_xml_parsing` are the focused Rust evidence.
+- Python OPM parsing/generation/validation delegates to Rust and exposes structured exception
+  attributes and the same resource policies; `test_parse_and_generation_options.py` exercises the
+  parity contract.
+- `opm_cli` fixes CLI exits, JSON diagnostics, stdin/stdout separation, conversion, resource limits,
+  and atomic destination behavior.
+
+Tracked OPM KVN/XML seeds exercise the existing panic-safety fuzz targets. `just package-python`
+builds the ABI3 wheel, installs it with dependencies into an isolated environment, and imports the
+OPM and conversion APIs. These cells remain unverified pending published timing budgets, sustained
+fuzz-run evidence, supported-platform wheel coverage, the private security-reporting gate, and
+independent normative review. No broader conformance is advertised.
 
 ### `OPM-3.0-XML-GENERATE-RUST`
 
@@ -87,11 +127,8 @@ Available evidence:
 Evidence still required before `verified`:
 
 - closure of every remaining `Partial` and `Gap` in the requirement inventory;
-- stable, structured diagnostic codes and paths for every generation failure;
-- panic-free and bounded-resource evidence for adversarial public model states and output failures;
-- published OPM XML-generation performance and allocation regression budgets;
-- MSRV and additional-platform decisions, private security reporting, release-artifact installation,
-  and byte-reproducible release evidence.
+- published OPM XML-generation timing regression budgets;
+- a private security-reporting route and independent normative review.
 
 ### `OPM-3.0-KVN-GENERATE-RUST`
 
@@ -114,8 +151,9 @@ Available evidence:
   [`opm-3.0-kvn-generation.md`](conformance/opm-3.0-kvn-generation.md) maps current evidence and
   explicit gaps.
 
-Evidence still required before `verified` includes the broader structured-diagnostic contract,
-bounded-resource evidence, performance budgets, and the applicable Rust surface/release gates.
+Evidence still required before `verified` includes published timing budgets and the applicable Rust
+surface/release gates. Structured generation context, aggregate output bounds, zero-byte streaming
+preflight rejection, sink failures, and KVN allocation budgets now have executable evidence.
 
 ## Advertised Capabilities
 

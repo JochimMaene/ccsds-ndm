@@ -66,6 +66,18 @@ fn opm_3_xml_writer_propagates_sink_failures_without_panicking() {
         let error = result.unwrap_err();
         assert_eq!(error.code(), Some("io.error"));
         assert_eq!(error.field_path(), None);
+        let diagnostic = error
+            .diagnostic()
+            .expect("generation context should be present");
+        assert_eq!(
+            diagnostic.notation,
+            ccsds_ndm::error::DiagnosticNotation::Xml
+        );
+        assert_eq!(
+            diagnostic.message_kind,
+            ccsds_ndm::validation::MessageKind::Opm
+        );
+        assert_eq!(diagnostic.field_path, None);
         let io_error = error.as_io_error().unwrap_or_else(|| {
             panic!("writer returned a non-I/O error at byte limit {limit}: {error}")
         });

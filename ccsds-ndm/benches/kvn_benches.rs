@@ -10,8 +10,8 @@ use ccsds_ndm::messages::oem::{Oem, OemBody, OemData, OemMetadata, OemSegment};
 use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::tdm::Tdm;
-use ccsds_ndm::options::GenerateOptions;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::options::{GenerateOptions, ParseOptions};
+use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{
     CalendarEpoch, Epoch, InterpolationDegree, Position, PositionUnits, Velocity, VelocityUnits,
 };
@@ -121,6 +121,29 @@ fn bench_parse_opm(c: &mut Criterion) {
     });
 }
 
+fn bench_parse_opm_failures(c: &mut Criterion) {
+    let valid = include_str!("../../data/kvn/opm_g4.kvn");
+    let invalid_late = format!("{valid}UNKNOWN_KEY = 1\n");
+    let limited = ParseOptions::default().with_max_input_bytes(1);
+    let mut group = c.benchmark_group("kvn_parse_opm_failure");
+    group.bench_function("invalid_early", |b| {
+        b.iter(|| black_box(Opm::from_kvn(black_box("not an OPM"))).unwrap_err())
+    });
+    group.bench_function("invalid_late", |b| {
+        b.iter(|| black_box(Opm::from_kvn(black_box(&invalid_late))).unwrap_err())
+    });
+    group.bench_function("input_limit", |b| {
+        b.iter(|| {
+            black_box(Opm::from_kvn_with_options(
+                black_box(valid),
+                black_box(&limited),
+            ))
+            .unwrap_err()
+        })
+    });
+    group.finish();
+}
+
 fn bench_generate_opm(c: &mut Criterion) {
     let opm = Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).unwrap();
     let output_len = opm.to_kvn().unwrap().len() as u64;
@@ -158,6 +181,31 @@ fn bench_generate_opm_maneuver_scaling(c: &mut Criterion) {
         });
     }
 
+    group.finish();
+}
+
+fn bench_validate_opm(c: &mut Criterion) {
+    let valid = Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).unwrap();
+    let mut invalid = valid.clone();
+    invalid.header.originator.clear();
+    invalid.body.segment.metadata.object_name.clear();
+    invalid.body.segment.data.state_vector.x.value = f64::NAN;
+
+    let maneuver_source = Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).unwrap();
+    let mut maneuver_heavy = maneuver_source.clone();
+    maneuver_heavy.body.segment.data.maneuver_parameters =
+        vec![maneuver_source.body.segment.data.maneuver_parameters[0].clone(); 1000];
+
+    let mut group = c.benchmark_group("opm_validate");
+    group.bench_function("valid_rich", |b| {
+        b.iter(|| black_box(&valid).validate().unwrap())
+    });
+    group.bench_function("invalid_aggregate", |b| {
+        b.iter(|| black_box(&invalid).validation_errors().unwrap())
+    });
+    group.bench_function("valid_1000_maneuvers", |b| {
+        b.iter(|| black_box(&maneuver_heavy).validate().unwrap())
+    });
     group.finish();
 }
 
@@ -246,8 +294,10 @@ criterion_group!(
     bench_parse_kvn,
     bench_generate_kvn,
     bench_parse_opm,
+    bench_parse_opm_failures,
     bench_generate_opm,
     bench_generate_opm_maneuver_scaling,
+    bench_validate_opm,
     bench_parse_omm,
     bench_parse_tdm,
     bench_kvn_scaling,

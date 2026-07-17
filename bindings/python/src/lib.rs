@@ -119,6 +119,74 @@ fn from_file(py: Python, path: &str) -> PyResult<Py<PyAny>> {
     from_str(py, &content)
 }
 
+fn opm_notation(value: &str) -> PyResult<ccsds_ndm::Notation> {
+    match value {
+        "kvn" => Ok(ccsds_ndm::Notation::Kvn),
+        "xml" => Ok(ccsds_ndm::Notation::Xml),
+        other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "Unsupported format '{other}'. Use 'kvn' or 'xml'"
+        ))),
+    }
+}
+
+/// Strictly convert a standalone OPM between KVN and XML.
+#[pyfunction]
+#[pyo3(signature = (data, from_format, to_format, max_input_bytes=None, max_xml_depth=None, max_output_bytes=None))]
+fn convert_opm(
+    data: &str,
+    from_format: &str,
+    to_format: &str,
+    max_input_bytes: Option<usize>,
+    max_xml_depth: Option<usize>,
+    max_output_bytes: Option<usize>,
+) -> PyResult<String> {
+    let mut parse = ccsds_ndm::ParseOptions::default();
+    parse.max_input_bytes = max_input_bytes;
+    if let Some(depth) = max_xml_depth {
+        parse.max_xml_depth = depth;
+    }
+    let mut generate = ccsds_ndm::GenerateOptions::source();
+    generate.max_output_bytes = max_output_bytes;
+    ccsds_ndm::convert_opm(
+        data,
+        opm_notation(from_format)?,
+        opm_notation(to_format)?,
+        &parse,
+        &generate,
+    )
+    .map_err(ccsds_error_to_pyerr)
+}
+
+/// Strictly convert an OPM file and atomically replace the destination.
+#[pyfunction]
+#[pyo3(signature = (source_path, destination_path, from_format, to_format, max_input_bytes=None, max_xml_depth=None, max_output_bytes=None))]
+fn convert_opm_file(
+    source_path: &str,
+    destination_path: &str,
+    from_format: &str,
+    to_format: &str,
+    max_input_bytes: Option<usize>,
+    max_xml_depth: Option<usize>,
+    max_output_bytes: Option<usize>,
+) -> PyResult<()> {
+    let mut parse = ccsds_ndm::ParseOptions::default();
+    parse.max_input_bytes = max_input_bytes;
+    if let Some(depth) = max_xml_depth {
+        parse.max_xml_depth = depth;
+    }
+    let mut generate = ccsds_ndm::GenerateOptions::source();
+    generate.max_output_bytes = max_output_bytes;
+    ccsds_ndm::convert_opm_file(
+        source_path,
+        destination_path,
+        opm_notation(from_format)?,
+        opm_notation(to_format)?,
+        &parse,
+        &generate,
+    )
+    .map_err(ccsds_error_to_pyerr)
+}
+
 /// The Python module definition.
 #[pymodule]
 #[pyo3(name = "ccsds_ndm")]
@@ -129,6 +197,8 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // High-level API aligned with Rust core
     m.add_function(wrap_pyfunction!(from_str, m)?)?;
     m.add_function(wrap_pyfunction!(from_file, m)?)?;
+    m.add_function(wrap_pyfunction!(convert_opm, m)?)?;
+    m.add_function(wrap_pyfunction!(convert_opm_file, m)?)?;
 
     // Common types shared across message types
     m.add_class::<OdmHeader>()?;

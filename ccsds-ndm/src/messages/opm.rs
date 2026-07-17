@@ -76,9 +76,6 @@ impl crate::traits::Validate for Opm {
             ),
             "",
         )?;
-        if let Some(error) = self.xml_text_errors().into_iter().next() {
-            return Err(error.into());
-        }
         self.header.validate()?;
         self.body.validate()?;
         Ok(())
@@ -97,7 +94,6 @@ impl crate::traits::Validate for Opm {
             }
             Err(error) => return Err(error),
         }
-        errors.extend(self.xml_text_errors());
         errors.extend(self.header.validation_errors()?);
         errors.extend(self.body.validation_errors()?);
         Ok(errors)
@@ -106,39 +102,616 @@ impl crate::traits::Validate for Opm {
 
 impl Ndm for Opm {
     fn to_kvn(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Opm,
-            &self.version,
-            crate::generation::OutputFormat::Kvn,
-            self,
-        )?;
-        ToKvn::validate_kvn(self)?;
-        let mut writer = KvnWriter::new();
-        self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        (|| {
+            crate::generation::validate_for_generation(
+                crate::validation::MessageKind::Opm,
+                &self.version,
+                crate::generation::OutputFormat::Kvn,
+                self,
+            )?;
+            ToKvn::validate_kvn(self)?;
+            let mut writer = KvnWriter::new();
+            self.write_kvn(&mut writer);
+            Ok(writer.finish())
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_generation_context(
+                crate::validation::MessageKind::Opm,
+                crate::error::DiagnosticNotation::Kvn,
+                &self.version,
+                &self.version,
+            )
+        })
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let opm = Self::from_kvn_str(kvn)?;
-        crate::traits::Validate::validate(&opm)?;
-        Ok(opm)
+        Self::from_kvn_with_options(kvn, &crate::options::ParseOptions::default())
     }
 
     fn to_xml(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Opm,
-            &self.version,
-            crate::generation::OutputFormat::Xml,
-            self,
-        )?;
-        crate::xml::to_string(self)
+        (|| {
+            crate::generation::validate_for_generation(
+                crate::validation::MessageKind::Opm,
+                &self.version,
+                crate::generation::OutputFormat::Xml,
+                self,
+            )?;
+            self.validate_xml_text()?;
+            crate::xml::to_string(self)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_generation_context(
+                crate::validation::MessageKind::Opm,
+                crate::error::DiagnosticNotation::Xml,
+                &self.version,
+                &self.version,
+            )
+        })
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let opm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
-        crate::traits::Validate::validate(&opm)?;
-        Ok(opm)
+        Self::from_xml_with_options(xml, &crate::options::ParseOptions::default())
     }
+}
+
+impl Opm {
+    /// Strictly parse and validate an OPM KVN document with caller resource limits.
+    pub fn from_kvn_with_options(
+        kvn: &str,
+        options: &crate::options::ParseOptions,
+    ) -> Result<Self> {
+        let source_edition = kvn.lines().find_map(|line| {
+            line.split_once('=')
+                .filter(|(key, _)| key.trim() == "CCSDS_OPM_VERS")
+                .map(|(_, value)| value.trim())
+        });
+        (|| {
+            validate_input_size(kvn, options)?;
+            validate_kvn_syntax(kvn)?;
+            let opm = Self::from_kvn_str(kvn)?;
+            crate::traits::Validate::validate(&opm)?;
+            Ok(opm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Opm,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                source_edition,
+            )
+        })
+    }
+
+    /// Strictly parse and validate an OPM XML document with caller resource limits.
+    pub fn from_xml_with_options(
+        xml: &str,
+        options: &crate::options::ParseOptions,
+    ) -> Result<Self> {
+        let source_edition = xml
+            .find("<opm")
+            .and_then(|root| xml[root..].split_once("version=\"").map(|(_, value)| value))
+            .and_then(|value| value.split_once('"').map(|(version, _)| version));
+        (|| {
+            validate_input_size(xml, options)?;
+            validate_xml_envelope(xml, options)?;
+            let opm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
+            crate::traits::Validate::validate(&opm)?;
+            Ok(opm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Opm,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                source_edition,
+            )
+        })
+    }
+}
+
+fn validate_input_size(input: &str, options: &crate::options::ParseOptions) -> Result<()> {
+    if let Some(limit) = options.max_input_bytes {
+        if input.len() > limit {
+            return Err(crate::error::CcsdsNdmError::ResourceLimitExceeded {
+                resource: "input_document",
+                limit,
+                actual: input.len(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    use crate::error::{CcsdsNdmError, FormatError};
+
+    fn invalid(line: usize, offset: usize, message: impl AsRef<str>) -> CcsdsNdmError {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(
+            crate::error::KvnParseError {
+                line,
+                column: 1,
+                message: message.as_ref().to_owned(),
+                contexts: vec!["strict OPM KVN"],
+                offset,
+            },
+        ))))
+    }
+
+    fn rank(key: &str) -> Option<u8> {
+        Some(match key {
+            "CCSDS_OPM_VERS" => 0,
+            "CLASSIFICATION" => 1,
+            "CREATION_DATE" => 2,
+            "ORIGINATOR" => 3,
+            "MESSAGE_ID" => 4,
+            "OBJECT_NAME" => 5,
+            "OBJECT_ID" => 6,
+            "CENTER_NAME" => 7,
+            "REF_FRAME" => 8,
+            "REF_FRAME_EPOCH" => 9,
+            "TIME_SYSTEM" => 10,
+            "EPOCH" => 11,
+            "X" => 12,
+            "Y" => 13,
+            "Z" => 14,
+            "X_DOT" => 15,
+            "Y_DOT" => 16,
+            "Z_DOT" => 17,
+            "SEMI_MAJOR_AXIS" => 20,
+            "ECCENTRICITY" => 21,
+            "INCLINATION" => 22,
+            "RA_OF_ASC_NODE" => 23,
+            "ARG_OF_PERICENTER" => 24,
+            "TRUE_ANOMALY" | "MEAN_ANOMALY" => 25,
+            "GM" => 26,
+            "MASS" => 30,
+            "SOLAR_RAD_AREA" => 31,
+            "SOLAR_RAD_COEFF" => 32,
+            "DRAG_AREA" => 33,
+            "DRAG_COEFF" => 34,
+            "COV_REF_FRAME" => 40,
+            "CX_X" => 41,
+            "CY_X" => 42,
+            "CY_Y" => 43,
+            "CZ_X" => 44,
+            "CZ_Y" => 45,
+            "CZ_Z" => 46,
+            "CX_DOT_X" => 47,
+            "CX_DOT_Y" => 48,
+            "CX_DOT_Z" => 49,
+            "CX_DOT_X_DOT" => 50,
+            "CY_DOT_X" => 51,
+            "CY_DOT_Y" => 52,
+            "CY_DOT_Z" => 53,
+            "CY_DOT_X_DOT" => 54,
+            "CY_DOT_Y_DOT" => 55,
+            "CZ_DOT_X" => 56,
+            "CZ_DOT_Y" => 57,
+            "CZ_DOT_Z" => 58,
+            "CZ_DOT_X_DOT" => 59,
+            "CZ_DOT_Y_DOT" => 60,
+            "CZ_DOT_Z_DOT" => 61,
+            "MAN_EPOCH_IGNITION" => 70,
+            "MAN_DURATION" => 71,
+            "MAN_DELTA_MASS" => 72,
+            "MAN_REF_FRAME" => 73,
+            "MAN_DV_1" => 74,
+            "MAN_DV_2" => 75,
+            "MAN_DV_3" => 76,
+            key if key.starts_with("USER_DEFINED_") => 80,
+            _ => return None,
+        })
+    }
+
+    fn comment_starts_block(previous: u8, key: &str) -> bool {
+        match key {
+            "CLASSIFICATION" | "CREATION_DATE" => previous == 0,
+            "OBJECT_NAME" => matches!(previous, 3 | 4),
+            "EPOCH" => previous == 10,
+            "SEMI_MAJOR_AXIS" => previous == 17,
+            "MASS" | "SOLAR_RAD_AREA" | "SOLAR_RAD_COEFF" | "DRAG_AREA" | "DRAG_COEFF" => {
+                matches!(previous, 17 | 26)
+            }
+            "COV_REF_FRAME" | "CX_X" => matches!(previous, 17 | 26 | 30..=34),
+            "MAN_EPOCH_IGNITION" => matches!(previous, 17 | 26 | 30..=34 | 61 | 76),
+            key if key.starts_with("USER_DEFINED_") => {
+                matches!(previous, 17 | 26 | 30..=34 | 61 | 76)
+            }
+            _ => false,
+        }
+    }
+
+    let mut previous = None;
+    let mut pending_comment = false;
+    let mut line_offset = 0usize;
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let line_number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        if line.as_bytes().contains(&b'\r') {
+            return Err(invalid(line_number, line_offset, "lone carriage return"));
+        }
+        if line.len() > 254 {
+            return Err(invalid(
+                line_number,
+                line_offset,
+                "line exceeds the normative 254-character limit",
+            ));
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return Err(invalid(
+                line_number,
+                line_offset,
+                "non-printable or non-ASCII character",
+            ));
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            line_offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            pending_comment = true;
+            line_offset += raw_line.len() + 1;
+            continue;
+        }
+        if line.matches('=').count() != 1 {
+            return Err(invalid(
+                line_number,
+                line_offset,
+                "expected exactly one assignment",
+            ));
+        }
+        let (key, _) = line
+            .split_once('=')
+            .ok_or_else(|| invalid(line_number, line_offset, "expected an assignment"))?;
+        let key = key.trim();
+        let current =
+            rank(key).ok_or_else(|| invalid(line_number, line_offset, "unknown OPM keyword"))?;
+
+        if pending_comment {
+            let Some(previous_rank) = previous else {
+                return Err(invalid(
+                    line_number,
+                    line_offset,
+                    "comments before the version would be lost",
+                ));
+            };
+            if !comment_starts_block(previous_rank, key) {
+                return Err(invalid(
+                    line_number,
+                    line_offset,
+                    "COMMENT is not at the beginning of a logical block",
+                ));
+            }
+            pending_comment = false;
+        }
+
+        if let Some(previous_rank) = previous {
+            let repeated_maneuver = current == 70 && previous_rank == 76;
+            let repeated_user_defined = current == 80 && previous_rank == 80;
+            let anomaly_choice = current == 25 && previous_rank == 25;
+            if current <= previous_rank
+                && !repeated_maneuver
+                && !repeated_user_defined
+                && !anomaly_choice
+            {
+                return Err(invalid(
+                    line_number,
+                    line_offset,
+                    "duplicate or out-of-order OPM keyword",
+                ));
+            }
+        }
+        previous = Some(current);
+        line_offset += raw_line.len() + 1;
+    }
+    if pending_comment {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "trailing COMMENT has no logical block",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_xml_envelope(xml: &str, options: &crate::options::ParseOptions) -> Result<()> {
+    use crate::error::{CcsdsNdmError, FormatError};
+    use quick_xml::events::Event;
+
+    fn invalid(message: impl Into<String>) -> CcsdsNdmError {
+        CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message.into())))
+    }
+
+    fn validate_root(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+        if start.name().as_ref() != b"opm" {
+            return Err(invalid("expected standalone OPM root element 'opm'"));
+        }
+        for attribute in start.attributes() {
+            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+            if !matches!(
+                attribute.key.as_ref(),
+                b"id" | b"version" | b"xmlns:xsi" | b"xsi:noNamespaceSchemaLocation"
+            ) {
+                return Err(invalid(format!(
+                    "unknown OPM root attribute '{}'",
+                    String::from_utf8_lossy(attribute.key.as_ref())
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    let document = xml.strip_prefix('\u{feff}').unwrap_or(xml);
+    if document
+        .find("<?xml")
+        .is_some_and(|declaration| declaration != 0)
+    {
+        return Err(invalid(
+            "an XML declaration, when present, must begin the document",
+        ));
+    }
+
+    #[derive(Clone, Copy)]
+    enum Container {
+        Opm,
+        Header,
+        Body,
+        Segment,
+        Metadata,
+        Data,
+        StateVector,
+        Keplerian,
+        Spacecraft,
+        Covariance,
+        Maneuver,
+        UserDefined,
+        Leaf,
+    }
+
+    struct Frame {
+        container: Container,
+        last_child: u8,
+    }
+
+    fn container(name: &[u8]) -> Container {
+        match name {
+            b"opm" => Container::Opm,
+            b"header" => Container::Header,
+            b"body" => Container::Body,
+            b"segment" => Container::Segment,
+            b"metadata" => Container::Metadata,
+            b"data" => Container::Data,
+            b"stateVector" => Container::StateVector,
+            b"keplerianElements" => Container::Keplerian,
+            b"spacecraftParameters" => Container::Spacecraft,
+            b"covarianceMatrix" => Container::Covariance,
+            b"maneuverParameters" => Container::Maneuver,
+            b"userDefinedParameters" => Container::UserDefined,
+            _ => Container::Leaf,
+        }
+    }
+
+    fn child_rank(parent: Container, name: &[u8]) -> Option<u8> {
+        let rank = match parent {
+            Container::Opm => match name {
+                b"header" => 0,
+                b"body" => 1,
+                _ => return None,
+            },
+            Container::Header => match name {
+                b"COMMENT" => 0,
+                b"CLASSIFICATION" => 1,
+                b"CREATION_DATE" => 2,
+                b"ORIGINATOR" => 3,
+                b"MESSAGE_ID" => 4,
+                _ => return None,
+            },
+            Container::Body => match name {
+                b"segment" => 0,
+                _ => return None,
+            },
+            Container::Segment => match name {
+                b"metadata" => 0,
+                b"data" => 1,
+                _ => return None,
+            },
+            Container::Metadata => match name {
+                b"COMMENT" => 0,
+                b"OBJECT_NAME" => 1,
+                b"OBJECT_ID" => 2,
+                b"CENTER_NAME" => 3,
+                b"REF_FRAME" => 4,
+                b"REF_FRAME_EPOCH" => 5,
+                b"TIME_SYSTEM" => 6,
+                _ => return None,
+            },
+            Container::Data => match name {
+                b"COMMENT" => 0,
+                b"stateVector" => 1,
+                b"keplerianElements" => 2,
+                b"spacecraftParameters" => 3,
+                b"covarianceMatrix" => 4,
+                b"maneuverParameters" => 5,
+                b"userDefinedParameters" => 6,
+                _ => return None,
+            },
+            Container::StateVector => match name {
+                b"COMMENT" => 0,
+                b"EPOCH" => 1,
+                b"X" => 2,
+                b"Y" => 3,
+                b"Z" => 4,
+                b"X_DOT" => 5,
+                b"Y_DOT" => 6,
+                b"Z_DOT" => 7,
+                _ => return None,
+            },
+            Container::Keplerian => match name {
+                b"COMMENT" => 0,
+                b"SEMI_MAJOR_AXIS" => 1,
+                b"ECCENTRICITY" => 2,
+                b"INCLINATION" => 3,
+                b"RA_OF_ASC_NODE" => 4,
+                b"ARG_OF_PERICENTER" => 5,
+                b"TRUE_ANOMALY" | b"MEAN_ANOMALY" => 6,
+                b"GM" => 7,
+                _ => return None,
+            },
+            Container::Spacecraft => match name {
+                b"COMMENT" => 0,
+                b"MASS" => 1,
+                b"SOLAR_RAD_AREA" => 2,
+                b"SOLAR_RAD_COEFF" => 3,
+                b"DRAG_AREA" => 4,
+                b"DRAG_COEFF" => 5,
+                _ => return None,
+            },
+            Container::Covariance => match name {
+                b"COMMENT" => 0,
+                b"COV_REF_FRAME" => 1,
+                b"CX_X" => 2,
+                b"CY_X" => 3,
+                b"CY_Y" => 4,
+                b"CZ_X" => 5,
+                b"CZ_Y" => 6,
+                b"CZ_Z" => 7,
+                b"CX_DOT_X" => 8,
+                b"CX_DOT_Y" => 9,
+                b"CX_DOT_Z" => 10,
+                b"CX_DOT_X_DOT" => 11,
+                b"CY_DOT_X" => 12,
+                b"CY_DOT_Y" => 13,
+                b"CY_DOT_Z" => 14,
+                b"CY_DOT_X_DOT" => 15,
+                b"CY_DOT_Y_DOT" => 16,
+                b"CZ_DOT_X" => 17,
+                b"CZ_DOT_Y" => 18,
+                b"CZ_DOT_Z" => 19,
+                b"CZ_DOT_X_DOT" => 20,
+                b"CZ_DOT_Y_DOT" => 21,
+                b"CZ_DOT_Z_DOT" => 22,
+                _ => return None,
+            },
+            Container::Maneuver => match name {
+                b"COMMENT" => 0,
+                b"MAN_EPOCH_IGNITION" => 1,
+                b"MAN_DURATION" => 2,
+                b"MAN_DELTA_MASS" => 3,
+                b"MAN_REF_FRAME" => 4,
+                b"MAN_DV_1" => 5,
+                b"MAN_DV_2" => 6,
+                b"MAN_DV_3" => 7,
+                _ => return None,
+            },
+            Container::UserDefined => match name {
+                b"COMMENT" => 0,
+                b"USER_DEFINED" => 1,
+                _ => return None,
+            },
+            Container::Leaf => return Some(0),
+        };
+        Some(rank)
+    }
+
+    fn enter_child(stack: &mut [Frame], name: &[u8]) -> Result<()> {
+        if let Some(parent) = stack.last_mut() {
+            let rank = child_rank(parent.container, name).ok_or_else(|| {
+                invalid(format!(
+                    "element '{}' is not allowed in this OPM block",
+                    String::from_utf8_lossy(name)
+                ))
+            })?;
+            if rank < parent.last_child {
+                return Err(invalid(format!(
+                    "element '{}' is out of order in its OPM block",
+                    String::from_utf8_lossy(name)
+                )));
+            }
+            parent.last_child = rank;
+        }
+        Ok(())
+    }
+
+    let mut reader = quick_xml::Reader::from_str(xml);
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut stack = Vec::with_capacity(8);
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(start)) => {
+                if root_closed {
+                    return Err(invalid("trailing content after OPM document"));
+                }
+                if !root_seen {
+                    validate_root(&start)?;
+                    root_seen = true;
+                } else {
+                    enter_child(&mut stack, start.name().as_ref())?;
+                }
+                stack.push(Frame {
+                    container: container(start.name().as_ref()),
+                    last_child: 0,
+                });
+                depth += 1;
+                if depth > options.max_xml_depth {
+                    return Err(CcsdsNdmError::ResourceLimitExceeded {
+                        resource: "xml_depth",
+                        limit: options.max_xml_depth,
+                        actual: depth,
+                    });
+                }
+            }
+            Ok(Event::Empty(start)) => {
+                if root_closed {
+                    return Err(invalid("trailing content after OPM document"));
+                }
+                if !root_seen {
+                    validate_root(&start)?;
+                    root_seen = true;
+                    root_closed = true;
+                } else {
+                    enter_child(&mut stack, start.name().as_ref())?;
+                }
+            }
+            Ok(Event::End(_)) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unexpected XML closing element"))?;
+                stack.pop();
+                if depth == 0 {
+                    root_closed = true;
+                }
+            }
+            Ok(Event::Text(text)) => {
+                if (root_closed || !root_seen)
+                    && !text
+                        .xml_content()
+                        .map_err(|error| invalid(error.to_string()))?
+                        .trim()
+                        .is_empty()
+                {
+                    return Err(invalid("text outside OPM root element"));
+                }
+            }
+            Ok(Event::CData(_)) if root_closed || !root_seen => {
+                return Err(invalid("CDATA outside OPM root element"));
+            }
+            Ok(Event::DocType(_)) => {
+                return Err(invalid("XML document type declarations are not supported"));
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(error) => return Err(CcsdsNdmError::from(error)),
+        }
+    }
+
+    if !root_seen || !root_closed {
+        return Err(invalid("incomplete OPM XML document"));
+    }
+    Ok(())
 }
 
 impl Opm {
@@ -624,6 +1197,13 @@ impl Opm {
         Ok(())
     }
 
+    pub(crate) fn validate_xml_text(&self) -> Result<()> {
+        match self.xml_text_errors().into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
+    }
+
     fn xml_text_errors(&self) -> Vec<ValidationError> {
         fn check(
             errors: &mut Vec<ValidationError>,
@@ -798,6 +1378,7 @@ impl ToKvn for Opm {
 
 /// The body of the OPM, containing a single segment.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct OpmBody {
     #[serde(rename = "segment")]
     pub segment: OpmSegment,
@@ -823,6 +1404,7 @@ impl ToKvn for OpmBody {
 ///
 /// Contains metadata and data sections.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct OpmSegment {
     pub metadata: OpmMetadata,
     pub data: OpmData,
@@ -854,7 +1436,7 @@ impl ToKvn for OpmSegment {
 
 /// OPM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OpmMetadata {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
@@ -1018,7 +1600,7 @@ impl ToKvn for OpmMetadata {
 
 /// OPM Data Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OpmData {
     /// Comments (see 7.8 for formatting rules).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1260,7 +1842,7 @@ impl ToKvn for OpmData {
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct KeplerianElements {
     /// Comments (see 7.8 for formatting rules).
     ///
@@ -1474,7 +2056,7 @@ impl ToKvn for KeplerianElements {
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct ManeuverParameters {
     /// Comments (see 7.8 for formatting rules).
     ///

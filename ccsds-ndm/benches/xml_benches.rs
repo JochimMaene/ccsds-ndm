@@ -359,6 +359,29 @@ fn bench_xml_parse_opm(c: &mut Criterion) {
     });
 }
 
+fn bench_xml_parse_opm_failures(c: &mut Criterion) {
+    let valid = include_str!("../../data/xml/opm_g5.xml");
+    let invalid_late = format!("{valid}<trailing/>");
+    let limited = ccsds_ndm::ParseOptions::default().with_max_input_bytes(1);
+    let mut group = c.benchmark_group("xml_parse_opm_failure");
+    group.bench_function("invalid_early", |b| {
+        b.iter(|| black_box(Opm::from_xml(black_box("not XML"))).unwrap_err())
+    });
+    group.bench_function("invalid_late", |b| {
+        b.iter(|| black_box(Opm::from_xml(black_box(&invalid_late))).unwrap_err())
+    });
+    group.bench_function("input_limit", |b| {
+        b.iter(|| {
+            black_box(Opm::from_xml_with_options(
+                black_box(valid),
+                black_box(&limited),
+            ))
+            .unwrap_err()
+        })
+    });
+    group.finish();
+}
+
 fn bench_xml_generate_opm(c: &mut Criterion) {
     let opm =
         Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("invalid OPM benchmark");
@@ -427,6 +450,7 @@ criterion_group!(
     bench_ocm_covariance_10k,
     bench_ocm_maneuver_10k,
     bench_xml_parse_opm,
+    bench_xml_parse_opm_failures,
     bench_xml_generate_opm,
     bench_xml_parse_omm,
     bench_xml_parse_tdm,

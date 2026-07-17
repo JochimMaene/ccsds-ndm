@@ -76,6 +76,14 @@ perf.data.old
 ccsds-ndm/fuzz/target/
 ccsds-ndm/fuzz/artifacts/
 ccsds-ndm/fuzz/corpus/
+!ccsds-ndm/fuzz/corpus/
+ccsds-ndm/fuzz/corpus/*
+!ccsds-ndm/fuzz/corpus/fuzz_kvn/
+!ccsds-ndm/fuzz/corpus/fuzz_xml/
+ccsds-ndm/fuzz/corpus/fuzz_kvn/*
+ccsds-ndm/fuzz/corpus/fuzz_xml/*
+!ccsds-ndm/fuzz/corpus/fuzz_kvn/opm-3.0-minimal.kvn
+!ccsds-ndm/fuzz/corpus/fuzz_xml/opm-3.0-minimal.xml
 
 # ------------------------------
 # Build artifacts
@@ -93,3 +101,5 @@ copilot-instructions.md
 GEMINI.md
 CLAUDE.md
 AGENTS.md
+
+bindings/cpp

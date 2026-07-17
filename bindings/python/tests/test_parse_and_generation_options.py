@@ -56,3 +56,71 @@ def test_failed_generation_preserves_existing_file(tmp_path):
         message.to_file(str(output), "kvn", version="1.0")
 
     assert output.read_text() == "keep me"
+
+
+def test_opm_structured_diagnostics_and_resource_limits_are_exposed():
+    invalid = OPM_KVN.replace(
+        "OBJECT_NAME = OSPREY 5",
+        "OBJECT_NAME = OSPREY 5\nUNKNOWN_KEY = value",
+    )
+    with pytest.raises(ccsds_ndm.NdmKvnParseError) as caught:
+        ccsds_ndm.Opm.from_str(invalid, format="kvn")
+
+    error = caught.value
+    assert error.severity == "error"
+    assert error.operation == "parse"
+    assert error.notation == "kvn"
+    assert error.message_kind == "opm"
+    assert error.source_edition == "3.0"
+    assert error.target_edition is None
+    assert error.code == "parse.kvn.syntax"
+    assert (error.line, error.column) == (6, 1)
+    assert error.original_token == "UNKNOWN_KEY = value"
+    assert error.recovery is None
+
+    with pytest.raises(ccsds_ndm.NdmError) as limited_parse:
+        ccsds_ndm.Opm.from_str(
+            OPM_KVN,
+            format="kvn",
+            max_input_bytes=len(OPM_KVN.encode()) - 1,
+        )
+    assert limited_parse.value.code == "resource.input_limit_exceeded"
+    assert limited_parse.value.operation == "parse"
+
+    message = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn")
+    with pytest.raises(ccsds_ndm.NdmError) as limited_output:
+        message.to_xml(max_output_bytes=1)
+    assert limited_output.value.code == "resource.output_limit_exceeded"
+    assert limited_output.value.operation == "generate"
+    assert limited_output.value.notation == "xml"
+
+
+def test_python_opm_file_parsing_applies_limits_in_the_rust_core(tmp_path):
+    source = tmp_path / "source.kvn"
+    source.write_text(OPM_KVN)
+
+    with pytest.raises(ccsds_ndm.NdmError) as limited:
+        ccsds_ndm.Opm.from_file(str(source), format="kvn", max_input_bytes=16)
+    assert limited.value.code == "resource.input_limit_exceeded"
+
+    with pytest.raises(ccsds_ndm.NdmIoError):
+        ccsds_ndm.Opm.from_file(str(tmp_path / "missing.kvn"), format="kvn")
+
+
+def test_python_opm_conversion_delegates_to_strict_rust_core(tmp_path):
+    xml = ccsds_ndm.convert_opm(OPM_KVN, "kvn", "xml")
+    assert ccsds_ndm.Opm.from_str(xml, format="xml").to_kvn() == ccsds_ndm.Opm.from_str(
+        OPM_KVN, format="kvn"
+    ).to_kvn()
+
+    source = tmp_path / "source.kvn"
+    destination = tmp_path / "destination.xml"
+    source.write_text(OPM_KVN)
+    ccsds_ndm.convert_opm_file(str(source), str(destination), "kvn", "xml")
+    ccsds_ndm.Opm.from_file(str(destination), format="xml")
+
+    destination.write_text("sentinel")
+    source.write_text("not an OPM")
+    with pytest.raises(ccsds_ndm.NdmKvnParseError):
+        ccsds_ndm.convert_opm_file(str(source), str(destination), "kvn", "xml")
+    assert destination.read_text() == "sentinel"

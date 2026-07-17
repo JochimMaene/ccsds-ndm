@@ -25,28 +25,18 @@ pub fn parse_typed<T: Ndm>(_py: Python<'_>, data: &str, format: Option<&str>) ->
     .map_err(ccsds_error_to_pyerr)
 }
 
-pub fn validate_message<T: Validate>(
-    message: &T,
-    strict: bool,
-) -> PyResult<Option<Vec<String>>> {
+pub fn validate_message<T: Validate>(message: &T, strict: bool) -> PyResult<Option<Vec<String>>> {
     if strict {
-        message
-            .validate()
-            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        message.validate().map_err(ccsds_error_to_pyerr)?;
         return Ok(None);
     }
 
-    let errors = message
-        .validation_errors()
-        .map_err(ccsds_error_to_pyerr)?;
+    let errors = message.validation_errors().map_err(ccsds_error_to_pyerr)?;
     if errors.is_empty() {
         Ok(None)
     } else {
         Ok(Some(
-            errors
-                .into_iter()
-                .map(|error| error.to_string())
-                .collect(),
+            errors.into_iter().map(|error| error.to_string()).collect(),
         ))
     }
 }
@@ -64,7 +54,17 @@ pub fn generate_string<T: VersionedNdm>(
     format: &str,
     version: Option<&str>,
 ) -> PyResult<String> {
-    let options = generate_options(version);
+    generate_string_with_limit(message, format, version, None)
+}
+
+pub fn generate_string_with_limit<T: VersionedNdm>(
+    message: &T,
+    format: &str,
+    version: Option<&str>,
+    max_output_bytes: Option<usize>,
+) -> PyResult<String> {
+    let mut options = generate_options(version);
+    options.max_output_bytes = max_output_bytes;
     match format {
         "kvn" => message.to_kvn_with(&options).map_err(ccsds_error_to_pyerr),
         "xml" => message.to_xml_with(&options).map_err(ccsds_error_to_pyerr),
@@ -78,7 +78,18 @@ pub fn generate_file<T: VersionedNdm>(
     format: &str,
     version: Option<&str>,
 ) -> PyResult<()> {
-    let options = generate_options(version);
+    generate_file_with_limit(message, path, format, version, None)
+}
+
+pub fn generate_file_with_limit<T: VersionedNdm>(
+    message: &T,
+    path: &str,
+    format: &str,
+    version: Option<&str>,
+    max_output_bytes: Option<usize>,
+) -> PyResult<()> {
+    let mut options = generate_options(version);
+    options.max_output_bytes = max_output_bytes;
     if format != "kvn" && format != "xml" {
         return Err(unsupported_format(format));
     }

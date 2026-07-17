@@ -4046,7 +4046,7 @@ impl std::fmt::Display for AngVelFrameType {
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4 (OPM), Section 4.2.4 (OMM), Section 6.2.9 (OCM).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UserDefined {
     /// Comments (see 7.8 for formatting rules).
     ///
@@ -4066,6 +4066,7 @@ pub struct UserDefined {
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct UserDefinedParameter {
     /// Value of the user-defined parameter.
     #[serde(rename = "$value", default)]

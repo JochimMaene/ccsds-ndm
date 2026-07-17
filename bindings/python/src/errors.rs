@@ -8,7 +8,7 @@
 //! `CcsdsNdmError` hierarchy. This allows Python consumers to catch specific
 //! error types for more granular error handling.
 
-use ccsds_ndm::error::CcsdsNdmError;
+use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation, FormatError};
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyIOError, PyValueError};
 use pyo3::prelude::*;
@@ -80,6 +80,56 @@ create_exception!(
 /// Python exception type.
 pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
     match e {
+        CcsdsNdmError::Generation { context, source } => {
+            let code = source.code();
+            let field_path = source.field_path();
+            let error = ccsds_error_to_pyerr(*source);
+            enrich_exception(
+                error,
+                "generate",
+                context.notation,
+                context.message_kind.as_str(),
+                Some(context.source_edition),
+                Some(context.target_edition),
+                code,
+                field_path,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+        }
+        CcsdsNdmError::Parsing { context, source } => {
+            let code = if matches!(
+                source.as_format_error(),
+                Some(FormatError::InvalidFormat(_))
+            ) {
+                Some(match context.notation {
+                    DiagnosticNotation::Kvn => "parse.kvn.syntax",
+                    DiagnosticNotation::Xml => "parse.xml.syntax",
+                })
+            } else {
+                source.code()
+            };
+            let field_path = source.field_path();
+            let error = ccsds_error_to_pyerr(*source);
+            enrich_exception(
+                error,
+                "parse",
+                context.notation,
+                context.message_kind.as_str(),
+                context.source_edition,
+                None,
+                code,
+                field_path,
+                context.line,
+                context.column,
+                context.byte_offset,
+                context.original_token,
+                context.expected,
+            )
+        }
         CcsdsNdmError::Io(io_err) => NdmIoError::new_err(io_err.to_string()),
         CcsdsNdmError::Format(format_err) => {
             use ccsds_ndm::error::FormatError;
@@ -98,7 +148,17 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
                 _ => NdmFormatError::new_err(format_err.to_string()),
             }
         }
-        CcsdsNdmError::Validation(val_err) => NdmValidationError::new_err(val_err.to_string()),
+        CcsdsNdmError::Validation(val_err) => {
+            let code = val_err.code();
+            let field_path = val_err.field_path();
+            let error = NdmValidationError::new_err(val_err.to_string());
+            Python::attach(|py| {
+                let value = error.value(py);
+                let _ = value.setattr("code", code);
+                let _ = value.setattr("field_path", field_path);
+            });
+            error
+        }
         CcsdsNdmError::Epoch(epoch_err) => NdmEpochError::new_err(epoch_err.to_string()),
         CcsdsNdmError::UnsupportedMessage(msg) => NdmUnsupportedMessageError::new_err(msg),
         CcsdsNdmError::UnsupportedInputVersion { .. }
@@ -110,6 +170,47 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
         }
         _ => NdmError::new_err(e.to_string()),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn enrich_exception(
+    error: PyErr,
+    operation: &'static str,
+    notation: DiagnosticNotation,
+    message_kind: &'static str,
+    source_edition: Option<String>,
+    target_edition: Option<String>,
+    code: Option<&'static str>,
+    field_path: Option<String>,
+    line: Option<usize>,
+    column: Option<usize>,
+    byte_offset: Option<usize>,
+    original_token: Option<String>,
+    expected: Option<&'static str>,
+) -> PyErr {
+    let notation = match notation {
+        DiagnosticNotation::Kvn => "kvn",
+        DiagnosticNotation::Xml => "xml",
+    };
+    Python::attach(|py| {
+        let value = error.value(py);
+        let _ = value.setattr("severity", "error");
+        let _ = value.setattr("operation", operation);
+        let _ = value.setattr("notation", notation);
+        let _ = value.setattr("message_kind", message_kind.to_ascii_lowercase());
+        let _ = value.setattr("source_edition", source_edition);
+        let _ = value.setattr("target_edition", target_edition);
+        let _ = value.setattr("code", code);
+        let _ = value.setattr("field_path", field_path);
+        let _ = value.setattr("line", line);
+        let _ = value.setattr("column", column);
+        let _ = value.setattr("byte_offset", byte_offset);
+        let _ = value.setattr("original_token", original_token);
+        let _ = value.setattr("expected", expected);
+        let _ = value.setattr("requirement", Option::<&str>::None);
+        let _ = value.setattr("recovery", Option::<&str>::None);
+    });
+    error
 }
 
 /// Registers the exception classes with the Python module.

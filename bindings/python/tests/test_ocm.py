@@ -10,6 +10,7 @@ import pytest
 from ccsds_ndm import (
     CovLine,
     ManLine,
+    NdmValidationError,
     Ocm,
     OcmCovarianceMatrix,
     OcmData,
@@ -101,7 +102,7 @@ class TestOcm:
         segment.data = data
         ocm.segment = segment
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmValidationError):
             ocm.validate()
 
     def test_metadata_reference_epochs_require_calendar_form(self):

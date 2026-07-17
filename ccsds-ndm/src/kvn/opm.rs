@@ -477,12 +477,12 @@ DRAG_COEFF = 2.5
         // Version error
         let bad_version = MINIMAL_OPM.replacen("CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = BAD", 1);
         let err = Opm::from_kvn(&bad_version).unwrap_err();
-        match err {
-            crate::error::CcsdsNdmError::UnsupportedInputVersion { version, .. } => {
-                assert_eq!(version, "BAD");
-            }
-            _ => panic!("Expected unsupported input version, got {:?}", err),
-        }
+        assert_eq!(err.code(), Some("parse.unsupported_input_version"));
+        assert_eq!(
+            err.diagnostic()
+                .and_then(|diagnostic| diagnostic.source_edition),
+            Some("BAD")
+        );
 
         // Metadata errors
         let mut kvn_meta_err = "OBJECT_NAME = SAT\nUNKNOWN_KEY = VAL\n";

@@ -147,8 +147,10 @@
 //! [`VersionedNdm`]; notation-specific parser and writer mechanics remain internal.
 
 pub mod common;
+pub mod conversion;
 pub mod detect;
 pub mod error;
+mod fsutil;
 pub mod generation;
 pub(crate) mod kvn;
 pub mod messages;
@@ -160,10 +162,13 @@ pub mod validation;
 pub mod versioning;
 pub(crate) mod xml;
 
+pub use conversion::{
+    convert_opm, convert_opm_file, convert_opm_to_file, parse_opm_file, Notation,
+};
 use error::{CcsdsNdmError, Result};
 pub use generation::VersionedNdm;
 pub(crate) use kvn::parser::parse_block;
-pub use options::{GenerateOptions, TargetVersion};
+pub use options::{GenerateOptions, ParseOptions, TargetVersion};
 use std::fs;
 use std::path::Path;
 
@@ -413,7 +418,15 @@ impl MessageType {
     /// Returns a KVN-generation error or an I/O error from writing the destination.
     pub fn to_kvn_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let kvn = self.to_kvn()?;
-        fs::write(path, kvn).map_err(CcsdsNdmError::from)
+        fsutil::atomic_write(path.as_ref(), kvn.as_bytes()).map_err(|error| match self {
+            MessageType::Opm(message) => error.with_generation_context(
+                validation::MessageKind::Opm,
+                error::DiagnosticNotation::Kvn,
+                &message.version,
+                &message.version,
+            ),
+            _ => error,
+        })
     }
 
     /// Generate XML using the stored edition and write the complete document to a file.
@@ -426,7 +439,15 @@ impl MessageType {
     /// Returns an XML-generation error or an I/O error from writing the destination.
     pub fn to_xml_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let xml = self.to_xml()?;
-        fs::write(path, xml).map_err(CcsdsNdmError::from)
+        fsutil::atomic_write(path.as_ref(), xml.as_bytes()).map_err(|error| match self {
+            MessageType::Opm(message) => error.with_generation_context(
+                validation::MessageKind::Opm,
+                error::DiagnosticNotation::Xml,
+                &message.version,
+                &message.version,
+            ),
+            _ => error,
+        })
     }
 }
 

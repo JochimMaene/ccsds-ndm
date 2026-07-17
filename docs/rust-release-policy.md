@@ -28,14 +28,15 @@ guarantee.
 ## Crate packaging
 
 Run `just package-rust` from a clean checkout before publishing. It runs `cargo package --locked`,
-which applies Cargo's package-file selection and verifies that the unpacked crate builds using the
-locked dependency resolution. The Rust release workflow runs this command in a separate
-clean-checkout job and will not publish unless it succeeds. It also requires the release tag to
-equal `v` followed by the version in `Cargo.toml`.
+extracts the produced `.crate`, installs the CLI from that extracted artifact into a temporary
+prefix, and executes its version command. This applies Cargo's package-file selection and verifies
+that the artifact—not merely the working tree—builds and installs using the locked dependency
+resolution. The Rust release workflow runs this command in a separate clean-checkout job and will
+not publish unless it succeeds. It also requires the release tag to equal `v` followed by the
+version in `Cargo.toml`.
 
-This is package construction and buildability evidence. It is not evidence of byte-for-byte
-reproducible artifacts, installation on every platform, or supply-chain provenance. Those remain
-release gaps.
+This is package construction and current-stable Ubuntu installation evidence. Byte-for-byte
+reproducible artifacts and supply-chain provenance are not required before 1.0 and are not claimed.
 
 ## Security reporting
 
