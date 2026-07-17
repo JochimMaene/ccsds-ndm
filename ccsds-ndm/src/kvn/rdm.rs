@@ -59,7 +59,7 @@ pub fn rdm_header(input: &mut &str) -> KvnResult<RdmHeader> {
         kv_sep.parse_next(input)?;
         match key {
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -134,9 +134,9 @@ pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
         "CONTROLLED_REENTRY" => controlled_reentry: kv_enum,
         "CENTER_NAME" => center_name: kv_string,
         "TIME_SYSTEM" => time_system: kv_string,
-        "EPOCH_TZERO" => epoch_tzero: kv_epoch,
+        "EPOCH_TZERO" => epoch_tzero: kv_calendar_epoch,
         "REF_FRAME" => ref_frame: kv_string,
-        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_epoch,
+        "REF_FRAME_EPOCH" => val: kv_calendar_epoch_opt => { ref_frame_epoch = val; },
         "EPHEMERIS_NAME" => ephemeris_name: kv_string,
         "GRAVITY_MODEL" => gravity_model: kv_string,
         "ATMOSPHERIC_MODEL" => atmospheric_model: kv_string,
@@ -151,8 +151,8 @@ pub fn rdm_metadata(input: &mut &str) -> KvnResult<RdmMetadata> {
         "REENTRY_DISINTEGRATION" => reentry_disintegration: kv_enum,
         "IMPACT_UNCERTAINTY_METHOD" => impact_uncertainty_method: kv_enum,
         "PREVIOUS_MESSAGE_ID" => previous_message_id: kv_string,
-        "PREVIOUS_MESSAGE_EPOCH" => previous_message_epoch: kv_epoch,
-        "NEXT_MESSAGE_EPOCH" => next_message_epoch: kv_epoch,
+        "PREVIOUS_MESSAGE_EPOCH" => val: kv_calendar_epoch_opt => { previous_message_epoch = val; },
+        "NEXT_MESSAGE_EPOCH" => val: kv_calendar_epoch_opt => { next_message_epoch = val; },
     }, |_| false);
 
     Ok(RdmMetadata {
@@ -259,9 +259,9 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "REENTRY_ALTITUDE" => val: kv_from_kvn => { reentry_altitude = Some(val); },
         "ORBIT_LIFETIME_WINDOW_START" => val: kv_from_kvn => { orbit_lifetime_window_start = Some(val); },
         "ORBIT_LIFETIME_WINDOW_END" => val: kv_from_kvn => { orbit_lifetime_window_end = Some(val); },
-        "NOMINAL_REENTRY_EPOCH" => val: kv_epoch => { nominal_reentry_epoch = Some(val); },
-        "REENTRY_WINDOW_START" => val: kv_epoch => { reentry_window_start = Some(val); },
-        "REENTRY_WINDOW_END" => val: kv_epoch => { reentry_window_end = Some(val); },
+        "NOMINAL_REENTRY_EPOCH" => val: kv_calendar_epoch => { nominal_reentry_epoch = Some(val); },
+        "REENTRY_WINDOW_START" => val: kv_calendar_epoch => { reentry_window_start = Some(val); },
+        "REENTRY_WINDOW_END" => val: kv_calendar_epoch => { reentry_window_end = Some(val); },
         "ORBIT_LIFETIME_CONFIDENCE_LEVEL" => val: kv_from_kvn => { orbit_lifetime_confidence_level = Some(val); },
 
         "PROBABILITY_OF_IMPACT" => val: kv_from_kvn => { ground_params.probability_of_impact = Some(val); have_ground = true; },
@@ -269,9 +269,9 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "PROBABILITY_OF_BREAK_UP" => val: kv_from_kvn => { ground_params.probability_of_break_up = Some(val); have_ground = true; },
         "PROBABILITY_OF_LAND_IMPACT" => val: kv_from_kvn => { ground_params.probability_of_land_impact = Some(val); have_ground = true; },
         "PROBABILITY_OF_CASUALTY" => val: kv_from_kvn => { ground_params.probability_of_casualty = Some(val); have_ground = true; },
-        "NOMINAL_IMPACT_EPOCH" => val: kv_epoch => { ground_params.nominal_impact_epoch = Some(val); have_ground = true; },
-        "IMPACT_WINDOW_START" => val: kv_epoch => { ground_params.impact_window_start = Some(val); have_ground = true; },
-        "IMPACT_WINDOW_END" => val: kv_epoch => { ground_params.impact_window_end = Some(val); have_ground = true; },
+        "NOMINAL_IMPACT_EPOCH" => val: kv_calendar_epoch => { ground_params.nominal_impact_epoch = Some(val); have_ground = true; },
+        "IMPACT_WINDOW_START" => val: kv_calendar_epoch => { ground_params.impact_window_start = Some(val); have_ground = true; },
+        "IMPACT_WINDOW_END" => val: kv_calendar_epoch => { ground_params.impact_window_end = Some(val); have_ground = true; },
         "IMPACT_REF_FRAME" => val: kv_string => { ground_params.impact_ref_frame = Some(val); have_ground = true; },
         "NOMINAL_IMPACT_LON" => val: kv_from_kvn => { ground_params.nominal_impact_lon = Some(val); have_ground = true; },
         "NOMINAL_IMPACT_LAT" => val: kv_from_kvn => { ground_params.nominal_impact_lat = Some(val); have_ground = true; },
@@ -295,7 +295,7 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "IMPACT_3_STOP_LAT" => val: kv_from_kvn => { ground_params.impact_3_stop_lat = Some(val); have_ground = true; },
         "IMPACT_3_CROSS_TRACK" => val: kv_from_kvn => { ground_params.impact_3_cross_track = Some(val); have_ground = true; },
 
-        "EPOCH" => val: kv_epoch => { sv_epoch = Some(val); },
+        "EPOCH" => val: kv_calendar_epoch => { sv_epoch = Some(val); },
         "X" => val: kv_from_kvn => { sv_x = Some(val); },
         "Y" => val: kv_from_kvn => { sv_y = Some(val); },
         "Z" => val: kv_from_kvn => { sv_z = Some(val); },
@@ -337,8 +337,8 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         "BALLISTIC_COEFF" => val: kv_from_kvn => { spacecraft_params.ballistic_coeff = Some(val); have_sp = true; },
         "THRUST_ACCELERATION" => val: kv_from_kvn => { spacecraft_params.thrust_acceleration = Some(val); have_sp = true; },
 
-        "TIME_LASTOB_START" => val: kv_epoch => { od_params.time_lastob_start = Some(val); have_od = true; },
-        "TIME_LASTOB_END" => val: kv_epoch => { od_params.time_lastob_end = Some(val); have_od = true; },
+        "TIME_LASTOB_START" => val: kv_calendar_epoch => { od_params.time_lastob_start = Some(val); have_od = true; },
+        "TIME_LASTOB_END" => val: kv_calendar_epoch => { od_params.time_lastob_end = Some(val); have_od = true; },
         "RECOMMENDED_OD_SPAN" => val: kv_from_kvn => { od_params.recommended_od_span = Some(val); have_od = true; },
         "ACTUAL_OD_SPAN" => val: kv_from_kvn => { od_params.actual_od_span = Some(val); have_od = true; },
         "OBS_AVAILABLE" => val: kv_u32 => { od_params.obs_available = Some(val.into()); have_od = true; },

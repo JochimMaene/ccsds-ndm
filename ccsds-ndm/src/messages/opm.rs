@@ -24,7 +24,7 @@ use std::borrow::Cow;
 /// such as mass, area, and maneuver planning data, if applicable) may be included with the message.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 3.1.1.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[derive(Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "opm")]
 pub struct Opm {
     pub header: OdmHeader,
@@ -37,6 +37,35 @@ pub struct Opm {
     pub version: String,
 }
 
+impl Serialize for Opm {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(rename = "opm")]
+        struct XmlOpm<'a> {
+            #[serde(rename = "@xmlns:xsi")]
+            xmlns_xsi: &'static str,
+            #[serde(rename = "@id")]
+            id: &'a Option<String>,
+            #[serde(rename = "@version")]
+            version: &'a str,
+            header: &'a OdmHeader,
+            body: &'a OpmBody,
+        }
+
+        XmlOpm {
+            xmlns_xsi: "http://www.w3.org/2001/XMLSchema-instance",
+            id: &self.id,
+            version: &self.version,
+            header: &self.header,
+            body: &self.body,
+        }
+        .serialize(serializer)
+    }
+}
+
 impl crate::traits::Validate for Opm {
     fn validate(&self) -> Result<()> {
         crate::versioning::validate_root(
@@ -45,7 +74,8 @@ impl crate::traits::Validate for Opm {
             &self.version,
         )?;
         self.header.validate()?;
-        self.body.validate()
+        self.body.validate()?;
+        Ok(())
     }
 
     fn validation_errors(&self) -> Result<Vec<ValidationError>> {
@@ -80,7 +110,7 @@ impl Ndm for Opm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let opm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Opm, &opm)?;
+        crate::traits::Validate::validate(&opm)?;
         Ok(opm)
     }
 
@@ -96,7 +126,7 @@ impl Ndm for Opm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let opm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Opm, &opm)?;
+        crate::traits::Validate::validate(&opm)?;
         Ok(opm)
     }
 }
@@ -247,7 +277,7 @@ pub struct OpmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub ref_frame_epoch: Option<Epoch>,
+    pub ref_frame_epoch: Option<CalendarEpoch>,
     /// Time system used for state vector, maneuver, and covariance data. Use of values other than
     /// those in 3.2.3.2 should be documented in an ICD.
     ///
@@ -403,6 +433,15 @@ impl Validate for OpmData {
         if let Some(ke) = &self.keplerian_elements {
             ke.validate()?;
         }
+        if let Some(parameters) = &self.spacecraft_parameters {
+            parameters.validate()?;
+        }
+        if let Some(covariance) = &self.covariance_matrix {
+            covariance.validate()?;
+        }
+        for maneuver in &self.maneuver_parameters {
+            maneuver.validate()?;
+        }
         if !self.maneuver_parameters.is_empty()
             && self
                 .spacecraft_parameters
@@ -426,6 +465,15 @@ impl Validate for OpmData {
             Some(elements) => elements.validation_errors()?,
             None => Vec::new(),
         });
+        if let Some(parameters) = &self.spacecraft_parameters {
+            errors.extend(parameters.validation_errors()?);
+        }
+        if let Some(covariance) = &self.covariance_matrix {
+            errors.extend(covariance.validation_errors()?);
+        }
+        for maneuver in &self.maneuver_parameters {
+            errors.extend(maneuver.validation_errors()?);
+        }
         if !self.maneuver_parameters.is_empty()
             && self
                 .spacecraft_parameters
@@ -574,20 +622,115 @@ pub struct KeplerianElements {
 
 impl crate::traits::Validate for KeplerianElements {
     fn validate(&self) -> Result<()> {
-        match (self.true_anomaly.is_some(), self.mean_anomaly.is_some()) {
-            (true, false) | (false, true) => Ok(()),
-            _ => Err(ValidationError::Generic {
-                message: Cow::Borrowed(
-                    "Keplerian Elements must have exactly one of TRUE_ANOMALY or MEAN_ANOMALY",
-                ),
-                line: None,
-            }
-            .into()),
+        match self.validation_errors()?.into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
         }
     }
 
     fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::validation_errors_from(self.validate())
+        let mut errors = Vec::new();
+
+        let semi_major_axis = self.semi_major_axis.value;
+        if !semi_major_axis.is_finite() {
+            errors.push(ValidationError::InvalidValue {
+                field: "SEMI_MAJOR_AXIS".into(),
+                value: semi_major_axis.to_string(),
+                expected: "a finite number".into(),
+                line: None,
+            });
+        }
+
+        let eccentricity = self.eccentricity.value;
+        if !eccentricity.is_finite() {
+            errors.push(ValidationError::InvalidValue {
+                field: "ECCENTRICITY".into(),
+                value: eccentricity.to_string(),
+                expected: "a finite number".into(),
+                line: None,
+            });
+        } else if eccentricity < 0.0 {
+            errors.push(ValidationError::OutOfRange {
+                name: "ECCENTRICITY".into(),
+                value: eccentricity.to_string(),
+                expected: ">= 0".into(),
+                line: None,
+            });
+        }
+
+        let inclination = self.inclination.angle.value;
+        if !inclination.is_finite() {
+            errors.push(ValidationError::InvalidValue {
+                field: "INCLINATION".into(),
+                value: inclination.to_string(),
+                expected: "a finite number".into(),
+                line: None,
+            });
+        } else if !(0.0..=180.0).contains(&inclination) {
+            errors.push(ValidationError::OutOfRange {
+                name: "INCLINATION".into(),
+                value: inclination.to_string(),
+                expected: "[0, 180]".into(),
+                line: None,
+            });
+        }
+
+        for (field, angle) in [
+            ("RA_OF_ASC_NODE", Some(&self.ra_of_asc_node)),
+            ("ARG_OF_PERICENTER", Some(&self.arg_of_pericenter)),
+            ("TRUE_ANOMALY", self.true_anomaly.as_ref()),
+            ("MEAN_ANOMALY", self.mean_anomaly.as_ref()),
+        ] {
+            let Some(angle) = angle else {
+                continue;
+            };
+            if !angle.value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: angle.value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            } else if !(-360.0..360.0).contains(&angle.value) {
+                errors.push(ValidationError::OutOfRange {
+                    name: field.into(),
+                    value: angle.value.to_string(),
+                    expected: "[-360, 360)".into(),
+                    line: None,
+                });
+            }
+        }
+
+        let gm = self.gm.value;
+        if !gm.is_finite() {
+            errors.push(ValidationError::InvalidValue {
+                field: "GM".into(),
+                value: gm.to_string(),
+                expected: "a finite number".into(),
+                line: None,
+            });
+        } else if gm <= 0.0 {
+            errors.push(ValidationError::OutOfRange {
+                name: "GM".into(),
+                value: gm.to_string(),
+                expected: "> 0".into(),
+                line: None,
+            });
+        }
+
+        if !matches!(
+            (self.true_anomaly.is_some(), self.mean_anomaly.is_some()),
+            (true, false) | (false, true)
+        ) {
+            errors.push(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "Keplerian Elements must have exactly one of TRUE_ANOMALY or MEAN_ANOMALY",
+                ),
+                line: None,
+            });
+        }
+
+        Ok(errors)
     }
 }
 
@@ -629,7 +772,7 @@ pub struct ManeuverParameters {
     /// Epoch of ignition (see 7.5.10 for formatting rules)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    pub man_epoch_ignition: Epoch,
+    pub man_epoch_ignition: CalendarEpoch,
     /// Maneuver duration (If = 0, impulsive maneuver)
     ///
     /// **Units**: s
@@ -642,9 +785,7 @@ pub struct ManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     ///
-    /// **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
-    /// This implementation follows the underlying schema type and allows non-positive values
-    /// (`<= 0`) for interoperability.
+    /// The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
     pub man_delta_mass: DeltaMassZ,
     /// Reference frame in which the velocity increment vector data are given. The user must
     /// select from the accepted set of values indicated in 3.2.4.11.
@@ -670,6 +811,84 @@ pub struct ManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub man_dv_3: Velocity,
+}
+
+impl Validate for ManeuverParameters {
+    fn validate(&self) -> Result<()> {
+        match self.validation_errors()?.into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "Maneuver Parameters",
+            [
+                ("MAN_EPOCH_IGNITION", self.man_epoch_ignition.is_empty()),
+                ("MAN_REF_FRAME", self.man_ref_frame.trim().is_empty()),
+            ],
+        );
+
+        let duration = self.man_duration.value;
+        if !duration.is_finite() {
+            errors.push(ValidationError::InvalidValue {
+                field: "MAN_DURATION".into(),
+                value: duration.to_string(),
+                expected: "a finite number".into(),
+                line: None,
+            });
+        } else if duration < 0.0 {
+            errors.push(ValidationError::OutOfRange {
+                name: "MAN_DURATION".into(),
+                value: duration.to_string(),
+                expected: ">= 0".into(),
+                line: None,
+            });
+        }
+        if matches!(self.man_duration.units, Some(TimeUnits::Day)) {
+            errors.push(ValidationError::InvalidValue {
+                field: "MAN_DURATION units".into(),
+                value: "d".into(),
+                expected: "s or omitted".into(),
+                line: None,
+            });
+        }
+
+        let delta_mass = self.man_delta_mass.value;
+        if !delta_mass.is_finite() {
+            errors.push(ValidationError::InvalidValue {
+                field: "MAN_DELTA_MASS".into(),
+                value: delta_mass.to_string(),
+                expected: "a finite number".into(),
+                line: None,
+            });
+        } else if delta_mass > 0.0 {
+            errors.push(ValidationError::OutOfRange {
+                name: "MAN_DELTA_MASS".into(),
+                value: delta_mass.to_string(),
+                expected: "<= 0".into(),
+                line: None,
+            });
+        }
+
+        for (field, value) in [
+            ("MAN_DV_1", self.man_dv_1.value),
+            ("MAN_DV_2", self.man_dv_2.value),
+            ("MAN_DV_3", self.man_dv_3.value),
+        ] {
+            if !value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            }
+        }
+
+        Ok(errors)
+    }
 }
 
 impl ToKvn for ManeuverParameters {
@@ -826,50 +1045,6 @@ MAN_DV_3 = 0.0
             )
         });
         assert!(ok, "expected MASS missing validation error, got {err}");
-    }
-
-    #[test]
-    fn test_opm_maneuver_without_mass_lenient_warns() {
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2022-11-06T09:23:57
-ORIGINATOR = JAXA
-OBJECT_NAME = SAT
-OBJECT_ID = 1
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2022-12-18T14:28:15.1172
-X = 6503.514
-Y = 1239.647
-Z = -717.490
-X_DOT = -0.873160
-Y_DOT = 8.740420
-Z_DOT = -4.191076
-MAN_EPOCH_IGNITION = 2023-01-01T00:00:00
-MAN_DURATION = 10.0
-MAN_DELTA_MASS = -1.0
-MAN_REF_FRAME = RSW
-MAN_DV_1 = 0.1
-MAN_DV_2 = 0.0
-MAN_DV_3 = 0.0
-"#;
-        let _ = crate::validation::take_warnings();
-        let opm = crate::validation::with_validation_mode(
-            crate::validation::ValidationMode::Permissive,
-            || Opm::from_kvn(kvn),
-        )
-        .expect("lenient parse should succeed");
-        assert_eq!(opm.body.segment.data.maneuver_parameters.len(), 1);
-
-        let warnings = crate::validation::take_warnings();
-        assert!(warnings.iter().any(|w| {
-            w.message_kind == crate::validation::MessageKind::Opm
-                && matches!(
-                    w.error,
-                    ValidationError::MissingRequiredField { ref block, ref field, .. }
-                    if block.as_ref() == "Spacecraft Parameters" && field.as_ref() == "MASS"
-                )
-        }));
     }
 
     // =========================================================================
@@ -1938,7 +2113,7 @@ Z_DOT = -4.191076 [km/s]
         let mut data = OpmData::builder()
             .state_vector(
                 StateVector::builder()
-                    .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .epoch("2023-01-01T00:00:00".parse().unwrap())
                     .x(Distance::new(1.0, None))
                     .y(Distance::new(1.0, None))
                     .z(Distance::new(1.0, None))
@@ -1972,7 +2147,7 @@ Z_DOT = -4.191076 [km/s]
             .version("3.0")
             .header(
                 OdmHeader::builder()
-                    .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .creation_date("2023-01-01T00:00:00".parse().unwrap())
                     .originator("TEST")
                     .build(),
             )
@@ -1986,7 +2161,7 @@ Z_DOT = -4.191076 [km/s]
                                     .object_id("1")
                                     .center_name("EARTH")
                                     .ref_frame("GCRF")
-                                    .ref_frame_epoch(Epoch::new("2000-01-01T12:00:00").unwrap())
+                                    .ref_frame_epoch("2000-01-01T12:00:00".parse().unwrap())
                                     .time_system("UTC")
                                     .build(),
                             )
@@ -1994,7 +2169,7 @@ Z_DOT = -4.191076 [km/s]
                                 OpmData::builder()
                                     .state_vector(
                                         StateVector::builder()
-                                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                                            .epoch("2023-01-01T00:00:00".parse().unwrap())
                                             .x(Distance::new(1.0, None))
                                             .y(Distance::new(1.0, None))
                                             .z(Distance::new(1.0, None))
@@ -2064,7 +2239,7 @@ Z_DOT = -4.191076 [km/s]
             .version("3.0")
             .header(
                 OdmHeader::builder()
-                    .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .creation_date("2023-01-01T00:00:00".parse().unwrap())
                     .originator("TEST")
                     .build(),
             )
@@ -2085,7 +2260,7 @@ Z_DOT = -4.191076 [km/s]
                                 OpmData::builder()
                                     .state_vector(
                                         StateVector::builder()
-                                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                                            .epoch("2023-01-01T00:00:00".parse().unwrap())
                                             .x(Distance::new(1.0, None))
                                             .y(Distance::new(1.0, None))
                                             .z(Distance::new(1.0, None))

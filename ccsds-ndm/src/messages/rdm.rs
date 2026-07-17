@@ -11,8 +11,8 @@ use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::{
-    ControlledType, DisintegrationType, Distance, Epoch, ImpactUncertaintyType, ObjectDescription,
-    ReentryUncertaintyMethodType, UserDefined, YesNo,
+    CalendarEpoch, ControlledType, DisintegrationType, Distance, ImpactUncertaintyType,
+    ObjectDescription, ReentryUncertaintyMethodType, UserDefined, YesNo,
 };
 use serde::{Deserialize, Serialize};
 
@@ -79,7 +79,7 @@ impl Ndm for Rdm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let rdm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Rdm, &rdm)?;
+        crate::traits::Validate::validate(&rdm)?;
         Ok(rdm)
     }
 
@@ -95,7 +95,7 @@ impl Ndm for Rdm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Rdm, &rdm)?;
+        crate::traits::Validate::validate(&rdm)?;
         Ok(rdm)
     }
 }
@@ -124,7 +124,7 @@ pub struct RdmHeader {
     /// File creation date and time in UTC.
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23
-    pub creation_date: Epoch,
+    pub creation_date: CalendarEpoch,
     /// Creating agency or entity.
     ///
     /// Examples: DLR, ESA
@@ -404,7 +404,7 @@ pub struct RdmMetadata {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    pub epoch_tzero: Epoch,
+    pub epoch_tzero: CalendarEpoch,
     /// Reference frame in which the (optional) orbit information will be provided. The value
     /// should be taken from the keyword value name column in the SANA celestial body reference
     /// frames registry, reference `[11]`. The reference frame must be the same for all orbit
@@ -433,7 +433,7 @@ pub struct RdmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub ref_frame_epoch: Option<Epoch>,
+    pub ref_frame_epoch: Option<CalendarEpoch>,
     /// Unique identifier of an external ephemeris file used or NONE.
     ///
     /// **Examples**: NONE, EPHEMERIS, INTELSAT2
@@ -622,7 +622,7 @@ pub struct RdmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub previous_message_epoch: Option<Epoch>,
+    pub previous_message_epoch: Option<CalendarEpoch>,
     /// Scheduled UTC epoch of the next RDM for the same object (formatting rules specified in
     /// 5.3.3.5); N/A if no other message is scheduled.
     ///
@@ -634,7 +634,7 @@ pub struct RdmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub next_message_epoch: Option<Epoch>,
+    pub next_message_epoch: Option<CalendarEpoch>,
 }
 
 impl ToKvn for RdmMetadata {

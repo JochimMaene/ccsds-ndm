@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::{OdmHeader, StateVectorAcc};
-use crate::error::Result;
+use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::{
-    Epoch, InterpolationDegree, PositionCovariance, PositionVelocityCovariance, VelocityCovariance,
+    CalendarEpoch, Epoch, InterpolationDegree, PositionCovariance, PositionVelocityCovariance,
+    VelocityCovariance,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
@@ -22,6 +23,15 @@ use std::num::NonZeroU32;
 #[cfg(test)]
 #[allow(unused_imports)]
 use crate::error::CcsdsNdmError;
+
+fn contextual_epoch_error(epoch: &Epoch, field: &'static str) -> Option<ValidationError> {
+    (!epoch.is_contextually_valid()).then(|| ValidationError::InvalidValue {
+        field: field.into(),
+        value: epoch.to_string(),
+        expected: "a valid calendar, ordinal, or non-degenerate numeric epoch".into(),
+        line: None,
+    })
+}
 
 //----------------------------------------------------------------------
 // Root OEM Structure
@@ -195,6 +205,24 @@ impl crate::traits::Validate for OemMetadata {
             }
             .into());
         }
+        for (field, epoch) in [
+            ("START_TIME", &self.start_time),
+            ("STOP_TIME", &self.stop_time),
+        ] {
+            if let Some(error) = contextual_epoch_error(epoch, field) {
+                return Err(error.into());
+            }
+        }
+        for (field, epoch) in [
+            ("USEABLE_START_TIME", self.useable_start_time.as_ref()),
+            ("USEABLE_STOP_TIME", self.useable_stop_time.as_ref()),
+        ] {
+            if let Some(epoch) = epoch {
+                if let Some(error) = contextual_epoch_error(epoch, field) {
+                    return Err(error.into());
+                }
+            }
+        }
         if self.interpolation.is_some() && self.interpolation_degree.is_none() {
             return Err(crate::error::ValidationError::MissingRequiredField {
                 block: "OEM Metadata".into(),
@@ -207,7 +235,7 @@ impl crate::traits::Validate for OemMetadata {
     }
 
     fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
+        let mut errors = crate::validation::missing_required_fields(
             "OEM Metadata",
             [
                 ("OBJECT_NAME", self.object_name.trim().is_empty()),
@@ -220,7 +248,26 @@ impl crate::traits::Validate for OemMetadata {
                     self.interpolation.is_some() && self.interpolation_degree.is_none(),
                 ),
             ],
-        ))
+        );
+        for (field, epoch) in [
+            ("START_TIME", &self.start_time),
+            ("STOP_TIME", &self.stop_time),
+        ] {
+            if let Some(error) = contextual_epoch_error(epoch, field) {
+                errors.push(error);
+            }
+        }
+        for (field, epoch) in [
+            ("USEABLE_START_TIME", self.useable_start_time.as_ref()),
+            ("USEABLE_STOP_TIME", self.useable_stop_time.as_ref()),
+        ] {
+            if let Some(epoch) = epoch {
+                if let Some(error) = contextual_epoch_error(epoch, field) {
+                    errors.push(error);
+                }
+            }
+        }
+        Ok(errors)
     }
 }
 
@@ -283,7 +330,7 @@ impl Ndm for Oem {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let oem = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Oem, &oem)?;
+        crate::traits::Validate::validate(&oem)?;
         Ok(oem)
     }
 
@@ -299,7 +346,7 @@ impl Ndm for Oem {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let oem: Self = crate::xml::from_str_with_context(xml, "OEM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Oem, &oem)?;
+        crate::traits::Validate::validate(&oem)?;
         Ok(oem)
     }
 }
@@ -427,7 +474,7 @@ pub struct OemMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub ref_frame_epoch: Option<Epoch>,
+    pub ref_frame_epoch: Option<CalendarEpoch>,
     /// Time system used for ephemeris and covariance data. Use of values other than those in
     /// 3.2.3.2 should be documented in an ICD.
     ///
@@ -783,6 +830,9 @@ impl ToKvn for OemCovarianceMatrix {
 
 impl crate::traits::Validate for OemCovarianceMatrix {
     fn validate(&self) -> Result<()> {
+        if let Some(error) = contextual_epoch_error(&self.epoch, "EPOCH") {
+            return Err(error.into());
+        }
         for (field, value) in self.values() {
             if !value.is_finite() {
                 return Err(crate::error::ValidationError::InvalidValue {
@@ -798,19 +848,19 @@ impl crate::traits::Validate for OemCovarianceMatrix {
     }
 
     fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        Ok(self
-            .values()
-            .into_iter()
-            .filter(|(_, value)| !value.is_finite())
-            .map(
-                |(field, value)| crate::error::ValidationError::InvalidValue {
-                    field: field.into(),
-                    value: value.to_string(),
-                    expected: "a finite number".into(),
-                    line: None,
-                },
-            )
-            .collect())
+        let mut errors = Vec::new();
+        if let Some(error) = contextual_epoch_error(&self.epoch, "EPOCH") {
+            errors.push(error);
+        }
+        errors.extend(self.values().into_iter().filter_map(|(field, value)| {
+            (!value.is_finite()).then_some(crate::error::ValidationError::InvalidValue {
+                field: field.into(),
+                value: value.to_string(),
+                expected: "a finite number".into(),
+                line: None,
+            })
+        }));
+        Ok(errors)
     }
 }
 

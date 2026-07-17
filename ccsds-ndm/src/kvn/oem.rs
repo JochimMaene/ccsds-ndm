@@ -97,7 +97,7 @@ pub fn oem_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 classification = Some(kv_string.parse_next(input)?);
             }
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -152,7 +152,7 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
         "OBJECT_ID" => object_id: kv_string,
         "CENTER_NAME" => center_name: kv_string,
         "REF_FRAME" => ref_frame: kv_string,
-        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_epoch,
+        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_calendar_epoch,
         "TIME_SYSTEM" => time_system: kv_string,
         "START_TIME" => start_time: kv_epoch,
         "USEABLE_START_TIME" => useable_start_time: kv_epoch,
@@ -996,9 +996,11 @@ META_STOP
     #[test]
     fn test_odm_header_errors() {
         // Invalid creation date
-        let kvn = "CREATION_DATE = INVALID\nORIGINATOR = TEST\n";
-        let mut input = kvn;
-        assert!(odm_header.parse_next(&mut input).is_err());
+        for value in ["INVALID", "123.5", "2023-02-29T00:00:00"] {
+            let kvn = format!("CREATION_DATE = {value}\nORIGINATOR = TEST\n");
+            let mut input = kvn.as_str();
+            assert!(odm_header.parse_next(&mut input).is_err());
+        }
     }
 
     #[test]
@@ -1987,6 +1989,78 @@ META_STOP
 "#;
         let oem = Oem::from_kvn(kvn_with).unwrap();
         assert!(oem.body.segment[0].metadata.ref_frame_epoch.is_some());
+    }
+
+    #[test]
+    fn ref_frame_epoch_requires_calendar_form() {
+        let source = include_str!("../../../data/kvn/oem_g11.kvn");
+        let with_epoch = source.replacen(
+            "REF_FRAME = EME2000\n",
+            "REF_FRAME = EME2000\nREF_FRAME_EPOCH = 2000-01-01T12:00:00\n",
+            1,
+        );
+        let oem = Oem::from_kvn(&with_epoch).expect("calendar frame epoch should parse");
+        assert_eq!(
+            oem.body.segment[0]
+                .metadata
+                .ref_frame_epoch
+                .as_ref()
+                .unwrap()
+                .as_str(),
+            "2000-01-01T12:00:00"
+        );
+
+        let numeric = with_epoch.replace(
+            "REF_FRAME_EPOCH = 2000-01-01T12:00:00",
+            "REF_FRAME_EPOCH = 123.5",
+        );
+        assert!(Oem::from_kvn(&numeric).is_err());
+    }
+
+    #[test]
+    fn contextual_epoch_fields_reject_invalid_values_but_keep_numeric_time_tags() {
+        let source = include_str!("../../../data/kvn/oem_g11.kvn");
+        for (needle, replacement) in [
+            (
+                "START_TIME = 2019-12-18T12:00:00.331",
+                "START_TIME = 2023-02-29T12:00:00",
+            ),
+            (
+                "USEABLE_START_TIME = 2019-12-18T12:10:00.331",
+                "USEABLE_START_TIME = +",
+            ),
+            ("2019-12-18T12:00:00.331 2789.619", "+ 2789.619"),
+        ] {
+            let invalid = source.replacen(needle, replacement, 1);
+            assert!(
+                Oem::from_kvn(&invalid).is_err(),
+                "accepted invalid contextual epoch replacement {replacement:?}"
+            );
+        }
+
+        let relative = source
+            .replace("TIME_SYSTEM = UTC", "TIME_SYSTEM = MET")
+            .replacen(
+                "START_TIME = 2019-12-18T12:00:00.331",
+                "START_TIME = 123.5",
+                1,
+            )
+            .replacen(
+                "USEABLE_START_TIME = 2019-12-18T12:10:00.331",
+                "USEABLE_START_TIME = 124.0",
+                1,
+            )
+            .replacen(
+                "USEABLE_STOP_TIME = 2019-12-28T21:23:00.331",
+                "USEABLE_STOP_TIME = 125.0",
+                1,
+            )
+            .replacen(
+                "STOP_TIME = 2019-12-28T21:28:00.331",
+                "STOP_TIME = 126.0",
+                1,
+            );
+        assert!(Oem::from_kvn(&relative).is_ok());
     }
 
     #[test]

@@ -2,60 +2,27 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::errors::{ccsds_error_to_pyerr, NdmParseWarning};
+use crate::errors::ccsds_error_to_pyerr;
 use ccsds_ndm::generation::VersionedNdm;
-use ccsds_ndm::options::{GenerateOptions, ParseMode};
+use ccsds_ndm::options::GenerateOptions;
 use ccsds_ndm::traits::{Ndm, Validate};
 use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::*;
 use std::path::Path;
 
-pub fn parse_mode(strict: bool) -> ParseMode {
-    if strict {
-        ParseMode::Strict
-    } else {
-        ParseMode::Permissive
-    }
-}
-
-pub fn parse_typed<T: Ndm>(
-    py: Python<'_>,
-    data: &str,
-    format: Option<&str>,
-    strict: bool,
-) -> PyResult<T> {
-    let mode = parse_mode(strict);
-    let report = match format {
-        Some("kvn") => T::from_kvn_with_mode(data, mode),
-        Some("xml") => T::from_xml_with_mode(data, mode),
+pub fn parse_typed<T: Ndm>(_py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<T> {
+    match format {
+        Some("kvn") => T::from_kvn(data),
+        Some("xml") => T::from_xml(data),
         Some(other) => {
             return Err(pyo3::exceptions::PyValueError::new_err(format!(
                 "Unsupported format '{other}'. Use 'kvn' or 'xml'",
             )))
         }
-        None if data.trim_start().starts_with('<') => T::from_xml_with_mode(data, mode),
-        None => T::from_kvn_with_mode(data, mode),
+        None if data.trim_start().starts_with('<') => T::from_xml(data),
+        None => T::from_kvn(data),
     }
-    .map_err(ccsds_error_to_pyerr)?;
-
-    emit_diagnostics(py, &report.diagnostics)?;
-    Ok(report.message)
-}
-
-pub fn emit_diagnostics(
-    py: Python<'_>,
-    diagnostics: &[ccsds_ndm::validation::ValidationIssue],
-) -> PyResult<()> {
-    if diagnostics.is_empty() {
-        return Ok(());
-    }
-
-    let warnings = py.import("warnings")?;
-    let category = py.get_type::<NdmParseWarning>();
-    for diagnostic in diagnostics {
-        warnings.call_method1("warn", (diagnostic.error.to_string(), &category))?;
-    }
-    Ok(())
+    .map_err(ccsds_error_to_pyerr)
 }
 
 pub fn validate_message<T: Validate>(

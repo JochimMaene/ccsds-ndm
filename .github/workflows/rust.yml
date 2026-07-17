@@ -26,6 +26,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ccsds-ndm
+      - name: Install XSD validator
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libxml2-utils
       - name: Run tests
         run: just test-rust
 
@@ -54,6 +58,10 @@ jobs:
       - uses: taiki-e/install-action@just
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install XSD validator
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libxml2-utils
       - name: Generate code coverage
         run: just coverage
       - name: Upload coverage to Codecov

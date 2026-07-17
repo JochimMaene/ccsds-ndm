@@ -297,7 +297,7 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<AttManeuverState> {
     let mut man_delta_mass = None;
 
     parse_block!(input, comment, {
-        "MAN_EPOCH_START" => man_epoch_start: kv_epoch,
+        "MAN_EPOCH_START" => man_epoch_start: kv_calendar_epoch,
         "MAN_DURATION" => man_duration: kv_from_kvn,
         "MAN_REF_FRAME" => man_ref_frame: kv_string,
         "MAN_TOR_X" => man_tor_x: kv_from_kvn,
@@ -333,7 +333,7 @@ pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
 
     // EPOCH is mandatory and usually the first key in data section
     let (epoch, _) = expect_key("EPOCH").parse_next(input)?;
-    let epoch = crate::types::Epoch::from_str(epoch)
+    let epoch = crate::types::CalendarEpoch::from_str(epoch)
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
 
     let mut quaternion_state = Vec::new();

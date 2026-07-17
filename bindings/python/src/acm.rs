@@ -4,7 +4,7 @@
 
 use crate::common::parse_time_system;
 use crate::common::AdmHeader;
-use crate::types::parse_epoch;
+use crate::types::{parse_calendar_epoch, parse_epoch, parse_relative_time};
 use ccsds_ndm::messages::acm as core_acm;
 use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, AttBasisType, AttRateType, RotSeq};
 use pyo3::exceptions::PyValueError;
@@ -89,28 +89,18 @@ impl Acm {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, strict=true))]
-    fn from_str(
-        py: Python<'_>,
-        data: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format, strict)?;
+    #[pyo3(signature = (data, format=None))]
+    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
+        let inner = crate::api::parse_typed(py, data, format)?;
         Ok(Self { inner })
     }
 
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, strict=true))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None))]
+    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format, strict)
+        Self::from_str(py, &content, format)
     }
 
     /// Serialize to KVN, preserving the source version by default.
@@ -279,7 +269,7 @@ impl AcmMetadata {
                 object_name,
                 international_designator,
                 time_system,
-                epoch_tzero: parse_epoch(&epoch_tzero)?,
+                epoch_tzero: parse_calendar_epoch(&epoch_tzero)?,
                 catalog_name: None,
                 object_designator: None,
                 originator_poc: None,
@@ -506,7 +496,7 @@ impl AcmMetadata {
 
     #[setter]
     fn set_epoch_tzero(&mut self, value: String) -> PyResult<()> {
-        self.inner.epoch_tzero = parse_epoch(&value)?;
+        self.inner.epoch_tzero = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -587,7 +577,7 @@ impl AcmMetadata {
 
     #[setter]
     fn set_next_leap_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.next_leap_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.next_leap_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1462,7 +1452,7 @@ impl AcmManeuverParameters {
         self.inner.man_purpose = value;
     }
 
-    /// Maneuver begin time (relative or absolute epoch string).
+    /// Maneuver begin time in seconds relative to EPOCH_TZERO.
     ///
     /// :type: str | None
     #[getter]
@@ -1475,11 +1465,11 @@ impl AcmManeuverParameters {
 
     #[setter]
     fn set_man_begin_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.man_begin_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.man_begin_time = value.map(|s| parse_relative_time(&s)).transpose()?;
         Ok(())
     }
 
-    /// Maneuver end time (relative or absolute epoch string).
+    /// Maneuver end time in seconds relative to EPOCH_TZERO.
     ///
     /// :type: str | None
     #[getter]
@@ -1492,7 +1482,7 @@ impl AcmManeuverParameters {
 
     #[setter]
     fn set_man_end_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.man_end_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.man_end_time = value.map(|s| parse_relative_time(&s)).transpose()?;
         Ok(())
     }
 

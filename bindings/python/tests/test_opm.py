@@ -98,6 +98,29 @@ class TestOpm:
         opm2 = Opm.from_file(str(path), format="kvn")
         assert opm2.header.originator == "TEST"
 
+    def test_epoch_fields_require_calendar_form(self):
+        with pytest.raises(ValueError):
+            OpmMetadata(
+                object_name="SAT1",
+                object_id="2023-001A",
+                center_name="EARTH",
+                ref_frame="GCRF",
+                time_system="UTC",
+                ref_frame_epoch="12345.5",
+            )
+
+        with pytest.raises(ValueError):
+            StateVector(
+                epoch="12345.5",
+                x=7000.0,
+                y=0.0,
+                z=0.0,
+                x_dot=0.0,
+                y_dot=7.5,
+                z_dot=0.0,
+                comments=None,
+            )
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

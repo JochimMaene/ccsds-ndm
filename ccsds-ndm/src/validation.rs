@@ -4,13 +4,6 @@
 
 use crate::error::{CcsdsNdmError, Result, ValidationError};
 use crate::traits::Validate;
-use std::cell::{Cell, RefCell};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ValidationMode {
-    Strict,
-    Permissive,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MessageKind {
@@ -44,49 +37,6 @@ impl MessageKind {
             Self::Ndm => "NDM",
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ValidationIssue {
-    pub message_kind: MessageKind,
-    pub error: ValidationError,
-}
-
-thread_local! {
-    static VALIDATION_MODE: Cell<ValidationMode> = const { Cell::new(ValidationMode::Strict) };
-    static VALIDATION_WARNINGS: RefCell<Vec<ValidationIssue>> = const { RefCell::new(Vec::new()) };
-}
-
-pub(crate) fn current_mode() -> ValidationMode {
-    VALIDATION_MODE.with(|mode| mode.get())
-}
-
-pub(crate) fn with_validation_mode<T>(
-    mode: ValidationMode,
-    f: impl FnOnce() -> Result<T>,
-) -> Result<T> {
-    struct Guard {
-        prev: ValidationMode,
-    }
-
-    impl Drop for Guard {
-        fn drop(&mut self) {
-            VALIDATION_MODE.with(|mode| mode.set(self.prev));
-        }
-    }
-
-    let prev = VALIDATION_MODE.with(|m| {
-        let prev = m.get();
-        m.set(mode);
-        prev
-    });
-
-    let _guard = Guard { prev };
-    f()
-}
-
-pub(crate) fn take_warnings() -> Vec<ValidationIssue> {
-    VALIDATION_WARNINGS.with(|warnings| warnings.borrow_mut().drain(..).collect())
 }
 
 pub(crate) fn collect_validation_result(
@@ -139,37 +89,4 @@ pub(crate) fn missing_required_fields<const N: usize>(
             line: None,
         })
         .collect()
-}
-
-pub fn validate_with_mode(kind: MessageKind, value: &impl Validate) -> Result<()> {
-    if current_mode() == ValidationMode::Strict {
-        return value.validate();
-    }
-
-    for error in value.validation_errors()? {
-        handle_validation_error_inner(kind, error)?;
-    }
-    Ok(())
-}
-
-pub fn handle_validation_error(kind: MessageKind, err: CcsdsNdmError) -> Result<()> {
-    match err {
-        CcsdsNdmError::Validation(val) => handle_validation_error_inner(kind, *val),
-        other => Err(other),
-    }
-}
-
-fn handle_validation_error_inner(kind: MessageKind, err: ValidationError) -> Result<()> {
-    match current_mode() {
-        ValidationMode::Strict => Err(err.into()),
-        ValidationMode::Permissive => {
-            VALIDATION_WARNINGS.with(|warnings| {
-                warnings.borrow_mut().push(ValidationIssue {
-                    message_kind: kind,
-                    error: err,
-                });
-            });
-            Ok(())
-        }
-    }
 }

@@ -13,6 +13,7 @@ use crate::types::*;
 use fast_float;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::cmp::Ordering;
 
 //----------------------------------------------------------------------
 // Root OCM Structure
@@ -82,7 +83,7 @@ impl Ndm for Ocm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let ocm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Ocm, &ocm)?;
+        crate::traits::Validate::validate(&ocm)?;
         Ok(ocm)
     }
 
@@ -98,7 +99,7 @@ impl Ndm for Ocm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Ocm, &ocm)?;
+        crate::traits::Validate::validate(&ocm)?;
         Ok(ocm)
     }
 }
@@ -262,6 +263,12 @@ impl OcmTrajState {
             }
         }
 
+        validate_ocm_history_epoch_sequence(
+            self.traj_lines.iter().map(|line| &line.epoch),
+            "trajLine epoch",
+            "TRAJ",
+        )?;
+
         let traj_type = self.traj_type.trim().to_uppercase();
 
         if let Some(units) = &self.traj_units {
@@ -306,6 +313,98 @@ impl OcmTrajState {
     }
 }
 
+#[inline(always)]
+fn validate_ocm_history_epoch(epoch: &Epoch, field: &'static str) -> Result<EpochKind> {
+    let kind = epoch.kind();
+    let valid = match kind {
+        EpochKind::Calendar => epoch.calendar_fields_are_valid() == Some(true),
+        EpochKind::Numeric => epoch.numeric_is_non_degenerate() == Some(true),
+    };
+    if valid {
+        Ok(kind)
+    } else {
+        Err(ValidationError::InvalidValue {
+            field: Cow::Borrowed(field),
+            value: epoch.to_string(),
+            expected: Cow::Borrowed("a valid calendar, ordinal, or numeric epoch"),
+            line: None,
+        }
+        .into())
+    }
+}
+
+/// Validates the per-block epoch branch rule from ODM §6.2.2.5.
+///
+/// Classification is computed when each [`Epoch`] is constructed. Ordering state is derived once
+/// per record and retained only until the next record, so this remains a single allocation-free
+/// pass without adding a cache to every stored epoch.
+#[inline(always)]
+fn validate_ocm_history_epoch_sequence<'a>(
+    epochs: impl IntoIterator<Item = &'a Epoch>,
+    field: &'static str,
+    block: &'static str,
+) -> Result<()> {
+    let mut expected_kind = None;
+    let mut previous_key: Option<crate::types::EpochOrderKey<'a>> = None;
+    for epoch in epochs {
+        let kind = validate_ocm_history_epoch(epoch, field)?;
+        if let Some(expected) = expected_kind {
+            if kind != expected {
+                let branch = match expected {
+                    EpochKind::Calendar => "calendar",
+                    EpochKind::Numeric => "numeric",
+                };
+                return Err(ValidationError::InvalidValue {
+                    field: Cow::Borrowed(field),
+                    value: epoch.to_string(),
+                    expected: format!(
+                        "the same {branch} time-tag branch as earlier records in the {block} block"
+                    )
+                    .into(),
+                    line: None,
+                }
+                .into());
+            }
+        } else {
+            expected_kind = Some(kind);
+        }
+        let key = epoch
+            .order_key()
+            .ok_or_else(|| ValidationError::InvalidValue {
+                field: Cow::Borrowed(field),
+                value: epoch.to_string(),
+                expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
+                line: None,
+            })?;
+        if let Some(previous) = previous_key {
+            let ordering = previous
+                .compare(&key)
+                .ok_or_else(|| ValidationError::InvalidValue {
+                    field: Cow::Borrowed(field),
+                    value: epoch.to_string(),
+                    expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
+                    line: None,
+                })?;
+            if ordering != Ordering::Less {
+                let expected = if ordering == Ordering::Equal {
+                    "a unique epoch strictly after the previous record"
+                } else {
+                    "an epoch strictly after the previous record"
+                };
+                return Err(ValidationError::InvalidValue {
+                    field: Cow::Borrowed(field),
+                    value: epoch.to_string(),
+                    expected: Cow::Borrowed(expected),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        previous_key = Some(key);
+    }
+    Ok(())
+}
+
 impl OcmCovarianceMatrix {
     fn validate(&self) -> Result<()> {
         if self.cov_ref_frame.trim().is_empty() {
@@ -332,6 +431,11 @@ impl OcmCovarianceMatrix {
             }
             .into());
         }
+        validate_ocm_history_epoch_sequence(
+            self.cov_lines.iter().map(|line| &line.epoch),
+            "covLine epoch",
+            "COV",
+        )?;
         Ok(())
     }
 }
@@ -371,23 +475,278 @@ impl OcmManeuverParameters {
             .into());
         }
         let tokens = parse_csv_list(&self.man_composition);
-        let time_tags = tokens.iter().filter(|t| is_man_time_tag(t)).count();
-        let expected = tokens.len().saturating_sub(time_tags);
-        if expected > 0 {
-            for line in &self.man_lines {
-                if line.values.len() < expected {
+        let Some(time_tag) = tokens.first().and_then(|token| man_time_tag(token)) else {
+            return Err(ValidationError::InvalidValue {
+                field: Cow::Borrowed("MAN_COMPOSITION"),
+                value: self.man_composition.clone(),
+                expected: Cow::Borrowed(
+                    "first element TIME_ABSOLUTE or TIME_RELATIVE, with no additional time tag",
+                ),
+                line: None,
+            }
+            .into());
+        };
+        if tokens
+            .iter()
+            .skip(1)
+            .any(|token| man_time_tag(token).is_some())
+        {
+            return Err(ValidationError::InvalidValue {
+                field: Cow::Borrowed("MAN_COMPOSITION"),
+                value: self.man_composition.clone(),
+                expected: Cow::Borrowed(
+                    "first element TIME_ABSOLUTE or TIME_RELATIVE, with no additional time tag",
+                ),
+                line: None,
+            }
+            .into());
+        }
+
+        for (field, epoch) in [
+            ("MAN_PREV_EPOCH", self.man_prev_epoch.as_ref()),
+            ("MAN_NEXT_EPOCH", self.man_next_epoch.as_ref()),
+            ("DC_WIN_OPEN", self.dc_win_open.as_ref()),
+            ("DC_WIN_CLOSE", self.dc_win_close.as_ref()),
+            ("DC_EXEC_START", self.dc_exec_start.as_ref()),
+            ("DC_EXEC_STOP", self.dc_exec_stop.as_ref()),
+            ("DC_REF_TIME", self.dc_ref_time.as_ref()),
+        ] {
+            if let Some(epoch) = epoch {
+                validate_man_epoch_field(epoch, time_tag, field)?;
+            }
+        }
+
+        validate_man_duty_cycle(self)?;
+
+        let expected = tokens.len().saturating_sub(1);
+        let mut previous_key: Option<crate::types::EpochOrderKey<'_>> = None;
+        for line in &self.man_lines {
+            validate_man_history_epoch(&line.epoch, time_tag)?;
+            let key = line
+                .epoch
+                .order_key()
+                .ok_or_else(|| ValidationError::InvalidValue {
+                    field: Cow::Borrowed("manLine epoch"),
+                    value: line.epoch.to_string(),
+                    expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
+                    line: None,
+                })?;
+            if let Some(previous) = previous_key {
+                let ordering =
+                    previous
+                        .compare(&key)
+                        .ok_or_else(|| ValidationError::InvalidValue {
+                            field: Cow::Borrowed("manLine epoch"),
+                            value: line.epoch.to_string(),
+                            expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
+                            line: None,
+                        })?;
+                if ordering == Ordering::Equal {
                     return Err(ValidationError::InvalidValue {
-                        field: Cow::Borrowed("MAN_COMPOSITION"),
-                        value: format!("{} ({} values)", self.man_composition, line.values.len()),
-                        expected: format!("{} values per line", expected).into(),
+                        field: Cow::Borrowed("manLine epoch"),
+                        value: line.epoch.to_string(),
+                        expected: Cow::Borrowed("a unique epoch within the MAN block"),
                         line: None,
                     }
                     .into());
                 }
             }
+            previous_key = Some(key);
+            if line.values.len() < expected {
+                return Err(ValidationError::InvalidValue {
+                    field: Cow::Borrowed("MAN_COMPOSITION"),
+                    value: format!("{} ({} values)", self.man_composition, line.values.len()),
+                    expected: format!("{} values per line", expected).into(),
+                    line: None,
+                }
+                .into());
+            }
         }
         Ok(())
     }
+}
+
+#[derive(Clone, Copy)]
+enum ManTimeTag {
+    Absolute,
+    Relative,
+}
+
+fn man_time_tag(value: &str) -> Option<ManTimeTag> {
+    match value.trim().to_ascii_uppercase().as_str() {
+        "TIME_ABSOLUTE" => Some(ManTimeTag::Absolute),
+        "TIME_RELATIVE" => Some(ManTimeTag::Relative),
+        _ => None,
+    }
+}
+
+fn validate_man_history_epoch(epoch: &Epoch, time_tag: ManTimeTag) -> Result<()> {
+    validate_man_epoch_field(epoch, time_tag, "manLine epoch")
+}
+
+fn validate_man_epoch_field(
+    epoch: &Epoch,
+    time_tag: ManTimeTag,
+    field: &'static str,
+) -> Result<()> {
+    let valid = match time_tag {
+        ManTimeTag::Absolute => {
+            epoch.kind() == EpochKind::Calendar && epoch.calendar_fields_are_valid() == Some(true)
+        }
+        ManTimeTag::Relative => {
+            epoch.kind() == EpochKind::Numeric && epoch.numeric_is_non_degenerate() == Some(true)
+        }
+    };
+    if valid {
+        return Ok(());
+    }
+
+    let expected = match time_tag {
+        ManTimeTag::Absolute => "a valid calendar or ordinal epoch for TIME_ABSOLUTE",
+        ManTimeTag::Relative => "a non-degenerate numeric epoch for TIME_RELATIVE",
+    };
+    Err(ValidationError::InvalidValue {
+        field: Cow::Borrowed(field),
+        value: epoch.to_string(),
+        expected: Cow::Borrowed(expected),
+        line: None,
+    }
+    .into())
+}
+
+fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
+    if !matches!(man.dc_type, ManDc::Continuous) {
+        for (field, present) in [
+            ("DC_WIN_OPEN", man.dc_win_open.is_some()),
+            ("DC_WIN_CLOSE", man.dc_win_close.is_some()),
+            ("DC_EXEC_START", man.dc_exec_start.is_some()),
+            ("DC_EXEC_STOP", man.dc_exec_stop.is_some()),
+            ("DC_REF_TIME", man.dc_ref_time.is_some()),
+            (
+                "DC_TIME_PULSE_DURATION",
+                man.dc_time_pulse_duration.is_some(),
+            ),
+            ("DC_TIME_PULSE_PERIOD", man.dc_time_pulse_period.is_some()),
+        ] {
+            if !present {
+                return Err(ValidationError::missing_required("MAN", field).into());
+            }
+        }
+    }
+
+    if matches!(man.dc_type, ManDc::TimeAndAngle) {
+        for (field, present) in [
+            ("DC_REF_DIR", man.dc_ref_dir.is_some()),
+            ("DC_BODY_FRAME", man.dc_body_frame.is_some()),
+            ("DC_BODY_TRIGGER", man.dc_body_trigger.is_some()),
+            ("DC_PA_START_ANGLE", man.dc_pa_start_angle.is_some()),
+            ("DC_PA_STOP_ANGLE", man.dc_pa_stop_angle.is_some()),
+        ] {
+            if !present {
+                return Err(ValidationError::missing_required("MAN", field).into());
+            }
+        }
+    }
+
+    if let Some(max_cycles) = man.dc_max_cycles {
+        if max_cycles == 0 {
+            return Err(ValidationError::invalid_value(
+                "DC_MAX_CYCLES",
+                max_cycles.to_string(),
+                "a positive integer",
+            )
+            .into());
+        }
+    }
+
+    for (field, angle) in [
+        ("DC_PA_START_ANGLE", man.dc_pa_start_angle.as_ref()),
+        ("DC_PA_STOP_ANGLE", man.dc_pa_stop_angle.as_ref()),
+    ] {
+        if let Some(angle) = angle {
+            if !(-360.0..360.0).contains(&angle.value) {
+                return Err(ValidationError::invalid_value(
+                    field,
+                    angle.value.to_string(),
+                    "a finite angle in the XSD range [-360, 360)",
+                )
+                .into());
+            }
+        }
+    }
+
+    if let (Some(window_open), Some(execution_start)) =
+        (man.dc_win_open.as_ref(), man.dc_exec_start.as_ref())
+    {
+        let ordering = window_open
+            .cmp_same_branch(execution_start)
+            .ok_or_else(|| {
+                ValidationError::invalid_value(
+                    "DC_EXEC_START",
+                    execution_start.to_string(),
+                    "a comparable epoch coincident with or after DC_WIN_OPEN",
+                )
+            })?;
+        if ordering == Ordering::Greater {
+            return Err(ValidationError::invalid_value(
+                "DC_EXEC_START",
+                execution_start.to_string(),
+                "coincident with or after DC_WIN_OPEN",
+            )
+            .into());
+        }
+    }
+
+    if let (Some(execution_stop), Some(window_close)) =
+        (man.dc_exec_stop.as_ref(), man.dc_win_close.as_ref())
+    {
+        let ordering = execution_stop
+            .cmp_same_branch(window_close)
+            .ok_or_else(|| {
+                ValidationError::invalid_value(
+                    "DC_EXEC_STOP",
+                    execution_stop.to_string(),
+                    "a comparable epoch coincident with or before DC_WIN_CLOSE",
+                )
+            })?;
+        if ordering == Ordering::Greater {
+            return Err(ValidationError::invalid_value(
+                "DC_EXEC_STOP",
+                execution_stop.to_string(),
+                "coincident with or before DC_WIN_CLOSE",
+            )
+            .into());
+        }
+    }
+
+    for (field, duration) in [
+        (
+            "DC_TIME_PULSE_DURATION",
+            man.dc_time_pulse_duration.as_ref(),
+        ),
+        ("DC_TIME_PULSE_PERIOD", man.dc_time_pulse_period.as_ref()),
+    ] {
+        if let Some(duration) = duration {
+            if let Some(error) = validate_ocm_seconds_duration(field, duration) {
+                return Err(error.into());
+            }
+        }
+    }
+
+    if let (Some(duration), Some(period)) = (
+        man.dc_time_pulse_duration.as_ref(),
+        man.dc_time_pulse_period.as_ref(),
+    ) {
+        if period.value < duration.value {
+            return Err(ValidationError::invalid_value(
+                "DC_TIME_PULSE_PERIOD",
+                period.value.to_string(),
+                "greater than or equal to DC_TIME_PULSE_DURATION",
+            )
+            .into());
+        }
+    }
+    Ok(())
 }
 
 fn expected_traj_units(traj_type: &str) -> Option<Vec<&'static str>> {
@@ -427,11 +786,6 @@ fn parse_csv_list(value: &str) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect()
-}
-
-fn is_man_time_tag(value: &str) -> bool {
-    let v = value.trim().to_ascii_uppercase();
-    matches!(v.as_str(), "EPOCH" | "TIME_ABSOLUTE" | "TIME_RELATIVE")
 }
 
 //----------------------------------------------------------------------
@@ -895,7 +1249,7 @@ pub struct OcmMetadata {
     /// **Examples**: 2001-11-06T11:17:33
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
-    pub epoch_tzero: Epoch,
+    pub epoch_tzero: CalendarEpoch,
     /// Specification of the operational status of the space object. Select from the accepted
     /// set of values indicated in annex B, subsection B12.
     ///
@@ -975,7 +1329,7 @@ pub struct OcmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub previous_message_epoch: Option<Epoch>,
+    pub previous_message_epoch: Option<CalendarEpoch>,
     /// Anticipated (or actual) epoch of the next message from this originator for this space
     /// object. (For format specification, see 7.5.10.) NOTE—One may provide the next message
     /// epoch without supplying the NEXT_MESSAGE_ID, and vice versa.
@@ -988,7 +1342,7 @@ pub struct OcmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub next_message_epoch: Option<Epoch>,
+    pub next_message_epoch: Option<CalendarEpoch>,
     /// Time of the earliest data contained in the OCM, specified as either a relative or
     /// absolute time tag.
     ///
@@ -1048,7 +1402,7 @@ pub struct OcmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub next_leap_epoch: Option<Epoch>,
+    pub next_leap_epoch: Option<CalendarEpoch>,
     /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since
     /// 1958) incorporated by the message originator at epoch 'NEXT_LEAP_EPOCH'. This keyword
     /// should be provided if NEXT_LEAP_EPOCH is supplied.
@@ -1114,35 +1468,103 @@ pub struct OcmMetadata {
     pub celestial_source: Option<String>,
 }
 
+fn validate_ocm_time_offset_units(
+    field: &'static str,
+    offset: &TimeOffset,
+) -> Option<ValidationError> {
+    matches!(offset.units, Some(TimeUnits::Day)).then(|| {
+        ValidationError::invalid_value(format!("{field} units"), "d", "seconds ('s') or omitted")
+    })
+}
+
+fn validate_ocm_seconds_duration(
+    field: &'static str,
+    duration: &Duration,
+) -> Option<ValidationError> {
+    if !duration.value.is_finite() {
+        return Some(ValidationError::invalid_value(
+            field,
+            duration.value.to_string(),
+            "a finite non-negative number in seconds",
+        ));
+    }
+    if duration.value < 0.0 {
+        return Some(ValidationError::invalid_value(
+            field,
+            duration.value.to_string(),
+            "a non-negative number in seconds",
+        ));
+    }
+    matches!(duration.units, Some(TimeUnits::Day)).then(|| {
+        ValidationError::invalid_value(format!("{field} units"), "d", "seconds ('s') or omitted")
+    })
+}
+
+fn ocm_metadata_validation_errors(metadata: &OcmMetadata) -> Vec<ValidationError> {
+    let mut errors = crate::validation::missing_required_fields(
+        "OCM Metadata",
+        [
+            ("TIME_SYSTEM", metadata.time_system.trim().is_empty()),
+            ("EPOCH_TZERO", metadata.epoch_tzero.is_empty()),
+        ],
+    );
+
+    if metadata.time_system.trim().eq_ignore_ascii_case("SCLK") {
+        errors.extend(crate::validation::missing_required_fields(
+            "OCM Metadata",
+            [
+                (
+                    "SCLK_OFFSET_AT_EPOCH",
+                    metadata.sclk_offset_at_epoch.is_none(),
+                ),
+                (
+                    "SCLK_SEC_PER_SI_SEC",
+                    metadata.sclk_sec_per_si_sec.is_none(),
+                ),
+            ],
+        ));
+    }
+
+    for (field, offset) in [
+        (
+            "SCLK_OFFSET_AT_EPOCH",
+            metadata.sclk_offset_at_epoch.as_ref(),
+        ),
+        ("TAIMUTC_AT_TZERO", metadata.taimutc_at_tzero.as_ref()),
+        ("NEXT_LEAP_TAIMUTC", metadata.next_leap_taimutc.as_ref()),
+        ("UT1MUTC_AT_TZERO", metadata.ut1mutc_at_tzero.as_ref()),
+    ] {
+        if let Some(offset) = offset {
+            if let Some(error) = validate_ocm_time_offset_units(field, offset) {
+                errors.push(error);
+            }
+        }
+    }
+    if let Some(rate) = metadata.sclk_sec_per_si_sec.as_ref() {
+        if let Some(error) = validate_ocm_seconds_duration("SCLK_SEC_PER_SI_SEC", rate) {
+            errors.push(error);
+        }
+    }
+    if metadata.next_leap_epoch.is_some() && metadata.next_leap_taimutc.is_none() {
+        errors.push(ValidationError::missing_required(
+            "OCM Metadata",
+            "NEXT_LEAP_TAIMUTC (required when NEXT_LEAP_EPOCH is present)",
+        ));
+    }
+
+    errors
+}
+
 impl crate::traits::Validate for OcmMetadata {
     fn validate(&self) -> Result<()> {
-        if self.time_system.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OCM Metadata".into(),
-                field: "TIME_SYSTEM".into(),
-                line: None,
-            }
-            .into());
+        match self.validation_errors()?.into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
         }
-        if self.epoch_tzero.is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OCM Metadata".into(),
-                field: "EPOCH_TZERO".into(),
-                line: None,
-            }
-            .into());
-        }
-        Ok(())
     }
 
     fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "OCM Metadata",
-            [
-                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
-                ("EPOCH_TZERO", self.epoch_tzero.is_empty()),
-            ],
-        ))
+        Ok(ocm_metadata_validation_errors(self))
     }
 }
 
@@ -1308,12 +1730,7 @@ pub struct OcmData {
     #[builder(default)]
     pub traj: Vec<OcmTrajState>,
     /// Space object physical characteristics.
-    #[serde(
-        rename = "phys",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "phys", default, skip_serializing_if = "Option::is_none")]
     pub phys: Option<OcmPhysicalDescription>,
     /// List of covariance time history blocks.
     #[serde(rename = "cov", default)]
@@ -1551,7 +1968,7 @@ pub struct OcmTrajState {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub traj_frame_epoch: Option<Epoch>,
+    pub traj_frame_epoch: Option<CalendarEpoch>,
     /// Start time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
     /// allows the message creator to introduce fictitious (but numerically smooth) data nodes
@@ -1568,7 +1985,7 @@ pub struct OcmTrajState {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub useable_start_time: Option<Epoch>,
+    pub useable_start_time: Option<CalendarEpoch>,
     /// Stop time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
     /// allows the message creator to introduce fictitious (but numerically smooth) data nodes
@@ -1585,7 +2002,7 @@ pub struct OcmTrajState {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub useable_stop_time: Option<Epoch>,
+    pub useable_stop_time: Option<CalendarEpoch>,
     /// The integer orbit revolution number associated with the first trajectory state in this
     /// trajectory state time history block. NOTE—The first ascending node crossing that occurs
     /// AFTER launch or deployment is designated to be the beginning of orbit revolution number
@@ -1672,7 +2089,7 @@ pub struct OcmTrajState {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TrajLine {
-    pub epoch: String,
+    pub epoch: Epoch,
     pub values: Vec<f64>,
 }
 
@@ -1681,7 +2098,7 @@ impl Serialize for TrajLine {
     where
         S: serde::Serializer,
     {
-        let mut s = self.epoch.clone();
+        let mut s = self.epoch.to_string();
         for v in &self.values {
             s.push(' ');
             s.push_str(&v.to_string());
@@ -1700,7 +2117,8 @@ impl<'de> Deserialize<'de> for TrajLine {
         let epoch = parts
             .next()
             .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
-            .to_string();
+            .parse()
+            .map_err(serde::de::Error::custom)?;
         let values: std::result::Result<Vec<f64>, _> = parts
             .map(|v| fast_float::parse(v).map_err(serde::de::Error::custom))
             .collect();
@@ -1933,7 +2351,7 @@ pub struct OcmPhysicalDescription {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub oeb_parent_frame_epoch: Option<Epoch>,
+    pub oeb_parent_frame_epoch: Option<CalendarEpoch>,
     /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
     /// (defined above) to the frame aligned with the OEB (defined in annex F, subsection F1).
@@ -2716,7 +3134,7 @@ pub struct OcmCovarianceMatrix {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub cov_frame_epoch: Option<Epoch>,
+    pub cov_frame_epoch: Option<CalendarEpoch>,
     /// Minimum scale factor to apply to this covariance data to achieve realism.
     ///
     /// **Examples**: 0.5
@@ -2800,7 +3218,7 @@ pub struct OcmCovarianceMatrix {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct CovLine {
-    pub epoch: String,
+    pub epoch: Epoch,
     pub values: Vec<f64>,
 }
 
@@ -2809,7 +3227,7 @@ impl Serialize for CovLine {
     where
         S: serde::Serializer,
     {
-        let mut s = self.epoch.clone();
+        let mut s = self.epoch.to_string();
         for v in &self.values {
             s.push(' ');
             s.push_str(&v.to_string());
@@ -2828,7 +3246,8 @@ impl<'de> Deserialize<'de> for CovLine {
         let epoch = parts
             .next()
             .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
-            .to_string();
+            .parse()
+            .map_err(serde::de::Error::custom)?;
         let values: std::result::Result<Vec<f64>, _> = parts
             .map(|v| fast_float::parse(v).map_err(serde::de::Error::custom))
             .collect();
@@ -3030,7 +3449,7 @@ pub struct OcmManeuverParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub man_frame_epoch: Option<Epoch>,
+    pub man_frame_epoch: Option<CalendarEpoch>,
     /// Origin of maneuver gravitational assist body, which may be a natural solar system body
     /// (planets, asteroids, comets, and natural satellites), including any planet barycenter
     /// or the solar system barycenter. (See annex B, subsection B2, for acceptable
@@ -3267,7 +3686,7 @@ pub struct OcmManeuverParameters {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ManLine {
-    pub epoch: String,
+    pub epoch: Epoch,
     pub values: Vec<String>,
 }
 
@@ -3276,7 +3695,7 @@ impl Serialize for ManLine {
     where
         S: serde::Serializer,
     {
-        let mut s = self.epoch.clone();
+        let mut s = self.epoch.to_string();
         for v in &self.values {
             s.push(' ');
             s.push_str(v);
@@ -3295,7 +3714,8 @@ impl<'de> Deserialize<'de> for ManLine {
         let epoch = parts
             .next()
             .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
-            .to_string();
+            .parse()
+            .map_err(serde::de::Error::custom)?;
         let values: Vec<String> = parts.map(|s| s.to_string()).collect();
         Ok(ManLine { epoch, values })
     }
@@ -4375,10 +4795,144 @@ mod tests {
 
         // Fix it
         ocm.body.segment.data.traj[0].traj_lines.push(TrajLine {
-            epoch: "2000-01-01T00:00:00".to_string(),
+            epoch: "2000-01-01T00:00:00".parse().unwrap(),
             values: vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
         });
         assert!(ocm.validate().is_ok());
+
+        for value in ["2000-366T23:59:60Z", "12345.5"] {
+            ocm.body.segment.data.traj[0].traj_lines[0].epoch = value.parse().unwrap();
+            assert!(ocm.validate().is_ok(), "valid trajectory epoch {value}");
+        }
+
+        for value in ["2001-366T00:00:00", "2023-01-01T24:00:00", "+", "123."] {
+            ocm.body.segment.data.traj[0].traj_lines[0].epoch = value.parse().unwrap();
+            assert!(ocm.validate().is_err(), "invalid trajectory epoch {value}");
+        }
+    }
+
+    #[test]
+    fn traj_line_deserialization_rejects_non_epoch_first_token() {
+        let xml = "<trajLine>not-an-epoch 1 2 3</trajLine>";
+        assert!(crate::xml::from_str::<TrajLine>(xml).is_err());
+    }
+
+    #[test]
+    fn test_ocm_validation_cov_lines_epochs() {
+        let mut cov = OcmCovarianceMatrix::builder()
+            .cov_ref_frame("GCRF")
+            .cov_type("CARTPV")
+            .cov_lines(vec![CovLine {
+                epoch: "2000-01-01T00:00:00".parse().unwrap(),
+                values: vec![1.0],
+            }])
+            .build();
+        assert!(cov.validate().is_ok());
+
+        for value in ["2000-366T23:59:60Z", "12345.5"] {
+            cov.cov_lines[0].epoch = value.parse().unwrap();
+            assert!(cov.validate().is_ok(), "valid covariance epoch {value}");
+        }
+
+        for value in ["2001-366T00:00:00", "2023-01-01T24:00:00", "+", "123."] {
+            cov.cov_lines[0].epoch = value.parse().unwrap();
+            assert!(cov.validate().is_err(), "invalid covariance epoch {value}");
+        }
+    }
+
+    #[test]
+    fn ocm_history_blocks_reject_mixed_epoch_branches() {
+        let mut traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("CARTPV")
+            .traj_lines(vec![
+                TrajLine {
+                    epoch: "2000-01-01T00:00:00".parse().unwrap(),
+                    values: vec![1.0],
+                },
+                TrajLine {
+                    epoch: "1.0".parse().unwrap(),
+                    values: vec![2.0],
+                },
+            ])
+            .build();
+        assert!(traj.validate().is_err());
+
+        traj.traj_lines[1].epoch = "2000-01-01T00:00:01".parse().unwrap();
+        assert!(traj.validate().is_ok());
+
+        let mut cov = OcmCovarianceMatrix::builder()
+            .cov_ref_frame("GCRF")
+            .cov_type("CARTPV")
+            .cov_lines(vec![
+                CovLine {
+                    epoch: "1.0".parse().unwrap(),
+                    values: vec![1.0],
+                },
+                CovLine {
+                    epoch: "2000-01-01T00:00:01".parse().unwrap(),
+                    values: vec![2.0],
+                },
+            ])
+            .build();
+        assert!(cov.validate().is_err());
+
+        cov.cov_lines[1].epoch = "2.0".parse().unwrap();
+        assert!(cov.validate().is_ok());
+    }
+
+    #[test]
+    fn ocm_history_blocks_reject_duplicate_and_decreasing_epochs() {
+        let mut traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("CARTPV")
+            .traj_lines(vec![
+                TrajLine {
+                    epoch: "1".parse().unwrap(),
+                    values: vec![1.0],
+                },
+                TrajLine {
+                    epoch: "+1.0".parse().unwrap(),
+                    values: vec![2.0],
+                },
+            ])
+            .build();
+        assert!(traj.validate().is_err());
+
+        traj.traj_lines[1].epoch = "0.5".parse().unwrap();
+        assert!(traj.validate().is_err());
+
+        traj.traj_lines[1].epoch = "2".parse().unwrap();
+        assert!(traj.validate().is_ok());
+
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .man_composition("TIME_RELATIVE, THR_X")
+            .man_lines(vec![
+                ManLine {
+                    epoch: "1".parse().unwrap(),
+                    values: vec!["1".to_string()],
+                },
+                ManLine {
+                    epoch: "1.0".parse().unwrap(),
+                    values: vec!["2".to_string()],
+                },
+            ])
+            .build();
+        assert!(man.validate().is_err());
+
+        man.man_lines[1].epoch = "2".parse().unwrap();
+        assert!(man.validate().is_ok());
+    }
+
+    #[test]
+    fn cov_line_deserialization_rejects_non_epoch_first_token() {
+        let xml = "<covLine>not-an-epoch 1 2 3</covLine>";
+        assert!(crate::xml::from_str::<CovLine>(xml).is_err());
     }
 
     #[test]
@@ -4389,7 +4943,7 @@ mod tests {
             .traj_type("CARTPV")
             .build();
         traj.traj_lines.push(TrajLine {
-            epoch: "2000-01-01T00:00:00".to_string(),
+            epoch: "2000-01-01T00:00:00".parse().unwrap(),
             values: vec![1.0],
         });
         traj.orb_revnum = Some(-1.0);
@@ -4501,12 +5055,12 @@ TRAJ_STOP
         // The official file may not have covariance data in line format
         // So we manually build one and check serialization
         let cov_line = CovLine {
-            epoch: "2023-01-01T00:00:00".to_string(),
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
         };
 
-        // Test Display trait which is used in to_kvn - use debug instead
-        let display = format!("{:?}", cov_line);
+        // Test the epoch's wire spelling used by KVN/XML generation.
+        let display = format!("{}", cov_line.epoch);
         assert!(display.contains("2023-01-01T00:00:00"));
     }
 
@@ -4522,7 +5076,7 @@ TRAJ_STOP
         }
 
         let cov_line = CovLine {
-            epoch: "2023-01-01T00:00:00".to_string(),
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec![1.0, 2.0, 3.0],
         };
 
@@ -4537,7 +5091,7 @@ TRAJ_STOP
 
         // Deserialize and verify using quick-xml
         let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
-        assert_eq!(deserialized.cov_line.epoch, "2023-01-01T00:00:00");
+        assert_eq!(deserialized.cov_line.epoch.as_str(), "2023-01-01T00:00:00");
         assert_eq!(deserialized.cov_line.values.len(), 3);
     }
 
@@ -4552,7 +5106,7 @@ TRAJ_STOP
         }
 
         let man_line = ManLine {
-            epoch: "2023-01-01T00:00:00".to_string(),
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec!["1.0".to_string(), "2.0".to_string(), "3.0".to_string()],
         };
 
@@ -4564,8 +5118,196 @@ TRAJ_STOP
 
         // Deserialize and verify
         let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
-        assert_eq!(deserialized.man_line.epoch, "2023-01-01T00:00:00");
+        assert_eq!(deserialized.man_line.epoch.as_str(), "2023-01-01T00:00:00");
         assert_eq!(deserialized.man_line.values.len(), 3);
+    }
+
+    #[test]
+    fn test_ocm_validation_man_line_epoch_matches_composition() {
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .man_composition("TIME_RELATIVE, MAN_DURA")
+            .man_lines(vec![ManLine {
+                epoch: "123.5".parse().unwrap(),
+                values: vec!["10.0".to_string()],
+            }])
+            .build();
+        assert!(man.validate().is_ok());
+
+        man.man_lines[0].epoch = "2023-001T00:00:00".parse().unwrap();
+        assert!(man.validate().is_err());
+
+        man.man_composition = "TIME_ABSOLUTE, MAN_DURA".to_string();
+        assert!(man.validate().is_ok());
+
+        man.man_lines[0].epoch = "123.5".parse().unwrap();
+        assert!(man.validate().is_err());
+    }
+
+    #[test]
+    fn test_ocm_validation_man_duty_cycle_requirements_and_period() {
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .dc_type(ManDc::Time)
+            .man_composition("TIME_ABSOLUTE, DV_X")
+            .man_lines(vec![ManLine {
+                epoch: "2023-01-01T00:00:00".parse().unwrap(),
+                values: vec!["1.0".to_string()],
+            }])
+            .build();
+        man.dc_win_open = Some("2023-01-01T00:00:00".parse().unwrap());
+        man.dc_win_close = Some("2023-01-01T01:00:00".parse().unwrap());
+        man.dc_exec_start = Some("2023-01-01T00:10:00".parse().unwrap());
+        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
+        man.dc_ref_time = Some("2023-01-01T00:00:00".parse().unwrap());
+        man.dc_time_pulse_duration = Some(Duration::new(60.0, Some(TimeUnits::Seconds)).unwrap());
+        man.dc_time_pulse_period = Some(Duration::new(120.0, Some(TimeUnits::Seconds)).unwrap());
+        assert!(man.validate().is_ok());
+
+        man.dc_exec_start = Some("2022-12-31T23:50:00".parse().unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_EXEC_START"));
+        man.dc_exec_start = Some("2023-01-01T00:10:00".parse().unwrap());
+
+        man.dc_exec_stop = Some("2023-01-01T01:10:00".parse().unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_EXEC_STOP"));
+        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
+
+        man.dc_time_pulse_period = Some(Duration::new(30.0, Some(TimeUnits::Seconds)).unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_TIME_PULSE_PERIOD"));
+        assert!(error.contains("DC_TIME_PULSE_DURATION"));
+
+        man.dc_time_pulse_period = Some(Duration::new(120.0, Some(TimeUnits::Seconds)).unwrap());
+        man.dc_exec_stop = None;
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_EXEC_STOP"));
+
+        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
+        man.dc_max_cycles = Some(0);
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_MAX_CYCLES"));
+    }
+
+    #[test]
+    fn test_ocm_metadata_sclk_and_next_leap_requirements() {
+        let mut metadata = OcmMetadata::builder()
+            .time_system("SCLK")
+            .epoch_tzero("2023-01-01T00:00:00".parse().unwrap())
+            .build();
+        let error = metadata.validate().unwrap_err().to_string();
+        assert!(error.contains("SCLK_OFFSET_AT_EPOCH"));
+
+        metadata.sclk_offset_at_epoch = Some(TimeOffset {
+            value: 100.0,
+            units: Some(TimeUnits::Seconds),
+        });
+        let error = metadata.validate().unwrap_err().to_string();
+        assert!(error.contains("SCLK_SEC_PER_SI_SEC"));
+
+        metadata.sclk_sec_per_si_sec = Some(Duration {
+            value: 1.0,
+            units: Some(TimeUnits::Seconds),
+        });
+        assert!(metadata.validate().is_ok());
+
+        metadata.next_leap_epoch = Some("2024-01-01T00:00:00".parse().unwrap());
+        let error = metadata.validate().unwrap_err().to_string();
+        assert!(error.contains("NEXT_LEAP_TAIMUTC"));
+
+        metadata.next_leap_taimutc = Some(TimeOffset {
+            value: 37.0,
+            units: Some(TimeUnits::Seconds),
+        });
+        assert!(metadata.validate().is_ok());
+
+        metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Day);
+        let error = metadata.validate().unwrap_err().to_string();
+        assert!(error.contains("SCLK_OFFSET_AT_EPOCH"));
+
+        metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Seconds);
+        metadata.sclk_sec_per_si_sec.as_mut().unwrap().units = Some(TimeUnits::Day);
+        let error = metadata.validate().unwrap_err().to_string();
+        assert!(error.contains("SCLK_SEC_PER_SI_SEC"));
+    }
+
+    #[test]
+    fn test_ocm_validation_man_duty_cycle_angle_requirements_and_epoch_branch() {
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .dc_type(ManDc::TimeAndAngle)
+            .man_composition("TIME_RELATIVE, DV_X")
+            .man_lines(vec![ManLine {
+                epoch: "1".parse().unwrap(),
+                values: vec!["1.0".to_string()],
+            }])
+            .build();
+        man.dc_win_open = Some("0".parse().unwrap());
+        man.dc_win_close = Some("10".parse().unwrap());
+        man.dc_exec_start = Some("1".parse().unwrap());
+        man.dc_exec_stop = Some("9".parse().unwrap());
+        man.dc_ref_time = Some("0".parse().unwrap());
+        man.dc_time_pulse_duration = Some(Duration::new(1.0, None).unwrap());
+        man.dc_time_pulse_period = Some(Duration::new(2.0, None).unwrap());
+        man.dc_ref_dir = Some(Vec3Double::new(1.0, 0.0, 0.0));
+        man.dc_body_frame = Some("SC_BODY".to_string());
+        man.dc_body_trigger = Some(Vec3Double::new(0.0, 1.0, 0.0));
+        man.dc_pa_start_angle = Some("0".parse().unwrap());
+        man.dc_pa_stop_angle = Some("180".parse().unwrap());
+        assert!(man.validate().is_ok());
+
+        man.dc_body_trigger = None;
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_BODY_TRIGGER"));
+
+        man.dc_body_trigger = Some(Vec3Double::new(0.0, 1.0, 0.0));
+        man.dc_win_open = Some("2023-01-01T00:00:00".parse().unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_WIN_OPEN"));
+
+        man.dc_win_open = Some("0".parse().unwrap());
+        man.dc_pa_start_angle = Some(Angle {
+            value: 360.0,
+            units: Some(AngleUnits::Deg),
+        });
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_PA_START_ANGLE"));
+    }
+
+    #[test]
+    fn test_ocm_validation_man_composition_requires_one_time_tag_first() {
+        let line = ManLine {
+            epoch: "2023-001T00:00:00".parse().unwrap(),
+            values: vec!["10.0".to_string()],
+        };
+        for composition in [
+            "EPOCH, MAN_DURA",
+            "MAN_DURA, TIME_ABSOLUTE",
+            "TIME_RELATIVE, TIME_ABSOLUTE, MAN_DURA",
+            "",
+        ] {
+            let man = OcmManeuverParameters::builder()
+                .man_id("MAN-1")
+                .man_device_id("THR-1")
+                .man_ref_frame("GCRF")
+                .man_composition(composition)
+                .man_lines(vec![line.clone()])
+                .build();
+            assert!(man.validate().is_err(), "invalid composition {composition}");
+        }
+    }
+
+    #[test]
+    fn man_line_deserialization_rejects_non_epoch_first_token() {
+        let xml = "<manLine>not-an-epoch 1 2 3</manLine>";
+        assert!(crate::xml::from_str::<ManLine>(xml).is_err());
     }
 
     #[test]
@@ -4586,7 +5328,7 @@ TRAJ_STOP
         traj.orb_revnum = Some(-1.0);
         // Also needs at least one line to pass first check
         traj.traj_lines.push(TrajLine {
-            epoch: "2023-01-01T00:00:00".to_string(),
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec![0.0],
         });
         assert!(traj.validate().is_err());
@@ -4619,7 +5361,7 @@ TRAJ_STOP
             .build();
         traj.orb_revnum_basis = Some(RevNumBasis::One);
         traj.traj_lines.push(TrajLine {
-            epoch: "2023-01-01T00:00:00".to_string(),
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec![0.0],
         });
         let mut writer = crate::kvn::ser::KvnWriter::new();

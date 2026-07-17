@@ -3,7 +3,7 @@ from typing import Optional, Union
 import numpy
 
 def from_file(
-    path: str, strict: bool = True
+    path: str,
 ) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
     """
     Parse from a file path (KVN or XML).
@@ -12,9 +12,6 @@ def from_file(
     ----------
     path : str
         Path to the file.
-    strict : bool, optional
-        Reject CCSDS violations by default. Set to False for permissive parsing with warnings.
-
     Returns
     -------
     Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
@@ -22,9 +19,7 @@ def from_file(
     """
     ...
 
-def from_str(
-    data: str, strict: bool = True
-) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
+def from_str(data: str) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
     """
     Parse a string (KVN or XML) and return the corresponding NDM object.
 
@@ -32,10 +27,6 @@ def from_str(
     ----------
     data : str
         The content to parse.
-    strict : bool, optional
-        Reject CCSDS violations by default. Set to False to recover from supported deviations and
-        emit :class:`NdmParseWarning` diagnostics.
-
     Returns
     -------
     Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
@@ -71,12 +62,12 @@ class Acm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Acm:
+    def from_file(path: str, format: Optional[str] = None) -> Acm:
         """ """
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Acm:
+    def from_str(data: str, format: Optional[str] = None) -> Acm:
         """ """
         ...
 
@@ -661,7 +652,7 @@ class AcmManeuverParameters:
     @property
     def man_begin_time(self) -> str | None:
         """
-        Maneuver begin time (relative or absolute epoch string).
+        Maneuver begin time in seconds relative to EPOCH_TZERO.
         """
         ...
 
@@ -679,7 +670,7 @@ class AcmManeuverParameters:
     @property
     def man_end_time(self) -> str | None:
         """
-        Maneuver end time (relative or absolute epoch string).
+        Maneuver end time in seconds relative to EPOCH_TZERO.
         """
         ...
 
@@ -1459,12 +1450,12 @@ class Aem:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Aem:
+    def from_file(path: str, format: Optional[str] = None) -> Aem:
         """ """
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Aem:
+    def from_str(data: str, format: Optional[str] = None) -> Aem:
         """ """
         ...
 
@@ -2018,12 +2009,12 @@ class Apm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Apm:
+    def from_file(path: str, format: Optional[str] = None) -> Apm:
         """ """
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Apm:
+    def from_str(data: str, format: Optional[str] = None) -> Apm:
         """ """
         ...
 
@@ -2512,7 +2503,7 @@ class Cdm:
     @body.setter
     def body(self, value: CdmBody) -> None: ...
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Cdm:
+    def from_file(path: str, format: Optional[str] = None) -> Cdm:
         """
         Parse a CDM from a file path with optional format.
 
@@ -2548,7 +2539,7 @@ class Cdm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Cdm:
+    def from_str(data: str, format: Optional[str] = None) -> Cdm:
         """
         Parse a CDM from a string with optional format.
 
@@ -5065,9 +5056,7 @@ class ManeuverParameters:
         Units: kg
 
 
-        **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
-        This implementation follows the underlying schema type and allows non-positive values
-        (`<= 0`) for interoperability.
+        The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
         """
         ...
 
@@ -5343,14 +5332,14 @@ class Ndm:
     @comments.setter
     def comments(self, value: list[str]) -> None: ...
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Ndm:
+    def from_file(path: str, format: Optional[str] = None) -> Ndm:
         """
         Parse an NDM combined instantiation from a file.
         """
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Ndm:
+    def from_str(data: str, format: Optional[str] = None) -> Ndm:
         """
         Parse an NDM combined instantiation from a string.
         """
@@ -5456,7 +5445,7 @@ class Ocm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Ocm:
+    def from_file(path: str, format: Optional[str] = None) -> Ocm:
         """
         Create an OCM message from a file.
 
@@ -5475,7 +5464,7 @@ class Ocm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Ocm:
+    def from_str(data: str, format: Optional[str] = None) -> Ocm:
         """
         Create an OCM message from a string.
 
@@ -9367,7 +9356,7 @@ class Oem:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Oem:
+    def from_file(path: str, format: Optional[str] = None) -> Oem:
         """
         Create an OEM message from a file.
 
@@ -9387,7 +9376,7 @@ class Oem:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Oem:
+    def from_str(data: str, format: Optional[str] = None) -> Oem:
         """
         Create an OEM message from a string.
 
@@ -10294,7 +10283,7 @@ class Omm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Omm:
+    def from_file(path: str, format: Optional[str] = None) -> Omm:
         """
         Create an OMM message from a file.
 
@@ -10313,7 +10302,7 @@ class Omm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Omm:
+    def from_str(data: str, format: Optional[str] = None) -> Omm:
         """ """
         ...
 
@@ -10744,7 +10733,7 @@ class Opm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Opm:
+    def from_file(path: str, format: Optional[str] = None) -> Opm:
         """
         Create an OPM message from a file.
 
@@ -10763,7 +10752,7 @@ class Opm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Opm:
+    def from_str(data: str, format: Optional[str] = None) -> Opm:
         """
         Create an OPM message from a string.
         """
@@ -11609,7 +11598,7 @@ class Rdm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Rdm:
+    def from_file(path: str, format: Optional[str] = None) -> Rdm:
         """
         Create an RDM message from a file.
 
@@ -11629,7 +11618,7 @@ class Rdm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Rdm:
+    def from_str(data: str, format: Optional[str] = None) -> Rdm:
         """
         Create an RDM message from a string.
 
@@ -13546,7 +13535,7 @@ class Tdm:
     @body.setter
     def body(self, value: TdmBody) -> None: ...
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None, strict: bool = True) -> Tdm:
+    def from_file(path: str, format: Optional[str] = None) -> Tdm:
         """
         Create a TDM message from a file.
 
@@ -13566,7 +13555,7 @@ class Tdm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None, strict: bool = True) -> Tdm:
+    def from_str(data: str, format: Optional[str] = None) -> Tdm:
         """
         Create a TDM message from a string.
 
@@ -15110,23 +15099,6 @@ class NdmIoError(OSError):
     def args(self): ...
     @property
     def characters_written(self): ...
-
-class NdmParseWarning(Warning):
-    """
-    Warning emitted when permissive parsing recovers from a CCSDS violation.
-    """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmUnsupportedMessageError(NdmError):
     """

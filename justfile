@@ -104,6 +104,10 @@ test-python:
 # Run both Rust and Python tests
 test: test-rust test-python
 
+# Run the OPM 3.0 Rust XML-generation conformance slice
+conformance-opm-xml:
+    cargo test --manifest-path {{rust_manifest}} --test opm_3_xml_generation_conformance
+
 # Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
 check: lint audit-strict stubs-check sync-docs-check test
 

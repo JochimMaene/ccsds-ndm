@@ -9,7 +9,7 @@ use crate::kvn::ser::KvnWriter;
 use crate::traits::Validate;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::{
-    Epoch, Percentage, TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath,
+    CalendarEpoch, Percentage, TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath,
     TdmRangeMode, TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
 };
 use fast_float;
@@ -86,7 +86,7 @@ impl Ndm for Tdm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let tdm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Tdm, &tdm)?;
+        crate::traits::Validate::validate(&tdm)?;
         Ok(tdm)
     }
 
@@ -101,18 +101,9 @@ impl Ndm for Tdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        if crate::validation::current_mode() == crate::validation::ValidationMode::Strict
-            || crate::validation::current_mode() == crate::validation::ValidationMode::Permissive
-        {
-            if let Err(err) = validate_tdm_xml_metadata(xml) {
-                crate::validation::handle_validation_error(
-                    crate::validation::MessageKind::Tdm,
-                    err,
-                )?;
-            }
-        }
+        validate_tdm_xml_metadata(xml)?;
         let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Tdm, &tdm)?;
+        crate::traits::Validate::validate(&tdm)?;
         Ok(tdm)
     }
 }
@@ -149,7 +140,7 @@ pub struct TdmHeader {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23.4, 2006-001T00:00:00Z
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.2.
-    pub creation_date: Epoch,
+    pub creation_date: CalendarEpoch,
     /// Creating agency. Value should be an entry from the ‘Abbreviation’ column in the SANA
     /// Organizations Registry, <https://sanaregistry.org/r/organizations/organizations.html>
     /// (reference `[11]`).
@@ -367,7 +358,7 @@ pub struct TdmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub start_time: Option<Epoch>,
+    pub start_time: Option<CalendarEpoch>,
     /// The STOP_TIME keyword shall specify the UTC stop time of the total time span covered by
     /// the tracking data immediately following this Metadata Section. (For format
     /// specification, see 4.3.9.)
@@ -380,7 +371,7 @@ pub struct TdmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub stop_time: Option<Epoch>,
+    pub stop_time: Option<CalendarEpoch>,
     /// The PARTICIPANT_n keyword shall represent the participants (see 1.3.4.1) in a tracking
     /// data session. It is indexed to allow unambiguous reference to other data in the TDM
     /// (max index is 5). At least two participants must be specified for most sessions; for
@@ -1546,7 +1537,7 @@ impl ToKvn for TdmData {
 pub struct TdmObservation {
     /// Time associated with the tracking observable.
     #[serde(rename = "EPOCH")]
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// The tracking observable (measurement or calculation).
     #[serde(rename = "$value")]
     pub data: TdmObservationData,
@@ -1571,7 +1562,7 @@ impl<'de> Deserialize<'de> for TdmObservation {
             where
                 A: MapAccess<'de>,
             {
-                let mut epoch: Option<Epoch> = None;
+                let mut epoch: Option<CalendarEpoch> = None;
                 let mut data: Option<TdmObservationData> = None;
 
                 while let Some(key) = map.next_key::<String>()? {

@@ -4,7 +4,7 @@
 
 use crate::common::OdmHeader;
 use crate::common::{parse_object_description, parse_time_system};
-use crate::types::parse_epoch;
+use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::messages::ocm as core_ocm;
 use ccsds_ndm::types::Duration;
 use pyo3::exceptions::PyValueError;
@@ -52,14 +52,9 @@ impl Ocm {
     /// Ocm
     ///     The parsed Ocm object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, strict=true))]
-    fn from_str(
-        py: Python<'_>,
-        data: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format, strict)?;
+    #[pyo3(signature = (data, format=None))]
+    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
+        let inner = crate::api::parse_typed(py, data, format)?;
         Ok(Self { inner })
     }
 
@@ -77,16 +72,11 @@ impl Ocm {
     /// Ocm
     ///     The parsed OCM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, strict=true))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None))]
+    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format, strict)
+        Self::from_str(py, &content, format)
     }
 
     /// Create a new OCM message.
@@ -577,7 +567,7 @@ impl OcmMetadata {
                 constellation,
                 object_type: object_type_enum,
                 time_system,
-                epoch_tzero: parse_epoch(&epoch_tzero)?,
+                epoch_tzero: parse_calendar_epoch(&epoch_tzero)?,
                 ops_status,
                 orbit_category,
                 ocm_data_elements,
@@ -590,9 +580,11 @@ impl OcmMetadata {
                     units: None,
                 }),
                 previous_message_epoch: previous_message_epoch
-                    .map(|s| parse_epoch(&s))
+                    .map(|s| parse_calendar_epoch(&s))
                     .transpose()?,
-                next_message_epoch: next_message_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                next_message_epoch: next_message_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 start_time: start_time.map(|s| parse_epoch(&s)).transpose()?,
                 stop_time: stop_time.map(|s| parse_epoch(&s)).transpose()?,
                 time_span: time_span.map(|v| DayInterval {
@@ -603,7 +595,9 @@ impl OcmMetadata {
                     value: v,
                     units: None,
                 }),
-                next_leap_epoch: next_leap_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                next_leap_epoch: next_leap_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 next_leap_taimutc: next_leap_taimutc.map(|v| TimeOffset {
                     value: v,
                     units: None,
@@ -662,7 +656,7 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_epoch_tzero(&mut self, value: String) -> PyResult<()> {
-        self.inner.epoch_tzero = parse_epoch(&value)?;
+        self.inner.epoch_tzero = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -1224,7 +1218,9 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_previous_message_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.previous_message_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.previous_message_epoch = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
     /// Anticipated (or actual) epoch of the next message from this originator for this space
@@ -1243,7 +1239,9 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_next_message_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.next_message_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.next_message_epoch = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
     /// Time of the earliest data contained in the OCM, specified as either a relative or
@@ -1333,7 +1331,9 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_next_leap_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.next_leap_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.next_leap_epoch = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
     /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since
@@ -1672,9 +1672,15 @@ impl OcmTrajState {
                 propagator,
                 center_name,
                 traj_ref_frame,
-                traj_frame_epoch: traj_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
-                useable_start_time: useable_start_time.map(|s| parse_epoch(&s)).transpose()?,
-                useable_stop_time: useable_stop_time.map(|s| parse_epoch(&s)).transpose()?,
+                traj_frame_epoch: traj_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
+                useable_start_time: useable_start_time
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
+                useable_stop_time: useable_stop_time
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 orb_revnum,
                 orb_revnum_basis: None, // RevNumBasis enum doesn't implement FromStr
                 traj_type,
@@ -1935,7 +1941,9 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_traj_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.traj_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.traj_frame_epoch = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
 
@@ -1959,7 +1967,9 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_useable_start_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.useable_start_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.useable_start_time = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
 
@@ -1983,7 +1993,9 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_useable_stop_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.useable_stop_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.useable_stop_time = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
 
@@ -2097,10 +2109,13 @@ impl TrajLine {
     /// Create a new TrajLine object.
     #[new]
     #[pyo3(signature = (*, epoch, values))]
-    fn new(epoch: String, values: Vec<f64>) -> Self {
-        Self {
-            inner: core_ocm::TrajLine { epoch, values },
-        }
+    fn new(epoch: String, values: Vec<f64>) -> PyResult<Self> {
+        Ok(Self {
+            inner: core_ocm::TrajLine {
+                epoch: parse_epoch(&epoch)?,
+                values,
+            },
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -2116,11 +2131,12 @@ impl TrajLine {
     /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
-        self.inner.epoch.clone()
+        self.inner.epoch.as_str().to_string()
     }
     #[setter]
-    fn set_epoch(&mut self, value: String) {
-        self.inner.epoch = value;
+    fn set_epoch(&mut self, value: String) -> PyResult<()> {
+        self.inner.epoch = parse_epoch(&value)?;
+        Ok(())
     }
 
     /// Trajectory state elements for this epoch.
@@ -2298,7 +2314,7 @@ impl OcmPhysicalDescription {
                 }),
                 oeb_parent_frame,
                 oeb_parent_frame_epoch: oeb_parent_frame_epoch
-                    .map(|s| parse_epoch(&s))
+                    .map(|s| parse_calendar_epoch(&s))
                     .transpose()?,
                 oeb_q1,
                 oeb_q2,
@@ -2696,7 +2712,9 @@ impl OcmPhysicalDescription {
     }
     #[setter]
     fn set_oeb_parent_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.oeb_parent_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.oeb_parent_frame_epoch = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
     /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
@@ -3458,7 +3476,9 @@ impl OcmCovarianceMatrix {
                 )?,
                 cov_basis_id,
                 cov_ref_frame,
-                cov_frame_epoch: cov_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                cov_frame_epoch: cov_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 cov_scale_min,
                 cov_scale_max,
                 cov_confidence: cov_confidence.map(|v| Percentage {
@@ -3606,7 +3626,9 @@ impl OcmCovarianceMatrix {
     }
     #[setter]
     fn set_cov_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.cov_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.cov_frame_epoch = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
 
@@ -3765,10 +3787,13 @@ impl CovLine {
     /// Create a new CovLine object.
     #[new]
     #[pyo3(signature = (*, epoch, values))]
-    fn new(epoch: String, values: Vec<f64>) -> Self {
-        Self {
-            inner: core_ocm::CovLine { epoch, values },
-        }
+    fn new(epoch: String, values: Vec<f64>) -> PyResult<Self> {
+        Ok(Self {
+            inner: core_ocm::CovLine {
+                epoch: parse_epoch(&epoch)?,
+                values,
+            },
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -3784,11 +3809,12 @@ impl CovLine {
     /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
-        self.inner.epoch.clone()
+        self.inner.epoch.as_str().to_string()
     }
     #[setter]
-    fn set_epoch(&mut self, value: String) {
-        self.inner.epoch = value;
+    fn set_epoch(&mut self, value: String) -> PyResult<()> {
+        self.inner.epoch = parse_epoch(&value)?;
+        Ok(())
     }
 
     /// Covariance matrix elements for this epoch.
@@ -3976,7 +4002,9 @@ impl OcmManeuverParameters {
                 man_purpose,
                 man_pred_source,
                 man_ref_frame,
-                man_frame_epoch: man_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                man_frame_epoch: man_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 grav_assist_name,
                 dc_type: dc_type
                     .map(|s| s.parse())
@@ -4214,7 +4242,9 @@ impl OcmManeuverParameters {
     }
     #[setter]
     fn set_man_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.man_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.man_frame_epoch = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
 
@@ -4625,10 +4655,13 @@ impl ManLine {
     /// Create a new ManLine object.
     #[new]
     #[pyo3(signature = (*, epoch, values))]
-    fn new(epoch: String, values: Vec<String>) -> Self {
-        Self {
-            inner: core_ocm::ManLine { epoch, values },
-        }
+    fn new(epoch: String, values: Vec<String>) -> PyResult<Self> {
+        Ok(Self {
+            inner: core_ocm::ManLine {
+                epoch: parse_epoch(&epoch)?,
+                values,
+            },
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -4644,11 +4677,12 @@ impl ManLine {
     /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
-        self.inner.epoch.clone()
+        self.inner.epoch.as_str().to_string()
     }
     #[setter]
-    fn set_epoch(&mut self, value: String) {
-        self.inner.epoch = value;
+    fn set_epoch(&mut self, value: String) -> PyResult<()> {
+        self.inner.epoch = parse_epoch(&value)?;
+        Ok(())
     }
 
     /// Maneuver elements for this epoch.

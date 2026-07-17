@@ -4,7 +4,7 @@
 
 use crate::common::{parse_reference_frame, parse_time_system};
 use crate::common::{OdmHeader, StateVector};
-use crate::types::parse_epoch;
+use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::opm as core_opm;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
 use pyo3::exceptions::PyValueError;
@@ -128,14 +128,9 @@ impl Opm {
     /// Create an OPM message from a string.
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, strict=true))]
-    fn from_str(
-        py: Python<'_>,
-        data: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format, strict)?;
+    #[pyo3(signature = (data, format=None))]
+    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
+        let inner = crate::api::parse_typed(py, data, format)?;
         Ok(Self { inner })
     }
 
@@ -153,16 +148,11 @@ impl Opm {
     /// Opm
     ///     The parsed OPM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, strict=true))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None))]
+    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format, strict)
+        Self::from_str(py, &content, format)
     }
 
     /// Serialize to KVN, preserving the source version by default.
@@ -348,7 +338,9 @@ impl OpmMetadata {
                 center_name,
                 ref_frame,
                 time_system,
-                ref_frame_epoch: ref_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                ref_frame_epoch: ref_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 comment: comment.unwrap_or_default(),
             },
         })
@@ -468,7 +460,9 @@ impl OpmMetadata {
 
     #[setter]
     fn set_ref_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.ref_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.ref_frame_epoch = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
 
@@ -1436,7 +1430,7 @@ impl ManeuverParameters {
         Ok(Self {
             inner: core_opm::ManeuverParameters {
                 comment: vec![],
-                man_epoch_ignition: parse_epoch(&man_epoch_ignition)?,
+                man_epoch_ignition: parse_calendar_epoch(&man_epoch_ignition)?,
                 man_duration: Duration::new(man_duration, None)
                     .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
                 man_delta_mass: DeltaMassZ::new(man_delta_mass, None)
@@ -1480,7 +1474,7 @@ impl ManeuverParameters {
 
     #[setter]
     fn set_man_epoch_ignition(&mut self, value: String) -> PyResult<()> {
-        self.inner.man_epoch_ignition = parse_epoch(&value)?;
+        self.inner.man_epoch_ignition = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -1504,9 +1498,7 @@ impl ManeuverParameters {
     /// Units: kg
     ///
     ///
-    /// **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
-    /// This implementation follows the underlying schema type and allows non-positive values
-    /// (`<= 0`) for interoperability.
+    /// The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
     ///
     /// :type: float
     #[getter]

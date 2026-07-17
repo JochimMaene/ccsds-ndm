@@ -186,7 +186,7 @@ pub struct TleToOmmOptions {
     pub message_id: Option<String>,
     /// Optional creation date override for the generated ODM header.
     /// Defaults to the parsed TLE epoch.
-    pub creation_date: Option<Epoch>,
+    pub creation_date: Option<CalendarEpoch>,
 }
 
 impl crate::traits::Validate for Omm {
@@ -231,7 +231,7 @@ impl Ndm for Omm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let omm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Omm, &omm)?;
+        crate::traits::Validate::validate(&omm)?;
         Ok(omm)
     }
 
@@ -247,7 +247,7 @@ impl Ndm for Omm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let omm: Self = crate::xml::from_str_with_context(xml, "OMM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Omm, &omm)?;
+        crate::traits::Validate::validate(&omm)?;
         Ok(omm)
     }
 }
@@ -395,7 +395,7 @@ pub struct OmmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub ref_frame_epoch: Option<Epoch>,
+    pub ref_frame_epoch: Option<CalendarEpoch>,
     /// Time system used for Keplerian elements and covariance data. Use of values other than
     /// those in 3.2.3.2 should be documented in an ICD.
     ///
@@ -694,7 +694,7 @@ pub struct MeanElements {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Semi-major axis in kilometers (preferred), or, if MEAN_ELEMENT_THEORY = SGP/SGP4, the
     /// Keplerian Mean motion in revolutions per day
     ///
@@ -1465,15 +1465,6 @@ MEAN_MOTION_DDOT = 0.0 [rev/day**3]
 AGOM = 0.0001 [m**2/kg]
 "#;
         assert!(Omm::from_kvn(kvn).is_err());
-
-        let _ = crate::validation::take_warnings();
-        let _omm = crate::validation::with_validation_mode(
-            crate::validation::ValidationMode::Permissive,
-            || Omm::from_kvn(kvn),
-        )
-        .expect("lenient parse should succeed");
-        let warnings = crate::validation::take_warnings();
-        assert!(!warnings.is_empty());
     }
 
     #[test]
@@ -1575,7 +1566,7 @@ TLE_PARAMETERS =
         let data = OmmData::builder()
             .mean_elements(
                 MeanElements::builder()
-                    .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .epoch("2023-01-01T00:00:00".parse().unwrap())
                     .mean_motion(MeanMotion::new(15.0, None))
                     .eccentricity(NonNegativeDouble::new(0.001).unwrap())
                     .inclination(Inclination::new(10.0, None).unwrap())
@@ -1628,7 +1619,7 @@ TLE_PARAMETERS =
             .version("3.0")
             .header(
                 OdmHeader::builder()
-                    .creation_date(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .creation_date("2023-01-01T00:00:00".parse().unwrap())
                     .originator("ME")
                     .build(),
             )
@@ -1650,7 +1641,7 @@ TLE_PARAMETERS =
                                 OmmData::builder()
                                     .mean_elements(
                                         MeanElements::builder()
-                                            .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                                            .epoch("2023-01-01T00:00:00".parse().unwrap())
                                             .mean_motion(MeanMotion::new(15.0, None))
                                             .eccentricity(NonNegativeDouble::new(0.001).unwrap())
                                             .inclination(Inclination::new(10.0, None).unwrap())
@@ -1689,7 +1680,7 @@ TLE_PARAMETERS =
         let mut data = OmmData::builder()
             .mean_elements(
                 MeanElements::builder()
-                    .epoch(Epoch::new("2023-01-01T00:00:00").unwrap())
+                    .epoch("2023-01-01T00:00:00".parse().unwrap())
                     .semi_major_axis(Distance::new(7000.0, None))
                     .eccentricity(NonNegativeDouble::new(0.001).unwrap())
                     .inclination(Inclination::new(10.0, None).unwrap())
@@ -1833,11 +1824,16 @@ MEAN_MOTION_DDOT = 0.0000000000000 [rev/day**3]
             object_id: None,
             originator: Some("18 SPCS".to_string()),
             message_id: None,
-            creation_date: None,
+            creation_date: Some("2021-01-01T00:00:00".parse().unwrap()),
         };
 
         let omm = Omm::from_tle_lines_with_options(line1, line2, &options)
             .expect("failed to parse TLE lines with options");
+        assert_eq!(omm.header.creation_date.as_str(), "2021-01-01T00:00:00");
+        assert_eq!(
+            omm.body.segment.data.mean_elements.epoch.as_str(),
+            "2020-12-13T16:36:04.502592"
+        );
         let (line1_out, line2_out) = omm.to_tle_lines().expect("failed to regenerate TLE");
         assert_eq!(line1_out, line1);
         assert_eq!(line2_out, line2);

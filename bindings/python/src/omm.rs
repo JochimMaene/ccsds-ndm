@@ -4,7 +4,7 @@
 
 use crate::common::OdmHeader;
 use crate::common::{parse_reference_frame, parse_time_system};
-use crate::types::parse_epoch;
+use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::omm as core_omm;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
 use pyo3::exceptions::PyValueError;
@@ -135,14 +135,9 @@ impl Omm {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, strict=true))]
-    fn from_str(
-        py: Python<'_>,
-        data: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format, strict)?;
+    #[pyo3(signature = (data, format=None))]
+    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
+        let inner = crate::api::parse_typed(py, data, format)?;
         Ok(Self { inner })
     }
 
@@ -160,16 +155,11 @@ impl Omm {
     /// Omm
     ///     The parsed OMM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, strict=true))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None))]
+    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format, strict)
+        Self::from_str(py, &content, format)
     }
 
     /// Serialize to KVN, preserving the source version by default.
@@ -271,7 +261,9 @@ impl Omm {
             object_id,
             originator,
             message_id,
-            creation_date: creation_date.map(|s| parse_epoch(&s)).transpose()?,
+            creation_date: creation_date
+                .map(|s| parse_calendar_epoch(&s))
+                .transpose()?,
         };
 
         let inner = core_omm::Omm::from_tle_lines_with_options(line1, line2, &options)
@@ -411,7 +403,9 @@ impl OmmMetadata {
                 ref_frame,
                 time_system,
                 mean_element_theory,
-                ref_frame_epoch: ref_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                ref_frame_epoch: ref_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 comment: comment.unwrap_or_default(),
             },
         })
@@ -552,7 +546,9 @@ impl OmmMetadata {
 
     #[setter]
     fn set_ref_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.ref_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.ref_frame_epoch = value
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
 
@@ -629,7 +625,7 @@ impl MeanElements {
         Ok(Self {
             inner: core_omm::MeanElements {
                 comment: vec![],
-                epoch: parse_epoch(&epoch)?,
+                epoch: parse_calendar_epoch(&epoch)?,
                 eccentricity: ccsds_ndm::types::NonNegativeDouble {
                     value: eccentricity,
                 },
@@ -683,7 +679,7 @@ impl MeanElements {
 
     #[setter]
     fn set_epoch(&mut self, value: String) -> PyResult<()> {
-        self.inner.epoch = parse_epoch(&value)?;
+        self.inner.epoch = parse_calendar_epoch(&value)?;
         Ok(())
     }
 

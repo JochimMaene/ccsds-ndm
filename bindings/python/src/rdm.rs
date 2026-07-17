@@ -7,7 +7,7 @@ use crate::common::{
     GroundImpactParameters, OdParameters, StateVector,
 };
 use crate::opm::OpmCovarianceMatrix;
-use crate::types::parse_epoch;
+use crate::types::parse_calendar_epoch;
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::messages::rdm as core_rdm;
 use ccsds_ndm::types::{self as core_types, *};
@@ -159,14 +159,9 @@ impl Rdm {
     /// Rdm
     ///     The parsed RDM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, strict=true))]
-    fn from_str(
-        py: Python<'_>,
-        data: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format, strict)?;
+    #[pyo3(signature = (data, format=None))]
+    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
+        let inner = crate::api::parse_typed(py, data, format)?;
         Ok(Self { inner })
     }
 
@@ -185,16 +180,11 @@ impl Rdm {
     /// Rdm
     ///     The parsed RDM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, strict=true))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None))]
+    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format, strict)
+        Self::from_str(py, &content, format)
     }
 
     /// Serialize to KVN, preserving the source version by default.
@@ -303,7 +293,7 @@ impl RdmHeader {
         Ok(Self {
             inner: core_rdm::RdmHeader {
                 comment: comment.unwrap_or_default(),
-                creation_date: parse_epoch(&creation_date)?,
+                creation_date: parse_calendar_epoch(&creation_date)?,
                 originator,
                 message_id,
             },
@@ -339,7 +329,7 @@ impl RdmHeader {
     }
     #[setter]
     fn set_creation_date(&mut self, v: String) -> PyResult<()> {
-        self.inner.creation_date = parse_epoch(&v)?;
+        self.inner.creation_date = parse_calendar_epoch(&v)?;
         Ok(())
     }
 
@@ -604,9 +594,9 @@ impl RdmMetadata {
                 controlled_reentry: controlled_reentry_enum,
                 center_name,
                 time_system,
-                epoch_tzero: parse_epoch(&epoch_tzero)?,
+                epoch_tzero: parse_calendar_epoch(&epoch_tzero)?,
                 ref_frame,
-                ref_frame_epoch: ref_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                ref_frame_epoch: ref_frame_epoch.map(|s| parse_calendar_epoch(&s)).transpose()?,
                 ephemeris_name,
                 gravity_model,
                 atmospheric_model,
@@ -622,9 +612,11 @@ impl RdmMetadata {
                 impact_uncertainty_method: impact_uncertainty_method_enum,
                 previous_message_id,
                 previous_message_epoch: previous_message_epoch
-                    .map(|s| parse_epoch(&s))
+                    .map(|s| parse_calendar_epoch(&s))
                     .transpose()?,
-                next_message_epoch: next_message_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                next_message_epoch: next_message_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
             },
         })
     }
@@ -817,7 +809,7 @@ impl RdmMetadata {
     }
     #[setter]
     fn set_epoch_tzero(&mut self, v: String) -> PyResult<()> {
-        self.inner.epoch_tzero = parse_epoch(&v)?;
+        self.inner.epoch_tzero = parse_calendar_epoch(&v)?;
         Ok(())
     }
 
@@ -855,7 +847,7 @@ impl RdmMetadata {
     }
     #[setter]
     fn set_ref_frame_epoch(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.ref_frame_epoch = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.ref_frame_epoch = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1125,7 +1117,7 @@ impl RdmMetadata {
     }
     #[setter]
     fn set_previous_message_epoch(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.previous_message_epoch = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.previous_message_epoch = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1144,7 +1136,7 @@ impl RdmMetadata {
     }
     #[setter]
     fn set_next_message_epoch(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.next_message_epoch = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.next_message_epoch = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1417,10 +1409,14 @@ impl AtmosphericReentryParameters {
                     .transpose()
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 nominal_reentry_epoch: nominal_reentry_epoch
-                    .map(|s| parse_epoch(&s))
+                    .map(|s| parse_calendar_epoch(&s))
                     .transpose()?,
-                reentry_window_start: reentry_window_start.map(|s| parse_epoch(&s)).transpose()?,
-                reentry_window_end: reentry_window_end.map(|s| parse_epoch(&s)).transpose()?,
+                reentry_window_start: reentry_window_start
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
+                reentry_window_end: reentry_window_end
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 orbit_lifetime_confidence_level: orbit_lifetime_confidence_level
                     .map(PercentageRequired::new)
                     .transpose()
@@ -1524,7 +1520,7 @@ impl AtmosphericReentryParameters {
     }
     #[setter]
     fn set_nominal_reentry_epoch(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.nominal_reentry_epoch = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.nominal_reentry_epoch = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1541,7 +1537,7 @@ impl AtmosphericReentryParameters {
     }
     #[setter]
     fn set_reentry_window_start(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.reentry_window_start = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.reentry_window_start = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1558,7 +1554,7 @@ impl AtmosphericReentryParameters {
     }
     #[setter]
     fn set_reentry_window_end(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.reentry_window_end = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.reentry_window_end = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 

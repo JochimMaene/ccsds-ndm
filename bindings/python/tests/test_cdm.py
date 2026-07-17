@@ -181,6 +181,17 @@ class TestCdm:
         with pytest.raises(ValueError, match="COVARIANCE_MATRIX is missing"):
             _ = data.covariance_matrix_numpy
 
+    def test_epoch_fields_reject_numeric_xsd_branch(self):
+        with pytest.raises(ValueError):
+            CdmHeader(
+                creation_date="123.5",
+                originator="TEST",
+                message_id="ID",
+            )
+
+        with pytest.raises(ValueError):
+            RelativeMetadataData(tca="123.5", miss_distance=100.0)
+
     def test_cdm_data_numpy_shape_validation(self):
         with pytest.raises(ValueError, match="State vector must be shape"):
             CdmData.from_numpy(

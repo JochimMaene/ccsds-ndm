@@ -9,7 +9,6 @@
 
 use crate::error::{Result, ValidationError};
 use crate::kvn::ser::KvnWriter;
-use crate::options::{ParseMode, ParseReport};
 
 /// Core trait for NDM message types.
 ///
@@ -83,11 +82,6 @@ pub trait Ndm: Sized + serde::Serialize + Validate {
     /// * `kvn` - The KVN content as a string
     fn from_kvn(kvn: &str) -> Result<Self>;
 
-    /// Parse KVN with an explicit compliance mode.
-    fn from_kvn_with_mode(kvn: &str, mode: ParseMode) -> Result<ParseReport<Self>> {
-        crate::options::parse_with_mode(mode, || Self::from_kvn(kvn))
-    }
-
     /// Serialize the message to XML format.
     ///
     /// # Returns
@@ -101,11 +95,6 @@ pub trait Ndm: Sized + serde::Serialize + Validate {
     ///
     /// * `xml` - The XML content as a string
     fn from_xml(xml: &str) -> Result<Self>;
-
-    /// Parse XML with an explicit compliance mode.
-    fn from_xml_with_mode(xml: &str, mode: ParseMode) -> Result<ParseReport<Self>> {
-        crate::options::parse_with_mode(mode, || Self::from_xml(xml))
-    }
 }
 
 /// Trait for types that can be parsed from a KVN value string.
@@ -130,13 +119,13 @@ pub trait CcsdsNullable {
 
 impl CcsdsNullable for String {
     fn is_null(&self) -> bool {
-        self.trim().is_empty() || self.trim() == "n/a"
+        self.trim().is_empty() || self.trim().eq_ignore_ascii_case("n/a")
     }
 }
 
 impl CcsdsNullable for str {
     fn is_null(&self) -> bool {
-        self.trim().is_empty() || self.trim() == "n/a"
+        self.trim().is_empty() || self.trim().eq_ignore_ascii_case("n/a")
     }
 }
 

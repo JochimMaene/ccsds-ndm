@@ -81,7 +81,7 @@ impl Ndm for Acm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let acm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Acm, &acm)?;
+        crate::traits::Validate::validate(&acm)?;
         Ok(acm)
     }
 
@@ -97,7 +97,7 @@ impl Ndm for Acm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let acm: Self = crate::xml::from_str_with_context(xml, "ACM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Acm, &acm)?;
+        crate::traits::Validate::validate(&acm)?;
         Ok(acm)
     }
 }
@@ -345,7 +345,7 @@ pub struct AcmMetadata {
     /// **Examples**: 2016-11-10T00:00:00
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    pub epoch_tzero: Epoch,
+    pub epoch_tzero: CalendarEpoch,
     /// Comma-delimited list of elements of information data blocks included in this message. The
     /// order shall be the same as the order of the data blocks in the message. Values shall be
     /// confined to the following list: ATT, PHYS, COV, MAN, AD, USER. If the ACM contains multiple
@@ -410,7 +410,7 @@ pub struct AcmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub next_leap_epoch: Option<Epoch>,
+    pub next_leap_epoch: Option<CalendarEpoch>,
     /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since 1958)
     /// incorporated by the message originator at epoch ‘NEXT_LEAP_EPOCH’. This keyword should be
     /// provided if NEXT_LEAP_EPOCH is supplied.
@@ -1312,7 +1312,7 @@ pub struct AcmManeuverParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub man_begin_time: Option<Epoch>,
+    pub man_begin_time: Option<RelativeTime>,
     /// End time of actual maneuver, measured as a relative time with respect to EPOCH_TZERO.
     ///
     /// **Examples**: 120.0
@@ -1325,7 +1325,7 @@ pub struct AcmManeuverParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub man_end_time: Option<Epoch>,
+    pub man_end_time: Option<RelativeTime>,
     /// Maneuver duration.
     ///
     /// **Units**: s

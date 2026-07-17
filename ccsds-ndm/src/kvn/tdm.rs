@@ -12,7 +12,7 @@ use crate::messages::tdm::{
     Tdm, TdmBody, TdmData, TdmHeader, TdmMetadata, TdmObservation, TdmObservationData, TdmSegment,
 };
 use crate::parse_block;
-use crate::types::{Epoch, Percentage};
+use crate::types::{CalendarEpoch, Percentage};
 use winnow::combinator::preceded;
 use winnow::error::{AddContext, ErrMode, StrContext};
 use winnow::prelude::*;
@@ -59,7 +59,7 @@ pub fn tdm_header(input: &mut &str) -> KvnResult<TdmHeader> {
         kv_sep.parse_next(input)?;
         match key {
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -158,8 +158,8 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
         "TRACK_ID" => val: kv_string => { track_id = Some(val); },
         "DATA_TYPES" => val: kv_string => { data_types = Some(val); },
         "TIME_SYSTEM" => val: kv_string => { time_system = Some(val); },
-        "START_TIME" => val: kv_epoch => { start_time = Some(val); },
-        "STOP_TIME" => val: kv_epoch => { stop_time = Some(val); },
+        "START_TIME" => val: kv_calendar_epoch => { start_time = Some(val); },
+        "STOP_TIME" => val: kv_calendar_epoch => { stop_time = Some(val); },
         "PARTICIPANT_1" => val: kv_string => { participant_1 = Some(val); },
         "PARTICIPANT_2" => val: kv_string => { participant_2 = Some(val); },
         "PARTICIPANT_3" => val: kv_string => { participant_3 = Some(val); },
@@ -293,6 +293,7 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
 pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
     use winnow::combinator::dispatch;
 
+    let kv_epoch_token = kv_calendar_epoch_token;
     let checkpoint = input.checkpoint();
     let (epoch, data) = dispatch! {
         preceded(ws, keyword);
@@ -346,7 +347,7 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
         "TROPO_WET" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoWet(v)))),
         "VLBI_DELAY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::VlbiDelay(v)))),
         _ => |i: &mut &str| Err(ErrMode::Cut(InternalParserError::from_input(i).add_context(i, &i.checkpoint(), StrContext::Label("Unknown TDM data keyword")))),
-    }.try_map(|res: std::result::Result<(Epoch, TdmObservationData), CcsdsNdmError>| res).parse_next(input).map_err(|e| {
+    }.try_map(|res: std::result::Result<(CalendarEpoch, TdmObservationData), CcsdsNdmError>| res).parse_next(input).map_err(|e| {
         if e.is_backtrack() {
             ErrMode::Backtrack(InternalParserError::from_input(input).add_context(
                 input,

@@ -4,7 +4,7 @@
 
 use crate::common::AdmHeader;
 use crate::common::{parse_reference_frame, parse_time_system};
-use crate::types::parse_epoch;
+use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::types::{
     Angle, AngleRate, AttitudeTypeType, Duration, InterpolationDegree, QuaternionDotComponent,
@@ -64,7 +64,7 @@ fn parse_attitude_type_or_infer(
 }
 
 fn build_state_from_values(
-    epoch: ccsds_ndm::types::Epoch,
+    epoch: ccsds_ndm::types::CalendarEpoch,
     values: &[f64],
     attitude_type: &AttitudeTypeType,
 ) -> PyResult<core_aem::AemAttitudeStateWrapper> {
@@ -317,7 +317,7 @@ fn build_state_from_values(
 
 fn values_from_content(
     content: ccsds_ndm::common::AemAttitudeState,
-) -> (ccsds_ndm::types::Epoch, Vec<f64>) {
+) -> (ccsds_ndm::types::CalendarEpoch, Vec<f64>) {
     match content {
         ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) => (
             v.epoch,
@@ -601,28 +601,18 @@ impl Aem {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, strict=true))]
-    fn from_str(
-        py: Python<'_>,
-        data: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format, strict)?;
+    #[pyo3(signature = (data, format=None))]
+    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
+        let inner = crate::api::parse_typed(py, data, format)?;
         Ok(Self { inner })
     }
 
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, strict=true))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None))]
+    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format, strict)
+        Self::from_str(py, &content, format)
     }
 }
 
@@ -759,10 +749,14 @@ impl AemMetadata {
                 ref_frame_a,
                 ref_frame_b,
                 time_system,
-                start_time: parse_epoch(&start_time)?,
-                stop_time: parse_epoch(&stop_time)?,
-                useable_start_time: useable_start_time.map(|s| parse_epoch(&s)).transpose()?,
-                useable_stop_time: useable_stop_time.map(|s| parse_epoch(&s)).transpose()?,
+                start_time: parse_calendar_epoch(&start_time)?,
+                stop_time: parse_calendar_epoch(&stop_time)?,
+                useable_start_time: useable_start_time
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
+                useable_stop_time: useable_stop_time
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 attitude_type,
                 euler_rot_seq: euler_rot_seq
                     .map(|s| RotSeq::from_str(&s))
@@ -923,7 +917,7 @@ impl AemMetadata {
 
     #[setter]
     fn set_start_time(&mut self, value: String) -> PyResult<()> {
-        self.inner.start_time = parse_epoch(&value)?;
+        self.inner.start_time = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -940,7 +934,7 @@ impl AemMetadata {
 
     #[setter]
     fn set_stop_time(&mut self, value: String) -> PyResult<()> {
-        self.inner.stop_time = parse_epoch(&value)?;
+        self.inner.stop_time = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -964,7 +958,7 @@ impl AemMetadata {
 
     #[setter]
     fn set_useable_start_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.useable_start_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.useable_start_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -984,7 +978,7 @@ impl AemMetadata {
 
     #[setter]
     fn set_useable_stop_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.useable_stop_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.useable_stop_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1179,7 +1173,7 @@ impl AemData {
             let row = array_view.row(i);
             let row_values: Vec<f64> = row.iter().copied().collect();
             attitude_states.push(build_state_from_values(
-                parse_epoch(epoch_str)?,
+                parse_calendar_epoch(epoch_str)?,
                 &row_values,
                 &resolved_type,
             )?);
@@ -1316,7 +1310,7 @@ impl AemData {
             let content = state
                 .content()
                 .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-            let epoch = parse_epoch(epoch_str)?;
+            let epoch = parse_calendar_epoch(epoch_str)?;
             let updated_state = match content {
                 ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(mut v) => {
                     v.epoch = epoch;
@@ -1473,7 +1467,7 @@ impl AemData {
 #[pyclass]
 #[derive(Clone)]
 pub struct AttitudeState {
-    pub epoch: ccsds_ndm::types::Epoch,
+    pub epoch: ccsds_ndm::types::CalendarEpoch,
     pub values: Vec<f64>,
 }
 
@@ -1482,7 +1476,7 @@ impl AttitudeState {
     #[new]
     fn new(epoch: String, values: Vec<f64>) -> PyResult<Self> {
         Ok(Self {
-            epoch: parse_epoch(&epoch)?,
+            epoch: parse_calendar_epoch(&epoch)?,
             values,
         })
     }
@@ -1494,7 +1488,7 @@ impl AttitudeState {
 
     #[setter]
     fn set_epoch(&mut self, value: String) -> PyResult<()> {
-        self.epoch = parse_epoch(&value)?;
+        self.epoch = parse_calendar_epoch(&value)?;
         Ok(())
     }
 

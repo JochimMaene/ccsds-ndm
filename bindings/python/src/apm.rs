@@ -5,7 +5,7 @@
 use crate::attitude::{AngVelState, EulerAngleState, InertiaState, QuaternionState, SpinState};
 use crate::common::parse_time_system;
 use crate::common::AdmHeader;
-use crate::types::parse_epoch;
+use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::apm as core_apm;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -158,28 +158,18 @@ impl Apm {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, strict=true))]
-    fn from_str(
-        py: Python<'_>,
-        data: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format, strict)?;
+    #[pyo3(signature = (data, format=None))]
+    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
+        let inner = crate::api::parse_typed(py, data, format)?;
         Ok(Self { inner })
     }
 
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, strict=true))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None))]
+    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format, strict)
+        Self::from_str(py, &content, format)
     }
 }
 
@@ -399,7 +389,7 @@ impl ApmData {
         Ok(Self {
             inner: core_apm::ApmData {
                 comment: comment.unwrap_or_default(),
-                epoch: parse_epoch(&epoch)?,
+                epoch: parse_calendar_epoch(&epoch)?,
                 quaternion_state: quaternion_state
                     .unwrap_or_default()
                     .into_iter()
@@ -550,7 +540,7 @@ impl ApmData {
 
     #[setter]
     fn set_epoch(&mut self, value: String) -> PyResult<()> {
-        self.inner.epoch = parse_epoch(&value)?;
+        self.inner.epoch = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -606,7 +596,7 @@ impl ManeuverParameters {
         Ok(Self {
             inner: ccsds_ndm::common::AttManeuverState {
                 comment: comment.unwrap_or_default(),
-                man_epoch_start: parse_epoch(&man_epoch_start)?,
+                man_epoch_start: parse_calendar_epoch(&man_epoch_start)?,
                 man_duration: Duration {
                     value: man_duration,
                     units: None,
@@ -633,7 +623,7 @@ impl ManeuverParameters {
 
     #[setter]
     fn set_man_epoch_start(&mut self, value: String) -> PyResult<()> {
-        self.inner.man_epoch_start = parse_epoch(&value)?;
+        self.inner.man_epoch_start = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -716,9 +706,7 @@ impl ManeuverParameters {
     /// Units: kg
     ///
     ///
-    /// **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
-    /// This implementation follows the underlying schema type and allows non-positive values
-    /// (`<= 0`) for interoperability.
+    /// The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
     ///
     /// :type: Optional[float]
     #[getter]

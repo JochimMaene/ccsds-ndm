@@ -62,7 +62,7 @@ pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
         kv_sep.parse_next(input)?;
         match key {
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -122,7 +122,7 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
     let mut collision_probability_method = None;
 
     parse_block!(input, comment, {
-        "TCA" => tca: kv_epoch,
+        "TCA" => tca: kv_calendar_epoch,
         "MISS_DISTANCE" => miss_distance: kv_from_kvn,
         "RELATIVE_SPEED" => val: kv_from_kvn_opt => { relative_speed = val; },
         "RELATIVE_POSITION_R" => val: kv_from_kvn_opt => { rel_pos_r = val; },
@@ -131,15 +131,15 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
         "RELATIVE_VELOCITY_R" => val: kv_from_kvn_opt => { rel_vel_r = val; },
         "RELATIVE_VELOCITY_T" => val: kv_from_kvn_opt => { rel_vel_t = val; },
         "RELATIVE_VELOCITY_N" => val: kv_from_kvn_opt => { rel_vel_n = val; },
-        "START_SCREEN_PERIOD" => val: kv_epoch_opt => { start_screen_period = val; },
-        "STOP_SCREEN_PERIOD" => val: kv_epoch_opt => { stop_screen_period = val; },
+        "START_SCREEN_PERIOD" => val: kv_calendar_epoch_opt => { start_screen_period = val; },
+        "STOP_SCREEN_PERIOD" => val: kv_calendar_epoch_opt => { stop_screen_period = val; },
         "SCREEN_VOLUME_FRAME" => val: kv_enum_opt => { screen_volume_frame = val; },
         "SCREEN_VOLUME_SHAPE" => val: kv_enum_opt => { screen_volume_shape = val; },
         "SCREEN_VOLUME_X" => val: kv_from_kvn_opt => { screen_volume_x = val; },
         "SCREEN_VOLUME_Y" => val: kv_from_kvn_opt => { screen_volume_y = val; },
         "SCREEN_VOLUME_Z" => val: kv_from_kvn_opt => { screen_volume_z = val; },
-        "SCREEN_ENTRY_TIME" => val: kv_epoch_opt => { screen_entry_time = val; },
-        "SCREEN_EXIT_TIME" => val: kv_epoch_opt => { screen_exit_time = val; },
+        "SCREEN_ENTRY_TIME" => val: kv_calendar_epoch_opt => { screen_entry_time = val; },
+        "SCREEN_EXIT_TIME" => val: kv_calendar_epoch_opt => { screen_exit_time = val; },
         "COLLISION_PROBABILITY" => val: kv_from_kvn_opt => { collision_probability = val; },
         "COLLISION_PROBABILITY_METHOD" => val: kv_string_opt => { collision_probability_method = val; },
     }, |i: &mut &str| at_block_start("META", i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Relative Metadata key");
@@ -430,8 +430,8 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
     let mut has_cov = false;
 
     parse_block!(input, comment, {
-        "TIME_LASTOB_START" => val: kv_epoch_opt => { od_params.time_lastob_start = val; has_od_params = true; },
-        "TIME_LASTOB_END" => val: kv_epoch_opt => { od_params.time_lastob_end = val; has_od_params = true; },
+        "TIME_LASTOB_START" => val: kv_calendar_epoch_opt => { od_params.time_lastob_start = val; has_od_params = true; },
+        "TIME_LASTOB_END" => val: kv_calendar_epoch_opt => { od_params.time_lastob_end = val; has_od_params = true; },
         "RECOMMENDED_OD_SPAN" => val: kv_from_kvn_opt => { od_params.recommended_od_span = val; has_od_params = true; },
         "ACTUAL_OD_SPAN" => val: kv_from_kvn_opt => { od_params.actual_od_span = val; has_od_params = true; },
         "OBS_AVAILABLE" => val: kv_u32_opt => { od_params.obs_available = val.map(|v| v.into()); has_od_params = true; },

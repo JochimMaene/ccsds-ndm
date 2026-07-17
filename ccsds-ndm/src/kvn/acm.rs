@@ -72,9 +72,9 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
         "ODM_MSG_LINK" => val: kv_string => { odm_msg_link = Some(val); },
         "CENTER_NAME" => val: kv_string => { center_name = Some(val); },
         "TIME_SYSTEM" => val: kv_string => { time_system = Some(val); },
-        "EPOCH_TZERO" => val: kv_epoch => { epoch_tzero = Some(val); },
+        "EPOCH_TZERO" => val: kv_calendar_epoch => { epoch_tzero = Some(val); },
         "TAIMUTC_AT_TZERO" => val: kv_from_kvn => { taimutc_at_tzero = Some(val); },
-        "NEXT_LEAP_EPOCH" => val: kv_epoch => { next_leap_epoch = Some(val); },
+        "NEXT_LEAP_EPOCH" => val: kv_calendar_epoch => { next_leap_epoch = Some(val); },
         "NEXT_LEAP_TAIMUTC" => val: kv_from_kvn => { next_leap_taimutc = Some(val); },
         "ACM_DATA_ELEMENTS" => val: kv_string => { acm_data_elements = Some(val); },
         "START_TIME" => val: kv_epoch => { start_time = Some(val); },
@@ -312,8 +312,8 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
         "MAN_ID" => val: kv_string => { man_id = Some(val); },
         "MAN_PREV_ID" => val: kv_string => { man_prev_id = Some(val); },
         "MAN_PURPOSE" => val: kv_string => { man_purpose = Some(val); },
-        "MAN_BEGIN_TIME" => val: kv_epoch => { man_begin_time = Some(val); },
-        "MAN_END_TIME" => val: kv_epoch => { man_end_time = Some(val); },
+        "MAN_BEGIN_TIME" => val: kv_relative_time => { man_begin_time = Some(val); },
+        "MAN_END_TIME" => val: kv_relative_time => { man_end_time = Some(val); },
         "MAN_DURATION" => val: kv_from_kvn => { man_duration = Some(val); },
         "ACTUATOR_USED" => val: kv_string => { actuator_used = Some(val); },
         "TARGET_MOMENTUM" => val: kv_target_momentum => { target_momentum = Some(val); },
@@ -732,19 +732,16 @@ COV_STOP
     fn test_acm_man_block() {
         let man_block = r#"MAN_START
 MAN_ID = MAN_001
+MAN_PURPOSE = ATT_ADJUST
 MAN_BEGIN_TIME = 100.0
-MAN_END_TIME = 200.0
 MAN_DURATION = 100.0 [s]
 ACTUATOR_USED = THRUSTER_1
-TARGET_MOMENTUM = 0.1 0.2 0.3 [N*m*s]
+TARGET_MOM_FRAME = J2000
+        TARGET_MOMENTUM = 0.1 0.2 0.3 [N*m*s]
 MAN_STOP
 "#;
         let input = format!("{}{}{}", sample_acm_header(), sample_acm_meta(), man_block);
-        let acm = crate::validation::with_validation_mode(
-            crate::validation::ValidationMode::Permissive,
-            || Acm::from_kvn(&input),
-        )
-        .unwrap();
+        let acm = Acm::from_kvn(&input).unwrap();
         let man = &acm.body.segment.data.man[0];
         assert_eq!(man.man_id.as_deref(), Some("MAN_001"));
         assert_eq!(man.man_duration.as_ref().unwrap().value, 100.0);

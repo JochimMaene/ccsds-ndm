@@ -7,17 +7,19 @@
 //! A high-performance, type-safe library for parsing and generating CCSDS Navigation Data Messages (NDM)
 //! in both KVN (Key-Value Notation) and XML formats.
 //!
-//! This crate is designed for mission-critical space applications where correctness, performance,
-//! and adherence to standards are paramount.
+//! This crate is designed for demanding space-data exchange where correctness, predictable
+//! performance, and adherence to the applicable standards are important.
 //!
 //! ## Key Features
 //!
-//! - **Comprehensive Support**: Full support for OPM, OMM, OEM, OCM, CDM, TDM, RDM, AEM, APM, and ACM messages.
+//! - **Broad Message Coverage**: Typed models, parsers, and serializers for OPM, OMM, OEM, OCM,
+//!   CDM, TDM, RDM, AEM, APM, and ACM messages. Model availability does not by itself establish
+//!   conformance for every edition, notation, or operation.
 //! - **Format Agnostic**: Seamlessly convert between KVN and XML formats.
 //! - **Type Safety**: Strictly typed units (e.g., `km`, `deg`, `s`) prevent physical unit errors.
 //! - **High Performance Parsing**: Utilizes `winnow` and `quick-xml` for efficient, low-allocation parsing.
 //! - **Ergonomic Construction**: Uses the builder pattern (via the [`bon`](https://docs.rs/bon) crate) for safe and easy message creation.
-//! - **Standard Compliant**: Validates messages against CCSDS 502.0-B-3 and related standards.
+//! - **Validation Infrastructure**: Shared syntax and semantic validation for CCSDS NDM workflows.
 //!
 //! ## Architecture
 //!
@@ -61,18 +63,8 @@
 //! let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
 //! ```
 //!
-//! Strict parsing is the default. To accept supported real-world deviations while retaining an
-//! audit trail, request permissive parsing and inspect its diagnostics:
-//!
-//! ```no_run
-//! use ccsds_ndm::{from_str_with_mode, ParseMode};
-//!
-//! let report = from_str_with_mode("CCSDS_OPM_VERS = 3.0\n...", ParseMode::Permissive)?;
-//! for diagnostic in &report.diagnostics {
-//!     eprintln!("{}", diagnostic.error);
-//! }
-//! # Ok::<(), ccsds_ndm::error::CcsdsNdmError>(())
-//! ```
+//! Parsing is strict. A future permissive surface will be added only alongside explicit,
+//! deterministic recovery rules and structured diagnostics.
 //!
 //! ### 3. Generate a message using the Builder Pattern
 //!
@@ -168,7 +160,7 @@ pub mod xml;
 
 use error::{CcsdsNdmError, Result};
 pub use generation::VersionedNdm;
-pub use options::{GenerateOptions, ParseMode, ParseReport, TargetVersion};
+pub use options::{GenerateOptions, TargetVersion};
 use std::fs;
 use std::path::Path;
 
@@ -417,11 +409,6 @@ pub fn from_str(s: &str) -> Result<MessageType> {
     detect::detect_message_type(s)
 }
 
-/// Parse an NDM from a string with an explicit compliance mode.
-pub fn from_str_with_mode(s: &str, mode: ParseMode) -> Result<ParseReport<MessageType>> {
-    options::parse_with_mode(mode, || detect::detect_message_type(s))
-}
-
 /// Parse an NDM from a file path, auto-detecting the message format (KVN or XML) and type.
 ///
 /// Reads the file contents and delegates to [`from_str`] for parsing.
@@ -445,13 +432,4 @@ pub fn from_str_with_mode(s: &str, mode: ParseMode) -> Result<ParseReport<Messag
 pub fn from_file<P: AsRef<Path>>(path: P) -> Result<MessageType> {
     let content = fs::read_to_string(path).map_err(CcsdsNdmError::from)?;
     from_str(&content)
-}
-
-/// Parse an NDM file with an explicit compliance mode.
-pub fn from_file_with_mode<P: AsRef<Path>>(
-    path: P,
-    mode: ParseMode,
-) -> Result<ParseReport<MessageType>> {
-    let content = fs::read_to_string(path).map_err(CcsdsNdmError::from)?;
-    from_str_with_mode(&content, mode)
 }

@@ -16,6 +16,7 @@ from ccsds_ndm import (
     OcmManeuverParameters,
     OcmMetadata,
     OcmOdParameters,
+    OcmPhysicalDescription,
     OcmSegment,
     OcmTrajState,
     OdmHeader,
@@ -82,6 +83,91 @@ class TestOcm:
         ocm2 = Ocm.from_str(xml, format="xml")
         assert len(ocm2.segment.data.traj) == 1
 
+    def test_history_time_tags_use_one_epoch_branch(self):
+        ocm = self._create_valid_ocm()
+        data = ocm.segment.data
+        data.traj = [
+            OcmTrajState(
+                center_name="EARTH",
+                traj_ref_frame="GCRF",
+                traj_type="CARTPV",
+                traj_lines=[
+                    TrajLine(epoch="2023-01-01T00:00:00", values=[1.0]),
+                    TrajLine(epoch="1.0", values=[2.0]),
+                ],
+            )
+        ]
+        segment = ocm.segment
+        segment.data = data
+        ocm.segment = segment
+
+        with pytest.raises(ValueError):
+            ocm.validate()
+
+    def test_metadata_reference_epochs_require_calendar_form(self):
+        with pytest.raises(ValueError):
+            OcmMetadata(epoch_tzero="123.5")
+
+        metadata = OcmMetadata(epoch_tzero="2023-01-01T00:00:00")
+        for field in (
+            "epoch_tzero",
+            "previous_message_epoch",
+            "next_message_epoch",
+            "next_leap_epoch",
+        ):
+            with pytest.raises(ValueError):
+                setattr(metadata, field, "123.5")
+
+    def test_frame_reference_epochs_require_calendar_form(self):
+        with pytest.raises(ValueError):
+            OcmTrajState(
+                center_name="EARTH",
+                traj_ref_frame="GCRF",
+                traj_type="CARTPV",
+                traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
+                traj_frame_epoch="123.5",
+            )
+
+        with pytest.raises(ValueError):
+            OcmPhysicalDescription(oeb_parent_frame_epoch="123.5")
+
+        with pytest.raises(ValueError):
+            OcmCovarianceMatrix(
+                cov_ref_frame="GCRF",
+                cov_type="CARTPV",
+                cov_ordering="LTM",
+                cov_lines=[CovLine(epoch="123.5", values=[1.0])],
+                cov_frame_epoch="123.5",
+            )
+
+        with pytest.raises(ValueError):
+            OcmManeuverParameters(
+                man_id="MAN-1",
+                man_device_id="THR-1",
+                man_composition="TIME_ABSOLUTE",
+                man_ref_frame="GCRF",
+                man_lines=[ManLine(epoch="123.5", values=["1.0"])],
+                man_frame_epoch="123.5",
+            )
+
+        with pytest.raises(ValueError):
+            OcmTrajState(
+                center_name="EARTH",
+                traj_ref_frame="GCRF",
+                traj_type="CARTPV",
+                traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
+                useable_start_time="123.5",
+            )
+
+        with pytest.raises(ValueError):
+            OcmTrajState(
+                center_name="EARTH",
+                traj_ref_frame="GCRF",
+                traj_type="CARTPV",
+                traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
+                useable_stop_time="123.5",
+            )
+
     def test_file_io(self, tmp_path):
         ocm = self._create_valid_ocm()
         path = tmp_path / "test.ocm"
@@ -117,7 +203,7 @@ class TestOcm:
         man = OcmManeuverParameters(
             man_id="MAN-1",
             man_device_id="THR-1",
-            man_composition="VECTOR",
+            man_composition="TIME_ABSOLUTE",
             man_ref_frame="EME2000",
             man_lines=[
                 ManLine(epoch="2023-01-01T00:00:00", values=["0.1", "0.0", "0.0"])
@@ -149,6 +235,42 @@ class TestOcm:
         od.days_since_last_obs = None
         assert od.days_since_first_obs is None
         assert od.days_since_last_obs is None
+
+    def test_traj_line_epoch_is_validated_without_changing_string_api(self):
+        line = TrajLine(epoch="2023-001T00:00:00", values=[1.0])
+        assert line.epoch == "2023-001T00:00:00"
+
+        line.epoch = "123.5"
+        assert line.epoch == "123.5"
+
+        with pytest.raises(ValueError):
+            TrajLine(epoch="not-an-epoch", values=[1.0])
+        with pytest.raises(ValueError):
+            line.epoch = "not-an-epoch"
+
+    def test_cov_line_epoch_is_validated_without_changing_string_api(self):
+        line = CovLine(epoch="2023-001T00:00:00", values=[1.0])
+        assert line.epoch == "2023-001T00:00:00"
+
+        line.epoch = "123.5"
+        assert line.epoch == "123.5"
+
+        with pytest.raises(ValueError):
+            CovLine(epoch="not-an-epoch", values=[1.0])
+        with pytest.raises(ValueError):
+            line.epoch = "not-an-epoch"
+
+    def test_man_line_epoch_is_validated_without_changing_string_api(self):
+        line = ManLine(epoch="2023-001T00:00:00", values=["1.0"])
+        assert line.epoch == "2023-001T00:00:00"
+
+        line.epoch = "123.5"
+        assert line.epoch == "123.5"
+
+        with pytest.raises(ValueError):
+            ManLine(epoch="not-an-epoch", values=["1.0"])
+        with pytest.raises(ValueError):
+            line.epoch = "not-an-epoch"
 
 
 if __name__ == "__main__":

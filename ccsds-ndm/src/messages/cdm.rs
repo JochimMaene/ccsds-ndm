@@ -78,7 +78,7 @@ impl Ndm for Cdm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let cdm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Cdm, &cdm)?;
+        crate::traits::Validate::validate(&cdm)?;
         Ok(cdm)
     }
 
@@ -94,7 +94,7 @@ impl Ndm for Cdm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Cdm, &cdm)?;
+        crate::traits::Validate::validate(&cdm)?;
         Ok(cdm)
     }
 }
@@ -124,7 +124,7 @@ pub struct CdmHeader {
     /// **Examples**: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
-    pub creation_date: Epoch,
+    pub creation_date: CalendarEpoch,
     /// Creating agency or owner/operator. Value should be the 'Abbreviation' value from the
     /// SANA 'Organizations' registry (<https://sanaregistry.org/r/organizations>) for an
     /// organization that has the Role of 'Conjunction Data Message Originator'. (See 5.2.9
@@ -337,7 +337,7 @@ pub struct RelativeMetadataData {
     /// The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    pub tca: Epoch,
+    pub tca: CalendarEpoch,
     /// The norm of the relative position vector. It indicates how close the two objects are at
     /// TCA. Data type = double.
     ///
@@ -373,7 +373,7 @@ pub struct RelativeMetadataData {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub start_screen_period: Option<Epoch>,
+    pub start_screen_period: Option<CalendarEpoch>,
     /// The stop time in UTC of the screening period for the conjunction assessment. (See
     /// 6.3.2.6 for formatting rules.)
     ///
@@ -383,7 +383,7 @@ pub struct RelativeMetadataData {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub stop_screen_period: Option<Epoch>,
+    pub stop_screen_period: Option<CalendarEpoch>,
     /// Name of the Object1 centered reference frame in which the screening volume data are
     /// given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
     /// E for definition.)
@@ -450,7 +450,7 @@ pub struct RelativeMetadataData {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub screen_entry_time: Option<Epoch>,
+    pub screen_entry_time: Option<CalendarEpoch>,
     /// The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
     /// rules.)
     ///
@@ -460,7 +460,7 @@ pub struct RelativeMetadataData {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub screen_exit_time: Option<Epoch>,
+    pub screen_exit_time: Option<CalendarEpoch>,
     /// The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will collide.
     /// Data type = double.
     ///

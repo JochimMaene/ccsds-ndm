@@ -87,6 +87,10 @@ class TestAcm:
 
         with pytest.raises(ValueError):
             meta.epoch_tzero = "not-an-epoch"
+        with pytest.raises(ValueError):
+            meta.epoch_tzero = "123.5"
+        with pytest.raises(ValueError):
+            meta.next_leap_epoch = "123.5"
 
     def test_acm_attitude_state_invalid_att_type_raises(self):
         with pytest.raises(ValueError):
@@ -216,8 +220,8 @@ class TestAcm:
         man.comment = ["updated"]
         man.man_prev_id = "MAN-0"
         man.man_purpose = "ATT_ADJUST"
-        man.man_begin_time = "2023-01-01T00:00:00"
-        man.man_end_time = "2023-01-01T00:01:00"
+        man.man_begin_time = "100.0"
+        man.man_end_time = "2.5e+2"
         man.man_duration = 60.0
         man.actuator_used = "RWA"
         man.target_momentum = [1.0, 2.0, 3.0]
@@ -229,8 +233,8 @@ class TestAcm:
         assert man.man_id == "MAN-1"
         assert man.man_prev_id == "MAN-0"
         assert man.man_purpose == "ATT_ADJUST"
-        assert man.man_begin_time == "2023-01-01T00:00:00"
-        assert man.man_end_time == "2023-01-01T00:01:00"
+        assert man.man_begin_time == "100.0"
+        assert man.man_end_time == "2.5e+2"
         assert man.man_duration == pytest.approx(60.0)
         assert man.actuator_used == "RWA"
         assert man.target_momentum == [1.0, 2.0, 3.0]
@@ -242,6 +246,10 @@ class TestAcm:
             man.target_momentum = [1.0, 2.0]
         with pytest.raises(ValueError):
             man.target_attitude = [0.0, 0.0, 1.0]
+        with pytest.raises(ValueError):
+            man.man_begin_time = "2023-01-01T00:00:00"
+        with pytest.raises(ValueError):
+            man.man_end_time = "NaN"
 
     def test_acm_attitude_determination_and_sensor_setters(self):
         sensor = AcmSensor(

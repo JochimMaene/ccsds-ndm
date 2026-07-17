@@ -41,10 +41,6 @@ use opm::*;
 /// ----------
 /// data : str
 ///     The content to parse.
-/// strict : bool, optional
-///     Reject CCSDS violations by default. Set to False to recover from supported deviations and
-///     emit :class:`NdmParseWarning` diagnostics.
-///
 /// Returns
 /// -------
 /// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
@@ -55,12 +51,8 @@ use opm::*;
 /// ValueError
 ///     If parsing fails.
 #[pyfunction]
-#[pyo3(signature = (data, strict=true))]
-fn from_str(py: Python, data: &str, strict: bool) -> PyResult<Py<PyAny>> {
-    let report = ccsds_ndm::from_str_with_mode(data, api::parse_mode(strict))
-        .map_err(ccsds_error_to_pyerr)?;
-    api::emit_diagnostics(py, &report.diagnostics)?;
-    let message = report.message;
+fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
+    let message = ccsds_ndm::from_str(data).map_err(ccsds_error_to_pyerr)?;
 
     match message {
         MessageType::Oem(oem) => {
@@ -116,19 +108,15 @@ fn from_str(py: Python, data: &str, strict: bool) -> PyResult<Py<PyAny>> {
 /// ----------
 /// path : str
 ///     Path to the file.
-/// strict : bool, optional
-///     Reject CCSDS violations by default. Set to False for permissive parsing with warnings.
-///
 /// Returns
 /// -------
 /// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
 ///     The parsed NDM object.
 #[pyfunction]
-#[pyo3(signature = (path, strict=true))]
-fn from_file(py: Python, path: &str, strict: bool) -> PyResult<Py<PyAny>> {
+fn from_file(py: Python, path: &str) -> PyResult<Py<PyAny>> {
     let content =
         fs::read_to_string(path).map_err(|e| errors::NdmIoError::new_err(e.to_string()))?;
-    from_str(py, &content, strict)
+    from_str(py, &content)
 }
 
 /// The Python module definition.

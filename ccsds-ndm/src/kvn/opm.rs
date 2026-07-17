@@ -78,7 +78,7 @@ pub fn opm_metadata(input: &mut &str) -> KvnResult<OpmMetadata> {
         "OBJECT_ID" => object_id: kv_string,
         "CENTER_NAME" => center_name: kv_string,
         "REF_FRAME" => ref_frame: kv_string,
-        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_epoch,
+        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_calendar_epoch,
         "TIME_SYSTEM" => time_system: kv_string,
     }, |_| false);
 
@@ -171,7 +171,7 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParamet
     let mut man_dv_3 = None;
 
     parse_block!(input, comment, {
-        "MAN_EPOCH_IGNITION" => man_epoch_ignition: kv_epoch,
+        "MAN_EPOCH_IGNITION" => man_epoch_ignition: kv_calendar_epoch,
         "MAN_DURATION" => man_duration: kv_from_kvn,
         "MAN_DELTA_MASS" => man_delta_mass: kv_from_kvn,
         "MAN_REF_FRAME" => man_ref_frame: kv_string,
@@ -354,6 +354,30 @@ Z_DOT = -4.191076 [km/s]
 
         let opm = result.unwrap();
         assert_eq!(opm.body.segment.data.state_vector.x.value, 6503.514);
+    }
+
+    #[test]
+    fn opm_epoch_fields_require_calendar_form() {
+        let numeric_state_epoch =
+            MINIMAL_OPM.replace("EPOCH = 2022-12-18T14:28:15.1172", "EPOCH = 12345.5");
+        assert!(Opm::from_kvn_str(&numeric_state_epoch).is_err());
+
+        let with_reference_epoch = MINIMAL_OPM.replace(
+            "REF_FRAME = ITRF2000\n",
+            "REF_FRAME = ITRF2000\nREF_FRAME_EPOCH = 2000-01-01T12:00:00\n",
+        );
+        let numeric_reference_epoch = with_reference_epoch.replace(
+            "REF_FRAME_EPOCH = 2000-01-01T12:00:00",
+            "REF_FRAME_EPOCH = 12345.5",
+        );
+        assert!(Opm::from_kvn_str(&numeric_reference_epoch).is_err());
+
+        let maneuver = include_str!("../../../data/kvn/opm_g2.kvn");
+        let numeric_maneuver_epoch = maneuver.replace(
+            "MAN_EPOCH_IGNITION = 2021-06-03T09:00:34.1",
+            "MAN_EPOCH_IGNITION = 12345.5",
+        );
+        assert!(Opm::from_kvn_str(&numeric_maneuver_epoch).is_err());
     }
 
     #[test]

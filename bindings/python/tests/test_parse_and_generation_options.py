@@ -11,38 +11,12 @@ import ccsds_ndm
 
 REPOSITORY_ROOT = Path(__file__).parents[3]
 OPM_KVN = (REPOSITORY_ROOT / "data/kvn/opm_g1.kvn").read_text()
-OPM_XML = (REPOSITORY_ROOT / "data/xml/opm_g5.xml").read_text()
 PERMISSIVE_XML = (REPOSITORY_ROOT / "data/xml/ndm_g22.xml").read_text()
 
 
-def test_strict_parsing_is_the_default():
+def test_parsing_rejects_semantically_invalid_messages():
     with pytest.raises(ccsds_ndm.NdmValidationError):
         ccsds_ndm.from_str(PERMISSIVE_XML)
-
-
-def test_permissive_parsing_emits_typed_warnings():
-    with pytest.warns(ccsds_ndm.NdmParseWarning):
-        message = ccsds_ndm.from_str(PERMISSIVE_XML, strict=False)
-
-    assert isinstance(message, ccsds_ndm.Ndm)
-
-
-def test_permissive_parsing_rejects_unsupported_versions():
-    unsupported = OPM_XML.replace('version="3.0"', 'version="99.0"')
-    with pytest.raises(ccsds_ndm.NdmValidationError):
-        ccsds_ndm.Opm.from_str(unsupported, format="xml", strict=False)
-
-
-def test_permissive_validation_returns_every_error():
-    invalid = OPM_XML.replace(
-        "<OBJECT_NAME>OSPREY 5</OBJECT_NAME>", "<OBJECT_NAME></OBJECT_NAME>"
-    ).replace("<OBJECT_ID>2022-999A</OBJECT_ID>", "<OBJECT_ID></OBJECT_ID>")
-    with pytest.warns(ccsds_ndm.NdmParseWarning):
-        message = ccsds_ndm.Opm.from_str(invalid, format="xml", strict=False)
-
-    errors = message.validate(strict=False)
-    assert errors is not None
-    assert len(errors) == 2
 
 
 def test_generation_preserves_source_version_or_upgrades_explicitly():

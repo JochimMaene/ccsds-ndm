@@ -15,12 +15,58 @@ from ccsds_ndm import (
     OemData,
     OemMetadata,
     OemSegment,
+    NdmValidationError,
     StateVectorAcc,
 )
 
 
 class TestOem:
     """Tests for OEM bindings."""
+
+    def test_odm_creation_date_requires_absolute_epoch(self):
+        with pytest.raises(ValueError):
+            OdmHeader("123.5", "TEST")
+
+        header = OdmHeader("2002-204T15:56:23Z", "TEST")
+        assert header.creation_date == "2002-204T15:56:23Z"
+        with pytest.raises(ValueError):
+            header.creation_date = "123.5"
+
+    def test_ref_frame_epoch_requires_calendar_form(self):
+        with pytest.raises(ValueError):
+            OemMetadata(
+                "SAT1",
+                "2023-001A",
+                "2023-01-01T00:00:00",
+                "2023-01-01T01:00:00",
+                center_name="EARTH",
+                ref_frame="EME2000",
+                time_system="UTC",
+                ref_frame_epoch="123.5",
+            )
+
+        metadata = self._create_valid_oem().segments[0].metadata
+        metadata.ref_frame_epoch = "2000-001T12:00:00"
+        assert metadata.ref_frame_epoch == "2000-001T12:00:00"
+        with pytest.raises(ValueError):
+            metadata.ref_frame_epoch = "123.5"
+
+    def test_contextual_epoch_validation_rejects_degenerate_values(self):
+        metadata = self._create_valid_oem().segments[0].metadata
+        metadata.start_time = "+"
+        with pytest.raises(ValueError):
+            metadata.validate()
+
+        oem = self._create_valid_oem()
+        segments = oem.segments
+        data = segments[0].data
+        state_vectors = data.state_vector
+        state_vectors[0].epoch = "2023-02-29T00:00:00"
+        data.state_vector = state_vectors
+        segments[0].data = data
+        oem.segments = segments
+        with pytest.raises(NdmValidationError):
+            oem.to_str(format="xml")
 
     def _create_valid_oem(self):
         header = OdmHeader("2023-01-01T00:00:00", "TEST", "UNCLASSIFIED", "ID", None)

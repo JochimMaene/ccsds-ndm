@@ -4,51 +4,6 @@
 
 //! Parsing and generation options.
 
-use crate::error::Result;
-use crate::validation::{ValidationIssue, ValidationMode};
-
-/// Controls whether parsing rejects or reports recoverable semantic violations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ParseMode {
-    /// Reject every syntax or semantic violation.
-    #[default]
-    Strict,
-    /// Accept supported deviations and return diagnostics for each recovery.
-    Permissive,
-}
-
-impl From<ParseMode> for ValidationMode {
-    fn from(value: ParseMode) -> Self {
-        match value {
-            ParseMode::Strict => ValidationMode::Strict,
-            ParseMode::Permissive => ValidationMode::Permissive,
-        }
-    }
-}
-
-/// A parsed message together with diagnostics produced by permissive recovery.
-#[derive(Debug, Clone, PartialEq)]
-#[must_use]
-pub struct ParseReport<T> {
-    /// Parsed message.
-    pub message: T,
-    /// Diagnostics in source order.
-    pub diagnostics: Vec<ValidationIssue>,
-}
-
-pub(crate) fn parse_with_mode<T>(
-    mode: ParseMode,
-    parser: impl FnOnce() -> Result<T>,
-) -> Result<ParseReport<T>> {
-    let _ = crate::validation::take_warnings();
-    let result = crate::validation::with_validation_mode(mode.into(), parser);
-    let diagnostics = crate::validation::take_warnings();
-    result.map(|message| ParseReport {
-        message,
-        diagnostics,
-    })
-}
-
 /// Selects the CCSDS edition used for generation.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum TargetVersion {

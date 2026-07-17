@@ -65,10 +65,10 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
         "REF_FRAME_A" => ref_frame_a: kv_string,
         "REF_FRAME_B" => ref_frame_b: kv_string,
         "TIME_SYSTEM" => time_system: kv_string,
-        "START_TIME" => start_time: kv_epoch,
-        "USEABLE_START_TIME" => useable_start_time: kv_epoch,
-        "USEABLE_STOP_TIME" => useable_stop_time: kv_epoch,
-        "STOP_TIME" => stop_time: kv_epoch,
+        "START_TIME" => start_time: kv_calendar_epoch,
+        "USEABLE_START_TIME" => useable_start_time: kv_calendar_epoch,
+        "USEABLE_STOP_TIME" => useable_stop_time: kv_calendar_epoch,
+        "STOP_TIME" => stop_time: kv_calendar_epoch,
         "ATTITUDE_TYPE" => attitude_type: kv_enum,
         "EULER_ROT_SEQ" => euler_rot_seq: kv_enum,
         "RATE_FRAME" => rate_frame: kv_string, // CCSDS 504.0-B-2 says RATE_FRAME in KVN
@@ -122,7 +122,7 @@ fn attitude_state_line(
         ))
     })?;
 
-    let epoch = crate::types::Epoch::from_str(epoch_str)
+    let epoch = crate::types::CalendarEpoch::from_str(epoch_str)
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
 
     let mut values = Vec::new();

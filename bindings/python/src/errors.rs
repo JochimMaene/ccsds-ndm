@@ -10,7 +10,7 @@
 
 use ccsds_ndm::error::CcsdsNdmError;
 use pyo3::create_exception;
-use pyo3::exceptions::{PyException, PyIOError, PyValueError, PyWarning};
+use pyo3::exceptions::{PyException, PyIOError, PyValueError};
 use pyo3::prelude::*;
 
 // Base exception for all CCSDS NDM errors.
@@ -20,13 +20,6 @@ create_exception!(
     NdmError,
     PyException,
     "Base exception for all CCSDS NDM errors."
-);
-
-create_exception!(
-    ccsds_ndm,
-    NdmParseWarning,
-    PyWarning,
-    "Warning emitted when permissive parsing recovers from a CCSDS violation."
 );
 
 // Format/parsing errors - inherit from both NdmError and ValueError for backward compat.
@@ -135,6 +128,5 @@ pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "NdmUnsupportedMessageError",
         m.py().get_type::<NdmUnsupportedMessageError>(),
     )?;
-    m.add("NdmParseWarning", m.py().get_type::<NdmParseWarning>())?;
     Ok(())
 }

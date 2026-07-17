@@ -585,6 +585,13 @@ pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
+/// Parses a calendar/ordinal epoch value from a KVN line.
+pub fn kv_calendar_epoch(input: &mut &str) -> KvnResult<CalendarEpoch> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    CalendarEpoch::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+}
+
 /// Parses an optional Epoch value from a KVN line.
 pub fn kv_epoch_opt(input: &mut &str) -> KvnResult<Option<Epoch>> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
@@ -598,10 +605,37 @@ pub fn kv_epoch_opt(input: &mut &str) -> KvnResult<Option<Epoch>> {
     }
 }
 
+/// Parses an optional calendar/ordinal epoch value from a KVN line.
+pub fn kv_calendar_epoch_opt(input: &mut &str) -> KvnResult<Option<CalendarEpoch>> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    let trimmed = v.trim();
+    if trimmed.is_null() {
+        Ok(None)
+    } else {
+        CalendarEpoch::from_str(trimmed)
+            .map(Some)
+            .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    }
+}
+
 /// Parses an Epoch value as a single token (until next space).
 pub fn kv_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
     let v = till_space.parse_next(input)?;
     Epoch::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+}
+
+/// Parses a calendar/ordinal epoch value as a single KVN token (until the next space).
+pub fn kv_calendar_epoch_token(input: &mut &str) -> KvnResult<CalendarEpoch> {
+    let v = till_space.parse_next(input)?;
+    CalendarEpoch::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+}
+
+/// Parses a finite relative time using the ADM/ACM `relTimeType` lexical rules.
+pub fn kv_relative_time(input: &mut &str) -> KvnResult<RelativeTime> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    RelativeTime::from_str(v.trim())
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
@@ -1014,7 +1048,7 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 classification = Some(kv_string.parse_next(input)?);
             }
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -1075,7 +1109,7 @@ pub fn adm_header(input: &mut &str) -> KvnResult<AdmHeader> {
                 classification = Some(kv_string.parse_next(input)?);
             }
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -1119,7 +1153,7 @@ pub fn state_vector(input: &mut &str) -> KvnResult<(Vec<String>, StateVector)> {
     let mut z_dot = None;
 
     parse_block!(input, comment, {
-        "EPOCH" => epoch: kv_epoch,
+        "EPOCH" => epoch: kv_calendar_epoch,
         "X" => x: kv_from_kvn,
         "Y" => y: kv_from_kvn,
         "Z" => z: kv_from_kvn,
@@ -1473,5 +1507,20 @@ mod tests {
             },
             _ => panic!("Expected cut error"),
         }
+    }
+
+    #[test]
+    fn adm_header_creation_date_requires_calendar_epoch() {
+        for value in ["123.5", "2023-02-29T00:00:00", ""] {
+            let input = format!("CREATION_DATE = {value}\nORIGINATOR = TEST\n");
+            assert!(
+                adm_header.parse(input.as_str()).is_err(),
+                "accepted {value:?}"
+            );
+        }
+
+        let mut input = "CREATION_DATE = 2023-060T00:00:00\nORIGINATOR = TEST\n";
+        let header = adm_header.parse_next(&mut input).unwrap();
+        assert_eq!(header.creation_date.as_str(), "2023-060T00:00:00");
     }
 }

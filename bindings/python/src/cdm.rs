@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 use std::fs;
 
 // Helper to parse epoch strings
-fn parse_epoch_str(value: &str) -> PyResult<Epoch> {
+fn parse_epoch_str(value: &str) -> PyResult<CalendarEpoch> {
     value
         .parse()
         .map_err(|e: EpochError| PyErr::new::<PyValueError, _>(e.to_string()))
@@ -275,14 +275,9 @@ impl Cdm {
     /// Cdm
     ///     The parsed CDM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, strict=true))]
-    fn from_str(
-        py: Python<'_>,
-        data: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format, strict)?;
+    #[pyo3(signature = (data, format=None))]
+    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
+        let inner = crate::api::parse_typed(py, data, format)?;
         Ok(Self { inner })
     }
 
@@ -300,16 +295,11 @@ impl Cdm {
     /// Cdm
     ///     The parsed CDM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, strict=true))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None))]
+    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format, strict)
+        Self::from_str(py, &content, format)
     }
 
     /// Serialize to KVN, preserving the source version by default.

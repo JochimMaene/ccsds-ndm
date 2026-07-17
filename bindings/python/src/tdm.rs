@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::{parse_time_system, parse_yes_no};
-use crate::types::parse_epoch;
+use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::tdm as core_tdm;
 use ccsds_ndm::types::{self as core_types};
 use pyo3::exceptions::PyValueError;
@@ -173,14 +173,9 @@ impl Tdm {
     /// Tdm
     ///     The parsed TDM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, strict=true))]
-    fn from_str(
-        py: Python<'_>,
-        data: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format, strict)?;
+    #[pyo3(signature = (data, format=None))]
+    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
+        let inner = crate::api::parse_typed(py, data, format)?;
         Ok(Self { inner })
     }
 
@@ -199,16 +194,11 @@ impl Tdm {
     /// Tdm
     ///     The parsed TDM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, strict=true))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None))]
+    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format, strict)
+        Self::from_str(py, &content, format)
     }
 
     /// Serialize to KVN, preserving the source version by default.
@@ -296,7 +286,7 @@ impl TdmHeader {
         Ok(Self {
             inner: core_tdm::TdmHeader {
                 comment: comment.unwrap_or_default(),
-                creation_date: parse_epoch(&creation_date)?,
+                creation_date: parse_calendar_epoch(&creation_date)?,
                 originator,
                 message_id,
             },
@@ -336,7 +326,7 @@ impl TdmHeader {
 
     #[setter]
     fn set_creation_date(&mut self, value: String) -> PyResult<()> {
-        self.inner.creation_date = parse_epoch(&value)?;
+        self.inner.creation_date = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -685,8 +675,8 @@ impl TdmMetadata {
                 track_id,
                 data_types,
                 time_system,
-                start_time: start_time.map(|s| parse_epoch(&s)).transpose()?,
-                stop_time: stop_time.map(|s| parse_epoch(&s)).transpose()?,
+                start_time: start_time.map(|s| parse_calendar_epoch(&s)).transpose()?,
+                stop_time: stop_time.map(|s| parse_calendar_epoch(&s)).transpose()?,
                 participant_1,
                 participant_2,
                 participant_3,
@@ -879,7 +869,7 @@ impl TdmMetadata {
     }
     #[setter]
     fn set_start_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.start_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.start_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -899,7 +889,7 @@ impl TdmMetadata {
     }
     #[setter]
     fn set_stop_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.stop_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.stop_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1957,7 +1947,7 @@ impl TdmObservation {
 
         Ok(Self {
             inner: core_tdm::TdmObservation {
-                epoch: parse_epoch(&epoch)?,
+                epoch: parse_calendar_epoch(&epoch)?,
                 data,
             },
         })
@@ -1982,7 +1972,7 @@ impl TdmObservation {
 
     #[setter]
     fn set_epoch(&mut self, value: String) -> PyResult<()> {
-        self.inner.epoch = parse_epoch(&value)?;
+        self.inner.epoch = parse_calendar_epoch(&value)?;
         Ok(())
     }
 

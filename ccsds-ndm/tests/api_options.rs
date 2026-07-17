@@ -7,17 +7,15 @@ use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::messages::ocm::{Ocm, OcmPhysicalDescription};
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{from_str, from_str_with_mode, GenerateOptions, MessageType, ParseMode};
+use ccsds_ndm::{from_str, GenerateOptions};
 
 const OPM_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
 const OPM_XML: &str = include_str!("../../data/xml/opm_g5.xml");
 const OEM_XML: &str = include_str!("../../data/xml/oem_g14.xml");
-const OMM_XML: &str = include_str!("../../data/xml/omm_g10.xml");
 const OCM_KVN: &str = include_str!("../../data/kvn/ocm_g15.kvn");
 const OCM_MAN_KVN: &str = include_str!("../../data/kvn/ocm_g17.kvn");
 const ACM_KVN: &str = include_str!("../../data/kvn/acm_g7.kvn");
@@ -32,48 +30,6 @@ fn strict_parsing_remains_the_default() {
 }
 
 #[test]
-fn permissive_parsing_returns_diagnostics() {
-    let report = from_str_with_mode(PERMISSIVE_XML, ParseMode::Permissive).unwrap();
-    assert!(!report.diagnostics.is_empty());
-    assert!(matches!(report.message, MessageType::Ndm(_)));
-}
-
-#[test]
-fn permissive_parsing_rejects_unsupported_versions() {
-    let unsupported = OPM_XML.replace("version=\"3.0\"", "version=\"99.0\"");
-    assert!(Opm::from_xml_with_mode(&unsupported, ParseMode::Permissive).is_err());
-}
-
-#[test]
-fn permissive_parsing_reports_every_validation_issue() {
-    let invalid = OPM_XML
-        .replace(
-            "<OBJECT_NAME>OSPREY 5</OBJECT_NAME>",
-            "<OBJECT_NAME></OBJECT_NAME>",
-        )
-        .replace(
-            "<OBJECT_ID>2022-999A</OBJECT_ID>",
-            "<OBJECT_ID></OBJECT_ID>",
-        );
-
-    let report = Opm::from_xml_with_mode(&invalid, ParseMode::Permissive).unwrap();
-    assert_eq!(report.diagnostics.len(), 2);
-
-    let invalid = OMM_XML
-        .replace(
-            "<OBJECT_NAME>GOES-9</OBJECT_NAME>",
-            "<OBJECT_NAME></OBJECT_NAME>",
-        )
-        .replace(
-            "<OBJECT_ID>1995-025A</OBJECT_ID>",
-            "<OBJECT_ID></OBJECT_ID>",
-        );
-
-    let report = Omm::from_xml_with_mode(&invalid, ParseMode::Permissive).unwrap();
-    assert_eq!(report.diagnostics.len(), 2);
-}
-
-#[test]
 fn malformed_ocm_records_are_never_silent() {
     let invalid = OCM_KVN.replacen(
         "120.0 5478.6",
@@ -82,7 +38,6 @@ fn malformed_ocm_records_are_never_silent() {
     );
 
     assert!(Ocm::from_kvn(&invalid).is_err());
-    assert!(Ocm::from_kvn_with_mode(&invalid, ParseMode::Permissive).is_err());
 }
 
 #[test]

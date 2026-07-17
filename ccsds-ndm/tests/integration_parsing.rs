@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::{from_str, from_str_with_mode, ParseMode};
+use ccsds_ndm::from_str;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -81,26 +81,17 @@ fn test_parse_data_samples() {
             }
         };
 
-        let is_lenient_only = file
+        let is_known_nonconformant = file
             .file_name()
             .and_then(|name| name.to_str())
             .is_some_and(|name| name.eq_ignore_ascii_case("ndm_g22.xml"));
 
-        if is_lenient_only {
-            match from_str_with_mode(&content, ParseMode::Permissive) {
-                Ok(report) => {
-                    if report.diagnostics.is_empty() {
-                        failures.push(format!(
-                            "{} parsed in permissive mode but emitted no diagnostics",
-                            file.display()
-                        ));
-                    }
-                }
-                Err(e) => failures.push(format!(
-                    "{} failed to parse in permissive mode: {}",
-                    file.display(),
-                    e
-                )),
+        if is_known_nonconformant {
+            if from_str(&content).is_ok() {
+                failures.push(format!(
+                    "{} parsed strictly but is missing conditionally required OPM data",
+                    file.display()
+                ));
             }
         } else if let Err(e) = from_str(&content) {
             failures.push(format!("{} failed to parse: {}", file.display(), e));

@@ -121,50 +121,30 @@ impl Ndm {
 
     /// Parse an NDM combined instantiation from a string.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, strict=true))]
-    fn from_str(
-        py: Python<'_>,
-        data: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (data, format=None))]
+    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
         let inner = match format {
-            None => {
-                let report = ccsds_ndm::from_str_with_mode(
-                    data,
-                    crate::api::parse_mode(strict),
-                )
-                .map_err(crate::errors::ccsds_error_to_pyerr)?;
-                match report.message {
-                    MessageType::Ndm(inner) => {
-                        crate::api::emit_diagnostics(py, &report.diagnostics)?;
-                        inner
-                    }
-                    message => {
-                        return Err(PyValueError::new_err(format!(
-                            "Parsed message is not an NDM combined instantiation (got {})",
-                            message_type_name(&message),
-                        )))
-                    }
+            None => match ccsds_ndm::from_str(data).map_err(crate::errors::ccsds_error_to_pyerr)? {
+                MessageType::Ndm(inner) => inner,
+                message => {
+                    return Err(PyValueError::new_err(format!(
+                        "Parsed message is not an NDM combined instantiation (got {})",
+                        message_type_name(&message),
+                    )))
                 }
-            }
-            Some(_) => crate::api::parse_typed(py, data, format, strict)?,
+            },
+            Some(_) => crate::api::parse_typed(py, data, format)?,
         };
         Ok(Self { inner })
     }
 
     /// Parse an NDM combined instantiation from a file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, strict=true))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        strict: bool,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (path, format=None))]
+    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
         let content = fs::read_to_string(path)
             .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format, strict)
+        Self::from_str(py, &content, format)
     }
 
     /// Serialize the contained messages to KVN using their source versions.

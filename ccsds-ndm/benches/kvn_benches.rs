@@ -11,7 +11,7 @@ use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::tdm::Tdm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{
-    Epoch, InterpolationDegree, Position, PositionUnits, Velocity, VelocityUnits,
+    CalendarEpoch, Epoch, InterpolationDegree, Position, PositionUnits, Velocity, VelocityUnits,
 };
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::hint::black_box;
@@ -59,7 +59,7 @@ fn create_test_oem(num_states: usize) -> Oem {
         header: OdmHeader {
             comment: vec!["This is a header comment.".to_string()],
             classification: None,
-            creation_date: Epoch::from_str("2023-09-26T12:00:00Z").unwrap(),
+            creation_date: CalendarEpoch::from_str("2023-09-26T12:00:00Z").unwrap(),
             originator: "NASA/JPL".to_string(),
             message_id: None,
         },
@@ -163,6 +163,35 @@ fn bench_micro(c: &mut Criterion) {
     c.bench_function("micro_epoch_parse", |b| {
         b.iter(|| Epoch::from_str(black_box("2023-09-26T12:00:00.123456Z")).unwrap())
     });
+
+    let mut epoch_group = c.benchmark_group("epoch_parse_formats");
+    for (name, value) in [
+        ("calendar", "2023-09-26T12:00:00.123456Z"),
+        ("ordinal", "2023-269T12:00:00.123456Z"),
+        ("relative_integer", "123456"),
+        ("relative_decimal", "-123456.123456"),
+    ] {
+        epoch_group.bench_with_input(BenchmarkId::new("parse", name), value, |b, value| {
+            b.iter(|| Epoch::from_str(black_box(value)).unwrap())
+        });
+    }
+    epoch_group.finish();
+
+    let epoch = Epoch::from_str("2023-09-26T12:00:00.123456Z").unwrap();
+    c.bench_function("micro_epoch_access_without_reparse", |b| {
+        b.iter(|| black_box(&epoch).as_str())
+    });
+
+    let mut wrapper_group = c.benchmark_group("calendar_epoch_construction");
+    for (name, value) in [
+        ("calendar", "2023-09-26T12:00:00.123456Z"),
+        ("ordinal", "2023-269T12:00:00.123456Z"),
+    ] {
+        wrapper_group.bench_with_input(BenchmarkId::new("calendar", name), value, |b, value| {
+            b.iter(|| CalendarEpoch::from_str(black_box(value)).unwrap())
+        });
+    }
+    wrapper_group.finish();
 
     // Float parsing - the core of data parsing
     c.bench_function("micro_float_parse", |b| {

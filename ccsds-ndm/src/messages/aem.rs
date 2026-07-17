@@ -79,7 +79,7 @@ impl Ndm for Aem {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let aem = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Aem, &aem)?;
+        crate::traits::Validate::validate(&aem)?;
         Ok(aem)
     }
 
@@ -95,7 +95,7 @@ impl Ndm for Aem {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let aem: Self = crate::xml::from_str_with_context(xml, "AEM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Aem, &aem)?;
+        crate::traits::Validate::validate(&aem)?;
         Ok(aem)
     }
 }
@@ -284,7 +284,7 @@ pub struct AemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.11
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    pub start_time: Epoch,
+    pub start_time: CalendarEpoch,
     /// Optional start of USEABLE time span covered by attitude ephemeris data immediately
     /// following this metadata block. To allow for proper interpolation near the beginning/end of
     /// the attitude ephemeris data block, it may be necessary to utilize this keyword with values
@@ -300,7 +300,7 @@ pub struct AemMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub useable_start_time: Option<Epoch>,
+    pub useable_start_time: Option<CalendarEpoch>,
     /// Optional stop of USEABLE time span covered by attitude ephemeris data immediately following
     /// this metadata block. (See also USEABLE_START_TIME.)
     ///
@@ -312,14 +312,14 @@ pub struct AemMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub useable_stop_time: Option<Epoch>,
+    pub useable_stop_time: Option<CalendarEpoch>,
     /// End of TOTAL time span covered by the attitude ephemeris data immediately following this
     /// metadata block.
     ///
     /// **Examples**: 1996-12-18T14:28:15.11
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    pub stop_time: Epoch,
+    pub stop_time: CalendarEpoch,
     /// The type of information contained in the data lines. This keyword must have a value from the
     /// set specified at the right. (See table 4-4 for details of the data contained in each line.)
     ///

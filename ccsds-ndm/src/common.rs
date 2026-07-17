@@ -106,7 +106,7 @@ pub struct AdmHeader {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
-    pub creation_date: Epoch,
+    pub creation_date: CalendarEpoch,
     /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
     /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
     /// Abbreviation column is not populated. If desired organization is not listed there, follow
@@ -208,7 +208,7 @@ pub struct OdmHeader {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
-    pub creation_date: Epoch,
+    pub creation_date: CalendarEpoch,
     /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
     /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
     /// Abbreviation column is not populated. If desired organization is not listed there, follow
@@ -360,6 +360,58 @@ pub struct SpacecraftParameters {
     pub drag_coeff: Option<NonNegativeDouble>,
 }
 
+impl crate::traits::Validate for SpacecraftParameters {
+    fn validate(&self) -> Result<()> {
+        match self.validation_errors()?.into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        for (field, value) in [
+            ("MASS", self.mass.as_ref().map(|value| value.value)),
+            (
+                "SOLAR_RAD_AREA",
+                self.solar_rad_area.as_ref().map(|value| value.value),
+            ),
+            (
+                "SOLAR_RAD_COEFF",
+                self.solar_rad_coeff.as_ref().map(|value| value.value),
+            ),
+            (
+                "DRAG_AREA",
+                self.drag_area.as_ref().map(|value| value.value),
+            ),
+            (
+                "DRAG_COEFF",
+                self.drag_coeff.as_ref().map(|value| value.value),
+            ),
+        ] {
+            let Some(value) = value else {
+                continue;
+            };
+            if !value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            } else if value < 0.0 {
+                errors.push(ValidationError::OutOfRange {
+                    name: field.into(),
+                    value: value.to_string(),
+                    expected: ">= 0".into(),
+                    line: None,
+                });
+            }
+        }
+        Ok(errors)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdParameters {
@@ -380,7 +432,7 @@ pub struct OdParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub time_lastob_start: Option<Epoch>,
+    pub time_lastob_start: Option<CalendarEpoch>,
 
     /// The end of a time interval (UTC) that contains the time of the last accepted
     /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
@@ -392,7 +444,7 @@ pub struct OdParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub time_lastob_end: Option<Epoch>,
+    pub time_lastob_end: Option<CalendarEpoch>,
 
     /// The recommended OD time span calculated for the object.
     ///
@@ -603,6 +655,15 @@ impl ToKvn for StateVectorAcc {
 
 impl crate::traits::Validate for StateVectorAcc {
     fn validate(&self) -> Result<()> {
+        if !self.epoch.is_contextually_valid() {
+            return Err(ValidationError::InvalidValue {
+                field: "EPOCH".into(),
+                value: self.epoch.to_string(),
+                expected: "a valid calendar, ordinal, or non-degenerate numeric epoch".into(),
+                line: None,
+            }
+            .into());
+        }
         for (field, value) in [
             ("X", self.x.value),
             ("Y", self.y.value),
@@ -644,6 +705,14 @@ impl crate::traits::Validate for StateVectorAcc {
 
     fn validation_errors(&self) -> Result<Vec<ValidationError>> {
         let mut errors = Vec::new();
+        if !self.epoch.is_contextually_valid() {
+            errors.push(ValidationError::InvalidValue {
+                field: "EPOCH".into(),
+                value: self.epoch.to_string(),
+                expected: "a valid calendar, ordinal, or non-degenerate numeric epoch".into(),
+                line: None,
+            });
+        }
         for (field, value) in [
             ("X", self.x.value),
             ("Y", self.y.value),
@@ -759,7 +828,7 @@ pub struct StateVector {
     /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Position vector X-component.
     ///
     /// **Units**: km
@@ -1346,7 +1415,7 @@ pub struct AttManeuverState {
     /// Epoch of start of maneuver. (For format specification, see 6.8.9.)
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    pub man_epoch_start: Epoch,
+    pub man_epoch_start: CalendarEpoch,
     /// Maneuver duration.
     ///
     /// **Units**: s
@@ -1466,7 +1535,7 @@ impl ToKvn for AemAttitudeState {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionEphemeris {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Quaternion components Q1, Q2, Q3, QC.
     #[serde(rename = "quaternion")]
     pub quaternion: Quaternion,
@@ -1488,7 +1557,7 @@ impl ToKvn for QuaternionEphemeris {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionDerivative {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Quaternion components Q1, Q2, Q3, QC.
     #[serde(rename = "quaternion")]
     pub quaternion: Quaternion,
@@ -1521,7 +1590,7 @@ impl ToKvn for QuaternionDerivative {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionAngVel {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Quaternion components Q1, Q2, Q3, QC.
     #[serde(rename = "quaternion")]
     pub quaternion: Quaternion,
@@ -1550,7 +1619,7 @@ impl ToKvn for QuaternionAngVel {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngle {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Angle of the first rotation.
     pub angle_1: Angle,
     /// Angle of the second rotation.
@@ -1575,7 +1644,7 @@ impl ToKvn for EulerAngle {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleDerivative {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Angle of the first rotation.
     pub angle_1: Angle,
     /// Angle of the second rotation.
@@ -1610,7 +1679,7 @@ impl ToKvn for EulerAngleDerivative {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleAngVel {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Angle of the first rotation.
     pub angle_1: Angle,
     /// Angle of the second rotation.
@@ -1648,7 +1717,7 @@ impl ToKvn for EulerAngleAngVel {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct Spin {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Right ascension of spin axis vector in frame A.
     pub spin_alpha: Angle,
     /// Declination of the spin axis vector in frame A.
@@ -1678,7 +1747,7 @@ impl ToKvn for Spin {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinNutation {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Right ascension of spin axis vector in frame A.
     pub spin_alpha: Angle,
     /// Declination of the spin axis vector in frame A.
@@ -1717,7 +1786,7 @@ impl ToKvn for SpinNutation {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinNutationMom {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Right ascension of spin axis vector in frame A.
     pub spin_alpha: Angle,
     /// Declination of the spin axis vector in frame A.
@@ -2104,6 +2173,52 @@ pub struct OpmCovarianceMatrix {
     pub cz_dot_z_dot: VelocityCovariance,
 }
 
+impl crate::traits::Validate for OpmCovarianceMatrix {
+    fn validate(&self) -> Result<()> {
+        match self.validation_errors()?.into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        for (field, value) in [
+            ("CX_X", self.cx_x.value),
+            ("CY_X", self.cy_x.value),
+            ("CY_Y", self.cy_y.value),
+            ("CZ_X", self.cz_x.value),
+            ("CZ_Y", self.cz_y.value),
+            ("CZ_Z", self.cz_z.value),
+            ("CX_DOT_X", self.cx_dot_x.value),
+            ("CX_DOT_Y", self.cx_dot_y.value),
+            ("CX_DOT_Z", self.cx_dot_z.value),
+            ("CX_DOT_X_DOT", self.cx_dot_x_dot.value),
+            ("CY_DOT_X", self.cy_dot_x.value),
+            ("CY_DOT_Y", self.cy_dot_y.value),
+            ("CY_DOT_Z", self.cy_dot_z.value),
+            ("CY_DOT_X_DOT", self.cy_dot_x_dot.value),
+            ("CY_DOT_Y_DOT", self.cy_dot_y_dot.value),
+            ("CZ_DOT_X", self.cz_dot_x.value),
+            ("CZ_DOT_Y", self.cz_dot_y.value),
+            ("CZ_DOT_Z", self.cz_dot_z.value),
+            ("CZ_DOT_X_DOT", self.cz_dot_x_dot.value),
+            ("CZ_DOT_Y_DOT", self.cz_dot_y_dot.value),
+            ("CZ_DOT_Z_DOT", self.cz_dot_z_dot.value),
+        ] {
+            if !value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            }
+        }
+        Ok(errors)
+    }
+}
+
 impl ToKvn for OpmCovarianceMatrix {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -2202,7 +2317,7 @@ pub struct AtmosphericReentryParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub nominal_reentry_epoch: Option<Epoch>,
+    pub nominal_reentry_epoch: Option<CalendarEpoch>,
     /// Start epoch of the predicted atmospheric re-entry window (formatting rules specified in
     /// 5.3.3.5).
     ///
@@ -2212,7 +2327,7 @@ pub struct AtmosphericReentryParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub reentry_window_start: Option<Epoch>,
+    pub reentry_window_start: Option<CalendarEpoch>,
     /// End epoch of the predicted atmospheric re-entry window (formatting rules specified in
     /// 5.3.3.5).
     ///
@@ -2222,7 +2337,7 @@ pub struct AtmosphericReentryParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub reentry_window_end: Option<Epoch>,
+    pub reentry_window_end: Option<CalendarEpoch>,
     /// Confidence level of the orbit lifetime or re-entry epoch being inside the window
     /// defined by ORBIT_LIFETIME_WINDOW_START and ORBIT_LIFETIME_WINDOW_END or
     /// REENTRY_WINDOW_START and REENTRY_WINDOW_END.
@@ -2327,7 +2442,7 @@ pub struct GroundImpactParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub nominal_impact_epoch: Option<Epoch>,
+    pub nominal_impact_epoch: Option<CalendarEpoch>,
     /// Start epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
@@ -2336,7 +2451,7 @@ pub struct GroundImpactParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub impact_window_start: Option<Epoch>,
+    pub impact_window_start: Option<CalendarEpoch>,
     /// End epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
@@ -2345,7 +2460,7 @@ pub struct GroundImpactParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub impact_window_end: Option<Epoch>,
+    pub impact_window_end: Option<CalendarEpoch>,
     /// Reference frame of the impact location data. The value should be taken from the keyword
     /// value name column in the SANA celestial body reference frames registry, reference `[11]`.
     /// Only frames with the value ‘Body-Fixed’ in the Frame Type column shall be used.
@@ -3167,17 +3282,7 @@ mod tests {
             .build();
         assert!(h.validate().is_err());
 
-        let h = AdmHeader::builder()
-            .creation_date(Epoch::new("").unwrap())
-            .originator("ESA")
-            .build();
-        assert!(h.validate().is_err());
-
-        let h = OdmHeader::builder()
-            .creation_date(Epoch::new("").unwrap())
-            .originator("JAXA")
-            .build();
-        assert!(h.validate().is_err());
+        assert!(CalendarEpoch::new("").is_err());
     }
 
     #[test]

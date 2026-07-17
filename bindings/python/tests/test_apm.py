@@ -46,6 +46,29 @@ class TestApm:
         assert man.man_duration == 10.5
         assert man.man_ref_frame == "EME2000"
 
+    def test_apm_epoch_fields_require_calendar_or_ordinal_form(self):
+        with pytest.raises(ValueError):
+            ApmData(
+                epoch="123.5",
+                quaternion_state=[],
+                euler_angle_state=None,
+                angular_velocity=None,
+                spin=None,
+                inertia=None,
+                maneuver_parameters=None,
+                comment=None,
+            )
+
+        with pytest.raises(ValueError):
+            ManeuverParameters(
+                man_epoch_start="123.5",
+                man_duration=10.0,
+                man_ref_frame="EME2000",
+                man_tor_1=1.0,
+                man_tor_2=0.0,
+                man_tor_3=0.0,
+            )
+
     def test_apm_data(self):
         data = ApmData(
             epoch="2023-01-01T00:00:00",

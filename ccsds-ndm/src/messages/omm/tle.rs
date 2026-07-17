@@ -1314,7 +1314,7 @@ fn parse_tle_epoch_year(two_digit_year: u32) -> i32 {
     }
 }
 
-fn parse_tle_epoch_field(epoch_year_2: u32, epoch_day_field: &str) -> Result<Epoch> {
+fn parse_tle_epoch_field(epoch_year_2: u32, epoch_day_field: &str) -> Result<CalendarEpoch> {
     if epoch_day_field.len() != 12 || &epoch_day_field[3..4] != "." {
         return Err(ValidationError::InvalidValue {
             field: Cow::Borrowed("EPOCH"),
@@ -1385,7 +1385,7 @@ fn parse_tle_epoch_field(epoch_year_2: u32, epoch_day_field: &str) -> Result<Epo
         epoch.push_str(&frac_ns);
     }
 
-    Epoch::new(&epoch).map_err(Into::into)
+    CalendarEpoch::new(&epoch).map_err(Into::into)
 }
 
 fn format_launch_designator_object_id(

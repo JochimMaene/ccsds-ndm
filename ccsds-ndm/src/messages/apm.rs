@@ -76,7 +76,7 @@ impl Ndm for Apm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let apm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Apm, &apm)?;
+        crate::traits::Validate::validate(&apm)?;
         Ok(apm)
     }
 
@@ -92,7 +92,7 @@ impl Ndm for Apm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         let apm: Self = crate::xml::from_str_with_context(xml, "APM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Apm, &apm)?;
+        crate::traits::Validate::validate(&apm)?;
         Ok(apm)
     }
 }
@@ -298,7 +298,7 @@ pub struct ApmData {
     /// Epoch of the attitude elements and optional logical blocks.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Attitude quaternion. All mandatory elements are to be provided if the block is present.
     /// (See annex F for conventions and further detail.)
     ///
