@@ -63,8 +63,10 @@ Available evidence:
   shipped OPM 3.0 KVN and XML fixture against the official schema, exact output determinism across
   the Rust generation entry points, and rejection of invalid self-contained public-model states.
   Together they cover every safely reachable OPM missing-required-field, invalid-choice,
-  invalid-value, and out-of-range diagnostic path and compatibility-test one such diagnostic
-  across every Rust generation entry point. Run the main cell with `just conformance-opm-xml`.
+  invalid-value, and out-of-range diagnostic path, plus unsupported-output-version and file-I/O
+  codes. [`opm_xml_writer_failure.rs`](../ccsds-ndm/tests/opm_xml_writer_failure.rs) covers
+  streaming I/O diagnostics and panic-free propagation at multiple output boundaries. Run the
+  main cell with `just conformance-opm-xml`.
 - Requirement inventory:
   [`opm-3.0-xml-generation.md`](conformance/opm-3.0-xml-generation.md) maps the applicable ODM and
   project quality requirements to current evidence and explicit gaps.

@@ -16,17 +16,16 @@ fn opm_xml_generation_rejects_day_as_maneuver_duration_unit() {
         .man_duration
         .units = Some(TimeUnits::Day);
 
-    match opm
+    let error = opm
         .to_xml()
-        .expect_err("day is not an XSD-valid duration unit")
-    {
-        CcsdsNdmError::Validation(error) => {
-            assert_eq!(error.code(), Some("validation.invalid_value"));
-            assert_eq!(
-                error.field_path().as_deref(),
-                Some("body.segment.data.maneuver_parameters.man_duration.units")
-            );
-        }
+        .expect_err("day is not an XSD-valid duration unit");
+    assert_eq!(error.code(), Some("validation.invalid_value"));
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.maneuver_parameters.man_duration.units")
+    );
+    match error {
+        CcsdsNdmError::Validation(_) => {}
         error => panic!("expected a validation error, got: {error}"),
     }
 }

@@ -729,6 +729,30 @@ impl AddContext<&str, StrContext> for CcsdsNdmError {
 }
 
 impl CcsdsNdmError {
+    /// Stable machine-readable code, when this diagnostic category has been stabilized.
+    ///
+    /// Validation codes are delegated to the underlying [`ValidationError`]. Categories return
+    /// `None` until their compatibility behavior is covered by conformance tests.
+    pub fn code(&self) -> Option<&'static str> {
+        match self {
+            Self::Validation(error) => error.code(),
+            Self::Io(_) => Some("io.error"),
+            Self::UnsupportedOutputVersion { .. } => Some("generation.unsupported_output_version"),
+            _ => None,
+        }
+    }
+
+    /// Complete model field path for field-specific diagnostics.
+    ///
+    /// Operation-level failures such as an unsupported target version or an I/O error do not
+    /// concern a model field and therefore return `None`.
+    pub fn field_path(&self) -> Option<String> {
+        match self {
+            Self::Validation(error) => error.field_path(),
+            _ => None,
+        }
+    }
+
     /// Returns the inner KVN parse error if this is a FormatError::Kvn.
     pub fn as_kvn_parse_error(&self) -> Option<&KvnParseError> {
         match self {
@@ -943,6 +967,31 @@ mod tests {
             }
             error => panic!("expected a path-enriched error, got {error:?}"),
         }
+    }
+
+    #[test]
+    fn top_level_diagnostic_accessors_delegate_without_inventing_paths() {
+        let validation: CcsdsNdmError = ValidationError::invalid_value("X", "NaN", "finite")
+            .at_field_in("state_vector")
+            .into();
+        assert_eq!(validation.code(), Some("validation.invalid_value"));
+        assert_eq!(validation.field_path().as_deref(), Some("state_vector.x"));
+
+        let unsupported = CcsdsNdmError::UnsupportedOutputVersion {
+            message_type: "OPM",
+            format: "XML",
+            version: "2.0".into(),
+            supported: "3.0".into(),
+        };
+        assert_eq!(
+            unsupported.code(),
+            Some("generation.unsupported_output_version")
+        );
+        assert_eq!(unsupported.field_path(), None);
+
+        let io = CcsdsNdmError::Io(std::io::Error::other("failed"));
+        assert_eq!(io.code(), Some("io.error"));
+        assert_eq!(io.field_path(), None);
     }
 
     #[test]

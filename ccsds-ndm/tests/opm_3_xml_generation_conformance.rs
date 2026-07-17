@@ -49,18 +49,19 @@ fn assert_missing_required<T: std::fmt::Debug>(
     expected_field: &str,
     expected_path: &str,
 ) {
-    match result.expect_err(surface) {
+    let error = result.expect_err(surface);
+    assert_eq!(
+        error.code(),
+        Some("validation.missing_required_field"),
+        "{surface} returned an unstable top-level diagnostic code"
+    );
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some(expected_path),
+        "{surface} returned an incomplete top-level field path"
+    );
+    match error {
         CcsdsNdmError::Validation(error) => {
-            assert_eq!(
-                error.code(),
-                Some("validation.missing_required_field"),
-                "{surface} returned an unstable diagnostic code"
-            );
-            assert_eq!(
-                error.field_path().as_deref(),
-                Some(expected_path),
-                "{surface} returned an incomplete field path"
-            );
             assert!(
                 matches!(
                     *error,
@@ -177,6 +178,62 @@ fn every_opm_3_xml_generation_entry_point_rejects_an_invalid_model() {
     let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
     opm.body.segment.data.state_vector.x.value = f64::NAN;
     assert_non_finite_rejected("Ndm::to_xml with non-finite state", opm.to_xml());
+}
+
+#[test]
+fn opm_3_xml_generation_reports_unsupported_editions_across_rust_entry_points() {
+    let opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
+    let historical = {
+        let mut message = opm.clone();
+        message.version = "2.0".into();
+        message
+    };
+    let options = GenerateOptions::version("2.0");
+
+    assert_unsupported_output_version("Ndm::to_xml", historical.to_xml());
+    assert_unsupported_output_version("VersionedNdm::to_xml_with", opm.to_xml_with(&options));
+
+    let mut streamed = Vec::new();
+    assert_unsupported_output_version(
+        "VersionedNdm::write_xml_to",
+        opm.write_xml_to(&mut streamed, &options),
+    );
+    assert!(
+        streamed.is_empty(),
+        "unsupported streaming generation wrote partial output"
+    );
+
+    let historical = MessageType::Opm(historical);
+    assert_unsupported_output_version("MessageType::to_xml", historical.to_xml());
+    assert_unsupported_output_version(
+        "MessageType::to_xml_with",
+        MessageType::Opm(opm).to_xml_with(&options),
+    );
+
+    let directory = tempfile::tempdir().expect("failed to create temporary directory");
+    let path = directory.path().join("unsupported-opm.xml");
+    assert_unsupported_output_version("MessageType::to_xml_file", historical.to_xml_file(&path));
+    assert!(
+        !path.exists(),
+        "unsupported file generation created an output file"
+    );
+}
+
+#[test]
+fn opm_3_xml_file_generation_reports_output_failures_without_a_field_path() {
+    let opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
+    let directory = tempfile::tempdir().expect("failed to create temporary directory");
+
+    let error = MessageType::Opm(opm)
+        .to_xml_file(directory.path())
+        .expect_err("writing XML to a directory must fail");
+
+    assert_eq!(error.code(), Some("io.error"));
+    assert_eq!(error.field_path(), None);
+    assert!(
+        error.as_io_error().is_some(),
+        "file generation returned the wrong failure category: {error}"
+    );
 }
 
 #[test]
@@ -790,21 +847,21 @@ fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
     result: Result<T>,
     expected_path: &str,
 ) {
-    match result.expect_err(surface) {
-        CcsdsNdmError::Validation(error) => {
-            assert_eq!(
-                error.code(),
-                Some("validation.invalid_value"),
-                "{surface} returned an unstable diagnostic code"
-            );
-            assert_eq!(
-                error.field_path().as_deref(),
-                Some(expected_path),
-                "{surface} returned an incomplete field path"
-            );
-        }
-        error => panic!("{surface} returned a non-validation error: {error}"),
-    }
+    let error = result.expect_err(surface);
+    assert_eq!(
+        error.code(),
+        Some("validation.invalid_value"),
+        "{surface} returned an unstable top-level diagnostic code"
+    );
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some(expected_path),
+        "{surface} returned an incomplete top-level field path"
+    );
+    assert!(
+        matches!(&error, CcsdsNdmError::Validation(_)),
+        "{surface} returned a non-validation error: {error}"
+    );
 }
 
 fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
@@ -812,19 +869,45 @@ fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
     result: Result<T>,
     expected_path: &str,
 ) {
-    match result.expect_err(surface) {
-        CcsdsNdmError::Validation(error) => {
-            assert_eq!(
-                error.code(),
-                Some("validation.out_of_range"),
-                "{surface} returned an unstable diagnostic code"
-            );
-            assert_eq!(
-                error.field_path().as_deref(),
-                Some(expected_path),
-                "{surface} returned an incomplete field path"
-            );
-        }
-        error => panic!("{surface} returned a non-validation error: {error}"),
-    }
+    let error = result.expect_err(surface);
+    assert_eq!(
+        error.code(),
+        Some("validation.out_of_range"),
+        "{surface} returned an unstable top-level diagnostic code"
+    );
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some(expected_path),
+        "{surface} returned an incomplete top-level field path"
+    );
+    assert!(
+        matches!(&error, CcsdsNdmError::Validation(_)),
+        "{surface} returned a non-validation error: {error}"
+    );
+}
+
+fn assert_unsupported_output_version<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
+    let error = result.expect_err(surface);
+    assert_eq!(
+        error.code(),
+        Some("generation.unsupported_output_version"),
+        "{surface} returned an unstable diagnostic code"
+    );
+    assert_eq!(
+        error.field_path(),
+        None,
+        "{surface} invented a field path for an operation-level failure"
+    );
+    assert!(
+        matches!(
+            &error,
+            CcsdsNdmError::UnsupportedOutputVersion {
+                message_type: "OPM",
+                format: "XML",
+                version,
+                supported,
+            } if version == "2.0" && supported == "3.0"
+        ),
+        "{surface} returned the wrong unsupported-version details: {error}"
+    );
 }

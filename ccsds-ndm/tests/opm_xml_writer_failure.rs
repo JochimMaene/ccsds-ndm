@@ -64,6 +64,8 @@ fn opm_3_xml_writer_propagates_sink_failures_without_panicking() {
 
         let result = outcome.unwrap_or_else(|_| panic!("writer panicked at byte limit {limit}"));
         let error = result.unwrap_err();
+        assert_eq!(error.code(), Some("io.error"));
+        assert_eq!(error.field_path(), None);
         let io_error = error.as_io_error().unwrap_or_else(|| {
             panic!("writer returned a non-I/O error at byte limit {limit}: {error}")
         });

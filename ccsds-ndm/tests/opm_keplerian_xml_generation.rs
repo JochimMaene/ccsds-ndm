@@ -270,13 +270,14 @@ fn assert_invalid_choice_diagnostic<T: std::fmt::Debug>(
     result: Result<T>,
     expected_selected: &[&str],
 ) {
-    match result.expect_err("invalid anomaly choice") {
+    let error = result.expect_err("invalid anomaly choice");
+    assert_eq!(error.code(), Some("validation.invalid_choice"));
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.keplerian_elements")
+    );
+    match error {
         CcsdsNdmError::Validation(error) => {
-            assert_eq!(error.code(), Some("validation.invalid_choice"));
-            assert_eq!(
-                error.field_path().as_deref(),
-                Some("body.segment.data.keplerian_elements")
-            );
             let ValidationError::AtPath { source, .. } = *error else {
                 panic!("choice diagnostic did not carry its containing model path");
             };
