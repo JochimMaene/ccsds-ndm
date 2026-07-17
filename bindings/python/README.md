@@ -7,7 +7,9 @@
 
 Python bindings for the `ccsds-ndm` Rust core, for parsing, validating, and generating [CCSDS Navigation Data Messages (NDM)](https://public.ccsds.org/Pubs/500x0g4.pdf) in both KVN and XML formats.
 
-## Supported Message Types
+## Implemented Message Families
+
+The package exposes typed models, parsers, and serializers for the message families below. Inclusion in this table does not by itself claim verified support for every edition, notation, or operation. Exact support claims will be published in the project support and conformance matrix.
 
 | Message | Description |
 |---------|-------------|

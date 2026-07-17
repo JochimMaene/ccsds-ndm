@@ -4,7 +4,7 @@ Review date: 2026-07-14
 
 ## Executive assessment
 
-The Rust core has a promising base: broad NDM coverage, typed message models, dedicated KVN parsers, `quick-xml`, `winnow`, a sizeable fuzz corpus, and useful integration fixtures. It is not yet safe to describe as a golden-standard implementation, however. At review time, the design could emit schema-invalid XML, emitted KVN without validation, silently discarded malformed OCM records, and had no streaming API for the largest message types. Parser tolerance was inconsistent and usually silent rather than diagnostic.
+The Rust core has a promising base: broad NDM coverage, typed message models, dedicated KVN parsers, `quick-xml`, `winnow`, a sizeable fuzz corpus, and useful integration fixtures. It is not yet safe to describe as a reference-quality implementation, however. At review time, the design could emit schema-invalid XML, emitted KVN without validation, silently discarded malformed OCM records, and had no streaming API for the largest message types. Parser tolerance was inconsistent and usually silent rather than diagnostic.
 
 The most important product rule should be:
 
@@ -14,10 +14,17 @@ That rule was not enforced when the review was performed. The decisions section 
 implementation steps completed afterward; unresolved findings below still apply unless explicitly
 noted.
 
-## Review method
+## Review scope and method
+
+This review covers the Rust core only. It does not establish parity of the Python
+bindings, Python documentation, or Python tests; those remain a separate review
+and release requirement. The review uses the applicable published CCSDS standards
+as the conformance authority. The supplied XSDs, fixtures, and other
+implementations are evidence and interoperability references, not substitutes for
+the standards.
 
 - Traced every `Ndm` parse and generation entry point and the shared validation, detection, XML, KVN, and primitive-type layers.
-- Compared the XML models and emitted field order/names with the supplied schemas in `data/xsd/`.
+- Compared the XML models and emitted field order/names with the applicable supplied schemas in `data/xsd/`.
 - Generated XML from all available KVN fixtures and regenerated all available XML fixtures: 65 transformations in total. Three generated documents failed their applicable supplied XSD.
 - Ran focused probes for XML namespaces, KVN header detection, legacy version generation, and malformed OCM trajectory rows.
 - Reviewed the benchmark and fuzz targets for what they prove, not just whether they exist.
@@ -26,12 +33,21 @@ This was an architecture and source review, not a statistically rigorous perform
 
 ## Decisions adopted after this review
 
-- Convenience parsing is strict by default. Explicit permissive parsing returns a `ParseReport`
-  and never silently changes the default policy.
-- Generation preserves the parsed source version by default. Callers can request `latest` or an
-  exact edition without adding format-specific method families.
+- Parsing is currently strict-only. A permissive surface will be introduced only with explicit,
+  deterministic recovery rules and structured diagnostics.
+- Generation of a parsed message preserves its source edition when that edition has a complete,
+  conforming serializer. Newly constructed messages target the latest fully supported edition.
+  Callers can request an exact edition without adding format-specific method families.
 - A serializer refuses an edition it does not explicitly support; accepting an edition while
   parsing does not imply that the library can generate that edition.
+- Historical generation is supported only for an edition with a complete, edition-correct
+  serializer and demonstrated interoperability need.
+- Arbitrary vendor extensions outside CCSDS-defined extension mechanisms are unsupported. They are
+  rejected with a located diagnostic and are never silently discarded or regenerated. A
+  permissive profile may recover only documented, unambiguous CCSDS deviations.
+- Every advertised message type, edition, and notation is recorded in a support/conformance matrix
+  linking normative requirements to implementation and tests. A combination is not advertised as
+  supported until the matrix shows the full project quality bar is met.
 - Generated output is always validated. The Python compatibility argument `validate=False` is
   rejected rather than allowing unchecked output.
 
@@ -77,12 +93,12 @@ This demonstrates that Rust struct declaration order is currently an accidental 
 
 The supplied current schemas fix the version, for example OPM 3.0 at `data/xsd/ndmxml-4.0.0-opm-3.0.xsd:51`, ACM 2.0 at `data/xsd/ndmxml-4.0.0-acm-2.0.xsd:45`, and TDM 2.0 at `data/xsd/ndmxml-4.0.0-tdm-2.0.xsd:52`. KVN generation has the same problem: newer fields can be written under an older header.
 
-**Required change:** choose and document one of two defensible contracts:
-
-- Parse supported historical editions into a canonical model and generate the latest edition by default, reporting the upgrade; or
-- Implement an edition-specific validation and serialization layer, backed by the schema and prose for every advertised output edition.
-
-Do not preserve an input version string unless the selected serializer actually implements that edition.
+**Required change:** parse supported historical editions into the canonical model and preserve the
+source edition by default only when the library has a complete edition-specific validator and
+serializer backed by the standard. Otherwise generation must fail and require the caller to select
+a fully supported target edition explicitly. Never label current-shape output with an older edition.
+If changing editions would lose information or require inventing required data, generation must
+fail with a precise diagnostic.
 
 ### B4. Malformed OCM records are silently discarded
 
@@ -90,13 +106,29 @@ The OCM trajectory parser tries a row parser and, on any failure, consumes the w
 
 A focused probe replaced one number in a valid trajectory row with `NOT_A_FLOAT`. Parsing succeeded, regeneration succeeded, and the entire row was absent from the result. This is data loss, not merciful parsing.
 
-**Required change:** recover only for a precisely recognized continuation grammar. Otherwise return a located error in strict mode and a located warning plus preserved raw record in compatible mode. A golden implementation must never silently drop an unrecognized data line.
+**Required change:** recover only for a precisely recognized continuation grammar. Otherwise return
+a located parsing error. Diagnostic inspection may retain the raw record as uninterpreted content
+while reporting it. A reference-quality implementation must never silently drop an unrecognized
+data line.
 
 ### B5. XSD tests can pass without performing validation
 
 `ccsds-ndm/tests/xsd_schema_validation.rs:18` depends on an external `xmllint`. If it is absent, the test prints a message and returns successfully at `ccsds-ndm/tests/xsd_schema_validation.rs:34`. That happened in this review environment. The test covers only one fixture for most message types, omits ACM, and does not validate KVN-to-XML generation. Consequently, the failures in B2 are invisible to CI configurations without `xmllint`.
 
-**Required change:** make XSD validation a mandatory test dependency or a required CI tool, and fail if it is unavailable. Cover every shipped XML and KVN fixture, all message types, combined NDM, nullable values, optional blocks, and each supported output edition.
+**Required change:** make XSD validation a mandatory test dependency or a required CI tool, and fail if it is unavailable. Keep that dependency in test/CI infrastructure; the parsing and generation runtime must remain offline and independent of an XSD engine. Cover every shipped XML and KVN fixture, all message types, combined NDM, nullable values, optional blocks, and each supported output edition.
+
+### B6. Advertised support is not backed by an explicit conformance matrix
+
+The conformance policy defines support as an operation- and surface-specific promise. The review
+identifies individual fixture and serializer defects, but it does not establish one authoritative
+inventory of which capabilities are advertised or link each capability to normative requirements
+and tests.
+
+**Required change:** maintain a support/conformance matrix for every message type, edition, and
+notation. For each advertised combination, link the applicable CCSDS requirements, parsing and
+any advertised recovery coverage, validation coverage, KVN/XML generation evidence, cross-notation
+semantic round trips, malformed-input/resource tests, and streaming equivalence where applicable.
+Do not advertise a combination while any required evidence is missing.
 
 ## High-priority findings
 
@@ -124,7 +156,15 @@ Diagnostics need severity, format, message type/version, field path, line/column
 
 Merciful parsing should be policy-driven and observable. Silent acceptance makes typoed standard fields indistinguishable from supported vendor extensions; hard rejection of the same construct in the other notation is unpredictable.
 
-**Required change:** define two coherent, documented profiles: strict and permissive. Strict rejects every standard violation. Permissive applies only enumerated, deterministic recoveries and reports each one. Do not expose independent policy switches until real fixtures demonstrate a need that the two profiles cannot represent.
+Arbitrary vendor extensions outside CCSDS-defined extension mechanisms are out of scope. They must
+not be preserved or regenerated as an implicit permissive feature. Unknown fields should therefore
+produce a located diagnostic and rejection unless they belong to an explicitly modeled CCSDS
+extension mechanism.
+
+**Required change:** keep ordinary parsing strict and coherent. If a permissive profile is later
+justified by real fixtures, it may apply only enumerated, deterministic recoveries of documented
+CCSDS deviations and must report each one. It must not accept, silently drop, or silently preserve
+arbitrary vendor extensions. Do not expose independent policy switches without demonstrated need.
 
 ### H3. Namespace-qualified XML is rejected
 
@@ -183,7 +223,17 @@ The same code calls `format_finite` without first proving values are finite at `
 
 This mirrors permissive XSD lexical patterns but not the stronger field semantics in the CCSDS prose. One type is being used for absolute epochs and relative time tags with different legal domains.
 
-**Required change:** separate `AbsoluteEpoch` from relative/offset time, perform semantic calendar validation, and represent missing optional values with `Option` rather than an empty epoch. Preserve the original lexical spelling only where round-trip fidelity requires it.
+**Required change:** separate a validated `CalendarEpoch` from contextual numeric/calendar
+`Epoch`, perform semantic calendar validation, and represent missing optional values with `Option`
+rather than an empty epoch. Preserve the original lexical spelling only where round-trip fidelity
+requires it. The
+validated wrappers and the `OdmHeader.creation_date`/`AdmHeader.creation_date` migrations now
+address this finding for the shared ODM and ADM headers. The OCM metadata reference epochs
+(`EPOCH_TZERO`, previous/next message epochs, and `NEXT_LEAP_EPOCH`) are also now typed as
+`CalendarEpoch`, as are its four nested frame-reference epochs. OMM `REF_FRAME_EPOCH` and the
+mean-elements `EPOCH` are now also typed as `CalendarEpoch`. The remaining message families and
+contextual OCM fields are still audited incrementally. OPM reference-frame, state-vector, and
+maneuver ignition epochs are now also typed as `CalendarEpoch`.
 
 ### H10. Unit recovery can silently change meaning
 
@@ -207,13 +257,23 @@ Cap the heuristic, estimate only the current section, or grow geometrically from
 
 ### M3. Existing round trips are mostly self-consistency checks
 
-Parsing output again with the same implementation can prove stability while preserving the same non-standard dialect. The ACM name and TDM order defects are examples. Round-trip tests need an independent oracle: XSD for XML, standard-derived golden files for KVN, cross-implementation fixtures where licensing permits, and semantic comparisons across notations.
+Parsing output again with the same implementation can prove stability while preserving the same non-standard dialect. The ACM name and TDM order defects are examples. Round-trip tests need independent evidence: XSD for XML, standard-derived golden files for KVN, cross-implementation fixtures where licensing permits, and semantic comparisons across notations.
+
+Those semantic comparisons must include meaningful comments and CCSDS-defined user data wherever
+the relevant combination supports them. Whitespace, numeric spelling, and other presentation
+details may be canonicalized.
 
 ### M4. Fuzz targets prove only non-panicking parse attempts
 
-The three fuzz targets call parsing functions and discard results. The corpus is sizeable and useful, but targets do not exercise generation, strict/compatible modes, diagnostic determinism, round trips, schema compliance, or resource bounds. Existing timeout artifacts also deserve triage rather than remaining unexplained.
+The three fuzz targets call parsing functions and discard results. The corpus is sizeable and
+useful, but targets do not exercise generation, diagnostic determinism, round trips, schema
+compliance, or resource bounds. Existing timeout artifacts also deserve triage rather than
+remaining unexplained.
 
-Add structured/property targets: successful parse must generate without panic; canonical output must reparse equivalently; compatible recovery must produce diagnostics; strict mode must reject the same deviation; and bounded inputs must stay within documented memory/time limits.
+Add structured/property targets: successful parse must generate without panic; canonical output
+must reparse equivalently; any future recovery profile must produce diagnostics while ordinary
+parsing rejects the same deviation; and bounded inputs must stay within documented memory/time
+limits.
 
 ### M5. Benchmarks are narrow and lack quality gates
 
@@ -225,13 +285,24 @@ Build a representative benchmark corpus by format, message type, size, optional-
 
 The ACM name and TDM order defects are concrete drift. Large message files, repeated visitors, separate KVN/XML ordering logic, and hundreds of serde annotations make further divergence likely.
 
-Do not blindly generate the entire public API from XSD: the prose contains semantics that XSD cannot express. Do generate or verify mechanical facts such as XML names, sequence order, occurrence bounds, fixed version, unit enums, and fixture coverage. Keep semantic validation hand-written and reviewed.
+Do not blindly generate the entire public API from XSD: the prose contains semantics that XSD cannot express. Do generate or verify mechanical facts such as XML names, sequence order, occurrence bounds, fixed version, unit enums, and fixture coverage. Keep semantic validation hand-written and reviewed. The support/conformance matrix should be the authoritative index connecting these checks to each advertised combination.
 
 ### M7. Quality polish does not match mission-critical claims
 
 Examples include a duplicated AEM doc comment at `ccsds-ndm/src/kvn/aem.rs:108`, an always-true strict-or-lenient condition at `ccsds-ndm/src/messages/tdm.rs:81`, repeated `false || ...` expressions in OEM tests, stale implementation-history comments such as “Corrected” and “rest of logic remains similar,” and ignored formatting results throughout the writer. Strict Clippy currently reports 43 errors across all targets.
 
 These are not the primary correctness problems, but they are warning signs in code advertised for mission-critical use. Replace historical commentary with invariant-focused documentation, remove tautologies and duplication, and require focused human review for large generated-looking changes.
+
+### M8. Determinism and semantic preservation lack explicit gates
+
+The project goal promises deterministic generated output and semantic round trips, but the current
+review does not identify direct tests that generate the same validated model repeatedly, compare
+KVN and XML meanings independently, or verify preservation of supported comments and CCSDS-defined
+user data.
+
+**Required change:** add deterministic-output tests for every public writer and semantic
+round-trip tests across KVN and XML. Include supported comments and CCSDS-defined user data in the
+comparison, while allowing documented presentation normalization.
 
 ## Recommended target architecture
 
@@ -253,7 +324,8 @@ This prevents “lenient” from meaning “discard whatever did not parse” an
 
 ### 2. Define strictness as policy, not global state
 
-Suggested API shape:
+Parsing is currently strict-only. If concrete interoperability fixtures justify deterministic
+recoveries, a future API may use this shape:
 
 ```rust
 pub enum ParseMode {
@@ -267,16 +339,25 @@ pub struct ParseReport<T> {
 }
 ```
 
-`from_str` remains strict and returns the message directly. `from_str_with_mode` returns a `ParseReport`, associating every permissive recovery with that parse operation. `Permissive` must recover only through enumerated rules and report every recovery; it must not suppress arbitrary validation failures. A broader options structure should be added only after independent policies are justified by real inputs.
+`from_str` remains strict and returns the message directly. A future `from_str_with_mode` would
+return a `ParseReport`, associating every permissive recovery with that parse operation.
+`Permissive` must recover only through enumerated rules and report every recovery; it must not
+suppress arbitrary validation failures. A broader options structure should be added only after
+independent policies are justified by real inputs.
 
 ### 3. Make output conformance a hard invariant
 
-- Preserve the source edition when its serializer is implemented.
-- Require explicit `latest` or exact-edition selection when callers want a different edition.
+- Preserve the source edition of a parsed message by default when that edition has a complete,
+  edition-correct validator and serializer.
+- Target the latest fully supported edition for newly constructed messages.
+- Require explicit target selection when the source edition cannot be generated, and refuse an
+  exact historical target unless it has complete normative and executable evidence.
 - Validate before writing and fail with all relevant diagnostics.
 - Run every generated XML fixture through XSD in tests.
 - Maintain standard-derived KVN golden files and field-order inventories.
-- Ensure `to_kvn`, `to_xml`, and streaming writers share identical validation.
+- Ensure `to_kvn`, `to_xml`, and streaming writers share identical validation and conformance
+  behavior.
+- Reject arbitrary vendor extensions outside explicitly modeled CCSDS extension mechanisms.
 
 ### 4. Build streaming first, convenience second
 
@@ -298,8 +379,10 @@ Before optimizing individual parsers, agree on workloads and budgets. Recommende
 1. Fix ACM naming and TDM element order; make XSD tests mandatory and exhaustive.
 2. Gate every generator behind complete validation and reject non-finite values.
 3. Remove silent OCM line skipping and fix namespace/combined detection.
-4. Decide version-output policy and implement canonical latest-edition generation.
-5. Replace thread-local warnings with structured parse outcomes and explicit policies.
+4. Implement the decided version-output policy: preserve supported source editions, use the latest
+   supported edition for new messages, and require explicit lossless edition changes.
+5. Keep parsing strict-only until real fixtures justify enumerated recovery rules and structured
+   parse outcomes.
 6. Add streaming reader/writer APIs and representative allocation benchmarks.
 7. Replace JSON-backed XML optional parsing and unify numeric hot paths.
 8. Harden primitive types, units, and absolute/relative time semantics.
@@ -307,21 +390,30 @@ Before optimizing individual parsers, agree on workloads and budgets. Recommende
 
 ## Product decisions
 
-1. **Default parse behavior — decided:** convenience `from_str` is strict. Permissive parsing is explicit and returns diagnostics.
-2. **Historical output — decided:** generation preserves the source version by default, accepts an explicit target version, and refuses editions without a real serializer.
-3. **Unknown extensions:** is lossless parse/regenerate of vendor fields required? Recommendation: preserve unknown fields with source location and ordering in compatible mode; never emit them in standards-only output unless an explicit extension-preserving mode is selected.
-4. **Scale target:** what are the expected largest OEM/OCM/AEM files, record counts, and throughput/latency targets? These numbers should drive the streaming model and performance gates.
-5. **Canonical fidelity:** must lexical details such as whitespace, numeric spelling, comment placement, and unit spelling round-trip, or is semantic equivalence sufficient? A golden parser can support both, but they require different source and canonical representations.
+1. **Parse behavior — decided:** parsing is strict-only. A permissive API is deferred until real
+   fixtures justify enumerated recoveries and structured diagnostics.
+2. **Historical output — decided:** generation preserves a parsed message's source edition when that edition has a complete validator and serializer. Newly constructed messages target the latest fully supported edition. Other targets are explicit, and unsupported or lossy targets are refused.
+3. **Unknown extensions — decided:** arbitrary vendor extensions outside CCSDS-defined extension mechanisms are unsupported. They are rejected with a located diagnostic and are never silently discarded, preserved, or regenerated. Explicitly modeled CCSDS extension mechanisms follow their own documented support-matrix entries.
+4. **Support matrix — decided:** maintain an auditable message type × edition × notation matrix linking every advertised combination to normative requirements and tests. Unsupported or incomplete combinations remain unadvertised.
+5. **Scale target:** what are the expected largest OEM/OCM/AEM files, record counts, and throughput/latency targets? These numbers should drive the streaming model and performance gates.
+6. **Canonical fidelity — decided:** semantic equivalence is required. Meaningful comments and CCSDS-defined user data are preserved where supported; whitespace, numeric spelling, and other presentation formatting may be normalized.
 
-## Release bar for “golden standard” claims
+## Release Bar for Reference-Status Claims
 
 Do not claim standards-compliant generation or mission-critical suitability until all blockers are closed and CI proves:
 
+- every advertised combination is present in an auditable support/conformance matrix with complete normative and test evidence;
 - every shipped fixture generates XSD-valid XML;
+- generated KVN has equivalent standard-derived golden coverage;
 - every public generator rejects invalid/unrepresentable state;
 - no compatible recovery silently loses data;
 - historical version behavior is explicit and edition-correct;
 - strict and compatible policies are deterministic and fully diagnostic;
+- generated output is deterministic and KVN/XML round trips preserve supported comments, CCSDS-defined user data, and message semantics;
+- streaming and materialized APIs provide the same conformance behavior;
 - fuzzing covers parse and generation invariants with resource limits;
 - performance and allocation budgets are measured on representative corpora;
 - unsafe code is absent or justified, panics are excluded from public data paths, and failures are returned as located errors.
+
+This Rust-core review does not establish the project goal's Python parity requirement. That
+requirement must be verified separately before making a project-wide reference-quality claim.

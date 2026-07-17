@@ -3,6 +3,18 @@
 This project uses **Sphinx** for documentation, and all required dependencies are listed in `pyproject.toml`.
 We use **uv** to manage and run everything.
 
+The project-direction documents are maintained separately in Markdown:
+
+- `project-goal.md` — concise north star and product positioning;
+- `conformance-policy.md` — behavioral contract and capability quality bar;
+- `support-matrix.md` — authoritative capability statuses and their evidence;
+- `reference-status.md` — adoption targets and the scorecard for earning reference status;
+- `epoch-handling-plan.md` — measured architecture and incremental epoch migration plan;
+- `conformance/time-ordering-contract.md` — normative ordering/duplicate rules and comparator gates;
+- `conformance/epoch-field-inventory-oem-ocm.md` — XSD/book inventory for the first epoch slice;
+- `conformance/epoch-field-inventory-acm-ocm.md` — ACM reference-epoch migration and remaining OCM context audit;
+- `rust-core-review.md` — dated implementation review and remediation findings.
+
 ---
 
 ## 1. Install dependencies

@@ -10,7 +10,9 @@
 
 A high-performance Rust library with Python bindings for parsing, validating, and generating [CCSDS Navigation Data Messages (NDM)](https://public.ccsds.org/Pubs/500x0g4.pdf) in both KVN (Key-Value Notation) and XML formats.
 
-## Supported Message Types
+## Implemented Message Families
+
+The repository contains typed models, parsers, and serializers for the message families below. Inclusion in this table does not by itself claim that every edition, notation, operation, or public surface has completed the project's conformance quality bar. Exact support claims will be published in the support and conformance matrix.
 
 | Message | Description |
 |---------|-------------|
@@ -52,7 +54,7 @@ if isinstance(msg, ccsds_ndm.Opm):
     print(f"Object: {msg.segment.metadata.object_name}")
     print(f"Epoch: {msg.segment.data.state_vector.epoch}")
 
-    # Optional semantic validation
+    # Validate after constructing or modifying a message
     msg.validate()
 
     # Serialize
@@ -95,6 +97,10 @@ fn main() -> ccsds_ndm::error::Result<()> {
 
 - [User Guide & API Reference](https://jochimmaene.github.io/ccsds-ndm/)
 - [CCSDS NDM Standards](https://public.ccsds.org/Publications/BlueBooks.aspx)
+- [Project goal](docs/project-goal.md)
+- [Conformance and product policy](docs/conformance-policy.md)
+- [Support and conformance matrix](docs/support-matrix.md)
+- [Reference-status scorecard](docs/reference-status.md)
 
 ## License
 
