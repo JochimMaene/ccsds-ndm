@@ -67,6 +67,10 @@ Available evidence:
   codes. [`opm_xml_writer_failure.rs`](../ccsds-ndm/tests/opm_xml_writer_failure.rs) covers
   streaming I/O diagnostics and panic-free propagation at multiple output boundaries. Run the
   main cell with `just conformance-opm-xml`.
+- Performance evidence:
+  [`xml_benches.rs`](../ccsds-ndm/benches/xml_benches.rs) benchmarks the richest shipped OPM
+  fixture through validated materialized and streaming XML generation. Run it with
+  `just bench-opm-xml`. Published baselines and regression budgets are not yet claimed.
 - Requirement inventory:
   [`opm-3.0-xml-generation.md`](conformance/opm-3.0-xml-generation.md) maps the applicable ODM and
   project quality requirements to current evidence and explicit gaps.
@@ -76,6 +80,7 @@ Evidence still required before `verified`:
 - closure of every remaining `Partial` and `Gap` in the requirement inventory;
 - stable, structured diagnostic codes and paths for every generation failure;
 - panic-free and bounded-resource evidence for adversarial public model states and output failures;
+- published OPM XML-generation performance and allocation regression budgets;
 - Rust API documentation and compatibility tests for all advertised generation entry points; and
 - the applicable Rust artifact installation, platform, compatibility, security, and reproducible-
   release gates.

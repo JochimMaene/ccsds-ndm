@@ -107,6 +107,11 @@ test: test-rust test-python
 # Run the OPM 3.0 Rust XML-generation conformance slice
 conformance-opm-xml:
     cargo test --manifest-path {{rust_manifest}} --test opm_3_xml_generation_conformance
+    cargo test --manifest-path {{rust_manifest}} --test opm_epoch_xml_generation
+    cargo test --manifest-path {{rust_manifest}} --test opm_keplerian_xml_generation
+    cargo test --manifest-path {{rust_manifest}} --test opm_maneuver_duration_units
+    cargo test --manifest-path {{rust_manifest}} --test opm_xml_root_envelope
+    cargo test --manifest-path {{rust_manifest}} --test opm_xml_writer_failure
 
 # Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
 check: lint audit-strict stubs-check sync-docs-check test
@@ -119,6 +124,10 @@ check-ci: check
 # Run Rust benchmarks
 bench:
     cargo bench --manifest-path {{rust_manifest}}
+
+# Benchmark materialized and streaming OPM XML generation
+bench-opm-xml:
+    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_generate_opm
 
 # --- Coverage ---------------------------------------------------------------
 

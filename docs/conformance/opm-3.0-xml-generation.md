@@ -25,7 +25,8 @@ Evidence links used below:
 - [XML serializer](../../ccsds-ndm/src/xml.rs); and
 - [focused OPM 3.0 XML-generation tests](../../ccsds-ndm/tests/opm_3_xml_generation_conformance.rs);
 - [Keplerian mutation and boundary tests](../../ccsds-ndm/tests/opm_keplerian_xml_generation.rs);
-- [maneuver duration-unit tests](../../ccsds-ndm/tests/opm_maneuver_duration_units.rs).
+- [maneuver duration-unit tests](../../ccsds-ndm/tests/opm_maneuver_duration_units.rs); and
+- [XML benchmarks](../../ccsds-ndm/benches/xml_benches.rs).
 
 ## Inventory
 
@@ -55,13 +56,13 @@ Evidence links used below:
 | Invalid-model rejection | Covered | Public Rust XML generation rejects invalid self-contained public model states before writing: required text, XML-forbidden characters, epochs, units, and every state-vector, Keplerian, spacecraft, covariance, and maneuver number have focused mutation evidence. |
 | XSD-valid generated XML | Covered | All five shipped OPM fixtures pass the official schema after generation, with adversarial coverage of the schema-constrained public fields and XML text positions. |
 | Stable structured diagnostics | Partial | Every safely reachable OPM missing-required-field, invalid-choice, invalid-value, and out-of-range generation failure exposes a stable code and complete model path relative to the message root. The top-level `CcsdsNdmError::code` and `CcsdsNdmError::field_path` accessors preserve those details without variant matching. Focused mutations cover required fields, both invalid Keplerian anomaly selections, XML text positions, every public numeric block, maneuver duration units, all five spacecraft ranges, all seven Keplerian ranges, and both maneuver ranges. Unsupported XML target editions expose `generation.unsupported_output_version` across every Rust entry point; sink and file failures expose `io.error`. These operation-level failures correctly have no field path. Serializer failure is not safely reachable by mutating the fixed, prevalidated public OPM model, so no serializer code is claimed for this cell. Path context and choice details allocate only when validation fails; reading a code adds no allocation. The broader diagnostic contract still lacks a unified severity, operation/message-edition context, normative requirement, and applicable source-location view. |
-| Panic-free and bounded output | Partial | [Failing-writer tests](../../ccsds-ndm/tests/opm_xml_writer_failure.rs) cover multiple sink-failure boundaries and verify stable I/O diagnostics without panics. File-output failure and pre-write rejection tests cover materialized output behavior. Broader adversarial-model and resource-bound evidence remains open. |
+| Panic-free and bounded output | Partial | [Failing-writer tests](../../ccsds-ndm/tests/opm_xml_writer_failure.rs) cover multiple sink-failure boundaries and verify stable I/O diagnostics without panics. File-output failure and pre-write rejection tests cover materialized output behavior. `opm_3_xml_generation_handles_extreme_finite_values_in_every_numeric_block` fills every optional block, exercises extreme finite values in all public numeric positions, and validates the result against the official XSD. Configured collection/string/output limits and corresponding resource budgets remain open. |
+| Representative performance | Partial | `xml_generate_opm` benchmarks the richest shipped OPM fixture through both materialized and streaming XML generation, includes the shared validation gate in each iteration, and reports throughput using generated output bytes. `just bench-opm-xml` reproduces the workload. Published hardware/software baselines, allocation measurements, and regression budgets remain open. |
 | Rust surface/release gates | Gap | Installation, platform, API compatibility, security, migration, and reproducible-release evidence is not yet linked to this cell. |
 
 ## Next Small Implementation Step
 
-Inventory the metadata needed for a borrowed, allocation-free structured diagnostic view before
-adding another public diagnostic type. Reuse data already carried by error variants, distinguish
-fields that are inapplicable from fields that are not yet available, and avoid duplicating
-human-readable messages. Do not mark the capability `verified` until every remaining `Partial` and
-`Gap` above is closed.
+Define resource limits at the output boundary only after deciding which OPM collection and string
+sizes are operationally meaningful. A limit must prevent writing/allocation rather than reject an
+already materialized output, and its disabled/default behavior must remain a zero-cost branch.
+Do not mark the capability `verified` until every remaining `Partial` and `Gap` above is closed.

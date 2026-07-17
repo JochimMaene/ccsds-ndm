@@ -17,7 +17,8 @@ use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{
     CalendarEpoch, Epoch, InterpolationDegree, Position, PositionUnits, Velocity, VelocityUnits,
 };
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use ccsds_ndm::{GenerateOptions, VersionedNdm};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::hint::black_box;
 use std::num::NonZeroU32;
 use std::str::FromStr;
@@ -358,6 +359,30 @@ fn bench_xml_parse_opm(c: &mut Criterion) {
     });
 }
 
+fn bench_xml_generate_opm(c: &mut Criterion) {
+    let opm =
+        Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("invalid OPM benchmark");
+    let output_bytes = opm.to_xml().expect("OPM benchmark generation failed").len() as u64;
+    let mut group = c.benchmark_group("xml_generate_opm");
+    group.throughput(Throughput::Bytes(output_bytes));
+
+    group.bench_function("materialized", |b| {
+        b.iter(|| black_box(&opm).to_xml().unwrap())
+    });
+
+    let options = GenerateOptions::source();
+    let mut output = Vec::with_capacity(output_bytes as usize);
+    group.bench_function("streaming", |b| {
+        b.iter(|| {
+            output.clear();
+            black_box(&opm).write_xml_to(&mut output, &options).unwrap();
+            black_box(&output);
+        })
+    });
+
+    group.finish();
+}
+
 fn bench_xml_parse_omm(c: &mut Criterion) {
     let omm_xml = include_str!("../../data/xml/omm_g10.xml");
 
@@ -402,6 +427,7 @@ criterion_group!(
     bench_ocm_covariance_10k,
     bench_ocm_maneuver_10k,
     bench_xml_parse_opm,
+    bench_xml_generate_opm,
     bench_xml_parse_omm,
     bench_xml_parse_tdm,
     bench_xml_scaling,

@@ -452,6 +452,90 @@ fn opm_3_xml_generation_accepts_xml_1_0_text_boundaries() {
 }
 
 #[test]
+fn opm_3_xml_generation_handles_extreme_finite_values_in_every_numeric_block() {
+    let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[1].1).expect("failed to parse maneuver fixture");
+    let optional_blocks =
+        Opm::from_kvn(OPM_3_KVN_FIXTURES[3].1).expect("failed to parse covariance fixture");
+    opm.body.segment.data.covariance_matrix = optional_blocks.body.segment.data.covariance_matrix;
+    opm.body.segment.data.user_defined_parameters =
+        optional_blocks.body.segment.data.user_defined_parameters;
+
+    let state = &mut opm.body.segment.data.state_vector;
+    state.x.value = f64::MAX;
+    state.y.value = -f64::MAX;
+    state.z.value = f64::MAX;
+    state.x_dot.value = -f64::MAX;
+    state.y_dot.value = f64::MAX;
+    state.z_dot.value = -f64::MAX;
+
+    let elements = opm.body.segment.data.keplerian_elements.as_mut().unwrap();
+    elements.semi_major_axis.value = f64::MAX;
+    elements.eccentricity.value = f64::MAX;
+    elements.inclination.angle.value = 180.0;
+    elements.ra_of_asc_node.value = -360.0;
+    elements.arg_of_pericenter.value = 359.999;
+    elements.true_anomaly.as_mut().unwrap().value = -360.0;
+    elements.gm.value = f64::MAX;
+
+    let spacecraft = opm
+        .body
+        .segment
+        .data
+        .spacecraft_parameters
+        .as_mut()
+        .unwrap();
+    spacecraft.mass.as_mut().unwrap().value = f64::MAX;
+    spacecraft.solar_rad_area.as_mut().unwrap().value = f64::MAX;
+    spacecraft.solar_rad_coeff.as_mut().unwrap().value = f64::MAX;
+    spacecraft.drag_area.as_mut().unwrap().value = f64::MAX;
+    spacecraft.drag_coeff.as_mut().unwrap().value = f64::MAX;
+
+    macro_rules! set_covariance_to_max {
+        ($covariance:expr, $($field:ident),+ $(,)?) => {
+            $($covariance.$field.value = f64::MAX;)+
+        };
+    }
+    let covariance = opm.body.segment.data.covariance_matrix.as_mut().unwrap();
+    set_covariance_to_max!(
+        covariance,
+        cx_x,
+        cy_x,
+        cy_y,
+        cz_x,
+        cz_y,
+        cz_z,
+        cx_dot_x,
+        cx_dot_y,
+        cx_dot_z,
+        cx_dot_x_dot,
+        cy_dot_x,
+        cy_dot_y,
+        cy_dot_z,
+        cy_dot_x_dot,
+        cy_dot_y_dot,
+        cz_dot_x,
+        cz_dot_y,
+        cz_dot_z,
+        cz_dot_x_dot,
+        cz_dot_y_dot,
+        cz_dot_z_dot,
+    );
+
+    for maneuver in &mut opm.body.segment.data.maneuver_parameters {
+        maneuver.man_duration.value = f64::MAX;
+        maneuver.man_delta_mass.value = -f64::MAX;
+        maneuver.man_dv_1.value = f64::MAX;
+        maneuver.man_dv_2.value = -f64::MAX;
+        maneuver.man_dv_3.value = f64::MAX;
+    }
+
+    let xml = opm
+        .to_xml()
+        .expect("extreme finite values must not panic or fail generation");
+    validate_with_official_xsd("extreme finite values", &xml);
+}
+
+#[test]
 fn opm_3_xml_generation_reports_all_reachable_missing_required_paths() {
     type Mutation = (&'static str, &'static str, usize, fn(&mut Opm));
     let mutations: [Mutation; 9] = [
