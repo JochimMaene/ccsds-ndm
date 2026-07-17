@@ -117,6 +117,7 @@ conformance-opm-xml:
 conformance-opm-kvn:
     cargo test --manifest-path {{rust_manifest}} --test opm_3_kvn_generation_conformance
     cargo test --manifest-path {{rust_manifest}} --test opm_kvn_writer_failure
+    cargo test --manifest-path {{rust_manifest}} --test opm_kvn_allocations
 
 # Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
 check: lint audit-strict stubs-check sync-docs-check test

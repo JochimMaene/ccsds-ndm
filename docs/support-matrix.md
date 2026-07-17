@@ -106,8 +106,10 @@ Available evidence:
   covers exact ODM numeric spelling and pre-write rejection of invalid free text, lossy numeric
   values, and the normative uppercase/no-blank rule for user-defined keyword suffixes without
   turning Annex F's recommended regex into a mandatory restriction. Focused streaming sink failures
-  verify panic-free preservation of I/O diagnostics. Run it with `just conformance-opm-kvn`;
-  reproduce the materialized and streaming generation benchmark with `just bench-opm-kvn`.
+  verify panic-free preservation of I/O diagnostics. The richest numeric/covariance fixture also
+  has enforced allocation budgets for materialized and pre-sized streaming generation. Run the
+  evidence with `just conformance-opm-kvn`; reproduce the timing and repeated-maneuver scaling
+  benchmarks with `just bench-opm-kvn`.
 - Requirement inventory:
   [`opm-3.0-kvn-generation.md`](conformance/opm-3.0-kvn-generation.md) maps current evidence and
   explicit gaps.
