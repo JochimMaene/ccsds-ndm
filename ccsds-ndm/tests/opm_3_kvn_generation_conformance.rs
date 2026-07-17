@@ -2,8 +2,9 @@ use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::options::GenerateOptions;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::types::GmUnits;
+use ccsds_ndm::types::{CalendarEpoch, GmUnits};
 use ccsds_ndm::MessageType;
+use std::str::FromStr;
 
 fn opm() -> Opm {
     Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn"))
@@ -227,26 +228,62 @@ fn opm_kvn_rejects_non_ascii_and_control_characters() {
 
 #[test]
 fn opm_kvn_rejects_invalid_user_defined_keyword_suffixes() {
-    let mut message =
-        Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("fixture should parse");
-    message
-        .body
-        .segment
-        .data
-        .user_defined_parameters
-        .as_mut()
-        .unwrap()
-        .user_defined[0]
-        .parameter = "earth model".to_owned();
+    for invalid in [
+        "",
+        "earth_model",
+        "EARTH MODEL",
+        "EARTH=MODEL",
+        "ÉARTH_MODEL",
+    ] {
+        let mut message =
+            Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("fixture should parse");
+        message
+            .body
+            .segment
+            .data
+            .user_defined_parameters
+            .as_mut()
+            .unwrap()
+            .user_defined[0]
+            .parameter = invalid.to_owned();
 
-    let error = message
-        .to_kvn()
-        .expect_err("KVN keywords must be uppercase and contain no blanks");
-    assert_eq!(error.code(), Some("validation.invalid_value"));
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment.data.user_defined_parameters.user_defined.parameter")
-    );
+        let error = message
+            .to_kvn()
+            .expect_err("KVN keywords must be uppercase, non-empty, and contain no blanks or =");
+        assert_eq!(error.code(), Some("validation.invalid_value"));
+        assert_eq!(
+            error.field_path().as_deref(),
+            Some("body.segment.data.user_defined_parameters.user_defined.parameter")
+        );
+    }
+}
+
+#[test]
+fn opm_kvn_accepts_normative_user_defined_keyword_forms() {
+    for valid in [
+        "A",
+        "C3",
+        "3RD_BODY_PERTURBATION",
+        "A_B2",
+        "EARTH-MODEL",
+        "EARTH.MODEL",
+    ] {
+        let mut message =
+            Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("fixture should parse");
+        message
+            .body
+            .segment
+            .data
+            .user_defined_parameters
+            .as_mut()
+            .unwrap()
+            .user_defined[0]
+            .parameter = valid.to_owned();
+
+        let generated = message.to_kvn().expect("valid KVN keyword should generate");
+        assert!(generated.contains(&format!("USER_DEFINED_{valid}")));
+        Opm::from_kvn(&generated).expect("generated keyword should parse");
+    }
 }
 
 #[test]
@@ -265,6 +302,26 @@ fn opm_kvn_enforces_the_254_character_line_limit() {
         .expect_err("a 255-character COMMENT line must be rejected");
     assert_eq!(error.code(), Some("validation.out_of_range"));
     assert_eq!(error.field_path().as_deref(), Some("header.comment"));
+}
+
+#[test]
+fn opm_kvn_epoch_lines_are_bounded_by_the_epoch_type() {
+    let longest_epoch = format!("2000-001T00:00:00.{}", "0".repeat(46));
+    assert_eq!(longest_epoch.len(), 64);
+    let epoch = CalendarEpoch::from_str(&longest_epoch).expect("64-byte epoch should be valid");
+    assert!(CalendarEpoch::from_str(&format!("{longest_epoch}0")).is_err());
+
+    let mut message =
+        Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).expect("fixture should parse");
+    message.header.creation_date = epoch;
+    message.body.segment.metadata.ref_frame_epoch = Some(epoch);
+    message.body.segment.data.state_vector.epoch = epoch;
+    message.body.segment.data.maneuver_parameters[0].man_epoch_ignition = epoch;
+
+    let generated = message
+        .to_kvn()
+        .expect("maximum-width epochs should generate");
+    assert!(generated.lines().all(|line| line.len() <= 254));
 }
 
 #[test]

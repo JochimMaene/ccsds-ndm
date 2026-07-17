@@ -116,6 +116,7 @@ conformance-opm-xml:
 # Run the OPM 3.0 Rust KVN-generation conformance slice
 conformance-opm-kvn:
     cargo test --manifest-path {{rust_manifest}} --test opm_3_kvn_generation_conformance
+    cargo test --manifest-path {{rust_manifest}} --test opm_kvn_writer_failure
 
 # Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
 check: lint audit-strict stubs-check sync-docs-check test

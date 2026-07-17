@@ -104,15 +104,16 @@ Available evidence:
   verifies all four shipped Annex G fixtures retain assignment order, comments, and optional units;
   generated representative lines are printable ASCII and no longer than 254 characters. It also
   covers exact ODM numeric spelling and pre-write rejection of invalid free text, lossy numeric
-  values, and user-defined keyword suffixes. Run it with `just conformance-opm-kvn`; reproduce the
-  materialized and streaming generation benchmark with `just bench-opm-kvn`.
+  values, and the normative uppercase/no-blank rule for user-defined keyword suffixes without
+  turning Annex F's recommended regex into a mandatory restriction. Focused streaming sink failures
+  verify panic-free preservation of I/O diagnostics. Run it with `just conformance-opm-kvn`;
+  reproduce the materialized and streaming generation benchmark with `just bench-opm-kvn`.
 - Requirement inventory:
   [`opm-3.0-kvn-generation.md`](conformance/opm-3.0-kvn-generation.md) maps current evidence and
   explicit gaps.
 
-Evidence still required before `verified` includes complete user-defined-keyword rules, diagnostics
-and failing-writer coverage, bounded-resource evidence, performance budgets, and the applicable
-Rust surface/release gates.
+Evidence still required before `verified` includes complete diagnostic mutations, bounded-resource
+evidence, performance budgets, and the applicable Rust surface/release gates.
 
 ## Advertised Capabilities
 

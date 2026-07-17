@@ -299,6 +299,24 @@ pub fn key_token<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     terminated(preceded(ws, keyword), kv_sep).parse_next(input)
 }
 
+/// Parses a user-defined KVN keyword.
+///
+/// ODM 7.4.4 requires uppercase keywords without blanks but does not make Annex F's recommended
+/// alphanumeric-and-underscore regex normative. `=` remains excluded because it delimits the
+/// single assignment permitted by 7.4.3.
+fn user_defined_key_token<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+    terminated(
+        preceded(
+            ws,
+            take_while(1.., |character: char| {
+                character.is_ascii_graphic() && !character.is_ascii_lowercase() && character != '='
+            }),
+        ),
+        kv_sep,
+    )
+    .parse_next(input)
+}
+
 /// Parses the rest of a KVN line (value and optional unit).
 pub fn kv_rest<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)> {
     terminated(kvn_value, opt_line_ending).parse_next(input)
@@ -1169,7 +1187,7 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
         let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
-        let key = match key_token.parse_next(input) {
+        let key = match user_defined_key_token.parse_next(input) {
             Ok(k) => k,
             Err(_) => {
                 input.reset(&checkpoint);

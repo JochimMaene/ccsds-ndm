@@ -589,12 +589,13 @@ impl Opm {
                 if suffix.is_empty()
                     || suffix
                         .bytes()
-                        .any(|byte| byte.is_ascii_lowercase() || byte == b' ')
+                        .any(|byte| byte.is_ascii_lowercase() || byte == b' ' || byte == b'=')
                 {
                     return Err(ValidationError::InvalidValue {
                         field: "USER_DEFINED parameter".into(),
                         value: parameter.parameter.clone(),
-                        expected: "an uppercase KVN keyword suffix without blanks".into(),
+                        expected: "a non-empty uppercase KVN keyword suffix without blanks or ="
+                            .into(),
                         line: None,
                     }
                     .at_path("body.segment.data.user_defined_parameters.user_defined.parameter")
