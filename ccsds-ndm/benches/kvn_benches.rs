@@ -5,15 +5,17 @@
 //! KVN parsing and generation benchmarks for all message types.
 
 use ccsds_ndm::common::{OdmHeader, StateVectorAcc};
+use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::oem::{Oem, OemBody, OemData, OemMetadata, OemSegment};
 use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::tdm::Tdm;
+use ccsds_ndm::options::GenerateOptions;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{
     CalendarEpoch, Epoch, InterpolationDegree, Position, PositionUnits, Velocity, VelocityUnits,
 };
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::hint::black_box;
 use std::num::NonZeroU32;
 use std::str::FromStr;
@@ -119,6 +121,28 @@ fn bench_parse_opm(c: &mut Criterion) {
     });
 }
 
+fn bench_generate_opm(c: &mut Criterion) {
+    let opm = Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).unwrap();
+    let output_len = opm.to_kvn().unwrap().len() as u64;
+    let mut group = c.benchmark_group("kvn_generate_opm");
+    group.throughput(Throughput::Bytes(output_len));
+    group.bench_function("materialized", |b| {
+        b.iter(|| black_box(&opm).to_kvn().unwrap())
+    });
+    let options = GenerateOptions::source();
+    let mut output = Vec::with_capacity(output_len as usize);
+    group.bench_function("streaming_reused_vec", |b| {
+        b.iter(|| {
+            output.clear();
+            black_box(&opm)
+                .write_kvn_to(black_box(&mut output), black_box(&options))
+                .unwrap();
+            black_box(&output);
+        })
+    });
+    group.finish();
+}
+
 fn bench_parse_omm(c: &mut Criterion) {
     let omm_kvn = include_str!("../../data/kvn/omm_g7.kvn");
 
@@ -204,6 +228,7 @@ criterion_group!(
     bench_parse_kvn,
     bench_generate_kvn,
     bench_parse_opm,
+    bench_generate_opm,
     bench_parse_omm,
     bench_parse_tdm,
     bench_kvn_scaling,

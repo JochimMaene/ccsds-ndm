@@ -103,15 +103,16 @@ Available evidence:
   [`opm_3_kvn_generation_conformance.rs`](../ccsds-ndm/tests/opm_3_kvn_generation_conformance.rs)
   verifies all four shipped Annex G fixtures retain assignment order, comments, and optional units;
   generated representative lines are printable ASCII and no longer than 254 characters. It also
-  covers pre-write rejection of invalid free text and user-defined keyword suffixes. Run it with
-  `just conformance-opm-kvn`.
+  covers exact ODM numeric spelling and pre-write rejection of invalid free text, lossy numeric
+  values, and user-defined keyword suffixes. Run it with `just conformance-opm-kvn`; reproduce the
+  materialized and streaming generation benchmark with `just bench-opm-kvn`.
 - Requirement inventory:
   [`opm-3.0-kvn-generation.md`](conformance/opm-3.0-kvn-generation.md) maps current evidence and
   explicit gaps.
 
-Evidence still required before `verified` includes compliant 16-significant-digit numeric
-generation, complete user-defined-keyword rules, diagnostics and failing-writer coverage,
-bounded-resource evidence, performance budgets, and the applicable Rust surface/release gates.
+Evidence still required before `verified` includes complete user-defined-keyword rules, diagnostics
+and failing-writer coverage, bounded-resource evidence, performance budgets, and the applicable
+Rust surface/release gates.
 
 ## Advertised Capabilities
 

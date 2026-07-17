@@ -52,6 +52,20 @@ fn structural_lines(kvn: &str) -> Vec<String> {
         .collect()
 }
 
+fn significant_digits(value: &str) -> usize {
+    let digits: Vec<_> = value
+        .bytes()
+        .take_while(|byte| *byte != b'e' && *byte != b'E')
+        .filter(u8::is_ascii_digit)
+        .collect();
+    let first = digits.iter().position(|digit| *digit != b'0');
+    let last = digits.iter().rposition(|digit| *digit != b'0');
+    match (first, last) {
+        (Some(first), Some(last)) => last - first + 1,
+        _ => 1,
+    }
+}
+
 #[test]
 fn annex_g_opm_fixtures_generate_printable_ordered_kvn_with_preserved_units() {
     for source in [
@@ -72,7 +86,61 @@ fn annex_g_opm_fixtures_generate_printable_ordered_kvn_with_preserved_units() {
         assert!(generated.lines().all(|line| {
             line.len() <= 254 && line.bytes().all(|byte| (b' '..=b'~').contains(&byte))
         }));
+        for value in generated.lines().filter_map(|line| {
+            let (_, value) = line.split_once('=')?;
+            let number = value
+                .trim()
+                .split_once(" [")
+                .map_or(value.trim(), |(number, _)| number);
+            number.parse::<f64>().ok().map(|_| number)
+        }) {
+            assert!(
+                value.contains('.') && significant_digits(value) <= 16,
+                "non-compliant numeric spelling: {value}"
+            );
+        }
     }
+}
+
+#[test]
+fn opm_kvn_preserves_exact_extreme_values_when_the_odm_can_represent_them() {
+    let mut message = opm();
+    message.body.segment.data.state_vector.x.value = f64::from_bits(1);
+
+    let generated = message
+        .to_kvn()
+        .expect("minimum subnormal is representable");
+    assert!(generated.contains("X                    = 5.0e-324"));
+    let reparsed = Opm::from_kvn(&generated).expect("generated KVN should parse");
+    assert_eq!(
+        reparsed.body.segment.data.state_vector.x.value.to_bits(),
+        f64::from_bits(1).to_bits()
+    );
+}
+
+#[test]
+fn opm_kvn_rejects_values_that_need_seventeen_digits_before_writing() {
+    let mut message = opm();
+    message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
+
+    let error = message
+        .to_kvn()
+        .expect_err("lossy 16-digit rounding must not occur");
+    assert_eq!(error.code(), Some("validation.invalid_value"));
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.state_vector.x")
+    );
+
+    let mut output = Vec::new();
+    message
+        .write_kvn_to(&mut output, &GenerateOptions::source())
+        .expect_err("streaming must run numeric preflight");
+    assert!(output.is_empty());
+
+    message
+        .to_xml()
+        .expect("the KVN-specific precision rule must not affect XML");
 }
 
 #[test]

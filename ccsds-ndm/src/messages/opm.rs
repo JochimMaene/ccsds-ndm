@@ -5,7 +5,7 @@
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters, StateVector};
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
-use crate::kvn::ser::KvnWriter;
+use crate::kvn::ser::{KvnWriter, OdmFloat};
 use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
@@ -142,6 +142,276 @@ impl Ndm for Opm {
 }
 
 impl Opm {
+    fn validate_kvn_numbers(&self) -> Result<()> {
+        fn check(field: &'static str, value: f64, path: &'static str) -> Result<()> {
+            if OdmFloat::is_representable(value) {
+                return Ok(());
+            }
+            Err(ValidationError::InvalidValue {
+                field: field.into(),
+                value: value.to_string(),
+                expected: "an exactly representable ODM number with at most 16 significant digits"
+                    .into(),
+                line: None,
+            }
+            .at_path(path)
+            .into())
+        }
+
+        macro_rules! check {
+            ($field:literal, $value:expr, $path:literal) => {
+                check($field, $value, $path)?
+            };
+        }
+
+        let data = &self.body.segment.data;
+        let state = &data.state_vector;
+        check!("X", state.x.value, "body.segment.data.state_vector.x");
+        check!("Y", state.y.value, "body.segment.data.state_vector.y");
+        check!("Z", state.z.value, "body.segment.data.state_vector.z");
+        check!(
+            "X_DOT",
+            state.x_dot.value,
+            "body.segment.data.state_vector.x_dot"
+        );
+        check!(
+            "Y_DOT",
+            state.y_dot.value,
+            "body.segment.data.state_vector.y_dot"
+        );
+        check!(
+            "Z_DOT",
+            state.z_dot.value,
+            "body.segment.data.state_vector.z_dot"
+        );
+
+        if let Some(elements) = &data.keplerian_elements {
+            check!(
+                "SEMI_MAJOR_AXIS",
+                elements.semi_major_axis.value,
+                "body.segment.data.keplerian_elements.semi_major_axis"
+            );
+            check!(
+                "ECCENTRICITY",
+                elements.eccentricity.value,
+                "body.segment.data.keplerian_elements.eccentricity"
+            );
+            check!(
+                "INCLINATION",
+                elements.inclination.angle.value,
+                "body.segment.data.keplerian_elements.inclination"
+            );
+            check!(
+                "RA_OF_ASC_NODE",
+                elements.ra_of_asc_node.value,
+                "body.segment.data.keplerian_elements.ra_of_asc_node"
+            );
+            check!(
+                "ARG_OF_PERICENTER",
+                elements.arg_of_pericenter.value,
+                "body.segment.data.keplerian_elements.arg_of_pericenter"
+            );
+            if let Some(value) = &elements.true_anomaly {
+                check!(
+                    "TRUE_ANOMALY",
+                    value.value,
+                    "body.segment.data.keplerian_elements.true_anomaly"
+                );
+            }
+            if let Some(value) = &elements.mean_anomaly {
+                check!(
+                    "MEAN_ANOMALY",
+                    value.value,
+                    "body.segment.data.keplerian_elements.mean_anomaly"
+                );
+            }
+            check!(
+                "GM",
+                elements.gm.value,
+                "body.segment.data.keplerian_elements.gm"
+            );
+        }
+
+        if let Some(parameters) = &data.spacecraft_parameters {
+            for (field, value, path) in [
+                (
+                    "MASS",
+                    parameters.mass.as_ref().map(|value| value.value),
+                    "body.segment.data.spacecraft_parameters.mass",
+                ),
+                (
+                    "SOLAR_RAD_AREA",
+                    parameters.solar_rad_area.as_ref().map(|value| value.value),
+                    "body.segment.data.spacecraft_parameters.solar_rad_area",
+                ),
+                (
+                    "SOLAR_RAD_COEFF",
+                    parameters.solar_rad_coeff.as_ref().map(|value| value.value),
+                    "body.segment.data.spacecraft_parameters.solar_rad_coeff",
+                ),
+                (
+                    "DRAG_AREA",
+                    parameters.drag_area.as_ref().map(|value| value.value),
+                    "body.segment.data.spacecraft_parameters.drag_area",
+                ),
+                (
+                    "DRAG_COEFF",
+                    parameters.drag_coeff.as_ref().map(|value| value.value),
+                    "body.segment.data.spacecraft_parameters.drag_coeff",
+                ),
+            ] {
+                if let Some(value) = value {
+                    check(field, value, path)?;
+                }
+            }
+        }
+
+        if let Some(covariance) = &data.covariance_matrix {
+            for (field, value, path) in [
+                (
+                    "CX_X",
+                    covariance.cx_x.value,
+                    "body.segment.data.covariance_matrix.cx_x",
+                ),
+                (
+                    "CY_X",
+                    covariance.cy_x.value,
+                    "body.segment.data.covariance_matrix.cy_x",
+                ),
+                (
+                    "CY_Y",
+                    covariance.cy_y.value,
+                    "body.segment.data.covariance_matrix.cy_y",
+                ),
+                (
+                    "CZ_X",
+                    covariance.cz_x.value,
+                    "body.segment.data.covariance_matrix.cz_x",
+                ),
+                (
+                    "CZ_Y",
+                    covariance.cz_y.value,
+                    "body.segment.data.covariance_matrix.cz_y",
+                ),
+                (
+                    "CZ_Z",
+                    covariance.cz_z.value,
+                    "body.segment.data.covariance_matrix.cz_z",
+                ),
+                (
+                    "CX_DOT_X",
+                    covariance.cx_dot_x.value,
+                    "body.segment.data.covariance_matrix.cx_dot_x",
+                ),
+                (
+                    "CX_DOT_Y",
+                    covariance.cx_dot_y.value,
+                    "body.segment.data.covariance_matrix.cx_dot_y",
+                ),
+                (
+                    "CX_DOT_Z",
+                    covariance.cx_dot_z.value,
+                    "body.segment.data.covariance_matrix.cx_dot_z",
+                ),
+                (
+                    "CX_DOT_X_DOT",
+                    covariance.cx_dot_x_dot.value,
+                    "body.segment.data.covariance_matrix.cx_dot_x_dot",
+                ),
+                (
+                    "CY_DOT_X",
+                    covariance.cy_dot_x.value,
+                    "body.segment.data.covariance_matrix.cy_dot_x",
+                ),
+                (
+                    "CY_DOT_Y",
+                    covariance.cy_dot_y.value,
+                    "body.segment.data.covariance_matrix.cy_dot_y",
+                ),
+                (
+                    "CY_DOT_Z",
+                    covariance.cy_dot_z.value,
+                    "body.segment.data.covariance_matrix.cy_dot_z",
+                ),
+                (
+                    "CY_DOT_X_DOT",
+                    covariance.cy_dot_x_dot.value,
+                    "body.segment.data.covariance_matrix.cy_dot_x_dot",
+                ),
+                (
+                    "CY_DOT_Y_DOT",
+                    covariance.cy_dot_y_dot.value,
+                    "body.segment.data.covariance_matrix.cy_dot_y_dot",
+                ),
+                (
+                    "CZ_DOT_X",
+                    covariance.cz_dot_x.value,
+                    "body.segment.data.covariance_matrix.cz_dot_x",
+                ),
+                (
+                    "CZ_DOT_Y",
+                    covariance.cz_dot_y.value,
+                    "body.segment.data.covariance_matrix.cz_dot_y",
+                ),
+                (
+                    "CZ_DOT_Z",
+                    covariance.cz_dot_z.value,
+                    "body.segment.data.covariance_matrix.cz_dot_z",
+                ),
+                (
+                    "CZ_DOT_X_DOT",
+                    covariance.cz_dot_x_dot.value,
+                    "body.segment.data.covariance_matrix.cz_dot_x_dot",
+                ),
+                (
+                    "CZ_DOT_Y_DOT",
+                    covariance.cz_dot_y_dot.value,
+                    "body.segment.data.covariance_matrix.cz_dot_y_dot",
+                ),
+                (
+                    "CZ_DOT_Z_DOT",
+                    covariance.cz_dot_z_dot.value,
+                    "body.segment.data.covariance_matrix.cz_dot_z_dot",
+                ),
+            ] {
+                check(field, value, path)?;
+            }
+        }
+
+        for maneuver in &data.maneuver_parameters {
+            for (field, value, path) in [
+                (
+                    "MAN_DURATION",
+                    maneuver.man_duration.value,
+                    "body.segment.data.maneuver_parameters.man_duration",
+                ),
+                (
+                    "MAN_DELTA_MASS",
+                    maneuver.man_delta_mass.value,
+                    "body.segment.data.maneuver_parameters.man_delta_mass",
+                ),
+                (
+                    "MAN_DV_1",
+                    maneuver.man_dv_1.value,
+                    "body.segment.data.maneuver_parameters.man_dv_1",
+                ),
+                (
+                    "MAN_DV_2",
+                    maneuver.man_dv_2.value,
+                    "body.segment.data.maneuver_parameters.man_dv_2",
+                ),
+                (
+                    "MAN_DV_3",
+                    maneuver.man_dv_3.value,
+                    "body.segment.data.maneuver_parameters.man_dv_3",
+                ),
+            ] {
+                check(field, value, path)?;
+            }
+        }
+        Ok(())
+    }
+
     fn validate_kvn_text(&self) -> Result<()> {
         fn invalid_text(field: &'static str, value: &str, path: &'static str) -> Result<()> {
             if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
@@ -496,7 +766,8 @@ impl Opm {
 
 impl ToKvn for Opm {
     fn validate_kvn(&self) -> Result<()> {
-        self.validate_kvn_text()
+        self.validate_kvn_text()?;
+        self.validate_kvn_numbers()
     }
 
     fn write_kvn(&self, writer: &mut KvnWriter) {
@@ -886,7 +1157,16 @@ impl ToKvn for OpmData {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         // State Vector
-        self.state_vector.write_kvn(writer);
+        // Keep these OPM-only numeric fields paired with `validate_kvn_numbers`.
+        let state = &self.state_vector;
+        writer.write_comments(&state.comment);
+        writer.write_pair("EPOCH", state.epoch);
+        writer.write_odm_float_measure("X", &state.x);
+        writer.write_odm_float_measure("Y", &state.y);
+        writer.write_odm_float_measure("Z", &state.z);
+        writer.write_odm_float_measure("X_DOT", &state.x_dot);
+        writer.write_odm_float_measure("Y_DOT", &state.y_dot);
+        writer.write_odm_float_measure("Z_DOT", &state.z_dot);
 
         // Keplerian Elements
         if let Some(ke) = &self.keplerian_elements {
@@ -897,25 +1177,50 @@ impl ToKvn for OpmData {
         if let Some(sp) = &self.spacecraft_parameters {
             writer.write_comments(&sp.comment);
             if let Some(v) = &sp.mass {
-                writer.write_measure("MASS", &v.to_unit_value());
+                writer.write_odm_float_measure("MASS", &v.to_unit_value());
             }
             if let Some(v) = &sp.solar_rad_area {
-                writer.write_measure("SOLAR_RAD_AREA", &v.to_unit_value());
+                writer.write_odm_float_measure("SOLAR_RAD_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.solar_rad_coeff {
-                writer.write_pair("SOLAR_RAD_COEFF", v);
+                writer.write_odm_float_pair("SOLAR_RAD_COEFF", v.value);
             }
             if let Some(v) = &sp.drag_area {
-                writer.write_measure("DRAG_AREA", &v.to_unit_value());
+                writer.write_odm_float_measure("DRAG_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.drag_coeff {
-                writer.write_pair("DRAG_COEFF", v);
+                writer.write_odm_float_pair("DRAG_COEFF", v.value);
             }
         }
 
         // Covariance
         if let Some(cov) = &self.covariance_matrix {
-            cov.write_kvn(writer);
+            // Keep these OPM-only numeric fields paired with `validate_kvn_numbers`.
+            writer.write_comments(&cov.comment);
+            if let Some(frame) = &cov.cov_ref_frame {
+                writer.write_pair("COV_REF_FRAME", frame);
+            }
+            writer.write_odm_float_measure("CX_X", &cov.cx_x);
+            writer.write_odm_float_measure("CY_X", &cov.cy_x);
+            writer.write_odm_float_measure("CY_Y", &cov.cy_y);
+            writer.write_odm_float_measure("CZ_X", &cov.cz_x);
+            writer.write_odm_float_measure("CZ_Y", &cov.cz_y);
+            writer.write_odm_float_measure("CZ_Z", &cov.cz_z);
+            writer.write_odm_float_measure("CX_DOT_X", &cov.cx_dot_x);
+            writer.write_odm_float_measure("CX_DOT_Y", &cov.cx_dot_y);
+            writer.write_odm_float_measure("CX_DOT_Z", &cov.cx_dot_z);
+            writer.write_odm_float_measure("CX_DOT_X_DOT", &cov.cx_dot_x_dot);
+            writer.write_odm_float_measure("CY_DOT_X", &cov.cy_dot_x);
+            writer.write_odm_float_measure("CY_DOT_Y", &cov.cy_dot_y);
+            writer.write_odm_float_measure("CY_DOT_Z", &cov.cy_dot_z);
+            writer.write_odm_float_measure("CY_DOT_X_DOT", &cov.cy_dot_x_dot);
+            writer.write_odm_float_measure("CY_DOT_Y_DOT", &cov.cy_dot_y_dot);
+            writer.write_odm_float_measure("CZ_DOT_X", &cov.cz_dot_x);
+            writer.write_odm_float_measure("CZ_DOT_Y", &cov.cz_dot_y);
+            writer.write_odm_float_measure("CZ_DOT_Z", &cov.cz_dot_z);
+            writer.write_odm_float_measure("CZ_DOT_X_DOT", &cov.cz_dot_x_dot);
+            writer.write_odm_float_measure("CZ_DOT_Y_DOT", &cov.cz_dot_y_dot);
+            writer.write_odm_float_measure("CZ_DOT_Z_DOT", &cov.cz_dot_z_dot);
         }
 
         // Maneuvers
@@ -1132,18 +1437,19 @@ impl crate::traits::Validate for KeplerianElements {
 impl ToKvn for KeplerianElements {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_measure("SEMI_MAJOR_AXIS", &self.semi_major_axis);
-        writer.write_pair("ECCENTRICITY", self.eccentricity);
-        writer.write_measure("INCLINATION", &self.inclination.to_unit_value());
-        writer.write_measure("RA_OF_ASC_NODE", &self.ra_of_asc_node.to_unit_value());
-        writer.write_measure("ARG_OF_PERICENTER", &self.arg_of_pericenter.to_unit_value());
+        writer.write_odm_float_measure("SEMI_MAJOR_AXIS", &self.semi_major_axis);
+        writer.write_odm_float_pair("ECCENTRICITY", self.eccentricity.value);
+        writer.write_odm_float_measure("INCLINATION", &self.inclination.to_unit_value());
+        writer.write_odm_float_measure("RA_OF_ASC_NODE", &self.ra_of_asc_node.to_unit_value());
+        writer
+            .write_odm_float_measure("ARG_OF_PERICENTER", &self.arg_of_pericenter.to_unit_value());
         if let Some(v) = &self.true_anomaly {
-            writer.write_measure("TRUE_ANOMALY", &v.to_unit_value());
+            writer.write_odm_float_measure("TRUE_ANOMALY", &v.to_unit_value());
         }
         if let Some(v) = &self.mean_anomaly {
-            writer.write_measure("MEAN_ANOMALY", &v.to_unit_value());
+            writer.write_odm_float_measure("MEAN_ANOMALY", &v.to_unit_value());
         }
-        writer.write_measure("GM", &UnitValue::new(self.gm.value, self.gm.units.clone()));
+        writer.write_odm_float_measure("GM", &UnitValue::new(self.gm.value, self.gm.units.clone()));
     }
 }
 
@@ -1290,15 +1596,15 @@ impl ToKvn for ManeuverParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         writer.write_pair("MAN_EPOCH_IGNITION", self.man_epoch_ignition);
-        writer.write_measure("MAN_DURATION", &self.man_duration.to_unit_value());
-        writer.write_measure(
+        writer.write_odm_float_measure("MAN_DURATION", &self.man_duration.to_unit_value());
+        writer.write_odm_float_measure(
             "MAN_DELTA_MASS",
             &UnitValue::new(self.man_delta_mass.value, self.man_delta_mass.units.clone()),
         );
         writer.write_pair("MAN_REF_FRAME", &self.man_ref_frame);
-        writer.write_measure("MAN_DV_1", &self.man_dv_1);
-        writer.write_measure("MAN_DV_2", &self.man_dv_2);
-        writer.write_measure("MAN_DV_3", &self.man_dv_3);
+        writer.write_odm_float_measure("MAN_DV_1", &self.man_dv_1);
+        writer.write_odm_float_measure("MAN_DV_2", &self.man_dv_2);
+        writer.write_odm_float_measure("MAN_DV_3", &self.man_dv_3);
     }
 }
 

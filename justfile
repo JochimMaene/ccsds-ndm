@@ -133,6 +133,10 @@ bench:
 bench-opm-xml:
     cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_generate_opm
 
+# Benchmark materialized and streaming OPM KVN generation
+bench-opm-kvn:
+    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_generate_opm
+
 # --- Coverage ---------------------------------------------------------------
 
 # Generate code coverage report
