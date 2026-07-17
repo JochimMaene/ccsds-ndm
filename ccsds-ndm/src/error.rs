@@ -181,6 +181,14 @@ pub enum ValidationError {
         line: Option<usize>,
     },
 
+    /// A schema choice selected either none or more than one of its alternatives.
+    #[error("Invalid choice: expected exactly one of {fields:?}, selected {selected:?}")]
+    InvalidChoice {
+        fields: Vec<Cow<'static, str>>,
+        selected: Vec<Cow<'static, str>>,
+        line: Option<usize>,
+    },
+
     /// A value was provided that does not match the CCSDS specification.
     #[error("Invalid value for '{field}': '{value}' (expected {expected})")]
     InvalidValue {
@@ -223,6 +231,7 @@ impl ValidationError {
     pub fn code(&self) -> Option<&'static str> {
         match self {
             Self::MissingRequiredField { .. } => Some("validation.missing_required_field"),
+            Self::InvalidChoice { .. } => Some("validation.invalid_choice"),
             Self::InvalidValue { .. } => Some("validation.invalid_value"),
             Self::OutOfRange { .. } => Some("validation.out_of_range"),
             Self::AtPath { source, .. } => source.code(),
@@ -266,6 +275,7 @@ impl ValidationError {
                 field.as_ref()
             }
             Self::OutOfRange { name, .. } => name.as_ref(),
+            Self::InvalidChoice { .. } => return self.at_path(parent_path),
             Self::Conflict { .. } | Self::Generic { .. } | Self::AtPath { .. } => return self,
         };
         let field = field.to_ascii_lowercase();
@@ -302,6 +312,9 @@ impl ValidationError {
                 line: error_line, ..
             }
             | Self::Conflict {
+                line: error_line, ..
+            }
+            | Self::InvalidChoice {
                 line: error_line, ..
             }
             | Self::Generic {

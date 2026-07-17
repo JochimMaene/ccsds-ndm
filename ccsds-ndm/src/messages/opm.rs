@@ -906,14 +906,18 @@ impl crate::traits::Validate for KeplerianElements {
             });
         }
 
-        if !matches!(
-            (self.true_anomaly.is_some(), self.mean_anomaly.is_some()),
-            (true, false) | (false, true)
-        ) {
-            errors.push(ValidationError::Generic {
-                message: Cow::Borrowed(
-                    "Keplerian Elements must have exactly one of TRUE_ANOMALY or MEAN_ANOMALY",
-                ),
+        let selected_anomalies = match (self.true_anomaly.is_some(), self.mean_anomaly.is_some()) {
+            (true, false) | (false, true) => None,
+            (false, false) => Some(Vec::new()),
+            (true, true) => Some(vec![
+                Cow::Borrowed("TRUE_ANOMALY"),
+                Cow::Borrowed("MEAN_ANOMALY"),
+            ]),
+        };
+        if let Some(selected) = selected_anomalies {
+            errors.push(ValidationError::InvalidChoice {
+                fields: vec![Cow::Borrowed("TRUE_ANOMALY"), Cow::Borrowed("MEAN_ANOMALY")],
+                selected,
                 line: None,
             });
         }

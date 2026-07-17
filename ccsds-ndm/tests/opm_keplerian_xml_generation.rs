@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::error::{CcsdsNdmError, Result};
+use ccsds_ndm::error::{CcsdsNdmError, Result, ValidationError};
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 
@@ -258,12 +258,45 @@ fn xml_generation_preserves_the_xsd_anomaly_choice() {
         .as_mut()
         .unwrap()
         .true_anomaly = None;
-    assert!(neither.to_xml().is_err());
+    assert_invalid_choice_diagnostic(neither.to_xml(), &[]);
 
     let mut both = opm();
     let elements = both.body.segment.data.keplerian_elements.as_mut().unwrap();
     elements.mean_anomaly = elements.true_anomaly.clone();
-    assert!(both.to_xml().is_err());
+    assert_invalid_choice_diagnostic(both.to_xml(), &["TRUE_ANOMALY", "MEAN_ANOMALY"]);
+}
+
+fn assert_invalid_choice_diagnostic<T: std::fmt::Debug>(
+    result: Result<T>,
+    expected_selected: &[&str],
+) {
+    match result.expect_err("invalid anomaly choice") {
+        CcsdsNdmError::Validation(error) => {
+            assert_eq!(error.code(), Some("validation.invalid_choice"));
+            assert_eq!(
+                error.field_path().as_deref(),
+                Some("body.segment.data.keplerian_elements")
+            );
+            let ValidationError::AtPath { source, .. } = *error else {
+                panic!("choice diagnostic did not carry its containing model path");
+            };
+            let ValidationError::InvalidChoice {
+                fields, selected, ..
+            } = *source
+            else {
+                panic!("choice diagnostic wrapped the wrong validation error");
+            };
+            assert_eq!(
+                fields.iter().map(AsRef::as_ref).collect::<Vec<&str>>(),
+                ["TRUE_ANOMALY", "MEAN_ANOMALY"]
+            );
+            assert_eq!(
+                selected.iter().map(AsRef::as_ref).collect::<Vec<&str>>(),
+                expected_selected
+            );
+        }
+        error => panic!("anomaly choice returned a non-validation error: {error}"),
+    }
 }
 
 #[test]
