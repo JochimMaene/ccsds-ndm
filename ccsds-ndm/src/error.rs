@@ -205,6 +205,14 @@ pub enum ValidationError {
         message: Cow<'static, str>,
         line: Option<usize>,
     },
+
+    /// An existing validation error enriched with its canonical model path.
+    #[error("{source}")]
+    AtPath {
+        path: Cow<'static, str>,
+        #[source]
+        source: Box<ValidationError>,
+    },
 }
 
 impl ValidationError {
@@ -215,6 +223,8 @@ impl ValidationError {
     pub fn code(&self) -> Option<&'static str> {
         match self {
             Self::MissingRequiredField { .. } => Some("validation.missing_required_field"),
+            Self::InvalidValue { .. } => Some("validation.invalid_value"),
+            Self::AtPath { source, .. } => source.code(),
             _ => None,
         }
     }
@@ -222,23 +232,86 @@ impl ValidationError {
     /// Complete model field path relative to the message root, when the containing block has a
     /// canonical path mapping.
     pub fn field_path(&self) -> Option<String> {
-        let Self::MissingRequiredField { block, field, .. } = self else {
-            return None;
-        };
+        match self {
+            Self::AtPath { path, .. } => Some(path.to_string()),
+            Self::MissingRequiredField { block, field, .. } => {
+                let block_path = match block.as_ref() {
+                    "Root" => "",
+                    "ODM Header" => "header",
+                    "OPM Metadata" => "body.segment.metadata",
+                    "Spacecraft Parameters" => "body.segment.data.spacecraft_parameters",
+                    "Maneuver Parameters" => "body.segment.data.maneuver_parameters",
+                    _ => return None,
+                };
+                let field = field.to_ascii_lowercase();
+                Some(match block_path {
+                    "" => field,
+                    _ => format!("{block_path}.{field}"),
+                })
+            }
+            _ => None,
+        }
+    }
 
-        let block_path = match block.as_ref() {
-            "Root" => "",
-            "ODM Header" => "header",
-            "OPM Metadata" => "body.segment.metadata",
-            "Spacecraft Parameters" => "body.segment.data.spacecraft_parameters",
-            "Maneuver Parameters" => "body.segment.data.maneuver_parameters",
-            _ => return None,
+    pub(crate) fn at_field_in(self, parent_path: &'static str) -> Self {
+        if matches!(self, Self::AtPath { .. }) {
+            return self;
+        }
+        if matches!(self, Self::MissingRequiredField { .. }) && self.field_path().is_some() {
+            return self;
+        }
+        let field = match &self {
+            Self::MissingRequiredField { field, .. } | Self::InvalidValue { field, .. } => {
+                field.as_ref()
+            }
+            Self::OutOfRange { name, .. } => name.as_ref(),
+            Self::Conflict { .. } | Self::Generic { .. } | Self::AtPath { .. } => return self,
         };
         let field = field.to_ascii_lowercase();
-        Some(match block_path {
+        let field = match field.strip_suffix(" units") {
+            Some(field) => format!("{field}.units"),
+            None => field.replace(' ', "_"),
+        };
+        let path = match parent_path {
             "" => field,
-            _ => format!("{block_path}.{field}"),
-        })
+            _ => format!("{parent_path}.{field}"),
+        };
+        self.at_path(path)
+    }
+
+    pub(crate) fn at_path(self, path: impl Into<Cow<'static, str>>) -> Self {
+        if matches!(self, Self::AtPath { .. }) {
+            return self;
+        }
+        Self::AtPath {
+            path: path.into(),
+            source: Box::new(self),
+        }
+    }
+
+    fn set_line_if_missing(&mut self, line: usize) {
+        match self {
+            Self::OutOfRange {
+                line: error_line, ..
+            }
+            | Self::InvalidValue {
+                line: error_line, ..
+            }
+            | Self::MissingRequiredField {
+                line: error_line, ..
+            }
+            | Self::Conflict {
+                line: error_line, ..
+            }
+            | Self::Generic {
+                line: error_line, ..
+            } => {
+                if error_line.is_none() {
+                    *error_line = Some(line);
+                }
+            }
+            Self::AtPath { source, .. } => source.set_line_if_missing(line),
+        }
     }
 
     /// Convenience constructor for a missing required field error.
@@ -295,27 +368,7 @@ pub trait WithLocation: Sized {
 
 impl WithLocation for ValidationError {
     fn with_line(mut self, line: usize) -> Self {
-        match &mut self {
-            ValidationError::OutOfRange {
-                line: ref mut l, ..
-            }
-            | ValidationError::InvalidValue {
-                line: ref mut l, ..
-            }
-            | ValidationError::MissingRequiredField {
-                line: ref mut l, ..
-            }
-            | ValidationError::Conflict {
-                line: ref mut l, ..
-            }
-            | ValidationError::Generic {
-                line: ref mut l, ..
-            } => {
-                if l.is_none() {
-                    *l = Some(line);
-                }
-            }
-        }
+        self.set_line_if_missing(line);
         self
     }
 }
@@ -798,18 +851,10 @@ impl CcsdsNdmError {
                     inner.offset = target_offset;
                 }
             }
-            CcsdsNdmError::Validation(ref mut val_err) => match **val_err {
-                ValidationError::InvalidValue { ref mut line, .. }
-                | ValidationError::MissingRequiredField { ref mut line, .. }
-                | ValidationError::Conflict { ref mut line, .. }
-                | ValidationError::Generic { ref mut line, .. }
-                | ValidationError::OutOfRange { ref mut line, .. } => {
-                    if line.is_none() {
-                        let diag = ParseDiagnostic::new(input, offset, "");
-                        *line = Some(diag.line);
-                    }
-                }
-            },
+            CcsdsNdmError::Validation(ref mut val_err) => {
+                let diag = ParseDiagnostic::new(input, offset, "");
+                val_err.set_line_if_missing(diag.line);
+            }
             _ => {} // Other variants don't have location info
         }
         self
@@ -859,6 +904,31 @@ mod tests {
         };
         let s = format!("{}", err);
         assert!(s.contains("Missing required field: FIELD in block BLOCK"));
+    }
+
+    #[test]
+    fn validation_path_preserves_error_behavior() {
+        let error = ValidationError::invalid_value("X", "NaN", "a finite number");
+        let display = error.to_string();
+        let error = error
+            .at_field_in("body.segment.data.state_vector")
+            .with_line(12);
+
+        assert_eq!(error.code(), Some("validation.invalid_value"));
+        assert_eq!(
+            error.field_path().as_deref(),
+            Some("body.segment.data.state_vector.x")
+        );
+        assert_eq!(error.to_string(), display);
+        match error {
+            ValidationError::AtPath { source, .. } => {
+                assert!(matches!(
+                    *source,
+                    ValidationError::InvalidValue { line: Some(12), .. }
+                ));
+            }
+            error => panic!("expected a path-enriched error, got {error:?}"),
+        }
     }
 
     #[test]

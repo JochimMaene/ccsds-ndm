@@ -52,14 +52,13 @@ Evidence links used below:
 | Deterministic output | Covered | Repeated, versioned, streaming, and generic Rust entry points produce identical bytes for the representative OPM fixture. |
 | Invalid-model rejection | Covered | Public Rust XML generation rejects invalid self-contained public model states before writing: required text, XML-forbidden characters, epochs, units, and every state-vector, Keplerian, spacecraft, covariance, and maneuver number have focused mutation evidence. |
 | XSD-valid generated XML | Covered | All five shipped OPM fixtures pass the official schema after generation, with adversarial coverage of the schema-constrained public fields and XML text positions. |
-| Stable structured diagnostics | Partial | Every safely reachable OPM missing-required-field failure exposes the stable code `validation.missing_required_field` and a complete model path relative to the message root through `ValidationError::code` and `ValidationError::field_path`. `opm_3_xml_generation_reports_all_reachable_missing_required_paths` covers root ID, header originator, all five required metadata strings, conditional spacecraft mass, and maneuver reference frame. Empty required epochs are unrepresentable through the public `CalendarEpoch` type. `every_opm_3_xml_generation_entry_point_rejects_an_invalid_model` compatibility-tests one diagnostic across every Rust XML-generation entry point. Other diagnostic categories are not yet stabilized: their current variants retain a CCSDS keyword but not the containing model block, so shared fields such as `StateVector::x` cannot be assigned an OPM path without carrying additional context. |
+| Stable structured diagnostics | Partial | Every safely reachable OPM missing-required-field and invalid-value generation failure exposes a stable code and complete model path relative to the message root through `ValidationError::code` and `ValidationError::field_path`. Focused mutations cover required fields, XML text positions, every public numeric block, and maneuver duration units. Empty required epochs and invalid epoch text are unrepresentable through the public `CalendarEpoch` type. `every_opm_3_xml_generation_entry_point_rejects_an_invalid_model` compatibility-tests one diagnostic across every Rust XML-generation entry point. Path context is attached only when validation fails, avoiding success-path allocation. Other diagnostic categories, including range and field-conflict errors, are not yet stabilized. |
 | Panic-free and bounded output | Partial | [Failing-writer tests](../../ccsds-ndm/tests/opm_xml_writer_failure.rs) cover multiple sink-failure boundaries and verify I/O error propagation without panics. Broader adversarial-model and resource-bound evidence remains open. |
 | Rust surface/release gates | Gap | Installation, platform, API compatibility, security, migration, and reproducible-release evidence is not yet linked to this cell. |
 
 ## Next Small Implementation Step
 
-Before stabilizing `validation.invalid_value`, choose the smallest representation that carries a
-canonical model path when an error is constructed or propagated. Do not infer paths from bare
-keywords: shared types make that ambiguous across message families. Keep the existing
-missing-required-field API stable while evaluating that representation. Do not mark the capability
-`verified` until every remaining `Partial` and `Gap` above is closed.
+Stabilize `validation.out_of_range` using the canonical path context already attached by OPM
+validation, and add focused range-boundary assertions without introducing another diagnostic
+hierarchy. Do not mark the capability `verified` until every remaining `Partial` and `Gap` above is
+closed.

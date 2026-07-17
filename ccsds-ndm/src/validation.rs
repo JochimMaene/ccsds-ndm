@@ -77,6 +77,23 @@ pub(crate) fn validation_errors_from(result: Result<()>) -> Result<Vec<Validatio
     Ok(errors)
 }
 
+pub(crate) fn validate_at_field_path(result: Result<()>, parent_path: &'static str) -> Result<()> {
+    match result {
+        Err(CcsdsNdmError::Validation(error)) => Err((*error).at_field_in(parent_path).into()),
+        result => result,
+    }
+}
+
+pub(crate) fn at_field_paths(
+    errors: Vec<ValidationError>,
+    parent_path: &'static str,
+) -> Vec<ValidationError> {
+    errors
+        .into_iter()
+        .map(|error| error.at_field_in(parent_path))
+        .collect()
+}
+
 pub(crate) fn collect_message_validation_errors(
     kind: MessageKind,
     id: &Option<String>,

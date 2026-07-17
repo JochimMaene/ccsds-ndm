@@ -61,8 +61,8 @@ Available evidence:
   checks every shipped OPM 3.0 KVN and XML fixture against the official schema, checks exact output
   determinism across the Rust generation entry points, and uses public-model mutations to check
   rejection of invalid self-contained states. It also covers every safely reachable OPM
-  missing-required-field diagnostic path and compatibility-tests one such diagnostic across every
-  Rust generation entry point. Run it with `just conformance-opm-xml`.
+  missing-required-field and invalid-value diagnostic path and compatibility-tests one such
+  diagnostic across every Rust generation entry point. Run it with `just conformance-opm-xml`.
 - Requirement inventory:
   [`opm-3.0-xml-generation.md`](conformance/opm-3.0-xml-generation.md) maps the applicable ODM and
   project quality requirements to current evidence and explicit gaps.

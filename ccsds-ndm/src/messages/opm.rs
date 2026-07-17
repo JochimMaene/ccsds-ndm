@@ -68,10 +68,13 @@ impl Serialize for Opm {
 
 impl crate::traits::Validate for Opm {
     fn validate(&self) -> Result<()> {
-        crate::versioning::validate_root(
-            crate::validation::MessageKind::Opm,
-            &self.id,
-            &self.version,
+        crate::validation::validate_at_field_path(
+            crate::versioning::validate_root(
+                crate::validation::MessageKind::Opm,
+                &self.id,
+                &self.version,
+            ),
+            "",
         )?;
         if let Some(error) = self.xml_text_errors().into_iter().next() {
             return Err(error.into());
@@ -89,7 +92,9 @@ impl crate::traits::Validate for Opm {
             &self.version,
         ) {
             Ok(()) => {}
-            Err(crate::error::CcsdsNdmError::Validation(error)) => errors.push(*error),
+            Err(crate::error::CcsdsNdmError::Validation(error)) => {
+                errors.push((*error).at_field_in(""))
+            }
             Err(error) => return Err(error),
         }
         errors.extend(self.xml_text_errors());
@@ -139,59 +144,151 @@ crate::impl_versioned_ndm!(Opm, Opm);
 
 impl Opm {
     fn xml_text_errors(&self) -> Vec<ValidationError> {
-        fn check(errors: &mut Vec<ValidationError>, field: &'static str, value: &str) {
+        fn check(
+            errors: &mut Vec<ValidationError>,
+            field: &'static str,
+            value: &str,
+            path: &'static str,
+        ) {
             if let Some(error) = crate::validation::xml_text_error(field, value) {
-                errors.push(error);
+                errors.push(error.at_path(path));
             }
         }
-        fn check_comments(errors: &mut Vec<ValidationError>, comments: &[String]) {
+        fn check_comments(
+            errors: &mut Vec<ValidationError>,
+            comments: &[String],
+            path: &'static str,
+        ) {
             for comment in comments {
-                check(errors, "COMMENT", comment);
+                check(errors, "COMMENT", comment, path);
             }
         }
 
         let mut errors = Vec::new();
-        check_comments(&mut errors, &self.header.comment);
+        check_comments(&mut errors, &self.header.comment, "header.comment");
         if let Some(value) = &self.header.classification {
-            check(&mut errors, "CLASSIFICATION", value);
+            check(
+                &mut errors,
+                "CLASSIFICATION",
+                value,
+                "header.classification",
+            );
         }
-        check(&mut errors, "ORIGINATOR", &self.header.originator);
+        check(
+            &mut errors,
+            "ORIGINATOR",
+            &self.header.originator,
+            "header.originator",
+        );
         if let Some(value) = &self.header.message_id {
-            check(&mut errors, "MESSAGE_ID", value);
+            check(&mut errors, "MESSAGE_ID", value, "header.message_id");
         }
 
         let segment = &self.body.segment;
-        check_comments(&mut errors, &segment.metadata.comment);
-        check(&mut errors, "OBJECT_NAME", &segment.metadata.object_name);
-        check(&mut errors, "OBJECT_ID", &segment.metadata.object_id);
-        check(&mut errors, "CENTER_NAME", &segment.metadata.center_name);
-        check(&mut errors, "REF_FRAME", &segment.metadata.ref_frame);
-        check(&mut errors, "TIME_SYSTEM", &segment.metadata.time_system);
+        check_comments(
+            &mut errors,
+            &segment.metadata.comment,
+            "body.segment.metadata.comment",
+        );
+        check(
+            &mut errors,
+            "OBJECT_NAME",
+            &segment.metadata.object_name,
+            "body.segment.metadata.object_name",
+        );
+        check(
+            &mut errors,
+            "OBJECT_ID",
+            &segment.metadata.object_id,
+            "body.segment.metadata.object_id",
+        );
+        check(
+            &mut errors,
+            "CENTER_NAME",
+            &segment.metadata.center_name,
+            "body.segment.metadata.center_name",
+        );
+        check(
+            &mut errors,
+            "REF_FRAME",
+            &segment.metadata.ref_frame,
+            "body.segment.metadata.ref_frame",
+        );
+        check(
+            &mut errors,
+            "TIME_SYSTEM",
+            &segment.metadata.time_system,
+            "body.segment.metadata.time_system",
+        );
 
         let data = &segment.data;
-        check_comments(&mut errors, &data.comment);
-        check_comments(&mut errors, &data.state_vector.comment);
+        check_comments(&mut errors, &data.comment, "body.segment.data.comment");
+        check_comments(
+            &mut errors,
+            &data.state_vector.comment,
+            "body.segment.data.state_vector.comment",
+        );
         if let Some(elements) = &data.keplerian_elements {
-            check_comments(&mut errors, &elements.comment);
+            check_comments(
+                &mut errors,
+                &elements.comment,
+                "body.segment.data.keplerian_elements.comment",
+            );
         }
         if let Some(parameters) = &data.spacecraft_parameters {
-            check_comments(&mut errors, &parameters.comment);
+            check_comments(
+                &mut errors,
+                &parameters.comment,
+                "body.segment.data.spacecraft_parameters.comment",
+            );
         }
         if let Some(covariance) = &data.covariance_matrix {
-            check_comments(&mut errors, &covariance.comment);
+            check_comments(
+                &mut errors,
+                &covariance.comment,
+                "body.segment.data.covariance_matrix.comment",
+            );
             if let Some(value) = &covariance.cov_ref_frame {
-                check(&mut errors, "COV_REF_FRAME", value);
+                check(
+                    &mut errors,
+                    "COV_REF_FRAME",
+                    value,
+                    "body.segment.data.covariance_matrix.cov_ref_frame",
+                );
             }
         }
         for maneuver in &data.maneuver_parameters {
-            check_comments(&mut errors, &maneuver.comment);
-            check(&mut errors, "MAN_REF_FRAME", &maneuver.man_ref_frame);
+            check_comments(
+                &mut errors,
+                &maneuver.comment,
+                "body.segment.data.maneuver_parameters.comment",
+            );
+            check(
+                &mut errors,
+                "MAN_REF_FRAME",
+                &maneuver.man_ref_frame,
+                "body.segment.data.maneuver_parameters.man_ref_frame",
+            );
         }
         if let Some(user_defined) = &data.user_defined_parameters {
-            check_comments(&mut errors, &user_defined.comment);
+            check_comments(
+                &mut errors,
+                &user_defined.comment,
+                "body.segment.data.user_defined_parameters.comment",
+            );
             for parameter in &user_defined.user_defined {
-                check(&mut errors, "USER_DEFINED parameter", &parameter.parameter);
-                check(&mut errors, "USER_DEFINED", &parameter.value);
+                check(
+                    &mut errors,
+                    "USER_DEFINED parameter",
+                    &parameter.parameter,
+                    "body.segment.data.user_defined_parameters.user_defined.parameter",
+                );
+                check(
+                    &mut errors,
+                    "USER_DEFINED",
+                    &parameter.value,
+                    "body.segment.data.user_defined_parameters.user_defined.value",
+                );
             }
         }
         errors
@@ -490,18 +587,33 @@ pub struct OpmData {
 
 impl Validate for OpmData {
     fn validate(&self) -> Result<()> {
-        self.state_vector.validate()?;
+        crate::validation::validate_at_field_path(
+            self.state_vector.validate(),
+            "body.segment.data.state_vector",
+        )?;
         if let Some(ke) = &self.keplerian_elements {
-            ke.validate()?;
+            crate::validation::validate_at_field_path(
+                ke.validate(),
+                "body.segment.data.keplerian_elements",
+            )?;
         }
         if let Some(parameters) = &self.spacecraft_parameters {
-            parameters.validate()?;
+            crate::validation::validate_at_field_path(
+                parameters.validate(),
+                "body.segment.data.spacecraft_parameters",
+            )?;
         }
         if let Some(covariance) = &self.covariance_matrix {
-            covariance.validate()?;
+            crate::validation::validate_at_field_path(
+                covariance.validate(),
+                "body.segment.data.covariance_matrix",
+            )?;
         }
         for maneuver in &self.maneuver_parameters {
-            maneuver.validate()?;
+            crate::validation::validate_at_field_path(
+                maneuver.validate(),
+                "body.segment.data.maneuver_parameters",
+            )?;
         }
         if !self.maneuver_parameters.is_empty()
             && self
@@ -521,19 +633,34 @@ impl Validate for OpmData {
     }
 
     fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.state_vector.validation_errors()?;
+        let mut errors = crate::validation::at_field_paths(
+            self.state_vector.validation_errors()?,
+            "body.segment.data.state_vector",
+        );
         errors.extend(match &self.keplerian_elements {
-            Some(elements) => elements.validation_errors()?,
+            Some(elements) => crate::validation::at_field_paths(
+                elements.validation_errors()?,
+                "body.segment.data.keplerian_elements",
+            ),
             None => Vec::new(),
         });
         if let Some(parameters) = &self.spacecraft_parameters {
-            errors.extend(parameters.validation_errors()?);
+            errors.extend(crate::validation::at_field_paths(
+                parameters.validation_errors()?,
+                "body.segment.data.spacecraft_parameters",
+            ));
         }
         if let Some(covariance) = &self.covariance_matrix {
-            errors.extend(covariance.validation_errors()?);
+            errors.extend(crate::validation::at_field_paths(
+                covariance.validation_errors()?,
+                "body.segment.data.covariance_matrix",
+            ));
         }
         for maneuver in &self.maneuver_parameters {
-            errors.extend(maneuver.validation_errors()?);
+            errors.extend(crate::validation::at_field_paths(
+                maneuver.validation_errors()?,
+                "body.segment.data.maneuver_parameters",
+            ));
         }
         if !self.maneuver_parameters.is_empty()
             && self

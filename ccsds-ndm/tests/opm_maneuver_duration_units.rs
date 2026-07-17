@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::error::{CcsdsNdmError, ValidationError};
+use ccsds_ndm::error::CcsdsNdmError;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::TimeUnits;
@@ -20,14 +20,13 @@ fn opm_xml_generation_rejects_day_as_maneuver_duration_unit() {
         .to_xml()
         .expect_err("day is not an XSD-valid duration unit")
     {
-        CcsdsNdmError::Validation(error) => assert!(matches!(
-            *error,
-            ValidationError::InvalidValue {
-                ref field,
-                ref value,
-                ..
-            } if field.as_ref() == "MAN_DURATION units" && value == "d"
-        )),
+        CcsdsNdmError::Validation(error) => {
+            assert_eq!(error.code(), Some("validation.invalid_value"));
+            assert_eq!(
+                error.field_path().as_deref(),
+                Some("body.segment.data.maneuver_parameters.man_duration.units")
+            );
+        }
         error => panic!("expected a validation error, got: {error}"),
     }
 }

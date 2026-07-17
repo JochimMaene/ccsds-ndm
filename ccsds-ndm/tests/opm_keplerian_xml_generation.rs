@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use ccsds_ndm::error::{CcsdsNdmError, Result};
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 
@@ -13,82 +14,125 @@ fn opm() -> Opm {
 
 #[test]
 fn xml_generation_rejects_non_finite_keplerian_values_after_mutation() {
-    let mut message = opm();
-    message
-        .body
-        .segment
-        .data
-        .keplerian_elements
-        .as_mut()
-        .unwrap()
-        .semi_major_axis
-        .value = f64::NAN;
-    assert!(message.to_xml().is_err());
+    type Mutation = (&'static str, fn(&mut Opm));
+    let mutations: [Mutation; 8] = [
+        ("SEMI_MAJOR_AXIS", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .semi_major_axis
+                .value = f64::NAN
+        }),
+        ("ECCENTRICITY", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .eccentricity
+                .value = f64::INFINITY
+        }),
+        ("INCLINATION", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .inclination
+                .angle
+                .value = f64::NAN
+        }),
+        ("RA_OF_ASC_NODE", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .ra_of_asc_node
+                .value = f64::NEG_INFINITY
+        }),
+        ("ARG_OF_PERICENTER", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .arg_of_pericenter
+                .value = f64::NAN
+        }),
+        ("TRUE_ANOMALY", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .true_anomaly
+                .as_mut()
+                .unwrap()
+                .value = f64::INFINITY
+        }),
+        ("MEAN_ANOMALY", |message| {
+            let elements = message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap();
+            elements.true_anomaly = None;
+            elements.mean_anomaly = Some(ccsds_ndm::types::Angle::new(0.0, None).unwrap());
+            elements.mean_anomaly.as_mut().unwrap().value = f64::NAN;
+        }),
+        ("GM", |message| {
+            message
+                .body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .gm
+                .value = f64::NAN
+        }),
+    ];
 
-    let mut message = opm();
-    message
-        .body
-        .segment
-        .data
-        .keplerian_elements
-        .as_mut()
-        .unwrap()
-        .eccentricity
-        .value = f64::INFINITY;
-    assert!(message.to_xml().is_err());
-
-    let mut message = opm();
-    message
-        .body
-        .segment
-        .data
-        .keplerian_elements
-        .as_mut()
-        .unwrap()
-        .inclination
-        .angle
-        .value = f64::NAN;
-    assert!(message.to_xml().is_err());
-
-    for field in [
-        "RA_OF_ASC_NODE",
-        "ARG_OF_PERICENTER",
-        "TRUE_ANOMALY",
-        "MEAN_ANOMALY",
-    ] {
+    for (field, mutate) in mutations {
         let mut message = opm();
-        let elements = message
-            .body
-            .segment
-            .data
-            .keplerian_elements
-            .as_mut()
-            .unwrap();
-        match field {
-            "RA_OF_ASC_NODE" => elements.ra_of_asc_node.value = f64::NEG_INFINITY,
-            "ARG_OF_PERICENTER" => elements.arg_of_pericenter.value = f64::NAN,
-            "TRUE_ANOMALY" => elements.true_anomaly.as_mut().unwrap().value = f64::INFINITY,
-            "MEAN_ANOMALY" => {
-                elements.true_anomaly = None;
-                elements.mean_anomaly = Some(ccsds_ndm::types::Angle::new(0.0, None).unwrap());
-                elements.mean_anomaly.as_mut().unwrap().value = f64::NAN;
-            }
-            _ => unreachable!(),
-        }
-        assert!(message.to_xml().is_err(), "accepted non-finite {field}");
+        mutate(&mut message);
+        let path = format!(
+            "body.segment.data.keplerian_elements.{}",
+            field.to_ascii_lowercase()
+        );
+        assert_invalid_value_diagnostic(field, message.to_xml(), &path);
     }
+}
 
-    let mut message = opm();
-    message
-        .body
-        .segment
-        .data
-        .keplerian_elements
-        .as_mut()
-        .unwrap()
-        .gm
-        .value = f64::NAN;
-    assert!(message.to_xml().is_err());
+fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
+    field: &str,
+    result: Result<T>,
+    expected_path: &str,
+) {
+    match result.expect_err(field) {
+        CcsdsNdmError::Validation(error) => {
+            assert_eq!(error.code(), Some("validation.invalid_value"));
+            assert_eq!(error.field_path().as_deref(), Some(expected_path));
+        }
+        error => panic!("{field} returned a non-validation error: {error}"),
+    }
 }
 
 #[test]

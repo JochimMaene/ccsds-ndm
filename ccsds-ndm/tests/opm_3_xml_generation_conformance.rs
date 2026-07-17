@@ -180,139 +180,208 @@ fn every_opm_3_xml_generation_entry_point_rejects_an_invalid_model() {
 }
 
 #[test]
+fn opm_3_xml_generation_reports_an_invalid_root_id() {
+    let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
+    opm.id = Some("WRONG_ID".into());
+
+    assert_invalid_value_diagnostic("id", opm.to_xml(), "id");
+}
+
+#[test]
 fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
-    type Mutation = (&'static str, usize, fn(&mut Opm));
+    type Mutation = (&'static str, &'static str, usize, fn(&mut Opm));
     let mutations: [Mutation; 21] = [
-        ("header COMMENT", 0, |opm| {
+        ("header COMMENT", "header.comment", 0, |opm| {
             opm.header.comment.push("\u{1}".into())
         }),
-        ("CLASSIFICATION", 0, |opm| {
+        ("CLASSIFICATION", "header.classification", 0, |opm| {
             opm.header.classification = Some("\u{1}".into())
         }),
-        ("ORIGINATOR", 0, |opm| opm.header.originator.push('\u{1}')),
-        ("MESSAGE_ID", 0, |opm| {
+        ("ORIGINATOR", "header.originator", 0, |opm| {
+            opm.header.originator.push('\u{1}')
+        }),
+        ("MESSAGE_ID", "header.message_id", 0, |opm| {
             opm.header.message_id = Some("\u{1}".into())
         }),
-        ("metadata COMMENT", 0, |opm| {
-            opm.body.segment.metadata.comment.push("\u{1}".into())
-        }),
-        ("OBJECT_NAME", 0, |opm| {
-            opm.body.segment.metadata.object_name.push('\u{1}')
-        }),
-        ("OBJECT_ID", 0, |opm| {
+        (
+            "metadata COMMENT",
+            "body.segment.metadata.comment",
+            0,
+            |opm| opm.body.segment.metadata.comment.push("\u{1}".into()),
+        ),
+        (
+            "OBJECT_NAME",
+            "body.segment.metadata.object_name",
+            0,
+            |opm| opm.body.segment.metadata.object_name.push('\u{1}'),
+        ),
+        ("OBJECT_ID", "body.segment.metadata.object_id", 0, |opm| {
             opm.body.segment.metadata.object_id.push('\u{1}')
         }),
-        ("CENTER_NAME", 0, |opm| {
-            opm.body.segment.metadata.center_name.push('\u{1}')
-        }),
-        ("REF_FRAME", 0, |opm| {
+        (
+            "CENTER_NAME",
+            "body.segment.metadata.center_name",
+            0,
+            |opm| opm.body.segment.metadata.center_name.push('\u{1}'),
+        ),
+        ("REF_FRAME", "body.segment.metadata.ref_frame", 0, |opm| {
             opm.body.segment.metadata.ref_frame.push('\u{1}')
         }),
-        ("TIME_SYSTEM", 0, |opm| {
-            opm.body.segment.metadata.time_system.push('\u{1}')
-        }),
-        ("data COMMENT", 0, |opm| {
+        (
+            "TIME_SYSTEM",
+            "body.segment.metadata.time_system",
+            0,
+            |opm| opm.body.segment.metadata.time_system.push('\u{1}'),
+        ),
+        ("data COMMENT", "body.segment.data.comment", 0, |opm| {
             opm.body.segment.data.comment.push("\u{1}".into())
         }),
-        ("state-vector COMMENT", 0, |opm| {
-            opm.body
-                .segment
-                .data
-                .state_vector
-                .comment
-                .push("\u{1}".into())
-        }),
-        ("Keplerian COMMENT", 1, |opm| {
-            opm.body
-                .segment
-                .data
-                .keplerian_elements
-                .as_mut()
-                .unwrap()
-                .comment
-                .push("\u{1}".into())
-        }),
-        ("spacecraft COMMENT", 0, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .comment
-                .push("\u{1}".into())
-        }),
-        ("covariance COMMENT", 3, |opm| {
-            opm.body
-                .segment
-                .data
-                .covariance_matrix
-                .as_mut()
-                .unwrap()
-                .comment
-                .push("\u{1}".into())
-        }),
-        ("COV_REF_FRAME", 3, |opm| {
-            opm.body
-                .segment
-                .data
-                .covariance_matrix
-                .as_mut()
-                .unwrap()
-                .cov_ref_frame = Some("\u{1}".into())
-        }),
-        ("maneuver COMMENT", 1, |opm| {
-            opm.body.segment.data.maneuver_parameters[0]
-                .comment
-                .push("\u{1}".into())
-        }),
-        ("MAN_REF_FRAME", 1, |opm| {
-            opm.body.segment.data.maneuver_parameters[0]
-                .man_ref_frame
-                .push('\u{1}')
-        }),
-        ("USER_DEFINED parameter", 3, |opm| {
-            opm.body
-                .segment
-                .data
-                .user_defined_parameters
-                .as_mut()
-                .unwrap()
-                .user_defined[0]
-                .parameter
-                .push('\u{1}')
-        }),
-        ("user-defined COMMENT", 3, |opm| {
-            opm.body
-                .segment
-                .data
-                .user_defined_parameters
-                .as_mut()
-                .unwrap()
-                .comment
-                .push("\u{1}".into())
-        }),
-        ("USER_DEFINED value", 3, |opm| {
-            opm.body
-                .segment
-                .data
-                .user_defined_parameters
-                .as_mut()
-                .unwrap()
-                .user_defined[0]
-                .value
-                .push('\u{1}')
-        }),
+        (
+            "state-vector COMMENT",
+            "body.segment.data.state_vector.comment",
+            0,
+            |opm| {
+                opm.body
+                    .segment
+                    .data
+                    .state_vector
+                    .comment
+                    .push("\u{1}".into())
+            },
+        ),
+        (
+            "Keplerian COMMENT",
+            "body.segment.data.keplerian_elements.comment",
+            1,
+            |opm| {
+                opm.body
+                    .segment
+                    .data
+                    .keplerian_elements
+                    .as_mut()
+                    .unwrap()
+                    .comment
+                    .push("\u{1}".into())
+            },
+        ),
+        (
+            "spacecraft COMMENT",
+            "body.segment.data.spacecraft_parameters.comment",
+            0,
+            |opm| {
+                opm.body
+                    .segment
+                    .data
+                    .spacecraft_parameters
+                    .as_mut()
+                    .unwrap()
+                    .comment
+                    .push("\u{1}".into())
+            },
+        ),
+        (
+            "covariance COMMENT",
+            "body.segment.data.covariance_matrix.comment",
+            3,
+            |opm| {
+                opm.body
+                    .segment
+                    .data
+                    .covariance_matrix
+                    .as_mut()
+                    .unwrap()
+                    .comment
+                    .push("\u{1}".into())
+            },
+        ),
+        (
+            "COV_REF_FRAME",
+            "body.segment.data.covariance_matrix.cov_ref_frame",
+            3,
+            |opm| {
+                opm.body
+                    .segment
+                    .data
+                    .covariance_matrix
+                    .as_mut()
+                    .unwrap()
+                    .cov_ref_frame = Some("\u{1}".into())
+            },
+        ),
+        (
+            "maneuver COMMENT",
+            "body.segment.data.maneuver_parameters.comment",
+            1,
+            |opm| {
+                opm.body.segment.data.maneuver_parameters[0]
+                    .comment
+                    .push("\u{1}".into())
+            },
+        ),
+        (
+            "MAN_REF_FRAME",
+            "body.segment.data.maneuver_parameters.man_ref_frame",
+            1,
+            |opm| {
+                opm.body.segment.data.maneuver_parameters[0]
+                    .man_ref_frame
+                    .push('\u{1}')
+            },
+        ),
+        (
+            "USER_DEFINED parameter",
+            "body.segment.data.user_defined_parameters.user_defined.parameter",
+            3,
+            |opm| {
+                opm.body
+                    .segment
+                    .data
+                    .user_defined_parameters
+                    .as_mut()
+                    .unwrap()
+                    .user_defined[0]
+                    .parameter
+                    .push('\u{1}')
+            },
+        ),
+        (
+            "user-defined COMMENT",
+            "body.segment.data.user_defined_parameters.comment",
+            3,
+            |opm| {
+                opm.body
+                    .segment
+                    .data
+                    .user_defined_parameters
+                    .as_mut()
+                    .unwrap()
+                    .comment
+                    .push("\u{1}".into())
+            },
+        ),
+        (
+            "USER_DEFINED value",
+            "body.segment.data.user_defined_parameters.user_defined.value",
+            3,
+            |opm| {
+                opm.body
+                    .segment
+                    .data
+                    .user_defined_parameters
+                    .as_mut()
+                    .unwrap()
+                    .user_defined[0]
+                    .value
+                    .push('\u{1}')
+            },
+        ),
     ];
 
-    for (field, fixture, mutate) in mutations {
+    for (field, path, fixture, mutate) in mutations {
         let mut opm =
             Opm::from_kvn(OPM_3_KVN_FIXTURES[fixture].1).expect("failed to parse OPM fixture");
         mutate(&mut opm);
-        assert!(
-            opm.to_xml().is_err(),
-            "generation accepted an XML 1.0 control character in {field}"
-        );
+        assert_invalid_value_diagnostic(field, opm.to_xml(), path);
     }
 }
 
@@ -418,15 +487,19 @@ fn opm_3_xml_generation_rejects_every_non_finite_state_vector_component() {
     for (field, mutate) in mutations {
         let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
         mutate(&mut opm);
-        assert_non_finite_rejected(field, opm.to_xml());
+        let path = format!(
+            "body.segment.data.state_vector.{}",
+            field.to_ascii_lowercase()
+        );
+        assert_invalid_value_diagnostic(field, opm.to_xml(), &path);
     }
 }
 
 #[test]
 fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
-    type Mutation = (&'static str, fn(&mut Opm));
+    type Mutation = (&'static str, bool, fn(&mut Opm));
     let mutations: [Mutation; 5] = [
-        ("MASS", |opm| {
+        ("MASS", true, |opm| {
             opm.body
                 .segment
                 .data
@@ -438,7 +511,7 @@ fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
                 .unwrap()
                 .value = f64::NAN
         }),
-        ("SOLAR_RAD_AREA", |opm| {
+        ("SOLAR_RAD_AREA", false, |opm| {
             opm.body
                 .segment
                 .data
@@ -450,7 +523,7 @@ fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
                 .unwrap()
                 .value = -1.0
         }),
-        ("SOLAR_RAD_COEFF", |opm| {
+        ("SOLAR_RAD_COEFF", true, |opm| {
             opm.body
                 .segment
                 .data
@@ -462,7 +535,7 @@ fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
                 .unwrap()
                 .value = f64::INFINITY
         }),
-        ("DRAG_AREA", |opm| {
+        ("DRAG_AREA", false, |opm| {
             opm.body
                 .segment
                 .data
@@ -474,7 +547,7 @@ fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
                 .unwrap()
                 .value = -1.0
         }),
-        ("DRAG_COEFF", |opm| {
+        ("DRAG_COEFF", true, |opm| {
             opm.body
                 .segment
                 .data
@@ -488,10 +561,18 @@ fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
         }),
     ];
 
-    for (field, mutate) in mutations {
+    for (field, is_invalid_value, mutate) in mutations {
         let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
         mutate(&mut opm);
-        assert!(opm.to_xml().is_err(), "generation accepted invalid {field}");
+        if is_invalid_value {
+            let path = format!(
+                "body.segment.data.spacecraft_parameters.{}",
+                field.to_ascii_lowercase()
+            );
+            assert_invalid_value_diagnostic(field, opm.to_xml(), &path);
+        } else {
+            assert!(opm.to_xml().is_err(), "generation accepted invalid {field}");
+        }
     }
 }
 
@@ -545,7 +626,11 @@ fn opm_3_xml_generation_rejects_every_non_finite_covariance_component() {
         let mut opm =
             Opm::from_kvn(OPM_3_KVN_FIXTURES[3].1).expect("failed to parse covariance fixture");
         mutate(&mut opm);
-        assert_non_finite_rejected(field, opm.to_xml());
+        let path = format!(
+            "body.segment.data.covariance_matrix.{}",
+            field.to_ascii_lowercase()
+        );
+        assert_invalid_value_diagnostic(field, opm.to_xml(), &path);
     }
 }
 
@@ -578,7 +663,11 @@ fn opm_3_xml_generation_rejects_every_invalid_maneuver_value() {
         let mut opm =
             Opm::from_kvn(OPM_3_KVN_FIXTURES[1].1).expect("failed to parse maneuver fixture");
         mutate(&mut opm);
-        assert_non_finite_rejected(field, opm.to_xml());
+        let path = format!(
+            "body.segment.data.maneuver_parameters.{}",
+            field.to_ascii_lowercase()
+        );
+        assert_invalid_value_diagnostic(field, opm.to_xml(), &path);
     }
 }
 
@@ -611,12 +700,41 @@ fn assert_non_finite_rejected<T: std::fmt::Debug>(surface: &str, result: Result<
     match result.expect_err(surface) {
         CcsdsNdmError::Validation(error) => assert!(
             matches!(
-                *error,
+                validation_error_source(&error),
                 ValidationError::InvalidValue { ref expected, .. }
                     if expected.as_ref() == "a finite number"
             ),
             "{surface} returned the wrong validation error: {error}"
         ),
+        error => panic!("{surface} returned a non-validation error: {error}"),
+    }
+}
+
+fn validation_error_source(error: &ValidationError) -> &ValidationError {
+    match error {
+        ValidationError::AtPath { source, .. } => validation_error_source(source),
+        error => error,
+    }
+}
+
+fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
+    surface: &str,
+    result: Result<T>,
+    expected_path: &str,
+) {
+    match result.expect_err(surface) {
+        CcsdsNdmError::Validation(error) => {
+            assert_eq!(
+                error.code(),
+                Some("validation.invalid_value"),
+                "{surface} returned an unstable diagnostic code"
+            );
+            assert_eq!(
+                error.field_path().as_deref(),
+                Some(expected_path),
+                "{surface} returned an incomplete field path"
+            );
+        }
         error => panic!("{surface} returned a non-validation error: {error}"),
     }
 }
