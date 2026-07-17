@@ -602,6 +602,17 @@ impl Opm {
                     .into());
                 }
                 let key_len = "USER_DEFINED_".len() + suffix.len();
+                let minimum_line_len = key_len.max(20) + 3;
+                if minimum_line_len > 254 {
+                    return Err(ValidationError::OutOfRange {
+                        name: "USER_DEFINED parameter".into(),
+                        value: minimum_line_len.to_string(),
+                        expected: "a KVN line no longer than 254 characters".into(),
+                        line: None,
+                    }
+                    .at_path("body.segment.data.user_defined_parameters.user_defined.parameter")
+                    .into());
+                }
                 pair(
                     "USER_DEFINED",
                     &parameter.value,

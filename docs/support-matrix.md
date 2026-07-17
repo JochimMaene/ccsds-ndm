@@ -112,8 +112,8 @@ Available evidence:
   [`opm-3.0-kvn-generation.md`](conformance/opm-3.0-kvn-generation.md) maps current evidence and
   explicit gaps.
 
-Evidence still required before `verified` includes complete diagnostic mutations, bounded-resource
-evidence, performance budgets, and the applicable Rust surface/release gates.
+Evidence still required before `verified` includes the broader structured-diagnostic contract,
+bounded-resource evidence, performance budgets, and the applicable Rust surface/release gates.
 
 ## Advertised Capabilities
 

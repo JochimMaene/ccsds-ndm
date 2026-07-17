@@ -145,6 +145,84 @@ fn opm_kvn_rejects_values_that_need_seventeen_digits_before_writing() {
 }
 
 #[test]
+fn opm_kvn_reports_unrepresentable_numbers_in_every_optional_numeric_block() {
+    const LOSSY: f64 = 1.234_567_890_123_456_7;
+    type Mutation = (&'static str, &'static str, fn(&mut Opm));
+    let mutations: [Mutation; 4] = [
+        (
+            include_str!("../../data/kvn/opm_g2.kvn"),
+            "body.segment.data.keplerian_elements.semi_major_axis",
+            |message| {
+                message
+                    .body
+                    .segment
+                    .data
+                    .keplerian_elements
+                    .as_mut()
+                    .unwrap()
+                    .semi_major_axis
+                    .value = LOSSY
+            },
+        ),
+        (
+            include_str!("../../data/kvn/opm_g2.kvn"),
+            "body.segment.data.spacecraft_parameters.mass",
+            |message| {
+                message
+                    .body
+                    .segment
+                    .data
+                    .spacecraft_parameters
+                    .as_mut()
+                    .unwrap()
+                    .mass
+                    .as_mut()
+                    .unwrap()
+                    .value = LOSSY
+            },
+        ),
+        (
+            include_str!("../../data/kvn/opm_g4.kvn"),
+            "body.segment.data.covariance_matrix.cx_x",
+            |message| {
+                message
+                    .body
+                    .segment
+                    .data
+                    .covariance_matrix
+                    .as_mut()
+                    .unwrap()
+                    .cx_x
+                    .value = LOSSY
+            },
+        ),
+        (
+            include_str!("../../data/kvn/opm_g2.kvn"),
+            "body.segment.data.maneuver_parameters.man_duration",
+            |message| {
+                message.body.segment.data.maneuver_parameters[0]
+                    .man_duration
+                    .value = LOSSY
+            },
+        ),
+    ];
+
+    for (source, path, mutate) in mutations {
+        let mut message = Opm::from_kvn(source).expect("fixture should parse");
+        mutate(&mut message);
+
+        let error = message
+            .to_kvn()
+            .expect_err("lossy 16-digit rounding must not occur");
+        assert_eq!(error.code(), Some("validation.invalid_value"));
+        assert_eq!(error.field_path().as_deref(), Some(path));
+        message
+            .to_xml()
+            .expect("the KVN-specific precision rule must not affect XML");
+    }
+}
+
+#[test]
 fn opm_kvn_requires_the_odm_spelling_for_gm_units() {
     let mut message =
         Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).expect("fixture should parse");
@@ -302,6 +380,71 @@ fn opm_kvn_enforces_the_254_character_line_limit() {
         .expect_err("a 255-character COMMENT line must be rejected");
     assert_eq!(error.code(), Some("validation.out_of_range"));
     assert_eq!(error.field_path().as_deref(), Some("header.comment"));
+}
+
+#[test]
+fn opm_kvn_enforces_the_line_limit_for_assignment_values() {
+    let mut message = opm();
+    message.header.originator = "A".repeat(231);
+
+    let generated = message
+        .to_kvn()
+        .expect("a 254-character assignment line should be valid");
+    let originator = generated
+        .lines()
+        .find(|line| line.starts_with("ORIGINATOR"))
+        .expect("generated KVN should contain ORIGINATOR");
+    assert_eq!(originator.len(), 254);
+
+    message.header.originator.push('A');
+    let error = message
+        .to_kvn()
+        .expect_err("a 255-character assignment line must be rejected");
+    assert_eq!(error.code(), Some("validation.out_of_range"));
+    assert_eq!(error.field_path().as_deref(), Some("header.originator"));
+}
+
+#[test]
+fn opm_kvn_attributes_an_oversized_user_defined_keyword_to_its_parameter() {
+    let mut message =
+        Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("fixture should parse");
+    let parameter = &mut message
+        .body
+        .segment
+        .data
+        .user_defined_parameters
+        .as_mut()
+        .unwrap()
+        .user_defined[0];
+    parameter.parameter = "A".repeat(237);
+    parameter.value = "V".to_owned();
+
+    let generated = message
+        .to_kvn()
+        .expect("a 254-character user-defined line should be valid");
+    let user_defined = generated
+        .lines()
+        .find(|line| line.starts_with("USER_DEFINED_"))
+        .expect("generated KVN should contain user-defined data");
+    assert_eq!(user_defined.len(), 254);
+
+    message
+        .body
+        .segment
+        .data
+        .user_defined_parameters
+        .as_mut()
+        .unwrap()
+        .user_defined[0]
+        .parameter = "A".repeat(239);
+    let error = message
+        .to_kvn()
+        .expect_err("a keyword that exceeds the line limit must be rejected");
+    assert_eq!(error.code(), Some("validation.out_of_range"));
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.user_defined_parameters.user_defined.parameter")
+    );
 }
 
 #[test]
