@@ -143,6 +143,24 @@ fn bench_generate_opm(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_generate_opm_maneuver_scaling(c: &mut Criterion) {
+    let base = Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).unwrap();
+    let maneuver = base.body.segment.data.maneuver_parameters[0].clone();
+    let mut group = c.benchmark_group("kvn_generate_opm_maneuver_scaling");
+    group.sample_size(60);
+
+    for count in [1, 10, 100, 1000] {
+        let mut opm = base.clone();
+        opm.body.segment.data.maneuver_parameters = vec![maneuver.clone(); count];
+        group.throughput(Throughput::Elements(count as u64));
+        group.bench_with_input(BenchmarkId::from_parameter(count), &opm, |b, opm| {
+            b.iter(|| black_box(opm).to_kvn().unwrap())
+        });
+    }
+
+    group.finish();
+}
+
 fn bench_parse_omm(c: &mut Criterion) {
     let omm_kvn = include_str!("../../data/kvn/omm_g7.kvn");
 
@@ -229,6 +247,7 @@ criterion_group!(
     bench_generate_kvn,
     bench_parse_opm,
     bench_generate_opm,
+    bench_generate_opm_maneuver_scaling,
     bench_parse_omm,
     bench_parse_tdm,
     bench_kvn_scaling,
