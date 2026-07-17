@@ -43,18 +43,44 @@ fn validate_with_official_xsd(label: &str, xml: &str) {
     );
 }
 
-fn assert_missing_object_name<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
+fn assert_missing_required<T: std::fmt::Debug>(
+    surface: &str,
+    result: Result<T>,
+    expected_field: &str,
+    expected_path: &str,
+) {
     match result.expect_err(surface) {
-        CcsdsNdmError::Validation(error) => assert!(
-            matches!(
-                *error,
-                ValidationError::MissingRequiredField { ref field, .. }
-                    if field.as_ref() == "OBJECT_NAME"
-            ),
-            "{surface} returned the wrong validation error: {error}"
-        ),
+        CcsdsNdmError::Validation(error) => {
+            assert_eq!(
+                error.code(),
+                Some("validation.missing_required_field"),
+                "{surface} returned an unstable diagnostic code"
+            );
+            assert_eq!(
+                error.field_path().as_deref(),
+                Some(expected_path),
+                "{surface} returned an incomplete field path"
+            );
+            assert!(
+                matches!(
+                    *error,
+                    ValidationError::MissingRequiredField { ref field, .. }
+                        if field.as_ref() == expected_field
+                ),
+                "{surface} returned the wrong validation error: {error}"
+            );
+        }
         error => panic!("{surface} returned a non-validation error: {error}"),
     }
+}
+
+fn assert_missing_object_name<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
+    assert_missing_required(
+        surface,
+        result,
+        "OBJECT_NAME",
+        "body.segment.metadata.object_name",
+    );
 }
 
 #[test]
@@ -154,64 +180,410 @@ fn every_opm_3_xml_generation_entry_point_rejects_an_invalid_model() {
 }
 
 #[test]
-fn opm_3_xml_generation_validates_nested_optional_blocks() {
-    let mut spacecraft =
-        Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse spacecraft fixture");
-    spacecraft
-        .body
-        .segment
-        .data
-        .spacecraft_parameters
-        .as_mut()
-        .unwrap()
-        .mass
-        .as_mut()
-        .unwrap()
-        .value = f64::NAN;
-    assert_non_finite_rejected("spacecraft parameters", spacecraft.to_xml());
+fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
+    type Mutation = (&'static str, usize, fn(&mut Opm));
+    let mutations: [Mutation; 21] = [
+        ("header COMMENT", 0, |opm| {
+            opm.header.comment.push("\u{1}".into())
+        }),
+        ("CLASSIFICATION", 0, |opm| {
+            opm.header.classification = Some("\u{1}".into())
+        }),
+        ("ORIGINATOR", 0, |opm| opm.header.originator.push('\u{1}')),
+        ("MESSAGE_ID", 0, |opm| {
+            opm.header.message_id = Some("\u{1}".into())
+        }),
+        ("metadata COMMENT", 0, |opm| {
+            opm.body.segment.metadata.comment.push("\u{1}".into())
+        }),
+        ("OBJECT_NAME", 0, |opm| {
+            opm.body.segment.metadata.object_name.push('\u{1}')
+        }),
+        ("OBJECT_ID", 0, |opm| {
+            opm.body.segment.metadata.object_id.push('\u{1}')
+        }),
+        ("CENTER_NAME", 0, |opm| {
+            opm.body.segment.metadata.center_name.push('\u{1}')
+        }),
+        ("REF_FRAME", 0, |opm| {
+            opm.body.segment.metadata.ref_frame.push('\u{1}')
+        }),
+        ("TIME_SYSTEM", 0, |opm| {
+            opm.body.segment.metadata.time_system.push('\u{1}')
+        }),
+        ("data COMMENT", 0, |opm| {
+            opm.body.segment.data.comment.push("\u{1}".into())
+        }),
+        ("state-vector COMMENT", 0, |opm| {
+            opm.body
+                .segment
+                .data
+                .state_vector
+                .comment
+                .push("\u{1}".into())
+        }),
+        ("Keplerian COMMENT", 1, |opm| {
+            opm.body
+                .segment
+                .data
+                .keplerian_elements
+                .as_mut()
+                .unwrap()
+                .comment
+                .push("\u{1}".into())
+        }),
+        ("spacecraft COMMENT", 0, |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .comment
+                .push("\u{1}".into())
+        }),
+        ("covariance COMMENT", 3, |opm| {
+            opm.body
+                .segment
+                .data
+                .covariance_matrix
+                .as_mut()
+                .unwrap()
+                .comment
+                .push("\u{1}".into())
+        }),
+        ("COV_REF_FRAME", 3, |opm| {
+            opm.body
+                .segment
+                .data
+                .covariance_matrix
+                .as_mut()
+                .unwrap()
+                .cov_ref_frame = Some("\u{1}".into())
+        }),
+        ("maneuver COMMENT", 1, |opm| {
+            opm.body.segment.data.maneuver_parameters[0]
+                .comment
+                .push("\u{1}".into())
+        }),
+        ("MAN_REF_FRAME", 1, |opm| {
+            opm.body.segment.data.maneuver_parameters[0]
+                .man_ref_frame
+                .push('\u{1}')
+        }),
+        ("USER_DEFINED parameter", 3, |opm| {
+            opm.body
+                .segment
+                .data
+                .user_defined_parameters
+                .as_mut()
+                .unwrap()
+                .user_defined[0]
+                .parameter
+                .push('\u{1}')
+        }),
+        ("user-defined COMMENT", 3, |opm| {
+            opm.body
+                .segment
+                .data
+                .user_defined_parameters
+                .as_mut()
+                .unwrap()
+                .comment
+                .push("\u{1}".into())
+        }),
+        ("USER_DEFINED value", 3, |opm| {
+            opm.body
+                .segment
+                .data
+                .user_defined_parameters
+                .as_mut()
+                .unwrap()
+                .user_defined[0]
+                .value
+                .push('\u{1}')
+        }),
+    ];
 
-    let mut spacecraft =
-        Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse spacecraft fixture");
-    spacecraft
-        .body
-        .segment
-        .data
-        .spacecraft_parameters
-        .as_mut()
-        .unwrap()
-        .mass
-        .as_mut()
-        .unwrap()
-        .value = -1.0;
-    assert!(spacecraft.to_xml().is_err());
+    for (field, fixture, mutate) in mutations {
+        let mut opm =
+            Opm::from_kvn(OPM_3_KVN_FIXTURES[fixture].1).expect("failed to parse OPM fixture");
+        mutate(&mut opm);
+        assert!(
+            opm.to_xml().is_err(),
+            "generation accepted an XML 1.0 control character in {field}"
+        );
+    }
+}
 
-    let mut covariance =
-        Opm::from_kvn(OPM_3_KVN_FIXTURES[3].1).expect("failed to parse covariance fixture");
-    covariance
-        .body
-        .segment
-        .data
-        .covariance_matrix
-        .as_mut()
-        .unwrap()
-        .cx_x
-        .value = f64::INFINITY;
-    assert_non_finite_rejected("covariance matrix", covariance.to_xml());
+#[test]
+fn opm_3_xml_generation_accepts_xml_1_0_text_boundaries() {
+    let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
+    opm.header.comment.push("\t\n\r \u{FFFD}\u{10000}".into());
 
-    let mut maneuver =
-        Opm::from_kvn(OPM_3_KVN_FIXTURES[1].1).expect("failed to parse maneuver fixture");
-    maneuver.body.segment.data.maneuver_parameters[0]
-        .man_dv_1
-        .value = f64::NAN;
-    assert_non_finite_rejected("maneuver parameters", maneuver.to_xml());
+    opm.to_xml()
+        .expect("generation rejected characters permitted by XML 1.0");
+}
 
-    let mut maneuver =
-        Opm::from_kvn(OPM_3_KVN_FIXTURES[1].1).expect("failed to parse maneuver fixture");
-    maneuver.body.segment.data.maneuver_parameters[0]
-        .man_ref_frame
-        .clear();
-    assert!(maneuver.to_xml().is_err());
+#[test]
+fn opm_3_xml_generation_reports_all_reachable_missing_required_paths() {
+    type Mutation = (&'static str, &'static str, usize, fn(&mut Opm));
+    let mutations: [Mutation; 9] = [
+        ("id", "id", 0, |opm| opm.id = None),
+        ("ORIGINATOR", "header.originator", 0, |opm| {
+            opm.header.originator.clear()
+        }),
+        (
+            "OBJECT_NAME",
+            "body.segment.metadata.object_name",
+            0,
+            |opm| opm.body.segment.metadata.object_name.clear(),
+        ),
+        ("OBJECT_ID", "body.segment.metadata.object_id", 0, |opm| {
+            opm.body.segment.metadata.object_id.clear()
+        }),
+        (
+            "CENTER_NAME",
+            "body.segment.metadata.center_name",
+            0,
+            |opm| opm.body.segment.metadata.center_name.clear(),
+        ),
+        ("REF_FRAME", "body.segment.metadata.ref_frame", 0, |opm| {
+            opm.body.segment.metadata.ref_frame.clear()
+        }),
+        (
+            "TIME_SYSTEM",
+            "body.segment.metadata.time_system",
+            0,
+            |opm| opm.body.segment.metadata.time_system.clear(),
+        ),
+        (
+            "MASS",
+            "body.segment.data.spacecraft_parameters.mass",
+            1,
+            |opm| {
+                opm.body
+                    .segment
+                    .data
+                    .spacecraft_parameters
+                    .as_mut()
+                    .unwrap()
+                    .mass = None
+            },
+        ),
+        (
+            "MAN_REF_FRAME",
+            "body.segment.data.maneuver_parameters.man_ref_frame",
+            1,
+            |opm| {
+                opm.body.segment.data.maneuver_parameters[0]
+                    .man_ref_frame
+                    .clear()
+            },
+        ),
+    ];
 
+    for (field, path, fixture, mutate) in mutations {
+        let mut opm =
+            Opm::from_kvn(OPM_3_KVN_FIXTURES[fixture].1).expect("failed to parse OPM fixture");
+        mutate(&mut opm);
+        assert_missing_required(field, opm.to_xml(), field, path);
+    }
+}
+
+#[test]
+fn opm_3_xml_generation_rejects_every_non_finite_state_vector_component() {
+    type Mutation = (&'static str, fn(&mut Opm));
+    let mutations: [Mutation; 6] = [
+        ("X", |opm| {
+            opm.body.segment.data.state_vector.x.value = f64::NAN
+        }),
+        ("Y", |opm| {
+            opm.body.segment.data.state_vector.y.value = f64::INFINITY
+        }),
+        ("Z", |opm| {
+            opm.body.segment.data.state_vector.z.value = f64::NEG_INFINITY
+        }),
+        ("X_DOT", |opm| {
+            opm.body.segment.data.state_vector.x_dot.value = f64::NAN
+        }),
+        ("Y_DOT", |opm| {
+            opm.body.segment.data.state_vector.y_dot.value = f64::INFINITY
+        }),
+        ("Z_DOT", |opm| {
+            opm.body.segment.data.state_vector.z_dot.value = f64::NEG_INFINITY
+        }),
+    ];
+
+    for (field, mutate) in mutations {
+        let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
+        mutate(&mut opm);
+        assert_non_finite_rejected(field, opm.to_xml());
+    }
+}
+
+#[test]
+fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
+    type Mutation = (&'static str, fn(&mut Opm));
+    let mutations: [Mutation; 5] = [
+        ("MASS", |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .mass
+                .as_mut()
+                .unwrap()
+                .value = f64::NAN
+        }),
+        ("SOLAR_RAD_AREA", |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .solar_rad_area
+                .as_mut()
+                .unwrap()
+                .value = -1.0
+        }),
+        ("SOLAR_RAD_COEFF", |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .solar_rad_coeff
+                .as_mut()
+                .unwrap()
+                .value = f64::INFINITY
+        }),
+        ("DRAG_AREA", |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .drag_area
+                .as_mut()
+                .unwrap()
+                .value = -1.0
+        }),
+        ("DRAG_COEFF", |opm| {
+            opm.body
+                .segment
+                .data
+                .spacecraft_parameters
+                .as_mut()
+                .unwrap()
+                .drag_coeff
+                .as_mut()
+                .unwrap()
+                .value = f64::NEG_INFINITY
+        }),
+    ];
+
+    for (field, mutate) in mutations {
+        let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
+        mutate(&mut opm);
+        assert!(opm.to_xml().is_err(), "generation accepted invalid {field}");
+    }
+}
+
+#[test]
+fn opm_3_xml_generation_rejects_every_non_finite_covariance_component() {
+    macro_rules! mutations {
+        ($($field:ident),+ $(,)?) => {
+            [
+                $((
+                    stringify!($field),
+                    (|opm: &mut Opm| {
+                        opm.body
+                            .segment
+                            .data
+                            .covariance_matrix
+                            .as_mut()
+                            .unwrap()
+                            .$field
+                            .value = f64::NAN;
+                    }) as fn(&mut Opm),
+                )),+
+            ]
+        };
+    }
+
+    let mutations = mutations![
+        cx_x,
+        cy_x,
+        cy_y,
+        cz_x,
+        cz_y,
+        cz_z,
+        cx_dot_x,
+        cx_dot_y,
+        cx_dot_z,
+        cx_dot_x_dot,
+        cy_dot_x,
+        cy_dot_y,
+        cy_dot_z,
+        cy_dot_x_dot,
+        cy_dot_y_dot,
+        cz_dot_x,
+        cz_dot_y,
+        cz_dot_z,
+        cz_dot_x_dot,
+        cz_dot_y_dot,
+        cz_dot_z_dot,
+    ];
+
+    for (field, mutate) in mutations {
+        let mut opm =
+            Opm::from_kvn(OPM_3_KVN_FIXTURES[3].1).expect("failed to parse covariance fixture");
+        mutate(&mut opm);
+        assert_non_finite_rejected(field, opm.to_xml());
+    }
+}
+
+#[test]
+fn opm_3_xml_generation_rejects_every_invalid_maneuver_value() {
+    type Mutation = (&'static str, fn(&mut Opm));
+    let mutations: [Mutation; 5] = [
+        ("MAN_DURATION", |opm| {
+            opm.body.segment.data.maneuver_parameters[0]
+                .man_duration
+                .value = f64::NAN
+        }),
+        ("MAN_DELTA_MASS", |opm| {
+            opm.body.segment.data.maneuver_parameters[0]
+                .man_delta_mass
+                .value = f64::INFINITY
+        }),
+        ("MAN_DV_1", |opm| {
+            opm.body.segment.data.maneuver_parameters[0].man_dv_1.value = f64::NAN
+        }),
+        ("MAN_DV_2", |opm| {
+            opm.body.segment.data.maneuver_parameters[0].man_dv_2.value = f64::INFINITY
+        }),
+        ("MAN_DV_3", |opm| {
+            opm.body.segment.data.maneuver_parameters[0].man_dv_3.value = f64::NEG_INFINITY
+        }),
+    ];
+
+    for (field, mutate) in mutations {
+        let mut opm =
+            Opm::from_kvn(OPM_3_KVN_FIXTURES[1].1).expect("failed to parse maneuver fixture");
+        mutate(&mut opm);
+        assert_non_finite_rejected(field, opm.to_xml());
+    }
+}
+
+#[test]
+fn opm_3_xml_generation_validates_maneuver_boundaries() {
     let mut maneuver =
         Opm::from_kvn(OPM_3_KVN_FIXTURES[1].1).expect("failed to parse maneuver fixture");
     maneuver.body.segment.data.maneuver_parameters[0]

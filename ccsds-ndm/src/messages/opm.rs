@@ -73,6 +73,9 @@ impl crate::traits::Validate for Opm {
             &self.id,
             &self.version,
         )?;
+        if let Some(error) = self.xml_text_errors().into_iter().next() {
+            return Err(error.into());
+        }
         self.header.validate()?;
         self.body.validate()?;
         Ok(())
@@ -89,6 +92,7 @@ impl crate::traits::Validate for Opm {
             Err(crate::error::CcsdsNdmError::Validation(error)) => errors.push(*error),
             Err(error) => return Err(error),
         }
+        errors.extend(self.xml_text_errors());
         errors.extend(self.header.validation_errors()?);
         errors.extend(self.body.validation_errors()?);
         Ok(errors)
@@ -134,7 +138,64 @@ impl Ndm for Opm {
 crate::impl_versioned_ndm!(Opm, Opm);
 
 impl Opm {
-    // No inherent validate() anymore
+    fn xml_text_errors(&self) -> Vec<ValidationError> {
+        fn check(errors: &mut Vec<ValidationError>, field: &'static str, value: &str) {
+            if let Some(error) = crate::validation::xml_text_error(field, value) {
+                errors.push(error);
+            }
+        }
+        fn check_comments(errors: &mut Vec<ValidationError>, comments: &[String]) {
+            for comment in comments {
+                check(errors, "COMMENT", comment);
+            }
+        }
+
+        let mut errors = Vec::new();
+        check_comments(&mut errors, &self.header.comment);
+        if let Some(value) = &self.header.classification {
+            check(&mut errors, "CLASSIFICATION", value);
+        }
+        check(&mut errors, "ORIGINATOR", &self.header.originator);
+        if let Some(value) = &self.header.message_id {
+            check(&mut errors, "MESSAGE_ID", value);
+        }
+
+        let segment = &self.body.segment;
+        check_comments(&mut errors, &segment.metadata.comment);
+        check(&mut errors, "OBJECT_NAME", &segment.metadata.object_name);
+        check(&mut errors, "OBJECT_ID", &segment.metadata.object_id);
+        check(&mut errors, "CENTER_NAME", &segment.metadata.center_name);
+        check(&mut errors, "REF_FRAME", &segment.metadata.ref_frame);
+        check(&mut errors, "TIME_SYSTEM", &segment.metadata.time_system);
+
+        let data = &segment.data;
+        check_comments(&mut errors, &data.comment);
+        check_comments(&mut errors, &data.state_vector.comment);
+        if let Some(elements) = &data.keplerian_elements {
+            check_comments(&mut errors, &elements.comment);
+        }
+        if let Some(parameters) = &data.spacecraft_parameters {
+            check_comments(&mut errors, &parameters.comment);
+        }
+        if let Some(covariance) = &data.covariance_matrix {
+            check_comments(&mut errors, &covariance.comment);
+            if let Some(value) = &covariance.cov_ref_frame {
+                check(&mut errors, "COV_REF_FRAME", value);
+            }
+        }
+        for maneuver in &data.maneuver_parameters {
+            check_comments(&mut errors, &maneuver.comment);
+            check(&mut errors, "MAN_REF_FRAME", &maneuver.man_ref_frame);
+        }
+        if let Some(user_defined) = &data.user_defined_parameters {
+            check_comments(&mut errors, &user_defined.comment);
+            for parameter in &user_defined.user_defined {
+                check(&mut errors, "USER_DEFINED parameter", &parameter.parameter);
+                check(&mut errors, "USER_DEFINED", &parameter.value);
+            }
+        }
+        errors
+    }
 }
 
 impl ToKvn for Opm {

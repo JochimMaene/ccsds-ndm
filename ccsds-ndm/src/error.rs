@@ -208,6 +208,39 @@ pub enum ValidationError {
 }
 
 impl ValidationError {
+    /// Stable machine-readable code, when this diagnostic category has been stabilized.
+    ///
+    /// Categories return `None` until their code and compatibility behavior are covered by
+    /// conformance tests.
+    pub fn code(&self) -> Option<&'static str> {
+        match self {
+            Self::MissingRequiredField { .. } => Some("validation.missing_required_field"),
+            _ => None,
+        }
+    }
+
+    /// Complete model field path relative to the message root, when the containing block has a
+    /// canonical path mapping.
+    pub fn field_path(&self) -> Option<String> {
+        let Self::MissingRequiredField { block, field, .. } = self else {
+            return None;
+        };
+
+        let block_path = match block.as_ref() {
+            "Root" => "",
+            "ODM Header" => "header",
+            "OPM Metadata" => "body.segment.metadata",
+            "Spacecraft Parameters" => "body.segment.data.spacecraft_parameters",
+            "Maneuver Parameters" => "body.segment.data.maneuver_parameters",
+            _ => return None,
+        };
+        let field = field.to_ascii_lowercase();
+        Some(match block_path {
+            "" => field,
+            _ => format!("{block_path}.{field}"),
+        })
+    }
+
     /// Convenience constructor for a missing required field error.
     pub fn missing_required(
         block: impl Into<Cow<'static, str>>,
