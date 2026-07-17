@@ -28,6 +28,11 @@ by the advertised capability before returning a typed model. The operations rema
 dimensions: validation can be invoked independently after construction or mutation, and each
 operation requires its own evidence.
 
+Raw notation parser combinators, serde helpers, and KVN writers are implementation details, not
+alternate public processing surfaces. Rust callers parse complete typed messages through
+`Ndm::from_kvn`, `Ndm::from_xml`, or the crate-level auto-detection helpers, and generate through
+`Ndm`, `VersionedNdm`, or `MessageType`, so the validation boundary cannot be skipped accidentally.
+
 Conformance means compliance with the syntactic and semantic requirements that can be decided from the message and explicitly supplied caller context. It does not prove that mission data is factually correct, that an external identifier exists, or that an asserted physical state is true.
 
 Canonical output is deterministic, edition-correct output that preserves supported message meaning. It is not necessarily byte-for-byte identical to the source.

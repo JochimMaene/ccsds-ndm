@@ -104,8 +104,6 @@ impl Ndm for Ocm {
     }
 }
 
-crate::impl_versioned_ndm!(Ocm, Ocm);
-
 impl Ocm {
     // No inherent validate() anymore
 }

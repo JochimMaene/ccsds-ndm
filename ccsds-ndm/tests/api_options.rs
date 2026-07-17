@@ -76,6 +76,16 @@ fn opm_generation_rejects_non_finite_state_vectors() {
 
     let error = opm.to_kvn().unwrap_err();
     assert!(error.to_string().contains("finite"));
+
+    let mut output = Vec::new();
+    let error = opm
+        .write_kvn_to(&mut output, &GenerateOptions::source())
+        .unwrap_err();
+    assert!(error.to_string().contains("finite"));
+    assert!(
+        output.is_empty(),
+        "validation must precede streaming output"
+    );
 }
 
 #[test]

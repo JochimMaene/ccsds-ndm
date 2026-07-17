@@ -140,8 +140,6 @@ impl Ndm for Opm {
     }
 }
 
-crate::impl_versioned_ndm!(Opm, Opm);
-
 impl Opm {
     fn xml_text_errors(&self) -> Vec<ValidationError> {
         fn check(

@@ -13,7 +13,7 @@ use std::io::Write;
 
 /// Output notation used when checking edition support.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputFormat {
+pub(crate) enum OutputFormat {
     Kvn,
     Xml,
 }
@@ -52,7 +52,11 @@ pub(crate) fn validate_for_generation(
 }
 
 /// NDM messages that carry a CCSDS edition in their root element/header.
-pub trait VersionedNdm: Ndm + Clone + ToKvn {
+///
+/// This trait is implemented by the library's complete message types. Notation-specific
+/// serialization mechanics remain internal so callers cannot bypass the validation performed by
+/// these generation methods.
+pub trait VersionedNdm: Ndm + Clone {
     /// Message family used to resolve supported editions.
     const KIND: MessageKind;
 
@@ -62,19 +66,28 @@ pub trait VersionedNdm: Ndm + Clone + ToKvn {
     /// Update the edition stored on a cloned message before generation.
     fn set_version(&mut self, version: String);
 
-    /// Generate KVN using explicit options.
-    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
-        let version = self.target_version(options)?;
-        if version.as_ref() == self.version() {
-            return self.to_kvn();
-        }
+    /// Generate a complete KVN document using an explicit target-edition policy.
+    ///
+    /// [`TargetVersion::Source`] preserves the stored edition. A different supported target is
+    /// applied to a clone, leaving `self` unchanged. The selected message is fully validated
+    /// before serialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected edition cannot be generated or the selected model is
+    /// invalid.
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String>;
 
-        let mut message = self.clone();
-        message.set_version(version.into_owned());
-        message.to_kvn()
-    }
-
-    /// Generate XML using explicit options.
+    /// Generate a complete XML document using an explicit target-edition policy.
+    ///
+    /// [`TargetVersion::Source`] preserves the stored edition. A different supported target is
+    /// applied to a clone, leaving `self` unchanged. The selected message is fully validated
+    /// before serialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected edition cannot be generated, the selected model is
+    /// invalid, or XML serialization fails.
     fn to_xml_with(&self, options: &GenerateOptions) -> Result<String> {
         let version = self.target_version(options)?;
         if version.as_ref() == self.version() {
@@ -86,25 +99,26 @@ pub trait VersionedNdm: Ndm + Clone + ToKvn {
         message.to_xml()
     }
 
-    /// Write KVN directly to an I/O sink.
-    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
-        let version = self.target_version(options)?;
-        if version.as_ref() == self.version() {
-            validate_for_generation(Self::KIND, self.version(), OutputFormat::Kvn, self)?;
-            let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
-            ToKvn::write_kvn(self, &mut writer);
-            return writer.finish_io().map_err(CcsdsNdmError::from);
-        }
+    /// Stream KVN to an I/O sink using an explicit target-edition policy.
+    ///
+    /// The selected message is fully validated before any bytes are written. A sink failure can
+    /// leave a prefix of the document in `output`, as with other streaming writers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected edition cannot be generated, the selected model is
+    /// invalid, or the sink rejects a write.
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()>;
 
-        let mut message = self.clone();
-        message.set_version(version.into_owned());
-        validate_for_generation(Self::KIND, message.version(), OutputFormat::Kvn, &message)?;
-        let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
-        ToKvn::write_kvn(&message, &mut writer);
-        writer.finish_io().map_err(CcsdsNdmError::from)
-    }
-
-    /// Write XML directly to an I/O sink.
+    /// Stream XML to an I/O sink using an explicit target-edition policy.
+    ///
+    /// The selected message is fully validated before any bytes are written. A sink failure can
+    /// leave a prefix of the document in `output`, as with other streaming writers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected edition cannot be generated, the selected model is
+    /// invalid, XML serialization fails, or the sink rejects a write.
     fn write_xml_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
         let version = self.target_version(options)?;
         if version.as_ref() == self.version() {
@@ -136,11 +150,45 @@ pub trait VersionedNdm: Ndm + Clone + ToKvn {
     }
 }
 
-#[macro_export]
+fn generate_kvn<T>(message: &T, options: &GenerateOptions) -> Result<String>
+where
+    T: VersionedNdm + ToKvn,
+{
+    let version = message.target_version(options)?;
+    if version.as_ref() == message.version() {
+        return message.to_kvn();
+    }
+
+    let mut selected = message.clone();
+    selected.set_version(version.into_owned());
+    selected.to_kvn()
+}
+
+fn stream_kvn<T, W>(message: &T, output: &mut W, options: &GenerateOptions) -> Result<()>
+where
+    T: VersionedNdm + ToKvn,
+    W: Write,
+{
+    let version = message.target_version(options)?;
+    if version.as_ref() == message.version() {
+        validate_for_generation(T::KIND, message.version(), OutputFormat::Kvn, message)?;
+        let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
+        ToKvn::write_kvn(message, &mut writer);
+        return writer.finish_io().map_err(CcsdsNdmError::from);
+    }
+
+    let mut selected = message.clone();
+    selected.set_version(version.into_owned());
+    validate_for_generation(T::KIND, selected.version(), OutputFormat::Kvn, &selected)?;
+    let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
+    ToKvn::write_kvn(&selected, &mut writer);
+    writer.finish_io().map_err(CcsdsNdmError::from)
+}
+
 macro_rules! impl_versioned_ndm {
     ($type:ty, $kind:ident) => {
-        impl $crate::generation::VersionedNdm for $type {
-            const KIND: $crate::validation::MessageKind = $crate::validation::MessageKind::$kind;
+        impl VersionedNdm for $type {
+            const KIND: MessageKind = MessageKind::$kind;
 
             fn version(&self) -> &str {
                 &self.version
@@ -149,9 +197,32 @@ macro_rules! impl_versioned_ndm {
             fn set_version(&mut self, version: String) {
                 self.version = version;
             }
+
+            fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+                generate_kvn(self, options)
+            }
+
+            fn write_kvn_to<W: Write>(
+                &self,
+                output: &mut W,
+                options: &GenerateOptions,
+            ) -> Result<()> {
+                stream_kvn(self, output, options)
+            }
         }
     };
 }
+
+impl_versioned_ndm!(crate::messages::acm::Acm, Acm);
+impl_versioned_ndm!(crate::messages::aem::Aem, Aem);
+impl_versioned_ndm!(crate::messages::apm::Apm, Apm);
+impl_versioned_ndm!(crate::messages::cdm::Cdm, Cdm);
+impl_versioned_ndm!(crate::messages::ocm::Ocm, Ocm);
+impl_versioned_ndm!(crate::messages::oem::Oem, Oem);
+impl_versioned_ndm!(crate::messages::omm::Omm, Omm);
+impl_versioned_ndm!(crate::messages::opm::Opm, Opm);
+impl_versioned_ndm!(crate::messages::rdm::Rdm, Rdm);
+impl_versioned_ndm!(crate::messages::tdm::Tdm, Tdm);
 
 #[cfg(test)]
 mod tests {
@@ -218,6 +289,14 @@ mod tests {
 
         fn set_version(&mut self, version: String) {
             self.version = version;
+        }
+
+        fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+            generate_kvn(self, options)
+        }
+
+        fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+            stream_kvn(self, output, options)
         }
     }
 

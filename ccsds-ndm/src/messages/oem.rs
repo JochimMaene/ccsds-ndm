@@ -351,8 +351,6 @@ impl Ndm for Oem {
     }
 }
 
-crate::impl_versioned_ndm!(Oem, Oem);
-
 impl ToKvn for Oem {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_pair("CCSDS_OEM_VERS", &self.version);

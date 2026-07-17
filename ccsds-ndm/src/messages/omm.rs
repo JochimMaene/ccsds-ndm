@@ -252,8 +252,6 @@ impl Ndm for Omm {
     }
 }
 
-crate::impl_versioned_ndm!(Omm, Omm);
-
 impl ToKvn for Omm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         // 1. Header

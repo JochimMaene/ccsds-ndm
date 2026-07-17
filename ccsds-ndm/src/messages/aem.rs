@@ -100,8 +100,6 @@ impl Ndm for Aem {
     }
 }
 
-crate::impl_versioned_ndm!(Aem, Aem);
-
 impl crate::traits::Validate for AemBody {
     fn validate(&self) -> Result<()> {
         if self.segment.is_empty() {

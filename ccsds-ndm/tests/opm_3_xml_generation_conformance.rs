@@ -18,6 +18,20 @@ const OPM_3_KVN_FIXTURES: [(&str, &str); 4] = [
 const OPM_3_XML_FIXTURES: [(&str, &str); 1] =
     [("opm_g5.xml", include_str!("../../data/xml/opm_g5.xml"))];
 
+#[test]
+fn public_opm_xml_generation_signatures_remain_compatible() {
+    let _typed: fn(&Opm) -> ccsds_ndm::error::Result<String> = <Opm as Ndm>::to_xml;
+    let _typed_with: fn(&Opm, &GenerateOptions) -> ccsds_ndm::error::Result<String> =
+        <Opm as VersionedNdm>::to_xml_with;
+    let _typed_streaming: fn(&Opm, &mut Vec<u8>, &GenerateOptions) -> ccsds_ndm::error::Result<()> =
+        <Opm as VersionedNdm>::write_xml_to::<Vec<u8>>;
+    let _generic: fn(&MessageType) -> ccsds_ndm::error::Result<String> = MessageType::to_xml;
+    let _generic_with: fn(&MessageType, &GenerateOptions) -> ccsds_ndm::error::Result<String> =
+        MessageType::to_xml_with;
+    let _generic_file: fn(&MessageType, PathBuf) -> ccsds_ndm::error::Result<()> =
+        MessageType::to_xml_file::<PathBuf>;
+}
+
 fn schema_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/xsd/ndmxml-4.0.0-master-4.0.xsd")
 }

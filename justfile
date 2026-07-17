@@ -151,6 +151,10 @@ bench-run:
 build:
     cd {{python_dir}} && uv run maturin build --release --strip --out ../../dist
 
+# Build and verify the publishable Rust crate from a clean working tree
+package-rust:
+    cargo package --manifest-path {{rust_manifest}} --locked
+
 # Build the documentation
 docs:
     uv run sphinx-build -b html docs docs/_build/html

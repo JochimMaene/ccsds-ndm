@@ -100,8 +100,6 @@ impl Ndm for Rdm {
     }
 }
 
-crate::impl_versioned_ndm!(Rdm, Rdm);
-
 impl ToKvn for Rdm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_pair("CCSDS_RDM_VERS", &self.version);

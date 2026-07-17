@@ -396,9 +396,9 @@ impl WithLocation for ValidationError {
 /// ```no_run
 /// use ccsds_ndm::messages::opm::Opm;
 /// use ccsds_ndm::error::CcsdsNdmError;
-/// use ccsds_ndm::kvn::parser::ParseKvn;
+/// use ccsds_ndm::traits::Ndm;
 ///
-/// match Opm::from_kvn_str("CCSDS_OPM_VERS = 3.0\n...") {
+/// match Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...") {
 ///     Ok(opm) => println!("Parsed: {:?}", opm),
 ///     Err(e) => {
 ///         if let Some(enum_err) = e.as_enum_error() {

@@ -108,8 +108,6 @@ impl Ndm for Tdm {
     }
 }
 
-crate::impl_versioned_ndm!(Tdm, Tdm);
-
 impl ToKvn for Tdm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_pair("CCSDS_TDM_VERS", &self.version);

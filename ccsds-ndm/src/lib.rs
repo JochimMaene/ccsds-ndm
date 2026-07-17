@@ -142,13 +142,15 @@
 //! - [`messages`]: Supported NDM message types (OPM, OEM, TDM, etc.).
 //! - [`traits`]: Core traits like `Ndm` and `UnitValue` handling.
 //! - [`types`]: Physical types (Distance, Velocity, Epoch, etc.) and CCSDS enumerations.
-//! - [`kvn`] & [`xml`]: Format-specific parsing and serialization logic.
+//!
+//! Complete messages are parsed and generated through [`Ndm`](traits::Ndm) and
+//! [`VersionedNdm`]; notation-specific parser and writer mechanics remain internal.
 
 pub mod common;
 pub mod detect;
 pub mod error;
 pub mod generation;
-pub mod kvn;
+pub(crate) mod kvn;
 pub mod messages;
 pub mod options;
 pub mod traits;
@@ -156,10 +158,11 @@ pub mod types;
 pub mod utils;
 pub mod validation;
 pub mod versioning;
-pub mod xml;
+pub(crate) mod xml;
 
 use error::{CcsdsNdmError, Result};
 pub use generation::VersionedNdm;
+pub(crate) use kvn::parser::parse_block;
 pub use options::{GenerateOptions, TargetVersion};
 use std::fs;
 use std::path::Path;
@@ -291,7 +294,13 @@ impl MessageType {
         }
     }
 
-    /// Serialize NDM to a KVN string.
+    /// Generate KVN using the edition stored on the message.
+    ///
+    /// The complete message is validated before serialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the stored edition cannot be generated or the model is invalid.
     pub fn to_kvn(&self) -> Result<String> {
         match self {
             MessageType::Oem(msg) => crate::traits::Ndm::to_kvn(msg),
@@ -308,7 +317,14 @@ impl MessageType {
         }
     }
 
-    /// Serialize NDM to an XML string.
+    /// Generate XML using the edition stored on the message.
+    ///
+    /// The complete message is validated before serialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the stored edition cannot be generated, the model is invalid, or XML
+    /// serialization fails.
     pub fn to_xml(&self) -> Result<String> {
         match self {
             MessageType::Oem(msg) => crate::traits::Ndm::to_xml(msg),
@@ -325,7 +341,16 @@ impl MessageType {
         }
     }
 
-    /// Serialize NDM to KVN with explicit generation options.
+    /// Generate KVN using an explicit target-edition policy.
+    ///
+    /// The selected message is fully validated before serialization. Selecting a different
+    /// edition does not mutate the contained message. A combined NDM accepts only
+    /// [`TargetVersion::Source`] because it has no single root edition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected edition cannot be generated, the model is invalid, or
+    /// the target policy is not applicable to a combined NDM.
     pub fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
         match self {
             MessageType::Oem(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
@@ -347,7 +372,16 @@ impl MessageType {
         }
     }
 
-    /// Serialize NDM to XML with explicit generation options.
+    /// Generate XML using an explicit target-edition policy.
+    ///
+    /// The selected message is fully validated before serialization. Selecting a different
+    /// edition does not mutate the contained message. A combined NDM accepts only
+    /// [`TargetVersion::Source`] because it has no single root edition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected edition cannot be generated, the model is invalid, the
+    /// target policy is not applicable to a combined NDM, or XML serialization fails.
     pub fn to_xml_with(&self, options: &GenerateOptions) -> Result<String> {
         match self {
             MessageType::Oem(msg) => generation::VersionedNdm::to_xml_with(msg, options),
@@ -369,13 +403,27 @@ impl MessageType {
         }
     }
 
-    /// Write KVN to a file.
+    /// Generate KVN using the stored edition and write the complete document to a file.
+    ///
+    /// Generation completes before the destination is opened, so validation errors do not modify
+    /// an existing destination.
+    ///
+    /// # Errors
+    ///
+    /// Returns a KVN-generation error or an I/O error from writing the destination.
     pub fn to_kvn_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let kvn = self.to_kvn()?;
         fs::write(path, kvn).map_err(CcsdsNdmError::from)
     }
 
-    /// Write XML to a file.
+    /// Generate XML using the stored edition and write the complete document to a file.
+    ///
+    /// Generation completes before the destination is opened, so validation or serialization
+    /// errors do not modify an existing destination.
+    ///
+    /// # Errors
+    ///
+    /// Returns an XML-generation error or an I/O error from writing the destination.
     pub fn to_xml_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let xml = self.to_xml()?;
         fs::write(path, xml).map_err(CcsdsNdmError::from)
@@ -385,8 +433,8 @@ impl MessageType {
 /// Parse an NDM from a string, auto-detecting the message format (KVN or XML) and type.
 ///
 /// This function inspects the input to determine whether it's KVN or XML format,
-/// then parses the appropriate message type based on the version header (KVN) or
-/// root element (XML).
+/// then parses and validates the appropriate complete message based on the version header (KVN)
+/// or root element (XML).
 ///
 /// # Arguments
 ///
@@ -396,6 +444,10 @@ impl MessageType {
 ///
 /// A [`MessageType`] variant containing the parsed message, or an error if
 /// parsing fails or the message type is not supported.
+///
+/// # Errors
+///
+/// Returns an error when detection fails or the selected strict parser rejects the input.
 ///
 /// # Example
 ///
@@ -421,6 +473,10 @@ pub fn from_str(s: &str) -> Result<MessageType> {
 ///
 /// A [`MessageType`] variant containing the parsed message, or an error if
 /// the file cannot be read or parsing fails.
+///
+/// # Errors
+///
+/// Returns an I/O error or an error from the selected strict parser.
 ///
 /// # Example
 ///

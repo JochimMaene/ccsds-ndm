@@ -97,8 +97,6 @@ impl Ndm for Apm {
     }
 }
 
-crate::impl_versioned_ndm!(Apm, Apm);
-
 impl ToKvn for Apm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_pair("CCSDS_APM_VERS", &self.version);

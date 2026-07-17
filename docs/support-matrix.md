@@ -64,13 +64,21 @@ Available evidence:
   the Rust generation entry points, and rejection of invalid self-contained public-model states.
   Together they cover every safely reachable OPM missing-required-field, invalid-choice,
   invalid-value, and out-of-range diagnostic path, plus unsupported-output-version and file-I/O
-  codes. [`opm_xml_writer_failure.rs`](../ccsds-ndm/tests/opm_xml_writer_failure.rs) covers
-  streaming I/O diagnostics and panic-free propagation at multiple output boundaries. Run the
-  main cell with `just conformance-opm-xml`.
+  codes. The same suite fixes the documented public Rust generation signatures, while the raw
+  serde XML serializer remains crate-internal so callers cannot bypass generation validation.
+  [`opm_xml_writer_failure.rs`](../ccsds-ndm/tests/opm_xml_writer_failure.rs) covers streaming I/O
+  diagnostics and panic-free propagation at multiple output boundaries. Run the main cell with
+  `just conformance-opm-xml`.
 - Performance evidence:
   [`xml_benches.rs`](../ccsds-ndm/benches/xml_benches.rs) benchmarks the richest shipped OPM
   fixture through validated materialized and streaming XML generation. Run it with
   `just bench-opm-xml`. Published baselines and regression budgets are not yet claimed.
+- Rust surface/release evidence:
+  the [pre-1.0 Rust release policy](rust-release-policy.md) records the exact tested toolchain and
+  platform scope, unstable compatibility contract, migration expectation, and missing private
+  security channel. `just package-rust` and the clean-checkout CI packaging job exercise Cargo's
+  package selection and verify the unpacked build before publishing; the release job also rejects
+  a tag that does not match the crate version.
 - Requirement inventory:
   [`opm-3.0-xml-generation.md`](conformance/opm-3.0-xml-generation.md) maps the applicable ODM and
   project quality requirements to current evidence and explicit gaps.
@@ -81,9 +89,8 @@ Evidence still required before `verified`:
 - stable, structured diagnostic codes and paths for every generation failure;
 - panic-free and bounded-resource evidence for adversarial public model states and output failures;
 - published OPM XML-generation performance and allocation regression budgets;
-- Rust API documentation and compatibility tests for all advertised generation entry points; and
-- the applicable Rust artifact installation, platform, compatibility, security, and reproducible-
-  release gates.
+- MSRV and additional-platform decisions, private security reporting, release-artifact installation,
+  and byte-reproducible release evidence.
 
 ## Advertised Capabilities
 

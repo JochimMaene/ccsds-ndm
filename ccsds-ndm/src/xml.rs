@@ -27,8 +27,12 @@ use std::io::Write as IoWrite;
 /// Header for CCSDS XML messages.
 const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
 
-/// Deserialize a CCSDS NDM message from an XML string.
-pub fn from_str<T: DeserializeOwned>(s: &str) -> Result<T> {
+/// Deserialize an internal XML representation from a string.
+///
+/// Complete public messages use [`Ndm::from_xml`](crate::traits::Ndm::from_xml), which adds the
+/// message-specific validation gate.
+#[cfg(test)]
+pub(crate) fn from_str<T: DeserializeOwned>(s: &str) -> Result<T> {
     Ok(from_xml_str(s)?)
 }
 
@@ -41,7 +45,7 @@ pub fn from_str<T: DeserializeOwned>(s: &str) -> Result<T> {
 ///
 /// * `s` - The XML string to deserialize
 /// * `type_name` - The name of the message type (e.g., "OPM", "CDM") for error context
-pub fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &str) -> Result<T> {
+pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &str) -> Result<T> {
     from_xml_str(s).map_err(|e| {
         crate::error::CcsdsNdmError::Format(Box::new(FormatError::XmlWithContext {
             context: format!("Failed to parse {} from XML", type_name),
@@ -50,10 +54,11 @@ pub fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &str) -> R
     })
 }
 
-/// Serialize a CCSDS NDM message to an XML string.
+/// Serialize a prevalidated CCSDS NDM message to an XML string.
 ///
-/// Includes the standard XML declaration.
-pub fn to_string<T: Serialize>(t: &T) -> Result<String> {
+/// This raw serde helper is crate-internal so public callers cannot bypass the validation and
+/// edition checks provided by [`Ndm::to_xml`](crate::traits::Ndm::to_xml).
+pub(crate) fn to_string<T: Serialize>(t: &T) -> Result<String> {
     let mut output = String::with_capacity(1024);
     output.push_str(XML_HEADER);
     output.push('\n');

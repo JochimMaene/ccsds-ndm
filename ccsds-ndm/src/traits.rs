@@ -68,32 +68,65 @@ pub trait Validate {
 /// let xml = opm.to_xml().unwrap();
 /// ```
 pub trait Ndm: Sized + serde::Serialize + Validate {
-    /// Serialize the message to KVN (Key-Value Notation) format.
+    /// Generate KVN using the edition stored on the message.
+    ///
+    /// Implementations validate the complete message and confirm that KVN generation supports the
+    /// stored edition before serializing. Use
+    /// [`VersionedNdm::to_kvn_with`](crate::generation::VersionedNdm::to_kvn_with) to select a
+    /// different target edition explicitly.
     ///
     /// # Returns
     ///
-    /// A string containing the KVN representation of the message.
+    /// A complete KVN document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the stored edition cannot be generated or the model is invalid.
     fn to_kvn(&self) -> Result<String>;
 
-    /// Parse a message from KVN (Key-Value Notation) format.
+    /// Parse and validate a complete message from KVN (Key-Value Notation).
+    ///
+    /// Implementations enforce the message parser's supported syntax and self-contained
+    /// validation rules before returning a typed model.
     ///
     /// # Arguments
     ///
     /// * `kvn` - The KVN content as a string
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed, unsupported, or invalid.
     fn from_kvn(kvn: &str) -> Result<Self>;
 
-    /// Serialize the message to XML format.
+    /// Generate XML using the edition stored on the message.
+    ///
+    /// Implementations validate the complete message and confirm that XML generation supports
+    /// the stored edition before serializing. Use
+    /// [`VersionedNdm::to_xml_with`](crate::generation::VersionedNdm::to_xml_with) to select a
+    /// different target edition explicitly.
     ///
     /// # Returns
     ///
-    /// A string containing the XML representation of the message.
+    /// A complete XML document, including its XML declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the stored edition cannot be generated, the model is invalid, or XML
+    /// serialization fails.
     fn to_xml(&self) -> Result<String>;
 
-    /// Parse a message from XML format.
+    /// Parse and validate a complete message from XML.
+    ///
+    /// Implementations deserialize the typed message and apply its self-contained validation rules
+    /// before returning it. Runtime validation does not invoke an external XSD engine.
     ///
     /// # Arguments
     ///
     /// * `xml` - The XML content as a string
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed, unsupported, or invalid.
     fn from_xml(xml: &str) -> Result<Self>;
 }
 
@@ -152,10 +185,11 @@ pub trait FromKvnFloat: Sized {
     fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self>;
 }
 
-/// Trait for types that can be serialized to KVN format.
+/// Internal trait for composing KVN output after the public generation gate has validated a
+/// complete message.
 ///
 /// Implementors write their KVN representation to the provided [`KvnWriter`].
-pub trait ToKvn {
+pub(crate) trait ToKvn {
     /// Write the KVN representation to the writer.
     ///
     /// # Arguments

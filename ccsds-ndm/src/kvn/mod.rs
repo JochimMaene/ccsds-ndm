@@ -16,18 +16,20 @@
 //!
 //! # Implementation Details
 //!
-//! - **Parsing**: Uses the [`winnow`](https://docs.rs/winnow) parser combinator library for high performance.
+//! - **Parsing**: Uses the [`winnow`](https://docs.rs/winnow) parser combinator library for high
+//!   performance. Raw parsers are crate-internal; public callers parse complete messages through
+//!   [`Ndm::from_kvn`](crate::traits::Ndm::from_kvn) or the crate-level auto-detection helpers.
 //! - **Serialization**: Uses a custom `KvnWriter` to ensure correct formatting and indentation.
 
-pub mod acm;
-pub mod aem;
-pub mod apm;
-pub mod cdm;
-pub mod ocm;
-pub mod oem;
-pub mod omm;
-pub mod opm;
-pub mod parser;
-pub mod rdm;
+pub(crate) mod acm;
+pub(crate) mod aem;
+pub(crate) mod apm;
+pub(crate) mod cdm;
+pub(crate) mod ocm;
+pub(crate) mod oem;
+pub(crate) mod omm;
+pub(crate) mod opm;
+pub(crate) mod parser;
+pub(crate) mod rdm;
 pub mod ser;
-pub mod tdm;
+pub(crate) mod tdm;
