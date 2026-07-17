@@ -2226,30 +2226,30 @@ impl ToKvn for OpmCovarianceMatrix {
             writer.write_pair("COV_REF_FRAME", frame);
         }
 
-        writer.write_pair("CX_X", &self.cx_x);
-        writer.write_pair("CY_X", &self.cy_x);
-        writer.write_pair("CY_Y", &self.cy_y);
-        writer.write_pair("CZ_X", &self.cz_x);
-        writer.write_pair("CZ_Y", &self.cz_y);
-        writer.write_pair("CZ_Z", &self.cz_z);
+        writer.write_measure("CX_X", &self.cx_x);
+        writer.write_measure("CY_X", &self.cy_x);
+        writer.write_measure("CY_Y", &self.cy_y);
+        writer.write_measure("CZ_X", &self.cz_x);
+        writer.write_measure("CZ_Y", &self.cz_y);
+        writer.write_measure("CZ_Z", &self.cz_z);
 
-        writer.write_pair("CX_DOT_X", &self.cx_dot_x);
-        writer.write_pair("CX_DOT_Y", &self.cx_dot_y);
-        writer.write_pair("CX_DOT_Z", &self.cx_dot_z);
-        writer.write_pair("CX_DOT_X_DOT", &self.cx_dot_x_dot);
+        writer.write_measure("CX_DOT_X", &self.cx_dot_x);
+        writer.write_measure("CX_DOT_Y", &self.cx_dot_y);
+        writer.write_measure("CX_DOT_Z", &self.cx_dot_z);
+        writer.write_measure("CX_DOT_X_DOT", &self.cx_dot_x_dot);
 
-        writer.write_pair("CY_DOT_X", &self.cy_dot_x);
-        writer.write_pair("CY_DOT_Y", &self.cy_dot_y);
-        writer.write_pair("CY_DOT_Z", &self.cy_dot_z);
-        writer.write_pair("CY_DOT_X_DOT", &self.cy_dot_x_dot);
-        writer.write_pair("CY_DOT_Y_DOT", &self.cy_dot_y_dot);
+        writer.write_measure("CY_DOT_X", &self.cy_dot_x);
+        writer.write_measure("CY_DOT_Y", &self.cy_dot_y);
+        writer.write_measure("CY_DOT_Z", &self.cy_dot_z);
+        writer.write_measure("CY_DOT_X_DOT", &self.cy_dot_x_dot);
+        writer.write_measure("CY_DOT_Y_DOT", &self.cy_dot_y_dot);
 
-        writer.write_pair("CZ_DOT_X", &self.cz_dot_x);
-        writer.write_pair("CZ_DOT_Y", &self.cz_dot_y);
-        writer.write_pair("CZ_DOT_Z", &self.cz_dot_z);
-        writer.write_pair("CZ_DOT_X_DOT", &self.cz_dot_x_dot);
-        writer.write_pair("CZ_DOT_Y_DOT", &self.cz_dot_y_dot);
-        writer.write_pair("CZ_DOT_Z_DOT", &self.cz_dot_z_dot);
+        writer.write_measure("CZ_DOT_X", &self.cz_dot_x);
+        writer.write_measure("CZ_DOT_Y", &self.cz_dot_y);
+        writer.write_measure("CZ_DOT_Z", &self.cz_dot_z);
+        writer.write_measure("CZ_DOT_X_DOT", &self.cz_dot_x_dot);
+        writer.write_measure("CZ_DOT_Y_DOT", &self.cz_dot_y_dot);
+        writer.write_measure("CZ_DOT_Z_DOT", &self.cz_dot_z_dot);
     }
 }
 

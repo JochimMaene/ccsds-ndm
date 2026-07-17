@@ -870,7 +870,10 @@ pub fn expect_block_end<'a>(
 
 /// Parses the ODM header section.
 pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
-    let mut comment = Vec::new();
+    // ODM §7.8 permits header comments only immediately after the version keyword. Comments
+    // encountered after header assignments belong to the next logical block and must not be
+    // consumed speculatively here.
+    let comment = collect_comments.parse_next(input)?;
     let mut classification = None;
     let mut creation_date = None;
     let mut originator = None;
@@ -878,7 +881,6 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
 
     loop {
         let checkpoint = input.checkpoint();
-        comment.extend(collect_comments.parse_next(input)?);
 
         let key = match preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
@@ -889,7 +891,7 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
         };
 
         // Stop if we encounter a metadata key
-        if key == "OBJECT_NAME" || key == "META_START" {
+        if key == "COMMENT" || key == "OBJECT_NAME" || key == "META_START" {
             input.reset(&checkpoint);
             break;
         }

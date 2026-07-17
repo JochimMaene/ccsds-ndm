@@ -190,6 +190,11 @@ pub trait FromKvnFloat: Sized {
 ///
 /// Implementors write their KVN representation to the provided [`KvnWriter`].
 pub(crate) trait ToKvn {
+    /// Validate notation-specific constraints that must hold before any KVN bytes are written.
+    fn validate_kvn(&self) -> Result<()> {
+        Ok(())
+    }
+
     /// Write the KVN representation to the writer.
     ///
     /// # Arguments

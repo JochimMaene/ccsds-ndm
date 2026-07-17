@@ -172,6 +172,7 @@ where
     let version = message.target_version(options)?;
     if version.as_ref() == message.version() {
         validate_for_generation(T::KIND, message.version(), OutputFormat::Kvn, message)?;
+        ToKvn::validate_kvn(message)?;
         let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
         ToKvn::write_kvn(message, &mut writer);
         return writer.finish_io().map_err(CcsdsNdmError::from);
@@ -180,6 +181,7 @@ where
     let mut selected = message.clone();
     selected.set_version(version.into_owned());
     validate_for_generation(T::KIND, selected.version(), OutputFormat::Kvn, &selected)?;
+    ToKvn::validate_kvn(&selected)?;
     let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
     ToKvn::write_kvn(&selected, &mut writer);
     writer.finish_io().map_err(CcsdsNdmError::from)

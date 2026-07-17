@@ -44,6 +44,7 @@ notations and editions.
 | ID | Message and edition | Standard and corrigendum | Notation / schema | Operation and target | Surface | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | `OPM-3.0-XML-GENERATE-RUST` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML; NDM/XML schema set 4.0.0, OPM schema 3.0 | Generate OPM 3.0 XML | Rust | `implemented-unverified` |
+| `OPM-3.0-KVN-GENERATE-RUST` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN | Generate OPM 3.0 KVN | Rust | `implemented-unverified` |
 
 ### `OPM-3.0-XML-GENERATE-RUST`
 
@@ -91,6 +92,26 @@ Evidence still required before `verified`:
 - published OPM XML-generation performance and allocation regression budgets;
 - MSRV and additional-platform decisions, private security reporting, release-artifact installation,
   and byte-reproducible release evidence.
+
+### `OPM-3.0-KVN-GENERATE-RUST`
+
+Available evidence:
+
+- Normative source: ODM sections 3.2 and 7.3–7.9 define OPM content, fixed KVN ordering, lexical
+  rules, units, and comment placement.
+- Executable evidence:
+  [`opm_3_kvn_generation_conformance.rs`](../ccsds-ndm/tests/opm_3_kvn_generation_conformance.rs)
+  verifies all four shipped Annex G fixtures retain assignment order, comments, and optional units;
+  generated representative lines are printable ASCII and no longer than 254 characters. It also
+  covers pre-write rejection of invalid free text and user-defined keyword suffixes. Run it with
+  `just conformance-opm-kvn`.
+- Requirement inventory:
+  [`opm-3.0-kvn-generation.md`](conformance/opm-3.0-kvn-generation.md) maps current evidence and
+  explicit gaps.
+
+Evidence still required before `verified` includes compliant 16-significant-digit numeric
+generation, complete user-defined-keyword rules, diagnostics and failing-writer coverage,
+bounded-resource evidence, performance budgets, and the applicable Rust surface/release gates.
 
 ## Advertised Capabilities
 

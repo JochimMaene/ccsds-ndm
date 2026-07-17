@@ -112,6 +112,7 @@ impl Ndm for Opm {
             crate::generation::OutputFormat::Kvn,
             self,
         )?;
+        ToKvn::validate_kvn(self)?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
@@ -141,6 +142,206 @@ impl Ndm for Opm {
 }
 
 impl Opm {
+    fn validate_kvn_text(&self) -> Result<()> {
+        fn invalid_text(field: &'static str, value: &str, path: &'static str) -> Result<()> {
+            if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+                return Ok(());
+            }
+            Err(ValidationError::InvalidValue {
+                field: field.into(),
+                value: value.into(),
+                expected: "printable ASCII characters and blanks".into(),
+                line: None,
+            }
+            .at_path(path)
+            .into())
+        }
+
+        fn pair(
+            field: &'static str,
+            value: &str,
+            path: &'static str,
+            key_len: usize,
+        ) -> Result<()> {
+            invalid_text(field, value, path)?;
+            let line_len = key_len.max(20) + 3 + value.len();
+            if line_len <= 254 {
+                return Ok(());
+            }
+            Err(ValidationError::OutOfRange {
+                name: field.into(),
+                value: line_len.to_string(),
+                expected: "a KVN line no longer than 254 characters".into(),
+                line: None,
+            }
+            .at_path(path)
+            .into())
+        }
+
+        fn comments(comments: &[String], path: &'static str) -> Result<()> {
+            for comment in comments {
+                invalid_text("COMMENT", comment, path)?;
+                let line_len = "COMMENT ".len() + comment.len();
+                if line_len > 254 {
+                    return Err(ValidationError::OutOfRange {
+                        name: "COMMENT".into(),
+                        value: line_len.to_string(),
+                        expected: "a KVN line no longer than 254 characters".into(),
+                        line: None,
+                    }
+                    .at_path(path)
+                    .into());
+                }
+            }
+            Ok(())
+        }
+
+        comments(&self.header.comment, "header.comment")?;
+        if let Some(value) = &self.header.classification {
+            pair(
+                "CLASSIFICATION",
+                value,
+                "header.classification",
+                "CLASSIFICATION".len(),
+            )?;
+        }
+        pair(
+            "ORIGINATOR",
+            &self.header.originator,
+            "header.originator",
+            "ORIGINATOR".len(),
+        )?;
+        if let Some(value) = &self.header.message_id {
+            pair("MESSAGE_ID", value, "header.message_id", "MESSAGE_ID".len())?;
+        }
+
+        let segment = &self.body.segment;
+        comments(&segment.metadata.comment, "body.segment.metadata.comment")?;
+        for (field, value, path) in [
+            (
+                "OBJECT_NAME",
+                segment.metadata.object_name.as_str(),
+                "body.segment.metadata.object_name",
+            ),
+            (
+                "OBJECT_ID",
+                segment.metadata.object_id.as_str(),
+                "body.segment.metadata.object_id",
+            ),
+            (
+                "CENTER_NAME",
+                segment.metadata.center_name.as_str(),
+                "body.segment.metadata.center_name",
+            ),
+            (
+                "REF_FRAME",
+                segment.metadata.ref_frame.as_str(),
+                "body.segment.metadata.ref_frame",
+            ),
+            (
+                "TIME_SYSTEM",
+                segment.metadata.time_system.as_str(),
+                "body.segment.metadata.time_system",
+            ),
+        ] {
+            pair(field, value, path, field.len())?;
+        }
+
+        let data = &segment.data;
+        comments(&data.comment, "body.segment.data.comment")?;
+        comments(
+            &data.state_vector.comment,
+            "body.segment.data.state_vector.comment",
+        )?;
+        if let Some(elements) = &data.keplerian_elements {
+            comments(
+                &elements.comment,
+                "body.segment.data.keplerian_elements.comment",
+            )?;
+            if matches!(elements.gm.units.as_ref(), Some(GmUnits::KM3PerS2)) {
+                return Err(ValidationError::InvalidValue {
+                    field: "GM units".into(),
+                    value: "KM**3/S**2".into(),
+                    expected: "km**3/s**2 or omitted for OPM KVN".into(),
+                    line: None,
+                }
+                .at_path("body.segment.data.keplerian_elements.gm.units")
+                .into());
+            }
+        }
+        if let Some(parameters) = &data.spacecraft_parameters {
+            comments(
+                &parameters.comment,
+                "body.segment.data.spacecraft_parameters.comment",
+            )?;
+        }
+        if let Some(covariance) = &data.covariance_matrix {
+            comments(
+                &covariance.comment,
+                "body.segment.data.covariance_matrix.comment",
+            )?;
+            if let Some(value) = &covariance.cov_ref_frame {
+                pair(
+                    "COV_REF_FRAME",
+                    value,
+                    "body.segment.data.covariance_matrix.cov_ref_frame",
+                    "COV_REF_FRAME".len(),
+                )?;
+            }
+        }
+        for maneuver in &data.maneuver_parameters {
+            comments(
+                &maneuver.comment,
+                "body.segment.data.maneuver_parameters.comment",
+            )?;
+            pair(
+                "MAN_REF_FRAME",
+                &maneuver.man_ref_frame,
+                "body.segment.data.maneuver_parameters.man_ref_frame",
+                "MAN_REF_FRAME".len(),
+            )?;
+        }
+        if let Some(user_defined) = &data.user_defined_parameters {
+            comments(
+                &user_defined.comment,
+                "body.segment.data.user_defined_parameters.comment",
+            )?;
+            for parameter in &user_defined.user_defined {
+                let suffix = parameter
+                    .parameter
+                    .strip_prefix("USER_DEFINED_")
+                    .unwrap_or(&parameter.parameter);
+                invalid_text(
+                    "USER_DEFINED parameter",
+                    suffix,
+                    "body.segment.data.user_defined_parameters.user_defined.parameter",
+                )?;
+                if suffix.is_empty()
+                    || suffix
+                        .bytes()
+                        .any(|byte| byte.is_ascii_lowercase() || byte == b' ')
+                {
+                    return Err(ValidationError::InvalidValue {
+                        field: "USER_DEFINED parameter".into(),
+                        value: parameter.parameter.clone(),
+                        expected: "an uppercase KVN keyword suffix without blanks".into(),
+                        line: None,
+                    }
+                    .at_path("body.segment.data.user_defined_parameters.user_defined.parameter")
+                    .into());
+                }
+                let key_len = "USER_DEFINED_".len() + suffix.len();
+                pair(
+                    "USER_DEFINED",
+                    &parameter.value,
+                    "body.segment.data.user_defined_parameters.user_defined.value",
+                    key_len,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
     fn xml_text_errors(&self) -> Vec<ValidationError> {
         fn check(
             errors: &mut Vec<ValidationError>,
@@ -294,6 +495,10 @@ impl Opm {
 }
 
 impl ToKvn for Opm {
+    fn validate_kvn(&self) -> Result<()> {
+        self.validate_kvn_text()
+    }
+
     fn write_kvn(&self, writer: &mut KvnWriter) {
         // 1. Header
         writer.write_pair("CCSDS_OPM_VERS", &self.version);

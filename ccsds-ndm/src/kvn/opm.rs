@@ -41,7 +41,6 @@ use crate::messages::opm::{
     KeplerianElements, ManeuverParameters, Opm, OpmBody, OpmData, OpmMetadata, OpmSegment,
 };
 use crate::parse_block;
-use winnow::combinator::peek;
 use winnow::prelude::*;
 use winnow::stream::Offset;
 
@@ -161,7 +160,9 @@ pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElement
 
 /// Parses a single maneuver parameter block.
 pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParameters>> {
-    let mut comment = Vec::new();
+    // ODM §7.8.7 permits comments only at the beginning of a maneuver logical block. Collecting
+    // comments inside the assignment loop would steal comments belonging to the next maneuver.
+    let comment = collect_comments.parse_next(input)?;
     let mut man_epoch_ignition = None;
     let mut man_duration = None;
     let mut man_delta_mass = None;
@@ -170,15 +171,35 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParamet
     let mut man_dv_2 = None;
     let mut man_dv_3 = None;
 
-    parse_block!(input, comment, {
-        "MAN_EPOCH_IGNITION" => man_epoch_ignition: kv_calendar_epoch,
-        "MAN_DURATION" => man_duration: kv_from_kvn,
-        "MAN_DELTA_MASS" => man_delta_mass: kv_from_kvn,
-        "MAN_REF_FRAME" => man_ref_frame: kv_string,
-        "MAN_DV_1" => man_dv_1: kv_from_kvn,
-        "MAN_DV_2" => man_dv_2: kv_from_kvn,
-        "MAN_DV_3" => man_dv_3: kv_from_kvn,
-    }, |i: &mut &str| man_epoch_ignition.is_some() && peek(key_token).parse_next(i).map(|k| k == "MAN_EPOCH_IGNITION").unwrap_or(false));
+    loop {
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(key) => key,
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
+            }
+        };
+        if key == "MAN_EPOCH_IGNITION" && man_epoch_ignition.is_some() {
+            input.reset(&checkpoint);
+            break;
+        }
+        match key {
+            "MAN_EPOCH_IGNITION" => {
+                man_epoch_ignition = Some(kv_calendar_epoch.parse_next(input)?);
+            }
+            "MAN_DURATION" => man_duration = Some(kv_from_kvn.parse_next(input)?),
+            "MAN_DELTA_MASS" => man_delta_mass = Some(kv_from_kvn.parse_next(input)?),
+            "MAN_REF_FRAME" => man_ref_frame = Some(kv_string.parse_next(input)?),
+            "MAN_DV_1" => man_dv_1 = Some(kv_from_kvn.parse_next(input)?),
+            "MAN_DV_2" => man_dv_2 = Some(kv_from_kvn.parse_next(input)?),
+            "MAN_DV_3" => man_dv_3 = Some(kv_from_kvn.parse_next(input)?),
+            _ => {
+                input.reset(&checkpoint);
+                break;
+            }
+        }
+    }
 
     if let Some(ignition) = man_epoch_ignition {
         Ok(Some(ManeuverParameters {
