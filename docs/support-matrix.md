@@ -4,9 +4,9 @@ This matrix is the authoritative statement of current `ccsds-ndm` capabilities. 
 coverage, examples, fixtures, and passing tests do not establish advertised conformance unless the
 exact capability cell below has status `verified`.
 
-The exact OPM 3.0 cells below are technically verified for their stated operations, notations,
-surfaces, and tested release environments. This does not imply support for another NDM message,
-edition, platform, permissive profile, or reference-quality project maturity.
+The exact OPM 3.0 and OEM 3.0 cells below are technically verified for their stated operations,
+notations, surfaces, and tested release environments. This does not imply support for another NDM
+message, edition, platform, permissive profile, or reference-quality project maturity.
 
 The [OPM 3.0 completion roadmap](opm-completion-roadmap.md) records how parsing, validation,
 generation, and conversion were completed across the intended public surfaces. It does not alter
@@ -65,6 +65,26 @@ notations and editions.
 | `OPM-3.0-VALIDATE-CLI` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN or XML 4.0.0 / OPM 3.0 | Validate input | CLI | `verified` |
 | `OPM-3.0-KVN-TO-XML-CLI` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN → XML 4.0.0 / OPM 3.0 | Convert | CLI | `verified` |
 | `OPM-3.0-XML-TO-KVN-CLI` | OPM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML 4.0.0 / OPM 3.0 → KVN | Convert | CLI | `verified` |
+| `OEM-3.0-XML-GENERATE-RUST` | OEM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML; NDM/XML schema set 4.0.0, OEM schema 3.0 | Generate OEM 3.0 XML | Rust | `verified` |
+| `OEM-3.0-KVN-GENERATE-RUST` | OEM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN | Generate OEM 3.0 KVN | Rust | `verified` |
+| `OEM-3.0-XML-PARSE-RUST` | OEM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML; NDM/XML schema set 4.0.0, OEM schema 3.0 | Strict parse and self-contained validation | Rust | `verified` |
+| `OEM-3.0-KVN-PARSE-RUST` | OEM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN | Strict parse and self-contained validation | Rust | `verified` |
+| `OEM-3.0-VALIDATE-RUST` | OEM 3.0 | CCSDS 502.0-B-3 + EC 1 | N/A | Validate typed OEM model | Rust | `verified` |
+| `OEM-3.0-KVN-TO-XML-RUST` | OEM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN → XML 4.0.0 / OEM 3.0 | Convert, preserving edition and meaning | Rust | `verified` |
+| `OEM-3.0-XML-TO-KVN-RUST` | OEM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML 4.0.0 / OEM 3.0 → KVN | Convert, preserving edition and meaning | Rust | `verified` |
+
+### OEM 3.0 Rust evidence
+
+The [OEM 3.0 conformance inventory](conformance/oem-3.0.md) maps the seven Rust cells to the
+applicable ODM sections, official OEM 3.0 XSD, implementation boundaries, and focused executable
+evidence. `oem_strict_parsing`, `oem_parse_diagnostics`, `oem_validation`,
+`oem_generation_conformance`, `oem_conversion`, and `oem_kvn_allocations` cover all shipped OEM
+fixtures, strict rejection, semantic validation, structured diagnostics, official-schema output,
+lossless normalized conversion, resource limits, atomic files, and stable streaming allocation
+behavior. Existing `kvn_scaling` and `xml_scaling` benchmarks provide
+reproducible 10–50,000-record workloads through `just bench-oem`; wall-clock results are
+informational. `just verify-oem` reproduces the complete Rust technical and packaged-artifact
+evidence. No OEM Python or CLI capability is advertised.
 
 ### Parsing, validation, conversion, Python, and CLI evidence
 
@@ -160,5 +180,6 @@ executable evidence. Wall-clock thresholds are optional under the proportionate 
 
 ## Advertised Capabilities
 
-The 17 `verified` OPM 3.0 rows above are the advertised capabilities. No capability is advertised
-beyond those exact cells and their documented tested release environments.
+The 17 `verified` OPM 3.0 rows and seven `verified` OEM 3.0 Rust rows above are the advertised
+capabilities. No capability is advertised beyond those exact cells and their documented tested
+release environments.

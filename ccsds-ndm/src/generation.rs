@@ -93,11 +93,10 @@ fn preflight_kvn_limit<T: ToKvn>(value: &T, options: &GenerateOptions) -> Result
     enforce_output_limit(counter.bytes, options)
 }
 
-pub(crate) fn validate_for_generation(
+pub(crate) fn validate_output_version(
     kind: MessageKind,
     version: &str,
     format: OutputFormat,
-    value: &impl Validate,
 ) -> Result<()> {
     let spec = crate::versioning::spec(kind).ok_or_else(|| {
         CcsdsNdmError::UnsupportedMessage(format!("{} generation", kind.as_str()))
@@ -114,6 +113,16 @@ pub(crate) fn validate_for_generation(
             supported: supported.join(", "),
         });
     }
+    Ok(())
+}
+
+pub(crate) fn validate_for_generation(
+    kind: MessageKind,
+    version: &str,
+    format: OutputFormat,
+    value: &impl Validate,
+) -> Result<()> {
+    validate_output_version(kind, version, format)?;
     value.validate()
 }
 
@@ -134,11 +143,21 @@ pub trait VersionedNdm: Ndm + Clone {
 
     /// Apply message-specific XML lexical checks before serialization.
     ///
-    /// Most message models need no additional check. OPM uses this hook to keep XML character
-    /// rules out of notation-neutral model validation while retaining one shared writer path.
+    /// Most message models need no additional check. OPM and OEM use this hook to keep XML
+    /// character rules out of notation-neutral model validation while retaining one shared
+    /// writer path.
     #[doc(hidden)]
     fn validate_xml_output(&self) -> Result<()> {
         Ok(())
+    }
+
+    /// Validate the complete model and KVN-specific generation constraints.
+    ///
+    /// Most messages have no additional KVN rules beyond model validation. OEM overrides this
+    /// hook to validate its large history and notation constraints in one traversal.
+    #[doc(hidden)]
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate()
     }
 
     /// Generate a complete KVN document using an explicit target-edition policy.
@@ -335,8 +354,8 @@ where
     let version = message.target_version(options)?;
     if version.as_ref() == message.version() {
         return (|| {
-            validate_for_generation(T::KIND, message.version(), OutputFormat::Kvn, message)?;
-            ToKvn::validate_kvn(message)?;
+            validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
+            message.validate_kvn_output()?;
             preflight_kvn_limit(message, options)?;
             let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
             ToKvn::write_kvn(message, &mut writer);
@@ -358,8 +377,8 @@ where
     let target_version = version.into_owned();
     selected.set_version(target_version);
     (|| {
-        validate_for_generation(T::KIND, selected.version(), OutputFormat::Kvn, &selected)?;
-        ToKvn::validate_kvn(&selected)?;
+        validate_output_version(T::KIND, selected.version(), OutputFormat::Kvn)?;
+        selected.validate_kvn_output()?;
         preflight_kvn_limit(&selected, options)?;
         let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
         ToKvn::write_kvn(&selected, &mut writer);
@@ -409,7 +428,6 @@ impl_versioned_ndm!(crate::messages::aem::Aem, Aem);
 impl_versioned_ndm!(crate::messages::apm::Apm, Apm);
 impl_versioned_ndm!(crate::messages::cdm::Cdm, Cdm);
 impl_versioned_ndm!(crate::messages::ocm::Ocm, Ocm);
-impl_versioned_ndm!(crate::messages::oem::Oem, Oem);
 impl_versioned_ndm!(crate::messages::omm::Omm, Omm);
 impl_versioned_ndm!(crate::messages::rdm::Rdm, Rdm);
 impl_versioned_ndm!(crate::messages::tdm::Tdm, Tdm);
@@ -427,6 +445,39 @@ impl VersionedNdm for crate::messages::opm::Opm {
 
     fn validate_xml_output(&self) -> Result<()> {
         self.validate_xml_text()
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate()?;
+        crate::traits::ToKvn::validate_kvn(self)
+    }
+
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        generate_kvn(self, options)
+    }
+
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+        stream_kvn(self, output, options)
+    }
+}
+
+impl VersionedNdm for crate::messages::oem::Oem {
+    const KIND: MessageKind = MessageKind::Oem;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    fn validate_xml_output(&self) -> Result<()> {
+        self.validate_xml_text()
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate_kvn_generation()
     }
 
     fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {

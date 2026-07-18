@@ -7,9 +7,10 @@
 
 use super::types::*;
 use crate::error::{Result, ValidationError};
-use crate::kvn::ser::KvnWriter;
+use crate::kvn::ser::{KvnWriter, OdmFloat};
 use crate::traits::ToKvn;
 use serde::{Deserialize, Serialize};
+use std::fmt::Write;
 
 /// Represents the `ndmHeader` complex type from the XSD.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
@@ -540,7 +541,7 @@ pub struct OdParameters {
 
 /// State Vector Components in the Specified Coordinate System.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct StateVectorAcc {
     /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
     ///
@@ -628,7 +629,6 @@ pub struct StateVectorAcc {
 
 impl ToKvn for StateVectorAcc {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut buffer = zmij::Buffer::new();
         writer.write_built_line(|line| {
             line.push_str(self.epoch.as_str());
             for value in [
@@ -640,14 +640,14 @@ impl ToKvn for StateVectorAcc {
                 self.z_dot.value,
             ] {
                 line.push(' ');
-                line.push_str(buffer.format(value));
+                let _ = write!(line, "{}", OdmFloat::new(value));
             }
             for acceleration in [&self.x_ddot, &self.y_ddot, &self.z_ddot]
                 .into_iter()
                 .flatten()
             {
                 line.push(' ');
-                line.push_str(buffer.format(acceleration.value));
+                let _ = write!(line, "{}", OdmFloat::new(acceleration.value));
             }
         });
     }

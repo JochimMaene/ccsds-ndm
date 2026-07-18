@@ -152,7 +152,8 @@ fn detect_xml_type(s: &str) -> Result<MessageType> {
                 let sliced_s = &s[offset..];
 
                 match name.as_str() {
-                    "oem" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Oem),
+                    // OEM's strict envelope validator must see the complete document.
+                    "oem" => return crate::traits::Ndm::from_xml(s).map(MessageType::Oem),
                     "cdm" => return crate::traits::Ndm::from_xml(sliced_s).map(MessageType::Cdm),
                     // OPM's strict envelope validator must see the complete document; slicing at
                     // the root would silently discard an invalid declaration or preamble.

@@ -1,6 +1,7 @@
-//! OPM notation conversion composed from the strict parser and validated generators.
+//! Notation conversion composed from strict typed parsers and validated generators.
 
 use crate::error::Result;
+use crate::messages::oem::Oem;
 use crate::messages::opm::Opm;
 use crate::options::{GenerateOptions, ParseOptions};
 use crate::VersionedNdm;
@@ -19,7 +20,12 @@ pub fn parse_opm_file(
     source: Option<Notation>,
     options: &ParseOptions,
 ) -> Result<Opm> {
-    let input = read_input(source_path.as_ref(), options.max_input_bytes, source)?;
+    let input = read_input(
+        source_path.as_ref(),
+        options.max_input_bytes,
+        source,
+        crate::validation::MessageKind::Opm,
+    )?;
     match source.unwrap_or_else(|| {
         if input.trim_start().starts_with('<') {
             Notation::Xml
@@ -29,6 +35,30 @@ pub fn parse_opm_file(
     }) {
         Notation::Kvn => Opm::from_kvn_with_options(&input, options),
         Notation::Xml => Opm::from_xml_with_options(&input, options),
+    }
+}
+
+/// Strictly parse an OEM file with bounded input reading and optional notation detection.
+pub fn parse_oem_file(
+    source_path: impl AsRef<Path>,
+    source: Option<Notation>,
+    options: &ParseOptions,
+) -> Result<Oem> {
+    let input = read_input(
+        source_path.as_ref(),
+        options.max_input_bytes,
+        source,
+        crate::validation::MessageKind::Oem,
+    )?;
+    match source.unwrap_or_else(|| {
+        if input.trim_start().starts_with('<') {
+            Notation::Xml
+        } else {
+            Notation::Kvn
+        }
+    }) {
+        Notation::Kvn => Oem::from_kvn_with_options(&input, options),
+        Notation::Xml => Oem::from_xml_with_options(&input, options),
     }
 }
 
@@ -43,6 +73,24 @@ pub fn convert_opm(
     let message = match source {
         Notation::Kvn => Opm::from_kvn_with_options(input, parse_options)?,
         Notation::Xml => Opm::from_xml_with_options(input, parse_options)?,
+    };
+    match target {
+        Notation::Kvn => message.to_kvn_with(generate_options),
+        Notation::Xml => message.to_xml_with(generate_options),
+    }
+}
+
+/// Convert a standalone OEM between KVN and XML without changing its edition by default.
+pub fn convert_oem(
+    input: &str,
+    source: Notation,
+    target: Notation,
+    parse_options: &ParseOptions,
+    generate_options: &GenerateOptions,
+) -> Result<String> {
+    let message = match source {
+        Notation::Kvn => Oem::from_kvn_with_options(input, parse_options)?,
+        Notation::Xml => Oem::from_xml_with_options(input, parse_options)?,
     };
     match target {
         Notation::Kvn => message.to_kvn_with(generate_options),
@@ -67,10 +115,28 @@ pub fn convert_opm_file(
     crate::fsutil::atomic_write(destination_path.as_ref(), output.as_bytes())
 }
 
+/// Convert an OEM file and atomically replace the destination only after conversion succeeds.
+pub fn convert_oem_file(
+    source_path: impl AsRef<Path>,
+    destination_path: impl AsRef<Path>,
+    source: Notation,
+    target: Notation,
+    parse_options: &ParseOptions,
+    generate_options: &GenerateOptions,
+) -> Result<()> {
+    let message = parse_oem_file(source_path, Some(source), parse_options)?;
+    let output = match target {
+        Notation::Kvn => message.to_kvn_with(generate_options),
+        Notation::Xml => message.to_xml_with(generate_options),
+    }?;
+    crate::fsutil::atomic_write(destination_path.as_ref(), output.as_bytes())
+}
+
 fn read_input(
     path: &Path,
     max_bytes: Option<usize>,
     source_hint: Option<Notation>,
+    kind: crate::validation::MessageKind,
 ) -> Result<String> {
     let Some(limit) = max_bytes else {
         return Ok(std::fs::read_to_string(path)?);
@@ -99,7 +165,7 @@ fn read_input(
             actual: bytes.len(),
         };
         return Err(error.with_parse_context(
-            crate::validation::MessageKind::Opm,
+            kind,
             match notation {
                 Notation::Kvn => crate::error::DiagnosticNotation::Kvn,
                 Notation::Xml => crate::error::DiagnosticNotation::Xml,
@@ -122,5 +188,18 @@ pub fn convert_opm_to_file(
     generate_options: &GenerateOptions,
 ) -> Result<()> {
     let output = convert_opm(input, source, target, parse_options, generate_options)?;
+    crate::fsutil::atomic_write(destination_path.as_ref(), output.as_bytes())
+}
+
+/// Convert in-memory OEM input and atomically write the complete destination.
+pub fn convert_oem_to_file(
+    input: &str,
+    destination_path: impl AsRef<Path>,
+    source: Notation,
+    target: Notation,
+    parse_options: &ParseOptions,
+    generate_options: &GenerateOptions,
+) -> Result<()> {
+    let output = convert_oem(input, source, target, parse_options, generate_options)?;
     crate::fsutil::atomic_write(destination_path.as_ref(), output.as_bytes())
 }

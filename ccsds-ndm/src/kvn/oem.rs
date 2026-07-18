@@ -1123,9 +1123,9 @@ CENTER_NAME = EARTH
 REF_FRAME = GCRF
 TIME_SYSTEM = UTC
 START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
 INTERPOLATION = LAGRANGE
 INTERPOLATION_DEGREE = 5
-STOP_TIME = 2023-01-02T00:00:00
 META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
@@ -1144,8 +1144,8 @@ CENTER_NAME = EARTH
 REF_FRAME = GCRF
 TIME_SYSTEM = UTC
 START_TIME = 2023-01-01T00:00:00
-INTERPOLATION_DEGREE = 0
 STOP_TIME = 2023-01-02T00:00:00
+INTERPOLATION_DEGREE = 0
 META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
@@ -1414,7 +1414,7 @@ META_STOP
 bad-epoch 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::Epoch(_)) | err.is_kvn_error() | false);
+        assert!(matches!(err, CcsdsNdmError::Parsing { .. }));
     }
 
     #[test]
@@ -2018,7 +2018,7 @@ META_STOP
     }
 
     #[test]
-    fn contextual_epoch_fields_reject_invalid_values_but_keep_numeric_time_tags() {
+    fn contextual_epoch_fields_require_absolute_time_tags() {
         let source = include_str!("../../../data/kvn/oem_g11.kvn");
         for (needle, replacement) in [
             (
@@ -2060,7 +2060,7 @@ META_STOP
                 "STOP_TIME = 126.0",
                 1,
             );
-        assert!(Oem::from_kvn(&relative).is_ok());
+        assert!(Oem::from_kvn(&relative).is_err());
     }
 
     #[test]
@@ -2097,9 +2097,9 @@ CENTER_NAME = EARTH
 REF_FRAME = GCRF
 TIME_SYSTEM = UTC
 START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
 INTERPOLATION = LAGRANGE
 INTERPOLATION_DEGREE = 7
-STOP_TIME = 2023-01-02T00:00:00
 META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
@@ -2122,8 +2122,8 @@ CENTER_NAME = EARTH
 REF_FRAME = GCRF
 TIME_SYSTEM = UTC
 START_TIME = 2023-01-01T00:00:00
-INTERPOLATION_DEGREE = 0
 STOP_TIME = 2023-01-02T00:00:00
+INTERPOLATION_DEGREE = 0
 META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;

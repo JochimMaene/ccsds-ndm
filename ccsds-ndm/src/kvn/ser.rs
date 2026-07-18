@@ -13,12 +13,56 @@ use std::io::Write as IoWrite;
 pub(crate) struct OdmFloat(f64);
 
 impl OdmFloat {
+    pub(crate) const fn new(value: f64) -> Self {
+        Self(value)
+    }
+
     pub(crate) fn is_representable(value: f64) -> bool {
         if !value.is_finite() {
             return false;
         }
         let mut buffer = zmij::Buffer::new();
         Self::significant_digits(buffer.format_finite(value)) <= 16
+    }
+
+    /// Return the emitted length when `value` has an exact ODM representation.
+    ///
+    /// Representability and length share one shortest-decimal conversion so OEM line preflight
+    /// does not format every history value twice.
+    pub(crate) fn formatted_len_if_representable(value: f64) -> Option<usize> {
+        if !value.is_finite() {
+            return None;
+        }
+        let mut buffer = zmij::Buffer::new();
+        let value = buffer.format_finite(value);
+        if Self::significant_digits(value) > 16 {
+            return None;
+        }
+
+        struct Counter(usize);
+        impl FmtWrite for Counter {
+            fn write_str(&mut self, value: &str) -> std::fmt::Result {
+                self.0 += value.len();
+                Ok(())
+            }
+        }
+
+        let mut counter = Counter(0);
+        let _ = Self::write_preformatted(value, &mut counter);
+        Some(counter.0)
+    }
+
+    /// Write `value` when its shortest exact spelling fits the ODM digit limit.
+    pub(crate) fn write_if_representable<W: FmtWrite>(value: f64, output: &mut W) -> bool {
+        if !value.is_finite() {
+            return false;
+        }
+        let mut buffer = zmij::Buffer::new();
+        let value = buffer.format_finite(value);
+        if Self::significant_digits(value) > 16 {
+            return false;
+        }
+        Self::write_preformatted(value, output).is_ok()
     }
 
     fn significant_digits(value: &str) -> usize {
@@ -86,10 +130,7 @@ impl OdmFloat {
         write!(output, "e{exponent}")
     }
 
-    fn write_to<W: FmtWrite>(&self, output: &mut W) -> std::fmt::Result {
-        let mut buffer = zmij::Buffer::new();
-        let value = buffer.format_finite(self.0);
-
+    fn write_preformatted<W: FmtWrite>(value: &str, output: &mut W) -> std::fmt::Result {
         if let Some(exponent) = value.find(['e', 'E']) {
             let mantissa = &value[..exponent];
             output.write_str(mantissa)?;
@@ -102,6 +143,11 @@ impl OdmFloat {
         } else {
             Self::write_fixed_as_scientific(value, output)
         }
+    }
+
+    fn write_to<W: FmtWrite>(&self, output: &mut W) -> std::fmt::Result {
+        let mut buffer = zmij::Buffer::new();
+        Self::write_preformatted(buffer.format_finite(self.0), output)
     }
 }
 
@@ -186,6 +232,22 @@ impl<'a> KvnWriter<'a> {
         line.push('\n');
         let _ = self.write_str(&line);
         self.line_buffer = line;
+    }
+
+    /// Builds one line and commits it only when the fallible builder succeeds.
+    pub(crate) fn try_write_built_line<E>(
+        &mut self,
+        build: impl FnOnce(&mut String) -> std::result::Result<(), E>,
+    ) -> std::result::Result<(), E> {
+        let mut line = std::mem::take(&mut self.line_buffer);
+        line.clear();
+        let result = build(&mut line);
+        if result.is_ok() {
+            line.push('\n');
+            let _ = self.write_str(&line);
+        }
+        self.line_buffer = line;
+        result
     }
 
     fn normalize_inline_value(value: &str) -> std::borrow::Cow<'_, str> {
@@ -343,6 +405,44 @@ mod tests {
         assert!(!OdmFloat::is_representable(f64::MAX));
         assert!(!OdmFloat::is_representable(f64::NAN));
         assert!(!OdmFloat::is_representable(f64::INFINITY));
+    }
+
+    #[test]
+    fn odm_float_combines_representability_and_emitted_length() {
+        for value in [-0.0, 1.0, -12.5, 1.0e15, 1.25e-20, f64::from_bits(1)] {
+            let mut output = String::new();
+            assert!(OdmFloat::write_if_representable(value, &mut output));
+            assert_eq!(
+                OdmFloat::formatted_len_if_representable(value),
+                Some(output.len())
+            );
+            assert_eq!(output, OdmFloat(value).to_string());
+        }
+        for value in [1.234_567_890_123_456_7, f64::MAX, f64::NAN] {
+            let mut output = String::new();
+            assert!(!OdmFloat::write_if_representable(value, &mut output));
+            assert!(output.is_empty());
+            assert_eq!(OdmFloat::formatted_len_if_representable(value), None);
+        }
+    }
+
+    #[test]
+    fn fallible_line_builder_commits_only_successful_lines() {
+        let mut writer = KvnWriter::new();
+        writer
+            .try_write_built_line(|line| -> Result<(), ()> {
+                line.push_str("accepted");
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            writer.try_write_built_line(|line| -> Result<(), ()> {
+                line.push_str("rejected");
+                Err(())
+            }),
+            Err(())
+        );
+        assert_eq!(writer.finish(), "accepted\n");
     }
 
     #[test]

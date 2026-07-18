@@ -67,9 +67,14 @@ pub struct ParseOptions {
     pub max_input_bytes: Option<usize>,
     /// Maximum XML element nesting depth.
     ///
-    /// OPM 3.0 has a small fixed schema depth; the default leaves generous headroom while
-    /// bounding adversarial nesting.
+    /// Current OPM/OEM schemas have small fixed depths; the default leaves generous headroom
+    /// while bounding adversarial nesting.
     pub max_xml_depth: usize,
+    /// Maximum number of materialized history records.
+    ///
+    /// `None` keeps record count unlimited. OEM counts state vectors and covariance matrices.
+    /// The limit is checked during notation preflight, before the typed history is allocated.
+    pub max_records: Option<usize>,
 }
 
 impl Default for ParseOptions {
@@ -77,6 +82,7 @@ impl Default for ParseOptions {
         Self {
             max_input_bytes: None,
             max_xml_depth: 16,
+            max_records: None,
         }
     }
 }
@@ -89,6 +95,11 @@ impl ParseOptions {
 
     pub fn with_max_xml_depth(mut self, max_xml_depth: usize) -> Self {
         self.max_xml_depth = max_xml_depth;
+        self
+    }
+
+    pub fn with_max_records(mut self, max_records: usize) -> Self {
+        self.max_records = Some(max_records);
         self
     }
 }

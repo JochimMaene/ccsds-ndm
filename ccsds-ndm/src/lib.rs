@@ -163,7 +163,8 @@ pub mod versioning;
 pub(crate) mod xml;
 
 pub use conversion::{
-    convert_opm, convert_opm_file, convert_opm_to_file, parse_opm_file, Notation,
+    convert_oem, convert_oem_file, convert_oem_to_file, convert_opm, convert_opm_file,
+    convert_opm_to_file, parse_oem_file, parse_opm_file, Notation,
 };
 use error::{CcsdsNdmError, Result};
 pub use generation::VersionedNdm;

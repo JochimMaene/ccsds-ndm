@@ -143,6 +143,25 @@ conformance-opm-cli:
 conformance-opm-python:
     cd {{python_dir}} && uv run pytest tests/test_opm.py tests/test_parse_and_generation_options.py
 
+# Run the focused OEM 3.0 Rust parsing, validation, generation, conversion, and resource evidence
+conformance-oem:
+    cargo test --manifest-path {{rust_manifest}} --test oem_strict_parsing
+    cargo test --manifest-path {{rust_manifest}} --test oem_parse_diagnostics
+    cargo test --manifest-path {{rust_manifest}} --test oem_validation
+    cargo test --manifest-path {{rust_manifest}} --test oem_generation_conformance
+    cargo test --manifest-path {{rust_manifest}} --test oem_conversion
+    cargo test --manifest-path {{rust_manifest}} --test oem_kvn_allocations
+
+# Reproduce the complete OEM 3.0 Rust technical verification and artifact evidence
+verify-oem:
+    just fmt-rust-check
+    just lint-rust
+    cargo test --manifest-path {{rust_manifest}} --all-features
+    just conformance-oem
+    cargo check --manifest-path {{rust_manifest}} --all-features --benches
+    just docs
+    just package-rust
+
 # Reproduce the complete OPM 3.0 technical verification and artifact evidence
 verify-opm:
     just check
@@ -185,6 +204,11 @@ bench-opm-parse:
 
 bench-opm-validation:
     cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- opm_validate
+
+# Reproduce OEM parsing and generation scaling; timings are informational
+bench-oem:
+    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_scaling
+    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_scaling
 
 # --- Coverage ---------------------------------------------------------------
 

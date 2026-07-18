@@ -361,6 +361,37 @@ impl ValidationError {
         }
     }
 
+    /// Prefix a validation path while retaining the underlying diagnostic category.
+    ///
+    /// OEM uses this for indexed segments and history records, where a static parent path cannot
+    /// identify the failing item.
+    pub(crate) fn within_path(self, parent_path: impl Into<Cow<'static, str>>) -> Self {
+        let parent_path = parent_path.into();
+        if let Self::AtPath { path, source } = self {
+            return Self::AtPath {
+                path: format!("{parent_path}.{path}").into(),
+                source,
+            };
+        }
+        let field = match &self {
+            Self::MissingRequiredField { field, .. } | Self::InvalidValue { field, .. } => {
+                field.as_ref()
+            }
+            Self::OutOfRange { name, .. } => name.as_ref(),
+            Self::InvalidChoice { .. } => return self.at_path(parent_path),
+            Self::Conflict { .. } | Self::Generic { .. } | Self::AtPath { .. } => return self,
+        };
+        let field = field.to_ascii_lowercase();
+        let field = match field.strip_suffix(" units") {
+            Some(field) => format!("{field}.units"),
+            None => field
+                .replace([' ', '/'], "_")
+                .replace(['(', ')'], "")
+                .replace("_at_least_one_required", ""),
+        };
+        self.at_path(format!("{parent_path}.{field}"))
+    }
+
     fn set_line_if_missing(&mut self, line: usize) {
         match self {
             Self::OutOfRange {
