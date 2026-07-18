@@ -5,7 +5,6 @@
 use ccsds_ndm::MessageType;
 use pyo3::prelude::*;
 use pyo3::Py;
-use std::fs;
 
 pub mod acm;
 pub mod aem;
@@ -50,10 +49,7 @@ use opm::*;
 /// ------
 /// ValueError
 ///     If parsing fails.
-#[pyfunction]
-fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
-    let message = ccsds_ndm::from_str(data).map_err(ccsds_error_to_pyerr)?;
-
+fn message_to_py(py: Python<'_>, message: MessageType) -> PyResult<Py<PyAny>> {
     match message {
         MessageType::Oem(oem) => {
             let py_obj = Py::new(py, Oem { inner: oem })?;
@@ -102,6 +98,23 @@ fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
     }
 }
 
+#[pyfunction]
+#[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+fn from_str(
+    py: Python,
+    data: &str,
+    format: Option<&str>,
+    max_input_bytes: Option<usize>,
+    max_xml_depth: Option<usize>,
+    max_records: Option<usize>,
+) -> PyResult<Py<PyAny>> {
+    let options = api::parse_options(max_input_bytes, max_xml_depth, max_records);
+    let message =
+        ccsds_ndm::from_str_with_options(data, format.map(notation).transpose()?, &options)
+            .map_err(ccsds_error_to_pyerr)?;
+    message_to_py(py, message)
+}
+
 /// Parse from a file path (KVN or XML).
 ///
 /// Parameters
@@ -113,13 +126,23 @@ fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
 /// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
 ///     The parsed NDM object.
 #[pyfunction]
-fn from_file(py: Python, path: &str) -> PyResult<Py<PyAny>> {
-    let content =
-        fs::read_to_string(path).map_err(|e| errors::NdmIoError::new_err(e.to_string()))?;
-    from_str(py, &content)
+#[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+fn from_file(
+    py: Python,
+    path: &str,
+    format: Option<&str>,
+    max_input_bytes: Option<usize>,
+    max_xml_depth: Option<usize>,
+    max_records: Option<usize>,
+) -> PyResult<Py<PyAny>> {
+    let options = api::parse_options(max_input_bytes, max_xml_depth, max_records);
+    let message =
+        ccsds_ndm::from_file_with_options(path, format.map(notation).transpose()?, &options)
+            .map_err(ccsds_error_to_pyerr)?;
+    message_to_py(py, message)
 }
 
-fn opm_notation(value: &str) -> PyResult<ccsds_ndm::Notation> {
+fn notation(value: &str) -> PyResult<ccsds_ndm::Notation> {
     match value {
         "kvn" => Ok(ccsds_ndm::Notation::Kvn),
         "xml" => Ok(ccsds_ndm::Notation::Xml),
@@ -149,8 +172,8 @@ fn convert_opm(
     generate.max_output_bytes = max_output_bytes;
     ccsds_ndm::convert_opm(
         data,
-        opm_notation(from_format)?,
-        opm_notation(to_format)?,
+        notation(from_format)?,
+        notation(to_format)?,
         &parse,
         &generate,
     )
@@ -179,8 +202,62 @@ fn convert_opm_file(
     ccsds_ndm::convert_opm_file(
         source_path,
         destination_path,
-        opm_notation(from_format)?,
-        opm_notation(to_format)?,
+        notation(from_format)?,
+        notation(to_format)?,
+        &parse,
+        &generate,
+    )
+    .map_err(ccsds_error_to_pyerr)
+}
+
+/// Convert any recognized NDM message between KVN and XML through the shared generation gate.
+#[pyfunction]
+#[pyo3(signature = (data, from_format, to_format, max_input_bytes=None, max_xml_depth=None, max_records=None, max_output_bytes=None, version=None))]
+fn convert(
+    data: &str,
+    from_format: &str,
+    to_format: &str,
+    max_input_bytes: Option<usize>,
+    max_xml_depth: Option<usize>,
+    max_records: Option<usize>,
+    max_output_bytes: Option<usize>,
+    version: Option<&str>,
+) -> PyResult<String> {
+    let parse = api::parse_options(max_input_bytes, max_xml_depth, max_records);
+    let mut generate = api::generate_options(version);
+    generate.max_output_bytes = max_output_bytes;
+    ccsds_ndm::convert(
+        data,
+        notation(from_format)?,
+        notation(to_format)?,
+        &parse,
+        &generate,
+    )
+    .map_err(ccsds_error_to_pyerr)
+}
+
+/// Convert any recognized NDM file and atomically replace the destination on success.
+#[pyfunction]
+#[pyo3(signature = (source_path, destination_path, from_format, to_format, max_input_bytes=None, max_xml_depth=None, max_records=None, max_output_bytes=None, version=None))]
+fn convert_file(
+    source_path: &str,
+    destination_path: &str,
+    from_format: &str,
+    to_format: &str,
+    max_input_bytes: Option<usize>,
+    max_xml_depth: Option<usize>,
+    max_records: Option<usize>,
+    max_output_bytes: Option<usize>,
+    version: Option<&str>,
+) -> PyResult<()> {
+    let parse = api::parse_options(max_input_bytes, max_xml_depth, max_records);
+    let mut generate = api::generate_options(version);
+    generate.max_output_bytes = max_output_bytes;
+    ccsds_ndm::convert_file(
+        source_path,
+        destination_path,
+        notation(from_format)?,
+        notation(to_format)?,
         &parse,
         &generate,
     )
@@ -199,6 +276,8 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(from_file, m)?)?;
     m.add_function(wrap_pyfunction!(convert_opm, m)?)?;
     m.add_function(wrap_pyfunction!(convert_opm_file, m)?)?;
+    m.add_function(wrap_pyfunction!(convert, m)?)?;
+    m.add_function(wrap_pyfunction!(convert_file, m)?)?;
 
     // Common types shared across message types
     m.add_class::<OdmHeader>()?;

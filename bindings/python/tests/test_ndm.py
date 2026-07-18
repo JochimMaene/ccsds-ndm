@@ -20,6 +20,7 @@ from ccsds_ndm import (
     CdmSegment,
     CdmStateVector,
     Ndm,
+    NdmValidationError,
     OdmHeader,  # Correct header for OEM
     Oem,
     OemData,
@@ -156,14 +157,13 @@ class TestNdm:
 
         assert isinstance(combined.messages[0], Tdm)
 
-    def test_auto_detection_rejects_single_message_kvn(self):
+    def test_typed_ndm_rejects_single_message_kvn(self):
         root = Path(__file__).parents[3]
         opm = (root / "data/kvn/opm_g1.kvn").read_text()
 
-        with pytest.raises(ValueError, match="not an NDM combined instantiation"):
-            Ndm.from_str(opm)
-
-        assert isinstance(Ndm.from_str(opm, format="kvn"), Ndm)
+        for format_hint in (None, "kvn"):
+            with pytest.raises(ValueError, match="different CCSDS NDM message type"):
+                Ndm.from_str(opm, format=format_hint)
 
     def test_ndm_roundtrip_xml(self):
         oem = self._create_valid_oem()
@@ -197,9 +197,10 @@ class TestNdm:
         path = tmp_path / "test.ndm"
         path.write_text("keep me")
 
-        with pytest.raises(ValueError, match="output version 1.0"):
+        with pytest.raises(NdmValidationError, match="output version 1.0") as caught:
             ndm.to_file(str(path), format="xml")
 
+        assert caught.value.code == "generation.unsupported_output_version"
         assert path.read_text() == "keep me"
 
     def test_ndm_message_and_comment_setters(self):

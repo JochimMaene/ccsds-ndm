@@ -31,6 +31,27 @@ import numpy
 """
 
 PUBLIC_API_PARAMETER_TYPES = {
+    "convert": {
+        "data": "str",
+        "from_format": "str",
+        "to_format": "str",
+        "max_input_bytes": "Optional[int]",
+        "max_xml_depth": "Optional[int]",
+        "max_records": "Optional[int]",
+        "max_output_bytes": "Optional[int]",
+        "version": "Optional[str]",
+    },
+    "convert_file": {
+        "source_path": "str",
+        "destination_path": "str",
+        "from_format": "str",
+        "to_format": "str",
+        "max_input_bytes": "Optional[int]",
+        "max_xml_depth": "Optional[int]",
+        "max_records": "Optional[int]",
+        "max_output_bytes": "Optional[int]",
+        "version": "Optional[str]",
+    },
     "convert_opm": {
         "data": "str",
         "from_format": "str",
@@ -52,6 +73,7 @@ PUBLIC_API_PARAMETER_TYPES = {
         "format": "str",
         "max_input_bytes": "Optional[int]",
         "max_xml_depth": "Optional[int]",
+        "max_records": "Optional[int]",
         "path": "str",
         "strict": "bool",
     },
@@ -60,6 +82,7 @@ PUBLIC_API_PARAMETER_TYPES = {
         "format": "str",
         "max_input_bytes": "Optional[int]",
         "max_xml_depth": "Optional[int]",
+        "max_records": "Optional[int]",
         "strict": "bool",
     },
     "to_file": {
@@ -463,9 +486,9 @@ def _generate_function(obj: Any, indent: str, owner_class: str | None = None) ->
     if not return_type:
         return_type = _extract_numpy_returns_type(doc)
     if not return_type:
-        if name in {"to_file", "__setstate__"}:
+        if name in {"to_file", "convert_file", "__setstate__"}:
             return_type = "None"
-        elif name in {"to_kvn", "to_str", "to_xml"}:
+        elif name in {"convert", "to_kvn", "to_str", "to_xml"}:
             return_type = "str"
         elif name == "to_numpy":
             return_type = "numpy.ndarray"

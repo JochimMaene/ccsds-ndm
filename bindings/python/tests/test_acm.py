@@ -340,7 +340,8 @@ class TestAcm:
             ref_frame_a="EME2000",
             ref_frame_b="SC_BODY_1",
             att_type="QUATERNION",
-            att_lines=[[0.0, 0.0, 0.0, 1.0]],  # Single line with quaternion
+            # Relative time followed by the four quaternion states.
+            att_lines=[[0.0, 0.0, 0.0, 0.0, 1.0]],
             comment=[],
         )
 

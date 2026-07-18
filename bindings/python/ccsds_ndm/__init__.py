@@ -110,6 +110,8 @@ from .ccsds_ndm import (
     TrajLine,
     UserDefined,
     YesNo,
+    convert,
+    convert_file,
     convert_opm,
     convert_opm_file,
     from_file,
@@ -120,6 +122,8 @@ __all__ = [
     # Top-level API
     "from_str",
     "from_file",
+    "convert",
+    "convert_file",
     "convert_opm",
     "convert_opm_file",
     "UserDefined",

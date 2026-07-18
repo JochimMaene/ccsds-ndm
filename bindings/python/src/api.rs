@@ -3,26 +3,128 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::errors::ccsds_error_to_pyerr;
+use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation, ParseErrorContext};
 use ccsds_ndm::generation::VersionedNdm;
-use ccsds_ndm::options::GenerateOptions;
+use ccsds_ndm::options::{GenerateOptions, ParseOptions};
 use ccsds_ndm::traits::{Ndm, Validate};
+use ccsds_ndm::{MessageType, Notation};
 use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::*;
 use std::path::Path;
 
-pub fn parse_typed<T: Ndm>(_py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<T> {
-    match format {
-        Some("kvn") => T::from_kvn(data),
-        Some("xml") => T::from_xml(data),
-        Some(other) => {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "Unsupported format '{other}'. Use 'kvn' or 'xml'",
-            )))
+pub trait FromMessageType: Ndm {
+    const KIND: ccsds_ndm::validation::MessageKind;
+
+    fn from_message_type(message: MessageType) -> Option<Self>;
+}
+
+macro_rules! impl_from_message_type {
+    ($type:path, $variant:ident, $kind:ident) => {
+        impl FromMessageType for $type {
+            const KIND: ccsds_ndm::validation::MessageKind =
+                ccsds_ndm::validation::MessageKind::$kind;
+
+            fn from_message_type(message: MessageType) -> Option<Self> {
+                match message {
+                    MessageType::$variant(message) => Some(message),
+                    _ => None,
+                }
+            }
         }
-        None if data.trim_start().starts_with('<') => T::from_xml(data),
-        None => T::from_kvn(data),
+    };
+}
+
+impl_from_message_type!(ccsds_ndm::messages::opm::Opm, Opm, Opm);
+impl_from_message_type!(ccsds_ndm::messages::oem::Oem, Oem, Oem);
+impl_from_message_type!(ccsds_ndm::messages::omm::Omm, Omm, Omm);
+impl_from_message_type!(ccsds_ndm::messages::ocm::Ocm, Ocm, Ocm);
+impl_from_message_type!(ccsds_ndm::messages::cdm::Cdm, Cdm, Cdm);
+impl_from_message_type!(ccsds_ndm::messages::tdm::Tdm, Tdm, Tdm);
+impl_from_message_type!(ccsds_ndm::messages::rdm::Rdm, Rdm, Rdm);
+impl_from_message_type!(ccsds_ndm::messages::aem::Aem, Aem, Aem);
+impl_from_message_type!(ccsds_ndm::messages::apm::Apm, Apm, Apm);
+impl_from_message_type!(ccsds_ndm::messages::acm::Acm, Acm, Acm);
+impl_from_message_type!(ccsds_ndm::messages::ndm::CombinedNdm, Ndm, Ndm);
+
+fn selected_notation(format: Option<&str>) -> PyResult<Option<Notation>> {
+    match format {
+        Some("kvn") => Ok(Some(Notation::Kvn)),
+        Some("xml") => Ok(Some(Notation::Xml)),
+        Some(other) => Err(unsupported_format(other)),
+        None => Ok(None),
     }
-    .map_err(ccsds_error_to_pyerr)
+}
+
+fn expect_typed<T: FromMessageType>(message: MessageType) -> PyResult<T> {
+    T::from_message_type(message)
+        .ok_or_else(|| PyValueError::new_err("input contains a different CCSDS NDM message type"))
+}
+
+pub fn parse_options(
+    max_input_bytes: Option<usize>,
+    max_xml_depth: Option<usize>,
+    max_records: Option<usize>,
+) -> ParseOptions {
+    let mut options = ParseOptions {
+        max_input_bytes,
+        max_records,
+        ..ParseOptions::default()
+    };
+    if let Some(depth) = max_xml_depth {
+        options.max_xml_depth = depth;
+    }
+    options
+}
+
+pub fn parse_typed<T: FromMessageType>(
+    _py: Python<'_>,
+    data: &str,
+    format: Option<&str>,
+) -> PyResult<T> {
+    parse_typed_with_options(data, format, &ParseOptions::default())
+}
+
+pub fn parse_typed_with_options<T: FromMessageType>(
+    data: &str,
+    format: Option<&str>,
+    options: &ParseOptions,
+) -> PyResult<T> {
+    let message = ccsds_ndm::from_str_with_options(data, selected_notation(format)?, options)
+        .map_err(ccsds_error_to_pyerr)?;
+    expect_typed(message)
+}
+
+pub fn parse_typed_file_with_options<T: FromMessageType>(
+    path: &str,
+    format: Option<&str>,
+    options: &ParseOptions,
+) -> PyResult<T> {
+    let notation = selected_notation(format)?;
+    let message = ccsds_ndm::from_file_with_options(path, notation, options).map_err(|error| {
+        let error = match (error, notation) {
+            (error @ CcsdsNdmError::ResourceLimitExceeded { .. }, Some(notation)) => {
+                CcsdsNdmError::Parsing {
+                    context: Box::new(ParseErrorContext {
+                        message_kind: T::KIND,
+                        notation: match notation {
+                            Notation::Kvn => DiagnosticNotation::Kvn,
+                            Notation::Xml => DiagnosticNotation::Xml,
+                        },
+                        source_edition: None,
+                        byte_offset: None,
+                        line: None,
+                        column: None,
+                        original_token: None,
+                        expected: None,
+                    }),
+                    source: Box::new(error),
+                }
+            }
+            (error, _) => error,
+        };
+        ccsds_error_to_pyerr(error)
+    })?;
+    expect_typed(message)
 }
 
 pub fn validate_message<T: Validate>(message: &T, strict: bool) -> PyResult<Option<Vec<String>>> {

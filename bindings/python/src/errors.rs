@@ -87,8 +87,8 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
             enrich_exception(
                 error,
                 "generate",
-                context.notation,
-                context.message_kind.as_str(),
+                Some(context.notation),
+                Some(context.message_kind.as_str()),
                 Some(context.source_edition),
                 Some(context.target_edition),
                 code,
@@ -117,8 +117,8 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
             enrich_exception(
                 error,
                 "parse",
-                context.notation,
-                context.message_kind.as_str(),
+                Some(context.notation),
+                Some(context.message_kind.as_str()),
                 context.source_edition,
                 None,
                 code,
@@ -152,18 +152,73 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
             let code = val_err.code();
             let field_path = val_err.field_path();
             let error = NdmValidationError::new_err(val_err.to_string());
-            Python::attach(|py| {
-                let value = error.value(py);
-                let _ = value.setattr("code", code);
-                let _ = value.setattr("field_path", field_path);
-            });
-            error
+            enrich_exception(
+                error,
+                "validate",
+                None,
+                None,
+                None,
+                None,
+                code,
+                field_path,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
         }
         CcsdsNdmError::Epoch(epoch_err) => NdmEpochError::new_err(epoch_err.to_string()),
         CcsdsNdmError::UnsupportedMessage(msg) => NdmUnsupportedMessageError::new_err(msg),
-        CcsdsNdmError::UnsupportedInputVersion { .. }
-        | CcsdsNdmError::UnsupportedOutputVersion { .. } => {
-            NdmValidationError::new_err(e.to_string())
+        CcsdsNdmError::UnsupportedInputVersion {
+            message_type,
+            version,
+            supported,
+        } => enrich_exception(
+            NdmValidationError::new_err(format!(
+                "Unsupported input version {version} for {message_type}; supported versions: {supported}"
+            )),
+            "parse",
+            None,
+            Some(message_type),
+            Some(version),
+            None,
+            Some("parse.unsupported_input_version"),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
+        CcsdsNdmError::UnsupportedOutputVersion {
+            message_type,
+            format,
+            version,
+            supported,
+        } => {
+            let notation = match format.to_ascii_lowercase().as_str() {
+                "kvn" => Some(DiagnosticNotation::Kvn),
+                "xml" => Some(DiagnosticNotation::Xml),
+                _ => None,
+            };
+            enrich_exception(
+                NdmValidationError::new_err(format!(
+                    "Unsupported {format} output version {version} for {message_type}; supported versions: {supported}"
+                )),
+                "generate",
+                notation,
+                Some(message_type),
+                Some(version.clone()),
+                Some(version),
+                Some("generation.unsupported_output_version"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
         }
         CcsdsNdmError::UnexpectedEof { context } => {
             NdmFormatError::new_err(format!("Unexpected end of input: {}", context))
@@ -176,8 +231,8 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
 fn enrich_exception(
     error: PyErr,
     operation: &'static str,
-    notation: DiagnosticNotation,
-    message_kind: &'static str,
+    notation: Option<DiagnosticNotation>,
+    message_kind: Option<&'static str>,
     source_edition: Option<String>,
     target_edition: Option<String>,
     code: Option<&'static str>,
@@ -188,16 +243,19 @@ fn enrich_exception(
     original_token: Option<String>,
     expected: Option<&'static str>,
 ) -> PyErr {
-    let notation = match notation {
+    let notation = notation.map(|notation| match notation {
         DiagnosticNotation::Kvn => "kvn",
         DiagnosticNotation::Xml => "xml",
-    };
+    });
     Python::attach(|py| {
         let value = error.value(py);
         let _ = value.setattr("severity", "error");
         let _ = value.setattr("operation", operation);
         let _ = value.setattr("notation", notation);
-        let _ = value.setattr("message_kind", message_kind.to_ascii_lowercase());
+        let _ = value.setattr(
+            "message_kind",
+            message_kind.map(|kind| kind.to_ascii_lowercase()),
+        );
         let _ = value.setattr("source_edition", source_edition);
         let _ = value.setattr("target_edition", target_edition);
         let _ = value.setattr("code", code);

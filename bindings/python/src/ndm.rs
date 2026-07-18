@@ -3,12 +3,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::ndm as core_ndm;
-use ccsds_ndm::traits::Ndm as _;
 use ccsds_ndm::MessageType;
-use pyo3::exceptions::{PyOSError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
-use std::io::Write;
 
 use crate::cdm::Cdm;
 use crate::ocm::Ocm;
@@ -70,22 +67,6 @@ fn py_messages_to_core(py: Python<'_>, messages: &[Py<PyAny>]) -> PyResult<Vec<M
         .collect()
 }
 
-fn message_type_name(message: &MessageType) -> &'static str {
-    match message {
-        MessageType::Opm(_) => "OPM",
-        MessageType::Omm(_) => "OMM",
-        MessageType::Oem(_) => "OEM",
-        MessageType::Ocm(_) => "OCM",
-        MessageType::Acm(_) => "ACM",
-        MessageType::Cdm(_) => "CDM",
-        MessageType::Tdm(_) => "TDM",
-        MessageType::Rdm(_) => "RDM",
-        MessageType::Aem(_) => "AEM",
-        MessageType::Apm(_) => "APM",
-        MessageType::Ndm(_) => "NDM",
-    }
-}
-
 #[pymethods]
 impl Ndm {
     #[new]
@@ -121,53 +102,68 @@ impl Ndm {
 
     /// Parse an NDM combined instantiation from a string.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = match format {
-            None => match ccsds_ndm::from_str(data).map_err(crate::errors::ccsds_error_to_pyerr)? {
-                MessageType::Ndm(inner) => inner,
-                message => {
-                    return Err(PyValueError::new_err(format!(
-                        "Parsed message is not an NDM combined instantiation (got {})",
-                        message_type_name(&message),
-                    )))
-                }
-            },
-            Some(_) => crate::api::parse_typed(py, data, format)?,
-        };
+    #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+    fn from_str(
+        _py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_xml_depth: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, max_records);
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
         Ok(Self { inner })
     }
 
     /// Parse an NDM combined instantiation from a file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format)
+    #[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+    fn from_file(
+        _py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_xml_depth: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, max_records);
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Ok(Self { inner })
     }
 
     /// Serialize the contained messages to KVN using their source versions.
-    fn to_kvn(&self) -> PyResult<String> {
-        self.inner
-            .to_kvn()
-            .map_err(|error| PyValueError::new_err(error.to_string()))
+    #[pyo3(signature = (max_output_bytes=None))]
+    fn to_kvn(&self, max_output_bytes: Option<usize>) -> PyResult<String> {
+        let mut options = ccsds_ndm::GenerateOptions::source();
+        options.max_output_bytes = max_output_bytes;
+        MessageType::Ndm(self.inner.clone())
+            .to_kvn_with(&options)
+            .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 
     /// Serialize the contained messages to XML using their source versions.
-    fn to_xml(&self) -> PyResult<String> {
-        self.inner
-            .to_xml()
-            .map_err(|error| PyValueError::new_err(error.to_string()))
+    #[pyo3(signature = (max_output_bytes=None))]
+    fn to_xml(&self, max_output_bytes: Option<usize>) -> PyResult<String> {
+        let mut options = ccsds_ndm::GenerateOptions::source();
+        options.max_output_bytes = max_output_bytes;
+        MessageType::Ndm(self.inner.clone())
+            .to_xml_with(&options)
+            .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 
     /// Serialize to a string.
-    #[pyo3(signature = (format, validate=true))]
-    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        format: &str,
+        validate: bool,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
         crate::api::require_checked_generation(validate)?;
         match format {
-            "kvn" => self.to_kvn(),
-            "xml" => self.to_xml(),
+            "kvn" => self.to_kvn(max_output_bytes),
+            "xml" => self.to_xml(max_output_bytes),
             other => Err(crate::api::unsupported_format(other)),
         }
     }
@@ -182,13 +178,20 @@ impl Ndm {
     ///     Output format ('kvn' or 'xml').
     /// validate : bool, optional
     ///     Whether to validate the message before writing (default: True).
-    #[pyo3(signature = (path, format, validate=true))]
-    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
-        let data = self.to_str(format, validate)?;
+    #[pyo3(signature = (path, format, validate=true, max_output_bytes=None))]
+    fn to_file(
+        &self,
+        path: &str,
+        format: &str,
+        validate: bool,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<()> {
+        let data = self.to_str(format, validate, max_output_bytes)?;
         crate::api::atomic_write(path, |output| {
+            use std::io::Write;
             output
                 .write_all(data.as_bytes())
-                .map_err(|error| PyOSError::new_err(error.to_string()))
+                .map_err(|error| pyo3::exceptions::PyOSError::new_err(error.to_string()))
         })
     }
 

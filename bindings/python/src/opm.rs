@@ -149,10 +149,12 @@ impl Opm {
                     "Unsupported format '{other}'. Use 'kvn' or 'xml'"
                 )))
             }
-            None if data.trim_start().starts_with('<') => {
-                core_opm::Opm::from_xml_with_options(data, &options)
-            }
-            None => core_opm::Opm::from_kvn_with_options(data, &options),
+            None => match ccsds_ndm::detect::detect_notation(data)
+                .map_err(crate::errors::ccsds_error_to_pyerr)?
+            {
+                ccsds_ndm::Notation::Kvn => core_opm::Opm::from_kvn_with_options(data, &options),
+                ccsds_ndm::Notation::Xml => core_opm::Opm::from_xml_with_options(data, &options),
+            },
         };
         let inner = parsed.map_err(crate::errors::ccsds_error_to_pyerr)?;
         Ok(Self { inner })

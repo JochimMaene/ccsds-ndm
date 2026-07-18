@@ -2,6 +2,37 @@
 from typing import Optional, Union
 import numpy
 
+def convert(
+    data: str,
+    from_format: str,
+    to_format: str,
+    max_input_bytes: Optional[int] = None,
+    max_xml_depth: Optional[int] = None,
+    max_records: Optional[int] = None,
+    max_output_bytes: Optional[int] = None,
+    version: Optional[str] = None,
+) -> str:
+    """
+    Convert any recognized NDM message between KVN and XML through the shared generation gate.
+    """
+    ...
+
+def convert_file(
+    source_path: str,
+    destination_path: str,
+    from_format: str,
+    to_format: str,
+    max_input_bytes: Optional[int] = None,
+    max_xml_depth: Optional[int] = None,
+    max_records: Optional[int] = None,
+    max_output_bytes: Optional[int] = None,
+    version: Optional[str] = None,
+) -> None:
+    """
+    Convert any recognized NDM file and atomically replace the destination on success.
+    """
+    ...
+
 def convert_opm(
     data: str,
     from_format: str,
@@ -31,6 +62,10 @@ def convert_opm_file(
 
 def from_file(
     path: str,
+    format: Optional[str] = None,
+    max_input_bytes: Optional[int] = None,
+    max_xml_depth: Optional[int] = None,
+    max_records: Optional[int] = None,
 ) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
     """
     Parse from a file path (KVN or XML).
@@ -46,24 +81,14 @@ def from_file(
     """
     ...
 
-def from_str(data: str) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
-    """
-    Parse a string (KVN or XML) and return the corresponding NDM object.
-
-    Parameters
-    ----------
-    data : str
-        The content to parse.
-    Returns
-    -------
-    Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
-        The parsed NDM object.
-
-    Raises
-    ------
-    ValueError
-        If parsing fails.
-    """
+def from_str(
+    data: str,
+    format: Optional[str] = None,
+    max_input_bytes: Optional[int] = None,
+    max_xml_depth: Optional[int] = None,
+    max_records: Optional[int] = None,
+):
+    """ """
     ...
 
 class Acm:
@@ -89,12 +114,24 @@ class Acm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Acm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Acm:
         """ """
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Acm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Acm:
         """ """
         ...
 
@@ -140,27 +177,36 @@ class Acm:
         format: str,
         validate: bool = True,
         version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> None:
         """
         Write directly to a KVN or XML file. ``validate`` must remain true.
         """
         ...
 
-    def to_kvn(self, version: Optional[str] = None) -> str:
+    def to_kvn(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to KVN, preserving the source version by default.
         """
         ...
 
     def to_str(
-        self, format: str, validate: bool = True, version: Optional[str] = None
+        self,
+        format: str,
+        validate: bool = True,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> str:
         """
         Serialize to KVN or XML. ``validate`` must remain true.
         """
         ...
 
-    def to_xml(self, version: Optional[str] = None) -> str:
+    def to_xml(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to XML, preserving the source version by default.
         """
@@ -202,7 +248,7 @@ class AcmAttitudeDetermination:
     @property
     def ad_epoch(self) -> str | None:
         """
-        Attitude determination epoch.
+        Epoch of the attitude determination.
         """
         ...
 
@@ -256,7 +302,10 @@ class AcmAttitudeDetermination:
     @property
     def attitude_type(self) -> str | None:
         """
-        Attitude type keyword.
+        Type of attitude data, selected per annex B, subsection B4. Attitude states must always be
+        listed before rate states.
+
+        Examples: QUATERNION
         """
         ...
 
@@ -282,6 +331,15 @@ class AcmAttitudeDetermination:
 
     @cov_type.setter
     def cov_type(self, value: str | None) -> None: ...
+    @property
+    def euler_rot_seq(self) -> str | None:
+        """
+        Euler rotation sequence used by Euler-angle attitude states.
+        """
+        ...
+
+    @euler_rot_seq.setter
+    def euler_rot_seq(self, value: str | None) -> None: ...
     @property
     def number_states(self) -> int | None:
         """
@@ -517,7 +575,7 @@ class AcmCovarianceMatrix:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def cov_basis(self) -> str:
+    def cov_basis(self) -> str | None:
         """
         Basis of this covariance time history data.
 
@@ -526,16 +584,34 @@ class AcmCovarianceMatrix:
         ...
 
     @cov_basis.setter
-    def cov_basis(self, value: str) -> None: ...
+    def cov_basis(self, value: str | None) -> None: ...
+    @property
+    def cov_basis_id(self) -> str | None:
+        """
+        Identifier for the covariance basis.
+        """
+        ...
+
+    @cov_basis_id.setter
+    def cov_basis_id(self, value: str | None) -> None: ...
     @property
     def cov_confidence(self) -> float | None:
         """
-        Optional covariance confidence.
+        Optional confidence level of the covariance matrix.
         """
         ...
 
     @cov_confidence.setter
     def cov_confidence(self, value: float | None) -> None: ...
+    @property
+    def cov_id(self) -> str | None:
+        """
+        Covariance history identifier.
+        """
+        ...
+
+    @cov_id.setter
+    def cov_id(self, value: str | None) -> None: ...
     @property
     def cov_lines(self) -> list[list[float]]:
         """
@@ -547,7 +623,16 @@ class AcmCovarianceMatrix:
     @cov_lines.setter
     def cov_lines(self, value: list[list[float]]) -> None: ...
     @property
-    def cov_ref_frame(self) -> str:
+    def cov_prev_id(self) -> str | None:
+        """
+        Previous covariance history identifier.
+        """
+        ...
+
+    @cov_prev_id.setter
+    def cov_prev_id(self, value: str | None) -> None: ...
+    @property
+    def cov_ref_frame(self) -> str | None:
         """
         Reference frame of the covariance time history. The full set of values is enumerated in
         annex B, subsection B3.
@@ -557,7 +642,7 @@ class AcmCovarianceMatrix:
         ...
 
     @cov_ref_frame.setter
-    def cov_ref_frame(self, value: str) -> None: ...
+    def cov_ref_frame(self, value: str | None) -> None: ...
     @property
     def cov_type(self) -> str:
         """
@@ -1167,7 +1252,7 @@ class AcmSensor:
     """
     def __init__(
         self,
-        sensor_number,
+        sensor_number=None,
         sensor_used=None,
         sensor_noise_stddev=None,
         sensor_frequency=None,
@@ -1191,6 +1276,15 @@ class AcmSensor:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
+    def number_sensor_noise_covariance(self) -> int | None:
+        """
+        Number of sensor-noise covariance elements.
+        """
+        ...
+
+    @number_sensor_noise_covariance.setter
+    def number_sensor_noise_covariance(self, value: int | None) -> None: ...
+    @property
     def sensor_frequency(self) -> float | None:
         """
         Sensor frequency in Hz.
@@ -1209,7 +1303,7 @@ class AcmSensor:
     @sensor_noise_stddev.setter
     def sensor_noise_stddev(self, value: list[float] | None) -> None: ...
     @property
-    def sensor_number(self) -> int:
+    def sensor_number(self) -> int | None:
         """
         Sensor number. Multiple sensors may be included, with each having a unique, ascending
         number.
@@ -1219,7 +1313,7 @@ class AcmSensor:
         ...
 
     @sensor_number.setter
-    def sensor_number(self, value: int) -> None: ...
+    def sensor_number(self, value: int | None) -> None: ...
     @property
     def sensor_used(self) -> str | None:
         """
@@ -1477,12 +1571,24 @@ class Aem:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Aem:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Aem:
         """ """
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Aem:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Aem:
         """ """
         ...
 
@@ -1528,27 +1634,36 @@ class Aem:
         format: str,
         validate: bool = True,
         version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> None:
         """
         Write directly to a KVN or XML file. ``validate`` must remain true.
         """
         ...
 
-    def to_kvn(self, version: Optional[str] = None) -> str:
+    def to_kvn(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to KVN, preserving the source version by default.
         """
         ...
 
     def to_str(
-        self, format: str, validate: bool = True, version: Optional[str] = None
+        self,
+        format: str,
+        validate: bool = True,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> str:
         """
         Serialize to KVN or XML. ``validate`` must remain true.
         """
         ...
 
-    def to_xml(self, version: Optional[str] = None) -> str:
+    def to_xml(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to XML, preserving the source version by default.
         """
@@ -2036,12 +2151,22 @@ class Apm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Apm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+    ) -> Apm:
         """ """
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Apm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+    ) -> Apm:
         """ """
         ...
 
@@ -2085,27 +2210,36 @@ class Apm:
         format: str,
         validate: bool = True,
         version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> None:
         """
         Write directly to a KVN or XML file. ``validate`` must remain true.
         """
         ...
 
-    def to_kvn(self, version: Optional[str] = None) -> str:
+    def to_kvn(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to KVN, preserving the source version by default.
         """
         ...
 
     def to_str(
-        self, format: str, validate: bool = True, version: Optional[str] = None
+        self,
+        format: str,
+        validate: bool = True,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> str:
         """
         Serialize to KVN or XML. ``validate`` must remain true.
         """
         ...
 
-    def to_xml(self, version: Optional[str] = None) -> str:
+    def to_xml(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to XML, preserving the source version by default.
         """
@@ -2530,7 +2664,12 @@ class Cdm:
     @body.setter
     def body(self, value: CdmBody) -> None: ...
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Cdm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+    ) -> Cdm:
         """
         Parse a CDM from a file path with optional format.
 
@@ -2566,7 +2705,12 @@ class Cdm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Cdm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+    ) -> Cdm:
         """
         Parse a CDM from a string with optional format.
 
@@ -2616,6 +2760,7 @@ class Cdm:
         format: str,
         validate: bool = True,
         version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> None:
         """
         Write the CDM to a file.
@@ -2633,21 +2778,29 @@ class Cdm:
         """
         ...
 
-    def to_kvn(self, version: Optional[str] = None) -> str:
+    def to_kvn(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to KVN, preserving the source version by default.
         """
         ...
 
     def to_str(
-        self, format: str, validate: bool = True, version: Optional[str] = None
+        self,
+        format: str,
+        validate: bool = True,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> str:
         """
         Serialize to KVN or XML. ``validate`` must remain true.
         """
         ...
 
-    def to_xml(self, version: Optional[str] = None) -> str:
+    def to_xml(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to XML, preserving the source version by default.
         """
@@ -3999,7 +4152,14 @@ class CdmStateVector:
         Velocity Z component. Units: km/s.
     """
     def __init__(
-        self, x: float, y: float, z: float, x_dot: float, y_dot: float, z_dot: float
+        self,
+        x: float,
+        y: float,
+        z: float,
+        x_dot: float,
+        y_dot: float,
+        z_dot: float,
+        comments=None,
     ) -> None: ...
     def __getstate__(self, /) -> object:
         """
@@ -4007,6 +4167,15 @@ class CdmStateVector:
         """
         ...
 
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments (see 6.3.4 for formatting rules).
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @staticmethod
     def from_numpy(array) -> CdmStateVector:
         """ """
@@ -5359,14 +5528,26 @@ class Ndm:
     @comments.setter
     def comments(self, value: list[str]) -> None: ...
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Ndm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Ndm:
         """
         Parse an NDM combined instantiation from a file.
         """
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Ndm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Ndm:
         """
         Parse an NDM combined instantiation from a string.
         """
@@ -5390,7 +5571,13 @@ class Ndm:
     def messages(
         self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
     ) -> None: ...
-    def to_file(self, path: str, format: str, validate: bool = True) -> None:
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        validate: bool = True,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
         """
         Write to file.
 
@@ -5405,19 +5592,21 @@ class Ndm:
         """
         ...
 
-    def to_kvn(self) -> str:
+    def to_kvn(self, max_output_bytes: Optional[int] = None) -> str:
         """
         Serialize the contained messages to KVN using their source versions.
         """
         ...
 
-    def to_str(self, format: str, validate: bool = True) -> str:
+    def to_str(
+        self, format: str, validate: bool = True, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to a string.
         """
         ...
 
-    def to_xml(self) -> str:
+    def to_xml(self, max_output_bytes: Optional[int] = None) -> str:
         """
         Serialize the contained messages to XML using their source versions.
         """
@@ -5472,7 +5661,13 @@ class Ocm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Ocm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Ocm:
         """
         Create an OCM message from a file.
 
@@ -5491,7 +5686,13 @@ class Ocm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Ocm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Ocm:
         """
         Create an OCM message from a string.
 
@@ -5551,6 +5752,7 @@ class Ocm:
         format: str,
         validate: bool = True,
         version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> None:
         """
         Write to file.
@@ -5568,7 +5770,9 @@ class Ocm:
         """
         ...
 
-    def to_kvn(self, version: Optional[str] = None) -> str:
+    def to_kvn(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to KVN, preserving the source version by default.
 
@@ -5577,14 +5781,20 @@ class Ocm:
         ...
 
     def to_str(
-        self, format: str, validate: bool = True, version: Optional[str] = None
+        self,
+        format: str,
+        validate: bool = True,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> str:
         """
         Serialize to KVN or XML. ``validate`` must remain true.
         """
         ...
 
-    def to_xml(self, version: Optional[str] = None) -> str:
+    def to_xml(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to XML, preserving the source version by default.
         """
@@ -9383,7 +9593,13 @@ class Oem:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Oem:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Oem:
         """
         Create an OEM message from a file.
 
@@ -9403,7 +9619,13 @@ class Oem:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Oem:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Oem:
         """
         Create an OEM message from a string.
 
@@ -9453,6 +9675,7 @@ class Oem:
         format: str,
         validate: bool = True,
         version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> None:
         """
         Write directly to a KVN or XML file.
@@ -9470,7 +9693,9 @@ class Oem:
         """
         ...
 
-    def to_kvn(self, version: Optional[str] = None) -> str:
+    def to_kvn(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to KVN, preserving the source version by default.
 
@@ -9479,14 +9704,20 @@ class Oem:
         ...
 
     def to_str(
-        self, format: str, validate: bool = True, version: Optional[str] = None
+        self,
+        format: str,
+        validate: bool = True,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> str:
         """
         Serialize to KVN or XML. ``validate`` must remain true.
         """
         ...
 
-    def to_xml(self, version: Optional[str] = None) -> str:
+    def to_xml(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to XML, preserving the source version by default.
         """
@@ -10310,7 +10541,12 @@ class Omm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Omm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+    ) -> Omm:
         """
         Create an OMM message from a file.
 
@@ -10329,7 +10565,12 @@ class Omm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Omm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+    ) -> Omm:
         """ """
         ...
 
@@ -10405,6 +10646,7 @@ class Omm:
         format: str,
         validate: bool = True,
         version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> None:
         """
         Write to file.
@@ -10422,7 +10664,9 @@ class Omm:
         """
         ...
 
-    def to_kvn(self, version: Optional[str] = None) -> str:
+    def to_kvn(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to KVN, preserving the source version by default.
 
@@ -10431,7 +10675,11 @@ class Omm:
         ...
 
     def to_str(
-        self, format: str, validate: bool = True, version: Optional[str] = None
+        self,
+        format: str,
+        validate: bool = True,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> str:
         """
         Serialize to KVN or XML. ``validate`` must remain true.
@@ -10449,7 +10697,9 @@ class Omm:
         """
         ...
 
-    def to_xml(self, version: Optional[str] = None) -> str:
+    def to_xml(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to XML, preserving the source version by default.
         """
@@ -11644,7 +11894,12 @@ class Rdm:
         ...
 
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Rdm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+    ) -> Rdm:
         """
         Create an RDM message from a file.
 
@@ -11664,7 +11919,12 @@ class Rdm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Rdm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+    ) -> Rdm:
         """
         Create an RDM message from a string.
 
@@ -11724,6 +11984,7 @@ class Rdm:
         format: str,
         validate: bool = True,
         version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> None:
         """
         Write to a file.
@@ -11741,7 +12002,9 @@ class Rdm:
         """
         ...
 
-    def to_kvn(self, version: Optional[str] = None) -> str:
+    def to_kvn(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to KVN, preserving the source version by default.
 
@@ -11753,7 +12016,11 @@ class Rdm:
         ...
 
     def to_str(
-        self, format: str, validate: bool = True, version: Optional[str] = None
+        self,
+        format: str,
+        validate: bool = True,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> str:
         """
         Serialize to string (generic).
@@ -11773,7 +12040,9 @@ class Rdm:
         """
         ...
 
-    def to_xml(self, version: Optional[str] = None) -> str:
+    def to_xml(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to XML, preserving the source version by default.
 
@@ -13581,7 +13850,13 @@ class Tdm:
     @body.setter
     def body(self, value: TdmBody) -> None: ...
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Tdm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Tdm:
         """
         Create a TDM message from a file.
 
@@ -13601,7 +13876,13 @@ class Tdm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Tdm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        max_input_bytes: Optional[int] = None,
+        max_xml_depth: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Tdm:
         """
         Create a TDM message from a string.
 
@@ -13662,6 +13943,7 @@ class Tdm:
         format: str,
         validate: bool = True,
         version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> None:
         """
         Write to file.
@@ -13679,7 +13961,9 @@ class Tdm:
         """
         ...
 
-    def to_kvn(self, version: Optional[str] = None) -> str:
+    def to_kvn(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to KVN, preserving the source version by default.
 
@@ -13688,14 +13972,20 @@ class Tdm:
         ...
 
     def to_str(
-        self, format: str, validate: bool = True, version: Optional[str] = None
+        self,
+        format: str,
+        validate: bool = True,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
     ) -> str:
         """
         Serialize to KVN or XML. ``validate`` must remain true.
         """
         ...
 
-    def to_xml(self, version: Optional[str] = None) -> str:
+    def to_xml(
+        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
+    ) -> str:
         """
         Serialize to XML, preserving the source version by default.
         """

@@ -9,7 +9,6 @@ use ccsds_ndm::messages::ocm as core_ocm;
 use ccsds_ndm::types::Duration;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
 
 /// Orbit Comprehensive Message (OCM).
 ///
@@ -52,9 +51,17 @@ impl Ocm {
     /// Ocm
     ///     The parsed Ocm object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format)?;
+    #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+    fn from_str(
+        _py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_xml_depth: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, max_records);
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
         Ok(Self { inner })
     }
 
@@ -72,11 +79,18 @@ impl Ocm {
     /// Ocm
     ///     The parsed OCM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format)
+    #[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+    fn from_file(
+        _py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_xml_depth: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, max_records);
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Ok(Self { inner })
     }
 
     /// Create a new OCM message.
@@ -185,22 +199,28 @@ impl Ocm {
     /// Serialize to KVN, preserving the source version by default.
     ///
     /// Pass ``version="latest"`` or an exact supported version to override it.
-    #[pyo3(signature = (version=None))]
-    fn to_kvn(&self, version: Option<&str>) -> PyResult<String> {
-        crate::api::generate_string(&self.inner, "kvn", version)
+    #[pyo3(signature = (version=None, max_output_bytes=None))]
+    fn to_kvn(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.inner, "kvn", version, max_output_bytes)
     }
 
     /// Serialize to XML, preserving the source version by default.
-    #[pyo3(signature = (version=None))]
-    fn to_xml(&self, version: Option<&str>) -> PyResult<String> {
-        crate::api::generate_string(&self.inner, "xml", version)
+    #[pyo3(signature = (version=None, max_output_bytes=None))]
+    fn to_xml(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
     }
 
     /// Serialize to KVN or XML. ``validate`` must remain true.
-    #[pyo3(signature = (format, validate=true, version=None))]
-    fn to_str(&self, format: &str, validate: bool, version: Option<&str>) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true, version=None, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        format: &str,
+        validate: bool,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
         crate::api::require_checked_generation(validate)?;
-        crate::api::generate_string(&self.inner, format, version)
+        crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
     }
 
     /// Write to file.
@@ -215,16 +235,17 @@ impl Ocm {
     ///     Must remain True; unchecked generation is not supported.
     /// version : str, optional
     ///     Source version by default, ``"latest"``, or an exact supported version.
-    #[pyo3(signature = (path, format, validate=true, version=None))]
+    #[pyo3(signature = (path, format, validate=true, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
         path: &str,
         format: &str,
         validate: bool,
         version: Option<&str>,
+        max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
         crate::api::require_checked_generation(validate)?;
-        crate::api::generate_file(&self.inner, path, format, version)
+        crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
     }
 }
 

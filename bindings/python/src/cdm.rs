@@ -9,7 +9,6 @@ use ccsds_ndm::types::{self as core_types, *};
 use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
 
 // Helper to parse epoch strings
 fn parse_epoch_str(value: &str) -> PyResult<CalendarEpoch> {
@@ -275,9 +274,16 @@ impl Cdm {
     /// Cdm
     ///     The parsed CDM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format)?;
+    #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None))]
+    fn from_str(
+        _py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_xml_depth: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, None);
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
         Ok(Self { inner })
     }
 
@@ -295,30 +301,42 @@ impl Cdm {
     /// Cdm
     ///     The parsed CDM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format)
+    #[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None))]
+    fn from_file(
+        _py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_xml_depth: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, None);
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Ok(Self { inner })
     }
 
     /// Serialize to KVN, preserving the source version by default.
-    #[pyo3(signature = (version=None))]
-    fn to_kvn(&self, version: Option<&str>) -> PyResult<String> {
-        crate::api::generate_string(&self.inner, "kvn", version)
+    #[pyo3(signature = (version=None, max_output_bytes=None))]
+    fn to_kvn(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.inner, "kvn", version, max_output_bytes)
     }
 
     /// Serialize to XML, preserving the source version by default.
-    #[pyo3(signature = (version=None))]
-    fn to_xml(&self, version: Option<&str>) -> PyResult<String> {
-        crate::api::generate_string(&self.inner, "xml", version)
+    #[pyo3(signature = (version=None, max_output_bytes=None))]
+    fn to_xml(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
     }
 
     /// Serialize to KVN or XML. ``validate`` must remain true.
-    #[pyo3(signature = (format, validate=true, version=None))]
-    fn to_str(&self, format: &str, validate: bool, version: Option<&str>) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true, version=None, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        format: &str,
+        validate: bool,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
         crate::api::require_checked_generation(validate)?;
-        crate::api::generate_string(&self.inner, format, version)
+        crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
     }
 
     /// Conjunction Data Message (CDM).
@@ -396,16 +414,17 @@ impl Cdm {
     ///     Must remain True; unchecked generation is not supported.
     /// version : str, optional
     ///     Source version by default, ``"latest"``, or an exact supported version.
-    #[pyo3(signature = (path, format, validate=true, version=None))]
+    #[pyo3(signature = (path, format, validate=true, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
         path: &str,
         format: &str,
         validate: bool,
         version: Option<&str>,
+        max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
         crate::api::require_checked_generation(validate)?;
-        crate::api::generate_file(&self.inner, path, format, version)
+        crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
     }
 }
 
@@ -2106,9 +2125,19 @@ pub struct CdmStateVector {
 #[pymethods]
 impl CdmStateVector {
     #[new]
-    fn new(x: f64, y: f64, z: f64, x_dot: f64, y_dot: f64, z_dot: f64) -> Self {
+    #[pyo3(signature = (x, y, z, x_dot, y_dot, z_dot, comments=None))]
+    fn new(
+        x: f64,
+        y: f64,
+        z: f64,
+        x_dot: f64,
+        y_dot: f64,
+        z_dot: f64,
+        comments: Option<Vec<String>>,
+    ) -> Self {
         Self {
             inner: core_cdm::CdmStateVector {
+                comment: comments.unwrap_or_default(),
                 x: PositionRequired::new(x),
                 y: PositionRequired::new(y),
                 z: PositionRequired::new(z),
@@ -2143,6 +2172,7 @@ impl CdmStateVector {
 
         Ok(Self {
             inner: core_cdm::CdmStateVector {
+                comment: Vec::new(),
                 x: PositionRequired::new(values[0]),
                 y: PositionRequired::new(values[1]),
                 z: PositionRequired::new(values[2]),
@@ -2151,6 +2181,19 @@ impl CdmStateVector {
                 z_dot: VelocityRequired::new(values[5]),
             },
         })
+    }
+
+    /// Comments (see 6.3.4 for formatting rules).
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn comment(&self) -> Vec<String> {
+        self.inner.comment.clone()
+    }
+
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.inner.comment = value;
     }
 
     /// Object Position Vector X component.

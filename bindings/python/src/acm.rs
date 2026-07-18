@@ -9,7 +9,6 @@ use ccsds_ndm::messages::acm as core_acm;
 use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, AttBasisType, AttRateType, RotSeq};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
 use std::str::FromStr;
 
 /// Attitude Comprehensive Message (ACM).
@@ -89,50 +88,72 @@ impl Acm {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(py: Python<'_>, data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(py, data, format)?;
+    #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+    fn from_str(
+        _py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_xml_depth: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, max_records);
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
         Ok(Self { inner })
     }
 
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(py: Python<'_>, path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(py, &content, format)
+    #[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+    fn from_file(
+        _py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_xml_depth: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, max_records);
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Ok(Self { inner })
     }
 
     /// Serialize to KVN, preserving the source version by default.
-    #[pyo3(signature = (version=None))]
-    fn to_kvn(&self, version: Option<&str>) -> PyResult<String> {
-        crate::api::generate_string(&self.inner, "kvn", version)
+    #[pyo3(signature = (version=None, max_output_bytes=None))]
+    fn to_kvn(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.inner, "kvn", version, max_output_bytes)
     }
 
     /// Serialize to XML, preserving the source version by default.
-    #[pyo3(signature = (version=None))]
-    fn to_xml(&self, version: Option<&str>) -> PyResult<String> {
-        crate::api::generate_string(&self.inner, "xml", version)
+    #[pyo3(signature = (version=None, max_output_bytes=None))]
+    fn to_xml(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
     }
 
     /// Serialize to KVN or XML. ``validate`` must remain true.
-    #[pyo3(signature = (format, validate=true, version=None))]
-    fn to_str(&self, format: &str, validate: bool, version: Option<&str>) -> PyResult<String> {
+    #[pyo3(signature = (format, validate=true, version=None, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        format: &str,
+        validate: bool,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
         crate::api::require_checked_generation(validate)?;
-        crate::api::generate_string(&self.inner, format, version)
+        crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
     }
 
     /// Write directly to a KVN or XML file. ``validate`` must remain true.
-    #[pyo3(signature = (path, format, validate=true, version=None))]
+    #[pyo3(signature = (path, format, validate=true, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
         path: &str,
         format: &str,
         validate: bool,
         version: Option<&str>,
+        max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
         crate::api::require_checked_generation(validate)?;
-        crate::api::generate_file(&self.inner, path, format, version)
+        crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
     }
 
     /// Attitude Comprehensive Message (ACM).
@@ -778,12 +799,30 @@ impl AcmAttitudeState {
     ) -> PyResult<Self> {
         let att_type = AcmAttitudeType::from_str(&att_type)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let number_states = att_lines
+            .first()
+            .and_then(|line| line.len().checked_sub(1))
+            .ok_or_else(|| {
+                PyValueError::new_err(
+                    "att_lines must contain relative time followed by at least one state",
+                )
+            })?;
+        if att_lines
+            .iter()
+            .any(|line| line.len() != number_states + 1)
+        {
+            return Err(PyValueError::new_err(
+                "all att_lines must contain the same number of states",
+            ));
+        }
+        let number_states = u32::try_from(number_states)
+            .map_err(|_| PyValueError::new_err("attitude state count exceeds u32"))?;
         Ok(Self {
             inner: core_acm::AcmAttitudeState {
                 comment: comment.unwrap_or_default(),
                 ref_frame_a,
                 ref_frame_b,
-                number_states: att_lines.len() as u32,
+                number_states,
                 att_type,
                 att_lines: att_lines
                     .into_iter()
@@ -1258,8 +1297,14 @@ impl AcmCovarianceMatrix {
         Ok(Self {
             inner: core_acm::AcmCovarianceMatrix {
                 comment: comment.unwrap_or_default(),
-                cov_basis,
-                cov_ref_frame,
+                cov_id: None,
+                cov_prev_id: None,
+                cov_basis: Some(
+                    AttBasisType::from_str(&cov_basis)
+                        .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                ),
+                cov_basis_id: None,
+                cov_ref_frame: Some(cov_ref_frame),
                 cov_type,
                 cov_lines: cov_lines
                     .into_iter()
@@ -1285,19 +1330,62 @@ impl AcmCovarianceMatrix {
         self.inner.comment = value;
     }
 
+    /// Covariance history identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_cov_id(&self) -> Option<String> {
+        self.inner.cov_id.clone()
+    }
+
+    #[setter]
+    fn set_cov_id(&mut self, value: Option<String>) {
+        self.inner.cov_id = value;
+    }
+
+    /// Previous covariance history identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_cov_prev_id(&self) -> Option<String> {
+        self.inner.cov_prev_id.clone()
+    }
+
+    #[setter]
+    fn set_cov_prev_id(&mut self, value: Option<String>) {
+        self.inner.cov_prev_id = value;
+    }
+
     /// Basis of this covariance time history data.
     ///
     /// Examples: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
     ///
-    /// :type: str
+    /// :type: str | None
     #[getter]
-    fn get_cov_basis(&self) -> String {
-        self.inner.cov_basis.clone()
+    fn get_cov_basis(&self) -> Option<String> {
+        self.inner.cov_basis.as_ref().map(ToString::to_string)
     }
 
     #[setter]
-    fn set_cov_basis(&mut self, value: String) {
-        self.inner.cov_basis = value;
+    fn set_cov_basis(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.cov_basis = value
+            .map(|value| AttBasisType::from_str(&value))
+            .transpose()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Identifier for the covariance basis.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_cov_basis_id(&self) -> Option<String> {
+        self.inner.cov_basis_id.clone()
+    }
+
+    #[setter]
+    fn set_cov_basis_id(&mut self, value: Option<String>) {
+        self.inner.cov_basis_id = value;
     }
 
     /// Reference frame of the covariance time history. The full set of values is enumerated in
@@ -1305,14 +1393,14 @@ impl AcmCovarianceMatrix {
     ///
     /// Examples: SC_BODY_1
     ///
-    /// :type: str
+    /// :type: str | None
     #[getter]
-    fn get_cov_ref_frame(&self) -> String {
+    fn get_cov_ref_frame(&self) -> Option<String> {
         self.inner.cov_ref_frame.clone()
     }
 
     #[setter]
-    fn set_cov_ref_frame(&mut self, value: String) {
+    fn set_cov_ref_frame(&mut self, value: Option<String>) {
         self.inner.cov_ref_frame = value;
     }
 
@@ -1333,7 +1421,7 @@ impl AcmCovarianceMatrix {
         Ok(())
     }
 
-    /// Optional covariance confidence.
+    /// Optional confidence level of the covariance matrix.
     ///
     /// :type: float | None
     #[getter]
@@ -1612,9 +1700,9 @@ pub struct AcmSensor {
 #[pymethods]
 impl AcmSensor {
     #[new]
-    #[pyo3(signature = (sensor_number, sensor_used=None, sensor_noise_stddev=None, sensor_frequency=None, comment=None))]
+    #[pyo3(signature = (sensor_number=None, sensor_used=None, sensor_noise_stddev=None, sensor_frequency=None, comment=None))]
     fn new(
-        sensor_number: u32,
+        sensor_number: Option<u32>,
         sensor_used: Option<String>,
         sensor_noise_stddev: Option<Vec<f64>>,
         sensor_frequency: Option<f64>,
@@ -1625,13 +1713,17 @@ impl AcmSensor {
                 comment: comment.unwrap_or_default(),
                 sensor_number,
                 sensor_used,
+                number_sensor_noise_covariance: None,
                 sensor_noise_stddev: sensor_noise_stddev.map(|values| {
                     ccsds_ndm::types::SensorNoise {
                         values,
                         units: None,
                     }
                 }),
-                sensor_frequency,
+                sensor_frequency: sensor_frequency.map(|value| ccsds_ndm::types::Frequency {
+                    value,
+                    units: None,
+                }),
             },
         }
     }
@@ -1656,14 +1748,14 @@ impl AcmSensor {
     ///
     /// Examples: 1, 2, 3
     ///
-    /// :type: int
+    /// :type: int | None
     #[getter]
-    fn get_sensor_number(&self) -> u32 {
+    fn get_sensor_number(&self) -> Option<u32> {
         self.inner.sensor_number
     }
 
     #[setter]
-    fn set_sensor_number(&mut self, value: u32) {
+    fn set_sensor_number(&mut self, value: Option<u32>) {
         self.inner.sensor_number = value;
     }
 
@@ -1678,6 +1770,19 @@ impl AcmSensor {
     #[setter]
     fn set_sensor_used(&mut self, value: Option<String>) {
         self.inner.sensor_used = value;
+    }
+
+    /// Number of sensor-noise covariance elements.
+    ///
+    /// :type: int | None
+    #[getter]
+    fn get_number_sensor_noise_covariance(&self) -> Option<u32> {
+        self.inner.number_sensor_noise_covariance
+    }
+
+    #[setter]
+    fn set_number_sensor_noise_covariance(&mut self, value: Option<u32>) {
+        self.inner.number_sensor_noise_covariance = value;
     }
 
     /// Sensor noise standard deviation values.
@@ -1704,12 +1809,15 @@ impl AcmSensor {
     /// :type: float | None
     #[getter]
     fn get_sensor_frequency(&self) -> Option<f64> {
-        self.inner.sensor_frequency
+        self.inner.sensor_frequency.as_ref().map(|value| value.value)
     }
 
     #[setter]
     fn set_sensor_frequency(&mut self, value: Option<f64>) {
-        self.inner.sensor_frequency = value;
+        self.inner.sensor_frequency = value.map(|value| ccsds_ndm::types::Frequency {
+            value,
+            units: None,
+        });
     }
 }
 
@@ -1734,6 +1842,7 @@ impl AcmAttitudeDetermination {
                 attitude_source: None,
                 number_states: None,
                 attitude_states: None,
+                euler_rot_seq: None,
                 cov_type: None,
                 ad_epoch: None,
                 ref_frame_a: None,
@@ -1845,6 +1954,23 @@ impl AcmAttitudeDetermination {
         Ok(())
     }
 
+    /// Euler rotation sequence used by Euler-angle attitude states.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_euler_rot_seq(&self) -> Option<String> {
+        self.inner.euler_rot_seq.as_ref().map(ToString::to_string)
+    }
+
+    #[setter]
+    fn set_euler_rot_seq(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.euler_rot_seq = value
+            .map(|value| RotSeq::from_str(&value))
+            .transpose()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
     /// Covariance type for estimator.
     ///
     /// :type: str | None
@@ -1862,7 +1988,7 @@ impl AcmAttitudeDetermination {
         Ok(())
     }
 
-    /// Attitude determination epoch.
+    /// Epoch of the attitude determination.
     ///
     /// :type: str | None
     #[getter]
@@ -1902,7 +2028,10 @@ impl AcmAttitudeDetermination {
         self.inner.ref_frame_b = value;
     }
 
-    /// Attitude type keyword.
+    /// Type of attitude data, selected per annex B, subsection B4. Attitude states must always be
+    /// listed before rate states.
+    ///
+    /// Examples: QUATERNION
     ///
     /// :type: str | None
     #[getter]
