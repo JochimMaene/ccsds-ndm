@@ -404,7 +404,6 @@ impl Epoch {
         let inner = match self.classification {
             EpochClassification::CalendarValid => EpochOrderKeyInner::Calendar {
                 value: self.as_str(),
-                parts: parse_calendar(self.as_str())?,
             },
             EpochClassification::CalendarInvalid => return None,
             EpochClassification::Numeric => {
@@ -427,7 +426,6 @@ pub(crate) struct EpochOrderKey<'a>(EpochOrderKeyInner<'a>);
 enum EpochOrderKeyInner<'a> {
     Calendar {
         value: &'a str,
-        parts: CalendarParts,
     },
     Numeric {
         parts: DecimalParts<'a>,
@@ -439,15 +437,9 @@ impl EpochOrderKey<'_> {
     pub(crate) fn compare(&self, other: &Self) -> Option<Ordering> {
         match (self.0, other.0) {
             (
-                EpochOrderKeyInner::Calendar {
-                    value: left,
-                    parts: left_parts,
-                },
-                EpochOrderKeyInner::Calendar {
-                    value: right,
-                    parts: right_parts,
-                },
-            ) => Some(compare_calendar_parts(left, left_parts, right, right_parts)),
+                EpochOrderKeyInner::Calendar { value: left },
+                EpochOrderKeyInner::Calendar { value: right },
+            ) => compare_calendar(left, right),
             (
                 EpochOrderKeyInner::Numeric {
                     parts: left_parts,
@@ -616,6 +608,62 @@ struct CalendarParts {
     seconds: i32,
     fraction_start: u8,
     fraction_len: u8,
+}
+
+fn compare_calendar(left: &str, right: &str) -> Option<Ordering> {
+    if left == right {
+        return Some(Ordering::Equal);
+    }
+
+    let time_start = |value: &str| {
+        if value.as_bytes().get(7) == Some(&b'-') {
+            11
+        } else {
+            9
+        }
+    };
+    let left_time_start = time_start(left);
+    let right_time_start = time_start(right);
+
+    // Within one CCSDS date layout, the date and whole-second fields are fixed-width and sort
+    // lexically. Fractional seconds need numeric comparison because the optional `Z` terminator
+    // and differing precision make a direct whole-string comparison incorrect.
+    if left_time_start == right_time_start {
+        let whole_seconds_end = left_time_start + 8;
+        match left[..whole_seconds_end].cmp(&right[..whole_seconds_end]) {
+            Ordering::Equal => {}
+            ordering => return Some(ordering),
+        }
+        let left_fraction = calendar_fraction(left, whole_seconds_end);
+        let right_fraction = calendar_fraction(right, whole_seconds_end);
+        let length = left_fraction.len().max(right_fraction.len());
+        return Some(
+            (0..length)
+                .map(|index| {
+                    left_fraction
+                        .get(index)
+                        .copied()
+                        .unwrap_or(b'0')
+                        .cmp(&right_fraction.get(index).copied().unwrap_or(b'0'))
+                })
+                .find(|ordering| *ordering != Ordering::Equal)
+                .unwrap_or(Ordering::Equal),
+        );
+    }
+
+    let left_parts = parse_calendar(left)?;
+    let right_parts = parse_calendar(right)?;
+    Some(compare_calendar_parts(left, left_parts, right, right_parts))
+}
+
+fn calendar_fraction(value: &str, whole_seconds_end: usize) -> &[u8] {
+    let suffix = &value[whole_seconds_end..];
+    suffix
+        .strip_suffix('Z')
+        .unwrap_or(suffix)
+        .strip_prefix('.')
+        .unwrap_or("")
+        .as_bytes()
 }
 
 fn compare_calendar_parts(
@@ -5043,6 +5091,14 @@ mod tests {
         );
         assert_eq!(
             calendar("2016-366T23:59:60.5Z").cmp_same_branch(&calendar("2017-001T00:00:00Z")),
+            Some(Less)
+        );
+        assert_eq!(
+            calendar("2023-01-01T00:00:00Z").cmp_same_branch(&calendar("2023-01-01T00:00:00.0Z")),
+            Some(Equal)
+        );
+        assert_eq!(
+            calendar("2023-001T00:00:00.09Z").cmp_same_branch(&calendar("2023-001T00:00:00.1Z")),
             Some(Less)
         );
         assert_eq!(

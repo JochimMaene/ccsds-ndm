@@ -36,7 +36,7 @@ impl OdmFloat {
         }
 
         let mut counter = Counter(0);
-        let _ = Self(value).write_to(&mut counter);
+        let _ = Self::write_finite(value, &mut counter);
         Some(counter.0)
     }
 
@@ -45,7 +45,7 @@ impl OdmFloat {
         if !value.is_finite() {
             return false;
         }
-        Self(value).write_to(output).is_ok()
+        Self::write_finite(value, output).is_ok()
     }
 
     fn significant_digits(value: &str) -> usize {
@@ -221,17 +221,33 @@ impl OdmFloat {
         )
     }
 
-    fn write_to<W: FmtWrite>(&self, output: &mut W) -> std::fmt::Result {
-        if !self.0.is_finite() {
-            return Err(std::fmt::Error);
-        }
+    fn write_finite<W: FmtWrite>(value: f64, output: &mut W) -> std::fmt::Result {
         let mut buffer = zmij::Buffer::new();
-        let shortest = buffer.format_finite(self.0);
+        let shortest = buffer.format_finite(value);
+        // The overwhelmingly common case already satisfies the ODM lexical constraints. Avoid
+        // rescanning short fixed-point spellings (and scientific spellings that already contain
+        // the required decimal point) before copying them to the output.
+        if shortest.len() <= 16 {
+            let exponent = shortest
+                .as_bytes()
+                .iter()
+                .position(|byte| matches!(byte, b'e' | b'E'));
+            if exponent.is_none_or(|index| shortest.as_bytes()[..index].contains(&b'.')) {
+                return output.write_str(shortest);
+            }
+        }
         if Self::significant_digits(shortest) <= 16 {
             Self::write_preformatted(shortest, output)
         } else {
             Self::write_rounded_scientific(shortest, output)
         }
+    }
+
+    fn write_to<W: FmtWrite>(&self, output: &mut W) -> std::fmt::Result {
+        if !self.0.is_finite() {
+            return Err(std::fmt::Error);
+        }
+        Self::write_finite(self.0, output)
     }
 }
 

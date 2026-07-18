@@ -52,6 +52,7 @@ use winnow::combinator::{preceded, repeat};
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
 use winnow::stream::Offset;
+use winnow::token::take_while;
 
 //----------------------------------------------------------------------
 // OEM Version Parser
@@ -196,6 +197,16 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
 // State Vector (Raw Line) Parser
 //----------------------------------------------------------------------
 
+fn parse_odm_f64(input: &mut &str) -> KvnResult<f64> {
+    let token = take_while::<_, _, ()>(1.., ('0'..='9', '.', '-', '+', 'e', 'E'))
+        .parse_next(input)
+        .map_err(|_| cut_err(input, "Invalid ODM number"))?;
+    if !crate::messages::oem::valid_odm_number(token) {
+        return Err(cut_err(input, "Invalid ODM number"));
+    }
+    fast_float::parse(token).map_err(|_| cut_err(input, "Invalid ODM number"))
+}
+
 /// Parses a raw state vector line.
 /// Format: EPOCH X Y Z X_DOT Y_DOT Z_DOT [X_DDOT Y_DDOT Z_DDOT]
 fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
@@ -206,7 +217,7 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
     for f in &mut floats {
         let checkpoint = input.checkpoint();
-        match preceded(space1, parse_f64_winnow).parse_next(input) {
+        match preceded(space1, parse_odm_f64).parse_next(input) {
             Ok(val) => {
                 *f = val;
                 count += 1;
@@ -304,8 +315,8 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
         comment.extend(collect_comments.parse_next(input)?);
 
         let line_vals = (
-            preceded(ws, parse_f64_winnow),
-            repeat(expected_count - 1, preceded(space1, parse_f64_winnow)),
+            preceded(ws, parse_odm_f64),
+            repeat(expected_count - 1, preceded(space1, parse_odm_f64)),
         )
             .map(|(first, rest): (f64, Vec<f64>)| {
                 let mut all = vec![first];

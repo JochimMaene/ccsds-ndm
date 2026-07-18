@@ -25,8 +25,11 @@ use std::str::FromStr;
 fn create_test_oem(num_states: usize) -> Oem {
     let mut state_vectors = Vec::with_capacity(num_states);
     for i in 0..num_states {
+        let second = i / 1_000;
+        let millisecond = i % 1_000;
         state_vectors.push(StateVectorAcc {
-            epoch: Epoch::from_str("2023-09-26T12:00:00Z").unwrap(),
+            epoch: Epoch::from_str(&format!("2023-09-26T12:00:{second:02}.{millisecond:03}Z"))
+                .unwrap(),
             x: Position {
                 units: Some(PositionUnits::Km),
                 value: 7000.0 + i as f64,
@@ -80,7 +83,7 @@ fn create_test_oem(num_states: usize) -> Oem {
                     start_time: Epoch::from_str("2023-09-26T12:00:00Z").unwrap(),
                     useable_start_time: None,
                     useable_stop_time: None,
-                    stop_time: Epoch::from_str("2023-09-26T12:02:00Z").unwrap(),
+                    stop_time: Epoch::from_str("2023-09-26T12:01:00Z").unwrap(),
                     interpolation: Some("LAGRANGE".to_string()),
                     interpolation_degree: NonZeroU32::new(5).map(InterpolationDegree),
                 },

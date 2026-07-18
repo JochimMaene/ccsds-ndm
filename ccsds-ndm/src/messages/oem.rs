@@ -1213,6 +1213,58 @@ fn validate_input_size(input: &str, options: &crate::options::ParseOptions) -> R
     Ok(())
 }
 
+pub(crate) fn valid_odm_number(token: &str) -> bool {
+    let bytes = token.as_bytes();
+    let mut index = usize::from(matches!(bytes.first(), Some(b'+' | b'-')));
+    if index == bytes.len() {
+        return false;
+    }
+
+    let integer_start = index;
+    while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+        index += 1;
+    }
+    let integer_digits = index - integer_start;
+    if integer_digits == 0 {
+        return false;
+    }
+
+    let mut fraction_digits = 0;
+    let has_decimal = bytes.get(index) == Some(&b'.');
+    if has_decimal {
+        index += 1;
+        let fraction_start = index;
+        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+        fraction_digits = index - fraction_start;
+        if fraction_digits == 0 {
+            return false;
+        }
+    }
+
+    let significant_digits = integer_digits + fraction_digits;
+    if significant_digits > 16 {
+        return false;
+    }
+    if index == bytes.len() {
+        return has_decimal || token.parse::<i32>().is_ok();
+    }
+    if !has_decimal || integer_digits != 1 || !matches!(bytes.get(index), Some(b'e' | b'E')) {
+        return false;
+    }
+
+    index += 1;
+    if matches!(bytes.get(index), Some(b'+' | b'-')) {
+        index += 1;
+    }
+    let exponent_start = index;
+    while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+        index += 1;
+    }
+    index == bytes.len() && index > exponent_start
+}
+
 fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) -> Result<()> {
     use crate::error::{CcsdsNdmError, FormatError};
 
@@ -1255,53 +1307,6 @@ fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) ->
             "INTERPOLATION_DEGREE" => 12,
             _ => return None,
         })
-    }
-
-    fn valid_odm_number(token: &str) -> bool {
-        let unsigned = token
-            .strip_prefix(['+', '-'])
-            .filter(|value| !value.is_empty())
-            .unwrap_or(token);
-        if unsigned.is_empty() {
-            return false;
-        }
-
-        let mut exponent_parts = unsigned.split(['e', 'E']);
-        let mantissa = exponent_parts.next().unwrap_or_default();
-        let exponent = exponent_parts.next();
-        if exponent_parts.next().is_some() {
-            return false;
-        }
-
-        if let Some(exponent) = exponent {
-            let exponent = exponent
-                .strip_prefix(['+', '-'])
-                .filter(|value| !value.is_empty())
-                .unwrap_or(exponent);
-            let Some((integer, fraction)) = mantissa.split_once('.') else {
-                return false;
-            };
-            return integer.len() == 1
-                && !fraction.is_empty()
-                && integer.bytes().all(|byte| byte.is_ascii_digit())
-                && fraction.bytes().all(|byte| byte.is_ascii_digit())
-                && integer.len() + fraction.len() <= 16
-                && !exponent.is_empty()
-                && exponent.bytes().all(|byte| byte.is_ascii_digit());
-        }
-
-        if let Some((integer, fraction)) = mantissa.split_once('.') {
-            return !integer.is_empty()
-                && !fraction.is_empty()
-                && integer.bytes().all(|byte| byte.is_ascii_digit())
-                && fraction.bytes().all(|byte| byte.is_ascii_digit())
-                && integer.len() + fraction.len() <= 16;
-        }
-
-        !mantissa.is_empty()
-            && mantissa.len() <= 16
-            && mantissa.bytes().all(|byte| byte.is_ascii_digit())
-            && token.parse::<i32>().is_ok()
     }
 
     #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1503,48 +1508,11 @@ fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) ->
             }
             _ => match phase {
                 Phase::Ephemeris if !covariance_closed => {
-                    let count = line.split_whitespace().count();
-                    if !matches!(count, 7 | 10) {
-                        return Err(invalid(
-                            line_number,
-                            offset,
-                            "ephemeris record must contain 7 or 10 fields",
-                        ));
-                    }
-                    if line
-                        .split_whitespace()
-                        .skip(1)
-                        .any(|token| !valid_odm_number(token))
-                    {
-                        return Err(invalid(
-                            line_number,
-                            offset,
-                            "ephemeris value does not use a valid ODM numeric lexical form",
-                        ));
-                    }
                     state_records += 1;
                     total_records += 1;
                     enforce_record_limit(total_records)?;
                 }
                 Phase::Covariance if covariance_epoch_seen && covariance_row < 6 => {
-                    let expected = covariance_row + 1;
-                    if line.split_whitespace().count() != expected {
-                        return Err(invalid(
-                            line_number,
-                            offset,
-                            format!("covariance row must contain {expected} fields"),
-                        ));
-                    }
-                    if line
-                        .split_whitespace()
-                        .any(|token| !valid_odm_number(token))
-                    {
-                        return Err(invalid(
-                            line_number,
-                            offset,
-                            "covariance value does not use a valid ODM numeric lexical form",
-                        ));
-                    }
                     covariance_row += 1;
                 }
                 _ => return Err(invalid(line_number, offset, "unexpected OEM record")),
@@ -2475,6 +2443,37 @@ impl OemCovarianceMatrix {
 mod tests {
     use super::*;
     use crate::traits::Ndm;
+
+    #[test]
+    fn odm_number_lexical_validation_matches_book_forms() {
+        for value in [
+            "0",
+            "-2147483648",
+            "2147483647",
+            "0.0",
+            "-12.5",
+            "1.234567890123456",
+            "1.0e0",
+            "-1.234567890123456E+308",
+        ] {
+            assert!(valid_odm_number(value), "{value}");
+        }
+        for value in [
+            "",
+            "+",
+            "2147483648",
+            "-2147483649",
+            ".5",
+            "1.",
+            "12e3",
+            "1e3",
+            "1.0e",
+            "1.0e+",
+            "1.2345678901234567",
+        ] {
+            assert!(!valid_odm_number(value), "{value}");
+        }
+    }
 
     #[test]
     fn test_header_optional_fields_roundtrip() {
