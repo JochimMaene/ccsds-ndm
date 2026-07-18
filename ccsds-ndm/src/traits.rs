@@ -38,7 +38,10 @@ pub trait Validate {
     ///
     /// `Ok(())` if valid, or a `ValidationError` if invalid.
     fn validate(&self) -> Result<()> {
-        Ok(())
+        match self.validation_errors()?.into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
     }
 
     /// Return every semantic validation error found on the object.
@@ -48,6 +51,25 @@ pub trait Validate {
     /// exhaustive reporting so adding new validation rules cannot silently fall back to returning
     /// only the first error.
     fn validation_errors(&self) -> Result<Vec<ValidationError>>;
+}
+
+#[cfg(test)]
+mod validate_default_tests {
+    use super::Validate;
+    use crate::error::{Result, ValidationError};
+
+    struct AggregateOnly;
+
+    impl Validate for AggregateOnly {
+        fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+            Ok(vec![ValidationError::generic("aggregate-only failure")])
+        }
+    }
+
+    #[test]
+    fn default_validate_fails_when_aggregate_validation_reports_an_error() {
+        assert!(AggregateOnly.validate().is_err());
+    }
 }
 
 /// Core trait for NDM message types.

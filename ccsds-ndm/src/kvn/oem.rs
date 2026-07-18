@@ -383,7 +383,6 @@ fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix
 
     loop {
         let checkpoint = input.checkpoint();
-        comment_line.parse_next(input).ok(); // Consume any comments
         if at_block_end("COVARIANCE", input) {
             break;
         }

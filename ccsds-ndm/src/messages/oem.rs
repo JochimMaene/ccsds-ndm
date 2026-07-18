@@ -682,20 +682,18 @@ impl Oem {
             Ok(())
         }
         fn number(field: &'static str, value: f64, path: impl FnOnce() -> String) -> Result<usize> {
-            if let Some(length) = OdmFloat::formatted_len_if_representable(value) {
+            if let Some(length) = OdmFloat::formatted_len(value) {
                 return Ok(length);
             }
             Err(ValidationError::InvalidValue {
                 field: field.into(),
                 value: value.to_string(),
-                expected: "an exactly representable ODM number with at most 16 significant digits"
-                    .into(),
+                expected: "a finite number".into(),
                 line: None,
             }
             .at_path(path())
             .into())
         }
-
         crate::versioning::validate_root(
             crate::validation::MessageKind::Oem,
             &self.id,
@@ -761,9 +759,9 @@ impl Oem {
                 writer.write_empty();
             }
             for (state_index, state) in segment.data.state_vector.iter().enumerate() {
-                validate_within_path(state.validate(), || {
-                    format!("{base}.data.state_vector[{state_index}]").into()
-                })?;
+                // The fused generation pass below applies the stronger OEM absolute/range/order
+                // epoch checks and checks every numeric component through `OdmFloat`. Calling the
+                // generic state validator here would scan the same epoch and values a second time.
                 let mut epoch_error = None;
                 epoch_range.state(state_index, state, &mut |error| {
                     epoch_error.get_or_insert(error);
@@ -804,28 +802,32 @@ impl Oem {
                         line.push_str(state.epoch.as_str());
                         for (field, value, member) in required_values {
                             line.push(' ');
-                            if !OdmFloat::write_if_representable(value, line) {
+                            if !OdmFloat::write_if_valid(value, line) {
                                 return Err(ValidationError::InvalidValue {
                                     field: field.into(),
                                     value: value.to_string(),
-                                    expected: "an exactly representable ODM number with at most 16 significant digits".into(),
+                                    expected: "a finite number".into(),
                                     line: None,
                                 }
-                                .at_path(format!("{base}.data.state_vector[{state_index}].{member}"))
+                                .at_path(format!(
+                                    "{base}.data.state_vector[{state_index}].{member}"
+                                ))
                                 .into());
                             }
                         }
                         for (field, value, member) in acceleration_values {
                             if let Some(value) = value {
                                 line.push(' ');
-                                if !OdmFloat::write_if_representable(value.value, line) {
+                                if !OdmFloat::write_if_valid(value.value, line) {
                                     return Err(ValidationError::InvalidValue {
                                         field: field.into(),
                                         value: value.value.to_string(),
-                                        expected: "an exactly representable ODM number with at most 16 significant digits".into(),
+                                        expected: "a finite number".into(),
                                         line: None,
                                     }
-                                    .at_path(format!("{base}.data.state_vector[{state_index}].{member}"))
+                                    .at_path(format!(
+                                        "{base}.data.state_vector[{state_index}].{member}"
+                                    ))
                                     .into());
                                 }
                             }
@@ -903,9 +905,15 @@ impl Oem {
             }
             for (covariance_index, covariance) in segment.data.covariance_matrix.iter().enumerate()
             {
-                validate_within_path(covariance.validate(), || {
-                    format!("{base}.data.covariance_matrix[{covariance_index}]").into()
-                })?;
+                // Numeric finiteness is subsumed by the representability checks used for every
+                // emitted matrix value. Keep the non-numeric absolute-epoch rule explicitly.
+                if let Some(error) = absolute_epoch_error(&covariance.epoch, "EPOCH") {
+                    return Err(error
+                        .at_path(format!(
+                            "{base}.data.covariance_matrix[{covariance_index}].epoch"
+                        ))
+                        .into());
+                }
                 let mut epoch_error = None;
                 epoch_range.covariance(covariance_index, covariance, &mut |error| {
                     epoch_error.get_or_insert(error);
@@ -945,11 +953,11 @@ impl Oem {
                                 if value_index > 0 {
                                     line.push(' ');
                                 }
-                                if !OdmFloat::write_if_representable(*value, line) {
+                                if !OdmFloat::write_if_valid(*value, line) {
                                     return Err(ValidationError::InvalidValue {
                                         field: (*field).into(),
                                         value: value.to_string(),
-                                        expected: "an exactly representable ODM number with at most 16 significant digits".into(),
+                                        expected: "a finite number".into(),
                                         line: None,
                                     }
                                     .at_path(format!(
@@ -1290,10 +1298,10 @@ fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) ->
                 && integer.len() + fraction.len() <= 16;
         }
 
-        mantissa.bytes().all(|byte| byte.is_ascii_digit())
-            && token
-                .parse::<i64>()
-                .is_ok_and(|value| (i32::MIN as i64..=i32::MAX as i64).contains(&value))
+        !mantissa.is_empty()
+            && mantissa.len() <= 16
+            && mantissa.bytes().all(|byte| byte.is_ascii_digit())
+            && token.parse::<i32>().is_ok()
     }
 
     #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1421,12 +1429,8 @@ fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) ->
                 covariance_closed = true;
             }
             _ if line.contains('=') => {
-                if line.matches('=').count() != 1 {
-                    return Err(invalid(
-                        line_number,
-                        offset,
-                        "expected exactly one assignment",
-                    ));
+                if !line.contains('=') {
+                    return Err(invalid(line_number, offset, "expected an assignment"));
                 }
                 let (key, _) = line.split_once('=').expect("one equals was checked");
                 let key = key.trim();

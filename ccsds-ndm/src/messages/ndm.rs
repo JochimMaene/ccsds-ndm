@@ -2,11 +2,156 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::error::Result;
+use crate::error::{CcsdsNdmError, FormatError, Result};
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn};
 use crate::MessageType;
 use serde::{Deserialize, Serialize};
+use std::io::Write;
+
+fn is_ascii_whitespace(bytes: &[u8]) -> bool {
+    bytes.iter().all(u8::is_ascii_whitespace)
+}
+
+fn history_record_count(message: &MessageType) -> usize {
+    match message {
+        MessageType::Opm(message) => message.body.segment.data.maneuver_parameters.len(),
+        MessageType::Oem(message) => message
+            .body
+            .segment
+            .iter()
+            .map(|segment| segment.data.state_vector.len() + segment.data.covariance_matrix.len())
+            .sum(),
+        MessageType::Ocm(message) => {
+            let data = &message.body.segment.data;
+            data.traj
+                .iter()
+                .map(|block| block.traj_lines.len())
+                .sum::<usize>()
+                + data
+                    .cov
+                    .iter()
+                    .map(|block| block.cov_lines.len())
+                    .sum::<usize>()
+                + data
+                    .man
+                    .iter()
+                    .map(|block| block.man_lines.len())
+                    .sum::<usize>()
+        }
+        MessageType::Tdm(message) => message
+            .body
+            .segments
+            .iter()
+            .map(|segment| segment.data.observations.len())
+            .sum(),
+        MessageType::Aem(message) => message
+            .body
+            .segment
+            .iter()
+            .map(|segment| segment.data.attitude_states.len())
+            .sum(),
+        MessageType::Acm(message) => {
+            let data = &message.body.segment.data;
+            data.att
+                .iter()
+                .map(|block| block.att_lines.len())
+                .sum::<usize>()
+                + data
+                    .cov
+                    .iter()
+                    .map(|block| block.cov_lines.len())
+                    .sum::<usize>()
+                + data.man.len()
+        }
+        MessageType::Ndm(message) => message.messages.iter().map(history_record_count).sum(),
+        MessageType::Omm(_) | MessageType::Cdm(_) | MessageType::Rdm(_) | MessageType::Apm(_) => 0,
+    }
+}
+
+fn invalid_envelope(message: impl Into<String>) -> CcsdsNdmError {
+    CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message.into())))
+}
+
+fn validate_combined_root_attributes(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+    for attribute in start.attributes() {
+        let attribute = attribute.map_err(|error| invalid_envelope(error.to_string()))?;
+        if !matches!(
+            attribute.key.as_ref(),
+            b"xmlns"
+                | b"xmlns:xsi"
+                | b"xmlns:ndm"
+                | b"xsi:noNamespaceSchemaLocation"
+                | b"xsi:schemaLocation"
+        ) {
+            return Err(invalid_envelope(format!(
+                "attribute '{}' is not allowed on the combined NDM root",
+                String::from_utf8_lossy(attribute.key.as_ref())
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_combined_child_attributes(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+    let mut id = false;
+    let mut version = false;
+    for attribute in start.attributes() {
+        let attribute = attribute.map_err(|error| invalid_envelope(error.to_string()))?;
+        match attribute.key.as_ref() {
+            b"id" if !id => id = true,
+            b"version" if !version => version = true,
+            name if name == b"xmlns" || name.starts_with(b"xmlns:") => {}
+            name => {
+                return Err(invalid_envelope(format!(
+                    "attribute '{}' is not allowed on a combined NDM constituent",
+                    String::from_utf8_lossy(name)
+                )))
+            }
+        }
+    }
+    if !id || !version {
+        return Err(invalid_envelope(
+            "combined NDM constituents require exactly one id and version attribute",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_combined_xml_depth(xml: &str, limit: usize) -> Result<()> {
+    let mut reader = quick_xml::Reader::from_str(xml);
+    let mut depth = 0usize;
+    loop {
+        match reader.read_event() {
+            Ok(quick_xml::events::Event::Start(_)) => {
+                depth = depth.saturating_add(1);
+                if depth > limit {
+                    return Err(CcsdsNdmError::ResourceLimitExceeded {
+                        resource: "xml_depth",
+                        limit,
+                        actual: depth,
+                    });
+                }
+            }
+            Ok(quick_xml::events::Event::Empty(_)) => {
+                let actual = depth.saturating_add(1);
+                if actual > limit {
+                    return Err(CcsdsNdmError::ResourceLimitExceeded {
+                        resource: "xml_depth",
+                        limit,
+                        actual,
+                    });
+                }
+            }
+            Ok(quick_xml::events::Event::End(_)) => {
+                depth = depth.saturating_sub(1);
+            }
+            Ok(quick_xml::events::Event::Eof) => return Ok(()),
+            Ok(_) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+}
 
 /// Combined Instantiation Navigation Data Message (NDM).
 ///
@@ -56,7 +201,15 @@ impl crate::traits::Validate for CombinedNdm {
                 MessageType::Rdm(m) => m.validate()?,
                 MessageType::Aem(m) => m.validate()?,
                 MessageType::Apm(m) => m.validate()?,
-                MessageType::Ndm(m) => m.validate()?,
+                MessageType::Ndm(_) => {
+                    return Err(crate::error::ValidationError::InvalidValue {
+                        field: "ndm".into(),
+                        value: "nested combined NDM".into(),
+                        expected: "a constituent standalone message".into(),
+                        line: None,
+                    }
+                    .into())
+                }
             }
         }
         Ok(())
@@ -76,7 +229,12 @@ impl crate::traits::Validate for CombinedNdm {
                 MessageType::Rdm(message) => message.validation_errors()?,
                 MessageType::Aem(message) => message.validation_errors()?,
                 MessageType::Apm(message) => message.validation_errors()?,
-                MessageType::Ndm(message) => message.validation_errors()?,
+                MessageType::Ndm(_) => vec![crate::error::ValidationError::InvalidValue {
+                    field: "ndm".into(),
+                    value: "nested combined NDM".into(),
+                    expected: "a constituent standalone message".into(),
+                    line: None,
+                }],
             });
         }
         Ok(errors)
@@ -85,7 +243,7 @@ impl crate::traits::Validate for CombinedNdm {
 
 impl Ndm for CombinedNdm {
     fn to_kvn(&self) -> Result<String> {
-        crate::traits::Validate::validate(self)?;
+        self.validate_kvn_envelope()?;
         for message in &self.messages {
             message.validate_for_generation(crate::generation::OutputFormat::Kvn)?;
         }
@@ -95,26 +253,134 @@ impl Ndm for CombinedNdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let headers = [
-            "CCSDS_OPM_VERS",
-            "CCSDS_OMM_VERS",
-            "CCSDS_OEM_VERS",
-            "CCSDS_OCM_VERS",
-            "CCSDS_ACM_VERS",
-            "CCSDS_CDM_VERS",
-            "CCSDS_TDM_VERS",
-            "CCSDS_RDM_VERS",
-            "CCSDS_AEM_VERS",
-            "CCSDS_APM_VERS",
-        ];
+        Self::from_kvn_with_options(kvn, &crate::options::ParseOptions::default())
+    }
 
-        let mut indices = Vec::new();
-        for header in headers {
-            for (idx, _) in kvn.match_indices(header) {
-                indices.push(idx);
+    fn to_xml(&self) -> Result<String> {
+        crate::traits::Validate::validate(self)?;
+        for message in &self.messages {
+            message.validate_for_generation(crate::generation::OutputFormat::Xml)?;
+        }
+        crate::xml::to_string(self).map_err(|error| {
+            error.with_generation_context(
+                crate::validation::MessageKind::Ndm,
+                crate::error::DiagnosticNotation::Xml,
+                "combined",
+                "combined",
+            )
+        })
+    }
+
+    fn from_xml(xml: &str) -> Result<Self> {
+        Self::from_xml_with_options(xml, &crate::options::ParseOptions::default())
+    }
+}
+
+impl CombinedNdm {
+    fn validate_kvn_envelope(&self) -> Result<()> {
+        crate::traits::Validate::validate(self)?;
+        if self.id.is_some() {
+            return Err(crate::error::ValidationError::InvalidValue {
+                field: "MESSAGE_ID".into(),
+                value: "present".into(),
+                expected:
+                    "omitted when generating the non-standard sequential KVN convenience form"
+                        .into(),
+                line: None,
+            }
+            .into());
+        }
+        for comment in &self.comments {
+            if !comment.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+                return Err(crate::error::ValidationError::InvalidValue {
+                    field: "COMMENT".into(),
+                    value: "non-ASCII or multiline text".into(),
+                    expected: "printable ASCII on one KVN record".into(),
+                    line: None,
+                }
+                .into());
             }
         }
-        indices.sort_unstable();
+        Ok(())
+    }
+
+    fn validate_source_options(options: &crate::options::GenerateOptions) -> Result<()> {
+        if matches!(
+            options.target_version,
+            crate::options::TargetVersion::Source
+        ) {
+            Ok(())
+        } else {
+            Err(CcsdsNdmError::UnsupportedMessage(
+                "A combined NDM has no single target version".into(),
+            ))
+        }
+    }
+
+    fn validate_children_for_generation(
+        &self,
+        format: crate::generation::OutputFormat,
+    ) -> Result<()> {
+        crate::traits::Validate::validate(self)?;
+        for message in &self.messages {
+            message.validate_for_generation(format)?;
+        }
+        Ok(())
+    }
+
+    /// Stream the sequential KVN convenience representation after aggregate preflight.
+    pub fn write_kvn_to<W: Write>(
+        &self,
+        output: &mut W,
+        options: &crate::options::GenerateOptions,
+    ) -> Result<()> {
+        Self::validate_source_options(options)?;
+        self.validate_kvn_envelope()?;
+        self.validate_children_for_generation(crate::generation::OutputFormat::Kvn)?;
+
+        crate::generation::preflight_kvn_limit(self, options)?;
+
+        let mut writer = KvnWriter::from_io(output);
+        self.write_kvn(&mut writer);
+        writer.finish_io().map_err(CcsdsNdmError::from)
+    }
+
+    /// Stream the normative XML combined instantiation after aggregate preflight.
+    pub fn write_xml_to<W: Write>(
+        &self,
+        output: &mut W,
+        options: &crate::options::GenerateOptions,
+    ) -> Result<()> {
+        Self::validate_source_options(options)?;
+        self.validate_children_for_generation(crate::generation::OutputFormat::Xml)?;
+
+        crate::generation::preflight_xml_limit(self, options)?;
+        crate::xml::to_writer(output, self).map_err(|error| {
+            error.with_generation_context(
+                crate::validation::MessageKind::Ndm,
+                crate::error::DiagnosticNotation::Xml,
+                "combined",
+                "combined",
+            )
+        })
+    }
+
+    /// Parse the sequential KVN convenience representation with bounded child parsing.
+    pub fn from_kvn_with_options(
+        kvn: &str,
+        options: &crate::options::ParseOptions,
+    ) -> Result<Self> {
+        if options
+            .max_input_bytes
+            .is_some_and(|limit| kvn.len() > limit)
+        {
+            return Err(CcsdsNdmError::ResourceLimitExceeded {
+                resource: "input_bytes",
+                limit: options.max_input_bytes.unwrap(),
+                actual: kvn.len(),
+            });
+        }
+        let indices = crate::detect::kvn_message_offsets(kvn);
 
         if indices.is_empty() {
             return Err(crate::error::CcsdsNdmError::UnsupportedMessage(
@@ -122,7 +388,22 @@ impl Ndm for CombinedNdm {
             ));
         }
 
+        let mut comments = Vec::new();
+        for line in kvn[..indices[0]].lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let Some(comment) = line.strip_prefix("COMMENT") else {
+                return Err(CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(
+                    "unexpected content before the first combined KVN message".into(),
+                ))));
+            };
+            comments.push(comment.trim_start().to_owned());
+        }
+
         let mut messages = Vec::new();
+        let mut records = 0usize;
         for i in 0..indices.len() {
             let start = indices[i];
             let end = if i + 1 < indices.len() {
@@ -140,28 +421,53 @@ impl Ndm for CombinedNdm {
                 continue;
             }
 
-            let msg = crate::from_str(chunk)?;
+            let mut child_options = options.clone();
+            if let Some(limit) = options.max_records {
+                child_options.max_records = Some(limit.saturating_sub(records));
+            }
+            let msg = crate::from_str_with_options(
+                chunk,
+                Some(crate::detect::Notation::Kvn),
+                &child_options,
+            )?;
+            records = records.saturating_add(history_record_count(&msg));
+            if options.max_records.is_some_and(|limit| records > limit) {
+                return Err(CcsdsNdmError::ResourceLimitExceeded {
+                    resource: "history_records",
+                    limit: options.max_records.unwrap(),
+                    actual: records,
+                });
+            }
             messages.push(msg);
         }
 
         Ok(CombinedNdm {
-            id: None,         // Not applicable for KVN
-            comments: vec![], // Comments are likely inside the individual messages
+            id: None, // Not applicable for KVN
+            comments,
             messages,
         })
     }
 
-    fn to_xml(&self) -> Result<String> {
-        crate::traits::Validate::validate(self)?;
-        for message in &self.messages {
-            message.validate_for_generation(crate::generation::OutputFormat::Xml)?;
-        }
-        crate::xml::to_string(self)
-    }
-
-    fn from_xml(xml: &str) -> Result<Self> {
+    /// Strictly parse a combined XML instantiation with bounded child parsing.
+    pub fn from_xml_with_options(
+        xml: &str,
+        options: &crate::options::ParseOptions,
+    ) -> Result<Self> {
         use quick_xml::events::Event;
         use quick_xml::reader::Reader;
+
+        if options
+            .max_input_bytes
+            .is_some_and(|limit| xml.len() > limit)
+        {
+            return Err(CcsdsNdmError::ResourceLimitExceeded {
+                resource: "input_bytes",
+                limit: options.max_input_bytes.unwrap(),
+                actual: xml.len(),
+            });
+        }
+        validate_combined_xml_depth(xml, options.max_xml_depth)?;
+        crate::xml::validate_document_root(xml, b"ndm", "combined NDM")?;
 
         let mut reader = Reader::from_str(xml);
         reader.config_mut().trim_text(true);
@@ -170,28 +476,60 @@ impl Ndm for CombinedNdm {
         let mut id = None;
         let mut comments = Vec::new();
         let mut messages = Vec::new();
+        let mut records = 0usize;
 
-        // Find the root <ndm> or <message> tag first
+        let invalid = |message: &str| {
+            CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message.into())))
+        };
+
+        // The first element must be the normative combined-instantiation root.
         loop {
             match reader.read_event_into(&mut buf)? {
-                Event::Start(e) => {
-                    let name = e.name();
-                    if name.as_ref() == b"ndm" || name.as_ref() == b"message" {
-                        break;
+                Event::Start(e) if e.name().as_ref() == b"ndm" => {
+                    validate_combined_root_attributes(&e)?;
+                    break;
+                }
+                Event::Empty(e) if e.name().as_ref() == b"ndm" => {
+                    validate_combined_root_attributes(&e)?;
+                    loop {
+                        buf.clear();
+                        match reader.read_event_into(&mut buf)? {
+                            Event::Eof => {
+                                return Ok(CombinedNdm {
+                                    id: None,
+                                    comments: Vec::new(),
+                                    messages: Vec::new(),
+                                });
+                            }
+                            Event::Text(text) if is_ascii_whitespace(text.as_ref()) => {}
+                            Event::Comment(_) => {}
+                            _ => return Err(invalid("trailing content after combined NDM root")),
+                        }
                     }
+                }
+                Event::Start(e) => {
+                    return Err(invalid(&format!(
+                        "expected <ndm> root, found <{}>",
+                        String::from_utf8_lossy(e.name().as_ref())
+                    )))
                 }
                 Event::Eof => {
                     return Err(crate::error::CcsdsNdmError::UnexpectedEof {
-                        context: "Missing <ndm> or <message> root tag".into(),
+                        context: "Missing <ndm> root tag".into(),
                     })
                 }
-                _ => (), // Skip other things (declarations, comments, etc.)
+                Event::Text(text) if !is_ascii_whitespace(text.as_ref()) => {
+                    return Err(invalid("non-whitespace content before <ndm>"));
+                }
+                Event::Decl(_) | Event::Comment(_) | Event::PI(_) | Event::Text(_) => {}
+                _ => return Err(invalid("unexpected content before <ndm>")),
             }
             buf.clear();
         }
         buf.clear();
 
-        // Parse children
+        // Schema sequence: optional MESSAGE_ID, comments, then any number of messages.
+        let mut phase = 0u8;
         loop {
             let event_start_pos = reader.buffer_position() as usize;
             match reader.read_event_into(&mut buf)? {
@@ -206,47 +544,82 @@ impl Ndm for CombinedNdm {
 
                     match name.as_str() {
                         "message_id" => {
+                            if phase != 0 || id.is_some() {
+                                return Err(invalid(
+                                    "MESSAGE_ID must occur at most once before comments and messages",
+                                ));
+                            }
                             let val = reader.read_text(name_bytes)?;
                             id = Some(val.to_string());
                         }
                         "comment" => {
+                            if phase > 1 {
+                                return Err(invalid("COMMENT must precede contained messages"));
+                            }
+                            phase = 1;
                             let val = reader.read_text(name_bytes)?;
                             comments.push(val.to_string());
                         }
                         // Extract the outer XML of the current element.
                         "opm" | "omm" | "oem" | "ocm" | "cdm" | "tdm" | "rdm" | "acm" | "aem"
                         | "apm" => {
+                            validate_combined_child_attributes(&e)?;
+                            phase = 2;
                             reader.read_to_end(name_bytes)?;
                             let end_pos = reader.buffer_position() as usize;
                             let full_element = &xml[actual_start_pos..end_pos];
 
-                            // Now parse `full_element` as specific type
-                            let msg = match name.as_str() {
-                                "opm" => MessageType::Opm(Ndm::from_xml(full_element)?),
-                                "omm" => MessageType::Omm(Ndm::from_xml(full_element)?),
-                                "oem" => MessageType::Oem(Ndm::from_xml(full_element)?),
-                                "ocm" => MessageType::Ocm(Ndm::from_xml(full_element)?),
-                                "acm" => MessageType::Acm(Ndm::from_xml(full_element)?),
-                                "cdm" => MessageType::Cdm(Ndm::from_xml(full_element)?),
-                                "tdm" => MessageType::Tdm(Ndm::from_xml(full_element)?),
-                                "rdm" => MessageType::Rdm(Ndm::from_xml(full_element)?),
-                                "aem" => MessageType::Aem(Ndm::from_xml(full_element)?),
-                                "apm" => MessageType::Apm(Ndm::from_xml(full_element)?),
-                                _ => unreachable!(),
-                            };
+                            let mut child_options = options.clone();
+                            if let Some(limit) = options.max_records {
+                                child_options.max_records = Some(limit.saturating_sub(records));
+                            }
+                            let msg = crate::from_str_with_options(
+                                full_element,
+                                Some(crate::detect::Notation::Xml),
+                                &child_options,
+                            )?;
+                            records = records.saturating_add(history_record_count(&msg));
+                            if options.max_records.is_some_and(|limit| records > limit) {
+                                return Err(CcsdsNdmError::ResourceLimitExceeded {
+                                    resource: "history_records",
+                                    limit: options.max_records.unwrap(),
+                                    actual: records,
+                                });
+                            }
                             messages.push(msg);
                         }
                         _ => {
-                            // Unknown tag, ignore
-                            reader.read_to_end(name_bytes)?;
+                            return Err(invalid(&format!("unknown combined NDM child <{name}>")));
                         }
                     }
                 }
-                Event::End(e) if e.name().as_ref() == b"ndm" => break,
-                Event::Eof => break,
-                _ => (),
+                Event::End(e) if e.name().as_ref() == b"ndm" => {
+                    break;
+                }
+                Event::End(e) => {
+                    return Err(invalid(&format!(
+                        "unexpected closing element </{}>",
+                        String::from_utf8_lossy(e.name().as_ref())
+                    )))
+                }
+                Event::Eof => return Err(invalid("combined NDM root is not closed")),
+                Event::Text(text) if !is_ascii_whitespace(text.as_ref()) => {
+                    return Err(invalid("unexpected text in combined NDM envelope"));
+                }
+                Event::Comment(_) | Event::Text(_) => {}
+                _ => return Err(invalid("unexpected content in combined NDM envelope")),
             }
             buf.clear();
+        }
+
+        loop {
+            buf.clear();
+            match reader.read_event_into(&mut buf)? {
+                Event::Eof => break,
+                Event::Text(text) if is_ascii_whitespace(text.as_ref()) => {}
+                Event::Comment(_) => {}
+                _ => return Err(invalid("trailing content after combined NDM root")),
+            }
         }
 
         Ok(CombinedNdm {

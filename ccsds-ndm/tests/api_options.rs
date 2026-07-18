@@ -11,7 +11,9 @@ use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{from_str, GenerateOptions};
+use ccsds_ndm::{
+    from_str, from_str_with_options, GenerateOptions, MessageType, Notation, ParseOptions,
+};
 
 const OPM_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
 const OPM_XML: &str = include_str!("../../data/xml/opm_g5.xml");
@@ -23,6 +25,79 @@ const RDM_XML: &str = include_str!("../../data/xml/rdm_c4.xml");
 const TDM_XML: &str = include_str!("../../data/xml/tdm_e21.xml");
 const CDM_XML: &str = include_str!("../../data/xml/cdm_44.xml");
 const PERMISSIVE_XML: &str = include_str!("../../data/xml/ndm_g22.xml");
+const OMM_KVN: &str = include_str!("../../data/kvn/omm_g7.kvn");
+const OMM_XML: &str = include_str!("../../data/xml/omm_g10.xml");
+
+#[test]
+fn generic_parse_options_bound_non_opm_inputs_and_xml_depth() {
+    let exact = ParseOptions::default().with_max_input_bytes(OMM_KVN.len());
+    assert!(matches!(
+        from_str_with_options(OMM_KVN, Some(Notation::Kvn), &exact).unwrap(),
+        MessageType::Omm(_)
+    ));
+
+    let too_small = ParseOptions::default().with_max_input_bytes(OMM_KVN.len() - 1);
+    let error = from_str_with_options(OMM_KVN, Some(Notation::Kvn), &too_small).unwrap_err();
+    assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
+
+    let shallow = ParseOptions::default().with_max_xml_depth(1);
+    let error = from_str_with_options(OMM_XML, Some(Notation::Xml), &shallow).unwrap_err();
+    assert_eq!(error.code(), Some("resource.xml_depth_limit_exceeded"));
+}
+
+#[test]
+fn history_record_limits_cover_each_concrete_history_message() {
+    use ccsds_ndm::{from_str_with_options, MessageType, Notation, ParseOptions};
+
+    let cases = [
+        (
+            include_str!("../../data/kvn/tdm_e1.kvn"),
+            ccsds_ndm::validation::MessageKind::Tdm,
+        ),
+        (
+            include_str!("../../data/kvn/aem_g4.kvn"),
+            ccsds_ndm::validation::MessageKind::Aem,
+        ),
+        (
+            include_str!("../../data/kvn/ocm_g15.kvn"),
+            ccsds_ndm::validation::MessageKind::Ocm,
+        ),
+        (
+            include_str!("../../data/kvn/acm_g6.kvn"),
+            ccsds_ndm::validation::MessageKind::Acm,
+        ),
+    ];
+    let options = ParseOptions::default().with_max_records(0);
+    for (input, kind) in cases {
+        let error = from_str_with_options(input, Some(Notation::Kvn), &options).unwrap_err();
+        let diagnostic = error.diagnostic().expect("structured record diagnostic");
+        assert_eq!(diagnostic.message_kind, kind);
+        assert_eq!(diagnostic.code, Some("resource.record_limit_exceeded"));
+    }
+
+    let xml_cases = [
+        include_str!("../../data/xml/tdm_e23.xml"),
+        include_str!("../../data/xml/aem_g11.xml"),
+        include_str!("../../data/xml/ocm_g20.xml"),
+    ];
+    for input in xml_cases {
+        let error = from_str_with_options(input, Some(Notation::Xml), &options).unwrap_err();
+        assert_eq!(
+            error.code(),
+            Some("resource.record_limit_exceeded"),
+            "{error}"
+        );
+    }
+
+    let acm = ccsds_ndm::from_str(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
+    let MessageType::Acm(acm) = acm else {
+        panic!("expected ACM fixture");
+    };
+    let xml =
+        ccsds_ndm::VersionedNdm::to_xml_with(&acm, &ccsds_ndm::GenerateOptions::source()).unwrap();
+    let error = from_str_with_options(&xml, Some(Notation::Xml), &options).unwrap_err();
+    assert_eq!(error.code(), Some("resource.record_limit_exceeded"));
+}
 
 #[test]
 fn strict_parsing_remains_the_default() {
@@ -135,7 +210,10 @@ fn oem_generation_handles_maximum_width_records_without_panicking() {
     let oem = Oem::from_xml(&input).unwrap();
     let result = std::panic::catch_unwind(|| oem.to_kvn());
     assert!(result.is_ok(), "KVN generation panicked");
-    assert!(result.unwrap().is_err());
+    let output = result
+        .unwrap()
+        .expect("finite values should round to the CCSDS digit limit");
+    assert!(output.contains("1.797693134862316e308"));
 }
 
 #[test]

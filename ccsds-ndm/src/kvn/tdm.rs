@@ -1429,10 +1429,7 @@ CCSDS_TDM_VERS = 2.0
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(err
-                        .message
-                        .to_lowercase()
-                        .contains("expected ccsds_tdm_vers"));
+                    assert!(err.message.contains("assignment outside a TDM section"));
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
             },
@@ -1458,8 +1455,8 @@ DATA_STOP
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
                     assert!(
-                        err.message.contains("Unknown TDM data keyword")
-                            || err.contexts.contains(&"Unknown TDM data keyword")
+                        err.message.contains("unknown TDM observation keyword")
+                            || err.contexts.contains(&"while validating TDM KVN structure")
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
@@ -1487,8 +1484,8 @@ DATA_STOP
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
                     assert!(
-                        err.message.contains("Unexpected TDM Metadata key")
-                            || err.contexts.contains(&"Unexpected TDM Metadata key")
+                        err.message.contains("unknown TDM metadata keyword")
+                            || err.contexts.contains(&"while validating TDM KVN structure")
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),

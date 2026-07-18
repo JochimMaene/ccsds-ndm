@@ -120,24 +120,18 @@ fn opm_kvn_preserves_exact_extreme_values_when_the_odm_can_represent_them() {
 }
 
 #[test]
-fn opm_kvn_rejects_values_that_need_seventeen_digits_before_writing() {
+fn opm_kvn_rounds_values_that_need_seventeen_digits() {
     let mut message = opm();
     message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
 
-    let error = message
-        .to_kvn()
-        .expect_err("lossy 16-digit rounding must not occur");
-    assert_eq!(error.code(), Some("validation.invalid_value"));
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment.data.state_vector.x")
-    );
+    let generated = message.to_kvn().expect("finite value should be rounded");
+    assert!(generated.contains("X                    = 1.234567890123457e0"));
 
     let mut output = Vec::new();
     message
         .write_kvn_to(&mut output, &GenerateOptions::source())
-        .expect_err("streaming must run numeric preflight");
-    assert!(output.is_empty());
+        .expect("streaming should use the same CCSDS rounding");
+    assert_eq!(output, generated.as_bytes());
 
     message
         .to_xml()
@@ -145,7 +139,7 @@ fn opm_kvn_rejects_values_that_need_seventeen_digits_before_writing() {
 }
 
 #[test]
-fn opm_kvn_reports_unrepresentable_numbers_in_every_optional_numeric_block() {
+fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
     const LOSSY: f64 = 1.234_567_890_123_456_7;
     type Mutation = (&'static str, &'static str, fn(&mut Opm));
     let mutations: [Mutation; 4] = [
@@ -207,15 +201,14 @@ fn opm_kvn_reports_unrepresentable_numbers_in_every_optional_numeric_block() {
         ),
     ];
 
-    for (source, path, mutate) in mutations {
+    for (source, _path, mutate) in mutations {
         let mut message = Opm::from_kvn(source).expect("fixture should parse");
         mutate(&mut message);
 
-        let error = message
+        assert!(message
             .to_kvn()
-            .expect_err("lossy 16-digit rounding must not occur");
-        assert_eq!(error.code(), Some("validation.invalid_value"));
-        assert_eq!(error.field_path().as_deref(), Some(path));
+            .expect("finite value should be rounded")
+            .contains("1.234567890123457e0"));
         message
             .to_xml()
             .expect("the KVN-specific precision rule must not affect XML");

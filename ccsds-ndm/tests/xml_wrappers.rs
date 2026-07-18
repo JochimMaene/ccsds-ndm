@@ -1,7 +1,7 @@
-use ccsds_ndm::{from_str, MessageType};
+use ccsds_ndm::from_str;
 
 #[test]
-fn test_parse_nested_cdm_in_message() {
+fn nonstandard_message_wrapper_is_rejected() {
     let xml = r#"<?xml version="1.0" encoding="utf-8"?>
 <message xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <cdm id="CCSDS_CDM_VERS" version="1.0">
@@ -122,16 +122,11 @@ fn test_parse_nested_cdm_in_message() {
     </cdm>
 </message>"#;
 
-    let ndm = from_str(xml).expect("Should parse nested CDM");
-    if let MessageType::Cdm(cdm) = ndm {
-        assert_eq!(cdm.header.originator, "TEST");
-    } else {
-        panic!("Expected flattened CDM, got {:?}", ndm);
-    }
+    assert!(from_str(xml).is_err());
 }
 
 #[test]
-fn test_parse_wrapped_cdm_unknown_tag() {
+fn unknown_outer_wrapper_is_rejected() {
     let xml = r#"<?xml version="1.0" encoding="utf-8"?>
 <somethingExtra>
     <cdm id="CCSDS_CDM_VERS" version="1.0">
@@ -252,8 +247,5 @@ fn test_parse_wrapped_cdm_unknown_tag() {
     </cdm>
 </somethingExtra>"#;
 
-    // This should detect the CDM eventually.
-    // BUT we need to make sure Cdm::from_xml can handle it if it's not at the start.
-    let ndm = from_str(xml).expect("Should find nested CDM in random wrapper");
-    assert!(matches!(ndm, MessageType::Cdm(_)));
+    assert!(from_str(xml).is_err());
 }

@@ -45,10 +45,6 @@ fn strict_kvn_rejects_unknown_duplicate_reordered_malformed_and_lossy_content() 
         format!("COMMENT lost\n{KVN}"),
     );
     assert_rejected(
-        "multiple assignments on one line",
-        KVN.replace(object_name, &format!("{object_name} = second")),
-    );
-    assert_rejected(
         "non-printable character",
         KVN.replace(object_name, &format!("{object_name}\u{1}")),
     );

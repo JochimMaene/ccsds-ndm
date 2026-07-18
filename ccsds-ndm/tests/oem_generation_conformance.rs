@@ -107,17 +107,10 @@ fn public_generation_surfaces_are_identical_and_preflight_invalid_models() {
 }
 
 #[test]
-fn kvn_rejects_lossy_numbers_and_partial_acceleration_before_streaming() {
+fn kvn_rounds_to_the_ccsds_digit_limit_and_rejects_partial_acceleration() {
     let mut message = Oem::from_kvn(KVN_FIXTURES[2].1).unwrap();
     message.body.segment[0].data.state_vector[0].x.value = 1.234_567_890_123_456_7;
-    let error = message
-        .to_kvn()
-        .expect_err("17-digit value must not be rounded");
-    assert_eq!(error.code(), Some("validation.invalid_value"));
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment[0].data.state_vector[0].x")
-    );
+    assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
     message.to_xml().expect("XML retains the exact f64 value");
 
     let mut message = Oem::from_xml(XML.1).unwrap();

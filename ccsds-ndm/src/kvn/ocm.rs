@@ -214,7 +214,18 @@ pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = kv_epoch_token.parse_next(input)?;
-    let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
+    space1.parse_next(input)?;
+    let raw_values = till_line_ending.parse_next(input)?;
+    let mut values = Vec::with_capacity(raw_values.split_whitespace().count());
+    for value in raw_values.split_whitespace() {
+        values.push(
+            fast_float::parse(value)
+                .map_err(|_| cut_err(input, "Malformed OCM trajectory numeric value"))?,
+        );
+    }
+    if values.is_empty() {
+        return Err(cut_err(input, "Missing OCM trajectory values"));
+    }
     opt_line_ending.parse_next(input)?;
     Ok(TrajLine { epoch, values })
 }
@@ -509,7 +520,18 @@ pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = kv_epoch_token.parse_next(input)?;
-    let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
+    space1.parse_next(input)?;
+    let raw_values = till_line_ending.parse_next(input)?;
+    let mut values = Vec::with_capacity(raw_values.split_whitespace().count());
+    for value in raw_values.split_whitespace() {
+        values.push(
+            fast_float::parse(value)
+                .map_err(|_| cut_err(input, "Malformed OCM covariance numeric value"))?,
+        );
+    }
+    if values.is_empty() {
+        return Err(cut_err(input, "Missing OCM covariance values"));
+    }
     opt_line_ending.parse_next(input)?;
     Ok(CovLine { epoch, values })
 }
@@ -905,15 +927,12 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
     let mut sensors = None;
     let mut weighted_rms = None;
     let mut data_types = None;
-    let mut _max_resi_accepted = None;
 
     parse_block!(input, comment, {
         "OD_ID" => od_id: kv_string,
         "OD_PREV_ID" => od_prev_id: kv_string,
         "OD_METHOD" => od_method: kv_string,
         "OD_EPOCH" => od_epoch: kv_epoch,
-        "OD_TIME_TAG" => od_epoch: kv_epoch,
-        "MAX_RESI_ACCEPTED" => _max_resi_accepted: kv_string,
         "DAYS_SINCE_FIRST_OBS" => days_since_first_obs: kv_from_kvn,
         "DAYS_SINCE_LAST_OBS" => days_since_last_obs: kv_from_kvn,
         "RECOMMENDED_OD_SPAN" => recommended_od_span: kv_from_kvn,
@@ -1939,13 +1958,13 @@ META_STOP
 PHYS_START
 MANUFACTURER = ACME_CORP
 BUS_MODEL = LEO_BUS
-WET_MASS = 500 [kg]
-DRY_MASS = 400 [kg]
 DRAG_CONST_AREA = 10.0 [m**2]
 DRAG_COEFF_NOM = 2.2
+WET_MASS = 500 [kg]
+DRY_MASS = 400 [kg]
+RCS = 1.0 [m**2]
 SRP_CONST_AREA = 8.0 [m**2]
 SOLAR_RAD_COEFF = 1.2
-RCS = 1.0 [m**2]
 MAX_THRUST = 0.1 [N]
 DV_BOL = 0.3 [km/s]
 DV_REMAINING = 0.15 [km/s]
@@ -2217,7 +2236,7 @@ MAN_STOP
             _ => panic!("Expected first keyword error, got: {:?}", err),
         }
 
-        // Comments before version should be OK
+        // Comments before version cannot be retained and are rejected rather than discarded.
         let kvn = r#"
 COMMENT leading comment
 CCSDS_OCM_VERS = 3.0
@@ -2228,7 +2247,7 @@ TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-01-01T00:00:00
 META_STOP
 "#;
-        assert!(Ocm::from_kvn(kvn).is_ok());
+        assert!(Ocm::from_kvn(kvn).is_err());
 
         // Unexpected segment start
         let kvn = r#"CCSDS_OCM_VERS = 3.0
@@ -2260,6 +2279,7 @@ META_STOP
             assert!(
                 err.message.contains("Expected META_STOP")
                     || err.message.contains("Unexpected OCM Data key")
+                    || err.message.contains("Unexpected OCM Metadata key")
                     || err.contexts.contains(&"Expected META_STOP")
                     || err.contexts.contains(&"Unexpected OCM Data key")
                     || err.contexts.contains(&"Unexpected OCM Metadata key")
@@ -2390,6 +2410,7 @@ USER_STOP
                     || err.message.contains("Expected TRAJ_START")
                     || err.contexts.contains(&"Expected META_START")
                     || err.contexts.contains(&"Expected TRAJ_START")
+                    || err.message.contains("Unexpected key in USER block")
                     || err.contexts.contains(&"Unexpected key in USER block")
             );
         } else {
@@ -2662,7 +2683,6 @@ OD_ID = OD1
 OD_PREV_ID = OD0
 OD_METHOD = LS
 OD_EPOCH = 2023-01-01T00:00:00
-OD_TIME_TAG = 2023-01-01T00:00:00
 DAYS_SINCE_FIRST_OBS = 10 [d]
 DAYS_SINCE_LAST_OBS = 1 [d]
 RECOMMENDED_OD_SPAN = 7 [d]
@@ -2671,7 +2691,6 @@ OBS_AVAILABLE = 100
 OBS_USED = 95
 TRACKS_AVAILABLE = 10
 TRACKS_USED = 9
-MAX_RESI_ACCEPTED = 3 [%]
 WEIGHTED_RMS = 0.5
 OD_STOP
 "#;
@@ -2816,7 +2835,7 @@ OD_EPOCH = 2023-01-01T00:00:00
 OD_STOP
 COMMENT Comment before USER
 USER_START
-PARAM = VAL
+USER_DEFINED_PARAM = VAL
 USER_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
@@ -2872,7 +2891,7 @@ EPOCH_TZERO = 2023-01-01T00:00:00
 META_STOP
 USER_START
 COMMENT inside user block
-PARAM = VAL
+USER_DEFINED_PARAM = VAL
 USER_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
@@ -2898,9 +2917,9 @@ TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-01-01T00:00:00
 META_STOP
 USER_START
-PARAM1 = VAL1
+USER_DEFINED_PARAM1 = VAL1
 
-PARAM2 = VAL2
+USER_DEFINED_PARAM2 = VAL2
 USER_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
@@ -3623,10 +3642,13 @@ CENTER_NAME = EARTH
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error().map_or(false, |err| err
-                .contexts
-                .iter()
-                .any(|c| c.contains("Expected META_START"))),
+            err.as_kvn_parse_error().is_some_and(|err| {
+                err.message.contains("Expected META_START")
+                    || err
+                        .contexts
+                        .iter()
+                        .any(|context| context.contains("Expected META_START"))
+            }),
             "Expected 'expected meta' error, got: {:?}",
             err
         );
@@ -3920,7 +3942,7 @@ OD_EPOCH = 2023-01-01T00:00:00
 OD_STOP
 USER_START
 COMMENT user comment
-CUSTOM_PARAM = custom_value
+USER_DEFINED_CUSTOM_PARAM = custom_value
 USER_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
@@ -4136,9 +4158,9 @@ META_STOP
 TRAJ_START
 CENTER_NAME = EARTH
 TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
 ORB_REVNUM = 100
 ORB_REVNUM_BASIS = 0
+TRAJ_TYPE = CARTPV
 2023-01-01T00:00:00 1 2 3 4 5 6
 TRAJ_STOP
 "#;

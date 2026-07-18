@@ -44,24 +44,20 @@ fn both_conversion_directions_preserve_the_complete_typed_model() {
 }
 
 #[test]
-fn xml_to_kvn_rejects_values_that_cannot_be_represented_without_rounding() {
+fn xml_to_kvn_rounds_values_to_the_ccsds_digit_limit() {
     let mut message = Opm::from_kvn(KVN_FIXTURES[0]).expect("fixture should parse");
     message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
     let xml = message.to_xml().expect("XML can represent the f64 exactly");
 
-    let error = convert_opm(
+    let kvn = convert_opm(
         &xml,
         Notation::Xml,
         Notation::Kvn,
         &ParseOptions::default(),
         &GenerateOptions::source(),
     )
-    .expect_err("lossy KVN conversion should fail");
-    assert_eq!(error.code(), Some("validation.invalid_value"));
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment.data.state_vector.x")
-    );
+    .expect("finite XML value should round to a conforming KVN value");
+    assert!(kvn.contains("X                    = 1.234567890123457e0"));
 }
 
 #[test]

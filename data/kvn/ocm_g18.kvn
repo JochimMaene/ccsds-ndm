@@ -45,7 +45,7 @@ SOLAR_RAD_COEFF = 1.300
 PHYS_STOP
 MAN_START
 COMMENT 200 s (in aggregate) of 10N thrust (in-track transitioning to radial)
-COMMENT w/effic η=0.95, Isp=300s, 5% 1-sigma error
+COMMENT w/effic eta=0.95, Isp=300s, 5% 1-sigma error
 MAN_ID = E_W_20160305B
 MAN_BASIS = CANDIDATE
 MAN_DEVICE_ID = THR_01

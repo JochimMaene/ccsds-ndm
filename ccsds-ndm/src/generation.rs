@@ -60,7 +60,7 @@ fn generation_error(
     error.with_generation_context(kind, format.diagnostic(), source_edition, target_edition)
 }
 
-fn enforce_output_limit(actual: usize, options: &GenerateOptions) -> Result<()> {
+pub(crate) fn enforce_output_limit(actual: usize, options: &GenerateOptions) -> Result<()> {
     if let Some(limit) = options.max_output_bytes {
         if actual > limit {
             return Err(CcsdsNdmError::ResourceLimitExceeded {
@@ -73,7 +73,10 @@ fn enforce_output_limit(actual: usize, options: &GenerateOptions) -> Result<()> 
     Ok(())
 }
 
-fn preflight_xml_limit<T: serde::Serialize>(value: &T, options: &GenerateOptions) -> Result<()> {
+pub(crate) fn preflight_xml_limit<T: serde::Serialize>(
+    value: &T,
+    options: &GenerateOptions,
+) -> Result<()> {
     if options.max_output_bytes.is_none() {
         return Ok(());
     }
@@ -82,7 +85,7 @@ fn preflight_xml_limit<T: serde::Serialize>(value: &T, options: &GenerateOptions
     enforce_output_limit(counter.bytes, options)
 }
 
-fn preflight_kvn_limit<T: ToKvn>(value: &T, options: &GenerateOptions) -> Result<()> {
+pub(crate) fn preflight_kvn_limit<T: ToKvn>(value: &T, options: &GenerateOptions) -> Result<()> {
     if options.max_output_bytes.is_none() {
         return Ok(());
     }
@@ -183,44 +186,12 @@ pub trait VersionedNdm: Ndm + Clone {
     /// Returns an error when the selected edition cannot be generated, the selected model is
     /// invalid, or XML serialization fails.
     fn to_xml_with(&self, options: &GenerateOptions) -> Result<String> {
-        let version = self.target_version(options)?;
-        if version.as_ref() == self.version() {
-            return self
-                .to_xml()
-                .and_then(|output| {
-                    enforce_output_limit(output.len(), options)?;
-                    Ok(output)
-                })
-                .map_err(|error| {
-                    generation_error(
-                        error,
-                        Self::KIND,
-                        OutputFormat::Xml,
-                        self.version(),
-                        version.as_ref(),
-                    )
-                });
-        }
-
-        let source_version = self.version();
-        let mut message = self.clone();
-        let target_version = version.into_owned();
-        message.set_version(target_version);
-        message
-            .to_xml()
-            .and_then(|output| {
+        with_target_message(self, options, OutputFormat::Xml, |message| {
+            message.to_xml().and_then(|output| {
                 enforce_output_limit(output.len(), options)?;
                 Ok(output)
             })
-            .map_err(|error| {
-                generation_error(
-                    error,
-                    Self::KIND,
-                    OutputFormat::Xml,
-                    source_version,
-                    message.version(),
-                )
-            })
+        })
     }
 
     /// Stream KVN to an I/O sink using an explicit target-edition policy.
@@ -244,43 +215,11 @@ pub trait VersionedNdm: Ndm + Clone {
     /// Returns an error when the selected edition cannot be generated, the selected model is
     /// invalid, XML serialization fails, or the sink rejects a write.
     fn write_xml_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
-        let version = self.target_version(options)?;
-        if version.as_ref() == self.version() {
-            return (|| {
-                validate_for_generation(Self::KIND, self.version(), OutputFormat::Xml, self)?;
-                self.validate_xml_output()?;
-                preflight_xml_limit(self, options)?;
-                crate::xml::to_writer(output, self)
-            })()
-            .map_err(|error| {
-                generation_error(
-                    error,
-                    Self::KIND,
-                    OutputFormat::Xml,
-                    self.version(),
-                    version.as_ref(),
-                )
-            });
-        }
-
-        let source_version = self.version();
-        let mut message = self.clone();
-        let target_version = version.into_owned();
-        message.set_version(target_version);
-        (|| {
-            validate_for_generation(Self::KIND, message.version(), OutputFormat::Xml, &message)?;
+        with_target_message(self, options, OutputFormat::Xml, |message| {
+            validate_for_generation(Self::KIND, message.version(), OutputFormat::Xml, message)?;
             message.validate_xml_output()?;
-            preflight_xml_limit(&message, options)?;
-            crate::xml::to_writer(output, &message)
-        })()
-        .map_err(|error| {
-            generation_error(
-                error,
-                Self::KIND,
-                OutputFormat::Xml,
-                source_version,
-                message.version(),
-            )
+            preflight_xml_limit(message, options)?;
+            crate::xml::to_writer(output, message)
         })
     }
 
@@ -302,48 +241,46 @@ pub trait VersionedNdm: Ndm + Clone {
     }
 }
 
-fn generate_kvn<T>(message: &T, options: &GenerateOptions) -> Result<String>
+fn with_target_message<T, R>(
+    message: &T,
+    options: &GenerateOptions,
+    format: OutputFormat,
+    operation: impl FnOnce(&T) -> Result<R>,
+) -> Result<R>
 where
-    T: VersionedNdm + ToKvn,
+    T: VersionedNdm,
 {
-    let version = message.target_version(options)?;
-    if version.as_ref() == message.version() {
-        return message
-            .to_kvn()
-            .and_then(|output| {
-                enforce_output_limit(output.len(), options)?;
-                Ok(output)
-            })
-            .map_err(|error| {
-                generation_error(
-                    error,
-                    T::KIND,
-                    OutputFormat::Kvn,
-                    message.version(),
-                    version.as_ref(),
-                )
-            });
+    let target_version = message.target_version(options)?;
+    if target_version.as_ref() == message.version() {
+        return operation(message).map_err(|error| {
+            generation_error(
+                error,
+                T::KIND,
+                format,
+                message.version(),
+                target_version.as_ref(),
+            )
+        });
     }
 
     let source_version = message.version();
     let mut selected = message.clone();
-    let target_version = version.into_owned();
-    selected.set_version(target_version);
-    selected
-        .to_kvn()
-        .and_then(|output| {
+    selected.set_version(target_version.into_owned());
+    operation(&selected).map_err(|error| {
+        generation_error(error, T::KIND, format, source_version, selected.version())
+    })
+}
+
+fn generate_kvn<T>(message: &T, options: &GenerateOptions) -> Result<String>
+where
+    T: VersionedNdm + ToKvn,
+{
+    with_target_message(message, options, OutputFormat::Kvn, |selected| {
+        selected.to_kvn().and_then(|output| {
             enforce_output_limit(output.len(), options)?;
             Ok(output)
         })
-        .map_err(|error| {
-            generation_error(
-                error,
-                T::KIND,
-                OutputFormat::Kvn,
-                source_version,
-                selected.version(),
-            )
-        })
+    })
 }
 
 fn stream_kvn<T, W>(message: &T, output: &mut W, options: &GenerateOptions) -> Result<()>
@@ -351,47 +288,15 @@ where
     T: VersionedNdm + ToKvn,
     W: Write,
 {
-    let version = message.target_version(options)?;
-    if version.as_ref() == message.version() {
-        return (|| {
-            validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
-            message.validate_kvn_output()?;
-            preflight_kvn_limit(message, options)?;
+    with_target_message(message, options, OutputFormat::Kvn, |selected| {
+        (|| {
+            validate_output_version(T::KIND, selected.version(), OutputFormat::Kvn)?;
+            selected.validate_kvn_output()?;
+            preflight_kvn_limit(selected, options)?;
             let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
-            ToKvn::write_kvn(message, &mut writer);
+            ToKvn::write_kvn(selected, &mut writer);
             writer.finish_io().map_err(CcsdsNdmError::from)
         })()
-        .map_err(|error| {
-            generation_error(
-                error,
-                T::KIND,
-                OutputFormat::Kvn,
-                message.version(),
-                version.as_ref(),
-            )
-        });
-    }
-
-    let source_version = message.version();
-    let mut selected = message.clone();
-    let target_version = version.into_owned();
-    selected.set_version(target_version);
-    (|| {
-        validate_output_version(T::KIND, selected.version(), OutputFormat::Kvn)?;
-        selected.validate_kvn_output()?;
-        preflight_kvn_limit(&selected, options)?;
-        let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
-        ToKvn::write_kvn(&selected, &mut writer);
-        writer.finish_io().map_err(CcsdsNdmError::from)
-    })()
-    .map_err(|error| {
-        generation_error(
-            error,
-            T::KIND,
-            OutputFormat::Kvn,
-            source_version,
-            selected.version(),
-        )
     })
 }
 
@@ -423,14 +328,161 @@ macro_rules! impl_versioned_ndm {
     };
 }
 
-impl_versioned_ndm!(crate::messages::acm::Acm, Acm);
-impl_versioned_ndm!(crate::messages::aem::Aem, Aem);
+impl VersionedNdm for crate::messages::acm::Acm {
+    const KIND: MessageKind = MessageKind::Acm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+
+    fn validate_xml_output(&self) -> Result<()> {
+        self.validate_xml_representability()
+    }
+
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        generate_kvn(self, options)
+    }
+
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+        stream_kvn(self, output, options)
+    }
+}
 impl_versioned_ndm!(crate::messages::apm::Apm, Apm);
-impl_versioned_ndm!(crate::messages::cdm::Cdm, Cdm);
-impl_versioned_ndm!(crate::messages::ocm::Ocm, Ocm);
 impl_versioned_ndm!(crate::messages::omm::Omm, Omm);
-impl_versioned_ndm!(crate::messages::rdm::Rdm, Rdm);
-impl_versioned_ndm!(crate::messages::tdm::Tdm, Tdm);
+
+impl VersionedNdm for crate::messages::cdm::Cdm {
+    const KIND: MessageKind = MessageKind::Cdm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        generate_kvn(self, options)
+    }
+
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+        stream_kvn(self, output, options)
+    }
+}
+
+impl VersionedNdm for crate::messages::aem::Aem {
+    const KIND: MessageKind = MessageKind::Aem;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        generate_kvn(self, options)
+    }
+
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+        stream_kvn(self, output, options)
+    }
+}
+
+impl VersionedNdm for crate::messages::ocm::Ocm {
+    const KIND: MessageKind = MessageKind::Ocm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        generate_kvn(self, options)
+    }
+
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+        stream_kvn(self, output, options)
+    }
+}
+
+impl VersionedNdm for crate::messages::tdm::Tdm {
+    const KIND: MessageKind = MessageKind::Tdm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        generate_kvn(self, options)
+    }
+
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+        stream_kvn(self, output, options)
+    }
+}
+
+impl VersionedNdm for crate::messages::rdm::Rdm {
+    const KIND: MessageKind = MessageKind::Rdm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        generate_kvn(self, options)
+    }
+
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+        stream_kvn(self, output, options)
+    }
+}
 
 impl VersionedNdm for crate::messages::opm::Opm {
     const KIND: MessageKind = MessageKind::Opm;

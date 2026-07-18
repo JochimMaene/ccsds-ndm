@@ -829,6 +829,61 @@ macro_rules! parse_block {
 
 pub(crate) use parse_block;
 
+/// Parse a flattened KVN block while allowing the caller to associate comments with the logical
+/// sub-block selected by the following keyword. Unlike `parse_block!`, comments at a boundary can
+/// remain unread for the following parser.
+macro_rules! parse_routed_block {
+    ($input:ident, $route_comments:expr, {
+        $($($key:literal)|+ => $target:ident : $parser:expr $(=> $action:block)? ),* $(,)?
+    }, $break_condition:expr, $error_label:expr) => {
+        loop {
+            let checkpoint = $input.checkpoint();
+            let loop_comments = collect_comments.parse_next($input)?;
+
+            if ($break_condition)(&mut *$input) {
+                $input.reset(&checkpoint);
+                break;
+            }
+
+            let key = match key_token.parse_next($input) {
+                Ok(key) => key,
+                Err(_) => {
+                    $input.reset(&checkpoint);
+                    break;
+                }
+            };
+
+            match key {
+                $($($key)|+ => {
+                    let value = $parser.parse_next($input)?;
+                    ($route_comments)(key, loop_comments);
+                    parse_routed_block!(@action value, $target $(, $action)?);
+                })*
+                _ => {
+                    $input.reset(&checkpoint);
+                    return Err(winnow::error::ErrMode::Cut(
+                        winnow::error::AddContext::add_context(
+                            crate::error::InternalParserError::from_input($input),
+                            $input,
+                            &$input.checkpoint(),
+                            winnow::error::StrContext::Label($error_label),
+                        ),
+                    ));
+                }
+            }
+        }
+    };
+    (@action $value:ident, $target:ident) => {
+        $target = Some($value);
+    };
+    (@action $value:ident, $binding:ident, $action:block) => {
+        let $binding = $value;
+        $action
+    };
+}
+
+pub(crate) use parse_routed_block;
+
 /// Checks if we're at a specific block start without full string scan.
 pub fn at_block_start(tag: &str, input: &str) -> bool {
     let s = input.trim_start_matches([' ', '\t']);

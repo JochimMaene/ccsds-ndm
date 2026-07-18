@@ -1,9 +1,11 @@
+use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
 const KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const OMM_KVN: &str = include_str!("../../data/kvn/omm_g7.kvn");
 
 fn cli(args: &[&str], stdin: Option<&str>) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_ccsds-ndm"));
@@ -24,6 +26,50 @@ fn cli(args: &[&str], stdin: Option<&str>) -> Output {
             .expect("stdin should be written");
     }
     child.wait_with_output().expect("CLI should finish")
+}
+
+#[test]
+fn cli_dispatches_non_opm_messages_through_the_shared_contract() {
+    let valid = cli(&["validate", "--format", "kvn", "-"], Some(OMM_KVN));
+    assert_eq!(valid.status.code(), Some(0));
+    assert!(valid.stdout.is_empty());
+    assert!(valid.stderr.is_empty());
+
+    let converted = cli(
+        &["convert", "--from", "kvn", "--to", "xml", "-"],
+        Some(OMM_KVN),
+    );
+    assert_eq!(converted.status.code(), Some(0));
+    assert!(converted.stderr.is_empty());
+    let xml = String::from_utf8(converted.stdout).unwrap();
+    Omm::from_xml(&xml).expect("CLI output should be a valid OMM XML document");
+
+    let limited = cli(
+        &[
+            "convert",
+            "--from",
+            "kvn",
+            "--to",
+            "xml",
+            "--max-output-bytes",
+            "1",
+            "-",
+        ],
+        Some(OMM_KVN),
+    );
+    assert_eq!(limited.status.code(), Some(4));
+    assert!(limited.stdout.is_empty());
+
+    let invalid = OMM_KVN.replacen("OBJECT_NAME", "UNKNOWN_NAME", 1);
+    let diagnostic = cli(
+        &["validate", "--format", "kvn", "--json", "-"],
+        Some(&invalid),
+    );
+    assert_eq!(diagnostic.status.code(), Some(2));
+    let diagnostic: serde_json::Value = serde_json::from_slice(&diagnostic.stderr).unwrap();
+    assert_eq!(diagnostic["operation"], "parse");
+    assert_eq!(diagnostic["notation"], "kvn");
+    assert_eq!(diagnostic["message_kind"], "omm");
 }
 
 #[test]

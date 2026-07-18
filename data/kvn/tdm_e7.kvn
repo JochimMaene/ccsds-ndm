@@ -4,7 +4,7 @@ COMMENT This example TDM describes a scenario such as might occur with a
 COMMENT spacecraft like Cassini, which has 3 transponders: X/S, X/X, X/Ka.
 COMMENT In this tracking session all 3 transponders were used.
 COMMENT This requires a TDM with 3 segments, because a single segment would
-COMMENT not be able to specify a ‘PATH’ statement that would describe the
+COMMENT not be able to specify a 'PATH' statement that would describe the
 COMMENT S-down, X-down, and Ka-down signal paths.
 CREATION_DATE = 2006-347T22:51:00
 ORIGINATOR = NASA

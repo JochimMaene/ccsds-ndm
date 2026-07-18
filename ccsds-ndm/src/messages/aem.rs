@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::AdmHeader;
-use crate::error::{Result, ValidationError};
+use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 #[cfg(test)]
@@ -12,6 +12,7 @@ use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::io::Write;
 
 //----------------------------------------------------------------------
 // Root AEM Structure
@@ -72,12 +73,14 @@ impl Ndm for Aem {
             crate::generation::OutputFormat::Kvn,
             self,
         )?;
+        self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        validate_kvn_syntax(kvn)?;
         let aem = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&aem)?;
         Ok(aem)
@@ -94,9 +97,502 @@ impl Ndm for Aem {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        crate::xml::validate_document_root(xml, b"aem", "AEM")?;
+        validate_xml_sequences(xml)?;
         let aem: Self = crate::xml::from_str_with_context(xml, "AEM")?;
         crate::traits::Validate::validate(&aem)?;
         Ok(aem)
+    }
+}
+
+fn validate_xml_sequences(xml: &str) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
+    crate::xml::validate_element_sequences(
+        xml,
+        "AEM",
+        |parent, child| {
+            let children = aem_xml_children(parent)?;
+            let rank = children.iter().position(|candidate| *candidate == child)? as u16;
+            let repeatable =
+                child == b"COMMENT" || child == b"segment" || child == b"attitudeState";
+            Some(XmlSequenceRule { rank, repeatable })
+        },
+        |element, attribute| {
+            attribute == b"units"
+                && matches!(
+                    element,
+                    b"Q1_DOT"
+                        | b"Q2_DOT"
+                        | b"Q3_DOT"
+                        | b"QC_DOT"
+                        | b"ANGLE_1"
+                        | b"ANGLE_2"
+                        | b"ANGLE_3"
+                        | b"ANGLE_1_DOT"
+                        | b"ANGLE_2_DOT"
+                        | b"ANGLE_3_DOT"
+                        | b"ANGVEL_X"
+                        | b"ANGVEL_Y"
+                        | b"ANGVEL_Z"
+                        | b"SPIN_ALPHA"
+                        | b"SPIN_DELTA"
+                        | b"SPIN_ANGLE"
+                        | b"SPIN_ANGLE_VEL"
+                        | b"NUTATION"
+                        | b"NUTATION_PER"
+                        | b"NUTATION_PHASE"
+                        | b"MOMENTUM_ALPHA"
+                        | b"MOMENTUM_DELTA"
+                        | b"NUTATION_VEL"
+                )
+        },
+    )
+}
+
+fn aem_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
+    Some(match parent {
+        b"aem" => &[b"header", b"body"],
+        b"header" => &[
+            b"COMMENT",
+            b"CLASSIFICATION",
+            b"CREATION_DATE",
+            b"ORIGINATOR",
+            b"MESSAGE_ID",
+        ],
+        b"body" => &[b"segment"],
+        b"segment" => &[b"metadata", b"data"],
+        b"metadata" => &[
+            b"COMMENT",
+            b"OBJECT_NAME",
+            b"OBJECT_ID",
+            b"CENTER_NAME",
+            b"REF_FRAME_A",
+            b"REF_FRAME_B",
+            b"TIME_SYSTEM",
+            b"START_TIME",
+            b"USEABLE_START_TIME",
+            b"USEABLE_STOP_TIME",
+            b"STOP_TIME",
+            b"ATTITUDE_TYPE",
+            b"EULER_ROT_SEQ",
+            b"ANGVEL_FRAME",
+            b"INTERPOLATION_METHOD",
+            b"INTERPOLATION_DEGREE",
+        ],
+        b"data" => &[b"COMMENT", b"attitudeState"],
+        b"attitudeState" => &[
+            b"quaternionEphemeris",
+            b"quaternionDerivative",
+            b"quaternionAngVel",
+            b"eulerAngle",
+            b"eulerAngleDerivative",
+            b"eulerAngleAngVel",
+            b"spin",
+            b"spinNutation",
+            b"spinNutationMom",
+        ],
+        b"quaternionEphemeris" => &[b"EPOCH", b"quaternion"],
+        b"quaternionDerivative" => &[b"EPOCH", b"quaternion", b"quaternionDot"],
+        b"quaternionAngVel" => &[b"EPOCH", b"quaternion", b"angVel"],
+        b"quaternion" => &[b"Q1", b"Q2", b"Q3", b"QC"],
+        b"quaternionDot" => &[b"Q1_DOT", b"Q2_DOT", b"Q3_DOT", b"QC_DOT"],
+        b"angVel" => &[b"ANGVEL_X", b"ANGVEL_Y", b"ANGVEL_Z"],
+        b"eulerAngle" => &[b"EPOCH", b"ANGLE_1", b"ANGLE_2", b"ANGLE_3"],
+        b"eulerAngleDerivative" => &[
+            b"EPOCH",
+            b"ANGLE_1",
+            b"ANGLE_2",
+            b"ANGLE_3",
+            b"ANGLE_1_DOT",
+            b"ANGLE_2_DOT",
+            b"ANGLE_3_DOT",
+        ],
+        b"eulerAngleAngVel" => &[
+            b"EPOCH",
+            b"ANGLE_1",
+            b"ANGLE_2",
+            b"ANGLE_3",
+            b"ANGVEL_X",
+            b"ANGVEL_Y",
+            b"ANGVEL_Z",
+        ],
+        b"spin" => &[
+            b"EPOCH",
+            b"SPIN_ALPHA",
+            b"SPIN_DELTA",
+            b"SPIN_ANGLE",
+            b"SPIN_ANGLE_VEL",
+        ],
+        b"spinNutation" => &[
+            b"EPOCH",
+            b"SPIN_ALPHA",
+            b"SPIN_DELTA",
+            b"SPIN_ANGLE",
+            b"SPIN_ANGLE_VEL",
+            b"NUTATION",
+            b"NUTATION_PER",
+            b"NUTATION_PHASE",
+        ],
+        b"spinNutationMom" => &[
+            b"EPOCH",
+            b"SPIN_ALPHA",
+            b"SPIN_DELTA",
+            b"SPIN_ANGLE",
+            b"SPIN_ANGLE_VEL",
+            b"MOMENTUM_ALPHA",
+            b"MOMENTUM_DELTA",
+            b"NUTATION_VEL",
+        ],
+        _ => return None,
+    })
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    const HEADER: &[&str] = &[
+        "CLASSIFICATION",
+        "CREATION_DATE",
+        "ORIGINATOR",
+        "MESSAGE_ID",
+    ];
+    const META: &[&str] = &[
+        "OBJECT_NAME",
+        "OBJECT_ID",
+        "CENTER_NAME",
+        "REF_FRAME_A",
+        "REF_FRAME_B",
+        "TIME_SYSTEM",
+        "START_TIME",
+        "USEABLE_START_TIME",
+        "USEABLE_STOP_TIME",
+        "STOP_TIME",
+        "ATTITUDE_TYPE",
+        "EULER_ROT_SEQ",
+        "RATE_FRAME",
+        "INTERPOLATION_METHOD",
+        "INTERPOLATION_DEGREE",
+    ];
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating AEM KVN structure"],
+            offset,
+        }))))
+    };
+    let mut block = None;
+    let mut last_block = None;
+    let mut previous_key = None;
+    let mut top_rank = None;
+    let mut block_has_content = false;
+    let mut offset = 0usize;
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        if line.len() > 254 {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            if block.is_none() && top_rank != Some(0) {
+                return fail("AEM header COMMENT must immediately follow the version record");
+            }
+            if block_has_content && !(block.is_none() && top_rank == Some(0)) {
+                return fail("COMMENT is not at the beginning of an AEM logical block");
+            }
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if let Some(marker) = line.strip_suffix("_START") {
+            if block.is_some() || !matches!(marker, "META" | "DATA") {
+                return fail("unknown or nested AEM marked block");
+            }
+            if (marker == "META" && matches!(last_block, Some("META")))
+                || (marker == "DATA" && last_block != Some("META"))
+            {
+                return fail("out-of-order AEM marked block");
+            }
+            block = Some(marker);
+            previous_key = None;
+            block_has_content = false;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if let Some(marker) = line.strip_suffix("_STOP") {
+            if block != Some(marker) {
+                return fail("mismatched AEM marked block end");
+            }
+            block = None;
+            last_block = Some(marker);
+            previous_key = None;
+            block_has_content = false;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        match block {
+            Some("DATA") => {
+                if line.contains('=') {
+                    return fail("assignment in AEM attitude-state history");
+                }
+                block_has_content = true;
+            }
+            Some("META") => {
+                if !line.contains('=') {
+                    return fail("expected one AEM metadata assignment");
+                }
+                let key = line.split_once('=').unwrap().0.trim();
+                let rank = META
+                    .iter()
+                    .position(|candidate| *candidate == key)
+                    .ok_or_else(|| {
+                        invalid(number, offset, "unknown AEM metadata keyword".into())
+                    })?;
+                if previous_key.is_some_and(|previous| rank <= previous) {
+                    return fail("duplicate or out-of-order AEM metadata keyword");
+                }
+                previous_key = Some(rank);
+                block_has_content = true;
+            }
+            None => {
+                if last_block.is_some() {
+                    return fail("content outside an AEM marked block");
+                }
+                if !line.contains('=') {
+                    return fail("expected one AEM header assignment");
+                }
+                let key = line.split_once('=').unwrap().0.trim();
+                let rank = if key == "CCSDS_AEM_VERS" {
+                    0
+                } else {
+                    HEADER
+                        .iter()
+                        .position(|candidate| *candidate == key)
+                        .map(|rank| rank + 1)
+                        .ok_or_else(|| {
+                            invalid(number, offset, "unknown AEM header keyword".into())
+                        })?
+                };
+                if top_rank.is_none() && rank != 0 {
+                    return fail("CCSDS_AEM_VERS must be the first record");
+                }
+                if top_rank.is_some_and(|previous| rank <= previous) {
+                    return fail("duplicate or out-of-order AEM header keyword");
+                }
+                top_rank = Some(rank);
+                block_has_content = true;
+            }
+            _ => unreachable!(),
+        }
+        offset += raw_line.len() + 1;
+    }
+    if block.is_some() {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "unclosed AEM marked block".into(),
+        ));
+    }
+    Ok(())
+}
+
+impl Aem {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        let check_text = |value: &str| -> Result<()> {
+            if !value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+                return Err(ValidationError::Generic {
+                    message: Cow::Borrowed(
+                        "AEM KVN free text must contain printable ASCII without line breaks",
+                    ),
+                    line: None,
+                }
+                .into());
+            }
+            Ok(())
+        };
+        for comment in &self.header.comment {
+            check_text(comment)?;
+        }
+        if let Some(value) = &self.header.classification {
+            check_text(value)?;
+        }
+        check_text(&self.header.originator)?;
+        if let Some(value) = &self.header.message_id {
+            check_text(value)?;
+        }
+        for segment in &self.body.segment {
+            for value in [
+                Some(&segment.metadata.object_name),
+                Some(&segment.metadata.object_id),
+                segment.metadata.center_name.as_ref(),
+                Some(&segment.metadata.ref_frame_a),
+                Some(&segment.metadata.ref_frame_b),
+                Some(&segment.metadata.time_system),
+                segment.metadata.angvel_frame.as_ref(),
+                segment.metadata.interpolation_method.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                check_text(value)?;
+            }
+            for comment in segment.metadata.comment.iter().chain(&segment.data.comment) {
+                check_text(comment)?;
+            }
+            for state in &segment.data.attitude_states {
+                validate_aem_state_numbers(state)?;
+            }
+        }
+        let mut sink = AemKvnLexicalSink::default();
+        let mut writer = KvnWriter::from_io(&mut sink);
+        self.write_kvn(&mut writer);
+        writer.finish_io().map_err(CcsdsNdmError::from)
+    }
+}
+
+fn validate_aem_state_numbers(state: &AemAttitudeStateWrapper) -> Result<()> {
+    let check = |values: &[f64]| -> Result<()> {
+        if values
+            .iter()
+            .all(|value| crate::kvn::ser::OdmFloat::is_valid(*value))
+        {
+            Ok(())
+        } else {
+            Err(ValidationError::Generic {
+                message: Cow::Borrowed("AEM KVN attitude-state numbers must be finite"),
+                line: None,
+            }
+            .into())
+        }
+    };
+    if let Some(v) = &state.quaternion_ephemeris {
+        check(&[
+            v.quaternion.q1,
+            v.quaternion.q2,
+            v.quaternion.q3,
+            v.quaternion.qc,
+        ])?;
+    }
+    if let Some(v) = &state.quaternion_derivative {
+        check(&[
+            v.quaternion.q1,
+            v.quaternion.q2,
+            v.quaternion.q3,
+            v.quaternion.qc,
+            v.quaternion_dot.q1_dot.value,
+            v.quaternion_dot.q2_dot.value,
+            v.quaternion_dot.q3_dot.value,
+            v.quaternion_dot.qc_dot.value,
+        ])?;
+    }
+    if let Some(v) = &state.quaternion_ang_vel {
+        check(&[
+            v.quaternion.q1,
+            v.quaternion.q2,
+            v.quaternion.q3,
+            v.quaternion.qc,
+            v.ang_vel.angvel_x.value,
+            v.ang_vel.angvel_y.value,
+            v.ang_vel.angvel_z.value,
+        ])?;
+    }
+    if let Some(v) = &state.euler_angle {
+        check(&[v.angle_1.value, v.angle_2.value, v.angle_3.value])?;
+    }
+    if let Some(v) = &state.euler_angle_derivative {
+        check(&[
+            v.angle_1.value,
+            v.angle_2.value,
+            v.angle_3.value,
+            v.angle_1_dot.value,
+            v.angle_2_dot.value,
+            v.angle_3_dot.value,
+        ])?;
+    }
+    if let Some(v) = &state.euler_angle_ang_vel {
+        check(&[
+            v.angle_1.value,
+            v.angle_2.value,
+            v.angle_3.value,
+            v.angvel_x.value,
+            v.angvel_y.value,
+            v.angvel_z.value,
+        ])?;
+    }
+    if let Some(v) = &state.spin {
+        check(&[
+            v.spin_alpha.value,
+            v.spin_delta.value,
+            v.spin_angle.value,
+            v.spin_angle_vel.value,
+        ])?;
+    }
+    if let Some(v) = &state.spin_nutation {
+        check(&[
+            v.spin_alpha.value,
+            v.spin_delta.value,
+            v.spin_angle.value,
+            v.spin_angle_vel.value,
+            v.nutation.value,
+            v.nutation_per.value,
+            v.nutation_phase.value,
+        ])?;
+    }
+    if let Some(v) = &state.spin_nutation_mom {
+        check(&[
+            v.spin_alpha.value,
+            v.spin_delta.value,
+            v.spin_angle.value,
+            v.spin_angle_vel.value,
+            v.momentum_alpha.value,
+            v.momentum_delta.value,
+            v.nutation_vel.value,
+        ])?;
+    }
+    Ok(())
+}
+
+#[derive(Default)]
+struct AemKvnLexicalSink {
+    line_len: usize,
+}
+
+impl Write for AemKvnLexicalSink {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        for byte in buffer {
+            if *byte == b'\n' {
+                if self.line_len > 254 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "generated AEM KVN record exceeds 254 characters",
+                    ));
+                }
+                self.line_len = 0;
+            } else {
+                if !(b' '..=b'~').contains(byte) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "generated AEM KVN contains non-printable or non-ASCII content",
+                    ));
+                }
+                self.line_len += 1;
+            }
+        }
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
@@ -112,6 +608,9 @@ impl crate::traits::Validate for AemBody {
         for segment in &self.segment {
             segment.validate()?;
         }
+        if let Some(error) = self.cross_segment_errors().into_iter().next() {
+            return Err(error.into());
+        }
         Ok(())
     }
 
@@ -123,10 +622,51 @@ impl crate::traits::Validate for AemBody {
                 "segment (at least one required)",
             ));
         }
-        for segment in &self.segment {
-            errors.extend(segment.validation_errors()?);
+        for (index, segment) in self.segment.iter().enumerate() {
+            errors.extend(
+                segment
+                    .validation_errors()?
+                    .into_iter()
+                    .map(|error| error.at_path(format!("segment[{index}]"))),
+            );
         }
+        errors.extend(self.cross_segment_errors());
         Ok(errors)
+    }
+}
+
+impl AemBody {
+    fn cross_segment_errors(&self) -> Vec<ValidationError> {
+        use std::cmp::Ordering;
+
+        let mut errors = Vec::new();
+        for (index, pair) in self.segment.windows(2).enumerate() {
+            let previous_stop = pair[0].metadata.useable_stop_time;
+            let current_start = pair[1].metadata.useable_start_time;
+            if matches!(
+                (previous_stop, current_start),
+                (Some(previous), Some(current))
+                    if previous
+                        .into_epoch()
+                        .cmp_same_branch(&current.into_epoch())
+                        == Some(Ordering::Greater)
+            ) {
+                errors.push(
+                    ValidationError::InvalidValue {
+                        field: "USEABLE_START_TIME".into(),
+                        value: current_start.unwrap().to_string(),
+                        expected: "no earlier than the preceding segment's USEABLE_STOP_TIME"
+                            .into(),
+                        line: None,
+                    }
+                    .at_path(format!(
+                        "segment[{}].metadata.useable_start_time",
+                        index + 1
+                    )),
+                );
+            }
+        }
+        errors
     }
 }
 
@@ -134,7 +674,11 @@ impl crate::traits::Validate for AemSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         crate::traits::Validate::validate(&self.data)?;
-        self.data.validate_with_type(&self.metadata.attitude_type)
+        self.data.validate_with_type(&self.metadata.attitude_type)?;
+        match self.timeline_errors().into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
     }
 
     fn validation_errors(&self) -> Result<Vec<ValidationError>> {
@@ -144,6 +688,7 @@ impl crate::traits::Validate for AemSegment {
             self.data
                 .validation_errors_with_type(&self.metadata.attitude_type),
         );
+        errors.extend(self.timeline_errors());
         Ok(errors)
     }
 }
@@ -151,6 +696,54 @@ impl crate::traits::Validate for AemSegment {
 impl AemSegment {
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
+    }
+
+    fn timeline_errors(&self) -> Vec<ValidationError> {
+        use std::cmp::Ordering;
+
+        let mut errors = Vec::new();
+        let start = self.metadata.start_time.into_epoch();
+        let stop = self.metadata.stop_time.into_epoch();
+        let mut previous: Option<crate::types::Epoch> = None;
+        for (index, state) in self.data.attitude_states.iter().enumerate() {
+            let Some(epoch) = state.epoch() else {
+                continue;
+            };
+            let current = epoch.into_epoch();
+            if start.cmp_same_branch(&current) == Some(Ordering::Greater)
+                || current.cmp_same_branch(&stop) == Some(Ordering::Greater)
+            {
+                errors.push(
+                    ValidationError::OutOfRange {
+                        name: "attitudeState EPOCH".into(),
+                        value: epoch.to_string(),
+                        expected: format!(
+                            "within START_TIME {} and STOP_TIME {}",
+                            self.metadata.start_time, self.metadata.stop_time
+                        )
+                        .into(),
+                        line: None,
+                    }
+                    .at_path(format!("data.attitude_states[{index}].epoch")),
+                );
+            }
+            if matches!(
+                previous,
+                Some(prior) if prior.cmp_same_branch(&current) != Some(Ordering::Less)
+            ) {
+                errors.push(
+                    ValidationError::InvalidValue {
+                        field: "attitudeState EPOCH".into(),
+                        value: epoch.to_string(),
+                        expected: "strictly increasing, non-repeated attitude time tags".into(),
+                        line: None,
+                    }
+                    .at_path(format!("data.attitude_states[{index}].epoch")),
+                );
+            }
+            previous = Some(current);
+        }
+        errors
     }
 }
 
@@ -167,6 +760,7 @@ impl ToKvn for Aem {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct AemBody {
     #[serde(rename = "segment")]
     pub segment: Vec<AemSegment>,
@@ -181,6 +775,7 @@ impl ToKvn for AemBody {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct AemSegment {
     pub metadata: AemMetadata,
     pub data: AemData,
@@ -201,7 +796,7 @@ impl ToKvn for AemSegment {
 
 /// AEM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct AemMetadata {
     /// Comments allowed only at the beginning of the Metadata section. Each comment line shall
     /// begin with this keyword.
@@ -447,7 +1042,61 @@ impl AemMetadata {
             .into());
         }
 
-        Ok(())
+        match self.time_span_errors().into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
+    }
+
+    fn time_span_errors(&self) -> Vec<ValidationError> {
+        use std::cmp::Ordering;
+
+        let mut errors = Vec::new();
+        let start = self.start_time.into_epoch();
+        let stop = self.stop_time.into_epoch();
+        if start.cmp_same_branch(&stop) == Some(Ordering::Greater) {
+            errors.push(ValidationError::InvalidValue {
+                field: "START_TIME/STOP_TIME".into(),
+                value: format!("{} > {}", self.start_time, self.stop_time),
+                expected: "START_TIME no later than STOP_TIME".into(),
+                line: None,
+            });
+        }
+        for (field, value) in [
+            ("USEABLE_START_TIME", self.useable_start_time),
+            ("USEABLE_STOP_TIME", self.useable_stop_time),
+        ] {
+            if let Some(value) = value {
+                let value_epoch = value.into_epoch();
+                if start.cmp_same_branch(&value_epoch) == Some(Ordering::Greater)
+                    || value_epoch.cmp_same_branch(&stop) == Some(Ordering::Greater)
+                {
+                    errors.push(ValidationError::OutOfRange {
+                        name: field.into(),
+                        value: value.to_string(),
+                        expected: "within the total START_TIME/STOP_TIME span".into(),
+                        line: None,
+                    });
+                }
+            }
+        }
+        if let (Some(useable_start), Some(useable_stop)) =
+            (self.useable_start_time, self.useable_stop_time)
+        {
+            if useable_start
+                .into_epoch()
+                .cmp_same_branch(&useable_stop.into_epoch())
+                == Some(Ordering::Greater)
+            {
+                errors.push(ValidationError::InvalidValue {
+                    field: "USEABLE_START_TIME/USEABLE_STOP_TIME".into(),
+                    value: format!("{useable_start} > {useable_stop}"),
+                    expected: "USEABLE_START_TIME no later than USEABLE_STOP_TIME".into(),
+                    line: None,
+                });
+            }
+        }
+        errors
     }
 }
 
@@ -473,7 +1122,7 @@ impl crate::traits::Validate for AemMetadata {
                 | AttitudeTypeType::EulerAngleAngVel
                 | AttitudeTypeType::EulerAngleAngVelUpper
         );
-        Ok(crate::validation::missing_required_fields(
+        let mut errors = crate::validation::missing_required_fields(
             "AEM Metadata",
             [
                 ("OBJECT_NAME", self.object_name.trim().is_empty()),
@@ -494,7 +1143,9 @@ impl crate::traits::Validate for AemMetadata {
                     requires_angvel_frame && self.angvel_frame.is_none(),
                 ),
             ],
-        ))
+        );
+        errors.extend(self.time_span_errors());
+        Ok(errors)
     }
 }
 
@@ -522,7 +1173,7 @@ impl ToKvn for AemMetadata {
             writer.write_pair("EULER_ROT_SEQ", v);
         }
         if let Some(v) = &self.angvel_frame {
-            writer.write_pair("ANGVEL_FRAME", v);
+            writer.write_pair("RATE_FRAME", v);
         }
         if let Some(v) = &self.interpolation_method {
             writer.write_pair("INTERPOLATION_METHOD", v);
@@ -535,7 +1186,7 @@ impl ToKvn for AemMetadata {
 
 /// AEM Data Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct AemData {
     /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
     /// with this keyword.
@@ -681,6 +1332,28 @@ impl AemAttitudeStateWrapper {
         None
     }
 
+    fn epoch(&self) -> Option<&CalendarEpoch> {
+        self.quaternion_ephemeris
+            .as_ref()
+            .map(|state| &state.epoch)
+            .or_else(|| {
+                self.quaternion_derivative
+                    .as_ref()
+                    .map(|state| &state.epoch)
+            })
+            .or_else(|| self.quaternion_ang_vel.as_ref().map(|state| &state.epoch))
+            .or_else(|| self.euler_angle.as_ref().map(|state| &state.epoch))
+            .or_else(|| {
+                self.euler_angle_derivative
+                    .as_ref()
+                    .map(|state| &state.epoch)
+            })
+            .or_else(|| self.euler_angle_ang_vel.as_ref().map(|state| &state.epoch))
+            .or_else(|| self.spin.as_ref().map(|state| &state.epoch))
+            .or_else(|| self.spin_nutation.as_ref().map(|state| &state.epoch))
+            .or_else(|| self.spin_nutation_mom.as_ref().map(|state| &state.epoch))
+    }
+
     fn populated_fields(&self) -> Vec<Cow<'static, str>> {
         let mut fields = Vec::new();
         for (field, populated) in [
@@ -735,8 +1408,24 @@ impl AemAttitudeStateWrapper {
 
 impl crate::traits::ToKvn for AemAttitudeStateWrapper {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        if let Some(content) = self.content() {
-            content.write_kvn(writer);
+        if let Some(value) = &self.quaternion_ephemeris {
+            value.write_kvn(writer);
+        } else if let Some(value) = &self.quaternion_derivative {
+            value.write_kvn(writer);
+        } else if let Some(value) = &self.quaternion_ang_vel {
+            value.write_kvn(writer);
+        } else if let Some(value) = &self.euler_angle {
+            value.write_kvn(writer);
+        } else if let Some(value) = &self.euler_angle_derivative {
+            value.write_kvn(writer);
+        } else if let Some(value) = &self.euler_angle_ang_vel {
+            value.write_kvn(writer);
+        } else if let Some(value) = &self.spin {
+            value.write_kvn(writer);
+        } else if let Some(value) = &self.spin_nutation {
+            value.write_kvn(writer);
+        } else if let Some(value) = &self.spin_nutation_mom {
+            value.write_kvn(writer);
         }
     }
 }
@@ -751,36 +1440,21 @@ impl crate::traits::Validate for AemData {
             .into());
         }
         for (idx, state) in self.attitude_states.iter().enumerate() {
-            let mut fields = Vec::new();
-            if state.quaternion_ephemeris.is_some() {
-                fields.push(Cow::Borrowed("quaternionEphemeris"));
-            }
-            if state.quaternion_derivative.is_some() {
-                fields.push(Cow::Borrowed("quaternionDerivative"));
-            }
-            if state.quaternion_ang_vel.is_some() {
-                fields.push(Cow::Borrowed("quaternionAngVel"));
-            }
-            if state.euler_angle.is_some() {
-                fields.push(Cow::Borrowed("eulerAngle"));
-            }
-            if state.euler_angle_derivative.is_some() {
-                fields.push(Cow::Borrowed("eulerAngleDerivative"));
-            }
-            if state.euler_angle_ang_vel.is_some() {
-                fields.push(Cow::Borrowed("eulerAngleAngVel"));
-            }
-            if state.spin.is_some() {
-                fields.push(Cow::Borrowed("spin"));
-            }
-            if state.spin_nutation.is_some() {
-                fields.push(Cow::Borrowed("spinNutation"));
-            }
-            if state.spin_nutation_mom.is_some() {
-                fields.push(Cow::Borrowed("spinNutationMom"));
-            }
-
-            match fields.len() {
+            let count = [
+                state.quaternion_ephemeris.is_some(),
+                state.quaternion_derivative.is_some(),
+                state.quaternion_ang_vel.is_some(),
+                state.euler_angle.is_some(),
+                state.euler_angle_derivative.is_some(),
+                state.euler_angle_ang_vel.is_some(),
+                state.spin.is_some(),
+                state.spin_nutation.is_some(),
+                state.spin_nutation_mom.is_some(),
+            ]
+            .into_iter()
+            .filter(|populated| *populated)
+            .count();
+            match count {
                 0 => {
                     return Err(ValidationError::missing_required(
                         "AEM Data",
@@ -790,7 +1464,7 @@ impl crate::traits::Validate for AemData {
                 }
                 1 => {}
                 _ => {
-                    return Err(ValidationError::conflict(fields).into());
+                    return Err(ValidationError::conflict(state.populated_fields()).into());
                 }
             }
         }
@@ -823,100 +1497,13 @@ impl crate::traits::Validate for AemData {
 impl AemData {
     pub fn validate_with_type(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
         for (idx, state) in self.attitude_states.iter().enumerate() {
-            let expected = attitude_type.to_string();
-            match attitude_type {
-                AttitudeTypeType::Quaternion | AttitudeTypeType::QuaternionUpper => {
-                    if state.quaternion_ephemeris.is_none() {
-                        return Err(ValidationError::generic(format!(
-                            "Data line {} expected {} data",
-                            idx + 1,
-                            expected
-                        ))
-                        .into());
-                    }
-                }
-                AttitudeTypeType::QuaternionDerivative
-                | AttitudeTypeType::QuaternionDerivativeUpper => {
-                    if state.quaternion_derivative.is_none() {
-                        return Err(ValidationError::generic(format!(
-                            "Data line {} expected {} data",
-                            idx + 1,
-                            expected
-                        ))
-                        .into());
-                    }
-                }
-                AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::QuaternionAngVelUpper => {
-                    if state.quaternion_ang_vel.is_none() {
-                        return Err(ValidationError::generic(format!(
-                            "Data line {} expected {} data",
-                            idx + 1,
-                            expected
-                        ))
-                        .into());
-                    }
-                }
-                AttitudeTypeType::EulerAngle | AttitudeTypeType::EulerAngleUpper => {
-                    if state.euler_angle.is_none() {
-                        return Err(ValidationError::generic(format!(
-                            "Data line {} expected {} data",
-                            idx + 1,
-                            expected
-                        ))
-                        .into());
-                    }
-                }
-                AttitudeTypeType::EulerAngleDerivative
-                | AttitudeTypeType::EulerAngleDerivativeUpper => {
-                    if state.euler_angle_derivative.is_none() {
-                        return Err(ValidationError::generic(format!(
-                            "Data line {} expected {} data",
-                            idx + 1,
-                            expected
-                        ))
-                        .into());
-                    }
-                }
-                AttitudeTypeType::EulerAngleAngVel | AttitudeTypeType::EulerAngleAngVelUpper => {
-                    if state.euler_angle_ang_vel.is_none() {
-                        return Err(ValidationError::generic(format!(
-                            "Data line {} expected {} data",
-                            idx + 1,
-                            expected
-                        ))
-                        .into());
-                    }
-                }
-                AttitudeTypeType::Spin | AttitudeTypeType::SpinUpper => {
-                    if state.spin.is_none() {
-                        return Err(ValidationError::generic(format!(
-                            "Data line {} expected {} data",
-                            idx + 1,
-                            expected
-                        ))
-                        .into());
-                    }
-                }
-                AttitudeTypeType::SpinNutation | AttitudeTypeType::SpinNutationUpper => {
-                    if state.spin_nutation.is_none() {
-                        return Err(ValidationError::generic(format!(
-                            "Data line {} expected {} data",
-                            idx + 1,
-                            expected
-                        ))
-                        .into());
-                    }
-                }
-                AttitudeTypeType::SpinNutationMom | AttitudeTypeType::SpinNutationMomUpper => {
-                    if state.spin_nutation_mom.is_none() {
-                        return Err(ValidationError::generic(format!(
-                            "Data line {} expected {} data",
-                            idx + 1,
-                            expected
-                        ))
-                        .into());
-                    }
-                }
+            if !state.matches_type(attitude_type) {
+                return Err(ValidationError::generic(format!(
+                    "Data line {} expected {} data",
+                    idx + 1,
+                    attitude_type
+                ))
+                .into());
             }
         }
         Ok(())
@@ -1021,8 +1608,8 @@ DATA_STOP
     }
 
     #[test]
-    fn test_aem_no_epoch_ordering_validation() {
-        // Epoch ordering is intentionally not validated; parsing should succeed.
+    fn test_aem_valid_epoch_ordering() {
+        // The sample has strictly increasing epochs and should pass timeline validation.
         let kvn = sample_aem_kvn();
         assert!(Aem::from_kvn(&kvn).is_ok());
     }

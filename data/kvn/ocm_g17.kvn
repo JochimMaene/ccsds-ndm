@@ -49,7 +49,7 @@ MAN_UNITS = [n/a, km/s, km/s, km/s, kg, %, n/a, m**2]
 590.0 CUBESAT_19 2.8773E-4 -9.3969E-4 -1.8491E-4 -1.0 5.0 -0.005263 0.033
 MAN_STOP
 MAN_START
-COMMENT 100 s of 0.5N +in-track thr w/η=0.95, Isp=300s, 5% 1-sigma error
+COMMENT 100 s of 0.5N +in-track thr w/eta=0.95, Isp=300s, 5% 1-sigma error
 COMMENT NOTE that this OCM specifies a future compound maneuver, with
 COMMENT deployment during low-level host platform thrusting.
 MAN_ID = E_W_20160305B

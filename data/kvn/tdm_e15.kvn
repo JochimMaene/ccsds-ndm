@@ -3,7 +3,7 @@ COMMENT TDM example created by yyyyy-nnnA Nav Team (NASA/JPL)
 COMMENT The following are clock offsets, in seconds between the
 COMMENT clocks at each DSN complex relative to UTC(NIST). The offset
 COMMENT is a mean of readings using several GPS space vehicles in
-COMMENT common view. Value is "station clock minus UTC”.
+COMMENT common view. Value is "station clock minus UTC".
 CREATION_DATE = 2005-161T15:45:00
 ORIGINATOR = NASA
 META_START

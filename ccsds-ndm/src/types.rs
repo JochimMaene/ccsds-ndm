@@ -82,6 +82,13 @@ pub enum EpochError {
 }
 
 fn classify_epoch(s: &str) -> Option<EpochClassification> {
+    // Nearly every history record uses the normative four-digit calendar/ordinal spelling.
+    // Recognize that common valid case in one pass; retain the schema-compatible parser below for
+    // uncommon spellings and for values that must remain parseable-but-semantically-invalid.
+    if common_calendar_fields_are_valid(s) {
+        return Some(EpochClassification::CalendarValid);
+    }
+
     fn parser(input: &mut &str) -> winnow::Result<EpochKind> {
         alt((
             // Calendar/Ordinal format: YYYY-MM-DDThh:mm:ss.sssZ
@@ -134,6 +141,81 @@ fn classify_epoch(s: &str) -> Option<EpochClassification> {
         EpochKind::Calendar => EpochClassification::CalendarInvalid,
         EpochKind::Numeric => EpochClassification::Numeric,
     })
+}
+
+fn common_calendar_fields_are_valid(value: &str) -> bool {
+    #[inline(always)]
+    fn decimal(bytes: &[u8]) -> Option<u16> {
+        bytes.iter().try_fold(0_u16, |value, byte| {
+            byte.is_ascii_digit()
+                .then_some(value * 10 + u16::from(*byte - b'0'))
+        })
+    }
+
+    let bytes = value.as_bytes();
+    if bytes.len() < 17 || bytes.get(4) != Some(&b'-') {
+        return false;
+    }
+    let (time_start, valid_date) = if bytes.get(7) == Some(&b'-') && bytes.get(10) == Some(&b'T') {
+        let Some(year) = decimal(&bytes[0..4]) else {
+            return false;
+        };
+        let Some(month) = decimal(&bytes[5..7]) else {
+            return false;
+        };
+        let Some(day) = decimal(&bytes[8..10]) else {
+            return false;
+        };
+        let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        let days_in_month = match month {
+            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+            4 | 6 | 9 | 11 => 30,
+            2 if leap_year => 29,
+            2 => 28,
+            _ => 0,
+        };
+        (11, day != 0 && day <= days_in_month)
+    } else if bytes.get(8) == Some(&b'T') {
+        let Some(year) = decimal(&bytes[0..4]) else {
+            return false;
+        };
+        let Some(ordinal) = decimal(&bytes[5..8]) else {
+            return false;
+        };
+        let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        (
+            9,
+            ordinal != 0 && ordinal <= if leap_year { 366 } else { 365 },
+        )
+    } else {
+        return false;
+    };
+    if !valid_date || bytes.len() < time_start + 8 {
+        return false;
+    }
+    let clock = &bytes[time_start..time_start + 8];
+    if clock.get(2) != Some(&b':') || clock.get(5) != Some(&b':') {
+        return false;
+    }
+    let (Some(hour), Some(minute), Some(second)) = (
+        decimal(&clock[0..2]),
+        decimal(&clock[3..5]),
+        decimal(&clock[6..8]),
+    ) else {
+        return false;
+    };
+    if hour > 23 || minute > 59 || second > 60 {
+        return false;
+    }
+
+    match &bytes[time_start + 8..] {
+        [] | [b'Z'] => true,
+        [b'.', fraction @ ..] => {
+            let fraction = fraction.strip_suffix(b"Z").unwrap_or(fraction);
+            !fraction.is_empty() && fraction.iter().all(u8::is_ascii_digit)
+        }
+        _ => false,
+    }
 }
 
 fn calendar_fields_are_valid(value: &str) -> bool {
@@ -2126,6 +2208,13 @@ impl PercentageRequired {
             units: PercentageUnits::Percent,
         })
     }
+
+    pub fn to_unit_value(&self) -> UnitValue<f64, PercentageUnits> {
+        UnitValue {
+            value: self.value,
+            units: Some(self.units.clone()),
+        }
+    }
 }
 impl std::fmt::Display for PercentageRequired {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -2672,6 +2761,13 @@ impl LatitudeRequired {
             units: LatLonUnits::Deg,
         })
     }
+
+    pub fn to_unit_value(&self) -> UnitValue<f64, LatLonUnits> {
+        UnitValue {
+            value: self.value,
+            units: Some(self.units.clone()),
+        }
+    }
 }
 impl std::fmt::Display for LatitudeRequired {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -2715,6 +2811,13 @@ impl LongitudeRequired {
             value,
             units: LatLonUnits::Deg,
         })
+    }
+
+    pub fn to_unit_value(&self) -> UnitValue<f64, LatLonUnits> {
+        UnitValue {
+            value: self.value,
+            units: Some(self.units.clone()),
+        }
     }
 }
 impl std::fmt::Display for LongitudeRequired {
@@ -4329,7 +4432,7 @@ impl std::str::FromStr for ManeuverableType {
 //----------------------------------------------------------------------
 
 /// A 3-element vector of doubles (XSD vec3Double)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Vec3Double {
     pub x: f64,
     pub y: f64,
@@ -4339,6 +4442,25 @@ pub struct Vec3Double {
 impl Vec3Double {
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
+    }
+}
+
+impl Serialize for Vec3Double {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&format!("{} {} {}", self.x, self.y, self.z))
+    }
+}
+
+impl<'de> Deserialize<'de> for Vec3Double {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::from_kvn_value(&value).map_err(serde::de::Error::custom)
     }
 }
 

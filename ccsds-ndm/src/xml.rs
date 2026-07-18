@@ -18,14 +18,235 @@
 //! - **Engine**: Uses [`quick-xml`](https://docs.rs/quick-xml) for efficient parsing and serialization.
 //! - **Validation**: While this parser checks for correct types, full XSD validation is not performed at runtime.
 
-use crate::error::{FormatError, Result};
+use crate::error::{CcsdsNdmError, FormatError, Result};
 use quick_xml::de::from_str as from_xml_str;
+use quick_xml::events::Event;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Write as FmtWrite;
 use std::io::Write as IoWrite;
 
 /// Header for CCSDS XML messages.
 const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> Result<()> {
+    let invalid =
+        |message: String| CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message)));
+    let document = s.strip_prefix('\u{feff}').unwrap_or(s);
+    if document
+        .find("<?xml")
+        .is_some_and(|declaration| declaration != 0)
+    {
+        return Err(invalid(
+            "an XML declaration, when present, must begin the document".into(),
+        ));
+    }
+
+    let mut reader = quick_xml::Reader::from_str(document);
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(start)) => {
+                if root_closed {
+                    return Err(invalid(format!(
+                        "trailing content after {type_name} document"
+                    )));
+                }
+                if !root_seen {
+                    validate_root_start(&start, root, type_name, &invalid)?;
+                    root_seen = true;
+                }
+                depth += 1;
+            }
+            Ok(Event::Empty(start)) => {
+                if root_closed {
+                    return Err(invalid(format!(
+                        "trailing content after {type_name} document"
+                    )));
+                }
+                if !root_seen {
+                    validate_root_start(&start, root, type_name, &invalid)?;
+                    root_seen = true;
+                    root_closed = true;
+                }
+            }
+            Ok(Event::End(_)) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    invalid(format!(
+                        "unexpected closing element in {type_name} document"
+                    ))
+                })?;
+                if depth == 0 {
+                    root_closed = true;
+                }
+            }
+            Ok(Event::Text(text)) => {
+                if (root_closed || !root_seen)
+                    && !text
+                        .xml_content()
+                        .map_err(|error| invalid(error.to_string()))?
+                        .trim()
+                        .is_empty()
+                {
+                    return Err(invalid(format!("text outside {type_name} root element")));
+                }
+            }
+            Ok(Event::CData(_)) if root_closed || !root_seen => {
+                return Err(invalid(format!("CDATA outside {type_name} root element")));
+            }
+            Ok(Event::DocType(_)) => {
+                return Err(invalid(
+                    "XML document type declarations are not supported".into(),
+                ));
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    if !root_seen || !root_closed {
+        return Err(invalid(format!("incomplete {type_name} XML document")));
+    }
+    Ok(())
+}
+
+fn validate_root_start(
+    start: &quick_xml::events::BytesStart<'_>,
+    root: &[u8],
+    type_name: &str,
+    invalid: &impl Fn(String) -> CcsdsNdmError,
+) -> Result<()> {
+    if start.name().as_ref() != root {
+        return Err(invalid(format!(
+            "expected standalone {type_name} root element '{}'",
+            String::from_utf8_lossy(root)
+        )));
+    }
+    for attribute in start.attributes() {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        if !matches!(
+            attribute.key.as_ref(),
+            b"id"
+                | b"version"
+                | b"xmlns"
+                | b"xmlns:xsi"
+                | b"xmlns:ndm"
+                | b"xsi:noNamespaceSchemaLocation"
+                | b"xsi:schemaLocation"
+        ) {
+            return Err(invalid(format!(
+                "unknown {type_name} root attribute '{}'",
+                String::from_utf8_lossy(attribute.key.as_ref())
+            )));
+        }
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct XmlSequenceRule {
+    pub rank: u16,
+    pub repeatable: bool,
+}
+
+/// Enforce schema sequence order without loading an XSD at runtime. Callers provide only the
+/// message-specific parent/child registration; serde remains responsible for typed values.
+pub(crate) fn validate_element_sequences(
+    s: &str,
+    type_name: &str,
+    child_rule: impl Fn(&[u8], &[u8]) -> Option<XmlSequenceRule>,
+    attribute_allowed: impl Fn(&[u8], &[u8]) -> bool,
+) -> Result<()> {
+    struct Frame {
+        name: Vec<u8>,
+        last_rank: Option<u16>,
+    }
+
+    let invalid = |message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(format!(
+            "invalid {type_name} XML sequence: {message}"
+        ))))
+    };
+    let mut reader = quick_xml::Reader::from_str(s.strip_prefix('\u{feff}').unwrap_or(s));
+    let mut stack: Vec<Frame> = Vec::new();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(start)) => {
+                let child = start.name().as_ref().to_vec();
+                if let Some(parent) = stack.last_mut() {
+                    validate_attributes(&start, &child, &attribute_allowed, &invalid)?;
+                    apply_sequence_rule(parent, &child, &child_rule, &invalid)?;
+                }
+                stack.push(Frame {
+                    name: child,
+                    last_rank: None,
+                });
+            }
+            Ok(Event::Empty(start)) => {
+                let child = start.name().as_ref().to_vec();
+                if let Some(parent) = stack.last_mut() {
+                    validate_attributes(&start, &child, &attribute_allowed, &invalid)?;
+                    apply_sequence_rule(parent, &child, &child_rule, &invalid)?;
+                }
+            }
+            Ok(Event::End(_)) => {
+                stack.pop();
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    fn apply_sequence_rule(
+        parent: &mut Frame,
+        child: &[u8],
+        child_rule: &impl Fn(&[u8], &[u8]) -> Option<XmlSequenceRule>,
+        invalid: &impl Fn(String) -> CcsdsNdmError,
+    ) -> Result<()> {
+        let rule = child_rule(&parent.name, child).ok_or_else(|| {
+            invalid(format!(
+                "unknown child '{}' in '{}'",
+                String::from_utf8_lossy(child),
+                String::from_utf8_lossy(&parent.name)
+            ))
+        })?;
+        if parent
+            .last_rank
+            .is_some_and(|last| rule.rank < last || (rule.rank == last && !rule.repeatable))
+        {
+            return Err(invalid(format!(
+                "duplicate or out-of-order child '{}' in '{}'",
+                String::from_utf8_lossy(child),
+                String::from_utf8_lossy(&parent.name)
+            )));
+        }
+        parent.last_rank = Some(rule.rank);
+        Ok(())
+    }
+
+    fn validate_attributes(
+        start: &quick_xml::events::BytesStart<'_>,
+        element: &[u8],
+        attribute_allowed: &impl Fn(&[u8], &[u8]) -> bool,
+        invalid: &impl Fn(String) -> CcsdsNdmError,
+    ) -> Result<()> {
+        for attribute in start.attributes() {
+            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+            if !attribute_allowed(element, attribute.key.as_ref()) {
+                return Err(invalid(format!(
+                    "unknown attribute '{}' on '{}'",
+                    String::from_utf8_lossy(attribute.key.as_ref()),
+                    String::from_utf8_lossy(element)
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    Ok(())
+}
 
 /// Deserialize an internal XML representation from a string.
 ///
@@ -131,6 +352,9 @@ mod tests {
         let err = res.unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("Failed to parse Wrapper from XML"));
+
+        let trailing = r#"<Wrapper><val>one</val></Wrapper><Wrapper><val>two</val></Wrapper>"#;
+        assert!(validate_document_root(trailing, b"Wrapper", "Wrapper").is_err());
     }
 
     #[test]

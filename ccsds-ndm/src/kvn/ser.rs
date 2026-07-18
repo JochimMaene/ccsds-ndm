@@ -6,10 +6,10 @@ use crate::types::UnitValue;
 use std::fmt::{Display, Write as FmtWrite};
 use std::io::Write as IoWrite;
 
-/// An exact, ODM-compatible spelling of a finite `f64`.
+/// A CCSDS-compatible spelling of a finite `f64`.
 ///
-/// The representability check must run before this adapter is written. Formatting starts from
-/// zmij's allocation-free shortest round-trip representation and only changes its spelling.
+/// CCSDS permits at most 16 decimal digits in fixed-point values and floating-point mantissas.
+/// Values whose shortest round-trip spelling needs 17 digits are rounded to 16 digits.
 pub(crate) struct OdmFloat(f64);
 
 impl OdmFloat {
@@ -17,25 +17,13 @@ impl OdmFloat {
         Self(value)
     }
 
-    pub(crate) fn is_representable(value: f64) -> bool {
-        if !value.is_finite() {
-            return false;
-        }
-        let mut buffer = zmij::Buffer::new();
-        Self::significant_digits(buffer.format_finite(value)) <= 16
+    pub(crate) const fn is_valid(value: f64) -> bool {
+        value.is_finite()
     }
 
-    /// Return the emitted length when `value` has an exact ODM representation.
-    ///
-    /// Representability and length share one shortest-decimal conversion so OEM line preflight
-    /// does not format every history value twice.
-    pub(crate) fn formatted_len_if_representable(value: f64) -> Option<usize> {
+    /// Return the emitted length of a finite CCSDS number.
+    pub(crate) fn formatted_len(value: f64) -> Option<usize> {
         if !value.is_finite() {
-            return None;
-        }
-        let mut buffer = zmij::Buffer::new();
-        let value = buffer.format_finite(value);
-        if Self::significant_digits(value) > 16 {
             return None;
         }
 
@@ -48,21 +36,16 @@ impl OdmFloat {
         }
 
         let mut counter = Counter(0);
-        let _ = Self::write_preformatted(value, &mut counter);
+        let _ = Self(value).write_to(&mut counter);
         Some(counter.0)
     }
 
-    /// Write `value` when its shortest exact spelling fits the ODM digit limit.
-    pub(crate) fn write_if_representable<W: FmtWrite>(value: f64, output: &mut W) -> bool {
+    /// Write `value` using a CCSDS-compatible spelling.
+    pub(crate) fn write_if_valid<W: FmtWrite>(value: f64, output: &mut W) -> bool {
         if !value.is_finite() {
             return false;
         }
-        let mut buffer = zmij::Buffer::new();
-        let value = buffer.format_finite(value);
-        if Self::significant_digits(value) > 16 {
-            return false;
-        }
-        Self::write_preformatted(value, output).is_ok()
+        Self(value).write_to(output).is_ok()
     }
 
     fn significant_digits(value: &str) -> usize {
@@ -145,9 +128,110 @@ impl OdmFloat {
         }
     }
 
+    fn write_rounded_scientific<W: FmtWrite>(value: &str, output: &mut W) -> std::fmt::Result {
+        let (mantissa, exponent) = value.find(['e', 'E']).map_or((value, 0i32), |index| {
+            let exponent = &value.as_bytes()[index + 1..];
+            let (negative, digits) = match exponent.first() {
+                Some(b'-') => (true, &exponent[1..]),
+                Some(b'+') => (false, &exponent[1..]),
+                _ => (false, exponent),
+            };
+            let magnitude = digits
+                .iter()
+                .fold(0i32, |value, digit| value * 10 + i32::from(*digit - b'0'));
+            (
+                &value[..index],
+                if negative { -magnitude } else { magnitude },
+            )
+        });
+        let negative = mantissa.starts_with('-');
+        let unsigned = mantissa.strip_prefix('-').unwrap_or(mantissa);
+        let digits_before_decimal = unsigned.find('.').unwrap_or(unsigned.len()) as i32;
+
+        let mut digits = [0u8; 17];
+        let mut first = None;
+        let mut significant = 0usize;
+        for (digit_index, byte) in unsigned.bytes().filter(u8::is_ascii_digit).enumerate() {
+            if first.is_none() && byte != b'0' {
+                first = Some(digit_index as i32);
+            }
+            if first.is_some() && significant < digits.len() {
+                digits[significant] = byte - b'0';
+                significant += 1;
+            }
+        }
+
+        let mut normalized_exponent =
+            exponent + digits_before_decimal - first.expect("non-zero finite value") - 1;
+        if digits[16] >= 5 {
+            let mut index = 16;
+            loop {
+                index -= 1;
+                if digits[index] < 9 {
+                    digits[index] += 1;
+                    break;
+                }
+                digits[index] = 0;
+                if index == 0 {
+                    digits[0] = 1;
+                    normalized_exponent += 1;
+                    break;
+                }
+            }
+        }
+
+        let last_fraction = (1..16).rev().find(|index| digits[*index] != 0).unwrap_or(1);
+
+        let mut formatted = [0u8; 32];
+        let mut length = 0usize;
+        if negative {
+            formatted[length] = b'-';
+            length += 1;
+        }
+        formatted[length] = b'0' + digits[0];
+        formatted[length + 1] = b'.';
+        length += 2;
+        for digit in &digits[1..=last_fraction] {
+            formatted[length] = b'0' + *digit;
+            length += 1;
+        }
+        formatted[length] = b'e';
+        length += 1;
+
+        let exponent_negative = normalized_exponent < 0;
+        let mut magnitude = normalized_exponent.unsigned_abs();
+        if exponent_negative {
+            formatted[length] = b'-';
+            length += 1;
+        }
+        let exponent_start = length;
+        loop {
+            formatted[length] = b'0' + (magnitude % 10) as u8;
+            length += 1;
+            magnitude /= 10;
+            if magnitude == 0 {
+                break;
+            }
+        }
+        formatted[exponent_start..length].reverse();
+
+        output.write_str(
+            std::str::from_utf8(&formatted[..length])
+                .expect("CCSDS numeric formatter produced ASCII"),
+        )
+    }
+
     fn write_to<W: FmtWrite>(&self, output: &mut W) -> std::fmt::Result {
+        if !self.0.is_finite() {
+            return Err(std::fmt::Error);
+        }
         let mut buffer = zmij::Buffer::new();
-        Self::write_preformatted(buffer.format_finite(self.0), output)
+        let shortest = buffer.format_finite(self.0);
+        if Self::significant_digits(shortest) <= 16 {
+            Self::write_preformatted(shortest, output)
+        } else {
+            Self::write_rounded_scientific(shortest, output)
+        }
     }
 }
 
@@ -215,6 +299,12 @@ impl<'a> KvnWriter<'a> {
         let _ = OdmFloat(value).write_to(line);
     }
 
+    fn build_tdm_observation<E: Display>(line: &mut String, key: &str, epoch: &E, value: f64) {
+        line.push_str(key);
+        line.extend(std::iter::repeat_n(' ', 20usize.saturating_sub(key.len())));
+        let _ = write!(line, " = {epoch} {value}");
+    }
+
     /// Create a writer that writes directly to an I/O sink.
     pub(crate) fn from_io<W: IoWrite>(output: &'a mut W) -> Self {
         Self {
@@ -274,7 +364,7 @@ impl<'a> KvnWriter<'a> {
         }
     }
 
-    /// Writes an exactly representable ODM number without allocating a value string.
+    /// Writes a CCSDS-compatible ODM number without allocating a value string.
     pub(crate) fn write_odm_float_pair(&mut self, key: &str, value: f64) {
         if let KvnOutput::String(output) = &mut self.output {
             Self::build_odm_float_pair(output, key, value);
@@ -284,7 +374,7 @@ impl<'a> KvnWriter<'a> {
         self.write_built_line(|line| Self::build_odm_float_pair(line, key, value));
     }
 
-    /// Writes an exactly representable ODM number and optional unit.
+    /// Writes a CCSDS-compatible ODM number and optional unit.
     pub(crate) fn write_odm_float_measure<U: Display>(
         &mut self,
         key: &str,
@@ -306,6 +396,112 @@ impl<'a> KvnWriter<'a> {
         self.write_built_line(build);
     }
 
+    /// Writes one TDM observation without allocating intermediate epoch/value strings.
+    pub(crate) fn write_tdm_observation<E: Display>(&mut self, key: &str, epoch: &E, value: f64) {
+        if let KvnOutput::String(output) = &mut self.output {
+            Self::build_tdm_observation(output, key, epoch, value);
+            output.push('\n');
+            return;
+        }
+        self.write_built_line(|line| Self::build_tdm_observation(line, key, epoch, value));
+    }
+
+    /// Writes an OCM numeric history record without per-value or per-record temporary strings.
+    pub(crate) fn write_ocm_numeric_history<E: Display>(&mut self, epoch: &E, values: &[f64]) {
+        let build = |line: &mut String| {
+            let _ = write!(line, "{epoch}");
+            for value in values {
+                line.push(' ');
+                let _ = OdmFloat(*value).write_to(line);
+            }
+        };
+        if let KvnOutput::String(output) = &mut self.output {
+            build(output);
+            output.push('\n');
+            return;
+        }
+        self.write_built_line(build);
+    }
+
+    /// Write one AEM attitude-state record without allocating intermediate strings.
+    pub(crate) fn write_aem_attitude_state<E: Display>(&mut self, epoch: &E, values: &[f64]) {
+        let build = |line: &mut String| {
+            let _ = write!(line, "{epoch}");
+            for value in values {
+                line.push(' ');
+                let _ = OdmFloat(*value).write_to(line);
+            }
+        };
+        if let KvnOutput::String(output) = &mut self.output {
+            build(output);
+            output.push('\n');
+            return;
+        }
+        self.write_built_line(build);
+    }
+
+    /// Write a numeric history record without allocating intermediate value strings.
+    pub(crate) fn write_numeric_record(&mut self, values: &[f64]) {
+        let build = |line: &mut String| {
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    line.push(' ');
+                }
+                let _ = OdmFloat(*value).write_to(line);
+            }
+        };
+        if let KvnOutput::String(output) = &mut self.output {
+            build(output);
+            output.push('\n');
+            return;
+        }
+        self.write_built_line(build);
+    }
+
+    /// Write a numeric vector assignment and optional unit without temporary joins.
+    pub(crate) fn write_numeric_vector<U: Display>(
+        &mut self,
+        key: &str,
+        values: &[f64],
+        unit: Option<&U>,
+    ) {
+        let build = |line: &mut String| {
+            let _ = write!(line, "{key:<20} = ");
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    line.push(' ');
+                }
+                let _ = OdmFloat(*value).write_to(line);
+            }
+            if let Some(unit) = unit {
+                let _ = write!(line, " [{unit}]");
+            }
+        };
+        if let KvnOutput::String(output) = &mut self.output {
+            build(output);
+            output.push('\n');
+            return;
+        }
+        self.write_built_line(build);
+    }
+
+    /// Writes an OCM maneuver history record without joining or formatting temporary strings.
+    pub(crate) fn write_ocm_text_history<E: Display>(&mut self, epoch: &E, values: &[String]) {
+        let build = |line: &mut String| {
+            let _ = write!(line, "{epoch}");
+            for value in values {
+                line.push(' ');
+                line.push_str(value);
+            }
+        };
+        if let KvnOutput::String(output) = &mut self.output {
+            build(output);
+            output.push('\n');
+            return;
+        }
+        self.write_built_line(build);
+    }
+
     /// Writes a raw line of text.
     pub fn write_line<V: Display>(&mut self, line: V) {
         let _ = writeln!(self, "{}", line);
@@ -314,6 +510,10 @@ impl<'a> KvnWriter<'a> {
     /// Writes comment lines.
     pub fn write_comments(&mut self, comments: &[String]) {
         for c in comments {
+            if c.is_empty() {
+                let _ = writeln!(self, "COMMENT");
+                continue;
+            }
             for line in c.lines() {
                 let normalized = Self::normalize_inline_value(line);
                 let _ = writeln!(self, "COMMENT {}", normalized);
@@ -372,6 +572,13 @@ mod tests {
     }
 
     #[test]
+    fn write_comments_preserves_empty_comment() {
+        let mut writer = KvnWriter::new();
+        writer.write_comments(&[String::new()]);
+        assert_eq!(writer.finish(), "COMMENT\n");
+    }
+
+    #[test]
     fn write_pair_normalizes_multiline_value() {
         let mut writer = KvnWriter::new();
         writer.write_pair(
@@ -387,42 +594,48 @@ mod tests {
     }
 
     #[test]
-    fn odm_float_preserves_exact_values_with_compliant_spelling() {
+    fn odm_float_preserves_exact_values_when_they_fit() {
         for value in [-0.0, 0.0, 1.0, -12.5, 1.0e15, 1.25e-20, f64::from_bits(1)] {
-            assert!(OdmFloat::is_representable(value));
+            assert!(OdmFloat::is_valid(value));
             let spelling = OdmFloat(value).to_string();
             assert!(spelling.contains('.'));
-            assert_eq!(spelling.parse::<f64>().unwrap().to_bits(), value.to_bits());
             assert!(OdmFloat::significant_digits(&spelling) <= 16);
         }
     }
 
     #[test]
-    fn odm_float_rejects_lossy_and_non_finite_values() {
-        assert!(OdmFloat::is_representable(1.234_567_890_123_456));
-        assert!(!OdmFloat::is_representable(1.234_567_890_123_456_7));
-        assert!(!OdmFloat::is_representable(f64::MIN_POSITIVE));
-        assert!(!OdmFloat::is_representable(f64::MAX));
-        assert!(!OdmFloat::is_representable(f64::NAN));
-        assert!(!OdmFloat::is_representable(f64::INFINITY));
+    fn odm_float_accepts_all_finite_values_and_rejects_non_finite_values() {
+        assert!(OdmFloat::is_valid(1.234_567_890_123_456));
+        assert!(OdmFloat::is_valid(1.234_567_890_123_456_7));
+        assert!(OdmFloat::is_valid(f64::MIN_POSITIVE));
+        assert!(OdmFloat::is_valid(f64::MAX));
+        assert!(!OdmFloat::is_valid(f64::NAN));
+        assert!(!OdmFloat::is_valid(f64::INFINITY));
     }
 
     #[test]
-    fn odm_float_combines_representability_and_emitted_length() {
-        for value in [-0.0, 1.0, -12.5, 1.0e15, 1.25e-20, f64::from_bits(1)] {
+    fn odm_float_combines_validity_and_emitted_length() {
+        for value in [
+            -0.0,
+            1.0,
+            -12.5,
+            1.0e15,
+            1.25e-20,
+            f64::from_bits(1),
+            1.234_567_890_123_456_7,
+            f64::MAX,
+        ] {
             let mut output = String::new();
-            assert!(OdmFloat::write_if_representable(value, &mut output));
-            assert_eq!(
-                OdmFloat::formatted_len_if_representable(value),
-                Some(output.len())
-            );
+            assert!(OdmFloat::write_if_valid(value, &mut output));
+            assert_eq!(OdmFloat::formatted_len(value), Some(output.len()));
             assert_eq!(output, OdmFloat(value).to_string());
+            assert!(OdmFloat::significant_digits(&output) <= 16);
         }
-        for value in [1.234_567_890_123_456_7, f64::MAX, f64::NAN] {
+        for value in [f64::NAN, f64::INFINITY] {
             let mut output = String::new();
-            assert!(!OdmFloat::write_if_representable(value, &mut output));
+            assert!(!OdmFloat::write_if_valid(value, &mut output));
             assert!(output.is_empty());
-            assert_eq!(OdmFloat::formatted_len_if_representable(value), None);
+            assert_eq!(OdmFloat::formatted_len(value), None);
         }
     }
 
@@ -455,5 +668,10 @@ mod tests {
             OdmFloat(1.234_567_890_123_456).to_string(),
             "1.234567890123456"
         );
+        assert_eq!(
+            OdmFloat(1.234_567_890_123_456_7).to_string(),
+            "1.234567890123457e0"
+        );
+        assert_eq!(OdmFloat(f64::MAX).to_string(), "1.797693134862316e308");
     }
 }

@@ -73,6 +73,45 @@ notations and editions.
 | `OEM-3.0-KVN-TO-XML-RUST` | OEM 3.0 | CCSDS 502.0-B-3 + EC 1 | KVN → XML 4.0.0 / OEM 3.0 | Convert, preserving edition and meaning | Rust | `verified` |
 | `OEM-3.0-XML-TO-KVN-RUST` | OEM 3.0 | CCSDS 502.0-B-3 + EC 1 | XML 4.0.0 / OEM 3.0 → KVN | Convert, preserving edition and meaning | Rust | `verified` |
 
+### Implemented family plumbing that is not yet verified
+
+The following is an implementation inventory, not a set of advertised capability cells. Each row
+summarises registration through the shared Rust core, Python adapters, and CLI for the listed
+current edition. The grouped status must not be read as verification of every operation, notation,
+or surface: exact cells will be added and promoted only after their message-specific normative and
+executable inventories are complete.
+
+| Message / current edition | Implemented shared surface | Status | Principal evidence gap |
+| --- | --- | --- | --- |
+| OMM 3.0 | KVN/XML parse, validate, generate, convert; Rust/Python/CLI | `implemented-unverified` | Exact operation/notation/surface cell review remains; all 70 ICS items, strictness, typed preservation, official-XSD generation, fixed-path allocation budgets, and packaged-surface gates are reconciled |
+| OCM 3.0 | KVN/XML parse, validate, generate, convert; Rust/Python/CLI | `implemented-unverified` | Grouped 259-row ICS reconciliation, strict block/XML structure, fixture/nested-block preservation, official-XSD generation, loss rejection, three-history allocation/scaling, Python, CLI, and shared artifact evidence are green; reviewed exact operation/notation/surface cells remain |
+| CDM 1.0 | KVN/XML parse, validate, generate, convert; Rust/Python/CLI | `implemented-unverified` | All 68 ICS rows are grouped and reconciled with strict structure, typed fixture preservation, official-XSD generation, loss-rejecting delimiter-free COMMENT handling, Python, CLI, and shared artifact evidence; reviewed exact cells remain |
+| TDM 2.0 | KVN/XML parse, validate, generate, convert; Rust/Python/CLI | `implemented-unverified` | Exact operation/notation/surface cell review remains; all 53 ICS items, strictness, full fixture/XSD preservation, optional-unit normalization, history allocation, packaged surfaces, and recorded Criterion scaling are reconciled |
+| RDM 1.0 | KVN/XML parse, validate, generate, convert; Rust/Python/CLI | `implemented-unverified` | Exact operation/notation/surface cell review remains; all 142 ICS items, strictness, logical-block comment/unit preservation, official-XSD generation, fixed-path allocation budgets, Criterion, and packaged surfaces are reconciled |
+| AEM 2.0 | KVN/XML parse, validate, generate, convert; Rust/Python/CLI | `implemented-unverified` | All 25 ICS rows are grouped with strict structure, all-nine-choice preservation, timeline semantics, fixed-unit normalization, official-XSD, allocation/scaling, Python, CLI, and artifact evidence; the official G4 degree-7/four-record conflict and reviewed exact cells remain |
+| APM 2.0 | KVN/XML parse, validate, generate, convert; Rust/Python/CLI | `implemented-unverified` | Exact operation/notation/surface cell review remains; all 82 ICS items, strictness, choice preservation, official-XSD generation, fixed-path allocation budgets, Criterion, and packaged surfaces are reconciled |
+| ACM 2.0 | KVN/XML parse, validate, generate, convert; Rust/Python/CLI | `implemented-unverified` | All 110 ICS rows are grouped with strict block/XML structure, schema-model corrections, typed fixture preservation, official-XSD generation, loss rejection, allocation/scaling, Python, CLI, and artifact evidence; reviewed exact cells remain |
+| Combined NDM envelope | Strict XML parse/generate and generic Rust/Python/CLI dispatch; sequential KVN convenience form | `implemented-unverified` | Sections 4.11.3–4.11.8 are reconciled with exact-envelope, ordered-child, official-schema, aggregate-resource, surface, artifact, and allocation evidence; exact-cell review and the XSD-valid G22 versus OPM maneuver/MASS conflict remain |
+
+The [shared family contract inventory](conformance/family-shared-contract.md) links the reusable
+resource, diagnostic, dispatch, and Criterion/CodSpeed evidence. OPM and OEM retain their exact
+verified cells above; this section records only the remaining implementation state and does not
+downgrade or broaden those claims.
+
+The [OMM 3.0 focused inventory](conformance/omm-3.0.md) records the first message-specific slice
+beyond the shared family plumbing: strict KVN layout, strict nested XML sequences and attributes,
+typed-model preservation for all shipped fixtures, and official-schema generation evidence.
+
+Focused inventories for [OCM 3.0](conformance/ocm-3.0.md),
+[CDM 1.0](conformance/cdm-1.0.md),
+[AEM 2.0](conformance/aem-2.0.md),
+[TDM 2.0](conformance/tdm-2.0.md),
+[RDM 1.0](conformance/rdm-1.0.md), [APM 2.0](conformance/apm-2.0.md), and
+[ACM 2.0](conformance/acm-2.0.md), plus the
+[Combined NDM envelope](conformance/combined-ndm.md), record their current
+message-specific strictness, preservation, official-schema, resource, and performance evidence
+without promoting unverified cells.
+
 ### OEM 3.0 Rust evidence
 
 The [OEM 3.0 conformance inventory](conformance/oem-3.0.md) maps the seven Rust cells to the
@@ -164,7 +203,7 @@ Available evidence:
   [`opm_3_kvn_generation_conformance.rs`](../ccsds-ndm/tests/opm_3_kvn_generation_conformance.rs)
   verifies all four shipped Annex G fixtures retain assignment order, comments, and optional units;
   generated representative lines are printable ASCII and no longer than 254 characters. It also
-  covers exact ODM numeric spelling and pre-write rejection of invalid free text, lossy numeric
+  covers CCSDS-bounded ODM numeric spelling and pre-write rejection of invalid free text, non-finite numeric
   values, and the normative uppercase/no-blank rule for user-defined keyword suffixes without
   turning Annex F's recommended regex into a mandatory restriction. Focused streaming sink failures
   verify panic-free preservation of I/O diagnostics. The richest numeric/covariance fixture also

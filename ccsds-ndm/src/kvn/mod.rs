@@ -32,4 +32,5 @@ pub(crate) mod opm;
 pub(crate) mod parser;
 pub(crate) mod rdm;
 pub mod ser;
+pub(crate) mod strict;
 pub(crate) mod tdm;

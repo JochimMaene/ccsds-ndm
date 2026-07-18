@@ -230,6 +230,7 @@ impl Ndm for Omm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        validate_kvn_syntax(kvn)?;
         let omm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&omm)?;
         Ok(omm)
@@ -246,10 +247,251 @@ impl Ndm for Omm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        crate::xml::validate_document_root(xml, b"omm", "OMM")?;
+        validate_xml_sequences(xml)?;
         let omm: Self = crate::xml::from_str_with_context(xml, "OMM")?;
         crate::traits::Validate::validate(&omm)?;
         Ok(omm)
     }
+}
+
+fn validate_xml_sequences(xml: &str) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
+
+    let rule = |rank, repeatable| XmlSequenceRule { rank, repeatable };
+    crate::xml::validate_element_sequences(
+        xml,
+        "OMM",
+        |parent, child| {
+            Some(match (parent, child) {
+                (b"omm", b"header") => rule(0, false),
+                (b"omm", b"body") => rule(1, false),
+                (b"header", b"COMMENT") => rule(0, true),
+                (b"header", b"CLASSIFICATION") => rule(1, false),
+                (b"header", b"CREATION_DATE") => rule(2, false),
+                (b"header", b"ORIGINATOR") => rule(3, false),
+                (b"header", b"MESSAGE_ID") => rule(4, false),
+                (b"body", b"segment") => rule(0, false),
+                (b"segment", b"metadata") => rule(0, false),
+                (b"segment", b"data") => rule(1, false),
+                (b"metadata", b"COMMENT") => rule(0, true),
+                (b"metadata", b"OBJECT_NAME") => rule(1, false),
+                (b"metadata", b"OBJECT_ID") => rule(2, false),
+                (b"metadata", b"CENTER_NAME") => rule(3, false),
+                (b"metadata", b"REF_FRAME") => rule(4, false),
+                (b"metadata", b"REF_FRAME_EPOCH") => rule(5, false),
+                (b"metadata", b"TIME_SYSTEM") => rule(6, false),
+                (b"metadata", b"MEAN_ELEMENT_THEORY") => rule(7, false),
+                (b"data", b"COMMENT") => rule(0, true),
+                (b"data", b"meanElements") => rule(1, false),
+                (b"data", b"spacecraftParameters") => rule(2, false),
+                (b"data", b"tleParameters") => rule(3, false),
+                (b"data", b"covarianceMatrix") => rule(4, false),
+                (b"data", b"userDefinedParameters") => rule(5, false),
+                (b"meanElements", b"COMMENT") => rule(0, true),
+                (b"meanElements", b"EPOCH") => rule(1, false),
+                (b"meanElements", b"SEMI_MAJOR_AXIS" | b"MEAN_MOTION") => rule(2, false),
+                (b"meanElements", b"ECCENTRICITY") => rule(3, false),
+                (b"meanElements", b"INCLINATION") => rule(4, false),
+                (b"meanElements", b"RA_OF_ASC_NODE") => rule(5, false),
+                (b"meanElements", b"ARG_OF_PERICENTER") => rule(6, false),
+                (b"meanElements", b"MEAN_ANOMALY") => rule(7, false),
+                (b"meanElements", b"GM") => rule(8, false),
+                (b"spacecraftParameters", b"COMMENT") => rule(0, true),
+                (b"spacecraftParameters", b"MASS") => rule(1, false),
+                (b"spacecraftParameters", b"SOLAR_RAD_AREA") => rule(2, false),
+                (b"spacecraftParameters", b"SOLAR_RAD_COEFF") => rule(3, false),
+                (b"spacecraftParameters", b"DRAG_AREA") => rule(4, false),
+                (b"spacecraftParameters", b"DRAG_COEFF") => rule(5, false),
+                (b"tleParameters", b"COMMENT") => rule(0, true),
+                (b"tleParameters", b"EPHEMERIS_TYPE") => rule(1, false),
+                (b"tleParameters", b"CLASSIFICATION_TYPE") => rule(2, false),
+                (b"tleParameters", b"NORAD_CAT_ID") => rule(3, false),
+                (b"tleParameters", b"ELEMENT_SET_NO") => rule(4, false),
+                (b"tleParameters", b"REV_AT_EPOCH") => rule(5, false),
+                (b"tleParameters", b"BSTAR" | b"BTERM") => rule(6, false),
+                (b"tleParameters", b"MEAN_MOTION_DOT") => rule(7, false),
+                (b"tleParameters", b"MEAN_MOTION_DDOT" | b"AGOM") => rule(8, false),
+                (b"covarianceMatrix", b"COMMENT") => rule(0, true),
+                (b"covarianceMatrix", b"COV_REF_FRAME") => rule(1, false),
+                (b"covarianceMatrix", b"CX_X") => rule(2, false),
+                (b"covarianceMatrix", b"CY_X") => rule(3, false),
+                (b"covarianceMatrix", b"CY_Y") => rule(4, false),
+                (b"covarianceMatrix", b"CZ_X") => rule(5, false),
+                (b"covarianceMatrix", b"CZ_Y") => rule(6, false),
+                (b"covarianceMatrix", b"CZ_Z") => rule(7, false),
+                (b"covarianceMatrix", b"CX_DOT_X") => rule(8, false),
+                (b"covarianceMatrix", b"CX_DOT_Y") => rule(9, false),
+                (b"covarianceMatrix", b"CX_DOT_Z") => rule(10, false),
+                (b"covarianceMatrix", b"CX_DOT_X_DOT") => rule(11, false),
+                (b"covarianceMatrix", b"CY_DOT_X") => rule(12, false),
+                (b"covarianceMatrix", b"CY_DOT_Y") => rule(13, false),
+                (b"covarianceMatrix", b"CY_DOT_Z") => rule(14, false),
+                (b"covarianceMatrix", b"CY_DOT_X_DOT") => rule(15, false),
+                (b"covarianceMatrix", b"CY_DOT_Y_DOT") => rule(16, false),
+                (b"covarianceMatrix", b"CZ_DOT_X") => rule(17, false),
+                (b"covarianceMatrix", b"CZ_DOT_Y") => rule(18, false),
+                (b"covarianceMatrix", b"CZ_DOT_Z") => rule(19, false),
+                (b"covarianceMatrix", b"CZ_DOT_X_DOT") => rule(20, false),
+                (b"covarianceMatrix", b"CZ_DOT_Y_DOT") => rule(21, false),
+                (b"covarianceMatrix", b"CZ_DOT_Z_DOT") => rule(22, false),
+                (b"userDefinedParameters", b"COMMENT") => rule(0, true),
+                (b"userDefinedParameters", b"USER_DEFINED") => rule(1, true),
+                _ => return None,
+            })
+        },
+        |element, attribute| match attribute {
+            b"units" => matches!(
+                element,
+                b"SEMI_MAJOR_AXIS"
+                    | b"MEAN_MOTION"
+                    | b"INCLINATION"
+                    | b"RA_OF_ASC_NODE"
+                    | b"ARG_OF_PERICENTER"
+                    | b"MEAN_ANOMALY"
+                    | b"GM"
+                    | b"MASS"
+                    | b"SOLAR_RAD_AREA"
+                    | b"DRAG_AREA"
+                    | b"BSTAR"
+                    | b"BTERM"
+                    | b"MEAN_MOTION_DOT"
+                    | b"MEAN_MOTION_DDOT"
+                    | b"AGOM"
+                    | b"CX_X"
+                    | b"CY_X"
+                    | b"CY_Y"
+                    | b"CZ_X"
+                    | b"CZ_Y"
+                    | b"CZ_Z"
+                    | b"CX_DOT_X"
+                    | b"CX_DOT_Y"
+                    | b"CX_DOT_Z"
+                    | b"CX_DOT_X_DOT"
+                    | b"CY_DOT_X"
+                    | b"CY_DOT_Y"
+                    | b"CY_DOT_Z"
+                    | b"CY_DOT_X_DOT"
+                    | b"CY_DOT_Y_DOT"
+                    | b"CZ_DOT_X"
+                    | b"CZ_DOT_Y"
+                    | b"CZ_DOT_Z"
+                    | b"CZ_DOT_X_DOT"
+                    | b"CZ_DOT_Y_DOT"
+                    | b"CZ_DOT_Z_DOT"
+            ),
+            b"parameter" => element == b"USER_DEFINED",
+            _ => false,
+        },
+    )
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    fn rank(key: &str) -> Option<u16> {
+        Some(match key {
+            "CCSDS_OMM_VERS" => 0,
+            "CLASSIFICATION" => 1,
+            "CREATION_DATE" => 2,
+            "ORIGINATOR" => 3,
+            "MESSAGE_ID" => 4,
+            "OBJECT_NAME" => 5,
+            "OBJECT_ID" => 6,
+            "CENTER_NAME" => 7,
+            "REF_FRAME" => 8,
+            "REF_FRAME_EPOCH" => 9,
+            "TIME_SYSTEM" => 10,
+            "MEAN_ELEMENT_THEORY" => 11,
+            "EPOCH" => 12,
+            "SEMI_MAJOR_AXIS" | "MEAN_MOTION" => 13,
+            "ECCENTRICITY" => 14,
+            "INCLINATION" => 15,
+            "RA_OF_ASC_NODE" => 16,
+            "ARG_OF_PERICENTER" => 17,
+            "MEAN_ANOMALY" => 18,
+            "GM" => 19,
+            "MASS" => 30,
+            "SOLAR_RAD_AREA" => 31,
+            "SOLAR_RAD_COEFF" => 32,
+            "DRAG_AREA" => 33,
+            "DRAG_COEFF" => 34,
+            "EPHEMERIS_TYPE" => 40,
+            "CLASSIFICATION_TYPE" => 41,
+            "NORAD_CAT_ID" => 42,
+            "ELEMENT_SET_NO" => 43,
+            "REV_AT_EPOCH" => 44,
+            "BSTAR" | "BTERM" => 45,
+            "MEAN_MOTION_DOT" => 46,
+            "MEAN_MOTION_DDOT" | "AGOM" => 47,
+            "COV_REF_FRAME" => 60,
+            "CX_X" => 61,
+            "CY_X" => 62,
+            "CY_Y" => 63,
+            "CZ_X" => 64,
+            "CZ_Y" => 65,
+            "CZ_Z" => 66,
+            "CX_DOT_X" => 67,
+            "CX_DOT_Y" => 68,
+            "CX_DOT_Z" => 69,
+            "CX_DOT_X_DOT" => 70,
+            "CY_DOT_X" => 71,
+            "CY_DOT_Y" => 72,
+            "CY_DOT_Z" => 73,
+            "CY_DOT_X_DOT" => 74,
+            "CY_DOT_Y_DOT" => 75,
+            "CZ_DOT_X" => 76,
+            "CZ_DOT_Y" => 77,
+            "CZ_DOT_Z" => 78,
+            "CZ_DOT_X_DOT" => 79,
+            "CZ_DOT_Y_DOT" => 80,
+            "CZ_DOT_Z_DOT" => 81,
+            key if key.starts_with("USER_DEFINED_") => 90,
+            _ => return None,
+        })
+    }
+
+    fn comments_start_block(previous: u16, key: &str) -> bool {
+        match key {
+            "CLASSIFICATION" | "CREATION_DATE" => previous == 0,
+            "OBJECT_NAME" => matches!(previous, 3 | 4),
+            "EPOCH" => previous == 11,
+            "MASS" | "SOLAR_RAD_AREA" | "SOLAR_RAD_COEFF" | "DRAG_AREA" | "DRAG_COEFF" => {
+                matches!(previous, 18 | 19)
+            }
+            "EPHEMERIS_TYPE"
+            | "CLASSIFICATION_TYPE"
+            | "NORAD_CAT_ID"
+            | "ELEMENT_SET_NO"
+            | "REV_AT_EPOCH"
+            | "BSTAR"
+            | "BTERM"
+            | "MEAN_MOTION_DOT"
+            | "MEAN_MOTION_DDOT"
+            | "AGOM" => matches!(previous, 18 | 19 | 30..=34),
+            "COV_REF_FRAME" | "CX_X" => {
+                matches!(previous, 18 | 19 | 30..=34 | 40..=47)
+            }
+            key if key.starts_with("USER_DEFINED_") => {
+                matches!(previous, 18 | 19 | 30..=34 | 40..=47 | 61..=81)
+            }
+            _ => false,
+        }
+    }
+
+    crate::kvn::strict::validate_odm_assignments(
+        kvn,
+        &crate::kvn::strict::OdmAssignmentRules {
+            context: "strict OMM KVN",
+            message_name: "OMM",
+            rank,
+            comment_starts_block: comments_start_block,
+            allows_non_increasing: |previous, current, _| {
+                (current == 13 && previous == 13)
+                    || (current == 45 && previous == 45)
+                    || (current == 47 && previous == 47)
+                    || (current == 90 && previous == 90)
+            },
+        },
+    )
 }
 
 impl ToKvn for Omm {
@@ -268,6 +510,7 @@ impl ToKvn for Omm {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct OmmBody {
     #[serde(rename = "segment")]
     pub segment: OmmSegment,
@@ -290,6 +533,7 @@ impl ToKvn for OmmBody {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct OmmSegment {
     pub metadata: OmmMetadata,
     pub data: OmmData,
@@ -321,7 +565,7 @@ impl crate::traits::Validate for OmmSegment {
 
 /// Metadata for the OMM.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OmmMetadata {
     /// Comments (allowed at the beginning of the OMM Metadata). (See 7.8 for formatting rules.)
     ///
@@ -510,7 +754,7 @@ impl ToKvn for OmmMetadata {
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OmmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -679,7 +923,7 @@ impl OmmData {
 
 /// Mean Keplerian Elements in the Specified Reference Frame.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct MeanElements {
     /// Comments (see 7.8 for formatting rules).
     ///
@@ -818,7 +1062,7 @@ impl ToKvn for MeanElements {
 
 /// TLE Related Parameters (This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct TleParameters {
     /// Comments (see 7.8 for formatting rules).
     ///

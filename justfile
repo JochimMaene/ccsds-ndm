@@ -152,6 +152,61 @@ conformance-oem:
     cargo test --manifest-path {{rust_manifest}} --test oem_conversion
     cargo test --manifest-path {{rust_manifest}} --test oem_kvn_allocations
 
+# Run the focused OMM 3.0 strictness, preservation, and generation evidence
+conformance-omm:
+    cargo test --manifest-path {{rust_manifest}} --test omm_conformance
+    cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
+    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
+
+# Run the focused standalone OCM 3.0 conformance and history-allocation evidence.
+conformance-ocm:
+    cargo test --manifest-path {{rust_manifest}} --test ocm_conformance
+    cargo test --manifest-path {{rust_manifest}} --test ocm_kvn_allocations
+    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
+
+# Run the focused standalone CDM 1.0 conformance evidence.
+conformance-cdm:
+    cargo test --manifest-path {{rust_manifest}} --test cdm_conformance
+    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
+
+# Run the focused standalone AEM 2.0 conformance and history-allocation evidence.
+conformance-aem:
+    cargo test --manifest-path {{rust_manifest}} --test aem_conformance
+    cargo test --manifest-path {{rust_manifest}} --test aem_semantic_validation
+    cargo test --manifest-path {{rust_manifest}} --test aem_kvn_allocations
+    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
+
+# Run the focused standalone ACM 2.0 conformance and history-allocation evidence.
+conformance-acm:
+    cargo test --manifest-path {{rust_manifest}} --test acm_conformance
+    cargo test --manifest-path {{rust_manifest}} --test acm_kvn_allocations
+    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
+
+# Run the focused combined NDM envelope, surface, and allocation evidence.
+conformance-combined:
+    cargo test --manifest-path {{rust_manifest}} --test combined_conformance
+    cargo test --manifest-path {{rust_manifest}} --test combined_ndm
+    cargo test --manifest-path {{rust_manifest}} --test combined_cli
+    cargo test --manifest-path {{rust_manifest}} --test combined_allocations
+
+# Run the focused standalone APM 2.0 conformance evidence.
+conformance-apm:
+    cargo test --manifest-path {{rust_manifest}} --test apm_conformance
+    cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
+    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
+
+# Run the focused standalone RDM 1.0 conformance evidence.
+conformance-rdm:
+    cargo test --manifest-path {{rust_manifest}} --test rdm_conformance
+    cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
+    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
+
+# Run the focused standalone TDM 2.0 conformance and history-allocation evidence.
+conformance-tdm:
+    cargo test --manifest-path {{rust_manifest}} --test tdm_conformance
+    cargo test --manifest-path {{rust_manifest}} --test tdm_kvn_allocations
+    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
+
 # Reproduce the complete OEM 3.0 Rust technical verification and artifact evidence
 verify-oem:
     just fmt-rust-check
@@ -209,6 +264,11 @@ bench-opm-validation:
 bench-oem:
     cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_scaling
     cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_scaling
+
+# Reproduce parse/generate workloads for every standalone message and combined XML NDM
+bench-family:
+    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_message_matrix
+    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_message_matrix
 
 # --- Coverage ---------------------------------------------------------------
 

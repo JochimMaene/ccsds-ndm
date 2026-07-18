@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::OdParameters;
-use crate::error::{Result, ValidationError};
+use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn, Validate};
@@ -71,12 +71,14 @@ impl Ndm for Cdm {
             crate::generation::OutputFormat::Kvn,
             self,
         )?;
+        self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        validate_kvn_syntax(kvn)?;
         let cdm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&cdm)?;
         Ok(cdm)
@@ -93,9 +95,540 @@ impl Ndm for Cdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        crate::xml::validate_document_root(xml, b"cdm", "CDM")?;
+        validate_xml_sequences(xml)?;
         let cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
         crate::traits::Validate::validate(&cdm)?;
         Ok(cdm)
+    }
+}
+
+fn validate_xml_sequences(xml: &str) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
+
+    crate::xml::validate_element_sequences(
+        xml,
+        "CDM",
+        |parent, child| {
+            let children = cdm_xml_children(parent)?;
+            let rank = children.iter().position(|candidate| *candidate == child)? as u16;
+            let repeatable = child == b"COMMENT" || (parent == b"body" && child == b"segment");
+            Some(XmlSequenceRule { rank, repeatable })
+        },
+        |element, attribute| {
+            attribute == b"units"
+                && matches!(
+                    element,
+                    b"MISS_DISTANCE"
+                        | b"RELATIVE_SPEED"
+                        | b"RELATIVE_POSITION_R"
+                        | b"RELATIVE_POSITION_T"
+                        | b"RELATIVE_POSITION_N"
+                        | b"RELATIVE_VELOCITY_R"
+                        | b"RELATIVE_VELOCITY_T"
+                        | b"RELATIVE_VELOCITY_N"
+                        | b"SCREEN_VOLUME_X"
+                        | b"SCREEN_VOLUME_Y"
+                        | b"SCREEN_VOLUME_Z"
+                        | b"COLLISION_PROBABILITY"
+                        | b"RECOMMENDED_OD_SPAN"
+                        | b"ACTUAL_OD_SPAN"
+                        | b"RESIDUALS_ACCEPTED"
+                        | b"WEIGHTED_RMS"
+                        | b"AREA_PC"
+                        | b"AREA_DRG"
+                        | b"AREA_SRP"
+                        | b"MASS"
+                        | b"CD_AREA_OVER_MASS"
+                        | b"CR_AREA_OVER_MASS"
+                        | b"THRUST_ACCELERATION"
+                        | b"SEDR"
+                        | b"X"
+                        | b"Y"
+                        | b"Z"
+                        | b"X_DOT"
+                        | b"Y_DOT"
+                        | b"Z_DOT"
+                        | b"CR_R"
+                        | b"CT_R"
+                        | b"CT_T"
+                        | b"CN_R"
+                        | b"CN_T"
+                        | b"CN_N"
+                        | b"CRDOT_R"
+                        | b"CRDOT_T"
+                        | b"CRDOT_N"
+                        | b"CRDOT_RDOT"
+                        | b"CTDOT_R"
+                        | b"CTDOT_T"
+                        | b"CTDOT_N"
+                        | b"CTDOT_RDOT"
+                        | b"CTDOT_TDOT"
+                        | b"CNDOT_R"
+                        | b"CNDOT_T"
+                        | b"CNDOT_N"
+                        | b"CNDOT_RDOT"
+                        | b"CNDOT_TDOT"
+                        | b"CNDOT_NDOT"
+                        | b"CDRG_R"
+                        | b"CDRG_T"
+                        | b"CDRG_N"
+                        | b"CDRG_RDOT"
+                        | b"CDRG_TDOT"
+                        | b"CDRG_NDOT"
+                        | b"CDRG_DRG"
+                        | b"CSRP_R"
+                        | b"CSRP_T"
+                        | b"CSRP_N"
+                        | b"CSRP_RDOT"
+                        | b"CSRP_TDOT"
+                        | b"CSRP_NDOT"
+                        | b"CSRP_DRG"
+                        | b"CSRP_SRP"
+                        | b"CTHR_R"
+                        | b"CTHR_T"
+                        | b"CTHR_N"
+                        | b"CTHR_RDOT"
+                        | b"CTHR_TDOT"
+                        | b"CTHR_NDOT"
+                        | b"CTHR_DRG"
+                        | b"CTHR_SRP"
+                        | b"CTHR_THR"
+                )
+        },
+    )
+}
+
+fn cdm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
+    Some(match parent {
+        b"cdm" => &[b"header", b"body"],
+        b"header" => &[
+            b"COMMENT",
+            b"CREATION_DATE",
+            b"ORIGINATOR",
+            b"MESSAGE_FOR",
+            b"MESSAGE_ID",
+        ],
+        b"body" => &[b"relativeMetadataData", b"segment"],
+        b"relativeMetadataData" => &[
+            b"COMMENT",
+            b"TCA",
+            b"MISS_DISTANCE",
+            b"RELATIVE_SPEED",
+            b"relativeStateVector",
+            b"START_SCREEN_PERIOD",
+            b"STOP_SCREEN_PERIOD",
+            b"SCREEN_VOLUME_FRAME",
+            b"SCREEN_VOLUME_SHAPE",
+            b"SCREEN_VOLUME_X",
+            b"SCREEN_VOLUME_Y",
+            b"SCREEN_VOLUME_Z",
+            b"SCREEN_ENTRY_TIME",
+            b"SCREEN_EXIT_TIME",
+            b"COLLISION_PROBABILITY",
+            b"COLLISION_PROBABILITY_METHOD",
+        ],
+        b"relativeStateVector" => &[
+            b"RELATIVE_POSITION_R",
+            b"RELATIVE_POSITION_T",
+            b"RELATIVE_POSITION_N",
+            b"RELATIVE_VELOCITY_R",
+            b"RELATIVE_VELOCITY_T",
+            b"RELATIVE_VELOCITY_N",
+        ],
+        b"segment" => &[b"metadata", b"data"],
+        b"metadata" => &[
+            b"COMMENT",
+            b"OBJECT",
+            b"OBJECT_DESIGNATOR",
+            b"CATALOG_NAME",
+            b"OBJECT_NAME",
+            b"INTERNATIONAL_DESIGNATOR",
+            b"OBJECT_TYPE",
+            b"OPERATOR_CONTACT_POSITION",
+            b"OPERATOR_ORGANIZATION",
+            b"OPERATOR_PHONE",
+            b"OPERATOR_EMAIL",
+            b"EPHEMERIS_NAME",
+            b"COVARIANCE_METHOD",
+            b"MANEUVERABLE",
+            b"ORBIT_CENTER",
+            b"REF_FRAME",
+            b"GRAVITY_MODEL",
+            b"ATMOSPHERIC_MODEL",
+            b"N_BODY_PERTURBATIONS",
+            b"SOLAR_RAD_PRESSURE",
+            b"EARTH_TIDES",
+            b"INTRACK_THRUST",
+        ],
+        b"data" => &[
+            b"COMMENT",
+            b"odParameters",
+            b"additionalParameters",
+            b"stateVector",
+            b"covarianceMatrix",
+        ],
+        b"odParameters" => &[
+            b"COMMENT",
+            b"TIME_LASTOB_START",
+            b"TIME_LASTOB_END",
+            b"RECOMMENDED_OD_SPAN",
+            b"ACTUAL_OD_SPAN",
+            b"OBS_AVAILABLE",
+            b"OBS_USED",
+            b"TRACKS_AVAILABLE",
+            b"TRACKS_USED",
+            b"RESIDUALS_ACCEPTED",
+            b"WEIGHTED_RMS",
+        ],
+        b"additionalParameters" => &[
+            b"COMMENT",
+            b"AREA_PC",
+            b"AREA_DRG",
+            b"AREA_SRP",
+            b"MASS",
+            b"CD_AREA_OVER_MASS",
+            b"CR_AREA_OVER_MASS",
+            b"THRUST_ACCELERATION",
+            b"SEDR",
+        ],
+        b"stateVector" => &[b"COMMENT", b"X", b"Y", b"Z", b"X_DOT", b"Y_DOT", b"Z_DOT"],
+        b"covarianceMatrix" => &[
+            b"COMMENT",
+            b"CR_R",
+            b"CT_R",
+            b"CT_T",
+            b"CN_R",
+            b"CN_T",
+            b"CN_N",
+            b"CRDOT_R",
+            b"CRDOT_T",
+            b"CRDOT_N",
+            b"CRDOT_RDOT",
+            b"CTDOT_R",
+            b"CTDOT_T",
+            b"CTDOT_N",
+            b"CTDOT_RDOT",
+            b"CTDOT_TDOT",
+            b"CNDOT_R",
+            b"CNDOT_T",
+            b"CNDOT_N",
+            b"CNDOT_RDOT",
+            b"CNDOT_TDOT",
+            b"CNDOT_NDOT",
+            b"CDRG_R",
+            b"CDRG_T",
+            b"CDRG_N",
+            b"CDRG_RDOT",
+            b"CDRG_TDOT",
+            b"CDRG_NDOT",
+            b"CDRG_DRG",
+            b"CSRP_R",
+            b"CSRP_T",
+            b"CSRP_N",
+            b"CSRP_RDOT",
+            b"CSRP_TDOT",
+            b"CSRP_NDOT",
+            b"CSRP_DRG",
+            b"CSRP_SRP",
+            b"CTHR_R",
+            b"CTHR_T",
+            b"CTHR_N",
+            b"CTHR_RDOT",
+            b"CTHR_TDOT",
+            b"CTHR_NDOT",
+            b"CTHR_DRG",
+            b"CTHR_SRP",
+            b"CTHR_THR",
+        ],
+        _ => return None,
+    })
+}
+
+fn cdm_kvn_key(key: &str) -> Option<(u8, u16)> {
+    const HEADER: &[&str] = &["CREATION_DATE", "ORIGINATOR", "MESSAGE_FOR", "MESSAGE_ID"];
+    const RELATIVE: &[&str] = &[
+        "TCA",
+        "MISS_DISTANCE",
+        "RELATIVE_SPEED",
+        "RELATIVE_POSITION_R",
+        "RELATIVE_POSITION_T",
+        "RELATIVE_POSITION_N",
+        "RELATIVE_VELOCITY_R",
+        "RELATIVE_VELOCITY_T",
+        "RELATIVE_VELOCITY_N",
+        "START_SCREEN_PERIOD",
+        "STOP_SCREEN_PERIOD",
+        "SCREEN_VOLUME_FRAME",
+        "SCREEN_VOLUME_SHAPE",
+        "SCREEN_VOLUME_X",
+        "SCREEN_VOLUME_Y",
+        "SCREEN_VOLUME_Z",
+        "SCREEN_ENTRY_TIME",
+        "SCREEN_EXIT_TIME",
+        "COLLISION_PROBABILITY",
+        "COLLISION_PROBABILITY_METHOD",
+    ];
+    const METADATA: &[&str] = &[
+        "OBJECT",
+        "OBJECT_DESIGNATOR",
+        "CATALOG_NAME",
+        "OBJECT_NAME",
+        "INTERNATIONAL_DESIGNATOR",
+        "OBJECT_TYPE",
+        "OPERATOR_CONTACT_POSITION",
+        "OPERATOR_ORGANIZATION",
+        "OPERATOR_PHONE",
+        "OPERATOR_EMAIL",
+        "EPHEMERIS_NAME",
+        "COVARIANCE_METHOD",
+        "MANEUVERABLE",
+        "ORBIT_CENTER",
+        "REF_FRAME",
+        "GRAVITY_MODEL",
+        "ATMOSPHERIC_MODEL",
+        "N_BODY_PERTURBATIONS",
+        "SOLAR_RAD_PRESSURE",
+        "EARTH_TIDES",
+        "INTRACK_THRUST",
+    ];
+    const OD: &[&str] = &[
+        "TIME_LASTOB_START",
+        "TIME_LASTOB_END",
+        "RECOMMENDED_OD_SPAN",
+        "ACTUAL_OD_SPAN",
+        "OBS_AVAILABLE",
+        "OBS_USED",
+        "TRACKS_AVAILABLE",
+        "TRACKS_USED",
+        "RESIDUALS_ACCEPTED",
+        "WEIGHTED_RMS",
+    ];
+    const ADDITIONAL: &[&str] = &[
+        "AREA_PC",
+        "AREA_DRG",
+        "AREA_SRP",
+        "MASS",
+        "CD_AREA_OVER_MASS",
+        "CR_AREA_OVER_MASS",
+        "THRUST_ACCELERATION",
+        "SEDR",
+    ];
+    const STATE: &[&str] = &["X", "Y", "Z", "X_DOT", "Y_DOT", "Z_DOT"];
+    const COVARIANCE: &[&str] = &[
+        "CR_R",
+        "CT_R",
+        "CT_T",
+        "CN_R",
+        "CN_T",
+        "CN_N",
+        "CRDOT_R",
+        "CRDOT_T",
+        "CRDOT_N",
+        "CRDOT_RDOT",
+        "CTDOT_R",
+        "CTDOT_T",
+        "CTDOT_N",
+        "CTDOT_RDOT",
+        "CTDOT_TDOT",
+        "CNDOT_R",
+        "CNDOT_T",
+        "CNDOT_N",
+        "CNDOT_RDOT",
+        "CNDOT_TDOT",
+        "CNDOT_NDOT",
+        "CDRG_R",
+        "CDRG_T",
+        "CDRG_N",
+        "CDRG_RDOT",
+        "CDRG_TDOT",
+        "CDRG_NDOT",
+        "CDRG_DRG",
+        "CSRP_R",
+        "CSRP_T",
+        "CSRP_N",
+        "CSRP_RDOT",
+        "CSRP_TDOT",
+        "CSRP_NDOT",
+        "CSRP_DRG",
+        "CSRP_SRP",
+        "CTHR_R",
+        "CTHR_T",
+        "CTHR_N",
+        "CTHR_RDOT",
+        "CTHR_TDOT",
+        "CTHR_NDOT",
+        "CTHR_DRG",
+        "CTHR_SRP",
+        "CTHR_THR",
+    ];
+
+    for (block, keys) in [
+        (0, HEADER),
+        (1, RELATIVE),
+        (2, METADATA),
+        (3, OD),
+        (4, ADDITIONAL),
+        (5, STATE),
+        (6, COVARIANCE),
+    ] {
+        if let Some(rank) = keys.iter().position(|candidate| *candidate == key) {
+            return Some((block, rank as u16));
+        }
+    }
+    None
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating CDM KVN structure"],
+            offset,
+        }))))
+    };
+    let mut saw_version = false;
+    let mut current_block = None;
+    let mut previous_key = None;
+    let mut pending_comments = false;
+    let mut segment_count = 0u8;
+    let mut offset = 0usize;
+
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        if line.len() > 254 {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            pending_comments = true;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if !line.contains('=') {
+            return fail("expected exactly one CDM assignment");
+        }
+        let key = line.split_once('=').unwrap().0.trim();
+        if key == "CCSDS_CDM_VERS" {
+            if saw_version || current_block.is_some() || pending_comments {
+                return fail("CCSDS_CDM_VERS must be the first record");
+            }
+            saw_version = true;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if !saw_version {
+            return fail("expected CCSDS_CDM_VERS as the first record");
+        }
+        let (block, rank) = cdm_kvn_key(key)
+            .ok_or_else(|| invalid(number, offset, "unknown CDM keyword".into()))?;
+
+        match current_block {
+            None => {
+                if block != 0 {
+                    return fail("expected CDM header");
+                }
+            }
+            Some(current) if block == current => {
+                if pending_comments && previous_key.is_some() {
+                    return fail("COMMENT is not at the beginning of a CDM logical block");
+                }
+                if previous_key.is_some_and(|previous| rank <= previous) {
+                    return fail("duplicate or out-of-order CDM keyword");
+                }
+            }
+            Some(5 | 6) if block == 2 => {
+                segment_count += 1;
+                if segment_count > 2 {
+                    return fail("CDM contains more than two segments");
+                }
+            }
+            Some(current) => {
+                let allowed = matches!(
+                    (current, block),
+                    (0, 1) | (1, 2) | (2, 3..=5) | (3, 4..=5) | (4, 5) | (5, 6)
+                );
+                if !allowed {
+                    return fail("out-of-order CDM logical block");
+                }
+            }
+        }
+        if block == 2 && key == "OBJECT" && current_block != Some(2) && segment_count == 0 {
+            segment_count = 1;
+        }
+        current_block = Some(block);
+        previous_key = Some(rank);
+        pending_comments = false;
+        offset += raw_line.len() + 1;
+    }
+
+    if pending_comments {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "trailing CDM COMMENT has no logical block".into(),
+        ));
+    }
+    if !saw_version {
+        return Err(invalid(1, 0, "missing CCSDS_CDM_VERS".into()));
+    }
+    Ok(())
+}
+
+impl Cdm {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        for segment in &self.body.segments {
+            let first_nested_comments = if let Some(od) = &segment.data.od_parameters {
+                &od.comment
+            } else if let Some(additional) = &segment.data.additional_parameters {
+                &additional.comment
+            } else {
+                &segment.data.state_vector.comment
+            };
+            if !first_nested_comments.is_empty() {
+                return Err(ValidationError::Generic {
+                    message: Cow::Borrowed(
+                        "CDM KVN cannot distinguish the outer data COMMENT run from the first nested logical-block COMMENT run",
+                    ),
+                    line: None,
+                }
+                .into());
+            }
+        }
+
+        // CDM has a fixed, bounded scalar shape. A private model fixed-point preflight therefore
+        // catches every lossy KVN scalar spelling and lexical record without introducing an
+        // unbounded history-sized allocation or emitting caller-visible bytes.
+        let mut writer = KvnWriter::new();
+        self.write_kvn(&mut writer);
+        let output = writer.finish();
+        validate_kvn_syntax(&output)?;
+        let reparsed = Self::from_kvn_str(&output)?;
+        crate::traits::Validate::validate(&reparsed)?;
+        if reparsed != *self {
+            return Err(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "CDM model cannot be represented in KVN without changing typed content",
+                ),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
     }
 }
 
@@ -105,7 +638,7 @@ impl Ndm for Cdm {
 
 /// Represents the `cdmHeader` complex type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmHeader {
     /// Comments (allowed in the CDM Header only immediately after the CDM version number).
     /// (See 6.3.4 for formatting rules.)
@@ -234,6 +767,7 @@ impl ToKvn for CdmHeader {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct CdmBody {
     #[serde(rename = "relativeMetadataData")]
     pub relative_metadata_data: RelativeMetadataData,
@@ -587,6 +1121,7 @@ impl ToKvn for RelativeStateVector {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct CdmSegment {
     pub metadata: CdmMetadata,
     pub data: CdmData,
@@ -614,7 +1149,7 @@ impl ToKvn for CdmSegment {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmMetadata {
     /// Comments (see 6.3.4 for formatting rules).
     ///
@@ -974,7 +1509,7 @@ impl CdmMetadata {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1225,6 +1760,12 @@ pub struct AdditionalParameters {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmStateVector {
+    /// Comments (see 6.3.4 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
+    pub comment: Vec<String>,
     /// Object Position Vector X component.
     ///
     /// Units: km
@@ -1294,6 +1835,7 @@ impl CdmStateVector {
 
 impl ToKvn for CdmStateVector {
     fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
         writer.write_measure("X", &self.x.to_unit_value());
         writer.write_measure("Y", &self.y.to_unit_value());
         writer.write_measure("Z", &self.z.to_unit_value());

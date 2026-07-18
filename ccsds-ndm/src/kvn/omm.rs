@@ -259,9 +259,9 @@ INCLINATION = 3.053900 [deg]
 RA_OF_ASC_NODE = 81.793900 [deg]
 ARG_OF_PERICENTER = 249.236300 [deg]
 MEAN_ANOMALY = 150.160200 [deg]
+BSTAR = 0.0001 [1/ER]
 MEAN_MOTION_DOT = 0.000001 [rev/day**2]
 MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-BSTAR = 0.0001 [1/ER]
 "#;
 
     #[test]
@@ -309,9 +309,9 @@ CLASSIFICATION_TYPE = U
 NORAD_CAT_ID = 23581
 ELEMENT_SET_NO = 999
 REV_AT_EPOCH = 1234
+BSTAR = 0.0001 [1/ER]
 MEAN_MOTION_DOT = 0.000001 [rev/day**2]
 MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-BSTAR = 0.0001 [1/ER]
 COV_REF_FRAME = TEME
 CX_X = 1.0
 CY_X = 0.1
@@ -598,7 +598,6 @@ INCLINATION = 98.0 [deg]
 RA_OF_ASC_NODE = 10.0 [deg]
 ARG_OF_PERICENTER = 20.0 [deg]
 MEAN_ANOMALY = 30.0 [deg]
-COMMENT No TLE Parameters at all!
 "#;
         let res = Omm::from_kvn(kvn_sgp4_missing_bstar);
         assert!(res.is_err());

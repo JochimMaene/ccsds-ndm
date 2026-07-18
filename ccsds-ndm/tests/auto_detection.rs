@@ -2,7 +2,31 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::from_str;
+use ccsds_ndm::messages::ndm::CombinedNdm;
+use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::{detect::detect_notation, from_str, MessageType, Notation};
+
+const OPM_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const OPM_XML: &str = include_str!("../../data/xml/opm_g5.xml");
+
+#[test]
+fn notation_detection_and_auto_parse_are_bom_safe() {
+    assert_eq!(detect_notation("\u{feff}  <opm/>").unwrap(), Notation::Xml);
+    assert_eq!(
+        detect_notation("\u{feff}\nCCSDS_OPM_VERS = 3.0").unwrap(),
+        Notation::Kvn
+    );
+    assert!(detect_notation("\u{feff} \r\n").is_err());
+
+    assert!(matches!(
+        from_str(&format!("\u{feff}{OPM_KVN}")).unwrap(),
+        MessageType::Opm(_)
+    ));
+    assert!(matches!(
+        from_str(&format!("\u{feff}{OPM_XML}")).unwrap(),
+        MessageType::Opm(_)
+    ));
+}
 
 #[test]
 fn test_kvn_detection_does_not_bypass_strict_preamble_rules() {
@@ -89,4 +113,33 @@ fn test_detect_failure_unknown_header() {
     "#;
     let err = from_str(input).unwrap_err();
     assert!(format!("{}", err).contains("Could not identify KVN header"));
+}
+
+#[test]
+fn kvn_header_names_inside_values_do_not_create_a_combined_message() {
+    let input = OPM_KVN.replace(
+        "COMMENT GEOCENTRIC, CARTESIAN, EARTH FIXED",
+        "COMMENT text mentioning CCSDS_OEM_VERS is not an OEM header",
+    );
+    assert!(matches!(from_str(&input).unwrap(), MessageType::Opm(_)));
+}
+
+#[test]
+fn xml_detection_rejects_nonstandard_wrappers_and_preserves_combined_identity() {
+    let opm_root = &OPM_XML[OPM_XML.find("<opm").unwrap()..];
+    let wrapped = format!("<response>{opm_root}</response>");
+    let error = from_str(&wrapped).expect_err("unknown wrappers are not strict NDM XML");
+    assert!(error.to_string().contains("unsupported XML root tag"));
+
+    let MessageType::Opm(opm) = from_str(OPM_XML).unwrap() else {
+        panic!("fixture should be an OPM");
+    };
+    let combined = CombinedNdm {
+        id: None,
+        comments: Vec::new(),
+        messages: vec![MessageType::Opm(opm)],
+    }
+    .to_xml()
+    .unwrap();
+    assert!(matches!(from_str(&combined).unwrap(), MessageType::Ndm(_)));
 }

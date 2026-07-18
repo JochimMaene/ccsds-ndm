@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::error::{CcsdsNdmError, Result, ValidationError};
+use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 #[cfg(test)]
@@ -13,8 +13,6 @@ use crate::types::{
     TdmRangeMode, TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
 };
 use fast_float;
-use quick_xml::events::Event;
-use quick_xml::Reader;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -79,12 +77,14 @@ impl Ndm for Tdm {
             crate::generation::OutputFormat::Kvn,
             self,
         )?;
+        self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        validate_kvn_syntax(kvn)?;
         let tdm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&tdm)?;
         Ok(tdm)
@@ -101,11 +101,408 @@ impl Ndm for Tdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        validate_tdm_xml_metadata(xml)?;
+        crate::xml::validate_document_root(xml, b"tdm", "TDM")?;
+        validate_xml_sequences(xml)?;
         let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
         crate::traits::Validate::validate(&tdm)?;
         Ok(tdm)
     }
+}
+
+impl Tdm {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        let check = |field: &'static str, value: &str| -> Result<()> {
+            if value.is_ascii() {
+                Ok(())
+            } else {
+                Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "printable ASCII for TDM KVN".into(),
+                    line: None,
+                }
+                .into())
+            }
+        };
+        for comment in &self.header.comment {
+            check("COMMENT", comment)?;
+        }
+        check("ORIGINATOR", &self.header.originator)?;
+        if let Some(value) = &self.header.message_id {
+            check("MESSAGE_ID", value)?;
+        }
+        for segment in &self.body.segments {
+            let metadata = &segment.metadata;
+            for comment in &metadata.comment {
+                check("COMMENT", comment)?;
+            }
+            for (field, value) in [
+                ("TRACK_ID", metadata.track_id.as_deref()),
+                ("DATA_TYPES", metadata.data_types.as_deref()),
+                ("TIME_SYSTEM", Some(metadata.time_system.as_str())),
+                ("PARTICIPANT_1", Some(metadata.participant_1.as_str())),
+                ("PARTICIPANT_2", metadata.participant_2.as_deref()),
+                ("PARTICIPANT_3", metadata.participant_3.as_deref()),
+                ("PARTICIPANT_4", metadata.participant_4.as_deref()),
+                ("PARTICIPANT_5", metadata.participant_5.as_deref()),
+                ("EPHEMERIS_NAME_1", metadata.ephemeris_name_1.as_deref()),
+                ("EPHEMERIS_NAME_2", metadata.ephemeris_name_2.as_deref()),
+                ("EPHEMERIS_NAME_3", metadata.ephemeris_name_3.as_deref()),
+                ("EPHEMERIS_NAME_4", metadata.ephemeris_name_4.as_deref()),
+                ("EPHEMERIS_NAME_5", metadata.ephemeris_name_5.as_deref()),
+                ("TRANSMIT_BAND", metadata.transmit_band.as_deref()),
+                ("RECEIVE_BAND", metadata.receive_band.as_deref()),
+                ("INTERPOLATION", metadata.interpolation.as_deref()),
+            ] {
+                if let Some(value) = value {
+                    check(field, value)?;
+                }
+            }
+            for comment in &segment.data.comment {
+                check("COMMENT", comment)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_xml_sequences(xml: &str) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
+
+    let rule = |rank, repeatable| XmlSequenceRule { rank, repeatable };
+    crate::xml::validate_element_sequences(
+        xml,
+        "TDM",
+        |parent, child| {
+            Some(match (parent, child) {
+                (b"tdm", b"header") => rule(0, false),
+                (b"tdm", b"body") => rule(1, false),
+                (b"header", b"COMMENT") => rule(0, true),
+                (b"header", b"CREATION_DATE") => rule(1, false),
+                (b"header", b"ORIGINATOR") => rule(2, false),
+                (b"header", b"MESSAGE_ID") => rule(3, false),
+                (b"body", b"segment") => rule(0, true),
+                (b"segment", b"metadata") => rule(0, false),
+                (b"segment", b"data") => rule(1, false),
+                (b"metadata", child) => rule(tdm_metadata_rank_bytes(child)?, child == b"COMMENT"),
+                (b"data", b"COMMENT") => rule(0, true),
+                (b"data", b"observation") => rule(1, true),
+                (b"observation", b"EPOCH") => rule(0, false),
+                (b"observation", child) if is_tdm_observation_key_bytes(child) => rule(1, false),
+                _ => return None,
+            })
+        },
+        |element, attribute| {
+            attribute == b"units" && matches!(element, b"ANGLE_1" | b"ANGLE_2" | b"RHUMIDITY")
+        },
+    )
+}
+
+fn tdm_metadata_rank(key: &str) -> Option<u16> {
+    const KEYS: &[&str] = &[
+        "COMMENT",
+        "TRACK_ID",
+        "DATA_TYPES",
+        "TIME_SYSTEM",
+        "START_TIME",
+        "STOP_TIME",
+        "PARTICIPANT_1",
+        "PARTICIPANT_2",
+        "PARTICIPANT_3",
+        "PARTICIPANT_4",
+        "PARTICIPANT_5",
+        "PATH",
+        "PATH_1",
+        "PATH_2",
+        "EPHEMERIS_NAME_1",
+        "EPHEMERIS_NAME_2",
+        "EPHEMERIS_NAME_3",
+        "EPHEMERIS_NAME_4",
+        "EPHEMERIS_NAME_5",
+        "TRANSMIT_BAND",
+        "RECEIVE_BAND",
+        "TURNAROUND_NUMERATOR",
+        "TURNAROUND_DENOMINATOR",
+        "TIMETAG_REF",
+        "INTEGRATION_INTERVAL",
+        "INTEGRATION_REF",
+        "FREQ_OFFSET",
+        "RANGE_MODE",
+        "RANGE_MODULUS",
+        "RANGE_UNITS",
+        "ANGLE_TYPE",
+        "REFERENCE_FRAME",
+        "INTERPOLATION",
+        "INTERPOLATION_DEGREE",
+        "DOPPLER_COUNT_BIAS",
+        "DOPPLER_COUNT_SCALE",
+        "DOPPLER_COUNT_ROLLOVER",
+        "TRANSMIT_DELAY_1",
+        "TRANSMIT_DELAY_2",
+        "TRANSMIT_DELAY_3",
+        "TRANSMIT_DELAY_4",
+        "TRANSMIT_DELAY_5",
+        "RECEIVE_DELAY_1",
+        "RECEIVE_DELAY_2",
+        "RECEIVE_DELAY_3",
+        "RECEIVE_DELAY_4",
+        "RECEIVE_DELAY_5",
+        "DATA_QUALITY",
+        "CORRECTION_ANGLE_1",
+        "CORRECTION_ANGLE_2",
+        "CORRECTION_DOPPLER",
+        "CORRECTION_MAG",
+        "CORRECTION_RANGE",
+        "CORRECTION_RCS",
+        "CORRECTION_RECEIVE",
+        "CORRECTION_TRANSMIT",
+        "CORRECTION_ABERRATION_YEARLY",
+        "CORRECTION_ABERRATION_DIURNAL",
+        "CORRECTIONS_APPLIED",
+    ];
+    if key == "MODE" {
+        return Some(11);
+    }
+    KEYS.iter()
+        .position(|candidate| *candidate == key)
+        .map(|rank| {
+            // PATH and PATH_1 are alternatives at the same schema rank. MODE precedes that choice.
+            match rank {
+                11 | 12 => 12,
+                rank if rank >= 13 => rank as u16,
+                rank => rank as u16,
+            }
+        })
+}
+
+fn tdm_metadata_rank_bytes(key: &[u8]) -> Option<u16> {
+    std::str::from_utf8(key).ok().and_then(tdm_metadata_rank)
+}
+
+fn is_tdm_observation_key(key: &str) -> bool {
+    is_tdm_observation_key_bytes(key.as_bytes())
+}
+
+fn is_tdm_observation_key_bytes(key: &[u8]) -> bool {
+    matches!(
+        key,
+        b"ANGLE_1"
+            | b"ANGLE_2"
+            | b"CARRIER_POWER"
+            | b"CLOCK_BIAS"
+            | b"CLOCK_DRIFT"
+            | b"DOPPLER_COUNT"
+            | b"DOPPLER_INSTANTANEOUS"
+            | b"DOPPLER_INTEGRATED"
+            | b"DOR"
+            | b"MAG"
+            | b"PC_N0"
+            | b"PR_N0"
+            | b"PRESSURE"
+            | b"RANGE"
+            | b"RCS"
+            | b"RECEIVE_FREQ"
+            | b"RECEIVE_FREQ_1"
+            | b"RECEIVE_FREQ_2"
+            | b"RECEIVE_FREQ_3"
+            | b"RECEIVE_FREQ_4"
+            | b"RECEIVE_FREQ_5"
+            | b"RECEIVE_PHASE_CT_1"
+            | b"RECEIVE_PHASE_CT_2"
+            | b"RECEIVE_PHASE_CT_3"
+            | b"RECEIVE_PHASE_CT_4"
+            | b"RECEIVE_PHASE_CT_5"
+            | b"RHUMIDITY"
+            | b"STEC"
+            | b"TEMPERATURE"
+            | b"TRANSMIT_FREQ_1"
+            | b"TRANSMIT_FREQ_2"
+            | b"TRANSMIT_FREQ_3"
+            | b"TRANSMIT_FREQ_4"
+            | b"TRANSMIT_FREQ_5"
+            | b"TRANSMIT_FREQ_RATE_1"
+            | b"TRANSMIT_FREQ_RATE_2"
+            | b"TRANSMIT_FREQ_RATE_3"
+            | b"TRANSMIT_FREQ_RATE_4"
+            | b"TRANSMIT_FREQ_RATE_5"
+            | b"TRANSMIT_PHASE_CT_1"
+            | b"TRANSMIT_PHASE_CT_2"
+            | b"TRANSMIT_PHASE_CT_3"
+            | b"TRANSMIT_PHASE_CT_4"
+            | b"TRANSMIT_PHASE_CT_5"
+            | b"TROPO_DRY"
+            | b"TROPO_WET"
+            | b"VLBI_DELAY"
+    )
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    #[derive(Clone, Copy, PartialEq)]
+    enum Section {
+        Header,
+        Metadata,
+        Data,
+    }
+
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating TDM KVN structure"],
+            offset,
+        }))))
+    };
+    let header_rank = |key: &str| match key {
+        "CCSDS_TDM_VERS" => Some(0),
+        "CREATION_DATE" => Some(1),
+        "ORIGINATOR" => Some(2),
+        "MESSAGE_ID" => Some(3),
+        _ => None,
+    };
+
+    let mut section = Section::Header;
+    let mut header_previous = None;
+    let mut metadata_seen = 0u128;
+    let mut metadata_has_content = false;
+    let mut data_has_observation = false;
+    let mut metadata_closed = false;
+    let mut completed_segments = 0usize;
+    let mut offset = 0usize;
+
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let line_number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(line_number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        if line.len() > 254 {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            let allowed = match section {
+                Section::Header => header_previous == Some(0),
+                Section::Metadata => !metadata_has_content,
+                Section::Data => !data_has_observation,
+            };
+            if !allowed {
+                return fail("COMMENT is not at the beginning of its TDM logical section");
+            }
+            offset += raw_line.len() + 1;
+            continue;
+        }
+
+        match line {
+            "META_START" => {
+                let after_header =
+                    completed_segments == 0 && matches!(header_previous, Some(2 | 3));
+                let after_segment = completed_segments > 0 && header_previous.is_none();
+                if section != Section::Header || !(after_header || after_segment) {
+                    return fail("META_START is out of order");
+                }
+                section = Section::Metadata;
+                metadata_seen = 0;
+                metadata_has_content = false;
+                metadata_closed = false;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            "META_STOP" => {
+                if section != Section::Metadata {
+                    return fail("META_STOP without matching META_START");
+                }
+                section = Section::Header;
+                // A sentinel distinguishes the between-segment state from the message header.
+                header_previous = None;
+                metadata_closed = true;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            "DATA_START" => {
+                if section != Section::Header || header_previous.is_some() || !metadata_closed {
+                    return fail("DATA_START must immediately follow a metadata section");
+                }
+                section = Section::Data;
+                data_has_observation = false;
+                metadata_closed = false;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            "DATA_STOP" => {
+                if section != Section::Data {
+                    return fail("DATA_STOP without matching DATA_START");
+                }
+                section = Section::Header;
+                header_previous = None;
+                completed_segments += 1;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            _ => {}
+        }
+
+        if !line.contains('=') {
+            return fail("expected an assignment or TDM section delimiter");
+        }
+        let key = line
+            .split_once('=')
+            .expect("assignment count checked")
+            .0
+            .trim();
+        match section {
+            Section::Header => {
+                if completed_segments > 0 || header_previous.is_none() && key != "CCSDS_TDM_VERS" {
+                    return fail("assignment outside a TDM section");
+                }
+                let rank = header_rank(key).ok_or_else(|| {
+                    invalid(line_number, offset, "unknown TDM header keyword".into())
+                })?;
+                if header_previous.is_some_and(|previous| rank <= previous) {
+                    return fail("duplicate or out-of-order TDM header keyword");
+                }
+                header_previous = Some(rank);
+            }
+            Section::Metadata => {
+                let rank = tdm_metadata_rank(key).ok_or_else(|| {
+                    invalid(line_number, offset, "unknown TDM metadata keyword".into())
+                })?;
+                if rank == 0 {
+                    return fail("COMMENT must use COMMENT line syntax");
+                }
+                let bit = 1u128 << rank;
+                if metadata_seen & bit != 0 {
+                    return fail("duplicate or mutually exclusive TDM metadata keyword");
+                }
+                metadata_seen |= bit;
+                metadata_has_content = true;
+            }
+            Section::Data => {
+                if !is_tdm_observation_key(key) {
+                    return fail("unknown TDM observation keyword");
+                }
+                data_has_observation = true;
+            }
+        }
+        offset += raw_line.len() + 1;
+    }
+
+    if section != Section::Header || completed_segments == 0 || header_previous.is_some() {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "unterminated or incomplete TDM section sequence".into(),
+        ));
+    }
+    Ok(())
 }
 
 impl ToKvn for Tdm {
@@ -122,7 +519,7 @@ impl ToKvn for Tdm {
 
 /// Represents the `tdmHeader` complex type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct TdmHeader {
     /// Comments (allowed in the TDM Header only immediately after the TDM version number).
     /// (See 4.5 for formatting rules.)
@@ -212,6 +609,7 @@ impl ToKvn for TdmHeader {
 
 /// The TDM Body consists of one or more TDM Segments.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct TdmBody {
     #[serde(rename = "segment")]
     #[builder(default)]
@@ -259,6 +657,7 @@ impl ToKvn for TdmBody {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct TdmSegment {
     /// Metadata section for this TDM segment.
     pub metadata: TdmMetadata,
@@ -297,7 +696,7 @@ impl ToKvn for TdmSegment {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct TdmMetadata {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1158,125 +1557,6 @@ impl TdmMetadata {
     }
 }
 
-fn validate_tdm_xml_metadata(xml: &str) -> Result<()> {
-    let allowed = tdm_metadata_allowed_tags();
-    let mut reader = Reader::from_str(xml);
-    reader.config_mut().trim_text(true);
-    let mut in_metadata = false;
-    let mut depth = 0usize;
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) => {
-                let name = e.name();
-                let name_bytes = name.as_ref();
-                let name = String::from_utf8_lossy(name_bytes);
-                if name.eq_ignore_ascii_case("metadata") {
-                    in_metadata = true;
-                    depth = 1;
-                    continue;
-                }
-                if in_metadata {
-                    depth += 1;
-                    if !allowed
-                        .iter()
-                        .any(|tag| tag.eq_ignore_ascii_case(name.as_ref()))
-                    {
-                        return Err(ValidationError::InvalidValue {
-                            field: Cow::Borrowed("TDM Metadata keyword"),
-                            value: name.to_string(),
-                            expected: Cow::Borrowed("allowed TDM metadata keyword"),
-                            line: None,
-                        }
-                        .into());
-                    }
-                }
-            }
-            Ok(Event::End(e)) => {
-                if in_metadata {
-                    let name = e.name();
-                    let name_bytes = name.as_ref();
-                    let name = String::from_utf8_lossy(name_bytes);
-                    if name.eq_ignore_ascii_case("metadata") {
-                        break;
-                    }
-                    depth = depth.saturating_sub(1);
-                }
-            }
-            Ok(Event::Eof) => break,
-            Ok(_) => {}
-            Err(e) => return Err(e.into()),
-        }
-    }
-
-    Ok(())
-}
-
-fn tdm_metadata_allowed_tags() -> &'static [&'static str] {
-    &[
-        "COMMENT",
-        "TRACK_ID",
-        "DATA_TYPES",
-        "TIME_SYSTEM",
-        "START_TIME",
-        "STOP_TIME",
-        "PARTICIPANT_1",
-        "PARTICIPANT_2",
-        "PARTICIPANT_3",
-        "PARTICIPANT_4",
-        "PARTICIPANT_5",
-        "MODE",
-        "PATH",
-        "PATH_1",
-        "PATH_2",
-        "TRANSMIT_BAND",
-        "RECEIVE_BAND",
-        "TURNAROUND_NUMERATOR",
-        "TURNAROUND_DENOMINATOR",
-        "TIMETAG_REF",
-        "INTEGRATION_INTERVAL",
-        "INTEGRATION_REF",
-        "FREQ_OFFSET",
-        "RANGE_MODE",
-        "RANGE_MODULUS",
-        "RANGE_UNITS",
-        "ANGLE_TYPE",
-        "REFERENCE_FRAME",
-        "INTERPOLATION",
-        "INTERPOLATION_DEGREE",
-        "DOPPLER_COUNT_BIAS",
-        "DOPPLER_COUNT_SCALE",
-        "DOPPLER_COUNT_ROLLOVER",
-        "TRANSMIT_DELAY_1",
-        "TRANSMIT_DELAY_2",
-        "TRANSMIT_DELAY_3",
-        "TRANSMIT_DELAY_4",
-        "TRANSMIT_DELAY_5",
-        "RECEIVE_DELAY_1",
-        "RECEIVE_DELAY_2",
-        "RECEIVE_DELAY_3",
-        "RECEIVE_DELAY_4",
-        "RECEIVE_DELAY_5",
-        "DATA_QUALITY",
-        "CORRECTION_ANGLE_1",
-        "CORRECTION_ANGLE_2",
-        "CORRECTION_DOPPLER",
-        "CORRECTION_MAG",
-        "CORRECTION_RANGE",
-        "CORRECTION_RCS",
-        "CORRECTION_RECEIVE",
-        "CORRECTION_TRANSMIT",
-        "CORRECTION_ABERRATION_YEARLY",
-        "CORRECTION_ABERRATION_DIURNAL",
-        "CORRECTIONS_APPLIED",
-        "EPHEMERIS_NAME_1",
-        "EPHEMERIS_NAME_2",
-        "EPHEMERIS_NAME_3",
-        "EPHEMERIS_NAME_4",
-        "EPHEMERIS_NAME_5",
-    ]
-}
-
 impl ToKvn for TdmMetadata {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("META_START");
@@ -1464,6 +1744,7 @@ impl ToKvn for TdmMetadata {
 
 /// The Data Section of the TDM Segment consists of one or more Tracking Data Records.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct TdmData {
     /// Comments.
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
@@ -1517,10 +1798,7 @@ impl ToKvn for TdmData {
         writer.write_section("DATA_START");
         writer.write_comments(&self.comment);
         for obs in &self.observations {
-            let key = obs.data.key();
-            let val_str = obs.data.value_to_string();
-            let line = format!("{} {}", obs.epoch, val_str);
-            writer.write_pair(key, line);
+            writer.write_tdm_observation(obs.data.key(), &obs.epoch, obs.data.value());
         }
         writer.write_section("DATA_STOP");
     }
@@ -1715,8 +1993,9 @@ impl<'de> Deserialize<'de> for TdmObservation {
                             data = Some(TdmObservationData::VlbiDelay(map.next_value()?));
                         }
                         _ => {
-                            // Consume unknown fields or attributes that might appear
-                            let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                            return Err(serde::de::Error::custom(format!(
+                                "unknown TDM observation field '{key}'"
+                            )));
                         }
                     }
                 }
@@ -2262,9 +2541,11 @@ DATA_STOP
     #[test]
     fn test_xml_sample_parsing() {
         let xml = include_str!("../../../data/xml/tdm_e21.xml");
-        let tdm = Tdm::from_xml(xml).expect("parse xml");
+        let mut tdm = Tdm::from_xml(xml).expect("parse xml");
         assert!(!tdm.body.segments.is_empty());
 
+        assert!(tdm.to_kvn().is_err());
+        tdm.body.segments[0].metadata.participant_1 = "DSS-25".into();
         let generated_kvn = tdm.to_kvn().expect("convert to kvn");
         let tdm2 = Tdm::from_kvn(&generated_kvn).expect("parse generated kvn");
 
@@ -2854,13 +3135,13 @@ DATA_STOP
   </segment></body></tdm>"#;
         assert!(Tdm::from_xml(xml_dup).is_err());
 
-        // Test unknown attribute/field skip
+        // Strict parsing rejects unknown root and observation attributes.
         let xml_unknown = r#"<tdm id="CCSDS_TDM_VERS" version="2.0" extra="val">
   <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
   <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
   <data><observation extra="ignore"><EPOCH>2023-01-01T00:00:00</EPOCH><RANGE>1.0</RANGE></observation></data>
   </segment></body></tdm>"#;
-        assert!(Tdm::from_xml(xml_unknown).is_ok());
+        assert!(Tdm::from_xml(xml_unknown).is_err());
     }
 
     #[test]

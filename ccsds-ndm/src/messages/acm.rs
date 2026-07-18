@@ -4,7 +4,7 @@
 
 use crate::common::AdmHeader;
 
-use crate::error::{Result, ValidationError};
+use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
 use crate::kvn::parser::KvnResult;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
@@ -12,6 +12,8 @@ use crate::traits::{Ndm, ToKvn};
 use crate::types::SensorNoise;
 use crate::types::*;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+use std::io::Write;
 
 //----------------------------------------------------------------------
 // Root ACM Structure
@@ -74,12 +76,14 @@ impl Ndm for Acm {
             crate::generation::OutputFormat::Kvn,
             self,
         )?;
+        self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        validate_kvn_syntax(kvn)?;
         let acm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&acm)?;
         Ok(acm)
@@ -92,14 +96,786 @@ impl Ndm for Acm {
             crate::generation::OutputFormat::Xml,
             self,
         )?;
+        self.validate_xml_representability()?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        crate::xml::validate_document_root(xml, b"acm", "ACM")?;
+        validate_xml_sequences(xml)?;
         let acm: Self = crate::xml::from_str_with_context(xml, "ACM")?;
         crate::traits::Validate::validate(&acm)?;
         Ok(acm)
     }
+}
+
+impl Acm {
+    pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        if self
+            .body
+            .segment
+            .data
+            .ad
+            .iter()
+            .flat_map(|determination| &determination.sensors)
+            .any(|sensor| !sensor.comment.is_empty())
+        {
+            return Err(ValidationError::InvalidValue {
+                field: "SENSOR COMMENT".into(),
+                value: "present".into(),
+                expected: "omitted; ACM 2.0 XML sensorData has no COMMENT element".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        let invalid_number = || {
+            CcsdsNdmError::Validation(Box::new(ValidationError::Generic {
+                message: Cow::Borrowed("ACM KVN numbers must be finite"),
+                line: None,
+            }))
+        };
+        let check_number = |value: f64| {
+            if crate::kvn::ser::OdmFloat::is_valid(value) {
+                Ok(())
+            } else {
+                Err(invalid_number())
+            }
+        };
+        let check_values = |values: &[f64]| {
+            if values
+                .iter()
+                .all(|value| crate::kvn::ser::OdmFloat::is_valid(*value))
+            {
+                Ok(())
+            } else {
+                Err(invalid_number())
+            }
+        };
+        let check_text = |value: &str| -> Result<()> {
+            if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+                Ok(())
+            } else {
+                Err(ValidationError::Generic {
+                    message: Cow::Borrowed(
+                        "ACM KVN free text must contain printable ASCII without line breaks",
+                    ),
+                    line: None,
+                }
+                .into())
+            }
+        };
+
+        for value in self
+            .header
+            .comment
+            .iter()
+            .chain(self.body.segment.metadata.comment.iter())
+        {
+            check_text(value)?;
+        }
+        for value in [
+            self.header.classification.as_ref(),
+            Some(&self.header.originator),
+            self.header.message_id.as_ref(),
+            Some(&self.body.segment.metadata.object_name),
+            self.body.segment.metadata.international_designator.as_ref(),
+            self.body.segment.metadata.catalog_name.as_ref(),
+            self.body.segment.metadata.object_designator.as_ref(),
+            self.body.segment.metadata.originator_poc.as_ref(),
+            self.body.segment.metadata.originator_position.as_ref(),
+            self.body.segment.metadata.originator_phone.as_ref(),
+            self.body.segment.metadata.originator_email.as_ref(),
+            self.body.segment.metadata.originator_address.as_ref(),
+            self.body.segment.metadata.odm_msg_link.as_ref(),
+            self.body.segment.metadata.center_name.as_ref(),
+            Some(&self.body.segment.metadata.time_system),
+            self.body.segment.metadata.acm_data_elements.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            check_text(value)?;
+        }
+        if let Some(value) = &self.body.segment.metadata.taimutc_at_tzero {
+            check_number(value.value)?;
+        }
+        if let Some(value) = &self.body.segment.metadata.next_leap_taimutc {
+            check_number(value.value)?;
+        }
+
+        let data = &self.body.segment.data;
+        for attitude in &data.att {
+            for value in attitude.comment.iter().chain(
+                [
+                    attitude.att_id.as_ref(),
+                    attitude.att_prev_id.as_ref(),
+                    attitude.att_basis_id.as_ref(),
+                    Some(&attitude.ref_frame_a),
+                    Some(&attitude.ref_frame_b),
+                ]
+                .into_iter()
+                .flatten(),
+            ) {
+                check_text(value)?;
+            }
+            for line in &attitude.att_lines {
+                check_values(&line.values)?;
+            }
+        }
+        if let Some(physical) = &data.phys {
+            for value in physical.comment.iter().chain(
+                [
+                    physical.cp_ref_frame.as_ref(),
+                    physical.inertia_ref_frame.as_ref(),
+                ]
+                .into_iter()
+                .flatten(),
+            ) {
+                check_text(value)?;
+            }
+            for value in [
+                physical.drag_coeff,
+                physical.wet_mass.as_ref().map(|value| value.value),
+                physical.dry_mass.as_ref().map(|value| value.value),
+                physical.ixx.as_ref().map(|value| value.value),
+                physical.iyy.as_ref().map(|value| value.value),
+                physical.izz.as_ref().map(|value| value.value),
+                physical.ixy.as_ref().map(|value| value.value),
+                physical.ixz.as_ref().map(|value| value.value),
+                physical.iyz.as_ref().map(|value| value.value),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                check_number(value)?;
+            }
+            if let Some(value) = &physical.cp {
+                check_values(&value.elements)?;
+            }
+        }
+        for covariance in &data.cov {
+            for value in covariance.comment.iter().chain(
+                [
+                    covariance.cov_id.as_ref(),
+                    covariance.cov_prev_id.as_ref(),
+                    covariance.cov_basis_id.as_ref(),
+                    covariance.cov_ref_frame.as_ref(),
+                ]
+                .into_iter()
+                .flatten(),
+            ) {
+                check_text(value)?;
+            }
+            for line in &covariance.cov_lines {
+                check_values(&line.values)?;
+            }
+        }
+        for maneuver in &data.man {
+            for value in maneuver.comment.iter().chain(
+                [
+                    maneuver.man_id.as_ref(),
+                    maneuver.man_prev_id.as_ref(),
+                    maneuver.man_purpose.as_ref(),
+                    maneuver.actuator_used.as_ref(),
+                    maneuver.target_mom_frame.as_ref(),
+                ]
+                .into_iter()
+                .flatten(),
+            ) {
+                check_text(value)?;
+            }
+            if let Some(value) = &maneuver.man_duration {
+                check_number(value.value)?;
+            }
+            if let Some(value) = &maneuver.target_momentum {
+                check_values(&value.elements)?;
+            }
+            if let Some(value) = &maneuver.target_attitude {
+                check_values(&value.values)?;
+            }
+            if let Some(value) = &maneuver.target_spinrate {
+                check_number(value.value)?;
+            }
+        }
+        if let Some(determination) = &data.ad {
+            for value in determination.comment.iter().chain(
+                [
+                    determination.ad_id.as_ref(),
+                    determination.ad_prev_id.as_ref(),
+                    determination.ad_method.as_ref(),
+                    determination.attitude_source.as_ref(),
+                    determination.ref_frame_a.as_ref(),
+                    determination.ref_frame_b.as_ref(),
+                ]
+                .into_iter()
+                .flatten(),
+            ) {
+                check_text(value)?;
+            }
+            for value in [
+                determination.sigma_u.as_ref().map(|value| value.value),
+                determination.sigma_v.as_ref().map(|value| value.value),
+                determination
+                    .rate_process_noise_stddev
+                    .as_ref()
+                    .map(|value| value.value),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                check_number(value)?;
+            }
+            for sensor in &determination.sensors {
+                for value in sensor.comment.iter().chain(sensor.sensor_used.iter()) {
+                    check_text(value)?;
+                }
+                if let Some(value) = &sensor.sensor_noise_stddev {
+                    check_values(&value.values)?;
+                }
+                if let Some(value) = &sensor.sensor_frequency {
+                    check_number(value.value)?;
+                }
+            }
+        }
+        if let Some(user) = &data.user {
+            for value in user.comment.iter().chain(
+                user.user_defined
+                    .iter()
+                    .flat_map(|parameter| [&parameter.parameter, &parameter.value]),
+            ) {
+                check_text(value)?;
+            }
+        }
+
+        let mut sink = AcmKvnLexicalSink::default();
+        let mut writer = KvnWriter::from_io(&mut sink);
+        self.write_kvn(&mut writer);
+        writer.finish_io().map_err(CcsdsNdmError::from)
+    }
+}
+
+#[derive(Default)]
+struct AcmKvnLexicalSink {
+    line_len: usize,
+}
+
+impl Write for AcmKvnLexicalSink {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        for byte in buffer {
+            if *byte == b'\n' {
+                if self.line_len > 254 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "generated ACM KVN record exceeds 254 characters",
+                    ));
+                }
+                self.line_len = 0;
+            } else {
+                if !(b' '..=b'~').contains(byte) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "generated ACM KVN contains non-printable or non-ASCII content",
+                    ));
+                }
+                self.line_len += 1;
+            }
+        }
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn validate_xml_sequences(xml: &str) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
+    crate::xml::validate_element_sequences(
+        xml,
+        "ACM",
+        |parent, child| {
+            let children = acm_xml_children(parent)?;
+            let rank = children.iter().position(|candidate| *candidate == child)? as u16;
+            let repeatable = matches!(
+                child,
+                b"COMMENT"
+                    | b"att"
+                    | b"cov"
+                    | b"man"
+                    | b"attLine"
+                    | b"covLine"
+                    | b"sensorData"
+                    | b"USER_DEFINED"
+            );
+            Some(XmlSequenceRule { rank, repeatable })
+        },
+        |element, attribute| {
+            (attribute == b"parameter" && element == b"USER_DEFINED")
+                || (attribute == b"units"
+                    && matches!(
+                        element,
+                        b"TAIMUTC_AT_TZERO"
+                            | b"NEXT_LEAP_TAIMUTC"
+                            | b"WET_MASS"
+                            | b"DRY_MASS"
+                            | b"CP"
+                            | b"IXX"
+                            | b"IYY"
+                            | b"IZZ"
+                            | b"IXY"
+                            | b"IXZ"
+                            | b"IYZ"
+                            | b"MAN_DURATION"
+                            | b"TARGET_MOMENTUM"
+                            | b"TARGET_SPINRATE"
+                            | b"SIGMA_U"
+                            | b"SIGMA_V"
+                            | b"RATE_PROCESS_NOISE_STDDEV"
+                            | b"SENSOR_NOISE_STDDEV"
+                            | b"SENSOR_FREQUENCY"
+                    ))
+        },
+    )
+}
+
+fn acm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
+    Some(match parent {
+        b"acm" => &[b"header", b"body"],
+        b"header" => &[
+            b"COMMENT",
+            b"CLASSIFICATION",
+            b"CREATION_DATE",
+            b"ORIGINATOR",
+            b"MESSAGE_ID",
+        ],
+        b"body" => &[b"segment"],
+        b"segment" => &[b"metadata", b"data"],
+        b"metadata" => &[
+            b"COMMENT",
+            b"OBJECT_NAME",
+            b"INTERNATIONAL_DESIGNATOR",
+            b"CATALOG_NAME",
+            b"OBJECT_DESIGNATOR",
+            b"ORIGINATOR_POC",
+            b"ORIGINATOR_POSITION",
+            b"ORIGINATOR_PHONE",
+            b"ORIGINATOR_EMAIL",
+            b"ORIGINATOR_ADDRESS",
+            b"ODM_MSG_LINK",
+            b"CENTER_NAME",
+            b"TIME_SYSTEM",
+            b"EPOCH_TZERO",
+            b"ACM_DATA_ELEMENTS",
+            b"START_TIME",
+            b"STOP_TIME",
+            b"TAIMUTC_AT_TZERO",
+            b"NEXT_LEAP_EPOCH",
+            b"NEXT_LEAP_TAIMUTC",
+        ],
+        b"data" => &[b"att", b"phys", b"cov", b"man", b"ad", b"user"],
+        b"att" => &[
+            b"COMMENT",
+            b"ATT_ID",
+            b"ATT_PREV_ID",
+            b"ATT_BASIS",
+            b"ATT_BASIS_ID",
+            b"REF_FRAME_A",
+            b"REF_FRAME_B",
+            b"NUMBER_STATES",
+            b"ATT_TYPE",
+            b"EULER_ROT_SEQ",
+            b"RATE_TYPE",
+            b"attLine",
+        ],
+        b"phys" => &[
+            b"COMMENT",
+            b"DRAG_COEFF",
+            b"WET_MASS",
+            b"DRY_MASS",
+            b"CP_REF_FRAME",
+            b"CP",
+            b"INERTIA_REF_FRAME",
+            b"IXX",
+            b"IYY",
+            b"IZZ",
+            b"IXY",
+            b"IXZ",
+            b"IYZ",
+        ],
+        b"cov" => &[
+            b"COMMENT",
+            b"COV_ID",
+            b"COV_PREV_ID",
+            b"COV_BASIS",
+            b"COV_BASIS_ID",
+            b"COV_REF_FRAME",
+            b"COV_TYPE",
+            b"covLine",
+        ],
+        b"man" => &[
+            b"COMMENT",
+            b"MAN_ID",
+            b"MAN_PREV_ID",
+            b"MAN_PURPOSE",
+            b"MAN_BEGIN_TIME",
+            b"MAN_END_TIME",
+            b"MAN_DURATION",
+            b"ACTUATOR_USED",
+            b"TARGET_MOMENTUM",
+            b"TARGET_MOM_FRAME",
+            b"TARGET_ATTITUDE",
+            b"TARGET_SPINRATE",
+        ],
+        b"ad" => &[
+            b"COMMENT",
+            b"AD_ID",
+            b"AD_PREV_ID",
+            b"AD_METHOD",
+            b"ATTITUDE_SOURCE",
+            b"NUMBER_STATES",
+            b"ATTITUDE_STATES",
+            b"EULER_ROT_SEQ",
+            b"COV_TYPE",
+            b"REF_FRAME_A",
+            b"REF_FRAME_B",
+            b"RATE_STATES",
+            b"SIGMA_U",
+            b"SIGMA_V",
+            b"RATE_PROCESS_NOISE_STDDEV",
+            b"sensorData",
+        ],
+        b"sensorData" => &[
+            b"SENSOR_NUMBER",
+            b"SENSOR_USED",
+            b"NUMBER_SENSOR_NOISE_COVARIANCE",
+            b"SENSOR_NOISE_STDDEV",
+            b"SENSOR_FREQUENCY",
+        ],
+        b"user" => &[b"COMMENT", b"USER_DEFINED"],
+        _ => return None,
+    })
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    const HEADER: &[&str] = &[
+        "CLASSIFICATION",
+        "CREATION_DATE",
+        "ORIGINATOR",
+        "MESSAGE_ID",
+    ];
+    const META: &[&str] = &[
+        "OBJECT_NAME",
+        "INTERNATIONAL_DESIGNATOR",
+        "CATALOG_NAME",
+        "OBJECT_DESIGNATOR",
+        "ORIGINATOR_POC",
+        "ORIGINATOR_POSITION",
+        "ORIGINATOR_PHONE",
+        "ORIGINATOR_EMAIL",
+        "ORIGINATOR_ADDRESS",
+        "ODM_MSG_LINK",
+        "CENTER_NAME",
+        "TIME_SYSTEM",
+        "EPOCH_TZERO",
+        "ACM_DATA_ELEMENTS",
+        "START_TIME",
+        "STOP_TIME",
+        "TAIMUTC_AT_TZERO",
+        "NEXT_LEAP_EPOCH",
+        "NEXT_LEAP_TAIMUTC",
+    ];
+    const ATT: &[&str] = &[
+        "ATT_ID",
+        "ATT_PREV_ID",
+        "ATT_BASIS",
+        "ATT_BASIS_ID",
+        "REF_FRAME_A",
+        "REF_FRAME_B",
+        "NUMBER_STATES",
+        "ATT_TYPE",
+        "EULER_ROT_SEQ",
+        "RATE_TYPE",
+    ];
+    const PHYS: &[&str] = &[
+        "DRAG_COEFF",
+        "WET_MASS",
+        "DRY_MASS",
+        "CP_REF_FRAME",
+        "CP",
+        "INERTIA_REF_FRAME",
+        "IXX",
+        "IYY",
+        "IZZ",
+        "IXY",
+        "IXZ",
+        "IYZ",
+    ];
+    const COV: &[&str] = &[
+        "COV_ID",
+        "COV_PREV_ID",
+        "COV_BASIS",
+        "COV_BASIS_ID",
+        "COV_REF_FRAME",
+        "COV_TYPE",
+    ];
+    const MAN: &[&str] = &[
+        "MAN_ID",
+        "MAN_PREV_ID",
+        "MAN_PURPOSE",
+        "MAN_BEGIN_TIME",
+        "MAN_END_TIME",
+        "MAN_DURATION",
+        "ACTUATOR_USED",
+        "TARGET_MOMENTUM",
+        "TARGET_MOM_FRAME",
+        "TARGET_ATTITUDE",
+        "TARGET_SPINRATE",
+    ];
+    const AD: &[&str] = &[
+        "AD_ID",
+        "AD_PREV_ID",
+        "AD_METHOD",
+        "ATTITUDE_SOURCE",
+        "NUMBER_STATES",
+        "ATTITUDE_STATES",
+        "EULER_ROT_SEQ",
+        "COV_TYPE",
+        "REF_FRAME_A",
+        "REF_FRAME_B",
+        "RATE_STATES",
+        "SIGMA_U",
+        "SIGMA_V",
+        "RATE_PROCESS_NOISE_STDDEV",
+    ];
+    const SENSOR: &[&str] = &[
+        "SENSOR_NUMBER",
+        "SENSOR_USED",
+        "NUMBER_SENSOR_NOISE_COVARIANCE",
+        "SENSOR_NOISE_STDDEV",
+        "SENSOR_FREQUENCY",
+    ];
+
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating ACM KVN structure"],
+            offset,
+        }))))
+    };
+    let block_keys = |block: &str| -> Option<&[&str]> {
+        Some(match block {
+            "META" => META,
+            "ATT" => ATT,
+            "PHYS" => PHYS,
+            "COV" => COV,
+            "MAN" => MAN,
+            "AD" => AD,
+            "SENSOR" => SENSOR,
+            "USER" => return None,
+            _ => return None,
+        })
+    };
+    let outer_rank = |block: &str| match block {
+        "META" => Some(0usize),
+        "ATT" => Some(1),
+        "PHYS" => Some(2),
+        "COV" => Some(3),
+        "MAN" => Some(4),
+        "AD" => Some(5),
+        "USER" => Some(6),
+        _ => None,
+    };
+
+    let mut block: Option<&str> = None;
+    let mut previous_key = None;
+    let mut top_rank = None;
+    let mut last_outer_rank = None;
+    let mut seen_nonrepeatable = 0u8;
+    let mut block_has_content = false;
+    let mut history_started = false;
+    let mut ad_sensor_started = false;
+    let mut offset = 0usize;
+
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        if line.len() > 254 {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            if block.is_none() && top_rank != Some(0) {
+                return fail("ACM header COMMENT must immediately follow the version record");
+            }
+            if block_has_content && block.is_some() {
+                return fail("COMMENT is not at the beginning of an ACM logical block");
+            }
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if let Some(marker) = line.strip_suffix("_START") {
+            if marker == "SENSOR" {
+                if block != Some("AD") || !ad_sensor_started && history_started {
+                    return fail("SENSOR block must be nested directly in AD");
+                }
+                block = Some("SENSOR");
+                previous_key = None;
+                block_has_content = false;
+                history_started = false;
+                ad_sensor_started = true;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            if block.is_some() {
+                return fail("unknown or nested ACM marked block");
+            }
+            let rank = outer_rank(marker)
+                .ok_or_else(|| invalid(number, offset, "unknown ACM marked block".into()))?;
+            if rank == 0 && last_outer_rank.is_some() {
+                return fail("duplicate ACM metadata block");
+            }
+            if last_outer_rank.is_some_and(|previous| rank < previous) {
+                return fail("out-of-order ACM marked block");
+            }
+            if !matches!(marker, "ATT" | "COV" | "MAN") {
+                let bit = 1u8 << rank;
+                if seen_nonrepeatable & bit != 0 {
+                    return fail("duplicate non-repeatable ACM marked block");
+                }
+                seen_nonrepeatable |= bit;
+            }
+            if rank != 0 && last_outer_rank.is_none() {
+                return fail("META must be the first ACM marked block");
+            }
+            last_outer_rank = Some(rank);
+            block = Some(marker);
+            previous_key = None;
+            block_has_content = false;
+            history_started = false;
+            ad_sensor_started = false;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if let Some(marker) = line.strip_suffix("_STOP") {
+            if marker == "SENSOR" {
+                if block != Some("SENSOR") {
+                    return fail("mismatched ACM SENSOR block end");
+                }
+                block = Some("AD");
+                previous_key = None;
+                block_has_content = true;
+                history_started = false;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            if block != Some(marker) {
+                return fail("mismatched ACM marked block end");
+            }
+            block = None;
+            previous_key = None;
+            block_has_content = false;
+            history_started = false;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+
+        match block {
+            None => {
+                if last_outer_rank.is_some() {
+                    return fail("content outside an ACM marked block");
+                }
+                if !line.contains('=') {
+                    return fail("expected one ACM header assignment");
+                }
+                let key = line.split_once('=').unwrap().0.trim();
+                let rank = if key == "CCSDS_ACM_VERS" {
+                    0
+                } else {
+                    HEADER
+                        .iter()
+                        .position(|candidate| *candidate == key)
+                        .map(|rank| rank + 1)
+                        .ok_or_else(|| {
+                            invalid(number, offset, "unknown ACM header keyword".into())
+                        })?
+                };
+                if top_rank.is_none() && rank != 0 {
+                    return fail("CCSDS_ACM_VERS must be the first record");
+                }
+                if top_rank.is_some_and(|previous| rank <= previous) {
+                    return fail("duplicate or out-of-order ACM header keyword");
+                }
+                top_rank = Some(rank);
+                block_has_content = true;
+            }
+            Some("ATT" | "COV") if !line.contains('=') => {
+                history_started = true;
+                block_has_content = true;
+            }
+            Some("USER") => {
+                if !line.contains('=')
+                    || !line
+                        .split_once('=')
+                        .unwrap()
+                        .0
+                        .trim()
+                        .starts_with("USER_DEFINED_")
+                {
+                    return fail("invalid ACM user-defined assignment");
+                }
+                block_has_content = true;
+            }
+            Some(current) => {
+                if history_started {
+                    return fail("assignment after ACM history data");
+                }
+                if current == "AD" && ad_sensor_started {
+                    return fail("AD assignment after SENSOR block");
+                }
+                if !line.contains('=') {
+                    return fail("expected one ACM block assignment");
+                }
+                let key = line.split_once('=').unwrap().0.trim();
+                let keys = block_keys(current)
+                    .ok_or_else(|| invalid(number, offset, "unknown ACM marked block".into()))?;
+                let rank = keys
+                    .iter()
+                    .position(|candidate| *candidate == key)
+                    .ok_or_else(|| invalid(number, offset, "unknown ACM keyword".into()))?;
+                if previous_key.is_some_and(|previous| rank <= previous) {
+                    return fail("duplicate or out-of-order ACM keyword");
+                }
+                previous_key = Some(rank);
+                block_has_content = true;
+            }
+        }
+        offset += raw_line.len() + 1;
+    }
+    if block.is_some() {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "unclosed ACM marked block".into(),
+        ));
+    }
+    Ok(())
 }
 
 impl ToKvn for Acm {
@@ -115,6 +891,7 @@ impl ToKvn for Acm {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct AcmBody {
     #[serde(rename = "segment")]
     pub segment: Box<AcmSegment>,
@@ -137,6 +914,7 @@ impl ToKvn for AcmBody {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct AcmSegment {
     pub metadata: AcmMetadata,
     pub data: AcmData,
@@ -170,7 +948,7 @@ impl ToKvn for AcmSegment {
 
 /// ACM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct AcmMetadata {
     /// Comments (allowed only at the beginning of the ACM Metadata). Each comment line shall begin
     /// with this keyword.
@@ -520,13 +1298,13 @@ impl ToKvn for AcmMetadata {
             writer.write_pair("STOP_TIME", v);
         }
         if let Some(v) = &self.taimutc_at_tzero {
-            writer.write_measure("TAIMUTC_AT_TZERO", &v.to_unit_value());
+            writer.write_odm_float_measure("TAIMUTC_AT_TZERO", &v.to_unit_value());
         }
         if let Some(v) = &self.next_leap_epoch {
             writer.write_pair("NEXT_LEAP_EPOCH", v);
         }
         if let Some(v) = &self.next_leap_taimutc {
-            writer.write_measure("NEXT_LEAP_TAIMUTC", &v.to_unit_value());
+            writer.write_odm_float_measure("NEXT_LEAP_TAIMUTC", &v.to_unit_value());
         }
         writer.write_section("META_STOP");
     }
@@ -538,7 +1316,7 @@ impl ToKvn for AcmMetadata {
 
 /// ACM Data Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct AcmData {
     /// One or more optional attitude state time histories (each consisting of one or more attitude
     /// states).
@@ -550,12 +1328,7 @@ pub struct AcmData {
     /// A single space object physical characteristics section.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        rename = "phys",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "phys", default, skip_serializing_if = "Option::is_none")]
     pub phys: Option<AcmPhysicalDescription>,
     /// One or more optional covariance time histories (each consisting of one or more covariance
     /// matrix diagonals).
@@ -578,12 +1351,7 @@ pub struct AcmData {
     /// A single user-defined Data section.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.10.
-    #[serde(
-        rename = "user",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "user", default, skip_serializing_if = "Option::is_none")]
     pub user: Option<UserDefined>,
 }
 
@@ -842,6 +1610,21 @@ impl AcmAttitudeState {
             }
             .into());
         }
+        let expected = self.number_states as usize + 1;
+        if let Some(line) = self
+            .att_lines
+            .iter()
+            .find(|line| line.values.len() != expected)
+        {
+            return Err(ValidationError::InvalidValue {
+                field: "attLine".into(),
+                value: line.values.len().to_string(),
+                expected: format!("relative time plus {} attitude states", self.number_states)
+                    .into(),
+                line: None,
+            }
+            .into());
+        }
         Ok(())
     }
 }
@@ -866,14 +1649,14 @@ impl ToKvn for AcmAttitudeState {
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
         writer.write_pair("NUMBER_STATES", self.number_states);
         writer.write_pair("ATT_TYPE", &self.att_type);
-        if let Some(v) = &self.rate_type {
-            writer.write_pair("RATE_TYPE", v);
-        }
         if let Some(v) = &self.euler_rot_seq {
             writer.write_pair("EULER_ROT_SEQ", v);
         }
+        if let Some(v) = &self.rate_type {
+            writer.write_pair("RATE_TYPE", v);
+        }
         for line in &self.att_lines {
-            writer.write_line(line.to_string());
+            writer.write_numeric_record(&line.values);
         }
         writer.write_section("ATT_STOP");
     }
@@ -1091,6 +1874,17 @@ impl AcmPhysicalDescription {
             }
             .into());
         }
+        if let Some(cp) = &self.cp {
+            if cp.elements.len() != 3 {
+                return Err(ValidationError::InvalidValue {
+                    field: "CP".into(),
+                    value: cp.elements.len().to_string(),
+                    expected: "exactly 3 vector elements".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
         Ok(())
     }
 }
@@ -1100,42 +1894,40 @@ impl ToKvn for AcmPhysicalDescription {
         writer.write_section("PHYS_START");
         writer.write_comments(&self.comment);
         if let Some(v) = self.drag_coeff {
-            writer.write_pair("DRAG_COEFF", v);
+            writer.write_odm_float_pair("DRAG_COEFF", v);
         }
         if let Some(v) = &self.wet_mass {
-            writer.write_measure("WET_MASS", &v.to_unit_value());
+            writer.write_odm_float_measure("WET_MASS", &v.to_unit_value());
         }
         if let Some(v) = &self.dry_mass {
-            writer.write_measure("DRY_MASS", &v.to_unit_value());
+            writer.write_odm_float_measure("DRY_MASS", &v.to_unit_value());
         }
         if let Some(v) = &self.cp_ref_frame {
             writer.write_pair("CP_REF_FRAME", v);
         }
         if let Some(v) = &self.cp {
-            writer.write_pair("CP_X", v.elements[0]);
-            writer.write_pair("CP_Y", v.elements[1]);
-            writer.write_pair("CP_Z", v.elements[2]);
+            writer.write_numeric_vector("CP", &v.elements, v.units.as_ref());
         }
         if let Some(v) = &self.inertia_ref_frame {
             writer.write_pair("INERTIA_REF_FRAME", v);
         }
         if let Some(v) = &self.ixx {
-            writer.write_measure("IXX", v);
+            writer.write_odm_float_measure("IXX", v);
         }
         if let Some(v) = &self.iyy {
-            writer.write_measure("IYY", v);
+            writer.write_odm_float_measure("IYY", v);
         }
         if let Some(v) = &self.izz {
-            writer.write_measure("IZZ", v);
+            writer.write_odm_float_measure("IZZ", v);
         }
         if let Some(v) = &self.ixy {
-            writer.write_measure("IXY", v);
+            writer.write_odm_float_measure("IXY", v);
         }
         if let Some(v) = &self.ixz {
-            writer.write_measure("IXZ", v);
+            writer.write_odm_float_measure("IXZ", v);
         }
         if let Some(v) = &self.iyz {
-            writer.write_measure("IYZ", v);
+            writer.write_odm_float_measure("IYZ", v);
         }
         writer.write_section("PHYS_STOP");
     }
@@ -1161,14 +1953,42 @@ pub struct AcmCovarianceMatrix {
     /// **Examples**: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
-    pub cov_basis: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub cov_id: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub cov_prev_id: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub cov_basis: Option<AttBasisType>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub cov_basis_id: Option<String>,
     /// Reference frame of the covariance time history. The full set of values is enumerated in
     /// annex B, subsection B3.
     ///
     /// **Examples**: SC_BODY_1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
-    pub cov_ref_frame: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub cov_ref_frame: Option<String>,
     /// Indicates covariance composition. Select from annex B, subsection B6.
     ///
     /// **Examples**: ANGLE, ANGLE_GYROBIAS
@@ -1178,11 +1998,7 @@ pub struct AcmCovarianceMatrix {
     /// Optional confidence level of the covariance matrix.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(skip)]
     pub cov_confidence: Option<f64>,
     /// Covariance data lines (diagonal terms only). (For the data units, see annex B, subsection
     /// B6.)
@@ -1194,6 +2010,15 @@ pub struct AcmCovarianceMatrix {
 
 impl AcmCovarianceMatrix {
     fn validate(&self) -> Result<()> {
+        if self.cov_confidence.is_some() {
+            return Err(ValidationError::InvalidValue {
+                field: "COV_CONFIDENCE".into(),
+                value: "present".into(),
+                expected: "omitted; ACM 2.0 does not define COV_CONFIDENCE".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.cov_lines.is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Covariance".into(),
@@ -1210,14 +2035,24 @@ impl ToKvn for AcmCovarianceMatrix {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("COV_START");
         writer.write_comments(&self.comment);
-        writer.write_pair("COV_BASIS", &self.cov_basis);
-        writer.write_pair("COV_REF_FRAME", &self.cov_ref_frame);
-        writer.write_pair("COV_TYPE", &self.cov_type);
-        if let Some(v) = self.cov_confidence {
-            writer.write_pair("COV_CONFIDENCE", v);
+        if let Some(v) = &self.cov_id {
+            writer.write_pair("COV_ID", v);
         }
+        if let Some(v) = &self.cov_prev_id {
+            writer.write_pair("COV_PREV_ID", v);
+        }
+        if let Some(v) = &self.cov_basis {
+            writer.write_pair("COV_BASIS", v);
+        }
+        if let Some(v) = &self.cov_basis_id {
+            writer.write_pair("COV_BASIS_ID", v);
+        }
+        if let Some(v) = &self.cov_ref_frame {
+            writer.write_pair("COV_REF_FRAME", v);
+        }
+        writer.write_pair("COV_TYPE", &self.cov_type);
         for line in &self.cov_lines {
-            writer.write_line(line.to_string());
+            writer.write_numeric_record(&line.values);
         }
         writer.write_section("COV_STOP");
     }
@@ -1435,6 +2270,17 @@ impl AcmManeuverParameters {
             }
             .into());
         }
+        if let Some(momentum) = &self.target_momentum {
+            if momentum.elements.len() != 3 {
+                return Err(ValidationError::InvalidValue {
+                    field: "TARGET_MOMENTUM".into(),
+                    value: momentum.elements.len().to_string(),
+                    expected: "exactly 3 vector elements".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
         if let Some(att) = &self.target_attitude {
             if att.values.len() != 4 {
                 return Err(ValidationError::InvalidValue {
@@ -1487,24 +2333,22 @@ impl ToKvn for AcmManeuverParameters {
             writer.write_pair("MAN_END_TIME", v);
         }
         if let Some(v) = &self.man_duration {
-            writer.write_measure("MAN_DURATION", &v.to_unit_value());
+            writer.write_odm_float_measure("MAN_DURATION", &v.to_unit_value());
         }
         if let Some(v) = &self.actuator_used {
             writer.write_pair("ACTUATOR_USED", v);
         }
         if let Some(v) = &self.target_momentum {
-            writer.write_pair("TARGET_MOM_X", v.elements[0]);
-            writer.write_pair("TARGET_MOM_Y", v.elements[1]);
-            writer.write_pair("TARGET_MOM_Z", v.elements[2]);
+            writer.write_numeric_vector("TARGET_MOMENTUM", &v.elements, v.units.as_ref());
         }
         if let Some(v) = &self.target_mom_frame {
             writer.write_pair("TARGET_MOM_FRAME", v);
         }
         if let Some(v) = &self.target_attitude {
-            writer.write_pair("TARGET_ATTITUDE", v);
+            writer.write_numeric_vector("TARGET_ATTITUDE", &v.values, None::<&&str>);
         }
         if let Some(v) = &self.target_spinrate {
-            writer.write_measure("TARGET_SPINRATE", v);
+            writer.write_odm_float_measure("TARGET_SPINRATE", v);
         }
         writer.write_section("MAN_STOP");
     }
@@ -1601,6 +2445,13 @@ pub struct AcmAttitudeDetermination {
     )]
     #[builder(into)]
     pub attitude_states: Option<AcmAttitudeType>,
+    /// Euler rotation sequence when the estimator attitude states use Euler angles.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub euler_rot_seq: Option<RotSeq>,
     /// Indicates covariance composition. Select from annex B, subsection B6.
     ///
     /// **Examples**: ANGLE, ANGLE_GYROBIAS
@@ -1616,11 +2467,7 @@ pub struct AcmAttitudeDetermination {
     /// Epoch of the attitude determination.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(skip)]
     pub ad_epoch: Option<Epoch>,
     /// Name of the reference frame that defines the starting point of the transformation described
     /// by the attitude state in the estimator. The set of allowed values is described in annex B,
@@ -1654,11 +2501,7 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: QUATERNION
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(skip)]
     pub attitude_type: Option<String>,
     /// Type of rate state included in the estimator. If rate states are included, attitude_states
     /// must be at least 6 to include both attitude states and rate states.
@@ -1720,6 +2563,24 @@ pub struct AcmAttitudeDetermination {
 
 impl AcmAttitudeDetermination {
     fn validate(&self) -> Result<()> {
+        if self.ad_epoch.is_some() {
+            return Err(ValidationError::InvalidValue {
+                field: "AD_EPOCH".into(),
+                value: "present".into(),
+                expected: "omitted; ACM 2.0 does not define AD_EPOCH".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.attitude_type.is_some() {
+            return Err(ValidationError::InvalidValue {
+                field: "ATTITUDE_TYPE".into(),
+                value: "present".into(),
+                expected: "omitted; use ATTITUDE_STATES in ACM 2.0".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.attitude_states.is_none() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Attitude Determination".into(),
@@ -1744,11 +2605,56 @@ impl AcmAttitudeDetermination {
             }
             .into());
         }
+        if self.number_states == Some(0) {
+            return Err(ValidationError::OutOfRange {
+                name: "NUMBER_STATES".into(),
+                value: "0".into(),
+                expected: "positive integer".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.sensors.is_empty() {
             return Ok(());
         }
 
-        let mut numbers: Vec<u32> = self.sensors.iter().map(|s| s.sensor_number).collect();
+        for sensor in &self.sensors {
+            if sensor.sensor_number == Some(0) {
+                return Err(ValidationError::OutOfRange {
+                    name: "SENSOR_NUMBER".into(),
+                    value: "0".into(),
+                    expected: "positive integer".into(),
+                    line: None,
+                }
+                .into());
+            }
+            if sensor.number_sensor_noise_covariance == Some(0) {
+                return Err(ValidationError::OutOfRange {
+                    name: "NUMBER_SENSOR_NOISE_COVARIANCE".into(),
+                    value: "0".into(),
+                    expected: "positive integer".into(),
+                    line: None,
+                }
+                .into());
+            }
+            if let Some(frequency) = &sensor.sensor_frequency {
+                if !frequency.value.is_finite() || frequency.value <= 0.0 {
+                    return Err(ValidationError::OutOfRange {
+                        name: "SENSOR_FREQUENCY".into(),
+                        value: frequency.value.to_string(),
+                        expected: "finite value > 0".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+
+        let mut numbers: Vec<u32> = self
+            .sensors
+            .iter()
+            .filter_map(|s| s.sensor_number)
+            .collect();
         numbers.sort_unstable();
 
         for window in numbers.windows(2) {
@@ -1791,11 +2697,11 @@ impl ToKvn for AcmAttitudeDetermination {
         if let Some(v) = &self.attitude_states {
             writer.write_pair("ATTITUDE_STATES", v);
         }
+        if let Some(v) = &self.euler_rot_seq {
+            writer.write_pair("EULER_ROT_SEQ", v);
+        }
         if let Some(v) = &self.cov_type {
             writer.write_pair("COV_TYPE", v);
-        }
-        if let Some(v) = &self.ad_epoch {
-            writer.write_pair("AD_EPOCH", v);
         }
         if let Some(v) = &self.ref_frame_a {
             writer.write_pair("REF_FRAME_A", v);
@@ -1803,20 +2709,17 @@ impl ToKvn for AcmAttitudeDetermination {
         if let Some(v) = &self.ref_frame_b {
             writer.write_pair("REF_FRAME_B", v);
         }
-        if let Some(v) = &self.attitude_type {
-            writer.write_pair("ATTITUDE_TYPE", v);
-        }
         if let Some(v) = &self.rate_states {
             writer.write_pair("RATE_STATES", v);
         }
         if let Some(v) = &self.sigma_u {
-            writer.write_measure("SIGMA_U", v);
+            writer.write_odm_float_measure("SIGMA_U", v);
         }
         if let Some(v) = &self.sigma_v {
-            writer.write_measure("SIGMA_V", v);
+            writer.write_odm_float_measure("SIGMA_V", v);
         }
         if let Some(v) = &self.rate_process_noise_stddev {
-            writer.write_measure("RATE_PROCESS_NOISE_STDDEV", v);
+            writer.write_odm_float_measure("RATE_PROCESS_NOISE_STDDEV", v);
         }
         for sensor in &self.sensors {
             sensor.write_kvn(writer);
@@ -1842,7 +2745,12 @@ pub struct AcmSensor {
     /// **Examples**: 1, 2, 3
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    pub sensor_number: u32,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub sensor_number: Option<u32>,
     /// Type of sensor used in estimation.
     ///
     /// **Examples**: AST, DSS, GYRO
@@ -1854,6 +2762,13 @@ pub struct AcmSensor {
         with = "crate::utils::nullable"
     )]
     pub sensor_used: Option<String>,
+    /// Number of elements in the sensor-noise covariance representation.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::nullable"
+    )]
+    pub number_sensor_noise_covariance: Option<u32>,
     /// Standard deviation of sensor noise.
     ///
     /// **Examples**: 0.0097 0.0097
@@ -1879,32 +2794,27 @@ pub struct AcmSensor {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub sensor_frequency: Option<f64>,
+    pub sensor_frequency: Option<Frequency>,
 }
 
 impl ToKvn for AcmSensor {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("SENSOR_START");
         writer.write_comments(&self.comment);
-        writer.write_pair("SENSOR_NUMBER", self.sensor_number);
+        if let Some(v) = self.sensor_number {
+            writer.write_pair("SENSOR_NUMBER", v);
+        }
         if let Some(v) = &self.sensor_used {
             writer.write_pair("SENSOR_USED", v);
         }
-        if let Some(v) = &self.sensor_noise_stddev {
-            let val_str = v
-                .values
-                .iter()
-                .map(|f| f.to_string())
-                .collect::<Vec<_>>()
-                .join(" ");
-            if let Some(u) = &v.units {
-                writer.write_pair("SENSOR_NOISE_STDDEV", format!("{} [{}]", val_str, u));
-            } else {
-                writer.write_pair("SENSOR_NOISE_STDDEV", val_str);
-            }
+        if let Some(v) = self.number_sensor_noise_covariance {
+            writer.write_pair("NUMBER_SENSOR_NOISE_COVARIANCE", v);
         }
-        if let Some(v) = self.sensor_frequency {
-            writer.write_pair("SENSOR_FREQUENCY", v);
+        if let Some(v) = &self.sensor_noise_stddev {
+            writer.write_numeric_vector("SENSOR_NOISE_STDDEV", &v.values, v.units.as_ref());
+        }
+        if let Some(v) = &self.sensor_frequency {
+            writer.write_odm_float_measure("SENSOR_FREQUENCY", &v.to_unit_value());
         }
         writer.write_section("SENSOR_STOP");
     }
@@ -1940,8 +2850,8 @@ META_STOP
 ATT_START
 REF_FRAME_A = EME2000
 REF_FRAME_B = SC_BODY_1
-ATT_TYPE = QUATERNION
 NUMBER_STATES = 4
+ATT_TYPE = QUATERNION
 0.0 0.5 0.5 0.5 0.5
 ATT_STOP
 "#
@@ -1975,15 +2885,15 @@ META_STOP
 ATT_START
 REF_FRAME_A = GCRF
 REF_FRAME_B = SC_BODY
-ATT_TYPE = QUATERNION
 NUMBER_STATES = 4
+ATT_TYPE = QUATERNION
 0.0 0 0 0 1
 ATT_STOP
 ATT_START
 REF_FRAME_A = GCRF
 REF_FRAME_B = INSTRUMENT
-ATT_TYPE = QUATERNION
 NUMBER_STATES = 4
+ATT_TYPE = QUATERNION
 0.0 0 0 0 1
 ATT_STOP
 "#;
@@ -2003,8 +2913,8 @@ META_STOP
 ATT_START
 REF_FRAME_A = GCRF
 REF_FRAME_B = SC_BODY
-ATT_TYPE = QUATERNION
 NUMBER_STATES = 4
+ATT_TYPE = QUATERNION
 0.0 0 0 0 1
 ATT_STOP
 "#;
@@ -2062,7 +2972,7 @@ AD_STOP
         );
         assert_eq!(
             parsed.body.segment.data.ad.as_ref().unwrap().sensors[0].sensor_number,
-            1
+            Some(1)
         );
     }
 }

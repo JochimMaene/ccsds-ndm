@@ -7,15 +7,12 @@
 //! This module implements KVN parsing for CDM using winnow parser combinators.
 
 use crate::common::OdParameters;
-use crate::error::InternalParserError;
 use crate::kvn::parser::*;
 use crate::messages::cdm::{
     AdditionalParameters, Cdm, CdmBody, CdmCovarianceMatrix, CdmData, CdmHeader, CdmMetadata,
     CdmSegment, CdmStateVector, RelativeMetadataData, RelativeStateVector,
 };
-use crate::parse_block;
 use winnow::combinator::peek;
-use winnow::error::AddContext;
 use winnow::prelude::*;
 use winnow::stream::Offset;
 
@@ -35,7 +32,8 @@ pub fn cdm_version(input: &mut &str) -> KvnResult<String> {
 //----------------------------------------------------------------------
 
 pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
-    let mut comment = Vec::new();
+    // Header comments are only permitted immediately after the version line.
+    let comment = collect_comments.parse_next(input)?;
     let mut creation_date = None;
 
     let mut originator = None;
@@ -44,7 +42,11 @@ pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
 
     loop {
         let checkpoint = input.checkpoint();
-        comment.extend(collect_comments.parse_next(input)?);
+        let upcoming_comments = collect_comments.parse_next(input)?;
+        if !upcoming_comments.is_empty() {
+            input.reset(&checkpoint);
+            break;
+        }
 
         let key = match keyword.parse_next(input) {
             Ok(k) => k,
@@ -121,7 +123,7 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
     let mut collision_probability = None;
     let mut collision_probability_method = None;
 
-    parse_block!(input, comment, {
+    parse_routed_block!(input, |_, comments| comment.extend(comments), {
         "TCA" => tca: kv_calendar_epoch,
         "MISS_DISTANCE" => miss_distance: kv_from_kvn,
         "RELATIVE_SPEED" => val: kv_from_kvn_opt => { relative_speed = val; },
@@ -271,6 +273,40 @@ fn is_cdm_data_key(key: &str) -> bool {
     )
 }
 
+fn is_od_parameter_key(key: &str) -> bool {
+    matches!(
+        key,
+        "TIME_LASTOB_START"
+            | "TIME_LASTOB_END"
+            | "RECOMMENDED_OD_SPAN"
+            | "ACTUAL_OD_SPAN"
+            | "OBS_AVAILABLE"
+            | "OBS_USED"
+            | "TRACKS_AVAILABLE"
+            | "TRACKS_USED"
+            | "RESIDUALS_ACCEPTED"
+            | "WEIGHTED_RMS"
+    )
+}
+
+fn is_additional_parameter_key(key: &str) -> bool {
+    matches!(
+        key,
+        "AREA_PC"
+            | "AREA_DRG"
+            | "AREA_SRP"
+            | "MASS"
+            | "CD_AREA_OVER_MASS"
+            | "CR_AREA_OVER_MASS"
+            | "THRUST_ACCELERATION"
+            | "SEDR"
+    )
+}
+
+fn is_state_vector_key(key: &str) -> bool {
+    matches!(key, "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT")
+}
+
 pub fn cdm_metadata(input: &mut &str) -> KvnResult<CdmMetadata> {
     let has_meta_block = if at_block_start("META", input) {
         expect_block_start("META").parse_next(input)?;
@@ -302,7 +338,7 @@ pub fn cdm_metadata(input: &mut &str) -> KvnResult<CdmMetadata> {
     let mut earth_tides = None;
     let mut intrack_thrust = None;
 
-    parse_block!(input, comment, {
+    parse_routed_block!(input, |_, comments| comment.extend(comments), {
         "OBJECT" => object: kv_enum,
         "OBJECT_DESIGNATOR" => object_designator: kv_string,
         "CATALOG_NAME" => val: kv_string_opt => { catalog_name = val; },
@@ -371,6 +407,9 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
     let mut comment = Vec::new();
     let mut od_params = OdParameters::default();
     let mut add_params = AdditionalParameters::default();
+    let mut state_vector_comment = Vec::new();
+    let mut covariance_comment = Vec::new();
+    let mut saw_data_key = false;
     let mut x = None;
     let mut y = None;
     let mut z = None;
@@ -429,7 +468,23 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
     let mut cthr_thr = None;
     let mut has_cov = false;
 
-    parse_block!(input, comment, {
+    parse_routed_block!(input, |key, comments| {
+        // The outer data comment and the first nested block's comment are adjacent in KVN and
+        // therefore intrinsically ambiguous. Keep that leading run on the outer data block so
+        // generation preserves its position. Later runs have an unambiguous following block.
+        if !saw_data_key {
+            comment.extend(comments);
+            saw_data_key = true;
+        } else if is_od_parameter_key(key) {
+            od_params.comment.extend(comments);
+        } else if is_additional_parameter_key(key) {
+            add_params.comment.extend(comments);
+        } else if is_state_vector_key(key) {
+            state_vector_comment.extend(comments);
+        } else {
+            covariance_comment.extend(comments);
+        }
+    }, {
         "TIME_LASTOB_START" => val: kv_calendar_epoch_opt => { od_params.time_lastob_start = val; has_od_params = true; },
         "TIME_LASTOB_END" => val: kv_calendar_epoch_opt => { od_params.time_lastob_end = val; has_od_params = true; },
         "RECOMMENDED_OD_SPAN" => val: kv_from_kvn_opt => { od_params.recommended_od_span = val; has_od_params = true; },
@@ -506,7 +561,7 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
 
     let covariance_matrix = if has_cov {
         Some(CdmCovarianceMatrix {
-            comment: Vec::new(),
+            comment: covariance_comment,
             cr_r: cr_r.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CR_R"))?,
             ct_r: ct_r.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CT_R"))?,
             ct_t: ct_t.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CT_T"))?,
@@ -581,6 +636,7 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
             None
         },
         state_vector: CdmStateVector {
+            comment: state_vector_comment,
             x: x.ok_or_else(|| missing_field_err(input, "Data", "X"))?,
             y: y.ok_or_else(|| missing_field_err(input, "Data", "Y"))?,
             z: z.ok_or_else(|| missing_field_err(input, "Data", "Z"))?,
@@ -995,13 +1051,12 @@ MESSAGE_ID = MSG-001
 
 TCA = 2025-01-02T12:00:00
 MISS_DISTANCE = 100.0 [m]
-SCREEN_VOLUME_SHAPE = BOX
 RELATIVE_POSITION_R = 10.0 [m]
 RELATIVE_POSITION_T = -20.0 [m]
 RELATIVE_POSITION_N = 5.0 [m]
 RELATIVE_VELOCITY_R = 0.1 [m/s]
 RELATIVE_VELOCITY_T = -0.2 [m/s]
-// Missing RELATIVE_VELOCITY_N
+SCREEN_VOLUME_SHAPE = BOX
 OBJECT = OBJECT1
 OBJECT_DESIGNATOR = 1
 CATALOG_NAME = CAT
@@ -1232,10 +1287,7 @@ ORIGINATOR = TEST
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(
-                        err.message.contains("Unknown Relative Metadata key")
-                            || err.contexts.contains(&"Unknown Relative Metadata key")
-                    )
+                    assert!(err.message.contains("unknown CDM keyword"))
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
             },
@@ -1248,8 +1300,8 @@ ORIGINATOR = TEST
         let mut kvn = sample_cdm_kvn();
         // Add optional metadata fields
         kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOPERATOR_CONTACT_POSITION = Flight Director\nOPERATOR_ORGANIZATION = NASA\nOPERATOR_PHONE = +1-555-1234\nOPERATOR_EMAIL = contact@nasa.gov\nORBIT_CENTER = EARTH\nGRAVITY_MODEL = EGM-96\nATMOSPHERIC_MODEL = JACCHIA 70 DCA\nN_BODY_PERTURBATIONS = MOON, SUN\nSOLAR_RAD_PRESSURE = YES\nEARTH_TIDES = YES\nINTRACK_THRUST = YES",
+            "OBJECT_TYPE = PAYLOAD\nEPHEMERIS_NAME = EPH1\nCOVARIANCE_METHOD = CALCULATED\nMANEUVERABLE = YES\nREF_FRAME = EME2000",
+            "OBJECT_TYPE = PAYLOAD\nOPERATOR_CONTACT_POSITION = Flight Director\nOPERATOR_ORGANIZATION = NASA\nOPERATOR_PHONE = +1-555-1234\nOPERATOR_EMAIL = contact@nasa.gov\nEPHEMERIS_NAME = EPH1\nCOVARIANCE_METHOD = CALCULATED\nMANEUVERABLE = YES\nORBIT_CENTER = EARTH\nREF_FRAME = EME2000\nGRAVITY_MODEL = EGM-96\nATMOSPHERIC_MODEL = JACCHIA 70 DCA\nN_BODY_PERTURBATIONS = MOON, SUN\nSOLAR_RAD_PRESSURE = YES\nEARTH_TIDES = YES\nINTRACK_THRUST = YES",
         );
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with optional metadata");
@@ -1424,10 +1476,7 @@ ORIGINATOR = TEST
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(
-                        err.message.contains("Unknown metadata key")
-                            || err.contexts.contains(&"Unknown metadata key")
-                    )
+                    assert!(err.message.contains("unknown CDM keyword"))
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
             },
@@ -1560,10 +1609,7 @@ ORIGINATOR = TEST
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(
-                        err.message.contains("Unknown Data key")
-                            || err.contexts.contains(&"Unknown Data key")
-                    )
+                    assert!(err.message.contains("unknown CDM keyword"))
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
             },
@@ -1627,7 +1673,6 @@ TCA = 2025-01-02T12:00:00
 MISS_DISTANCE = 100.0 [m]
 RELATIVE_SPEED = 7.5 [m/s]
 RELATIVE_POSITION_R = 10.0 [m]
-# Missing RELATIVE_POSITION_T etc.
 SCREEN_VOLUME_FRAME = RTN
 "#;
         let err = Cdm::from_kvn(input).unwrap_err();

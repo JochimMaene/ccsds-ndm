@@ -16,8 +16,8 @@ configured streaming output limit is counted before the caller sink receives byt
 fast path performs one serialization pass.
 
 `convert_opm` composes strict parsing and validated target generation. `convert_opm_file` and
-`convert_opm_to_file` replace a destination atomically only after conversion succeeds. XML values
-that need more than 16 significant digits in KVN fail rather than round.
+`convert_opm_to_file` replace a destination atomically only after conversion succeeds. Finite XML
+values are rounded when necessary to the 16-digit KVN representation required by CCSDS ODM.
 
 Errors expose stable `code()`, `field_path()`, and `diagnostic()` accessors. Diagnostic wording may
 improve before 1.0; codes, enum meanings, and canonical paths are the machine interface.

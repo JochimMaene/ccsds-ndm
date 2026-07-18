@@ -7,7 +7,7 @@ use crate::common::{
     SpinState,
 };
 
-use crate::error::{Result, ValidationError};
+use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 #[cfg(test)]
@@ -75,6 +75,7 @@ impl Ndm for Apm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        validate_kvn_syntax(kvn)?;
         let apm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&apm)?;
         Ok(apm)
@@ -91,10 +92,379 @@ impl Ndm for Apm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        crate::xml::validate_document_root(xml, b"apm", "APM")?;
+        validate_xml_sequences(xml)?;
         let apm: Self = crate::xml::from_str_with_context(xml, "APM")?;
         crate::traits::Validate::validate(&apm)?;
         Ok(apm)
     }
+}
+
+fn validate_xml_sequences(xml: &str) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
+
+    let rule = |rank, repeatable| XmlSequenceRule { rank, repeatable };
+    crate::xml::validate_element_sequences(
+        xml,
+        "APM",
+        |parent, child| {
+            Some(match (parent, child) {
+                (b"apm", b"header") => rule(0, false),
+                (b"apm", b"body") => rule(1, false),
+                (b"header", b"COMMENT") => rule(0, true),
+                (b"header", b"CLASSIFICATION") => rule(1, false),
+                (b"header", b"CREATION_DATE") => rule(2, false),
+                (b"header", b"ORIGINATOR") => rule(3, false),
+                (b"header", b"MESSAGE_ID") => rule(4, false),
+                (b"body", b"segment") => rule(0, false),
+                (b"segment", b"metadata") => rule(0, false),
+                (b"segment", b"data") => rule(1, false),
+                (b"metadata", b"COMMENT") => rule(0, true),
+                (b"metadata", b"OBJECT_NAME") => rule(1, false),
+                (b"metadata", b"OBJECT_ID") => rule(2, false),
+                (b"metadata", b"CENTER_NAME") => rule(3, false),
+                (b"metadata", b"TIME_SYSTEM") => rule(4, false),
+                (b"data", b"COMMENT") => rule(0, true),
+                (b"data", b"EPOCH") => rule(1, false),
+                (b"data", b"quaternionState") => rule(2, true),
+                (b"data", b"eulerAngleState") => rule(3, true),
+                (b"data", b"angularVelocity") => rule(4, true),
+                (b"data", b"spin") => rule(5, true),
+                (b"data", b"inertia") => rule(6, true),
+                (b"data", b"maneuverParameters") => rule(7, true),
+                (b"quaternionState", b"COMMENT") => rule(0, true),
+                (b"quaternionState", b"REF_FRAME_A") => rule(1, false),
+                (b"quaternionState", b"REF_FRAME_B") => rule(2, false),
+                (b"quaternionState", b"quaternion") => rule(3, false),
+                (b"quaternionState", b"quaternionDot") => rule(4, false),
+                (b"quaternion", b"Q1") => rule(0, false),
+                (b"quaternion", b"Q2") => rule(1, false),
+                (b"quaternion", b"Q3") => rule(2, false),
+                (b"quaternion", b"QC") => rule(3, false),
+                (b"quaternionDot", b"Q1_DOT") => rule(0, false),
+                (b"quaternionDot", b"Q2_DOT") => rule(1, false),
+                (b"quaternionDot", b"Q3_DOT") => rule(2, false),
+                (b"quaternionDot", b"QC_DOT") => rule(3, false),
+                (b"eulerAngleState", b"COMMENT") => rule(0, true),
+                (b"eulerAngleState", b"REF_FRAME_A") => rule(1, false),
+                (b"eulerAngleState", b"REF_FRAME_B") => rule(2, false),
+                (b"eulerAngleState", b"EULER_ROT_SEQ") => rule(3, false),
+                (b"eulerAngleState", b"ANGLE_1") => rule(4, false),
+                (b"eulerAngleState", b"ANGLE_2") => rule(5, false),
+                (b"eulerAngleState", b"ANGLE_3") => rule(6, false),
+                (b"eulerAngleState", b"ANGLE_1_DOT") => rule(7, false),
+                (b"eulerAngleState", b"ANGLE_2_DOT") => rule(8, false),
+                (b"eulerAngleState", b"ANGLE_3_DOT") => rule(9, false),
+                (b"angularVelocity", b"COMMENT") => rule(0, true),
+                (b"angularVelocity", b"REF_FRAME_A") => rule(1, false),
+                (b"angularVelocity", b"REF_FRAME_B") => rule(2, false),
+                (b"angularVelocity", b"ANGVEL_FRAME") => rule(3, false),
+                (b"angularVelocity", b"ANGVEL_X") => rule(4, false),
+                (b"angularVelocity", b"ANGVEL_Y") => rule(5, false),
+                (b"angularVelocity", b"ANGVEL_Z") => rule(6, false),
+                (b"spin", b"COMMENT") => rule(0, true),
+                (b"spin", b"REF_FRAME_A") => rule(1, false),
+                (b"spin", b"REF_FRAME_B") => rule(2, false),
+                (b"spin", b"SPIN_ALPHA") => rule(3, false),
+                (b"spin", b"SPIN_DELTA") => rule(4, false),
+                (b"spin", b"SPIN_ANGLE") => rule(5, false),
+                (b"spin", b"SPIN_ANGLE_VEL") => rule(6, false),
+                (b"spin", b"NUTATION") => rule(7, false),
+                (b"spin", b"NUTATION_PER") => rule(8, false),
+                (b"spin", b"NUTATION_PHASE") => rule(9, false),
+                (b"spin", b"MOMENTUM_ALPHA") => rule(10, false),
+                (b"spin", b"MOMENTUM_DELTA") => rule(11, false),
+                (b"spin", b"NUTATION_VEL") => rule(12, false),
+                (b"inertia", b"COMMENT") => rule(0, true),
+                (b"inertia", b"INERTIA_REF_FRAME") => rule(1, false),
+                (b"inertia", b"IXX") => rule(2, false),
+                (b"inertia", b"IYY") => rule(3, false),
+                (b"inertia", b"IZZ") => rule(4, false),
+                (b"inertia", b"IXY") => rule(5, false),
+                (b"inertia", b"IXZ") => rule(6, false),
+                (b"inertia", b"IYZ") => rule(7, false),
+                (b"maneuverParameters", b"COMMENT") => rule(0, true),
+                (b"maneuverParameters", b"MAN_EPOCH_START") => rule(1, false),
+                (b"maneuverParameters", b"MAN_DURATION") => rule(2, false),
+                (b"maneuverParameters", b"MAN_REF_FRAME") => rule(3, false),
+                (b"maneuverParameters", b"MAN_TOR_X") => rule(4, false),
+                (b"maneuverParameters", b"MAN_TOR_Y") => rule(5, false),
+                (b"maneuverParameters", b"MAN_TOR_Z") => rule(6, false),
+                (b"maneuverParameters", b"MAN_DELTA_MASS") => rule(7, false),
+                _ => return None,
+            })
+        },
+        |element, attribute| {
+            attribute == b"units"
+                && matches!(
+                    element,
+                    b"Q1_DOT"
+                        | b"Q2_DOT"
+                        | b"Q3_DOT"
+                        | b"QC_DOT"
+                        | b"ANGLE_1"
+                        | b"ANGLE_2"
+                        | b"ANGLE_3"
+                        | b"ANGLE_1_DOT"
+                        | b"ANGLE_2_DOT"
+                        | b"ANGLE_3_DOT"
+                        | b"ANGVEL_X"
+                        | b"ANGVEL_Y"
+                        | b"ANGVEL_Z"
+                        | b"SPIN_ALPHA"
+                        | b"SPIN_DELTA"
+                        | b"SPIN_ANGLE"
+                        | b"SPIN_ANGLE_VEL"
+                        | b"NUTATION"
+                        | b"NUTATION_PER"
+                        | b"NUTATION_PHASE"
+                        | b"MOMENTUM_ALPHA"
+                        | b"MOMENTUM_DELTA"
+                        | b"NUTATION_VEL"
+                        | b"IXX"
+                        | b"IYY"
+                        | b"IZZ"
+                        | b"IXY"
+                        | b"IXZ"
+                        | b"IYZ"
+                        | b"MAN_DURATION"
+                        | b"MAN_TOR_X"
+                        | b"MAN_TOR_Y"
+                        | b"MAN_TOR_Z"
+                        | b"MAN_DELTA_MASS"
+                )
+        },
+    )
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    fn top_rank(key: &str) -> Option<u16> {
+        Some(match key {
+            "CCSDS_APM_VERS" => 0,
+            "CLASSIFICATION" => 1,
+            "CREATION_DATE" => 2,
+            "ORIGINATOR" => 3,
+            "MESSAGE_ID" => 4,
+            "OBJECT_NAME" => 10,
+            "OBJECT_ID" => 11,
+            "CENTER_NAME" => 12,
+            "TIME_SYSTEM" => 13,
+            "EPOCH" => 20,
+            _ => return None,
+        })
+    }
+
+    fn block_rank(block: &str, key: &str) -> Option<u16> {
+        let keys: &[&str] = match block {
+            "META" => &["OBJECT_NAME", "OBJECT_ID", "CENTER_NAME", "TIME_SYSTEM"],
+            "QUAT" => &[
+                "REF_FRAME_A",
+                "REF_FRAME_B",
+                "Q1",
+                "Q2",
+                "Q3",
+                "QC",
+                "Q1_DOT",
+                "Q2_DOT",
+                "Q3_DOT",
+                "QC_DOT",
+            ],
+            "EULER" => &[
+                "REF_FRAME_A",
+                "REF_FRAME_B",
+                "EULER_ROT_SEQ",
+                "ANGLE_1",
+                "ANGLE_2",
+                "ANGLE_3",
+                "ANGLE_1_DOT",
+                "ANGLE_2_DOT",
+                "ANGLE_3_DOT",
+            ],
+            "ANGVEL" => &[
+                "REF_FRAME_A",
+                "REF_FRAME_B",
+                "ANGVEL_FRAME",
+                "ANGVEL_X",
+                "ANGVEL_Y",
+                "ANGVEL_Z",
+            ],
+            "SPIN" => &[
+                "REF_FRAME_A",
+                "REF_FRAME_B",
+                "SPIN_ALPHA",
+                "SPIN_DELTA",
+                "SPIN_ANGLE",
+                "SPIN_ANGLE_VEL",
+                "NUTATION",
+                "NUTATION_PER",
+                "NUTATION_PHASE",
+                "MOMENTUM_ALPHA",
+                "MOMENTUM_DELTA",
+                "NUTATION_VEL",
+            ],
+            "INERTIA" => &[
+                "INERTIA_REF_FRAME",
+                "IXX",
+                "IYY",
+                "IZZ",
+                "IXY",
+                "IXZ",
+                "IYZ",
+            ],
+            "MAN" => &[
+                "MAN_EPOCH_START",
+                "MAN_DURATION",
+                "MAN_REF_FRAME",
+                "MAN_TOR_X",
+                "MAN_TOR_Y",
+                "MAN_TOR_Z",
+                "MAN_DELTA_MASS",
+            ],
+            _ => return None,
+        };
+        keys.iter()
+            .position(|candidate| *candidate == key)
+            .map(|rank| rank as u16)
+    }
+
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating APM KVN structure"],
+            offset,
+        }))))
+    };
+    let mut current_block: Option<&str> = None;
+    let mut top_previous = None;
+    let mut block_previous = None;
+    let mut pending_comment = false;
+    let mut offset = 0usize;
+
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let line_number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(line_number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        if line.len() > 254 {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            if current_block.is_some() && block_previous.is_some() {
+                return fail("COMMENT is not at the beginning of a logical block");
+            }
+            if current_block.is_none() && !matches!(top_previous, Some(0 | 3 | 4 | 13)) {
+                return fail("COMMENT is not at the beginning of a logical block");
+            }
+            pending_comment = true;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+
+        if let Some(marker) = line.strip_suffix("_START") {
+            if current_block.is_some()
+                || !matches!(
+                    marker,
+                    "META" | "QUAT" | "EULER" | "ANGVEL" | "SPIN" | "INERTIA" | "MAN"
+                )
+            {
+                return fail("unknown or nested APM logical-block start");
+            }
+            if pending_comment {
+                return fail("COMMENT must follow, not precede, a logical-block start");
+            }
+            if marker == "META" {
+                if !matches!(top_previous, Some(3 | 4)) {
+                    return fail("META_START is out of order");
+                }
+            } else if top_previous != Some(20) {
+                return fail("attitude logical block must follow EPOCH");
+            }
+            current_block = Some(marker);
+            block_previous = None;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if let Some(marker) = line.strip_suffix("_STOP") {
+            if current_block != Some(marker) {
+                return fail("mismatched APM logical-block end");
+            }
+            if pending_comment {
+                return fail("trailing COMMENT has no logical block content");
+            }
+            if marker == "META" {
+                top_previous = Some(13);
+            }
+            current_block = None;
+            block_previous = None;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+
+        if !line.contains('=') {
+            return fail("expected an assignment or logical-block delimiter");
+        }
+        let key = line
+            .split_once('=')
+            .expect("assignment count checked")
+            .0
+            .trim();
+        if let Some(block) = current_block {
+            let rank = block_rank(block, key)
+                .ok_or_else(|| invalid(line_number, offset, "unknown APM block keyword".into()))?;
+            if block_previous.is_some_and(|previous| rank <= previous) {
+                return fail("duplicate or out-of-order APM block keyword");
+            }
+            block_previous = Some(rank);
+        } else {
+            let rank = top_rank(key)
+                .ok_or_else(|| invalid(line_number, offset, "unknown APM keyword".into()))?;
+            if pending_comment {
+                let starts_block = match key {
+                    "CLASSIFICATION" | "CREATION_DATE" => top_previous == Some(0),
+                    "OBJECT_NAME" => matches!(top_previous, Some(3 | 4)),
+                    "EPOCH" => top_previous == Some(13),
+                    _ => false,
+                };
+                if !starts_block {
+                    return fail("COMMENT is not at the beginning of a logical block");
+                }
+            }
+            if top_previous.is_some_and(|previous| rank <= previous) {
+                return fail("duplicate or out-of-order APM keyword");
+            }
+            top_previous = Some(rank);
+        }
+        pending_comment = false;
+        offset += raw_line.len() + 1;
+    }
+
+    if current_block.is_some() {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "unterminated APM logical block".into(),
+        ));
+    }
+    if pending_comment {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "trailing COMMENT has no logical block".into(),
+        ));
+    }
+    Ok(())
 }
 
 impl ToKvn for Apm {
@@ -110,6 +480,7 @@ impl ToKvn for Apm {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct ApmBody {
     // XSD says minOccurs=1 maxOccurs=1 for APM segment!
     #[serde(rename = "segment")]
@@ -133,6 +504,7 @@ impl ToKvn for ApmBody {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct ApmSegment {
     pub metadata: ApmMetadata,
     pub data: ApmData,
@@ -169,7 +541,7 @@ impl ToKvn for ApmSegment {
 
 /// APM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct ApmMetadata {
     /// Comments (allowed only at the beginning of the APM Metadata before OBJECT_NAME). Each
     /// comment line shall begin with this keyword.
@@ -285,7 +657,7 @@ impl ToKvn for ApmMetadata {
 
 /// APM Data Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct ApmData {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///

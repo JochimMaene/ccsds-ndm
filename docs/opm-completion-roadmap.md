@@ -89,7 +89,8 @@ Apply these constraints throughout the roadmap:
 1. Keep the Rust core as the only source of conformance decisions.
 2. Validate complete public models before generation; never rely on callers using constructors
    correctly.
-3. Reject ambiguity and information loss instead of guessing or rounding.
+3. Reject ambiguity and unsupported meaning instead of guessing. Apply standard-defined numeric
+   precision and rounding at notation boundaries.
 4. Keep notation-specific rules at notation boundaries. Do not make XML obey KVN-only numeric or
    lexical restrictions.
 5. Keep epochs as validated lexical values unless a demonstrated consumer needs chronological
@@ -386,12 +387,13 @@ Create separate directional cells:
 
 #### D2. Cover notation asymmetries
 
-- XML values that require more than 16 significant digits must fail KVN conversion rather than
-  round.
+- XML values that require more than 16 significant digits are rounded to a conforming KVN
+  representation.
 - KVN-only and XML-only unit spellings must be normalized only where the standards define the same
   unit.
 - Preserve optional-unit presence where the target notation permits it.
-- Reject a target notation that cannot represent the source meaning.
+- Reject a target notation that cannot represent the source meaning after applying its
+  standard-defined numeric precision.
 - Preserve comments at equivalent logical positions.
 - Preserve CCSDS user-defined parameters without accepting arbitrary unknown extensions.
 - Ensure XML output always passes the official OPM schema.
@@ -578,7 +580,8 @@ OPM 3.0 implementation is complete only when all applicable items below are true
 - [x] KVN-to-XML conversion is verified.
 - [x] XML-to-KVN conversion is verified.
 - [x] Semantic equivalence is tested across every logical block.
-- [x] Unrepresentable target values fail without rounding or data loss.
+- [x] Unrepresentable target values fail; finite numeric values use the target notation's
+  standard-defined precision.
 - [x] Edition changes are explicit.
 
 ### Public surfaces

@@ -994,6 +994,7 @@ impl CcsdsNdmError {
                 "generated_document" => Some("resource.output_limit_exceeded"),
                 "input_document" => Some("resource.input_limit_exceeded"),
                 "xml_depth" => Some("resource.xml_depth_limit_exceeded"),
+                "history_records" => Some("resource.record_limit_exceeded"),
                 _ => None,
             },
             _ => None,

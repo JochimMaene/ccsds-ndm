@@ -80,7 +80,7 @@ impl crate::traits::Validate for NdmHeader {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct AdmHeader {
     /// User-defined comments. (See 7.8 for formatting rules.)
     ///
@@ -1543,12 +1543,15 @@ pub struct QuaternionEphemeris {
 
 impl ToKvn for QuaternionEphemeris {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {}",
-            self.quaternion.q1, self.quaternion.q2, self.quaternion.q3, self.quaternion.qc
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.quaternion.q1,
+                self.quaternion.q2,
+                self.quaternion.q3,
+                self.quaternion.qc,
+            ],
+        );
     }
 }
 
@@ -1568,19 +1571,19 @@ pub struct QuaternionDerivative {
 
 impl ToKvn for QuaternionDerivative {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {}",
-            self.quaternion.q1, self.quaternion.q2, self.quaternion.q3, self.quaternion.qc
-        ));
-        line.push_str(&format!(
-            " {} {} {} {}",
-            self.quaternion_dot.q1_dot.value,
-            self.quaternion_dot.q2_dot.value,
-            self.quaternion_dot.q3_dot.value,
-            self.quaternion_dot.qc_dot.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.quaternion.q1,
+                self.quaternion.q2,
+                self.quaternion.q3,
+                self.quaternion.qc,
+                self.quaternion_dot.q1_dot.value,
+                self.quaternion_dot.q2_dot.value,
+                self.quaternion_dot.q3_dot.value,
+                self.quaternion_dot.qc_dot.value,
+            ],
+        );
     }
 }
 
@@ -1601,16 +1604,18 @@ pub struct QuaternionAngVel {
 
 impl ToKvn for QuaternionAngVel {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {}",
-            self.quaternion.q1, self.quaternion.q2, self.quaternion.q3, self.quaternion.qc
-        ));
-        line.push_str(&format!(
-            " {} {} {}",
-            self.ang_vel.angvel_x.value, self.ang_vel.angvel_y.value, self.ang_vel.angvel_z.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.quaternion.q1,
+                self.quaternion.q2,
+                self.quaternion.q3,
+                self.quaternion.qc,
+                self.ang_vel.angvel_x.value,
+                self.ang_vel.angvel_y.value,
+                self.ang_vel.angvel_z.value,
+            ],
+        );
     }
 }
 
@@ -1630,12 +1635,10 @@ pub struct EulerAngle {
 
 impl ToKvn for EulerAngle {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {}",
-            self.angle_1.value, self.angle_2.value, self.angle_3.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[self.angle_1.value, self.angle_2.value, self.angle_3.value],
+        );
     }
 }
 
@@ -1661,16 +1664,17 @@ pub struct EulerAngleDerivative {
 
 impl ToKvn for EulerAngleDerivative {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {}",
-            self.angle_1.value, self.angle_2.value, self.angle_3.value
-        ));
-        line.push_str(&format!(
-            " {} {} {}",
-            self.angle_1_dot.value, self.angle_2_dot.value, self.angle_3_dot.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.angle_1.value,
+                self.angle_2.value,
+                self.angle_3.value,
+                self.angle_1_dot.value,
+                self.angle_2_dot.value,
+                self.angle_3_dot.value,
+            ],
+        );
     }
 }
 
@@ -1699,16 +1703,17 @@ pub struct EulerAngleAngVel {
 
 impl ToKvn for EulerAngleAngVel {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {}",
-            self.angle_1.value, self.angle_2.value, self.angle_3.value
-        ));
-        line.push_str(&format!(
-            " {} {} {}",
-            self.angvel_x.value, self.angvel_y.value, self.angvel_z.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.angle_1.value,
+                self.angle_2.value,
+                self.angle_3.value,
+                self.angvel_x.value,
+                self.angvel_y.value,
+                self.angvel_z.value,
+            ],
+        );
     }
 }
 
@@ -1730,15 +1735,15 @@ pub struct Spin {
 
 impl ToKvn for Spin {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {}",
-            self.spin_alpha.value,
-            self.spin_delta.value,
-            self.spin_angle.value,
-            self.spin_angle_vel.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.spin_alpha.value,
+                self.spin_delta.value,
+                self.spin_angle.value,
+                self.spin_angle_vel.value,
+            ],
+        );
     }
 }
 
@@ -1766,18 +1771,18 @@ pub struct SpinNutation {
 
 impl ToKvn for SpinNutation {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {} {} {} {}",
-            self.spin_alpha.value,
-            self.spin_delta.value,
-            self.spin_angle.value,
-            self.spin_angle_vel.value,
-            self.nutation.value,
-            self.nutation_per.value,
-            self.nutation_phase.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.spin_alpha.value,
+                self.spin_delta.value,
+                self.spin_angle.value,
+                self.spin_angle_vel.value,
+                self.nutation.value,
+                self.nutation_per.value,
+                self.nutation_phase.value,
+            ],
+        );
     }
 }
 
@@ -1805,18 +1810,18 @@ pub struct SpinNutationMom {
 
 impl ToKvn for SpinNutationMom {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {} {} {} {}",
-            self.spin_alpha.value,
-            self.spin_delta.value,
-            self.spin_angle.value,
-            self.spin_angle_vel.value,
-            self.momentum_alpha.value,
-            self.momentum_delta.value,
-            self.nutation_vel.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.spin_alpha.value,
+                self.spin_delta.value,
+                self.spin_angle.value,
+                self.spin_angle_vel.value,
+                self.momentum_alpha.value,
+                self.momentum_delta.value,
+                self.nutation_vel.value,
+            ],
+        );
     }
 }
 
@@ -2355,13 +2360,14 @@ pub struct AtmosphericReentryParameters {
 
 impl ToKvn for AtmosphericReentryParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_pair("ORBIT_LIFETIME", &self.orbit_lifetime);
-        writer.write_pair("REENTRY_ALTITUDE", &self.reentry_altitude);
+        writer.write_comments(&self.comment);
+        writer.write_measure("ORBIT_LIFETIME", &self.orbit_lifetime.to_unit_value());
+        writer.write_measure("REENTRY_ALTITUDE", &self.reentry_altitude.to_unit_value());
         if let Some(v) = &self.orbit_lifetime_window_start {
-            writer.write_pair("ORBIT_LIFETIME_WINDOW_START", v);
+            writer.write_measure("ORBIT_LIFETIME_WINDOW_START", &v.to_unit_value());
         }
         if let Some(v) = &self.orbit_lifetime_window_end {
-            writer.write_pair("ORBIT_LIFETIME_WINDOW_END", v);
+            writer.write_measure("ORBIT_LIFETIME_WINDOW_END", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_reentry_epoch {
             writer.write_pair("NOMINAL_REENTRY_EPOCH", v);
@@ -2373,7 +2379,7 @@ impl ToKvn for AtmosphericReentryParameters {
             writer.write_pair("REENTRY_WINDOW_END", v);
         }
         if let Some(v) = &self.orbit_lifetime_confidence_level {
-            writer.write_pair("ORBIT_LIFETIME_CONFIDENCE_LEVEL", v);
+            writer.write_measure("ORBIT_LIFETIME_CONFIDENCE_LEVEL", &v.to_unit_value());
         }
     }
 }
@@ -2767,70 +2773,70 @@ impl ToKvn for GroundImpactParameters {
             writer.write_pair("IMPACT_REF_FRAME", v);
         }
         if let Some(v) = &self.nominal_impact_lon {
-            writer.write_pair("NOMINAL_IMPACT_LON", v);
+            writer.write_measure("NOMINAL_IMPACT_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_impact_lat {
-            writer.write_pair("NOMINAL_IMPACT_LAT", v);
+            writer.write_measure("NOMINAL_IMPACT_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_impact_alt {
-            writer.write_pair("NOMINAL_IMPACT_ALT", v);
+            writer.write_measure("NOMINAL_IMPACT_ALT", &v.to_unit_value());
         }
 
         if let Some(v) = &self.impact_1_confidence {
-            writer.write_pair("IMPACT_1_CONFIDENCE", v);
+            writer.write_measure("IMPACT_1_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_start_lon {
-            writer.write_pair("IMPACT_1_START_LON", v);
+            writer.write_measure("IMPACT_1_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_start_lat {
-            writer.write_pair("IMPACT_1_START_LAT", v);
+            writer.write_measure("IMPACT_1_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_stop_lon {
-            writer.write_pair("IMPACT_1_STOP_LON", v);
+            writer.write_measure("IMPACT_1_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_stop_lat {
-            writer.write_pair("IMPACT_1_STOP_LAT", v);
+            writer.write_measure("IMPACT_1_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_cross_track {
-            writer.write_pair("IMPACT_1_CROSS_TRACK", v);
+            writer.write_measure("IMPACT_1_CROSS_TRACK", v);
         }
 
         if let Some(v) = &self.impact_2_confidence {
-            writer.write_pair("IMPACT_2_CONFIDENCE", v);
+            writer.write_measure("IMPACT_2_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_start_lon {
-            writer.write_pair("IMPACT_2_START_LON", v);
+            writer.write_measure("IMPACT_2_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_start_lat {
-            writer.write_pair("IMPACT_2_START_LAT", v);
+            writer.write_measure("IMPACT_2_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_stop_lon {
-            writer.write_pair("IMPACT_2_STOP_LON", v);
+            writer.write_measure("IMPACT_2_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_stop_lat {
-            writer.write_pair("IMPACT_2_STOP_LAT", v);
+            writer.write_measure("IMPACT_2_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_cross_track {
-            writer.write_pair("IMPACT_2_CROSS_TRACK", v);
+            writer.write_measure("IMPACT_2_CROSS_TRACK", v);
         }
 
         if let Some(v) = &self.impact_3_confidence {
-            writer.write_pair("IMPACT_3_CONFIDENCE", v);
+            writer.write_measure("IMPACT_3_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_start_lon {
-            writer.write_pair("IMPACT_3_START_LON", v);
+            writer.write_measure("IMPACT_3_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_start_lat {
-            writer.write_pair("IMPACT_3_START_LAT", v);
+            writer.write_measure("IMPACT_3_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_stop_lon {
-            writer.write_pair("IMPACT_3_STOP_LON", v);
+            writer.write_measure("IMPACT_3_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_stop_lat {
-            writer.write_pair("IMPACT_3_STOP_LAT", v);
+            writer.write_measure("IMPACT_3_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_cross_track {
-            writer.write_pair("IMPACT_3_CROSS_TRACK", v);
+            writer.write_measure("IMPACT_3_CROSS_TRACK", v);
         }
     }
 }
@@ -3201,7 +3207,7 @@ mod tests {
         };
         let mut w = KvnWriter::new();
         qe.write_kvn(&mut w);
-        assert!(w.finish().contains("2000-01-01T00:00:00 1 0 0 0"));
+        assert!(w.finish().contains("2000-01-01T00:00:00 1.0 0.0 0.0 0.0"));
 
         let qd = QuaternionDerivative {
             epoch,
@@ -3222,7 +3228,7 @@ mod tests {
         qd.write_kvn(&mut w);
         assert!(w
             .finish()
-            .contains("2000-01-01T00:00:00 1 0 0 0 0.1 0.2 0.3 0.4"));
+            .contains("2000-01-01T00:00:00 1.0 0.0 0.0 0.0 0.1 0.2 0.3 0.4"));
     }
 
     #[test]
@@ -3306,7 +3312,7 @@ mod tests {
         };
         let mut w = KvnWriter::new();
         AemAttitudeState::QuaternionAngVel(qav).write_kvn(&mut w);
-        assert!(w.finish().contains("1 0 0 0"));
+        assert!(w.finish().contains("1.0 0.0 0.0 0.0"));
 
         // EulerAngleDerivative
         let ead = EulerAngleDerivative {
@@ -3320,7 +3326,7 @@ mod tests {
         };
         let mut w = KvnWriter::new();
         AemAttitudeState::EulerAngleDerivative(ead).write_kvn(&mut w);
-        assert!(w.finish().contains("10 20 30"));
+        assert!(w.finish().contains("10.0 20.0 30.0"));
 
         // SpinNutation
         let sn = SpinNutation {
@@ -3336,7 +3342,7 @@ mod tests {
         let mut w = KvnWriter::new();
         AemAttitudeState::SpinNutation(sn).write_kvn(&mut w);
         let kvn = w.finish();
-        assert!(kvn.contains("10 20 30 0.1 5 1 0"));
+        assert!(kvn.contains("10.0 20.0 30.0 0.1 5.0 1.0 0.0"));
 
         // SpinNutationMom
         let snm = SpinNutationMom {

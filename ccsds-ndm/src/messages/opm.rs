@@ -223,21 +223,7 @@ fn validate_input_size(input: &str, options: &crate::options::ParseOptions) -> R
 }
 
 fn validate_kvn_syntax(kvn: &str) -> Result<()> {
-    use crate::error::{CcsdsNdmError, FormatError};
-
-    fn invalid(line: usize, offset: usize, message: impl AsRef<str>) -> CcsdsNdmError {
-        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(
-            crate::error::KvnParseError {
-                line,
-                column: 1,
-                message: message.as_ref().to_owned(),
-                contexts: vec!["strict OPM KVN"],
-                offset,
-            },
-        ))))
-    }
-
-    fn rank(key: &str) -> Option<u8> {
+    fn rank(key: &str) -> Option<u16> {
         Some(match key {
             "CCSDS_OPM_VERS" => 0,
             "CLASSIFICATION" => 1,
@@ -303,7 +289,7 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         })
     }
 
-    fn comment_starts_block(previous: u8, key: &str) -> bool {
+    fn comment_starts_block(previous: u16, key: &str) -> bool {
         match key {
             "CLASSIFICATION" | "CREATION_DATE" => previous == 0,
             "OBJECT_NAME" => matches!(previous, 3 | 4),
@@ -321,98 +307,20 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         }
     }
 
-    let mut previous = None;
-    let mut pending_comment = false;
-    let mut line_offset = 0usize;
-    for (index, raw_line) in kvn.split('\n').enumerate() {
-        let line_number = index + 1;
-        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
-        if line.as_bytes().contains(&b'\r') {
-            return Err(invalid(line_number, line_offset, "lone carriage return"));
-        }
-        if line.len() > 254 {
-            return Err(invalid(
-                line_number,
-                line_offset,
-                "line exceeds the normative 254-character limit",
-            ));
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return Err(invalid(
-                line_number,
-                line_offset,
-                "non-printable or non-ASCII character",
-            ));
-        }
-        let line = line.trim();
-        if line.is_empty() {
-            line_offset += raw_line.len() + 1;
-            continue;
-        }
-        if line == "COMMENT" || line.starts_with("COMMENT ") {
-            pending_comment = true;
-            line_offset += raw_line.len() + 1;
-            continue;
-        }
-        if line.matches('=').count() != 1 {
-            return Err(invalid(
-                line_number,
-                line_offset,
-                "expected exactly one assignment",
-            ));
-        }
-        let (key, _) = line
-            .split_once('=')
-            .ok_or_else(|| invalid(line_number, line_offset, "expected an assignment"))?;
-        let key = key.trim();
-        let current =
-            rank(key).ok_or_else(|| invalid(line_number, line_offset, "unknown OPM keyword"))?;
-
-        if pending_comment {
-            let Some(previous_rank) = previous else {
-                return Err(invalid(
-                    line_number,
-                    line_offset,
-                    "comments before the version would be lost",
-                ));
-            };
-            if !comment_starts_block(previous_rank, key) {
-                return Err(invalid(
-                    line_number,
-                    line_offset,
-                    "COMMENT is not at the beginning of a logical block",
-                ));
-            }
-            pending_comment = false;
-        }
-
-        if let Some(previous_rank) = previous {
-            let repeated_maneuver = current == 70 && previous_rank == 76;
-            let repeated_user_defined = current == 80 && previous_rank == 80;
-            let anomaly_choice = current == 25 && previous_rank == 25;
-            if current <= previous_rank
-                && !repeated_maneuver
-                && !repeated_user_defined
-                && !anomaly_choice
-            {
-                return Err(invalid(
-                    line_number,
-                    line_offset,
-                    "duplicate or out-of-order OPM keyword",
-                ));
-            }
-        }
-        previous = Some(current);
-        line_offset += raw_line.len() + 1;
-    }
-    if pending_comment {
-        return Err(invalid(
-            kvn.lines().count().max(1),
-            kvn.len(),
-            "trailing COMMENT has no logical block",
-        ));
-    }
-    Ok(())
+    crate::kvn::strict::validate_odm_assignments(
+        kvn,
+        &crate::kvn::strict::OdmAssignmentRules {
+            context: "strict OPM KVN",
+            message_name: "OPM",
+            rank,
+            comment_starts_block,
+            allows_non_increasing: |previous, current, _| {
+                (current == 70 && previous == 76)
+                    || (current == 80 && previous == 80)
+                    || (current == 25 && previous == 25)
+            },
+        },
+    )
 }
 
 fn validate_xml_envelope(xml: &str, options: &crate::options::ParseOptions) -> Result<()> {
@@ -717,14 +625,13 @@ fn validate_xml_envelope(xml: &str, options: &crate::options::ParseOptions) -> R
 impl Opm {
     fn validate_kvn_numbers(&self) -> Result<()> {
         fn check(field: &'static str, value: f64, path: &'static str) -> Result<()> {
-            if OdmFloat::is_representable(value) {
+            if OdmFloat::is_valid(value) {
                 return Ok(());
             }
             Err(ValidationError::InvalidValue {
                 field: field.into(),
                 value: value.to_string(),
-                expected: "an exactly representable ODM number with at most 16 significant digits"
-                    .into(),
+                expected: "a finite number".into(),
                 line: None,
             }
             .at_path(path)

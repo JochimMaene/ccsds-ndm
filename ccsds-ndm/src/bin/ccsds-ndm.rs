@@ -1,6 +1,8 @@
 use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation};
-use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::{convert_opm, convert_opm_to_file, GenerateOptions, Notation, ParseOptions};
+use ccsds_ndm::{
+    convert as convert_message, convert_to_file as convert_message_to_file, from_str_with_options,
+    GenerateOptions, Notation, ParseOptions,
+};
 use serde_json::json;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -18,6 +20,7 @@ struct Common {
     json: bool,
     max_input_bytes: Option<usize>,
     max_xml_depth: Option<usize>,
+    max_records: Option<usize>,
 }
 
 struct Convert {
@@ -65,6 +68,10 @@ fn parse_common(args: &[String], allow_convert: bool) -> Result<(Common, Vec<Str
             "--max-xml-depth" => {
                 index += 1;
                 common.max_xml_depth = Some(number("--max-xml-depth", args.get(index).cloned())?);
+            }
+            "--max-records" => {
+                index += 1;
+                common.max_records = Some(number("--max-records", args.get(index).cloned())?);
             }
             value if value.starts_with('-') && value != "-" => {
                 if allow_convert {
@@ -170,14 +177,8 @@ fn read_input(path: Option<&str>, max_bytes: Option<usize>) -> Result<String, Cc
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?)
 }
 
-fn detected(input: &str, selected: Option<Notation>) -> Notation {
-    selected.unwrap_or_else(|| {
-        if input.trim_start().starts_with('<') {
-            Notation::Xml
-        } else {
-            Notation::Kvn
-        }
-    })
+fn detected(input: &str, selected: Option<Notation>) -> Result<Notation, CcsdsNdmError> {
+    selected.map_or_else(|| ccsds_ndm::detect::detect_notation(input), Ok)
 }
 
 fn parse_options(common: &Common) -> ParseOptions {
@@ -188,6 +189,7 @@ fn parse_options(common: &Common) -> ParseOptions {
     if let Some(depth) = common.max_xml_depth {
         options.max_xml_depth = depth;
     }
+    options.max_records = common.max_records;
     options
 }
 
@@ -207,7 +209,7 @@ fn report(error: &CcsdsNdmError, as_json: bool) {
                     ccsds_ndm::error::DiagnosticOperation::Generate => "generate",
                 }),
                 "notation": notation,
-                "message_kind": diagnostic.as_ref().map(|_| "opm"),
+                "message_kind": diagnostic.as_ref().map(|value| value.message_kind.as_str().to_ascii_lowercase()),
                 "source_edition": diagnostic.as_ref().and_then(|value| value.source_edition),
                 "target_edition": diagnostic.as_ref().and_then(|value| value.target_edition),
                 "code": error.code(),
@@ -241,12 +243,10 @@ fn validate(common: Common) -> Result<(), (CcsdsNdmError, bool)> {
     let input = read_input(common.input.as_deref(), common.max_input_bytes)
         .map_err(|error| (error, common.json))?;
     let options = parse_options(&common);
-    match detected(&input, common.notation) {
-        Notation::Kvn => Opm::from_kvn_with_options(&input, &options),
-        Notation::Xml => Opm::from_xml_with_options(&input, &options),
-    }
-    .map(|_| ())
-    .map_err(|error| (error, common.json))
+    let notation = detected(&input, common.notation).map_err(|error| (error, common.json))?;
+    from_str_with_options(&input, Some(notation), &options)
+        .map(|_| ())
+        .map_err(|error| (error, common.json))
 }
 
 fn convert(command: Convert) -> Result<(), (CcsdsNdmError, bool)> {
@@ -255,7 +255,8 @@ fn convert(command: Convert) -> Result<(), (CcsdsNdmError, bool)> {
         command.common.max_input_bytes,
     )
     .map_err(|error| (error, command.common.json))?;
-    let source = detected(&input, command.common.notation);
+    let source =
+        detected(&input, command.common.notation).map_err(|error| (error, command.common.json))?;
     let target = command.target.ok_or_else(|| {
         (
             CcsdsNdmError::UnsupportedMessage("convert requires --to kvn|xml".into()),
@@ -271,7 +272,7 @@ fn convert(command: Convert) -> Result<(), (CcsdsNdmError, bool)> {
     generate_options.max_output_bytes = command.max_output_bytes;
 
     match command.output.as_deref() {
-        Some(path) if path != "-" => convert_opm_to_file(
+        Some(path) if path != "-" => convert_message_to_file(
             &input,
             PathBuf::from(path),
             source,
@@ -279,7 +280,7 @@ fn convert(command: Convert) -> Result<(), (CcsdsNdmError, bool)> {
             &parse_options,
             &generate_options,
         ),
-        _ => convert_opm(&input, source, target, &parse_options, &generate_options).and_then(
+        _ => convert_message(&input, source, target, &parse_options, &generate_options).and_then(
             |output| {
                 std::io::stdout().write_all(output.as_bytes())?;
                 Ok(())

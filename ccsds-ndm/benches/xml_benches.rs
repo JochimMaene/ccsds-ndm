@@ -422,6 +422,63 @@ fn bench_xml_parse_tdm(c: &mut Criterion) {
     });
 }
 
+fn bench_tdm_xml_history_scaling(c: &mut Criterion) {
+    let mut template = Tdm::from_xml(include_str!("../../data/xml/tdm_e21.xml")).unwrap();
+    template.body.segments.truncate(1);
+    let observation = template.body.segments[0].data.observations[0].clone();
+    let mut group = c.benchmark_group("tdm_xml_history_scaling");
+
+    for records in [100, 1_000, 10_000] {
+        let mut message = template.clone();
+        message.body.segments[0].data.observations = vec![observation.clone(); records];
+        let input = message.to_xml().unwrap();
+        group.throughput(Throughput::Elements(records as u64));
+        group.bench_with_input(BenchmarkId::new("parse", records), &input, |b, input| {
+            b.iter(|| Tdm::from_xml(black_box(input)).unwrap())
+        });
+        group.bench_with_input(
+            BenchmarkId::new("generate", records),
+            &message,
+            |b, message| b.iter(|| black_box(message).to_xml().unwrap()),
+        );
+    }
+    group.finish();
+}
+
+fn bench_xml_message_matrix(c: &mut Criterion) {
+    let acm = ccsds_ndm::from_str(include_str!("../../data/kvn/acm_g6.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    let cases = vec![
+        ("opm", include_str!("../../data/xml/opm_g5.xml").to_owned()),
+        ("omm", include_str!("../../data/xml/omm_g10.xml").to_owned()),
+        ("oem", include_str!("../../data/xml/oem_g14.xml").to_owned()),
+        ("ocm", include_str!("../../data/xml/ocm_g20.xml").to_owned()),
+        ("cdm", include_str!("../../data/xml/cdm_44.xml").to_owned()),
+        ("tdm", include_str!("../../data/xml/tdm_e21.xml").to_owned()),
+        ("rdm", include_str!("../../data/xml/rdm_c3.xml").to_owned()),
+        ("aem", include_str!("../../data/xml/aem_g11.xml").to_owned()),
+        ("apm", include_str!("../../data/xml/apm_g10.xml").to_owned()),
+        ("acm", acm),
+        ("ndm", include_str!("../../data/xml/ndm_g12.xml").to_owned()),
+    ];
+    let mut group = c.benchmark_group("xml_message_matrix");
+    for (name, input) in &cases {
+        group.throughput(Throughput::Bytes(input.len() as u64));
+        group.bench_with_input(BenchmarkId::new("parse", name), input, |b, input| {
+            b.iter(|| ccsds_ndm::from_str(black_box(input)).unwrap())
+        });
+        let message = ccsds_ndm::from_str(input).unwrap();
+        group.bench_with_input(
+            BenchmarkId::new("generate", name),
+            &message,
+            |b, message| b.iter(|| black_box(message).to_xml().unwrap()),
+        );
+    }
+    group.finish();
+}
+
 fn bench_xml_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("xml_scaling");
 
@@ -454,6 +511,8 @@ criterion_group!(
     bench_xml_generate_opm,
     bench_xml_parse_omm,
     bench_xml_parse_tdm,
+    bench_tdm_xml_history_scaling,
+    bench_xml_message_matrix,
     bench_xml_scaling,
 );
 criterion_main!(benches);

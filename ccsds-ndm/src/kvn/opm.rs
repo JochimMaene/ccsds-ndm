@@ -218,6 +218,18 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParamet
             man_dv_3: man_dv_3
                 .ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DV_3"))?,
         }))
+    } else if man_duration.is_some()
+        || man_delta_mass.is_some()
+        || man_ref_frame.is_some()
+        || man_dv_1.is_some()
+        || man_dv_2.is_some()
+        || man_dv_3.is_some()
+    {
+        Err(missing_field_err(
+            input,
+            "Maneuver Parameters",
+            "MAN_EPOCH_IGNITION",
+        ))
     } else {
         Ok(None)
     }
@@ -231,7 +243,10 @@ pub fn all_maneuvers(input: &mut &str) -> KvnResult<Vec<ManeuverParameters>> {
         let checkpoint = input.checkpoint();
         match maneuver_parameters.parse_next(input) {
             Ok(Some(man)) => maneuvers.push(man),
-            Ok(None) => break,
+            Ok(None) => {
+                input.reset(&checkpoint);
+                break;
+            }
             Err(e) => return Err(e),
         }
 

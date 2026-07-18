@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::OdmHeader;
-use crate::error::{Result, ValidationError};
+use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 #[cfg(test)]
@@ -14,6 +14,7 @@ use fast_float;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::io::Write;
 
 //----------------------------------------------------------------------
 // Root OCM Structure
@@ -76,12 +77,14 @@ impl Ndm for Ocm {
             crate::generation::OutputFormat::Kvn,
             self,
         )?;
+        self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         Ok(writer.finish())
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        validate_kvn_syntax(kvn)?;
         let ocm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&ocm)?;
         Ok(ocm)
@@ -98,14 +101,895 @@ impl Ndm for Ocm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        crate::xml::validate_document_root(xml, b"ocm", "OCM")?;
+        validate_xml_sequences(xml)?;
         let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
         crate::traits::Validate::validate(&ocm)?;
         Ok(ocm)
     }
 }
 
+fn ocm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
+    Some(match parent {
+        b"ocm" => &[b"header", b"body"],
+        b"header" => &[
+            b"COMMENT",
+            b"CLASSIFICATION",
+            b"CREATION_DATE",
+            b"ORIGINATOR",
+            b"MESSAGE_ID",
+        ],
+        b"body" => &[b"segment"],
+        b"segment" => &[b"metadata", b"data"],
+        b"metadata" => &[
+            b"COMMENT",
+            b"OBJECT_NAME",
+            b"INTERNATIONAL_DESIGNATOR",
+            b"CATALOG_NAME",
+            b"OBJECT_DESIGNATOR",
+            b"ALTERNATE_NAMES",
+            b"ORIGINATOR_POC",
+            b"ORIGINATOR_POSITION",
+            b"ORIGINATOR_PHONE",
+            b"ORIGINATOR_EMAIL",
+            b"ORIGINATOR_ADDRESS",
+            b"TECH_ORG",
+            b"TECH_POC",
+            b"TECH_POSITION",
+            b"TECH_PHONE",
+            b"TECH_EMAIL",
+            b"TECH_ADDRESS",
+            b"PREVIOUS_MESSAGE_ID",
+            b"NEXT_MESSAGE_ID",
+            b"ADM_MSG_LINK",
+            b"CDM_MSG_LINK",
+            b"PRM_MSG_LINK",
+            b"RDM_MSG_LINK",
+            b"TDM_MSG_LINK",
+            b"OPERATOR",
+            b"OWNER",
+            b"COUNTRY",
+            b"CONSTELLATION",
+            b"OBJECT_TYPE",
+            b"TIME_SYSTEM",
+            b"EPOCH_TZERO",
+            b"OPS_STATUS",
+            b"ORBIT_CATEGORY",
+            b"OCM_DATA_ELEMENTS",
+            b"SCLK_OFFSET_AT_EPOCH",
+            b"SCLK_SEC_PER_SI_SEC",
+            b"PREVIOUS_MESSAGE_EPOCH",
+            b"NEXT_MESSAGE_EPOCH",
+            b"START_TIME",
+            b"STOP_TIME",
+            b"TIME_SPAN",
+            b"TAIMUTC_AT_TZERO",
+            b"NEXT_LEAP_EPOCH",
+            b"NEXT_LEAP_TAIMUTC",
+            b"UT1MUTC_AT_TZERO",
+            b"EOP_SOURCE",
+            b"INTERP_METHOD_EOP",
+            b"CELESTIAL_SOURCE",
+        ],
+        b"data" => &[b"traj", b"phys", b"cov", b"man", b"pert", b"od", b"user"],
+        b"traj" => &[
+            b"COMMENT",
+            b"TRAJ_ID",
+            b"TRAJ_PREV_ID",
+            b"TRAJ_NEXT_ID",
+            b"TRAJ_BASIS",
+            b"TRAJ_BASIS_ID",
+            b"INTERPOLATION",
+            b"INTERPOLATION_DEGREE",
+            b"PROPAGATOR",
+            b"CENTER_NAME",
+            b"TRAJ_REF_FRAME",
+            b"TRAJ_FRAME_EPOCH",
+            b"USEABLE_START_TIME",
+            b"USEABLE_STOP_TIME",
+            b"ORB_REVNUM",
+            b"ORB_REVNUM_BASIS",
+            b"TRAJ_TYPE",
+            b"ORB_AVERAGING",
+            b"TRAJ_UNITS",
+            b"trajLine",
+        ],
+        b"phys" => &[
+            b"COMMENT",
+            b"MANUFACTURER",
+            b"BUS_MODEL",
+            b"DOCKED_WITH",
+            b"DRAG_CONST_AREA",
+            b"DRAG_COEFF_NOM",
+            b"DRAG_UNCERTAINTY",
+            b"INITIAL_WET_MASS",
+            b"WET_MASS",
+            b"DRY_MASS",
+            b"OEB_PARENT_FRAME",
+            b"OEB_PARENT_FRAME_EPOCH",
+            b"OEB_Q1",
+            b"OEB_Q2",
+            b"OEB_Q3",
+            b"OEB_QC",
+            b"OEB_MAX",
+            b"OEB_INT",
+            b"OEB_MIN",
+            b"AREA_ALONG_OEB_MAX",
+            b"AREA_ALONG_OEB_INT",
+            b"AREA_ALONG_OEB_MIN",
+            b"AREA_MIN_FOR_PC",
+            b"AREA_MAX_FOR_PC",
+            b"AREA_TYP_FOR_PC",
+            b"RCS",
+            b"RCS_MIN",
+            b"RCS_MAX",
+            b"SRP_CONST_AREA",
+            b"SOLAR_RAD_COEFF",
+            b"SOLAR_RAD_UNCERTAINTY",
+            b"VM_ABSOLUTE",
+            b"VM_APPARENT_MIN",
+            b"VM_APPARENT",
+            b"VM_APPARENT_MAX",
+            b"REFLECTANCE",
+            b"ATT_CONTROL_MODE",
+            b"ATT_ACTUATOR_TYPE",
+            b"ATT_KNOWLEDGE",
+            b"ATT_CONTROL",
+            b"ATT_POINTING",
+            b"AVG_MANEUVER_FREQ",
+            b"MAX_THRUST",
+            b"DV_BOL",
+            b"DV_REMAINING",
+            b"IXX",
+            b"IYY",
+            b"IZZ",
+            b"IXY",
+            b"IXZ",
+            b"IYZ",
+        ],
+        b"cov" => &[
+            b"COMMENT",
+            b"COV_ID",
+            b"COV_PREV_ID",
+            b"COV_NEXT_ID",
+            b"COV_BASIS",
+            b"COV_BASIS_ID",
+            b"COV_REF_FRAME",
+            b"COV_FRAME_EPOCH",
+            b"COV_SCALE_MIN",
+            b"COV_SCALE_MAX",
+            b"COV_CONFIDENCE",
+            b"COV_TYPE",
+            b"COV_ORDERING",
+            b"COV_UNITS",
+            b"covLine",
+        ],
+        b"man" => &[
+            b"COMMENT",
+            b"MAN_ID",
+            b"MAN_PREV_ID",
+            b"MAN_NEXT_ID",
+            b"MAN_BASIS",
+            b"MAN_BASIS_ID",
+            b"MAN_DEVICE_ID",
+            b"MAN_PREV_EPOCH",
+            b"MAN_NEXT_EPOCH",
+            b"MAN_PURPOSE",
+            b"MAN_PRED_SOURCE",
+            b"MAN_REF_FRAME",
+            b"MAN_FRAME_EPOCH",
+            b"GRAV_ASSIST_NAME",
+            b"DC_TYPE",
+            b"DC_WIN_OPEN",
+            b"DC_WIN_CLOSE",
+            b"DC_MIN_CYCLES",
+            b"DC_MAX_CYCLES",
+            b"DC_EXEC_START",
+            b"DC_EXEC_STOP",
+            b"DC_REF_TIME",
+            b"DC_TIME_PULSE_DURATION",
+            b"DC_TIME_PULSE_PERIOD",
+            b"DC_REF_DIR",
+            b"DC_BODY_FRAME",
+            b"DC_BODY_TRIGGER",
+            b"DC_PA_START_ANGLE",
+            b"DC_PA_STOP_ANGLE",
+            b"MAN_COMPOSITION",
+            b"MAN_UNITS",
+            b"manLine",
+        ],
+        b"pert" => &[
+            b"COMMENT",
+            b"ATMOSPHERIC_MODEL",
+            b"GRAVITY_MODEL",
+            b"EQUATORIAL_RADIUS",
+            b"GM",
+            b"N_BODY_PERTURBATIONS",
+            b"CENTRAL_BODY_ROTATION",
+            b"OBLATE_FLATTENING",
+            b"OCEAN_TIDES_MODEL",
+            b"SOLID_TIDES_MODEL",
+            b"REDUCTION_THEORY",
+            b"ALBEDO_MODEL",
+            b"ALBEDO_GRID_SIZE",
+            b"SHADOW_MODEL",
+            b"SHADOW_BODIES",
+            b"SRP_MODEL",
+            b"SW_DATA_SOURCE",
+            b"SW_DATA_EPOCH",
+            b"SW_INTERP_METHOD",
+            b"FIXED_GEOMAG_KP",
+            b"FIXED_GEOMAG_AP",
+            b"FIXED_GEOMAG_DST",
+            b"FIXED_F10P7",
+            b"FIXED_F10P7_MEAN",
+            b"FIXED_M10P7",
+            b"FIXED_M10P7_MEAN",
+            b"FIXED_S10P7",
+            b"FIXED_S10P7_MEAN",
+            b"FIXED_Y10P7",
+            b"FIXED_Y10P7_MEAN",
+        ],
+        b"od" => &[
+            b"COMMENT",
+            b"OD_ID",
+            b"OD_PREV_ID",
+            b"OD_METHOD",
+            b"OD_EPOCH",
+            b"DAYS_SINCE_FIRST_OBS",
+            b"DAYS_SINCE_LAST_OBS",
+            b"RECOMMENDED_OD_SPAN",
+            b"ACTUAL_OD_SPAN",
+            b"OBS_AVAILABLE",
+            b"OBS_USED",
+            b"TRACKS_AVAILABLE",
+            b"TRACKS_USED",
+            b"MAXIMUM_OBS_GAP",
+            b"OD_EPOCH_EIGMAJ",
+            b"OD_EPOCH_EIGINT",
+            b"OD_EPOCH_EIGMIN",
+            b"OD_MAX_PRED_EIGMAJ",
+            b"OD_MIN_PRED_EIGMIN",
+            b"OD_CONFIDENCE",
+            b"GDOP",
+            b"SOLVE_N",
+            b"SOLVE_STATES",
+            b"CONSIDER_N",
+            b"CONSIDER_PARAMS",
+            b"SEDR",
+            b"SENSORS_N",
+            b"SENSORS",
+            b"WEIGHTED_RMS",
+            b"DATA_TYPES",
+        ],
+        b"user" => &[b"COMMENT", b"USER_DEFINED"],
+        _ => return None,
+    })
+}
+
+fn validate_xml_sequences(xml: &str) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
+    crate::xml::validate_element_sequences(
+        xml,
+        "OCM",
+        |parent, child| {
+            let children = ocm_xml_children(parent)?;
+            let rank = children.iter().position(|candidate| *candidate == child)? as u16;
+            let repeatable = matches!(
+                child,
+                b"COMMENT"
+                    | b"traj"
+                    | b"cov"
+                    | b"man"
+                    | b"trajLine"
+                    | b"covLine"
+                    | b"manLine"
+                    | b"USER_DEFINED"
+            );
+            Some(XmlSequenceRule { rank, repeatable })
+        },
+        |element, attribute| {
+            (attribute == b"parameter" && element == b"USER_DEFINED")
+                || (attribute == b"units"
+                    && matches!(
+                        element,
+                        b"SCLK_OFFSET_AT_EPOCH"
+                            | b"SCLK_SEC_PER_SI_SEC"
+                            | b"TIME_SPAN"
+                            | b"TAIMUTC_AT_TZERO"
+                            | b"NEXT_LEAP_TAIMUTC"
+                            | b"UT1MUTC_AT_TZERO"
+                            | b"DRAG_CONST_AREA"
+                            | b"DRAG_UNCERTAINTY"
+                            | b"INITIAL_WET_MASS"
+                            | b"WET_MASS"
+                            | b"DRY_MASS"
+                            | b"OEB_MAX"
+                            | b"OEB_INT"
+                            | b"OEB_MIN"
+                            | b"AREA_ALONG_OEB_MAX"
+                            | b"AREA_ALONG_OEB_INT"
+                            | b"AREA_ALONG_OEB_MIN"
+                            | b"AREA_MIN_FOR_PC"
+                            | b"AREA_MAX_FOR_PC"
+                            | b"AREA_TYP_FOR_PC"
+                            | b"RCS"
+                            | b"RCS_MIN"
+                            | b"RCS_MAX"
+                            | b"SRP_CONST_AREA"
+                            | b"SOLAR_RAD_UNCERTAINTY"
+                            | b"ATT_KNOWLEDGE"
+                            | b"ATT_CONTROL"
+                            | b"ATT_POINTING"
+                            | b"AVG_MANEUVER_FREQ"
+                            | b"MAX_THRUST"
+                            | b"DV_BOL"
+                            | b"DV_REMAINING"
+                            | b"IXX"
+                            | b"IYY"
+                            | b"IZZ"
+                            | b"IXY"
+                            | b"IXZ"
+                            | b"IYZ"
+                            | b"COV_CONFIDENCE"
+                            | b"DC_TIME_PULSE_DURATION"
+                            | b"DC_TIME_PULSE_PERIOD"
+                            | b"DC_PA_START_ANGLE"
+                            | b"DC_PA_STOP_ANGLE"
+                            | b"EQUATORIAL_RADIUS"
+                            | b"GM"
+                            | b"CENTRAL_BODY_ROTATION"
+                            | b"FIXED_GEOMAG_KP"
+                            | b"FIXED_GEOMAG_AP"
+                            | b"FIXED_GEOMAG_DST"
+                            | b"FIXED_F10P7"
+                            | b"FIXED_F10P7_MEAN"
+                            | b"FIXED_M10P7"
+                            | b"FIXED_M10P7_MEAN"
+                            | b"FIXED_S10P7"
+                            | b"FIXED_S10P7_MEAN"
+                            | b"FIXED_Y10P7"
+                            | b"FIXED_Y10P7_MEAN"
+                            | b"DAYS_SINCE_FIRST_OBS"
+                            | b"DAYS_SINCE_LAST_OBS"
+                            | b"RECOMMENDED_OD_SPAN"
+                            | b"ACTUAL_OD_SPAN"
+                            | b"MAXIMUM_OBS_GAP"
+                            | b"OD_EPOCH_EIGMAJ"
+                            | b"OD_EPOCH_EIGINT"
+                            | b"OD_EPOCH_EIGMIN"
+                            | b"OD_MAX_PRED_EIGMAJ"
+                            | b"OD_MIN_PRED_EIGMIN"
+                            | b"OD_CONFIDENCE"
+                            | b"SEDR"
+                            | b"WEIGHTED_RMS"
+                    ))
+        },
+    )
+}
+
+fn ocm_kvn_keys(block: &str) -> Option<&'static [&'static str]> {
+    Some(match block {
+        "META" => &[
+            "OBJECT_NAME",
+            "INTERNATIONAL_DESIGNATOR",
+            "CATALOG_NAME",
+            "OBJECT_DESIGNATOR",
+            "ALTERNATE_NAMES",
+            "ORIGINATOR_POC",
+            "ORIGINATOR_POSITION",
+            "ORIGINATOR_PHONE",
+            "ORIGINATOR_EMAIL",
+            "ORIGINATOR_ADDRESS",
+            "TECH_ORG",
+            "TECH_POC",
+            "TECH_POSITION",
+            "TECH_PHONE",
+            "TECH_EMAIL",
+            "TECH_ADDRESS",
+            "PREVIOUS_MESSAGE_ID",
+            "NEXT_MESSAGE_ID",
+            "ADM_MSG_LINK",
+            "CDM_MSG_LINK",
+            "PRM_MSG_LINK",
+            "RDM_MSG_LINK",
+            "TDM_MSG_LINK",
+            "OPERATOR",
+            "OWNER",
+            "COUNTRY",
+            "CONSTELLATION",
+            "OBJECT_TYPE",
+            "TIME_SYSTEM",
+            "EPOCH_TZERO",
+            "OPS_STATUS",
+            "ORBIT_CATEGORY",
+            "OCM_DATA_ELEMENTS",
+            "SCLK_OFFSET_AT_EPOCH",
+            "SCLK_SEC_PER_SI_SEC",
+            "PREVIOUS_MESSAGE_EPOCH",
+            "NEXT_MESSAGE_EPOCH",
+            "START_TIME",
+            "STOP_TIME",
+            "TIME_SPAN",
+            "TAIMUTC_AT_TZERO",
+            "NEXT_LEAP_EPOCH",
+            "NEXT_LEAP_TAIMUTC",
+            "UT1MUTC_AT_TZERO",
+            "EOP_SOURCE",
+            "INTERP_METHOD_EOP",
+            "CELESTIAL_SOURCE",
+        ],
+        "TRAJ" => &[
+            "TRAJ_ID",
+            "TRAJ_PREV_ID",
+            "TRAJ_NEXT_ID",
+            "TRAJ_BASIS",
+            "TRAJ_BASIS_ID",
+            "INTERPOLATION",
+            "INTERPOLATION_DEGREE",
+            "PROPAGATOR",
+            "CENTER_NAME",
+            "TRAJ_REF_FRAME",
+            "TRAJ_FRAME_EPOCH",
+            "USEABLE_START_TIME",
+            "USEABLE_STOP_TIME",
+            "ORB_REVNUM",
+            "ORB_REVNUM_BASIS",
+            "TRAJ_TYPE",
+            "ORB_AVERAGING",
+            "TRAJ_UNITS",
+        ],
+        "PHYS" => &[
+            "MANUFACTURER",
+            "BUS_MODEL",
+            "DOCKED_WITH",
+            "DRAG_CONST_AREA",
+            "DRAG_COEFF_NOM",
+            "DRAG_UNCERTAINTY",
+            "INITIAL_WET_MASS",
+            "WET_MASS",
+            "DRY_MASS",
+            "OEB_PARENT_FRAME",
+            "OEB_PARENT_FRAME_EPOCH",
+            "OEB_Q1",
+            "OEB_Q2",
+            "OEB_Q3",
+            "OEB_QC",
+            "OEB_MAX",
+            "OEB_INT",
+            "OEB_MIN",
+            "AREA_ALONG_OEB_MAX",
+            "AREA_ALONG_OEB_INT",
+            "AREA_ALONG_OEB_MIN",
+            "AREA_MIN_FOR_PC",
+            "AREA_MAX_FOR_PC",
+            "AREA_TYP_FOR_PC",
+            "RCS",
+            "RCS_MIN",
+            "RCS_MAX",
+            "SRP_CONST_AREA",
+            "SOLAR_RAD_COEFF",
+            "SOLAR_RAD_UNCERTAINTY",
+            "VM_ABSOLUTE",
+            "VM_APPARENT_MIN",
+            "VM_APPARENT",
+            "VM_APPARENT_MAX",
+            "REFLECTANCE",
+            "ATT_CONTROL_MODE",
+            "ATT_ACTUATOR_TYPE",
+            "ATT_KNOWLEDGE",
+            "ATT_CONTROL",
+            "ATT_POINTING",
+            "AVG_MANEUVER_FREQ",
+            "MAX_THRUST",
+            "DV_BOL",
+            "DV_REMAINING",
+            "IXX",
+            "IYY",
+            "IZZ",
+            "IXY",
+            "IXZ",
+            "IYZ",
+        ],
+        "COV" => &[
+            "COV_ID",
+            "COV_PREV_ID",
+            "COV_NEXT_ID",
+            "COV_BASIS",
+            "COV_BASIS_ID",
+            "COV_REF_FRAME",
+            "COV_FRAME_EPOCH",
+            "COV_SCALE_MIN",
+            "COV_SCALE_MAX",
+            "COV_CONFIDENCE",
+            "COV_TYPE",
+            "COV_ORDERING",
+            "COV_UNITS",
+        ],
+        "MAN" => &[
+            "MAN_ID",
+            "MAN_PREV_ID",
+            "MAN_NEXT_ID",
+            "MAN_BASIS",
+            "MAN_BASIS_ID",
+            "MAN_DEVICE_ID",
+            "MAN_PREV_EPOCH",
+            "MAN_NEXT_EPOCH",
+            "MAN_PURPOSE",
+            "MAN_PRED_SOURCE",
+            "MAN_REF_FRAME",
+            "MAN_FRAME_EPOCH",
+            "GRAV_ASSIST_NAME",
+            "DC_TYPE",
+            "DC_WIN_OPEN",
+            "DC_WIN_CLOSE",
+            "DC_MIN_CYCLES",
+            "DC_MAX_CYCLES",
+            "DC_EXEC_START",
+            "DC_EXEC_STOP",
+            "DC_REF_TIME",
+            "DC_TIME_PULSE_DURATION",
+            "DC_TIME_PULSE_PERIOD",
+            "DC_REF_DIR",
+            "DC_BODY_FRAME",
+            "DC_BODY_TRIGGER",
+            "DC_PA_START_ANGLE",
+            "DC_PA_STOP_ANGLE",
+            "MAN_COMPOSITION",
+            "MAN_UNITS",
+        ],
+        "PERT" => &[
+            "ATMOSPHERIC_MODEL",
+            "GRAVITY_MODEL",
+            "EQUATORIAL_RADIUS",
+            "GM",
+            "N_BODY_PERTURBATIONS",
+            "CENTRAL_BODY_ROTATION",
+            "OBLATE_FLATTENING",
+            "OCEAN_TIDES_MODEL",
+            "SOLID_TIDES_MODEL",
+            "REDUCTION_THEORY",
+            "ALBEDO_MODEL",
+            "ALBEDO_GRID_SIZE",
+            "SHADOW_MODEL",
+            "SHADOW_BODIES",
+            "SRP_MODEL",
+            "SW_DATA_SOURCE",
+            "SW_DATA_EPOCH",
+            "SW_INTERP_METHOD",
+            "FIXED_GEOMAG_KP",
+            "FIXED_GEOMAG_AP",
+            "FIXED_GEOMAG_DST",
+            "FIXED_F10P7",
+            "FIXED_F10P7_MEAN",
+            "FIXED_M10P7",
+            "FIXED_M10P7_MEAN",
+            "FIXED_S10P7",
+            "FIXED_S10P7_MEAN",
+            "FIXED_Y10P7",
+            "FIXED_Y10P7_MEAN",
+        ],
+        "OD" => &[
+            "OD_ID",
+            "OD_PREV_ID",
+            "OD_METHOD",
+            "OD_EPOCH",
+            "DAYS_SINCE_FIRST_OBS",
+            "DAYS_SINCE_LAST_OBS",
+            "RECOMMENDED_OD_SPAN",
+            "ACTUAL_OD_SPAN",
+            "OBS_AVAILABLE",
+            "OBS_USED",
+            "TRACKS_AVAILABLE",
+            "TRACKS_USED",
+            "MAXIMUM_OBS_GAP",
+            "OD_EPOCH_EIGMAJ",
+            "OD_EPOCH_EIGINT",
+            "OD_EPOCH_EIGMIN",
+            "OD_MAX_PRED_EIGMAJ",
+            "OD_MIN_PRED_EIGMIN",
+            "OD_CONFIDENCE",
+            "GDOP",
+            "SOLVE_N",
+            "SOLVE_STATES",
+            "CONSIDER_N",
+            "CONSIDER_PARAMS",
+            "SEDR",
+            "SENSORS_N",
+            "SENSORS",
+            "WEIGHTED_RMS",
+            "DATA_TYPES",
+        ],
+        "USER" => &[],
+        _ => return None,
+    })
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating OCM KVN structure"],
+            offset,
+        }))))
+    };
+    let block_rank = |block: &str| match block {
+        "META" => Some((0u8, false)),
+        "TRAJ" => Some((1, true)),
+        "PHYS" => Some((2, false)),
+        "COV" => Some((3, true)),
+        "MAN" => Some((4, true)),
+        "PERT" => Some((5, false)),
+        "OD" => Some((6, false)),
+        "USER" => Some((7, false)),
+        _ => None,
+    };
+    let mut current_block: Option<&str> = None;
+    let mut previous_key = None;
+    let mut last_block_rank = None;
+    let mut block_has_content = false;
+    let mut history_started = false;
+    let mut pending_block_comment = false;
+    let mut top_rank = None;
+    let mut offset = 0usize;
+
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        // ODM's 254-character KVN limit applies to keyword records. OCM covariance history
+        // records are fixed logical records and the official Annex G example contains complete
+        // lower-triangular records longer than 254 characters; splitting one would change it.
+        if line.len() > 254
+            && (line.contains('=') || !matches!(current_block, Some("TRAJ" | "COV" | "MAN")))
+        {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            if block_has_content {
+                return fail("COMMENT is not at the beginning of a logical block");
+            }
+            if current_block.is_none()
+                && top_rank != Some(0)
+                && top_rank.is_none_or(|rank| rank < 3)
+            {
+                return fail("COMMENT is not at the beginning of the header or a data block");
+            }
+            pending_block_comment =
+                current_block.is_none() && top_rank.is_some_and(|rank| rank >= 3);
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if let Some(marker) = line.strip_suffix("_START") {
+            if current_block.is_some() {
+                return if current_block == Some("USER") {
+                    fail("Unexpected key in USER block")
+                } else {
+                    fail("nested OCM marked block")
+                };
+            }
+            let (rank, repeatable) = block_rank(marker)
+                .ok_or_else(|| invalid(number, offset, "unknown OCM block".into()))?;
+            if last_block_rank.is_some_and(|last| rank < last || (rank == last && !repeatable)) {
+                return fail("duplicate or out-of-order OCM block");
+            }
+            if marker != "META" && last_block_rank.is_none() {
+                return fail("Expected META_START");
+            }
+            current_block = Some(marker);
+            previous_key = None;
+            block_has_content = false;
+            history_started = false;
+            pending_block_comment = false;
+            last_block_rank = Some(rank);
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if let Some(marker) = line.strip_suffix("_STOP") {
+            if current_block != Some(marker) {
+                return fail("mismatched or unexpected OCM block end");
+            }
+            current_block = None;
+            previous_key = None;
+            block_has_content = false;
+            history_started = false;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+
+        if let Some(block) = current_block {
+            if !line.contains('=') {
+                if !matches!(block, "TRAJ" | "COV" | "MAN") {
+                    return fail("unexpected non-assignment in OCM logical block");
+                }
+                block_has_content = true;
+                history_started = true;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            if !line.contains('=') {
+                return fail("expected an assignment");
+            }
+            let key = line.split_once('=').unwrap().0.trim();
+            if block == "USER" {
+                if !key.starts_with("USER_DEFINED_") || key.len() == "USER_DEFINED_".len() {
+                    return fail("unknown OCM USER keyword");
+                }
+                block_has_content = true;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            let keys = ocm_kvn_keys(block).unwrap();
+            let rank = keys
+                .iter()
+                .position(|candidate| *candidate == key)
+                .ok_or_else(|| {
+                    let block_name = match block {
+                        "META" => "Metadata",
+                        "TRAJ" => "Trajectory",
+                        "PHYS" => "Physical",
+                        "COV" => "Covariance",
+                        "MAN" => "Maneuver",
+                        "PERT" => "Perturbations",
+                        "OD" => "Orbit Determination",
+                        _ => block,
+                    };
+                    invalid(number, offset, format!("Unexpected OCM {block_name} key"))
+                })?;
+            if previous_key.is_some_and(|previous| rank <= previous) {
+                return fail("duplicate or out-of-order OCM block keyword");
+            }
+            if history_started && !(block == "MAN" && key == "MAN_UNITS") {
+                return fail("assignment after OCM history data");
+            }
+            previous_key = Some(rank);
+            block_has_content = true;
+        } else {
+            if pending_block_comment {
+                return fail("Unexpected OCM Data key");
+            }
+            if !line.contains('=') {
+                return fail("expected exactly one top-level assignment");
+            }
+            let key = line.split_once('=').unwrap().0.trim();
+            let rank = match key {
+                "CCSDS_OCM_VERS" => 0,
+                "CLASSIFICATION" => 1,
+                "CREATION_DATE" => 2,
+                "ORIGINATOR" => 3,
+                "MESSAGE_ID" => 4,
+                _ if last_block_rank.is_none() => return fail("Expected META_START"),
+                _ => return fail("Unexpected OCM Data key"),
+            };
+            if top_rank.is_some_and(|previous| rank <= previous) || last_block_rank.is_some() {
+                return fail("duplicate or out-of-order OCM top-level keyword");
+            }
+            top_rank = Some(rank);
+        }
+        offset += raw_line.len() + 1;
+    }
+    if current_block.is_some() {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "unclosed OCM marked block".into(),
+        ));
+    }
+    Ok(())
+}
+
 impl Ocm {
-    // No inherent validate() anymore
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        for trajectory in &self.body.segment.data.traj {
+            for line in &trajectory.traj_lines {
+                for value in &line.values {
+                    if !crate::kvn::ser::OdmFloat::is_valid(*value) {
+                        return Err(ValidationError::InvalidValue {
+                            field: Cow::Borrowed("trajLine"),
+                            value: value.to_string(),
+                            expected: Cow::Borrowed("a finite number"),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+            }
+        }
+        for covariance in &self.body.segment.data.cov {
+            for line in &covariance.cov_lines {
+                for value in &line.values {
+                    if !crate::kvn::ser::OdmFloat::is_valid(*value) {
+                        return Err(ValidationError::InvalidValue {
+                            field: Cow::Borrowed("covLine"),
+                            value: value.to_string(),
+                            expected: Cow::Borrowed("a finite number"),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+            }
+        }
+
+        let mut sink = OcmKvnLexicalSink::default();
+        let mut writer = KvnWriter::from_io(&mut sink);
+        self.write_kvn(&mut writer);
+        writer.finish_io().map_err(CcsdsNdmError::from)
+    }
+}
+
+#[derive(Default)]
+struct OcmKvnLexicalSink {
+    line_len: usize,
+    has_equals: bool,
+    history_block: bool,
+    prefix: [u8; 16],
+    prefix_len: usize,
+}
+
+impl OcmKvnLexicalSink {
+    fn finish_line(&mut self) -> std::io::Result<()> {
+        if self.line_len > 254 && (self.has_equals || !self.history_block) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "generated OCM KVN keyword record exceeds 254 characters",
+            ));
+        }
+        let prefix = &self.prefix[..self.prefix_len];
+        if matches!(prefix, b"TRAJ_START" | b"COV_START" | b"MAN_START") {
+            self.history_block = true;
+        } else if matches!(prefix, b"TRAJ_STOP" | b"COV_STOP" | b"MAN_STOP") {
+            self.history_block = false;
+        }
+        self.line_len = 0;
+        self.has_equals = false;
+        self.prefix_len = 0;
+        Ok(())
+    }
+}
+
+impl Write for OcmKvnLexicalSink {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        for byte in buffer {
+            if *byte == b'\n' {
+                self.finish_line()?;
+                continue;
+            }
+            if !(b' '..=b'~').contains(byte) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "generated OCM KVN contains non-printable or non-ASCII content",
+                ));
+            }
+            self.line_len = self.line_len.saturating_add(1);
+            self.has_equals |= *byte == b'=';
+            if self.prefix_len < self.prefix.len() {
+                self.prefix[self.prefix_len] = *byte;
+                self.prefix_len += 1;
+            }
+        }
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        if self.line_len > 0 {
+            self.finish_line()?;
+        }
+        Ok(())
+    }
 }
 
 impl ToKvn for Ocm {
@@ -795,6 +1679,7 @@ fn parse_csv_list(value: &str) -> Vec<String> {
 /// This struct serves as a container for the `OcmSegment`, which holds the
 /// metadata and data for the Orbit Comprehensive Message.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct OcmBody {
     #[serde(rename = "segment")]
     pub segment: Box<OcmSegment>,
@@ -820,6 +1705,7 @@ impl ToKvn for OcmBody {
 ///
 /// Contains metadata and data sections.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct OcmSegment {
     pub metadata: OcmMetadata,
     pub data: OcmData,
@@ -838,7 +1724,7 @@ impl ToKvn for OcmSegment {
 
 /// OCM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OcmMetadata {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// Metadata section; see 7.8 for comment formatting rules).
@@ -1721,7 +2607,7 @@ impl ToKvn for OcmMetadata {
 /// different data blocks, such as trajectory, physical properties, covariance,
 /// maneuvers, and other related information.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OcmData {
     /// List of trajectory state time history blocks.
     #[serde(rename = "traj", default)]
@@ -1739,28 +2625,13 @@ pub struct OcmData {
     #[builder(default)]
     pub man: Vec<OcmManeuverParameters>,
     /// Perturbation parameters.
-    #[serde(
-        rename = "pert",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "pert", default, skip_serializing_if = "Option::is_none")]
     pub pert: Option<OcmPerturbations>,
     /// Orbit determination data.
-    #[serde(
-        rename = "od",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "od", default, skip_serializing_if = "Option::is_none")]
     pub od: Option<OcmOdParameters>,
     /// User-defined parameters.
-    #[serde(
-        rename = "user",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "user", default, skip_serializing_if = "Option::is_none")]
     pub user: Option<UserDefined>,
 }
 
@@ -2186,8 +3057,7 @@ impl ToKvn for OcmTrajState {
             writer.write_pair("TRAJ_UNITS", v);
         }
         for line in &self.traj_lines {
-            let vals: Vec<String> = line.values.iter().map(|v| v.to_string()).collect();
-            writer.write_line(format!("{} {}", line.epoch, vals.join(" ")));
+            writer.write_ocm_numeric_history(&line.epoch, &line.values);
         }
         writer.write_section("TRAJ_STOP");
     }
@@ -3294,8 +4164,7 @@ impl ToKvn for OcmCovarianceMatrix {
             writer.write_pair("COV_UNITS", v);
         }
         for line in &self.cov_lines {
-            let vals: Vec<String> = line.values.iter().map(|v| v.to_string()).collect();
-            writer.write_line(format!("{} {}", line.epoch, vals.join(" ")));
+            writer.write_ocm_numeric_history(&line.epoch, &line.values);
         }
         writer.write_section("COV_STOP");
     }
@@ -3804,7 +4673,7 @@ impl ToKvn for OcmManeuverParameters {
             writer.write_pair("MAN_UNITS", v);
         }
         for line in &self.man_lines {
-            writer.write_line(format!("{} {}", line.epoch, line.values.join(" ")));
+            writer.write_ocm_text_history(&line.epoch, &line.values);
         }
         writer.write_section("MAN_STOP");
     }
@@ -4173,8 +5042,8 @@ impl ToKvn for OcmPerturbations {
             writer.write_measure("EQUATORIAL_RADIUS", v);
         }
         if let Some(v) = &self.gm {
-            writer.write_pair("GM", v.value.to_string());
-        } // GM units are optional/complex
+            writer.write_measure("GM", &v.to_unit_value());
+        }
         if let Some(v) = &self.n_body_perturbations {
             writer.write_pair("N_BODY_PERTURBATIONS", v);
         }
