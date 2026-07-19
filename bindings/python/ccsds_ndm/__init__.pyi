@@ -1,14 +1,15 @@
 # Generated content DO NOT EDIT
-from typing import Any, Optional, Union
+from typing import Optional, TypeVar, Union
 import numpy
 
-def edit(message: object) -> Any:
+T = TypeVar("T")
+
+def edit(message: T) -> T:
     """Return a live copy-on-write view for nested model updates."""
     ...
 
 def convert(
     data: str,
-    from_format: str,
     to_format: str,
     max_input_bytes: Optional[int] = None,
     max_xml_depth: Optional[int] = None,
@@ -24,7 +25,6 @@ def convert(
 def convert_file(
     source_path: str,
     destination_path: str,
-    from_format: str,
     to_format: str,
     max_input_bytes: Optional[int] = None,
     max_xml_depth: Optional[int] = None,
@@ -64,8 +64,27 @@ def from_str(
     max_input_bytes: Optional[int] = None,
     max_xml_depth: Optional[int] = None,
     max_records: Optional[int] = None,
-):
-    """ """
+) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
+    """
+    Parse a string containing KVN or XML.
+
+    Parameters
+    ----------
+    data : str
+        The content to parse.
+    format : str, optional
+        ``"kvn"`` or ``"xml"``. Detected automatically when omitted.
+
+    Returns
+    -------
+    Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
+        The parsed NDM object.
+
+    Raises
+    ------
+    ValueError
+        If the input is invalid or unsupported.
+    """
     ...
 
 class Acm:
@@ -15298,9 +15317,9 @@ class YesNo:
         """
         ...
 
-class NdmError(ValueError):
+class NdmError(Exception):
     """
-    Base exception for all CCSDS NDM errors.
+    Generic CCSDS NDM error.
     """
     def __getstate__(self, /) -> object:
         """
@@ -15315,7 +15334,7 @@ class NdmError(ValueError):
     @property
     def args(self): ...
 
-class NdmEpochError(NdmError):
+class NdmEpochError(ValueError):
     """
     Error parsing a CCSDS epoch string.
     """
@@ -15332,7 +15351,7 @@ class NdmEpochError(NdmError):
     @property
     def args(self): ...
 
-class NdmFormatError(NdmError):
+class NdmFormatError(ValueError):
     """
     Error during parsing of NDM data (KVN or XML).
     """
@@ -15349,7 +15368,7 @@ class NdmFormatError(NdmError):
     @property
     def args(self): ...
 
-class NdmIoError(NdmError):
+class NdmIoError(OSError):
     """
     I/O error during file operations.
     """
@@ -15365,8 +15384,10 @@ class NdmIoError(NdmError):
 
     @property
     def args(self): ...
+    @property
+    def characters_written(self): ...
 
-class NdmUnsupportedMessageError(NdmError):
+class NdmUnsupportedMessageError(ValueError):
     """
     Unsupported CCSDS message type.
     """
@@ -15383,7 +15404,7 @@ class NdmUnsupportedMessageError(NdmError):
     @property
     def args(self): ...
 
-class NdmValidationError(NdmError):
+class NdmValidationError(ValueError):
     """
     Validation error against CCSDS rules.
     """

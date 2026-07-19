@@ -41,7 +41,7 @@ source="$(
 )"
 binary="${temporary}/install/bin/ccsds-ndm"
 printf '%s\n' "${source}" | "${binary}" validate --format kvn -
-xml="$(printf '%s\n' "${source}" | "${binary}" convert --from kvn --to xml -)"
+xml="$(printf '%s\n' "${source}" | "${binary}" convert --to xml -)"
 printf '%s\n' "${xml}" | "${binary}" validate --format xml -
-kvn="$(printf '%s\n' "${xml}" | "${binary}" convert --from xml --to kvn -)"
+kvn="$(printf '%s\n' "${xml}" | "${binary}" convert --to kvn -)"
 printf '%s\n' "${kvn}" | "${binary}" validate --format kvn -

@@ -31,11 +31,26 @@ The project handles NDM representation and exchange. Orbit propagation, frame tr
 conjunction analysis, attitude dynamics, and other astrodynamics computations are outside its
 scope.
 
+## Feature Bar
+
+Popularity is an outcome of reliable user success, not feature count. A feature earns its place
+only when it:
+
+1. solves a common workflow, a CCSDS correctness requirement, or a measured bottleneck;
+2. uses the smallest complete design that keeps the safe path easy;
+3. improves correctness, performance, or usability enough to justify its tests, documentation,
+   compatibility cost, and long-term maintenance; and
+4. stays inside NDM representation and exchange.
+
+When comparing this project with another library, use a reproducible workload for performance and
+the shortest realistic workflow for usability. Do not add speculative extension points,
+compatibility modes, or integrations “just in case”; wait for demonstrated demand.
+
 ## Current Capabilities
 
 This document describes the direction of the project, not the capabilities of a particular
-release. The [support and conformance matrix](support-matrix.md) is the authoritative statement of
-what is currently supported and verified.
+release. The [support matrix](support-matrix.md) is the authoritative statement of what is
+currently supported and verified.
 
 ## Guiding Principles
 

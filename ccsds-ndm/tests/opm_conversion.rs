@@ -16,7 +16,6 @@ fn both_conversion_directions_preserve_the_complete_typed_model() {
         let expected = Opm::from_kvn(source).expect("KVN fixture should parse");
         let xml = convert(
             source,
-            Notation::Kvn,
             Notation::Xml,
             &ParseOptions::default(),
             &GenerateOptions::source(),
@@ -31,7 +30,6 @@ fn both_conversion_directions_preserve_the_complete_typed_model() {
     let expected = Opm::from_xml(XML_FIXTURE).expect("XML fixture should parse");
     let kvn = convert(
         XML_FIXTURE,
-        Notation::Xml,
         Notation::Kvn,
         &ParseOptions::default(),
         &GenerateOptions::source(),
@@ -51,7 +49,6 @@ fn xml_to_kvn_rounds_values_to_the_ccsds_digit_limit() {
 
     let kvn = convert(
         &xml,
-        Notation::Xml,
         Notation::Kvn,
         &ParseOptions::default(),
         &GenerateOptions::source(),
@@ -71,7 +68,6 @@ fn file_conversion_replaces_the_destination_only_after_success() {
     convert_file(
         &source,
         &destination,
-        Notation::Kvn,
         Notation::Xml,
         &ParseOptions::default(),
         &GenerateOptions::source(),
@@ -85,7 +81,6 @@ fn file_conversion_replaces_the_destination_only_after_success() {
     assert!(convert_file(
         &source,
         &destination,
-        Notation::Kvn,
         Notation::Xml,
         &ParseOptions::default(),
         &GenerateOptions::source(),
@@ -118,7 +113,6 @@ fn file_conversion_enforces_input_limit_before_materializing_the_document() {
     let error = convert_file(
         &source,
         &destination,
-        Notation::Kvn,
         Notation::Xml,
         &options,
         &GenerateOptions::source(),

@@ -34,21 +34,6 @@ use oem::*;
 use omm::*;
 use opm::*;
 
-/// Parse a string (KVN or XML) and return the corresponding NDM object.
-///
-/// Parameters
-/// ----------
-/// data : str
-///     The content to parse.
-/// Returns
-/// -------
-/// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
-///     The parsed NDM object.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If parsing fails.
 fn message_to_py(py: Python<'_>, message: MessageType) -> PyResult<Py<PyAny>> {
     match message {
         MessageType::Oem(oem) => {
@@ -98,6 +83,24 @@ fn message_to_py(py: Python<'_>, message: MessageType) -> PyResult<Py<PyAny>> {
     }
 }
 
+/// Parse a string containing KVN or XML.
+///
+/// Parameters
+/// ----------
+/// data : str
+///     The content to parse.
+/// format : str, optional
+///     ``"kvn"`` or ``"xml"``. Detected automatically when omitted.
+///
+/// Returns
+/// -------
+/// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
+///     The parsed NDM object.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the input is invalid or unsupported.
 #[pyfunction]
 #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
 fn from_str(
@@ -154,10 +157,9 @@ fn notation(value: &str) -> PyResult<ccsds_ndm::Notation> {
 
 /// Convert any recognized NDM message between KVN and XML through the shared generation gate.
 #[pyfunction]
-#[pyo3(signature = (data, from_format, to_format, max_input_bytes=None, max_xml_depth=None, max_records=None, max_output_bytes=None, version=None))]
+#[pyo3(signature = (data, to_format, max_input_bytes=None, max_xml_depth=None, max_records=None, max_output_bytes=None, version=None))]
 fn convert(
     data: &str,
-    from_format: &str,
     to_format: &str,
     max_input_bytes: Option<usize>,
     max_xml_depth: Option<usize>,
@@ -170,7 +172,6 @@ fn convert(
     generate.max_output_bytes = max_output_bytes;
     ccsds_ndm::convert(
         data,
-        notation(from_format)?,
         notation(to_format)?,
         &parse,
         &generate,
@@ -180,11 +181,10 @@ fn convert(
 
 /// Convert any recognized NDM file and atomically replace the destination on success.
 #[pyfunction]
-#[pyo3(signature = (source_path, destination_path, from_format, to_format, max_input_bytes=None, max_xml_depth=None, max_records=None, max_output_bytes=None, version=None))]
+#[pyo3(signature = (source_path, destination_path, to_format, max_input_bytes=None, max_xml_depth=None, max_records=None, max_output_bytes=None, version=None))]
 fn convert_file(
     source_path: &str,
     destination_path: &str,
-    from_format: &str,
     to_format: &str,
     max_input_bytes: Option<usize>,
     max_xml_depth: Option<usize>,
@@ -198,7 +198,6 @@ fn convert_file(
     ccsds_ndm::convert_file(
         source_path,
         destination_path,
-        notation(from_format)?,
         notation(to_format)?,
         &parse,
         &generate,

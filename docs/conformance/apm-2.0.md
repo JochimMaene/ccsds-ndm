@@ -1,8 +1,7 @@
 # APM 2.0 Focused Conformance Evidence
 
-This inventory records the current message-specific evidence for standalone APM 2.0. It is
-subordinate to the [conformance policy](../conformance-policy.md) and does not promote any support
-matrix cell by itself.
+This inventory records maintainer evidence for standalone APM 2.0. The
+[support matrix](../support-matrix.md) is the user-facing statement of current support.
 
 ## Scope and authorities
 
@@ -74,6 +73,5 @@ benchmarks provide the CodSpeed comparison surface for subsequent changes.
 
 ## Remaining verification work
 
-APM remains `implemented-unverified`. Its complete ICS feature inventory and packaged surfaces are
-reconciled, but grouped evidence is not promoted until the conformance-policy review creates and
-approves exact operation/notation/surface cells.
+APM remains available rather than verified. Its complete ICS feature inventory and packaged
+surfaces are reconciled; final message-level review remains.

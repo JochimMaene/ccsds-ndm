@@ -40,19 +40,27 @@ def test_type_specific_from_str_allows_default_format(cls, path):
     assert isinstance(parsed, cls)
 
 
-def test_all_public_ndm_exceptions_share_the_documented_base():
-    exception_types = [
+def test_public_exceptions_follow_python_error_categories():
+    value_errors = [
         ccsds_ndm.NdmFormatError,
         ccsds_ndm.NdmKvnParseError,
         ccsds_ndm.NdmXmlError,
         ccsds_ndm.NdmValidationError,
         ccsds_ndm.NdmEpochError,
-        ccsds_ndm.NdmIoError,
         ccsds_ndm.NdmUnsupportedMessageError,
     ]
-    assert all(
-        issubclass(exception, ccsds_ndm.NdmError) for exception in exception_types
-    )
+    assert all(issubclass(exception, ValueError) for exception in value_errors)
+    assert issubclass(ccsds_ndm.NdmIoError, OSError)
+    assert not issubclass(ccsds_ndm.NdmIoError, ValueError)
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["RelativeStateVector", "SpacecraftParameters", "TleParameters"],
+)
+def test_registered_model_types_are_exported_from_the_package(name):
+    assert name in ccsds_ndm.__all__
+    assert getattr(ccsds_ndm, name) is getattr(ccsds_ndm.ccsds_ndm, name)
 
 
 def test_edit_propagates_nested_and_list_changes_to_the_message():

@@ -130,7 +130,7 @@ value as `str` while sharing the same mutation-time validation.
 The 10k trajectory benchmark records 5.85–6.03 ms XML parsing, 4.02–4.03 ms KVN parsing, and about
 2.21 MB of retained trajectory/value storage after parsing. The `CalendarEpoch` narrowing is
 `repr(transparent)` over the existing inline value, so it does not change the trajectory record
-layout. See `docs/epoch-handling-plan.md` for the full timing, RSS, and record-layout comparison.
+layout.
 
 ## Context and conditional rules needed before conversion
 

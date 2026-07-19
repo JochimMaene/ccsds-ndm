@@ -212,13 +212,13 @@ def test_remaining_python_messages_share_the_bounded_contract(
 
 def test_generic_python_conversion_dispatches_non_opm_messages(tmp_path):
     omm = (REPOSITORY_ROOT / "data/kvn/omm_g7.kvn").read_text()
-    xml = ccsds_ndm.convert(omm, "kvn", "xml", max_output_bytes=100_000)
+    xml = ccsds_ndm.convert(omm, "xml", max_output_bytes=100_000)
     assert isinstance(ccsds_ndm.from_str(xml, format="xml"), ccsds_ndm.Omm)
 
     source = tmp_path / "source.omm"
     destination = tmp_path / "destination.xml"
     source.write_text(omm)
-    ccsds_ndm.convert_file(str(source), str(destination), "kvn", "xml")
+    ccsds_ndm.convert_file(str(source), str(destination), "xml")
     assert isinstance(
         ccsds_ndm.from_file(str(destination), format="xml"), ccsds_ndm.Omm
     )
@@ -252,21 +252,21 @@ def test_combined_python_message_keeps_identity_and_shared_limits():
 
 
 def test_python_conversion_delegates_to_strict_rust_core(tmp_path):
-    xml = ccsds_ndm.convert(OPM_KVN, "kvn", "xml")
+    xml = ccsds_ndm.convert(OPM_KVN, "xml")
     expected_kvn = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn").to_kvn()
     assert ccsds_ndm.Opm.from_str(xml, format="xml").to_kvn() == expected_kvn
 
-    kvn = ccsds_ndm.convert(xml, "xml", "kvn")
+    kvn = ccsds_ndm.convert(xml, "kvn")
     assert ccsds_ndm.Opm.from_str(kvn, format="kvn").to_kvn() == expected_kvn
 
     source = tmp_path / "source.kvn"
     destination = tmp_path / "destination.xml"
     source.write_text(OPM_KVN)
-    ccsds_ndm.convert_file(str(source), str(destination), "kvn", "xml")
+    ccsds_ndm.convert_file(str(source), str(destination), "xml")
     ccsds_ndm.Opm.from_file(str(destination), format="xml")
 
     destination.write_text("sentinel")
     source.write_text("not an OPM")
     with pytest.raises(ccsds_ndm.NdmUnsupportedMessageError):
-        ccsds_ndm.convert_file(str(source), str(destination), "kvn", "xml")
+        ccsds_ndm.convert_file(str(source), str(destination), "xml")
     assert destination.read_text() == "sentinel"

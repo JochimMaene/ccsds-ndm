@@ -43,6 +43,6 @@ assert message.segment.metadata.object_name == "EDITED"
 assert message.validate() is None
 xml = message.to_str("xml")
 assert "<OBJECT_NAME>EDITED</OBJECT_NAME>" in xml
-kvn = ccsds_ndm.convert(xml, "xml", "kvn")
+kvn = ccsds_ndm.convert(xml, "kvn")
 assert isinstance(ccsds_ndm.from_str(kvn, format="kvn"), ccsds_ndm.Opm)
 PY

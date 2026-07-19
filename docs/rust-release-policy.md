@@ -46,5 +46,4 @@ or other sensitive operational data. This explicit pre-1.0 scope describes how t
 is maintained; it is not a claim of confidential disclosure handling or mature security response.
 
 A private route and response-time policy should be added only when maintainership and operational
-use justify sustaining them. Mature security handling remains a reference-status goal rather than
-a technical OPM conformance gate.
+use justify sustaining them. It is not a technical OPM conformance gate.

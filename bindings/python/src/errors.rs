@@ -10,23 +10,22 @@
 
 use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation, FormatError};
 use pyo3::create_exception;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyException, PyOSError, PyValueError};
 use pyo3::prelude::*;
 
-// Base exception for all CCSDS NDM errors.
-// ValueError preserves the pre-1.0 parsing contract while providing one reliable library base.
+// Generic library error for failures without a more useful built-in category.
 create_exception!(
     ccsds_ndm,
     NdmError,
-    PyValueError,
-    "Base exception for all CCSDS NDM errors."
+    PyException,
+    "Generic CCSDS NDM error."
 );
 
 // Format/parsing errors.
 create_exception!(
     ccsds_ndm,
     NdmFormatError,
-    NdmError,
+    PyValueError,
     "Error during parsing of NDM data (KVN or XML)."
 );
 create_exception!(
@@ -46,7 +45,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmValidationError,
-    NdmError,
+    PyValueError,
     "Validation error against CCSDS rules."
 );
 
@@ -54,7 +53,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmEpochError,
-    NdmError,
+    PyValueError,
     "Error parsing a CCSDS epoch string."
 );
 
@@ -62,7 +61,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmIoError,
-    NdmError,
+    PyOSError,
     "I/O error during file operations."
 );
 
@@ -70,7 +69,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmUnsupportedMessageError,
-    NdmError,
+    PyValueError,
     "Unsupported CCSDS message type."
 );
 

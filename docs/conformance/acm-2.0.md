@@ -1,8 +1,7 @@
 # ACM 2.0 Focused Conformance Evidence
 
-This inventory records the current message-specific evidence for standalone ACM 2.0. It remains
-subordinate to the [conformance policy](../conformance-policy.md) and does not promote a support
-matrix cell by itself.
+This inventory records maintainer evidence for standalone ACM 2.0. The
+[support matrix](../support-matrix.md) is the user-facing statement of current support.
 
 ## Scope and authorities
 

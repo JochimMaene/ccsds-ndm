@@ -67,7 +67,6 @@ let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
 - Semantic validation via the shared `Validate` trait
 - KVN and XML read/write support
 - Builder APIs for constructing messages
-```
 
 ## License
 

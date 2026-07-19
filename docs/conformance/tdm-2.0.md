@@ -1,7 +1,7 @@
 # TDM 2.0 Focused Conformance Evidence
 
-This focused inventory is subordinate to the [conformance policy](../conformance-policy.md) and
-does not promote a support-matrix cell by itself.
+This inventory records maintainer evidence for standalone TDM 2.0. The
+[support matrix](../support-matrix.md) is the user-facing statement of current support.
 
 ## Scope and authorities
 
@@ -77,6 +77,6 @@ claims.
 
 ## Remaining verification work
 
-TDM remains `implemented-unverified`. Its complete ICS feature inventory and packaged surfaces are
-reconciled. The recorded timing observations below remain informational, and exact
-operation/notation/surface cells still require explicit conformance-policy review before promotion.
+TDM remains available rather than verified. Its complete ICS feature inventory and packaged
+surfaces are reconciled. The recorded timing observations below remain informational, and final
+message-level review remains.

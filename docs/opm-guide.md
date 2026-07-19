@@ -30,9 +30,10 @@ Install distribution `ccsds-ndm-py` and import `ccsds_ndm`. `Opm.from_str` / `fr
 Raised NDM exceptions expose `code`, `severity`, `operation`, `notation`, `message_kind`, editions,
 field path, and available source location/token fields.
 
-Use `ccsds_ndm.convert(data, "kvn", "xml")` for strings and
-`ccsds_ndm.convert_file(source, destination, "xml", "kvn")` for atomic file conversion. Both
-accept the same optional input, XML-depth, and output limits and delegate directly to Rust.
+Use `ccsds_ndm.convert(data, "xml")` for strings and
+`ccsds_ndm.convert_file(source, destination, "kvn")` for atomic file conversion. Input notation is
+detected automatically. Both accept the same optional input, XML-depth, and output limits and
+delegate directly to Rust.
 
 Nested PyO3 properties are owned snapshots. Use `ccsds_ndm.edit(message)` when changing a nested
 field so the update is copied back through every parent:
@@ -58,13 +59,12 @@ The installed `ccsds-ndm` executable intentionally provides only validation and 
 
 ```text
 ccsds-ndm validate [--format kvn|xml] [--json] [limits] [FILE|-]
-ccsds-ndm convert [--from kvn|xml] --to kvn|xml [-o FILE|-] [--target-version source|latest|VERSION] [--json] [limits] [FILE|-]
+ccsds-ndm convert --to kvn|xml [-o FILE|-] [--target-version source|latest|VERSION] [--json] [limits] [FILE|-]
 ```
 
-Absent an explicit source notation, leading `<` selects XML and all other non-empty input selects
-KVN. Converted document bytes go only to stdout (or the selected atomic output file); diagnostics go
-only to stderr. Exit codes are 0 success, 2 invalid input/model, 3 unsupported edition/operation,
-4 resource limit, 5 I/O, and 64 command usage.
+Input notation is detected automatically. Converted document bytes go only to stdout (or the
+selected atomic output file); diagnostics go only to stderr. Exit codes are 0 success, 2 invalid
+input/model, 3 unsupported edition/operation, 4 resource limit, 5 I/O, and 64 command usage.
 
 OPM, OEM, and OMM can target ODM 2.0 or 3.0. The 2.0 implementation is checked against the archived
 official [SANA NDM/XML schema archive](https://sanaregistry.org/r/ndmxml_unqualified/). OPM and OEM

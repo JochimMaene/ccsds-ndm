@@ -17,4 +17,4 @@ parity, stubs, and synchronized docstrings are enforced separately by `just audi
 
 Defects use the same public-only reporting scope documented in the
 [Rust release policy](rust-release-policy.md). A private security process and broader maintained
-platform matrix are reference-status goals, not implied by technical OPM capability verification.
+platform matrix should be added only when adoption and maintainership justify their ongoing cost.

@@ -45,19 +45,25 @@ if isinstance(msg, ccsds_ndm.Opm):
     print(f"Object: {msg.segment.metadata.object_name}")
     print(f"Epoch: {msg.segment.data.state_vector.epoch}")
 
-    # Validate (raises on error by default)
+    # Edit nested values and validate explicitly when useful.
+    ccsds_ndm.edit(msg).segment.metadata.object_name = "UPDATED"
     msg.validate()
 
-    # Serialize
+    # Generation always validates.
     msg.to_file("output.opm", "kvn")
     msg.to_file("output.xml", "xml")
+
+# Input notation is detected; only choose the output notation.
+xml = ccsds_ndm.convert(msg.to_kvn(), "xml")
+ccsds_ndm.convert_file("input.opm", "output.xml", "xml")
 ```
 
 ## Features
 
 - **Type-safe**: Strongly typed structures matching CCSDS XSD schemas
 - **Auto-detection**: Automatically detects message format and type
-- **Validation API**: `validate(strict=True|False)` available on message objects
+- **Strict parsing**: Rejects unknown, duplicate, reordered, and malformed content
+- **Validated output**: Invalid typed models are never silently serialized
 - **Native bindings**: PyO3 + maturin wrapping the Rust core implementation
 
 ## Documentation

@@ -12,6 +12,24 @@ const EXIT_UNSUPPORTED: i32 = 3;
 const EXIT_RESOURCE: i32 = 4;
 const EXIT_IO: i32 = 5;
 const EXIT_USAGE: i32 = 64;
+const USAGE: &str = "\
+ccsds-ndm validates and converts CCSDS Navigation Data Messages.
+
+Usage:
+  ccsds-ndm validate [OPTIONS] [FILE|-]
+  ccsds-ndm convert --to kvn|xml [OPTIONS] [FILE|-]
+
+Run `ccsds-ndm <command> --help` for command options.";
+const VALIDATE_USAGE: &str = "\
+Usage:
+  ccsds-ndm validate [--format kvn|xml] [--json] [LIMITS] [FILE|-]
+
+Input notation is detected automatically when --format is omitted.";
+const CONVERT_USAGE: &str = "\
+Usage:
+  ccsds-ndm convert --to kvn|xml [-o FILE|-] [--target-version source|latest|VERSION] [--json] [LIMITS] [FILE|-]
+
+Input notation is detected automatically.";
 
 #[derive(Default)]
 struct Common {
@@ -52,7 +70,7 @@ fn parse_common(args: &[String], allow_convert: bool) -> Result<(Common, Vec<Str
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
-            "--format" | "--from" => {
+            "--format" => {
                 index += 1;
                 common.notation =
                     Some(notation(args.get(index).ok_or_else(|| {
@@ -127,6 +145,12 @@ fn parse_convert(args: &[String]) -> Result<Convert, String> {
                         .to_owned(),
                 );
             }
+            "--from" | "--format" => {
+                return Err(
+                    "input notation is detected automatically; remove the source-format option"
+                        .into(),
+                );
+            }
             value => common_args.push(value.to_owned()),
         }
         index += 1;
@@ -176,10 +200,6 @@ fn read_input(path: Option<&str>, max_bytes: Option<usize>) -> Result<String, Cc
     }
     Ok(String::from_utf8(bytes)
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?)
-}
-
-fn detected(input: &str, selected: Option<Notation>) -> Result<Notation, CcsdsNdmError> {
-    selected.map_or_else(|| ccsds_ndm::detect::detect_notation(input), Ok)
 }
 
 fn parse_options(common: &Common) -> ParseOptions {
@@ -246,8 +266,7 @@ fn validate(common: Common) -> Result<(), (CcsdsNdmError, bool)> {
     let input = read_input(common.input.as_deref(), common.max_input_bytes)
         .map_err(|error| (error, common.json))?;
     let options = parse_options(&common);
-    let notation = detected(&input, common.notation).map_err(|error| (error, common.json))?;
-    from_str_with_options(&input, Some(notation), &options)
+    from_str_with_options(&input, common.notation, &options)
         .map(|_| ())
         .map_err(|error| (error, common.json))
 }
@@ -258,8 +277,6 @@ fn convert(command: Convert) -> Result<(), (CcsdsNdmError, bool)> {
         command.common.max_input_bytes,
     )
     .map_err(|error| (error, command.common.json))?;
-    let source =
-        detected(&input, command.common.notation).map_err(|error| (error, command.common.json))?;
     let target = command.target;
     let parse_options = parse_options(&command.common);
     let mut generate_options = match command.target_version.as_deref() {
@@ -273,25 +290,23 @@ fn convert(command: Convert) -> Result<(), (CcsdsNdmError, bool)> {
         Some(path) if path != "-" => convert_message_to_file(
             &input,
             PathBuf::from(path),
-            source,
             target,
             &parse_options,
             &generate_options,
         ),
-        _ => convert_message(&input, source, target, &parse_options, &generate_options).and_then(
-            |output| {
+        _ => {
+            convert_message(&input, target, &parse_options, &generate_options).and_then(|output| {
                 std::io::stdout().write_all(output.as_bytes())?;
                 Ok(())
-            },
-        ),
+            })
+        }
     }
     .map_err(|error| (error, command.common.json))
 }
 
-fn usage() {
-    eprintln!(
-        "usage:\n  ccsds-ndm validate [--format kvn|xml] [--json] [limits] [FILE|-]\n  ccsds-ndm convert [--from kvn|xml] --to kvn|xml [-o FILE|-] [--target-version source|latest|VERSION] [--json] [limits] [FILE|-]"
-    );
+fn help_requested(args: &[String]) -> bool {
+    args.iter()
+        .any(|arg| matches!(arg.as_str(), "--help" | "-h"))
 }
 
 fn main() {
@@ -300,11 +315,15 @@ fn main() {
     let args: Vec<_> = args.collect();
     let result = match command.as_deref() {
         Some("--help" | "-h") => {
-            usage();
+            println!("{USAGE}");
             return;
         }
         Some("--version" | "-V") => {
             println!("ccsds-ndm {}", env!("CARGO_PKG_VERSION"));
+            return;
+        }
+        Some("validate") if help_requested(&args) => {
+            println!("{VALIDATE_USAGE}");
             return;
         }
         Some("validate") => parse_common(&args, false).and_then(|(common, _)| {
@@ -313,6 +332,10 @@ fn main() {
                 std::process::exit(exit_for(&error));
             })
         }),
+        Some("convert") if help_requested(&args) => {
+            println!("{CONVERT_USAGE}");
+            return;
+        }
         Some("convert") => parse_convert(&args).and_then(|command| {
             convert(command).map_err(|(error, json)| {
                 report(&error, json);
@@ -322,8 +345,7 @@ fn main() {
         _ => Err("expected 'validate' or 'convert'".to_owned()),
     };
     if let Err(message) = result {
-        eprintln!("{message}");
-        usage();
+        eprintln!("{message}\n\n{USAGE}");
         std::process::exit(EXIT_USAGE);
     }
 }

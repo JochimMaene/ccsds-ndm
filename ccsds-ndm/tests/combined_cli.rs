@@ -30,23 +30,14 @@ fn combined_xml_uses_the_shared_cli_contract() {
     assert!(valid.stdout.is_empty());
     assert!(valid.stderr.is_empty());
 
-    let converted = cli(&["convert", "--from", "xml", "--to", "xml", "-"], XML);
+    let converted = cli(&["convert", "--to", "xml", "-"], XML);
     assert_eq!(converted.status.code(), Some(0));
     assert!(converted.stderr.is_empty());
     CombinedNdm::from_xml(&String::from_utf8(converted.stdout).unwrap())
         .expect("CLI output should remain a valid combined NDM");
 
     let limited = cli(
-        &[
-            "convert",
-            "--from",
-            "xml",
-            "--to",
-            "xml",
-            "--max-output-bytes",
-            "1",
-            "-",
-        ],
+        &["convert", "--to", "xml", "--max-output-bytes", "1", "-"],
         XML,
     );
     assert_eq!(limited.status.code(), Some(4));

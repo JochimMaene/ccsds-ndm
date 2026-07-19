@@ -39,7 +39,7 @@ fn every_remaining_standalone_family_uses_the_packaged_cli_contract() {
         assert!(valid.stdout.is_empty(), "{kind} validate stdout");
         assert!(valid.stderr.is_empty(), "{kind} validate stderr");
 
-        let converted = cli(&["convert", "--from", "kvn", "--to", "xml", "-"], input);
+        let converted = cli(&["convert", "--to", "xml", "-"], input);
         assert_eq!(converted.status.code(), Some(0), "{kind} convert");
         assert!(converted.stderr.is_empty(), "{kind} convert stderr");
         let xml = String::from_utf8(converted.stdout).unwrap();
@@ -60,16 +60,7 @@ fn every_remaining_standalone_family_uses_the_packaged_cli_contract() {
         );
 
         let limited = cli(
-            &[
-                "convert",
-                "--from",
-                "kvn",
-                "--to",
-                "xml",
-                "--max-output-bytes",
-                "1",
-                "-",
-            ],
+            &["convert", "--to", "xml", "--max-output-bytes", "1", "-"],
             input,
         );
         assert_eq!(limited.status.code(), Some(4), "{kind} output limit");

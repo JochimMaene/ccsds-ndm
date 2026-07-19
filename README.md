@@ -118,9 +118,7 @@ relabeling the document.
 - [User Guide & API Reference](https://jochimmaene.github.io/ccsds-ndm/)
 - [CCSDS NDM Standards](https://public.ccsds.org/Publications/BlueBooks.aspx)
 - [Project goal](docs/project-goal.md)
-- [Conformance and product policy](docs/conformance-policy.md)
-- [Support and conformance matrix](docs/support-matrix.md)
-- [Reference-status scorecard](docs/reference-status.md)
+- [Support matrix](docs/support-matrix.md)
 
 ## License
 

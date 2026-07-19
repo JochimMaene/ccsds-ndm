@@ -35,26 +35,14 @@ fn cli_dispatches_non_opm_messages_through_the_shared_contract() {
     assert!(valid.stdout.is_empty());
     assert!(valid.stderr.is_empty());
 
-    let converted = cli(
-        &["convert", "--from", "kvn", "--to", "xml", "-"],
-        Some(OMM_KVN),
-    );
+    let converted = cli(&["convert", "--to", "xml", "-"], Some(OMM_KVN));
     assert_eq!(converted.status.code(), Some(0));
     assert!(converted.stderr.is_empty());
     let xml = String::from_utf8(converted.stdout).unwrap();
     Omm::from_xml(&xml).expect("CLI output should be a valid OMM XML document");
 
     let limited = cli(
-        &[
-            "convert",
-            "--from",
-            "kvn",
-            "--to",
-            "xml",
-            "--max-output-bytes",
-            "1",
-            "-",
-        ],
+        &["convert", "--to", "xml", "--max-output-bytes", "1", "-"],
         Some(OMM_KVN),
     );
     assert_eq!(limited.status.code(), Some(4));
@@ -115,10 +103,24 @@ fn validate_has_stable_exit_and_json_diagnostic_contracts() {
 
 #[test]
 fn usage_errors_are_rejected_before_reading_input() {
-    let output = cli(&["convert", "--from", "kvn", "-"], Some(KVN));
+    let output = cli(&["convert", "-"], Some(KVN));
     assert_eq!(output.status.code(), Some(64));
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("convert requires --to kvn|xml"));
+}
+
+#[test]
+fn help_is_successful_and_uses_stdout() {
+    for args in [
+        &["--help"][..],
+        &["validate", "--help"][..],
+        &["convert", "--help"][..],
+    ] {
+        let output = cli(args, None);
+        assert_eq!(output.status.code(), Some(0), "{args:?}");
+        assert!(!output.stdout.is_empty(), "{args:?}");
+        assert!(output.stderr.is_empty(), "{args:?}");
+    }
 }
 
 #[test]
@@ -136,7 +138,7 @@ fn unidentified_inputs_still_have_parse_context() {
 
 #[test]
 fn convert_keeps_document_bytes_separate_and_protects_destination_files() {
-    let output = cli(&["convert", "--from", "kvn", "--to", "xml", "-"], Some(KVN));
+    let output = cli(&["convert", "--to", "xml", "-"], Some(KVN));
     assert_eq!(output.status.code(), Some(0));
     assert!(output.stderr.is_empty());
     let xml = String::from_utf8(output.stdout).expect("stdout should be UTF-8 XML");
@@ -146,10 +148,7 @@ fn convert_keeps_document_bytes_separate_and_protects_destination_files() {
         expected
     );
 
-    let reverse = cli(
-        &["convert", "--from", "xml", "--to", "kvn", "-"],
-        Some(&xml),
-    );
+    let reverse = cli(&["convert", "--to", "kvn", "-"], Some(&xml));
     assert_eq!(reverse.status.code(), Some(0));
     assert!(reverse.stderr.is_empty());
     let kvn = String::from_utf8(reverse.stdout).expect("stdout should be UTF-8 KVN");
@@ -164,8 +163,6 @@ fn convert_keeps_document_bytes_separate_and_protects_destination_files() {
     let invalid = cli(
         &[
             "convert",
-            "--from",
-            "kvn",
             "--to",
             "xml",
             "--output",
@@ -182,16 +179,7 @@ fn convert_keeps_document_bytes_separate_and_protects_destination_files() {
     );
 
     let odm_2 = cli(
-        &[
-            "convert",
-            "--from",
-            "kvn",
-            "--to",
-            "xml",
-            "--target-version",
-            "2.0",
-            "-",
-        ],
+        &["convert", "--to", "xml", "--target-version", "2.0", "-"],
         Some(KVN),
     );
     assert_eq!(odm_2.status.code(), Some(0));

@@ -1,8 +1,7 @@
 # OMM 3.0 Focused Conformance Evidence
 
-This inventory records the current message-specific evidence for standalone OMM 3.0. It is
-subordinate to the [conformance policy](../conformance-policy.md) and does not promote any support
-matrix cell by itself.
+This inventory records maintainer evidence for standalone OMM 3.0. The
+[support matrix](../support-matrix.md) is the user-facing statement of current support.
 
 ## Scope and authorities
 
@@ -61,7 +60,6 @@ artifact check are the reproducible packaged gates.
 
 ## Remaining verification work
 
-OMM remains `implemented-unverified`. The complete ICS feature inventory and current packaged
-surfaces are now reconciled, but exact matrix-cell promotion still requires the conformance-policy
-review to split these grouped results into operation/notation/surface claims. Shared delegation is
-evidence for that review, not an automatic verified claim.
+OMM remains available rather than verified. The complete ICS feature inventory and current
+packaged surfaces are reconciled; final message-level review remains. Shared delegation is evidence
+for that review, not an automatic verified claim.

@@ -25,10 +25,12 @@ from typing import Any
 INDENT = "    "
 GENERATED_HEADER = """\
 # Generated content DO NOT EDIT
-from typing import Any, Optional, Union
+from typing import Optional, TypeVar, Union
 import numpy
 
-def edit(message: object) -> Any:
+T = TypeVar("T")
+
+def edit(message: T) -> T:
     \"\"\"Return a live copy-on-write view for nested model updates.\"\"\"
     ...
 
@@ -37,7 +39,6 @@ def edit(message: object) -> Any:
 PUBLIC_API_PARAMETER_TYPES = {
     "convert": {
         "data": "str",
-        "from_format": "str",
         "to_format": "str",
         "max_input_bytes": "Optional[int]",
         "max_xml_depth": "Optional[int]",
@@ -48,7 +49,6 @@ PUBLIC_API_PARAMETER_TYPES = {
     "convert_file": {
         "source_path": "str",
         "destination_path": "str",
-        "from_format": "str",
         "to_format": "str",
         "max_input_bytes": "Optional[int]",
         "max_xml_depth": "Optional[int]",

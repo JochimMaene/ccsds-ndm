@@ -1,8 +1,7 @@
 # OCM 3.0 Focused Conformance Evidence
 
-This inventory records the current message-specific evidence for standalone OCM 3.0. It is
-subordinate to the [conformance policy](../conformance-policy.md) and does not promote any support
-matrix cell by itself.
+This inventory records maintainer evidence for standalone OCM 3.0. The
+[support matrix](../support-matrix.md) is the user-facing statement of current support.
 
 ## Scope and authorities
 

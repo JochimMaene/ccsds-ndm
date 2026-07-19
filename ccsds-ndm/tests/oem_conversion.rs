@@ -15,7 +15,6 @@ fn both_directions_preserve_the_complete_typed_model() {
         let expected = Oem::from_kvn(source).unwrap();
         let xml = convert(
             source,
-            Notation::Kvn,
             Notation::Xml,
             &ParseOptions::default(),
             &GenerateOptions::source(),
@@ -27,7 +26,6 @@ fn both_directions_preserve_the_complete_typed_model() {
     let expected = Oem::from_xml(XML).unwrap();
     let kvn = convert(
         XML,
-        Notation::Xml,
         Notation::Kvn,
         &ParseOptions::default(),
         &GenerateOptions::source(),
@@ -48,7 +46,6 @@ fn xml_to_kvn_rejects_partial_acceleration_without_emitting_ambiguous_data() {
 
     let error = convert(
         &xml,
-        Notation::Xml,
         Notation::Kvn,
         &ParseOptions::default(),
         &GenerateOptions::source(),
@@ -72,7 +69,6 @@ fn xml_to_kvn_rejects_comments_that_cannot_keep_their_covariance_association() {
 
     let error = convert(
         &xml,
-        Notation::Xml,
         Notation::Kvn,
         &ParseOptions::default(),
         &GenerateOptions::source(),
@@ -96,7 +92,6 @@ fn file_conversion_is_atomic_and_bounds_input_before_materialization() {
     convert_file(
         &source,
         &destination,
-        Notation::Kvn,
         Notation::Xml,
         &ParseOptions::default(),
         &GenerateOptions::source(),
@@ -108,7 +103,6 @@ fn file_conversion_is_atomic_and_bounds_input_before_materialization() {
     let error = convert_file(
         &source,
         &destination,
-        Notation::Kvn,
         Notation::Xml,
         &ParseOptions::default().with_max_input_bytes(16),
         &GenerateOptions::source(),

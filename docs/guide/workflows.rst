@@ -24,8 +24,10 @@ Use the same generic API for every recognized message family:
 
 .. code-block:: python
 
-   xml = ccsds_ndm.convert(kvn, "kvn", "xml")
-   ccsds_ndm.convert_file("input.opm", "output.xml", "kvn", "xml")
+   xml = ccsds_ndm.convert(kvn, "xml")
+   ccsds_ndm.convert_file("input.opm", "output.xml", "xml")
+
+The input notation is detected automatically.
 
 OPM, OEM, and OMM support edition-correct ODM 2.0 and 3.0 output. Select an edition with
 ``version="2.0"`` or ``version="3.0"``. The 2.0 checks use the official `SANA NDM/XML schema

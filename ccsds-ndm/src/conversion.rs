@@ -9,12 +9,11 @@ pub use crate::detect::Notation;
 /// Strictly convert any detected NDM message between KVN and XML.
 pub fn convert(
     input: &str,
-    source: Notation,
     target: Notation,
     parse_options: &ParseOptions,
     generate_options: &GenerateOptions,
 ) -> Result<String> {
-    let message = crate::from_str_with_options(input, Some(source), parse_options)?;
+    let message = crate::from_str_with_options(input, None, parse_options)?;
     match target {
         Notation::Kvn => message.to_kvn_with(generate_options),
         Notation::Xml => message.to_xml_with(generate_options),
@@ -25,12 +24,11 @@ pub fn convert(
 pub fn convert_file(
     source_path: impl AsRef<Path>,
     destination_path: impl AsRef<Path>,
-    source: Notation,
     target: Notation,
     parse_options: &ParseOptions,
     generate_options: &GenerateOptions,
 ) -> Result<()> {
-    let message = crate::from_file_with_options(source_path, Some(source), parse_options)?;
+    let message = crate::from_file_with_options(source_path, None, parse_options)?;
     let output = match target {
         Notation::Kvn => message.to_kvn_with(generate_options),
         Notation::Xml => message.to_xml_with(generate_options),
@@ -42,11 +40,10 @@ pub fn convert_file(
 pub fn convert_to_file(
     input: &str,
     destination_path: impl AsRef<Path>,
-    source: Notation,
     target: Notation,
     parse_options: &ParseOptions,
     generate_options: &GenerateOptions,
 ) -> Result<()> {
-    let output = convert(input, source, target, parse_options, generate_options)?;
+    let output = convert(input, target, parse_options, generate_options)?;
     crate::fsutil::atomic_write(destination_path.as_ref(), output.as_bytes())
 }
