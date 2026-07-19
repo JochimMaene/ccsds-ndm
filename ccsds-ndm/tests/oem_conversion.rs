@@ -1,6 +1,6 @@
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{convert_oem, convert_oem_file, GenerateOptions, Notation, ParseOptions};
+use ccsds_ndm::{convert, convert_file, GenerateOptions, Notation, ParseOptions};
 
 const KVN_FIXTURES: [&str; 3] = [
     include_str!("../../data/kvn/oem_g11.kvn"),
@@ -13,7 +13,7 @@ const XML: &str = include_str!("../../data/xml/oem_g14.xml");
 fn both_directions_preserve_the_complete_typed_model() {
     for source in KVN_FIXTURES {
         let expected = Oem::from_kvn(source).unwrap();
-        let xml = convert_oem(
+        let xml = convert(
             source,
             Notation::Kvn,
             Notation::Xml,
@@ -25,7 +25,7 @@ fn both_directions_preserve_the_complete_typed_model() {
     }
 
     let expected = Oem::from_xml(XML).unwrap();
-    let kvn = convert_oem(
+    let kvn = convert(
         XML,
         Notation::Xml,
         Notation::Kvn,
@@ -46,7 +46,7 @@ fn xml_to_kvn_rejects_partial_acceleration_without_emitting_ambiguous_data() {
         .to_xml()
         .expect("partial acceleration is representable in XML");
 
-    let error = convert_oem(
+    let error = convert(
         &xml,
         Notation::Xml,
         Notation::Kvn,
@@ -70,7 +70,7 @@ fn xml_to_kvn_rejects_comments_that_cannot_keep_their_covariance_association() {
     message.body.segment[0].data.covariance_matrix.push(second);
     let xml = message.to_xml().unwrap();
 
-    let error = convert_oem(
+    let error = convert(
         &xml,
         Notation::Xml,
         Notation::Kvn,
@@ -93,7 +93,7 @@ fn file_conversion_is_atomic_and_bounds_input_before_materialization() {
     std::fs::write(&source, KVN_FIXTURES[0]).unwrap();
     std::fs::write(&destination, b"sentinel").unwrap();
 
-    convert_oem_file(
+    convert_file(
         &source,
         &destination,
         Notation::Kvn,
@@ -105,7 +105,7 @@ fn file_conversion_is_atomic_and_bounds_input_before_materialization() {
     Oem::from_xml(&std::fs::read_to_string(&destination).unwrap()).unwrap();
 
     std::fs::write(&destination, b"sentinel").unwrap();
-    let error = convert_oem_file(
+    let error = convert_file(
         &source,
         &destination,
         Notation::Kvn,

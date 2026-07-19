@@ -61,6 +61,12 @@ htmlcov/
 # ------------------------------
 
 xsd/
+!data/xsd/
+data/xsd/*
+!data/xsd/ndmxml-2.0.0-common-2.0.xsd
+!data/xsd/ndmxml-2.0.0-oem-2.0.xsd
+!data/xsd/ndmxml-2.0.0-omm-2.0.xsd
+!data/xsd/ndmxml-2.0.0-opm-2.0.xsd
 
 # ------------------------------
 # Profiling outputs

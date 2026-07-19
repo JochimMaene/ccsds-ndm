@@ -184,18 +184,21 @@ fn output_limits_are_exact_and_streaming_failures_emit_nothing() {
 }
 
 #[test]
-fn unsupported_editions_are_rejected_instead_of_relabelled() {
+fn unaudited_editions_are_rejected_instead_of_relabelled() {
     let message = Oem::from_kvn(KVN_FIXTURES[0].1).unwrap();
-    let options = GenerateOptions::version("2.0");
+    let options = GenerateOptions::version("1.0");
     for error in [
         message.to_kvn_with(&options).unwrap_err(),
         message.to_xml_with(&options).unwrap_err(),
     ] {
-        assert_eq!(error.code(), Some("generation.unsupported_output_version"));
+        assert_eq!(
+            error.code(),
+            Some("generation.unsupported_version_conversion")
+        );
     }
 
     let mut historical = message;
-    historical.version = "2.0".into();
+    historical.version = "1.0".into();
     assert!(historical.to_kvn().is_err());
     assert!(historical.to_xml().is_err());
 }

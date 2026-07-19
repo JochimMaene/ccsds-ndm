@@ -114,6 +114,27 @@ fn validate_has_stable_exit_and_json_diagnostic_contracts() {
 }
 
 #[test]
+fn usage_errors_are_rejected_before_reading_input() {
+    let output = cli(&["convert", "--from", "kvn", "-"], Some(KVN));
+    assert_eq!(output.status.code(), Some(64));
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("convert requires --to kvn|xml"));
+}
+
+#[test]
+fn unidentified_inputs_still_have_parse_context() {
+    let output = cli(
+        &["validate", "--format", "kvn", "--json", "-"],
+        Some("NOT_AN_NDM = 1\n"),
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let diagnostic: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(diagnostic["operation"], "parse");
+    assert_eq!(diagnostic["notation"], "kvn");
+    assert_eq!(diagnostic["message_kind"], "ndm");
+}
+
+#[test]
 fn convert_keeps_document_bytes_separate_and_protects_destination_files() {
     let output = cli(&["convert", "--from", "kvn", "--to", "xml", "-"], Some(KVN));
     assert_eq!(output.status.code(), Some(0));
@@ -160,7 +181,7 @@ fn convert_keeps_document_bytes_separate_and_protects_destination_files() {
         b"sentinel"
     );
 
-    let unsupported = cli(
+    let odm_2 = cli(
         &[
             "convert",
             "--from",
@@ -173,6 +194,9 @@ fn convert_keeps_document_bytes_separate_and_protects_destination_files() {
         ],
         Some(KVN),
     );
-    assert_eq!(unsupported.status.code(), Some(3));
-    assert!(unsupported.stdout.is_empty());
+    assert_eq!(odm_2.status.code(), Some(0));
+    assert!(odm_2.stderr.is_empty());
+    let xml = String::from_utf8(odm_2.stdout).expect("ODM 2.0 XML should be UTF-8");
+    let parsed = Opm::from_xml(&xml).expect("ODM 2.0 output should parse");
+    assert_eq!(parsed.version, "2.0");
 }

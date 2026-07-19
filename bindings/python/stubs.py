@@ -25,8 +25,12 @@ from typing import Any
 INDENT = "    "
 GENERATED_HEADER = """\
 # Generated content DO NOT EDIT
-from typing import Optional, Union
+from typing import Any, Optional, Union
 import numpy
+
+def edit(message: object) -> Any:
+    \"\"\"Return a live copy-on-write view for nested model updates.\"\"\"
+    ...
 
 """
 
@@ -52,23 +56,6 @@ PUBLIC_API_PARAMETER_TYPES = {
         "max_output_bytes": "Optional[int]",
         "version": "Optional[str]",
     },
-    "convert_opm": {
-        "data": "str",
-        "from_format": "str",
-        "to_format": "str",
-        "max_input_bytes": "Optional[int]",
-        "max_xml_depth": "Optional[int]",
-        "max_output_bytes": "Optional[int]",
-    },
-    "convert_opm_file": {
-        "source_path": "str",
-        "destination_path": "str",
-        "from_format": "str",
-        "to_format": "str",
-        "max_input_bytes": "Optional[int]",
-        "max_xml_depth": "Optional[int]",
-        "max_output_bytes": "Optional[int]",
-    },
     "from_file": {
         "format": "str",
         "max_input_bytes": "Optional[int]",
@@ -89,14 +76,12 @@ PUBLIC_API_PARAMETER_TYPES = {
         "format": "str",
         "path": "str",
         "max_output_bytes": "Optional[int]",
-        "validate": "bool",
         "version": "Optional[str]",
     },
     "to_kvn": {"version": "Optional[str]", "max_output_bytes": "Optional[int]"},
     "to_str": {
         "format": "str",
         "max_output_bytes": "Optional[int]",
-        "validate": "bool",
         "version": "Optional[str]",
     },
     "to_xml": {"version": "Optional[str]", "max_output_bytes": "Optional[int]"},

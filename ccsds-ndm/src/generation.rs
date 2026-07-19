@@ -144,6 +144,20 @@ pub trait VersionedNdm: Ndm + Clone {
     /// Update the edition stored on a cloned message before generation.
     fn set_version(&mut self, version: String);
 
+    /// Confirm that changing the root edition is backed by an edition-aware, lossless mapping.
+    #[doc(hidden)]
+    fn validate_version_transition(&self, target_version: &str) -> Result<()> {
+        if target_version == self.version() {
+            Ok(())
+        } else {
+            Err(CcsdsNdmError::UnsupportedVersionConversion {
+                message_type: Self::KIND.as_str(),
+                source_version: self.version().to_owned(),
+                target_version: target_version.to_owned(),
+            })
+        }
+    }
+
     /// Apply message-specific XML lexical checks before serialization.
     ///
     /// Most message models need no additional check. OPM and OEM use this hook to keep XML
@@ -264,6 +278,17 @@ where
     }
 
     let source_version = message.version();
+    message
+        .validate_version_transition(target_version.as_ref())
+        .map_err(|error| {
+            generation_error(
+                error,
+                T::KIND,
+                format,
+                source_version,
+                target_version.as_ref(),
+            )
+        })?;
     let mut selected = message.clone();
     selected.set_version(target_version.into_owned());
     operation(&selected).map_err(|error| {
@@ -357,7 +382,37 @@ impl VersionedNdm for crate::messages::acm::Acm {
     }
 }
 impl_versioned_ndm!(crate::messages::apm::Apm, Apm);
-impl_versioned_ndm!(crate::messages::omm::Omm, Omm);
+
+impl VersionedNdm for crate::messages::omm::Omm {
+    const KIND: MessageKind = MessageKind::Omm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    fn validate_version_transition(&self, target_version: &str) -> Result<()> {
+        match (self.version(), target_version) {
+            ("2.0" | "3.0", "2.0" | "3.0") => Ok(()),
+            _ => Err(CcsdsNdmError::UnsupportedVersionConversion {
+                message_type: Self::KIND.as_str(),
+                source_version: self.version().to_owned(),
+                target_version: target_version.to_owned(),
+            }),
+        }
+    }
+
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        generate_kvn(self, options)
+    }
+
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+        stream_kvn(self, output, options)
+    }
+}
 
 impl VersionedNdm for crate::messages::cdm::Cdm {
     const KIND: MessageKind = MessageKind::Cdm;
@@ -495,6 +550,17 @@ impl VersionedNdm for crate::messages::opm::Opm {
         self.version = version;
     }
 
+    fn validate_version_transition(&self, target_version: &str) -> Result<()> {
+        match (self.version(), target_version) {
+            ("2.0" | "3.0", "2.0" | "3.0") => Ok(()),
+            _ => Err(CcsdsNdmError::UnsupportedVersionConversion {
+                message_type: Self::KIND.as_str(),
+                source_version: self.version().to_owned(),
+                target_version: target_version.to_owned(),
+            }),
+        }
+    }
+
     fn validate_xml_output(&self) -> Result<()> {
         self.validate_xml_text()
     }
@@ -522,6 +588,17 @@ impl VersionedNdm for crate::messages::oem::Oem {
 
     fn set_version(&mut self, version: String) {
         self.version = version;
+    }
+
+    fn validate_version_transition(&self, target_version: &str) -> Result<()> {
+        match (self.version(), target_version) {
+            ("2.0" | "3.0", "2.0" | "3.0") => Ok(()),
+            _ => Err(CcsdsNdmError::UnsupportedVersionConversion {
+                message_type: Self::KIND.as_str(),
+                source_version: self.version().to_owned(),
+                target_version: target_version.to_owned(),
+            }),
+        }
     }
 
     fn validate_xml_output(&self) -> Result<()> {
@@ -606,6 +683,10 @@ mod tests {
 
         fn set_version(&mut self, version: String) {
             self.version = version;
+        }
+
+        fn validate_version_transition(&self, _target_version: &str) -> Result<()> {
+            Ok(())
         }
 
         fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {

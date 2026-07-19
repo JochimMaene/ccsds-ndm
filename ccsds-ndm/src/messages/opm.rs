@@ -76,6 +76,7 @@ impl crate::traits::Validate for Opm {
             ),
             "",
         )?;
+        crate::versioning::validate_opm_edition(self)?;
         self.header.validate()?;
         self.body.validate()?;
         Ok(())
@@ -94,6 +95,10 @@ impl crate::traits::Validate for Opm {
             }
             Err(error) => return Err(error),
         }
+        crate::validation::collect_validation_result(
+            &mut errors,
+            crate::versioning::validate_opm_edition(self),
+        )?;
         errors.extend(self.header.validation_errors()?);
         errors.extend(self.body.validation_errors()?);
         Ok(errors)

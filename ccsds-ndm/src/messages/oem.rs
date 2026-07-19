@@ -75,18 +75,24 @@ impl crate::traits::Validate for Oem {
             &self.id,
             &self.version,
         )?;
+        crate::versioning::validate_oem_edition(self)?;
         self.header.validate()?;
         validate_within_path(self.body.validate(), || "body".into())
     }
 
     fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        crate::validation::collect_message_validation_errors(
+        let mut errors = crate::validation::collect_message_validation_errors(
             crate::validation::MessageKind::Oem,
             &self.id,
             &self.version,
             &self.header,
             &self.body,
-        )
+        )?;
+        crate::validation::collect_validation_result(
+            &mut errors,
+            crate::versioning::validate_oem_edition(self),
+        )?;
+        Ok(errors)
     }
 }
 

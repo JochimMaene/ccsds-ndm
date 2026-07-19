@@ -1,6 +1,10 @@
 # Generated content DO NOT EDIT
-from typing import Optional, Union
+from typing import Any, Optional, Union
 import numpy
+
+def edit(message: object) -> Any:
+    """Return a live copy-on-write view for nested model updates."""
+    ...
 
 def convert(
     data: str,
@@ -30,33 +34,6 @@ def convert_file(
 ) -> None:
     """
     Convert any recognized NDM file and atomically replace the destination on success.
-    """
-    ...
-
-def convert_opm(
-    data: str,
-    from_format: str,
-    to_format: str,
-    max_input_bytes: Optional[int] = None,
-    max_xml_depth: Optional[int] = None,
-    max_output_bytes: Optional[int] = None,
-):
-    """
-    Strictly convert a standalone OPM between KVN and XML.
-    """
-    ...
-
-def convert_opm_file(
-    source_path: str,
-    destination_path: str,
-    from_format: str,
-    to_format: str,
-    max_input_bytes: Optional[int] = None,
-    max_xml_depth: Optional[int] = None,
-    max_output_bytes: Optional[int] = None,
-):
-    """
-    Strictly convert an OPM file and atomically replace the destination.
     """
     ...
 
@@ -175,12 +152,11 @@ class Acm:
         self,
         path: str,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> None:
         """
-        Write directly to a KVN or XML file. ``validate`` must remain true.
+        Write validated KVN or XML directly to a file.
         """
         ...
 
@@ -195,12 +171,11 @@ class Acm:
     def to_str(
         self,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> str:
         """
-        Serialize to KVN or XML. ``validate`` must remain true.
+        Serialize to validated KVN or XML.
         """
         ...
 
@@ -1632,12 +1607,11 @@ class Aem:
         self,
         path: str,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> None:
         """
-        Write directly to a KVN or XML file. ``validate`` must remain true.
+        Write validated KVN or XML directly to a file.
         """
         ...
 
@@ -1652,12 +1626,11 @@ class Aem:
     def to_str(
         self,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> str:
         """
-        Serialize to KVN or XML. ``validate`` must remain true.
+        Serialize to validated KVN or XML.
         """
         ...
 
@@ -2208,12 +2181,11 @@ class Apm:
         self,
         path: str,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> None:
         """
-        Write directly to a KVN or XML file. ``validate`` must remain true.
+        Write validated KVN or XML directly to a file.
         """
         ...
 
@@ -2228,12 +2200,11 @@ class Apm:
     def to_str(
         self,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> str:
         """
-        Serialize to KVN or XML. ``validate`` must remain true.
+        Serialize to validated KVN or XML.
         """
         ...
 
@@ -2758,7 +2729,6 @@ class Cdm:
         self,
         path: str,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> None:
@@ -2771,8 +2741,6 @@ class Cdm:
             The output file path.
         format : str
             The output format ('kvn' or 'xml').
-        validate : bool, optional
-            Must remain True; unchecked generation is not supported.
         version : str, optional
             Source version by default, ``"latest"``, or an exact supported version.
         """
@@ -2789,12 +2757,11 @@ class Cdm:
     def to_str(
         self,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> str:
         """
-        Serialize to KVN or XML. ``validate`` must remain true.
+        Serialize to validated KVN or XML.
         """
         ...
 
@@ -5572,11 +5539,7 @@ class Ndm:
         self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
     ) -> None: ...
     def to_file(
-        self,
-        path: str,
-        format: str,
-        validate: bool = True,
-        max_output_bytes: Optional[int] = None,
+        self, path: str, format: str, max_output_bytes: Optional[int] = None
     ) -> None:
         """
         Write to file.
@@ -5587,8 +5550,6 @@ class Ndm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
         """
         ...
 
@@ -5598,9 +5559,7 @@ class Ndm:
         """
         ...
 
-    def to_str(
-        self, format: str, validate: bool = True, max_output_bytes: Optional[int] = None
-    ) -> str:
+    def to_str(self, format: str, max_output_bytes: Optional[int] = None) -> str:
         """
         Serialize to a string.
         """
@@ -5750,7 +5709,6 @@ class Ocm:
         self,
         path: str,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> None:
@@ -5763,8 +5721,6 @@ class Ocm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Must remain True; unchecked generation is not supported.
         version : str, optional
             Source version by default, ``"latest"``, or an exact supported version.
         """
@@ -5783,12 +5739,11 @@ class Ocm:
     def to_str(
         self,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> str:
         """
-        Serialize to KVN or XML. ``validate`` must remain true.
+        Serialize to KVN or XML after mandatory CCSDS validation.
         """
         ...
 
@@ -9673,7 +9628,6 @@ class Oem:
         self,
         path: str,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> None:
@@ -9686,8 +9640,6 @@ class Oem:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Must remain True; unchecked generation is not supported.
         version : str, optional
             Source version by default, ``"latest"``, or an exact supported version.
         """
@@ -9706,12 +9658,11 @@ class Oem:
     def to_str(
         self,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> str:
         """
-        Serialize to KVN or XML. ``validate`` must remain true.
+        Serialize to validated KVN or XML.
         """
         ...
 
@@ -10644,7 +10595,6 @@ class Omm:
         self,
         path: str,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> None:
@@ -10657,8 +10607,6 @@ class Omm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Must remain True; unchecked generation is not supported.
         version : str, optional
             Source version by default, ``"latest"``, or an exact supported version.
         """
@@ -10677,12 +10625,11 @@ class Omm:
     def to_str(
         self,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> str:
         """
-        Serialize to KVN or XML. ``validate`` must remain true.
+        Serialize to validated KVN or XML.
         """
         ...
 
@@ -11080,7 +11027,6 @@ class Opm:
         self,
         path: str,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> None:
@@ -11093,8 +11039,6 @@ class Opm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Must remain True; unchecked generation is not supported.
         version : str, optional
             Source version by default, ``"latest"``, or an exact supported version.
         """
@@ -11113,12 +11057,11 @@ class Opm:
     def to_str(
         self,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> str:
         """
-        Serialize to KVN or XML. ``validate`` must remain true.
+        Serialize to KVN or XML after mandatory CCSDS validation.
         """
         ...
 
@@ -11982,7 +11925,6 @@ class Rdm:
         self,
         path: str,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> None:
@@ -11995,8 +11937,6 @@ class Rdm:
             Output file path.
         format : str
             Format ('kvn' or 'xml').
-        validate : bool, optional
-            Must remain True; unchecked generation is not supported.
         version : str, optional
             Source version by default, ``"latest"``, or an exact supported version.
         """
@@ -12018,7 +11958,6 @@ class Rdm:
     def to_str(
         self,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> str:
@@ -12029,9 +11968,6 @@ class Rdm:
         ----------
         format : str
             Format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
-
         Returns
         -------
         str
@@ -13941,7 +13877,6 @@ class Tdm:
         self,
         path: str,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> None:
@@ -13954,8 +13889,6 @@ class Tdm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Must remain True; unchecked generation is not supported.
         version : str, optional
             Source version by default, ``"latest"``, or an exact supported version.
         """
@@ -13974,12 +13907,11 @@ class Tdm:
     def to_str(
         self,
         format: str,
-        validate: bool = True,
         version: Optional[str] = None,
         max_output_bytes: Optional[int] = None,
     ) -> str:
         """
-        Serialize to KVN or XML. ``validate`` must remain true.
+        Serialize to validated KVN or XML.
         """
         ...
 
@@ -15366,7 +15298,7 @@ class YesNo:
         """
         ...
 
-class NdmError(Exception):
+class NdmError(ValueError):
     """
     Base exception for all CCSDS NDM errors.
     """
@@ -15383,7 +15315,7 @@ class NdmError(Exception):
     @property
     def args(self): ...
 
-class NdmEpochError(ValueError):
+class NdmEpochError(NdmError):
     """
     Error parsing a CCSDS epoch string.
     """
@@ -15400,7 +15332,7 @@ class NdmEpochError(ValueError):
     @property
     def args(self): ...
 
-class NdmFormatError(ValueError):
+class NdmFormatError(NdmError):
     """
     Error during parsing of NDM data (KVN or XML).
     """
@@ -15417,7 +15349,7 @@ class NdmFormatError(ValueError):
     @property
     def args(self): ...
 
-class NdmIoError(OSError):
+class NdmIoError(NdmError):
     """
     I/O error during file operations.
     """
@@ -15433,8 +15365,6 @@ class NdmIoError(OSError):
 
     @property
     def args(self): ...
-    @property
-    def characters_written(self): ...
 
 class NdmUnsupportedMessageError(NdmError):
     """

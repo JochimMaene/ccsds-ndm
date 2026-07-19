@@ -242,16 +242,6 @@ pub fn atomic_write(
     Ok(())
 }
 
-pub fn require_checked_generation(validate: bool) -> PyResult<()> {
-    if validate {
-        Ok(())
-    } else {
-        Err(PyValueError::new_err(
-            "unchecked generation is not supported; generated messages must be CCSDS-compliant",
-        ))
-    }
-}
-
 pub fn unsupported_format(format: &str) -> PyErr {
     PyValueError::new_err(format!("Unsupported format '{format}'. Use 'kvn' or 'xml'",))
 }

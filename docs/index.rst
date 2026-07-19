@@ -32,6 +32,7 @@ For the specific Attitude Data Messages standard, see :doc:`ccsds-books/adm`.
    :caption: User Guide
 
    guide/quicktour
+   guide/workflows
 
 
 .. toctree::

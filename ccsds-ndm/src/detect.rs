@@ -94,10 +94,26 @@ pub fn detect_message_type_with_options(
     options: &ParseOptions,
 ) -> Result<MessageType> {
     let input = without_utf8_bom(s);
-    match notation.map_or_else(|| detect_notation(input), Ok)? {
+    let notation = notation.map_or_else(|| detect_notation(input), Ok)?;
+    let result = match notation {
         Notation::Kvn => detect_kvn_type(input, options),
         Notation::Xml => detect_xml_type(input, options),
-    }
+    };
+    result.map_err(|error| {
+        if error.diagnostic().is_some() {
+            error
+        } else {
+            error.with_parse_context(
+                crate::validation::MessageKind::Ndm,
+                match notation {
+                    Notation::Kvn => crate::error::DiagnosticNotation::Kvn,
+                    Notation::Xml => crate::error::DiagnosticNotation::Xml,
+                },
+                input,
+                None,
+            )
+        }
+    })
 }
 
 fn validate_input_size(

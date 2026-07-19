@@ -850,7 +850,7 @@ DATA_STOP
     #[test]
     fn test_aem_no_segments() {
         // Valid header but no body segments
-        let input = format!("{}", sample_aem_header());
+        let input = sample_aem_header().to_string();
         let err = Aem::from_kvn(&input).unwrap_err();
         match err {
             CcsdsNdmError::Format(boxed_err) => match *boxed_err {

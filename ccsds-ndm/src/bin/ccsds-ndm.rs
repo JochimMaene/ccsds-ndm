@@ -25,7 +25,7 @@ struct Common {
 
 struct Convert {
     common: Common,
-    target: Option<Notation>,
+    target: Notation,
     output: Option<String>,
     max_output_bytes: Option<usize>,
     target_version: Option<String>,
@@ -135,6 +135,7 @@ fn parse_convert(args: &[String]) -> Result<Convert, String> {
     if let Some(option) = unknown.first() {
         return Err(format!("unknown option '{option}'"));
     }
+    let target = target.ok_or_else(|| "convert requires --to kvn|xml".to_owned())?;
     Ok(Convert {
         common,
         target,
@@ -231,9 +232,11 @@ fn report(error: &CcsdsNdmError, as_json: bool) {
 fn exit_for(error: &CcsdsNdmError) -> i32 {
     match error.code() {
         Some(code) if code.starts_with("resource.") => EXIT_RESOURCE,
-        Some("parse.unsupported_input_version" | "generation.unsupported_output_version") => {
-            EXIT_UNSUPPORTED
-        }
+        Some(
+            "parse.unsupported_input_version"
+            | "generation.unsupported_output_version"
+            | "generation.unsupported_version_conversion",
+        ) => EXIT_UNSUPPORTED,
         _ if error.as_io_error().is_some() => EXIT_IO,
         _ => EXIT_INVALID,
     }
@@ -257,12 +260,7 @@ fn convert(command: Convert) -> Result<(), (CcsdsNdmError, bool)> {
     .map_err(|error| (error, command.common.json))?;
     let source =
         detected(&input, command.common.notation).map_err(|error| (error, command.common.json))?;
-    let target = command.target.ok_or_else(|| {
-        (
-            CcsdsNdmError::UnsupportedMessage("convert requires --to kvn|xml".into()),
-            command.common.json,
-        )
-    })?;
+    let target = command.target;
     let parse_options = parse_options(&command.common);
     let mut generate_options = match command.target_version.as_deref() {
         None | Some("source") => GenerateOptions::source(),
@@ -292,7 +290,7 @@ fn convert(command: Convert) -> Result<(), (CcsdsNdmError, bool)> {
 
 fn usage() {
     eprintln!(
-        "usage:\n  ccsds-ndm validate [--format kvn|xml] [--json] [limits] [FILE|-]\n  ccsds-ndm convert [--from kvn|xml] --to kvn|xml [-o FILE|-] [--target-version source|latest|3.0] [--json] [limits] [FILE|-]"
+        "usage:\n  ccsds-ndm validate [--format kvn|xml] [--json] [limits] [FILE|-]\n  ccsds-ndm convert [--from kvn|xml] --to kvn|xml [-o FILE|-] [--target-version source|latest|VERSION] [--json] [limits] [FILE|-]"
     );
 }
 

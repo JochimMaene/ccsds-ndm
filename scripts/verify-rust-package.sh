@@ -20,3 +20,28 @@ cargo install \
     --locked \
     --root "${temporary}/install"
 "${temporary}/install/bin/ccsds-ndm" --version
+
+source="$(
+    printf '%s\n' \
+        'CCSDS_OPM_VERS = 3.0' \
+        'CREATION_DATE = 2026-01-01T00:00:00' \
+        'ORIGINATOR = PACKAGE_TEST' \
+        'OBJECT_NAME = PACKAGE_TEST' \
+        'OBJECT_ID = 2026-001A' \
+        'CENTER_NAME = EARTH' \
+        'REF_FRAME = EME2000' \
+        'TIME_SYSTEM = UTC' \
+        'EPOCH = 2026-01-01T00:00:00' \
+        'X = 7000' \
+        'Y = 0' \
+        'Z = 0' \
+        'X_DOT = 0' \
+        'Y_DOT = 7.5' \
+        'Z_DOT = 0'
+)"
+binary="${temporary}/install/bin/ccsds-ndm"
+printf '%s\n' "${source}" | "${binary}" validate --format kvn -
+xml="$(printf '%s\n' "${source}" | "${binary}" convert --from kvn --to xml -)"
+printf '%s\n' "${xml}" | "${binary}" validate --format xml -
+kvn="$(printf '%s\n' "${xml}" | "${binary}" convert --from xml --to kvn -)"
+printf '%s\n' "${kvn}" | "${binary}" validate --format kvn -

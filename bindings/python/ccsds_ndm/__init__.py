@@ -112,11 +112,10 @@ from .ccsds_ndm import (
     YesNo,
     convert,
     convert_file,
-    convert_opm,
-    convert_opm_file,
     from_file,
     from_str,
 )
+from ._editing import edit
 
 __all__ = [
     # Top-level API
@@ -124,8 +123,7 @@ __all__ = [
     "from_file",
     "convert",
     "convert_file",
-    "convert_opm",
-    "convert_opm_file",
+    "edit",
     "UserDefined",
     "Ndm",
     # Exceptions

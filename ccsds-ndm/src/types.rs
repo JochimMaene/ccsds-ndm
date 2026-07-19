@@ -1202,6 +1202,29 @@ where
     }
 }
 
+fn kvn_unit_or_default<U>(unit: Option<&str>, default: U) -> Result<U>
+where
+    U: FromStr,
+    CcsdsNdmError: From<U::Err>,
+{
+    match unit {
+        Some(value) => value.parse::<U>().map_err(CcsdsNdmError::from),
+        None => Ok(default),
+    }
+}
+
+fn reject_kvn_unit(unit: Option<&str>) -> Result<()> {
+    match unit {
+        Some(value) => Err(crate::error::EnumParseError {
+            field: "unit",
+            value: value.to_owned(),
+            expected: "no unit",
+        }
+        .into()),
+        None => Ok(()),
+    }
+}
+
 //----------------------------------------------------------------------
 // Macros to reduce boilerplate for unit enums and wrappers
 //----------------------------------------------------------------------
@@ -1277,19 +1300,25 @@ macro_rules! define_required_type {
                         formatter.write_str("a float value or map with $value and @units")
                     }
 
-                    fn visit_f64<E>(self, v: f64) -> std::result::Result<Self::Value, E>
+                    fn visit_f64<E>(self, _v: f64) -> std::result::Result<Self::Value, E>
                     where
                         E: serde::de::Error,
                     {
-                        Ok($name::new(v))
+                        Err(E::custom(concat!(
+                            "missing required units attribute for ",
+                            stringify!($name)
+                        )))
                     }
 
                     fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
                     where
                         E: serde::de::Error,
                     {
-                        let val = v.parse::<f64>().map_err(E::custom)?;
-                        Ok($name::new(val))
+                        let _ = v;
+                        Err(E::custom(concat!(
+                            "missing required units attribute for ",
+                            stringify!($name)
+                        )))
                     }
 
                     fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
@@ -1309,11 +1338,9 @@ macro_rules! define_required_type {
                         }
                         let value =
                             value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
-                        let mut s = $name::new(value);
-                        if let Some(u) = units {
-                            s.units = u;
-                        }
-                        Ok(s)
+                        let units =
+                            units.ok_or_else(|| serde::de::Error::missing_field("@units"))?;
+                        Ok($name { value, units })
                     }
                 }
                 deserializer.deserialize_any(Visitor)
@@ -1339,8 +1366,11 @@ macro_rules! define_required_type {
             }
         }
         impl FromKvnFloat for $name {
-            fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
-                Ok(Self::new(value))
+            fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+                Ok(Self {
+                    value,
+                    units: kvn_unit_or_default(unit, $unit_enum::$default_unit)?,
+                })
             }
         }
     };
@@ -1735,8 +1765,10 @@ impl DayIntervalRequired {
     }
 }
 impl FromKvnFloat for DayIntervalRequired {
-    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
-        Self::new(value)
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let mut parsed = Self::new(value)?;
+        parsed.units = kvn_unit_or_default(unit, DayIntervalUnits::D)?;
+        Ok(parsed)
     }
 }
 impl std::fmt::Display for DayIntervalRequired {
@@ -1926,8 +1958,10 @@ impl AltitudeRequired {
     }
 }
 impl FromKvnFloat for AltitudeRequired {
-    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
-        Self::new(value)
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let mut parsed = Self::new(value)?;
+        parsed.units = kvn_unit_or_default(unit, LengthUnits::M)?;
+        Ok(parsed)
     }
 }
 impl std::fmt::Display for AltitudeRequired {
@@ -2203,15 +2237,20 @@ impl<'de> serde::Deserialize<'de> for PercentageRequired {
             where
                 E: serde::de::Error,
             {
-                PercentageRequired::new(v).map_err(E::custom)
+                let _ = v;
+                Err(E::custom(
+                    "missing required units attribute for PercentageRequired",
+                ))
             }
 
             fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
             where
                 E: serde::de::Error,
             {
-                let val = v.parse::<f64>().map_err(E::custom)?;
-                PercentageRequired::new(val).map_err(E::custom)
+                let _ = v;
+                Err(E::custom(
+                    "missing required units attribute for PercentageRequired",
+                ))
             }
 
             fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
@@ -2231,9 +2270,7 @@ impl<'de> serde::Deserialize<'de> for PercentageRequired {
                 }
                 let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
                 let mut s = PercentageRequired::new(value).map_err(serde::de::Error::custom)?;
-                if let Some(u) = units {
-                    s.units = u;
-                }
+                s.units = units.ok_or_else(|| serde::de::Error::missing_field("@units"))?;
                 Ok(s)
             }
         }
@@ -2270,8 +2307,10 @@ impl std::fmt::Display for PercentageRequired {
     }
 }
 impl FromKvnFloat for PercentageRequired {
-    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
-        Self::new(value)
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let mut parsed = Self::new(value)?;
+        parsed.units = kvn_unit_or_default(unit, PercentageUnits::Percent)?;
+        Ok(parsed)
     }
 }
 
@@ -2355,7 +2394,8 @@ impl std::fmt::Display for Probability {
 }
 
 impl FromKvnFloat for Probability {
-    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        reject_kvn_unit(unit)?;
         Self::new(value)
     }
 }
@@ -2441,7 +2481,8 @@ impl std::fmt::Display for NonNegativeDouble {
 }
 
 impl FromKvnFloat for NonNegativeDouble {
-    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        reject_kvn_unit(unit)?;
         Self::new(value)
     }
 }
@@ -2832,8 +2873,10 @@ impl std::str::FromStr for LatitudeRequired {
 }
 
 impl FromKvnFloat for LatitudeRequired {
-    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
-        Self::new(value)
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let mut parsed = Self::new(value)?;
+        parsed.units = kvn_unit_or_default(unit, LatLonUnits::Deg)?;
+        Ok(parsed)
     }
 }
 
@@ -2883,8 +2926,10 @@ impl std::str::FromStr for LongitudeRequired {
 }
 
 impl FromKvnFloat for LongitudeRequired {
-    fn from_kvn_float(value: f64, _unit: Option<&str>) -> Result<Self> {
-        Self::new(value)
+    fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
+        let mut parsed = Self::new(value)?;
+        parsed.units = kvn_unit_or_default(unit, LatLonUnits::Deg)?;
+        Ok(parsed)
     }
 }
 

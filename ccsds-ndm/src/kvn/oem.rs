@@ -993,14 +993,14 @@ META_STOP
 
     #[test]
     fn test_block_checks() {
-        let mut input = "META_STAR";
-        assert!(!at_block_start("META", &mut input));
-        let mut input = "META_START_EXTRA";
-        assert!(!at_block_start("META", &mut input));
-        let mut input = "META_STOP_EXTRA";
-        assert!(!at_block_end("META", &mut input));
-        let mut input = "META_END_EXTRA";
-        assert!(!at_block_end("META", &mut input));
+        let input = "META_STAR";
+        assert!(!at_block_start("META", input));
+        let input = "META_START_EXTRA";
+        assert!(!at_block_start("META", input));
+        let input = "META_STOP_EXTRA";
+        assert!(!at_block_end("META", input));
+        let input = "META_END_EXTRA";
+        assert!(!at_block_end("META", input));
     }
 
     #[test]
@@ -1274,7 +1274,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref msg, .. } if msg.contains("CCSDS_OEM_VERS")))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref msg, .. } if msg.contains("CCSDS_OEM_VERS")))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1315,7 +1315,7 @@ CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("segment")))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("segment")))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1328,7 +1328,7 @@ ORIGINATOR = TEST
 OBJECT_NAME = SAT1
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false || err.is_validation_error() || err.is_kvn_error();
+        let ok = err.is_validation_error() || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1348,7 +1348,7 @@ STOP_TIME = 2023-01-02T00:00:00
 META_STOP
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("must contain at least one state vector")))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("must contain at least one state vector")))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1443,7 +1443,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "OBJECT_ID"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "OBJECT_ID"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1464,7 +1464,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "CENTER_NAME"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "CENTER_NAME"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1485,7 +1485,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "REF_FRAME"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "REF_FRAME"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1506,7 +1506,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "TIME_SYSTEM"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "TIME_SYSTEM"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1527,7 +1527,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "START_TIME"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "START_TIME"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1548,7 +1548,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "STOP_TIME"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "STOP_TIME"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1560,7 +1560,7 @@ CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("segment")))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("segment")))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }

@@ -6180,8 +6180,10 @@ TRAJ_STOP
     #[test]
     fn test_ocm_validation_gaps() {
         // 1. DRAG_COEFF_NOM <= 0.0
-        let mut phys = OcmPhysicalDescription::default();
-        phys.drag_coeff_nom = Some(-1.0);
+        let mut phys = OcmPhysicalDescription {
+            drag_coeff_nom: Some(-1.0),
+            ..Default::default()
+        };
         assert!(phys.validate().is_err());
         phys.drag_coeff_nom = Some(0.0);
         assert!(phys.validate().is_err());

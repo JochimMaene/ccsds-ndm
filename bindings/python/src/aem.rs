@@ -579,30 +579,26 @@ impl Aem {
         crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
     }
 
-    /// Serialize to KVN or XML. ``validate`` must remain true.
-    #[pyo3(signature = (format, validate=true, version=None, max_output_bytes=None))]
+    /// Serialize to validated KVN or XML.
+    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
     fn to_str(
         &self,
         format: &str,
-        validate: bool,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<String> {
-        crate::api::require_checked_generation(validate)?;
         crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
     }
 
-    /// Write directly to a KVN or XML file. ``validate`` must remain true.
-    #[pyo3(signature = (path, format, validate=true, version=None, max_output_bytes=None))]
+    /// Write validated KVN or XML directly to a file.
+    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
         path: &str,
         format: &str,
-        validate: bool,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
-        crate::api::require_checked_generation(validate)?;
         crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
     }
 

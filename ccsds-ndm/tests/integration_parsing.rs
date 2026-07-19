@@ -26,15 +26,12 @@ fn test_parse_minimal_fixtures() {
                         } else {
                             failures.push(format!("{} failed to serialize to XML", case.name));
                         }
-                    } else {
-                        if let Ok(kvn_out) = msg.to_kvn() {
-                            if let Err(e) = from_str(&kvn_out) {
-                                failures
-                                    .push(format!("{} KVN round-trip failed: {}", case.name, e));
-                            }
-                        } else {
-                            failures.push(format!("{} failed to serialize to KVN", case.name));
+                    } else if let Ok(kvn_out) = msg.to_kvn() {
+                        if let Err(e) = from_str(&kvn_out) {
+                            failures.push(format!("{} KVN round-trip failed: {}", case.name, e));
                         }
+                    } else {
+                        failures.push(format!("{} failed to serialize to KVN", case.name));
                     }
                 }
                 Err(e) => failures.push(format!("{} failed to parse: {}", case.name, e)),

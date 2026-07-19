@@ -193,26 +193,36 @@ fn every_opm_3_xml_generation_entry_point_rejects_an_invalid_model() {
 }
 
 #[test]
-fn opm_3_xml_generation_reports_unsupported_editions_across_rust_entry_points() {
+fn opm_3_xml_generation_rejects_unaudited_editions_across_rust_entry_points() {
     let opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
     let historical = {
         let mut message = opm.clone();
-        message.version = "2.0".into();
+        message.version = "1.0".into();
         message
     };
-    let options = GenerateOptions::version("2.0");
+    let options = GenerateOptions::version("1.0");
 
-    assert_unsupported_output_version("Ndm::to_xml", "2.0", historical.to_xml());
-    assert_unsupported_output_version(
+    assert_unsupported_version(
+        "Ndm::to_xml",
+        "1.0",
+        "1.0",
+        "generation.unsupported_output_version",
+        historical.to_xml(),
+    );
+    assert_unsupported_version(
         "VersionedNdm::to_xml_with",
         "3.0",
+        "1.0",
+        "generation.unsupported_version_conversion",
         opm.to_xml_with(&options),
     );
 
     let mut streamed = Vec::new();
-    assert_unsupported_output_version(
+    assert_unsupported_version(
         "VersionedNdm::write_xml_to",
         "3.0",
+        "1.0",
+        "generation.unsupported_version_conversion",
         opm.write_xml_to(&mut streamed, &options),
     );
     assert!(
@@ -221,18 +231,28 @@ fn opm_3_xml_generation_reports_unsupported_editions_across_rust_entry_points() 
     );
 
     let historical = MessageType::Opm(historical);
-    assert_unsupported_output_version("MessageType::to_xml", "2.0", historical.to_xml());
-    assert_unsupported_output_version(
+    assert_unsupported_version(
+        "MessageType::to_xml",
+        "1.0",
+        "1.0",
+        "generation.unsupported_output_version",
+        historical.to_xml(),
+    );
+    assert_unsupported_version(
         "MessageType::to_xml_with",
         "3.0",
+        "1.0",
+        "generation.unsupported_version_conversion",
         MessageType::Opm(opm).to_xml_with(&options),
     );
 
     let directory = tempfile::tempdir().expect("failed to create temporary directory");
     let path = directory.path().join("unsupported-opm.xml");
-    assert_unsupported_output_version(
+    assert_unsupported_version(
         "MessageType::to_xml_file",
-        "2.0",
+        "1.0",
+        "1.0",
+        "generation.unsupported_output_version",
         historical.to_xml_file(&path),
     );
     assert!(
@@ -987,15 +1007,17 @@ fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
     assert!(error.as_validation_error().is_some());
 }
 
-fn assert_unsupported_output_version<T: std::fmt::Debug>(
+fn assert_unsupported_version<T: std::fmt::Debug>(
     surface: &str,
     expected_source: &str,
+    expected_target: &str,
+    expected_code: &str,
     result: Result<T>,
 ) {
     let error = result.expect_err(surface);
     assert_eq!(
         error.code(),
-        Some("generation.unsupported_output_version"),
+        Some(expected_code),
         "{surface} returned an unstable diagnostic code"
     );
     assert_eq!(
@@ -1015,5 +1037,5 @@ fn assert_unsupported_output_version<T: std::fmt::Debug>(
         ccsds_ndm::error::DiagnosticNotation::Xml
     );
     assert_eq!(diagnostic.source_edition, Some(expected_source));
-    assert_eq!(diagnostic.target_edition, Some("2.0"));
+    assert_eq!(diagnostic.target_edition, Some(expected_target));
 }

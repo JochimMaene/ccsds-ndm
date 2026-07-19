@@ -118,7 +118,8 @@ fn every_shipped_cdm_fixture_preserves_typed_content_and_generates_valid_xml() {
 
 #[test]
 fn every_kvn_generation_gate_rejects_loss_or_ambiguity_before_output() {
-    let cases: [(&str, fn(&mut Cdm)); 3] = [
+    type CdmMutation = fn(&mut Cdm);
+    let cases: [(&str, CdmMutation); 3] = [
         ("first nested comment", |message| {
             message.body.segments[0]
                 .data

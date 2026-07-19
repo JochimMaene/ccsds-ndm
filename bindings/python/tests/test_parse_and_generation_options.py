@@ -36,17 +36,17 @@ def test_generation_preserves_source_version_or_upgrades_explicitly():
     legacy = OPM_KVN.replace("3.0", "2.0", 1)
     message = ccsds_ndm.Opm.from_str(legacy, format="kvn")
 
-    with pytest.raises(ccsds_ndm.NdmValidationError, match="output version 2.0"):
-        message.to_kvn()
+    preserved = message.to_kvn()
+    assert preserved.splitlines()[0].endswith("2.0")
 
     upgraded = message.to_kvn(version="latest")
     assert upgraded.splitlines()[0].endswith("3.0")
 
 
-def test_unchecked_generation_is_rejected():
+def test_generation_has_no_misleading_unchecked_mode():
     message = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn")
 
-    with pytest.raises(ValueError, match="unchecked generation"):
+    with pytest.raises(TypeError, match="validate"):
         message.to_str("kvn", validate=False)
 
 
@@ -97,7 +97,7 @@ def test_failed_generation_preserves_existing_file(tmp_path):
     output = tmp_path / "output.ndm"
     output.write_text("keep me")
 
-    with pytest.raises(ccsds_ndm.NdmValidationError, match="output version 1.0"):
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="3.0 to 1.0"):
         message.to_file(str(output), "kvn", version="1.0")
 
     assert output.read_text() == "keep me"
@@ -251,22 +251,22 @@ def test_combined_python_message_keeps_identity_and_shared_limits():
     assert output_limit.value.message_kind == "ndm"
 
 
-def test_python_opm_conversion_delegates_to_strict_rust_core(tmp_path):
-    xml = ccsds_ndm.convert_opm(OPM_KVN, "kvn", "xml")
+def test_python_conversion_delegates_to_strict_rust_core(tmp_path):
+    xml = ccsds_ndm.convert(OPM_KVN, "kvn", "xml")
     expected_kvn = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn").to_kvn()
     assert ccsds_ndm.Opm.from_str(xml, format="xml").to_kvn() == expected_kvn
 
-    kvn = ccsds_ndm.convert_opm(xml, "xml", "kvn")
+    kvn = ccsds_ndm.convert(xml, "xml", "kvn")
     assert ccsds_ndm.Opm.from_str(kvn, format="kvn").to_kvn() == expected_kvn
 
     source = tmp_path / "source.kvn"
     destination = tmp_path / "destination.xml"
     source.write_text(OPM_KVN)
-    ccsds_ndm.convert_opm_file(str(source), str(destination), "kvn", "xml")
+    ccsds_ndm.convert_file(str(source), str(destination), "kvn", "xml")
     ccsds_ndm.Opm.from_file(str(destination), format="xml")
 
     destination.write_text("sentinel")
     source.write_text("not an OPM")
-    with pytest.raises(ccsds_ndm.NdmKvnParseError):
-        ccsds_ndm.convert_opm_file(str(source), str(destination), "kvn", "xml")
+    with pytest.raises(ccsds_ndm.NdmUnsupportedMessageError):
+        ccsds_ndm.convert_file(str(source), str(destination), "kvn", "xml")
     assert destination.read_text() == "sentinel"

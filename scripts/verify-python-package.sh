@@ -15,5 +15,34 @@ temporary="$(mktemp -d)"
 trap 'rm -rf "${temporary}"' EXIT
 uv venv "${temporary}/venv"
 uv pip install --python "${temporary}/venv/bin/python" "${wheels[0]}"
-"${temporary}/venv/bin/python" -c \
-    'import ccsds_ndm; assert hasattr(ccsds_ndm, "Opm"); assert hasattr(ccsds_ndm, "convert_opm")'
+"${temporary}/venv/bin/python" - <<'PY'
+import ccsds_ndm
+
+source = """\
+CCSDS_OPM_VERS = 3.0
+CREATION_DATE = 2026-01-01T00:00:00
+ORIGINATOR = PACKAGE_TEST
+OBJECT_NAME = PACKAGE_TEST
+OBJECT_ID = 2026-001A
+CENTER_NAME = EARTH
+REF_FRAME = EME2000
+TIME_SYSTEM = UTC
+EPOCH = 2026-01-01T00:00:00
+X = 7000
+Y = 0
+Z = 0
+X_DOT = 0
+Y_DOT = 7.5
+Z_DOT = 0
+"""
+
+message = ccsds_ndm.from_str(source, format="kvn")
+assert isinstance(message, ccsds_ndm.Opm)
+ccsds_ndm.edit(message).segment.metadata.object_name = "EDITED"
+assert message.segment.metadata.object_name == "EDITED"
+assert message.validate() is None
+xml = message.to_str("xml")
+assert "<OBJECT_NAME>EDITED</OBJECT_NAME>" in xml
+kvn = ccsds_ndm.convert(xml, "xml", "kvn")
+assert isinstance(ccsds_ndm.from_str(kvn, format="kvn"), ccsds_ndm.Opm)
+PY

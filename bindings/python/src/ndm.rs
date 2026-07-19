@@ -153,14 +153,12 @@ impl Ndm {
     }
 
     /// Serialize to a string.
-    #[pyo3(signature = (format, validate=true, max_output_bytes=None))]
+    #[pyo3(signature = (format, max_output_bytes=None))]
     fn to_str(
         &self,
         format: &str,
-        validate: bool,
         max_output_bytes: Option<usize>,
     ) -> PyResult<String> {
-        crate::api::require_checked_generation(validate)?;
         match format {
             "kvn" => self.to_kvn(max_output_bytes),
             "xml" => self.to_xml(max_output_bytes),
@@ -176,17 +174,14 @@ impl Ndm {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    #[pyo3(signature = (path, format, validate=true, max_output_bytes=None))]
+    #[pyo3(signature = (path, format, max_output_bytes=None))]
     fn to_file(
         &self,
         path: &str,
         format: &str,
-        validate: bool,
         max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
-        let data = self.to_str(format, validate, max_output_bytes)?;
+        let data = self.to_str(format, max_output_bytes)?;
         crate::api::atomic_write(path, |output| {
             use std::io::Write;
             output

@@ -325,12 +325,11 @@ pub fn kv_rest<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)>
 /// Fast float parser for KVN values.
 pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
     let checkpoint = input.checkpoint();
-    terminated(
+    let (value, unit) = terminated(
         (
             parse_f64_winnow.context(StrContext::Label("float")),
             kv_unit,
-        )
-            .map(|(f, _)| f),
+        ),
         opt_line_ending,
     )
     .parse_next(input)
@@ -342,21 +341,27 @@ pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
         } else {
             e
         }
-    })
+    })?;
+    if unit.is_some() {
+        return Err(cut_err(
+            input,
+            "Units are not allowed for this dimensionless or implicitly scaled field",
+        ));
+    }
+    Ok(value)
 }
 
 /// Fast i32 parser for KVN values.
 pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
     let checkpoint = input.checkpoint();
-    terminated(
+    let (value, unit) = terminated(
         (
             take_while(1.., ('0'..='9', '-', '+'))
                 .map(|s: &str| s.parse::<i32>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
-        )
-            .map(|(i, _)| i),
+        ),
         opt_line_ending,
     )
     .parse_next(input)
@@ -368,21 +373,24 @@ pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
         } else {
             e
         }
-    })
+    })?;
+    if unit.is_some() {
+        return Err(cut_err(input, "Units are not allowed for integer fields"));
+    }
+    Ok(value)
 }
 
 /// Fast u32 parser for KVN values.
 pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     let checkpoint = input.checkpoint();
-    terminated(
+    let (value, unit) = terminated(
         (
             take_while(1.., '0'..='9')
                 .map(|s: &str| s.parse::<u32>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
-        )
-            .map(|(u, _)| u),
+        ),
         opt_line_ending,
     )
     .parse_next(input)
@@ -398,7 +406,11 @@ pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
         } else {
             e
         }
-    })
+    })?;
+    if unit.is_some() {
+        return Err(cut_err(input, "Units are not allowed for integer fields"));
+    }
+    Ok(value)
 }
 
 /// Parses an optional u32 value from a KVN line.
@@ -409,20 +421,21 @@ pub fn kv_u32_opt(input: &mut &str) -> KvnResult<Option<u32>> {
     // Check if line contains only whitespace/unit or is empty
     let remainder = peek(till_line_ending).parse_next(input)?;
     if remainder.is_null() || remainder.trim().starts_with('[') {
-        let _ = kv_unit.parse_next(input)?;
+        if kv_unit.parse_next(input)?.is_some() {
+            return Err(cut_err(input, "Units are not allowed for integer fields"));
+        }
         opt_line_ending.parse_next(input)?;
         return Ok(None);
     }
 
-    terminated(
+    let (value, unit) = terminated(
         (
             take_while(1.., '0'..='9')
                 .map(|s: &str| s.parse::<u32>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.ok()),
             kv_unit,
-        )
-            .map(|(u, _)| u),
+        ),
         opt_line_ending,
     )
     .parse_next(input)
@@ -438,21 +451,24 @@ pub fn kv_u32_opt(input: &mut &str) -> KvnResult<Option<u32>> {
         } else {
             e
         }
-    })
+    })?;
+    if unit.is_some() {
+        return Err(cut_err(input, "Units are not allowed for integer fields"));
+    }
+    Ok(value)
 }
 
 /// Fast u64 parser for KVN values.
 pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
     let checkpoint = input.checkpoint();
-    terminated(
+    let (value, unit) = terminated(
         (
             take_while(1.., '0'..='9')
                 .map(|s: &str| s.parse::<u64>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
-        )
-            .map(|(u, _)| u),
+        ),
         opt_line_ending,
     )
     .parse_next(input)
@@ -468,7 +484,11 @@ pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
         } else {
             e
         }
-    })
+    })?;
+    if unit.is_some() {
+        return Err(cut_err(input, "Units are not allowed for integer fields"));
+    }
+    Ok(value)
 }
 
 /// Skips whitespace and empty lines.

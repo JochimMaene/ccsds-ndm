@@ -182,16 +182,6 @@ impl Opm {
         max_input_bytes: Option<usize>,
         max_xml_depth: Option<usize>,
     ) -> PyResult<Self> {
-        let source = match format {
-            Some("kvn") => Some(ccsds_ndm::Notation::Kvn),
-            Some("xml") => Some(ccsds_ndm::Notation::Xml),
-            Some(other) => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported format '{other}'. Use 'kvn' or 'xml'"
-                )))
-            }
-            None => None,
-        };
         let mut options = ParseOptions {
             max_input_bytes,
             ..ParseOptions::default()
@@ -199,9 +189,8 @@ impl Opm {
         if let Some(depth) = max_xml_depth {
             options.max_xml_depth = depth;
         }
-        ccsds_ndm::parse_opm_file(path, source, &options)
+        crate::api::parse_typed_file_with_options(path, format, &options)
             .map(|inner| Self { inner })
-            .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 
     /// Serialize to KVN, preserving the source version by default.
@@ -218,16 +207,14 @@ impl Opm {
         crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
     }
 
-    /// Serialize to KVN or XML. ``validate`` must remain true.
-    #[pyo3(signature = (format, validate=true, version=None, max_output_bytes=None))]
+    /// Serialize to KVN or XML after mandatory CCSDS validation.
+    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
     fn to_str(
         &self,
         format: &str,
-        validate: bool,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<String> {
-        crate::api::require_checked_generation(validate)?;
         crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
     }
 
@@ -239,20 +226,16 @@ impl Opm {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Must remain True; unchecked generation is not supported.
     /// version : str, optional
     ///     Source version by default, ``"latest"``, or an exact supported version.
-    #[pyo3(signature = (path, format, validate=true, version=None, max_output_bytes=None))]
+    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
         path: &str,
         format: &str,
-        validate: bool,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
-        crate::api::require_checked_generation(validate)?;
         crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
     }
 }

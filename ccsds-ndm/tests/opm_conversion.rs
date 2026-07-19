@@ -1,6 +1,6 @@
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{convert_opm, convert_opm_file, GenerateOptions, Notation, ParseOptions};
+use ccsds_ndm::{convert, convert_file, GenerateOptions, Notation, ParseOptions};
 
 const KVN_FIXTURES: [&str; 4] = [
     include_str!("../../data/kvn/opm_g1.kvn"),
@@ -14,7 +14,7 @@ const XML_FIXTURE: &str = include_str!("../../data/xml/opm_g5.xml");
 fn both_conversion_directions_preserve_the_complete_typed_model() {
     for source in KVN_FIXTURES {
         let expected = Opm::from_kvn(source).expect("KVN fixture should parse");
-        let xml = convert_opm(
+        let xml = convert(
             source,
             Notation::Kvn,
             Notation::Xml,
@@ -29,7 +29,7 @@ fn both_conversion_directions_preserve_the_complete_typed_model() {
     }
 
     let expected = Opm::from_xml(XML_FIXTURE).expect("XML fixture should parse");
-    let kvn = convert_opm(
+    let kvn = convert(
         XML_FIXTURE,
         Notation::Xml,
         Notation::Kvn,
@@ -49,7 +49,7 @@ fn xml_to_kvn_rounds_values_to_the_ccsds_digit_limit() {
     message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
     let xml = message.to_xml().expect("XML can represent the f64 exactly");
 
-    let kvn = convert_opm(
+    let kvn = convert(
         &xml,
         Notation::Xml,
         Notation::Kvn,
@@ -68,7 +68,7 @@ fn file_conversion_replaces_the_destination_only_after_success() {
     std::fs::write(&source, KVN_FIXTURES[0]).expect("source should be written");
     std::fs::write(&destination, b"sentinel").expect("sentinel should be written");
 
-    convert_opm_file(
+    convert_file(
         &source,
         &destination,
         Notation::Kvn,
@@ -82,7 +82,7 @@ fn file_conversion_replaces_the_destination_only_after_success() {
 
     std::fs::write(&source, "not an OPM").expect("invalid source should be written");
     std::fs::write(&destination, b"sentinel").expect("sentinel should be restored");
-    assert!(convert_opm_file(
+    assert!(convert_file(
         &source,
         &destination,
         Notation::Kvn,
@@ -115,7 +115,7 @@ fn file_conversion_enforces_input_limit_before_materializing_the_document() {
     std::fs::write(&destination, b"sentinel").expect("sentinel should be written");
 
     let options = ParseOptions::default().with_max_input_bytes(16);
-    let error = convert_opm_file(
+    let error = convert_file(
         &source,
         &destination,
         Notation::Kvn,

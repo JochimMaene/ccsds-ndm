@@ -40,6 +40,11 @@ pip install ccsds-ndm-py
 cargo add ccsds-ndm
 ```
 
+**Command line:**
+```bash
+cargo install ccsds-ndm
+```
+
 ## Quick Start
 
 ### Python
@@ -54,7 +59,10 @@ if isinstance(msg, ccsds_ndm.Opm):
     print(f"Object: {msg.segment.metadata.object_name}")
     print(f"Epoch: {msg.segment.data.state_vector.epoch}")
 
-    # Validate after constructing or modifying a message
+    # Nested model properties are owned snapshots. edit() writes changes back.
+    ccsds_ndm.edit(msg).segment.metadata.object_name = "UPDATED"
+
+    # Validate explicitly when useful; generation always validates.
     msg.validate()
 
     # Serialize
@@ -86,11 +94,23 @@ fn main() -> ccsds_ndm::error::Result<()> {
 }
 ```
 
+### Command line
+
+```bash
+ccsds-ndm validate example.opm
+ccsds-ndm convert --to xml example.opm -o example.xml
+```
+
+Use `--target-version 2.0` or `3.0` for an explicit ODM edition. OPM, OEM, and OMM
+support edition-correct 2.0 and 3.0 output; unsupported cross-edition changes fail instead of
+relabeling the document.
+
 ## Features
 
 - **Type-safe**: Strongly typed structures matching CCSDS XSD schemas
 - **Auto-detection**: Automatically detects message format and type
 - **Validation**: Semantic validation via shared Rust core
+- **CCSDS units**: Required units are checked instead of silently reinterpreted
 - **Python bindings**: Native Python API via PyO3 and maturin
 
 ## Documentation

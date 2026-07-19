@@ -1777,7 +1777,7 @@ IMPACT_WINDOW_END = 2023-01-06T18:00:00
 IMPACT_REF_FRAME = EFG
 NOMINAL_IMPACT_LON = -120.5
 NOMINAL_IMPACT_LAT = 35.2
-NOMINAL_IMPACT_ALT = 0.0 [km]
+NOMINAL_IMPACT_ALT = 0.0 [m]
 "#;
         let rdm = Rdm::from_kvn(kvn).unwrap();
         let g = rdm

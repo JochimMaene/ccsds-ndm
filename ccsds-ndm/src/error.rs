@@ -571,6 +571,16 @@ pub enum CcsdsNdmError {
         supported: String,
     },
 
+    /// Error for a requested edition change without a proven lossless mapping.
+    #[error(
+        "Unsupported version conversion for {message_type}: {source_version} to {target_version}"
+    )]
+    UnsupportedVersionConversion {
+        message_type: &'static str,
+        source_version: String,
+        target_version: String,
+    },
+
     /// A caller-selected resource policy was exceeded.
     #[error("Resource limit exceeded for {resource}: {actual} (limit: {limit})")]
     ResourceLimitExceeded {
@@ -990,6 +1000,9 @@ impl CcsdsNdmError {
             Self::UnsupportedInputVersion { .. } => Some("parse.unsupported_input_version"),
             Self::UnexpectedEof { .. } => Some("parse.unexpected_eof"),
             Self::UnsupportedOutputVersion { .. } => Some("generation.unsupported_output_version"),
+            Self::UnsupportedVersionConversion { .. } => {
+                Some("generation.unsupported_version_conversion")
+            }
             Self::ResourceLimitExceeded { resource, .. } => match *resource {
                 "generated_document" => Some("resource.output_limit_exceeded"),
                 "input_document" => Some("resource.input_limit_exceeded"),
@@ -1304,7 +1317,7 @@ mod tests {
 
     #[test]
     fn test_ccsds_ndm_error_helpers() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "io");
+        let io_err = std::io::Error::other("io");
         let err: CcsdsNdmError = io_err.into();
         assert!(err.as_io_error().is_some());
         assert!(err.is_io_error());
@@ -1356,10 +1369,7 @@ mod tests {
 
     #[test]
     fn test_format_error_variants() {
-        let xml_err = quick_xml::Error::Io(std::sync::Arc::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "io",
-        )));
+        let xml_err = quick_xml::Error::Io(std::sync::Arc::new(std::io::Error::other("io")));
         let err: CcsdsNdmError = FormatError::Xml(xml_err).into();
         assert!(err.as_xml_error().is_some());
 

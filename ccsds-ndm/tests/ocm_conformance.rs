@@ -143,7 +143,8 @@ fn time_and_angle_vectors_use_the_schema_lexical_form_across_notations() {
 
 #[test]
 fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
-    let cases: [(&str, fn(&mut Ocm)); 2] = [
+    type OcmMutation = fn(&mut Ocm);
+    let cases: [(&str, OcmMutation); 2] = [
         ("non-ASCII free text", |message: &mut Ocm| {
             message.body.segment.metadata.object_name = Some("OSPREY €".to_owned());
         }),

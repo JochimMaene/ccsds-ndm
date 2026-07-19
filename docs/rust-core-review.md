@@ -48,8 +48,8 @@ This was an architecture and source review, not a statistically rigorous perform
 - Every advertised message type, edition, and notation is recorded in a support/conformance matrix
   linking normative requirements to implementation and tests. A combination is not advertised as
   supported until the matrix shows the full project quality bar is met.
-- Generated output is always validated. The Python compatibility argument `validate=False` is
-  rejected rather than allowing unchecked output.
+- Generated output is always validated. The redundant Python `validate` generation argument has
+  been removed rather than implying that unchecked output is available.
 
 ## Validation results
 
@@ -99,6 +99,10 @@ serializer backed by the standard. Otherwise generation must fail and require th
 a fully supported target edition explicitly. Never label current-shape output with an older edition.
 If changing editions would lose information or require inventing required data, generation must
 fail with a precise diagnostic.
+
+**Resolution (2026-07-19):** OPM, OEM, and OMM 2.0 output now has edition-specific validation and
+is tested against the archived official NDM/XML 2.0 schemas. Their 2.0↔3.0 transitions are explicit;
+all other edition changes fail with `generation.unsupported_version_conversion`.
 
 ### B4. Malformed OCM records are silently discarded
 
@@ -241,6 +245,10 @@ Required numeric XML wrappers accept a scalar without units and inject a default
 
 **Required change:** parse units into a known enum, convert only when the standard permits it, retain approved extension units if policy allows, and emit a diagnostic whenever a default is inferred. Unknown or dimensionally incompatible units must not be silently accepted.
 
+**Resolution (2026-07-19):** required XML units are required, KVN units are parsed against the
+field's CCSDS unit enum, and dimensionless primitives reject spurious units. Regression tests cover
+required, incompatible, and dimensionless unit cases.
+
 ## Medium-priority findings
 
 ### M1. Models do not make invalid states hard to represent
@@ -292,6 +300,9 @@ Do not blindly generate the entire public API from XSD: the prose contains seman
 Examples include a duplicated AEM doc comment at `ccsds-ndm/src/kvn/aem.rs:108`, an always-true strict-or-lenient condition at `ccsds-ndm/src/messages/tdm.rs:81`, repeated `false || ...` expressions in OEM tests, stale implementation-history comments such as “Corrected” and “rest of logic remains similar,” and ignored formatting results throughout the writer. Strict Clippy currently reports 43 errors across all targets.
 
 These are not the primary correctness problems, but they are warning signs in code advertised for mission-critical use. Replace historical commentary with invariant-focused documentation, remove tautologies and duplication, and require focused human review for large generated-looking changes.
+
+**Resolution (2026-07-19):** the documented mechanical defects were removed and
+`cargo clippy --all-targets --all-features -- -D warnings` is green.
 
 ### M8. Determinism and semantic preservation lack explicit gates
 

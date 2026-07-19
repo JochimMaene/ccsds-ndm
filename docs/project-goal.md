@@ -1,53 +1,52 @@
 # Project Goal
 
-`ccsds-ndm` exists to make CCSDS Navigation Data Message exchange trustworthy, easy to adopt, and operationally predictable.
+`ccsds-ndm` aims to be the best library for working with CCSDS Navigation Data Messages in Rust
+and Python.
 
-Our ambition is to become the default open-source implementation for inspecting, parsing, validating, converting, and generating CCSDS NDM data, and a shared conformance test engine for the wider ecosystem.
+It focuses on the common tasks users need: parsing messages, validating their contents, converting
+between KVN and XML, modifying typed data, and generating valid output.
 
-Users should choose `ccsds-ndm` because the safe path is also the easy path: installation takes minutes, common workflows require little ceremony, diagnostics explain exactly what happened, large messages have predictable resource use, and every advertised capability links to reproducible conformance evidence.
+Users should choose `ccsds-ndm` because it is:
 
-We will earn reference status through demonstrated interoperability, independent operational adoption, dependable releases, transparent governance, and sustained agreement between the Rust, Python, and command-line surfaces. Applicable CCSDS schemas and publications remain authoritative; this project does not claim CCSDS endorsement or replace the standards.
+- **Correct.** Supported messages follow the applicable CCSDS publications and schemas. The library
+  rejects ambiguous or invalid data instead of guessing, never silently loses information, and
+  validates messages before generating output.
+- **Easy to use.** Installation is straightforward, common workflows require little code, and
+  errors explain what is wrong and where.
+- **Fast and predictable.** Typical messages are processed efficiently, while large messages and
+  malformed inputs have measured and bounded resource behavior where scale requires it.
+- **Dependable.** Supported behavior is documented, tested, and released consistently.
 
-## Status of This Document
+## Scope
 
-This document describes the target product and the position the project intends to earn. It is not a statement that every target capability exists today.
+The Rust core is the single implementation of parsing, validation, conversion, and generation
+behavior. The Python bindings and command-line interface reuse that behavior rather than developing
+independent interpretations of the standards.
 
-The published [support and conformance matrix](support-matrix.md) is the authoritative statement of current capabilities. A message model, parser, serializer, example, or test in the repository does not by itself establish advertised conformance. Until a capability appears in that matrix with status `verified`, it remains planned, implemented but unverified, experimental, or unsupported as applicable.
+The project intends to support the CCSDS NDM family in KVN and XML. Work is prioritized by common
+user workflows, correctness risk, and practical value. Complete, well-tested support for important
+message types is more valuable than broad but unreliable coverage.
 
-The detailed [conformance and product policy](conformance-policy.md) defines the project contract. The [reference-status scorecard](reference-status.md) defines how the project will decide whether it has earned its stated position.
+The project handles NDM representation and exchange. Orbit propagation, frame transformation,
+conjunction analysis, attitude dynamics, and other astrodynamics computations are outside its
+scope.
 
-## Who We Serve
+## Current Capabilities
 
-- Mission operators and data-exchange engineers who need reliable inspection, validation, conversion, and generation.
-- Application and library developers who need stable, idiomatic, high-performance Rust and Python APIs.
-- Other NDM implementers who need an independent, reproducible conformance test engine and interoperability reference.
-
-## Why Users Should Choose This Project
-
-- **The safe path is the easy path.** Installation, first validation, conversion, diagnostics, and CI integration work without requiring users to learn the entire CCSDS object model.
-- **Claims come with evidence.** Every advertised capability identifies the exact standard issue, corrigendum, notation, operation, public surface, and executable evidence behind it.
-- **Failures are actionable.** Diagnostics are precise, stable, machine-readable, and suitable for both people and automation.
-- **Real-world inputs are handled honestly.** Strict processing never guesses. Explicit permissive processing applies only documented, deterministic recoveries and reports every one.
-- **Scale is predictable.** Large history products, malformed inputs, and adversarial inputs have measured performance and bounded resource behavior.
-- **The project is dependable.** Interfaces, releases, compatibility, security handling, governance, and succession are transparent enough for long-lived operational adoption.
-
-## Product Shape
-
-The applicable official CCSDS schemas define notation-specific wire constraints. The applicable
-CCSDS publications and corrigenda define semantics and requirements not expressed by those schemas.
-Requirement-traceable tests and a support and conformance matrix turn those inputs into executable
-evidence in the shared Rust core.
-
-The Rust API, Python API, and standalone CLI expose the same parsing, validation, conversion, generation, and diagnostic decisions through interfaces appropriate to their environments. The Rust core is the behavioral source of truth; public surfaces do not develop independent conformance semantics.
-
-The long-term scope follows the complete CCSDS NDM family as it evolves. Work is prioritized by operational demand, conformance risk, interoperability value, and measured scale rather than by the appearance of broad coverage.
+This document describes the direction of the project, not the capabilities of a particular
+release. The [support and conformance matrix](support-matrix.md) is the authoritative statement of
+what is currently supported and verified.
 
 ## Guiding Principles
 
-1. **CCSDS is authoritative.** Official schemas decide notation-specific wire constraints; the applicable publications and corrigenda decide semantics not expressed by those schemas. Other implementations are interoperability references.
-2. **Correctness and usability reinforce each other.** Prevention of silent data loss is non-negotiable, and correct common workflows should require minimal ceremony.
-3. **Support is exact and evidence-based.** Partial, historical, experimental, and surface-specific capabilities are useful when labeled precisely.
-4. **No recovery is silent.** Ambiguous input is rejected; deterministic permissive recovery is always reported.
-5. **Generation is a conformance boundary.** Public writers validate the complete message for the selected edition before emitting data.
-6. **Performance is product behavior.** Claims require reproducible measurements and enforced resource budgets.
-7. **Complexity must be earned.** Features, abstractions, language bindings, and compatibility modes require demonstrated user or conformance value.
+1. **CCSDS is authoritative.** Official publications, corrigenda, and schemas define correct
+   behavior.
+2. **No silent data loss.** Unsupported, ambiguous, or invalid data must not be silently discarded
+   or reinterpreted.
+3. **The safe path is the easy path.** Correct parsing and generation should be the default and
+   should not require unnecessary ceremony.
+4. **Generation validates first.** Public writers emit valid output or return an actionable error.
+5. **Performance is measured.** Optimization follows representative workloads and must not weaken
+   correctness or clarity.
+6. **Complexity must earn its place.** Features, abstractions, compatibility modes, and additional
+   integrations are added only when they solve a demonstrated practical need.

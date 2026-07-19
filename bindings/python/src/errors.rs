@@ -10,23 +10,23 @@
 
 use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation, FormatError};
 use pyo3::create_exception;
-use pyo3::exceptions::{PyException, PyIOError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 // Base exception for all CCSDS NDM errors.
-// Inherits from Exception.
+// ValueError preserves the pre-1.0 parsing contract while providing one reliable library base.
 create_exception!(
     ccsds_ndm,
     NdmError,
-    PyException,
+    PyValueError,
     "Base exception for all CCSDS NDM errors."
 );
 
-// Format/parsing errors - inherit from both NdmError and ValueError for backward compat.
+// Format/parsing errors.
 create_exception!(
     ccsds_ndm,
     NdmFormatError,
-    PyValueError,
+    NdmError,
     "Error during parsing of NDM data (KVN or XML)."
 );
 create_exception!(
@@ -54,15 +54,15 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmEpochError,
-    PyValueError,
+    NdmError,
     "Error parsing a CCSDS epoch string."
 );
 
-// I/O errors - inherit from both NdmError and IOError.
+// I/O errors.
 create_exception!(
     ccsds_ndm,
     NdmIoError,
-    PyIOError,
+    NdmError,
     "I/O error during file operations."
 );
 
@@ -220,6 +220,28 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
                 None,
             )
         }
+        CcsdsNdmError::UnsupportedVersionConversion {
+            message_type,
+            source_version,
+            target_version,
+        } => enrich_exception(
+            NdmValidationError::new_err(format!(
+                "Unsupported version conversion for {message_type}: \
+                 {source_version} to {target_version}"
+            )),
+            "generate",
+            None,
+            Some(message_type),
+            Some(source_version),
+            Some(target_version),
+            Some("generation.unsupported_version_conversion"),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
         CcsdsNdmError::UnexpectedEof { context } => {
             NdmFormatError::new_err(format!("Unexpected end of input: {}", context))
         }

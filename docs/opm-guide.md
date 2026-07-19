@@ -1,6 +1,6 @@
-# OPM 3.0 Guide
+# OPM 2.0 and 3.0 Guide
 
-The implemented scope is standalone CCSDS OPM 3.0 in KVN and XML. The
+The implemented scope is standalone CCSDS OPM 2.0 and 3.0 in KVN and XML. The
 [support matrix](support-matrix.md) remains authoritative about verification status.
 
 ## Rust
@@ -15,8 +15,8 @@ target edition, output-byte bound, or streaming sink. Generation always validate
 configured streaming output limit is counted before the caller sink receives bytes; the unlimited
 fast path performs one serialization pass.
 
-`convert_opm` composes strict parsing and validated target generation. `convert_opm_file` and
-`convert_opm_to_file` replace a destination atomically only after conversion succeeds. Finite XML
+`convert` composes strict detection, parsing, and validated target generation. `convert_file` and
+`convert_to_file` replace a destination atomically only after conversion succeeds. Finite XML
 values are rounded when necessary to the 16-digit KVN representation required by CCSDS ODM.
 
 Errors expose stable `code()`, `field_path()`, and `diagnostic()` accessors. Diagnostic wording may
@@ -30,9 +30,18 @@ Install distribution `ccsds-ndm-py` and import `ccsds_ndm`. `Opm.from_str` / `fr
 Raised NDM exceptions expose `code`, `severity`, `operation`, `notation`, `message_kind`, editions,
 field path, and available source location/token fields.
 
-Use `ccsds_ndm.convert_opm(data, "kvn", "xml")` for strings and
-`ccsds_ndm.convert_opm_file(source, destination, "xml", "kvn")` for atomic file conversion. Both
+Use `ccsds_ndm.convert(data, "kvn", "xml")` for strings and
+`ccsds_ndm.convert_file(source, destination, "xml", "kvn")` for atomic file conversion. Both
 accept the same optional input, XML-depth, and output limits and delegate directly to Rust.
+
+Nested PyO3 properties are owned snapshots. Use `ccsds_ndm.edit(message)` when changing a nested
+field so the update is copied back through every parent:
+
+```python
+ccsds_ndm.edit(message).segment.metadata.object_name = "UPDATED"
+```
+
+Generation is always validated; there is no unchecked `validate=False` mode.
 
 ## Construction and optional blocks
 
@@ -49,13 +58,24 @@ The installed `ccsds-ndm` executable intentionally provides only validation and 
 
 ```text
 ccsds-ndm validate [--format kvn|xml] [--json] [limits] [FILE|-]
-ccsds-ndm convert [--from kvn|xml] --to kvn|xml [-o FILE|-] [--json] [limits] [FILE|-]
+ccsds-ndm convert [--from kvn|xml] --to kvn|xml [-o FILE|-] [--target-version source|latest|VERSION] [--json] [limits] [FILE|-]
 ```
 
 Absent an explicit source notation, leading `<` selects XML and all other non-empty input selects
 KVN. Converted document bytes go only to stdout (or the selected atomic output file); diagnostics go
 only to stderr. Exit codes are 0 success, 2 invalid input/model, 3 unsupported edition/operation,
 4 resource limit, 5 I/O, and 64 command usage.
+
+OPM, OEM, and OMM can target ODM 2.0 or 3.0. The 2.0 implementation is checked against the archived
+official [SANA NDM/XML schema archive](https://sanaregistry.org/r/ndmxml_unqualified/). OPM and OEM
+ODM 1.0 remain parse-only: no audited 1.0 schema-backed serializer is available, so the library
+rejects attempts to relabel or convert them.
+
+## Migrating the pre-0.0.9 API
+
+- Replace `convert_opm` and `convert_opm_file` with the generic `convert` and `convert_file`.
+- Remove the `validate` argument from `to_str` and `to_file`; output is always validated.
+- Use `edit(message)` for nested Python changes.
 
 ## Performance and limits
 

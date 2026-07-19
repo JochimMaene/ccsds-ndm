@@ -53,25 +53,6 @@ pub trait Validate {
     fn validation_errors(&self) -> Result<Vec<ValidationError>>;
 }
 
-#[cfg(test)]
-mod validate_default_tests {
-    use super::Validate;
-    use crate::error::{Result, ValidationError};
-
-    struct AggregateOnly;
-
-    impl Validate for AggregateOnly {
-        fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-            Ok(vec![ValidationError::generic("aggregate-only failure")])
-        }
-    }
-
-    #[test]
-    fn default_validate_fails_when_aggregate_validation_reports_an_error() {
-        assert!(AggregateOnly.validate().is_err());
-    }
-}
-
 /// Core trait for NDM message types.
 ///
 /// All CCSDS message types (OPM, OEM, CDM, etc.) implement this trait,
@@ -223,4 +204,23 @@ pub(crate) trait ToKvn {
     ///
     /// * `writer` - The KVN writer to output to
     fn write_kvn(&self, writer: &mut KvnWriter<'_>);
+}
+
+#[cfg(test)]
+mod validate_default_tests {
+    use super::Validate;
+    use crate::error::{Result, ValidationError};
+
+    struct AggregateOnly;
+
+    impl Validate for AggregateOnly {
+        fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+            Ok(vec![ValidationError::generic("aggregate-only failure")])
+        }
+    }
+
+    #[test]
+    fn default_validate_fails_when_aggregate_validation_reports_an_error() {
+        assert!(AggregateOnly.validate().is_err());
+    }
 }

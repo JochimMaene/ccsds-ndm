@@ -225,15 +225,23 @@ fn generation_preserves_source_version_by_default() {
 }
 
 #[test]
-fn unsupported_source_version_requires_explicit_upgrade() {
-    let legacy = OPM_KVN.replacen("3.0", "2.0", 1);
+fn unaudited_source_version_cannot_be_generated_or_relabelled() {
+    let legacy = OPM_KVN.replacen("3.0", "1.0", 1);
     let opm = Opm::from_kvn(&legacy).unwrap();
 
     let source_error = opm.to_kvn().unwrap_err();
-    assert!(source_error.to_string().contains("output version 2.0"));
+    assert_eq!(
+        source_error.code(),
+        Some("generation.unsupported_output_version")
+    );
 
-    let upgraded = opm.to_kvn_with(&GenerateOptions::latest()).unwrap();
-    assert!(upgraded.lines().next().unwrap().ends_with("3.0"));
+    let relabel_error = opm
+        .to_kvn_with(&GenerateOptions::latest())
+        .expect_err("ODM 1.0 has no audited edition converter");
+    assert_eq!(
+        relabel_error.code(),
+        Some("generation.unsupported_version_conversion")
+    );
 }
 
 #[test]

@@ -196,6 +196,7 @@ impl crate::traits::Validate for Omm {
             &self.id,
             &self.version,
         )?;
+        crate::versioning::validate_omm_edition(self)?;
         self.header.validate()?;
         self.body.validate()
     }
@@ -209,6 +210,10 @@ impl crate::traits::Validate for Omm {
                 &self.id,
                 &self.version,
             ),
+        )?;
+        crate::validation::collect_validation_result(
+            &mut errors,
+            crate::versioning::validate_omm_edition(self),
         )?;
         errors.extend(self.header.validation_errors()?);
         errors.extend(self.body.validation_errors()?);

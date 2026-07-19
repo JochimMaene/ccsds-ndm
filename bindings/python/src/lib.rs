@@ -152,64 +152,6 @@ fn notation(value: &str) -> PyResult<ccsds_ndm::Notation> {
     }
 }
 
-/// Strictly convert a standalone OPM between KVN and XML.
-#[pyfunction]
-#[pyo3(signature = (data, from_format, to_format, max_input_bytes=None, max_xml_depth=None, max_output_bytes=None))]
-fn convert_opm(
-    data: &str,
-    from_format: &str,
-    to_format: &str,
-    max_input_bytes: Option<usize>,
-    max_xml_depth: Option<usize>,
-    max_output_bytes: Option<usize>,
-) -> PyResult<String> {
-    let mut parse = ccsds_ndm::ParseOptions::default();
-    parse.max_input_bytes = max_input_bytes;
-    if let Some(depth) = max_xml_depth {
-        parse.max_xml_depth = depth;
-    }
-    let mut generate = ccsds_ndm::GenerateOptions::source();
-    generate.max_output_bytes = max_output_bytes;
-    ccsds_ndm::convert_opm(
-        data,
-        notation(from_format)?,
-        notation(to_format)?,
-        &parse,
-        &generate,
-    )
-    .map_err(ccsds_error_to_pyerr)
-}
-
-/// Strictly convert an OPM file and atomically replace the destination.
-#[pyfunction]
-#[pyo3(signature = (source_path, destination_path, from_format, to_format, max_input_bytes=None, max_xml_depth=None, max_output_bytes=None))]
-fn convert_opm_file(
-    source_path: &str,
-    destination_path: &str,
-    from_format: &str,
-    to_format: &str,
-    max_input_bytes: Option<usize>,
-    max_xml_depth: Option<usize>,
-    max_output_bytes: Option<usize>,
-) -> PyResult<()> {
-    let mut parse = ccsds_ndm::ParseOptions::default();
-    parse.max_input_bytes = max_input_bytes;
-    if let Some(depth) = max_xml_depth {
-        parse.max_xml_depth = depth;
-    }
-    let mut generate = ccsds_ndm::GenerateOptions::source();
-    generate.max_output_bytes = max_output_bytes;
-    ccsds_ndm::convert_opm_file(
-        source_path,
-        destination_path,
-        notation(from_format)?,
-        notation(to_format)?,
-        &parse,
-        &generate,
-    )
-    .map_err(ccsds_error_to_pyerr)
-}
-
 /// Convert any recognized NDM message between KVN and XML through the shared generation gate.
 #[pyfunction]
 #[pyo3(signature = (data, from_format, to_format, max_input_bytes=None, max_xml_depth=None, max_records=None, max_output_bytes=None, version=None))]
@@ -274,8 +216,6 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // High-level API aligned with Rust core
     m.add_function(wrap_pyfunction!(from_str, m)?)?;
     m.add_function(wrap_pyfunction!(from_file, m)?)?;
-    m.add_function(wrap_pyfunction!(convert_opm, m)?)?;
-    m.add_function(wrap_pyfunction!(convert_opm_file, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_function(wrap_pyfunction!(convert_file, m)?)?;
 
