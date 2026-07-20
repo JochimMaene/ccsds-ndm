@@ -143,3 +143,11 @@ fn xml_detection_rejects_nonstandard_wrappers_and_preserves_combined_identity() 
     .unwrap();
     assert!(matches!(from_str(&combined).unwrap(), MessageType::Ndm(_)));
 }
+
+#[test]
+fn xml_detection_accepts_an_empty_combined_instantiation() {
+    let MessageType::Ndm(message) = from_str("<ndm/>").unwrap() else {
+        panic!("an empty combined instantiation should preserve its NDM identity");
+    };
+    assert!(message.messages.is_empty());
+}

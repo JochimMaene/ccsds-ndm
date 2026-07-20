@@ -45,8 +45,8 @@ if isinstance(msg, ccsds_ndm.Opm):
     print(f"Object: {msg.segment.metadata.object_name}")
     print(f"Epoch: {msg.segment.data.state_vector.epoch}")
 
-    # Edit nested values and validate explicitly when useful.
-    ccsds_ndm.edit(msg).segment.metadata.object_name = "UPDATED"
+    # Edit nested values directly and validate explicitly when useful.
+    msg.segment.metadata.object_name = "UPDATED"
     msg.validate()
 
     # Generation always validates.

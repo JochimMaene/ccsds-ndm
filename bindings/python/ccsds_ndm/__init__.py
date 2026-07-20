@@ -118,7 +118,6 @@ from .ccsds_ndm import (
     from_file,
     from_str,
 )
-from ._editing import edit
 
 __all__ = [
     # Top-level API
@@ -126,7 +125,6 @@ __all__ = [
     "from_file",
     "convert",
     "convert_file",
-    "edit",
     "UserDefined",
     "Ndm",
     # Exceptions

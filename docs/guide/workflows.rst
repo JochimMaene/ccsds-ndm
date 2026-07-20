@@ -4,18 +4,19 @@ Common Workflows
 Editing nested Python models
 ----------------------------
 
-Nested model properties are owned snapshots. Use :func:`ccsds_ndm.edit` so changes are copied back
-through their parents:
+Nested model properties and collections are live. Change them directly:
 
 .. code-block:: python
 
    import ccsds_ndm
 
    message = ccsds_ndm.from_file("example.opm")
-   ccsds_ndm.edit(message).segment.metadata.object_name = "UPDATED"
+   message.segment.metadata.object_name = "UPDATED"
    message.to_file("updated.opm", "kvn")
 
-Generation always validates the complete message. There is no unchecked ``validate=False`` mode.
+Retained child references preserve their identity, and structural changes to repeated model fields
+such as OEM state-vector lists affect the owning message. Generation always validates the complete
+message. There is no commit step and no unchecked ``validate=False`` mode.
 
 Converting notation and edition
 -------------------------------
@@ -55,7 +56,7 @@ Migrating the pre-0.0.9 API
 
 Use ``convert`` and ``convert_file`` in place of the redundant OPM-only conversion functions.
 Remove the ``validate`` argument from ``to_str`` and ``to_file``; output is always validated.
-Use ``edit(message)`` for nested Python changes.
+Change nested Python fields directly; the former editor/proxy API has been removed.
 
 CCSDS units
 -----------

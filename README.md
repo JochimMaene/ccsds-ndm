@@ -59,8 +59,8 @@ if isinstance(msg, ccsds_ndm.Opm):
     print(f"Object: {msg.segment.metadata.object_name}")
     print(f"Epoch: {msg.segment.data.state_vector.epoch}")
 
-    # Nested model properties are owned snapshots. edit() writes changes back.
-    ccsds_ndm.edit(msg).segment.metadata.object_name = "UPDATED"
+    # Nested objects are live: direct changes affect the message.
+    msg.segment.metadata.object_name = "UPDATED"
 
     # Validate explicitly when useful; generation always validates.
     msg.validate()
@@ -112,6 +112,9 @@ relabeling the document.
 - **Validation**: Semantic validation via shared Rust core
 - **CCSDS units**: Required units are checked instead of silently reinterpreted
 - **Python bindings**: Native Python API via PyO3 and maturin
+
+Run `just bench-competitor` for the optional isolated Python comparison. The competing distribution
+is kept out of package dependencies and routine CI.
 
 ## Documentation
 

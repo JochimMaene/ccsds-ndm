@@ -31,31 +31,61 @@ use crate::opm::OpmCovarianceMatrix;
 /// segment : OmmSegment
 ///     The data segment.
 #[pyclass]
-#[derive(Clone)]
 pub struct Omm {
-    pub inner: core_omm::Omm,
+    id: Option<String>,
+    version: String,
+    header: Py<OdmHeader>,
+    segment: Py<OmmSegment>,
+}
+
+impl Omm {
+    pub(crate) fn from_core(py: Python<'_>, value: core_omm::Omm) -> PyResult<Self> {
+        Ok(Self {
+            id: value.id,
+            version: value.version,
+            header: Py::new(
+                py,
+                OdmHeader {
+                    inner: value.header,
+                },
+            )?,
+            segment: Py::new(py, OmmSegment::from_core(py, value.body.segment)?)?,
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_omm::Omm> {
+        Ok(core_omm::Omm {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            header: self.header.borrow(py).inner.clone(),
+            body: core_omm::OmmBody {
+                segment: self.segment.borrow(py).to_core(py),
+            },
+        })
+    }
 }
 
 #[pymethods]
 impl Omm {
     #[new]
-    fn new(header: OdmHeader, segment: OmmSegment) -> Self {
+    fn new(header: Py<OdmHeader>, segment: Py<OmmSegment>) -> Self {
         Self {
-            inner: core_omm::Omm {
-                header: header.inner,
-                body: core_omm::OmmBody {
-                    segment: segment.inner,
-                },
-                id: Some("CCSDS_OMM_VERS".to_string()),
-                version: "3.0".to_string(),
-            },
+            header,
+            segment,
+            id: Some("CCSDS_OMM_VERS".to_string()),
+            version: "3.0".to_string(),
         }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "Omm(object_name='{}')",
-            self.inner.body.segment.metadata.object_name
+            self.segment
+                .borrow(py)
+                .metadata
+                .borrow(py)
+                .inner
+                .object_name
         )
     }
 
@@ -64,7 +94,7 @@ impl Omm {
     /// :type: Optional[str]
     #[getter]
     fn get_id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     /// The message version.
@@ -72,13 +102,13 @@ impl Omm {
     /// :type: str
     #[getter]
     fn get_version(&self) -> String {
-        self.inner.version.clone()
+        self.version.clone()
     }
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Omm, &value)?;
-        self.inner.version = value;
+        self.version = value;
         Ok(())
     }
 
@@ -90,8 +120,8 @@ impl Omm {
     ///     If True (default), raises ValueError on the first error found.
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        crate::api::validate_message(&self.inner, strict)
+    fn validate(&self, py: Python<'_>, strict: bool) -> PyResult<Option<Vec<String>>> {
+        crate::api::validate_message(&self.to_core(py)?, strict)
     }
 
     /// Orbit Mean-Elements Message (OMM).
@@ -107,44 +137,39 @@ impl Omm {
     ///
     /// :type: OdmHeader
     #[getter]
-    fn get_header(&self) -> OdmHeader {
-        OdmHeader {
-            inner: self.inner.header.clone(),
-        }
+    fn get_header(&self, py: Python<'_>) -> Py<OdmHeader> {
+        self.header.clone_ref(py)
     }
 
     #[setter]
-    fn set_header(&mut self, header: OdmHeader) {
-        self.inner.header = header.inner;
+    fn set_header(&mut self, header: Py<OdmHeader>) {
+        self.header = header;
     }
 
     /// The data segment.
     ///
     /// :type: OmmSegment
     #[getter]
-    fn get_segment(&self) -> OmmSegment {
-        OmmSegment {
-            inner: self.inner.body.segment.clone(),
-        }
+    fn get_segment(&self, py: Python<'_>) -> Py<OmmSegment> {
+        self.segment.clone_ref(py)
     }
 
     #[setter]
-    fn set_segment(&mut self, segment: OmmSegment) {
-        self.inner.body.segment = segment.inner;
+    fn set_segment(&mut self, segment: Py<OmmSegment>) {
+        self.segment = segment;
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None))]
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None))]
     fn from_str(
-        _py: Python<'_>,
+        py: Python<'_>,
         data: &str,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
-        max_xml_depth: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, None);
+        let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_with_options(data, format, &options)?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 
     /// Create an OMM message from a file.
@@ -161,42 +186,57 @@ impl Omm {
     /// Omm
     ///     The parsed OMM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None))]
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
-        _py: Python<'_>,
+        py: Python<'_>,
         path: &str,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
-        max_xml_depth: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, None);
+        let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 
     /// Serialize to KVN, preserving the source version by default.
     ///
     /// Pass ``version="latest"`` or an exact supported version to override it.
     #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_kvn(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, "kvn", version, max_output_bytes)
+    fn to_kvn(
+        &self,
+        py: Python<'_>,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.to_core(py)?, "kvn", version, max_output_bytes)
     }
 
     /// Serialize to XML, preserving the source version by default.
     #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_xml(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
+    fn to_xml(
+        &self,
+        py: Python<'_>,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.to_core(py)?, "xml", version, max_output_bytes)
     }
 
     /// Serialize to validated KVN or XML.
     #[pyo3(signature = (format, version=None, max_output_bytes=None))]
     fn to_str(
         &self,
+        py: Python<'_>,
         format: &str,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
+        crate::api::generate_string_with_limit(
+            &self.to_core(py)?,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     /// Write to file.
@@ -212,12 +252,19 @@ impl Omm {
     #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
+        py: Python<'_>,
         path: &str,
         format: &str,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
+        crate::api::generate_file_with_limit(
+            &self.to_core(py)?,
+            path,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     /// Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
@@ -226,8 +273,8 @@ impl Omm {
     /// -------
     /// tuple[str, str]
     ///     `(line1, line2)` without a line 0.
-    fn to_tle_lines(&self) -> PyResult<(String, String)> {
-        self.inner
+    fn to_tle_lines(&self, py: Python<'_>) -> PyResult<(String, String)> {
+        self.to_core(py)?
             .to_tle_lines()
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
@@ -260,7 +307,9 @@ impl Omm {
         message_id=None,
         creation_date=None
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn from_tle_lines(
+        py: Python<'_>,
         line1: &str,
         line2: &str,
         object_name: Option<String>,
@@ -281,7 +330,7 @@ impl Omm {
 
         let inner = core_omm::Omm::from_tle_lines_with_options(line1, line2, &options)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 }
 
@@ -294,27 +343,43 @@ impl Omm {
 /// data : OmmData
 ///     Segment data.
 #[pyclass]
-#[derive(Clone)]
 pub struct OmmSegment {
-    pub inner: core_omm::OmmSegment,
+    metadata: Py<OmmMetadata>,
+    data: Py<OmmData>,
+}
+
+impl OmmSegment {
+    fn from_core(py: Python<'_>, value: core_omm::OmmSegment) -> PyResult<Self> {
+        Ok(Self {
+            metadata: Py::new(
+                py,
+                OmmMetadata {
+                    inner: value.metadata,
+                },
+            )?,
+            data: Py::new(py, OmmData::from_core(py, value.data)?)?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> core_omm::OmmSegment {
+        core_omm::OmmSegment {
+            metadata: self.metadata.borrow(py).inner.clone(),
+            data: self.data.borrow(py).to_core(py),
+        }
+    }
 }
 
 #[pymethods]
 impl OmmSegment {
     #[new]
-    fn new(metadata: OmmMetadata, data: OmmData) -> Self {
-        Self {
-            inner: core_omm::OmmSegment {
-                metadata: metadata.inner,
-                data: data.inner,
-            },
-        }
+    fn new(metadata: Py<OmmMetadata>, data: Py<OmmData>) -> Self {
+        Self { metadata, data }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "OmmSegment(object_name='{}')",
-            self.inner.metadata.object_name
+            self.metadata.borrow(py).inner.object_name
         )
     }
 
@@ -322,30 +387,26 @@ impl OmmSegment {
     ///
     /// :type: OmmMetadata
     #[getter]
-    fn get_metadata(&self) -> OmmMetadata {
-        OmmMetadata {
-            inner: self.inner.metadata.clone(),
-        }
+    fn get_metadata(&self, py: Python<'_>) -> Py<OmmMetadata> {
+        self.metadata.clone_ref(py)
     }
 
     #[setter]
-    fn set_metadata(&mut self, metadata: OmmMetadata) {
-        self.inner.metadata = metadata.inner;
+    fn set_metadata(&mut self, metadata: Py<OmmMetadata>) {
+        self.metadata = metadata;
     }
 
     /// Segment data.
     ///
     /// :type: OmmData
     #[getter]
-    fn get_data(&self) -> OmmData {
-        OmmData {
-            inner: self.inner.data.clone(),
-        }
+    fn get_data(&self, py: Python<'_>) -> Py<OmmData> {
+        self.data.clone_ref(py)
     }
 
     #[setter]
-    fn set_data(&mut self, data: OmmData) {
-        self.inner.data = data.inner;
+    fn set_data(&mut self, data: Py<OmmData>) {
+        self.data = data;
     }
 }
 
@@ -849,9 +910,66 @@ impl MeanElements {
 
 /// OMM Data section.
 #[pyclass]
-#[derive(Clone)]
 pub struct OmmData {
-    pub inner: core_omm::OmmData,
+    comment: Vec<String>,
+    mean_elements: Py<MeanElements>,
+    spacecraft_parameters: Option<Py<crate::common::SpacecraftParameters>>,
+    tle_parameters: Option<Py<TleParameters>>,
+    covariance_matrix: Option<Py<OpmCovarianceMatrix>>,
+    user_defined_parameters: Option<Py<crate::types::UserDefined>>,
+}
+
+impl OmmData {
+    fn from_core(py: Python<'_>, value: core_omm::OmmData) -> PyResult<Self> {
+        Ok(Self {
+            comment: value.comment,
+            mean_elements: Py::new(
+                py,
+                MeanElements {
+                    inner: value.mean_elements,
+                },
+            )?,
+            spacecraft_parameters: value
+                .spacecraft_parameters
+                .map(|inner| Py::new(py, crate::common::SpacecraftParameters { inner }))
+                .transpose()?,
+            tle_parameters: value
+                .tle_parameters
+                .map(|inner| Py::new(py, TleParameters { inner }))
+                .transpose()?,
+            covariance_matrix: value
+                .covariance_matrix
+                .map(|inner| Py::new(py, OpmCovarianceMatrix { inner }))
+                .transpose()?,
+            user_defined_parameters: value
+                .user_defined_parameters
+                .map(|inner| Py::new(py, crate::types::UserDefined { inner }))
+                .transpose()?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> core_omm::OmmData {
+        core_omm::OmmData {
+            comment: self.comment.clone(),
+            mean_elements: self.mean_elements.borrow(py).inner.clone(),
+            spacecraft_parameters: self
+                .spacecraft_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            tle_parameters: self
+                .tle_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            covariance_matrix: self
+                .covariance_matrix
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            user_defined_parameters: self
+                .user_defined_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+        }
+    }
 }
 
 #[pymethods]
@@ -864,23 +982,21 @@ impl OmmData {
     ///     Mean elements.
     #[new]
     #[pyo3(signature = (mean_elements, comments=None))]
-    fn new(mean_elements: MeanElements, comments: Option<Vec<String>>) -> Self {
+    fn new(mean_elements: Py<MeanElements>, comments: Option<Vec<String>>) -> Self {
         Self {
-            inner: core_omm::OmmData {
-                comment: comments.unwrap_or_default(),
-                mean_elements: mean_elements.inner,
-                spacecraft_parameters: None,
-                tle_parameters: None,
-                covariance_matrix: None,
-                user_defined_parameters: None,
-            },
+            comment: comments.unwrap_or_default(),
+            mean_elements,
+            spacecraft_parameters: None,
+            tle_parameters: None,
+            covariance_matrix: None,
+            user_defined_parameters: None,
         }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "OmmData(epoch='{}')",
-            self.inner.mean_elements.epoch.as_str()
+            self.mean_elements.borrow(py).inner.epoch.as_str()
         )
     }
 
@@ -888,15 +1004,13 @@ impl OmmData {
     ///
     /// :type: MeanElements
     #[getter]
-    fn get_mean_elements(&self) -> MeanElements {
-        MeanElements {
-            inner: self.inner.mean_elements.clone(),
-        }
+    fn get_mean_elements(&self, py: Python<'_>) -> Py<MeanElements> {
+        self.mean_elements.clone_ref(py)
     }
 
     #[setter]
-    fn set_mean_elements(&mut self, value: MeanElements) {
-        self.inner.mean_elements = value.inner;
+    fn set_mean_elements(&mut self, value: Py<MeanElements>) {
+        self.mean_elements = value;
     }
 
     /// Comments.
@@ -904,76 +1018,78 @@ impl OmmData {
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
+        self.comment.clone()
     }
 
     #[setter]
     fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
+        self.comment = value;
     }
 
     /// Spacecraft Parameters.
     ///
     /// :type: Optional[SpacecraftParameters]
     #[getter]
-    fn get_spacecraft_parameters(&self) -> Option<crate::common::SpacecraftParameters> {
-        self.inner
-            .spacecraft_parameters
+    fn get_spacecraft_parameters(
+        &self,
+        py: Python<'_>,
+    ) -> Option<Py<crate::common::SpacecraftParameters>> {
+        self.spacecraft_parameters
             .as_ref()
-            .map(|s| crate::common::SpacecraftParameters { inner: s.clone() })
+            .map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_spacecraft_parameters(&mut self, value: Option<crate::common::SpacecraftParameters>) {
-        self.inner.spacecraft_parameters = value.map(|s| s.inner);
+    fn set_spacecraft_parameters(
+        &mut self,
+        value: Option<Py<crate::common::SpacecraftParameters>>,
+    ) {
+        self.spacecraft_parameters = value;
     }
 
     /// TLE Related Parameters (Only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
     ///
     /// :type: Optional[TleParameters]
     #[getter]
-    fn get_tle_parameters(&self) -> Option<TleParameters> {
-        self.inner
-            .tle_parameters
+    fn get_tle_parameters(&self, py: Python<'_>) -> Option<Py<TleParameters>> {
+        self.tle_parameters
             .as_ref()
-            .map(|t| TleParameters { inner: t.clone() })
+            .map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_tle_parameters(&mut self, value: Option<TleParameters>) {
-        self.inner.tle_parameters = value.map(|t| t.inner);
+    fn set_tle_parameters(&mut self, value: Option<Py<TleParameters>>) {
+        self.tle_parameters = value;
     }
 
     /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form).
     ///
     /// :type: Optional[OpmCovarianceMatrix]
     #[getter]
-    fn get_covariance_matrix(&self) -> Option<OpmCovarianceMatrix> {
-        self.inner
-            .covariance_matrix
+    fn get_covariance_matrix(&self, py: Python<'_>) -> Option<Py<OpmCovarianceMatrix>> {
+        self.covariance_matrix
             .as_ref()
-            .map(|c| OpmCovarianceMatrix { inner: c.clone() })
+            .map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_covariance_matrix(&mut self, value: Option<OpmCovarianceMatrix>) {
-        self.inner.covariance_matrix = value.map(|c| c.inner);
+    fn set_covariance_matrix(&mut self, value: Option<Py<OpmCovarianceMatrix>>) {
+        self.covariance_matrix = value;
     }
 
     /// User-Defined Parameters.
     ///
     /// :type: UserDefined | None
     #[getter]
-    fn get_user_defined_parameters(&self) -> Option<crate::types::UserDefined> {
-        self.inner
-            .user_defined_parameters
+    fn get_user_defined_parameters(&self, py: Python<'_>) -> Option<Py<crate::types::UserDefined>> {
+        self.user_defined_parameters
             .as_ref()
-            .map(|u| crate::types::UserDefined { inner: u.clone() })
+            .map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_user_defined_parameters(&mut self, value: Option<crate::types::UserDefined>) {
-        self.inner.user_defined_parameters = value.map(|u| u.inner);
+    fn set_user_defined_parameters(&mut self, value: Option<Py<crate::types::UserDefined>>) {
+        self.user_defined_parameters = value;
     }
 }
 

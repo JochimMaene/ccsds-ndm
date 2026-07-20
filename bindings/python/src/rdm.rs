@@ -39,25 +39,50 @@ use pyo3::prelude::*;
 ///     The message segment containing metadata and data.
 ///     (Mandatory)
 #[pyclass]
-#[derive(Clone)]
 pub struct Rdm {
-    pub inner: core_rdm::Rdm,
+    id: Option<String>,
+    version: String,
+    header: Py<RdmHeader>,
+    segment: Py<RdmSegment>,
+}
+
+impl Rdm {
+    pub(crate) fn from_core(py: Python<'_>, value: core_rdm::Rdm) -> PyResult<Self> {
+        Ok(Self {
+            id: value.id,
+            version: value.version,
+            header: Py::new(
+                py,
+                RdmHeader {
+                    inner: value.header,
+                },
+            )?,
+            segment: Py::new(py, RdmSegment::from_core(py, *value.body.segment)?)?,
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_rdm::Rdm> {
+        Ok(core_rdm::Rdm {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            header: self.header.borrow(py).inner.clone(),
+            body: core_rdm::RdmBody {
+                segment: Box::new(self.segment.borrow(py).to_core(py)),
+            },
+        })
+    }
 }
 
 #[pymethods]
 impl Rdm {
     #[new]
     #[pyo3(signature = (*, header, segment))]
-    fn new(header: RdmHeader, segment: RdmSegment) -> Self {
+    fn new(header: Py<RdmHeader>, segment: Py<RdmSegment>) -> Self {
         Self {
-            inner: core_rdm::Rdm {
-                header: header.inner,
-                body: core_rdm::RdmBody {
-                    segment: Box::new(segment.inner),
-                },
-                id: Some("CCSDS_RDM_VERS".to_string()),
-                version: "1.0".to_string(),
-            },
+            header,
+            segment,
+            id: Some("CCSDS_RDM_VERS".to_string()),
+            version: "1.0".to_string(),
         }
     }
 
@@ -66,7 +91,7 @@ impl Rdm {
     /// :type: Optional[str]
     #[getter]
     fn get_id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     /// The message version.
@@ -74,13 +99,13 @@ impl Rdm {
     /// :type: str
     #[getter]
     fn get_version(&self) -> String {
-        self.inner.version.clone()
+        self.version.clone()
     }
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Rdm, &value)?;
-        self.inner.version = value;
+        self.version = value;
         Ok(())
     }
 
@@ -92,14 +117,19 @@ impl Rdm {
     ///     If True (default), raises ValueError on the first error found.
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        crate::api::validate_message(&self.inner, strict)
+    fn validate(&self, py: Python<'_>, strict: bool) -> PyResult<Option<Vec<String>>> {
+        crate::api::validate_message(&self.to_core(py)?, strict)
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "Rdm(object_name='{}')",
-            self.inner.body.segment.metadata.object_name
+            self.segment
+                .borrow(py)
+                .metadata
+                .borrow(py)
+                .inner
+                .object_name
         )
     }
 
@@ -117,30 +147,26 @@ impl Rdm {
     ///
     /// :type: RdmHeader
     #[getter]
-    fn get_header(&self) -> RdmHeader {
-        RdmHeader {
-            inner: self.inner.header.clone(),
-        }
+    fn get_header(&self, py: Python<'_>) -> Py<RdmHeader> {
+        self.header.clone_ref(py)
     }
 
     #[setter]
-    fn set_header(&mut self, header: RdmHeader) {
-        self.inner.header = header.inner;
+    fn set_header(&mut self, header: Py<RdmHeader>) {
+        self.header = header;
     }
 
     /// The RDM Body consists of a single segment.
     ///
     /// :type: RdmSegment
     #[getter]
-    fn get_segment(&self) -> RdmSegment {
-        RdmSegment {
-            inner: *self.inner.body.segment.clone(),
-        }
+    fn get_segment(&self, py: Python<'_>) -> Py<RdmSegment> {
+        self.segment.clone_ref(py)
     }
 
     #[setter]
-    fn set_segment(&mut self, segment: RdmSegment) {
-        self.inner.body.segment = Box::new(segment.inner);
+    fn set_segment(&mut self, segment: Py<RdmSegment>) {
+        self.segment = segment;
     }
 
     /// Create an RDM message from a string.
@@ -158,17 +184,16 @@ impl Rdm {
     /// Rdm
     ///     The parsed RDM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None))]
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None))]
     fn from_str(
-        _py: Python<'_>,
+        py: Python<'_>,
         data: &str,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
-        max_xml_depth: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, None);
+        let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_with_options(data, format, &options)?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 
     /// Create an RDM message from a file.
@@ -186,17 +211,16 @@ impl Rdm {
     /// Rdm
     ///     The parsed RDM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None))]
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
-        _py: Python<'_>,
+        py: Python<'_>,
         path: &str,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
-        max_xml_depth: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, None);
+        let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 
     /// Serialize to KVN, preserving the source version by default.
@@ -206,8 +230,13 @@ impl Rdm {
     /// str
     ///     The serialized KVN string.
     #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_kvn(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, "kvn", version, max_output_bytes)
+    fn to_kvn(
+        &self,
+        py: Python<'_>,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.to_core(py)?, "kvn", version, max_output_bytes)
     }
 
     /// Serialize to XML, preserving the source version by default.
@@ -217,8 +246,13 @@ impl Rdm {
     /// str
     ///     The serialized XML string.
     #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_xml(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
+    fn to_xml(
+        &self,
+        py: Python<'_>,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.to_core(py)?, "xml", version, max_output_bytes)
     }
 
     /// Serialize to string (generic).
@@ -235,11 +269,17 @@ impl Rdm {
     #[pyo3(signature = (format, version=None, max_output_bytes=None))]
     fn to_str(
         &self,
+        py: Python<'_>,
         format: &str,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
+        crate::api::generate_string_with_limit(
+            &self.to_core(py)?,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     /// Write to a file.
@@ -255,12 +295,19 @@ impl Rdm {
     #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
+        py: Python<'_>,
         path: &str,
         format: &str,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
+        crate::api::generate_file_with_limit(
+            &self.to_core(py)?,
+            path,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 }
 
@@ -387,28 +434,44 @@ impl RdmHeader {
 ///     Segment data.
 ///     (Mandatory)
 #[pyclass]
-#[derive(Clone)]
 pub struct RdmSegment {
-    pub inner: core_rdm::RdmSegment,
+    metadata: Py<RdmMetadata>,
+    data: Py<RdmData>,
+}
+
+impl RdmSegment {
+    fn from_core(py: Python<'_>, value: core_rdm::RdmSegment) -> PyResult<Self> {
+        Ok(Self {
+            metadata: Py::new(
+                py,
+                RdmMetadata {
+                    inner: value.metadata,
+                },
+            )?,
+            data: Py::new(py, RdmData::from_core(py, value.data)?)?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> core_rdm::RdmSegment {
+        core_rdm::RdmSegment {
+            metadata: self.metadata.borrow(py).inner.clone(),
+            data: self.data.borrow(py).to_core(py),
+        }
+    }
 }
 
 #[pymethods]
 impl RdmSegment {
     #[new]
     #[pyo3(signature = (*, metadata, data))]
-    fn new(metadata: RdmMetadata, data: RdmData) -> Self {
-        Self {
-            inner: core_rdm::RdmSegment {
-                metadata: metadata.inner,
-                data: data.inner,
-            },
-        }
+    fn new(metadata: Py<RdmMetadata>, data: Py<RdmData>) -> Self {
+        Self { metadata, data }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "RdmSegment(object_name='{}')",
-            self.inner.metadata.object_name
+            self.metadata.borrow(py).inner.object_name
         )
     }
 
@@ -416,28 +479,24 @@ impl RdmSegment {
     ///
     /// :type: RdmMetadata
     #[getter]
-    fn get_metadata(&self) -> RdmMetadata {
-        RdmMetadata {
-            inner: self.inner.metadata.clone(),
-        }
+    fn get_metadata(&self, py: Python<'_>) -> Py<RdmMetadata> {
+        self.metadata.clone_ref(py)
     }
     #[setter]
-    fn set_metadata(&mut self, v: RdmMetadata) {
-        self.inner.metadata = v.inner;
+    fn set_metadata(&mut self, value: Py<RdmMetadata>) {
+        self.metadata = value;
     }
 
     /// The data for this RDM segment.
     ///
     /// :type: RdmData
     #[getter]
-    fn get_data(&self) -> RdmData {
-        RdmData {
-            inner: self.inner.data.clone(),
-        }
+    fn get_data(&self, py: Python<'_>) -> Py<RdmData> {
+        self.data.clone_ref(py)
     }
     #[setter]
-    fn set_data(&mut self, v: RdmData) {
-        self.inner.data = v.inner;
+    fn set_data(&mut self, value: Py<RdmData>) {
+        self.data = value;
     }
 }
 
@@ -1190,9 +1249,88 @@ impl RdmMetadata {
 /// comment : list[str], optional
 ///     Comments.
 #[pyclass]
-#[derive(Clone)]
 pub struct RdmData {
-    pub inner: core_rdm::RdmData,
+    comment: Vec<String>,
+    atmospheric_reentry_parameters: Py<AtmosphericReentryParameters>,
+    ground_impact_parameters: Option<Py<GroundImpactParameters>>,
+    state_vector: Option<Py<StateVector>>,
+    covariance_matrix: Option<Py<OpmCovarianceMatrix>>,
+    spacecraft_parameters: Option<Py<RdmSpacecraftParameters>>,
+    od_parameters: Option<Py<OdParameters>>,
+    user_defined_parameters: Option<Py<crate::types::UserDefined>>,
+}
+
+impl RdmData {
+    fn from_core(py: Python<'_>, value: core_rdm::RdmData) -> PyResult<Self> {
+        Ok(Self {
+            comment: value.comment,
+            atmospheric_reentry_parameters: Py::new(
+                py,
+                AtmosphericReentryParameters {
+                    inner: value.atmospheric_reentry_parameters,
+                },
+            )?,
+            ground_impact_parameters: value
+                .ground_impact_parameters
+                .map(|inner| Py::new(py, GroundImpactParameters { inner }))
+                .transpose()?,
+            state_vector: value
+                .state_vector
+                .map(|inner| Py::new(py, StateVector { inner }))
+                .transpose()?,
+            covariance_matrix: value
+                .covariance_matrix
+                .map(|inner| Py::new(py, OpmCovarianceMatrix { inner }))
+                .transpose()?,
+            spacecraft_parameters: value
+                .spacecraft_parameters
+                .map(|inner| Py::new(py, RdmSpacecraftParameters { inner }))
+                .transpose()?,
+            od_parameters: value
+                .od_parameters
+                .map(|inner| Py::new(py, OdParameters { inner }))
+                .transpose()?,
+            user_defined_parameters: value
+                .user_defined_parameters
+                .map(|inner| Py::new(py, crate::types::UserDefined { inner }))
+                .transpose()?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> core_rdm::RdmData {
+        core_rdm::RdmData {
+            comment: self.comment.clone(),
+            atmospheric_reentry_parameters: self
+                .atmospheric_reentry_parameters
+                .borrow(py)
+                .inner
+                .clone(),
+            ground_impact_parameters: self
+                .ground_impact_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            state_vector: self
+                .state_vector
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            covariance_matrix: self
+                .covariance_matrix
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            spacecraft_parameters: self
+                .spacecraft_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            od_parameters: self
+                .od_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            user_defined_parameters: self
+                .user_defined_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+        }
+    }
 }
 
 #[pymethods]
@@ -1211,34 +1349,33 @@ impl RdmData {
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        atmospheric_reentry_parameters: AtmosphericReentryParameters,
-        ground_impact_parameters: Option<GroundImpactParameters>,
-        state_vector: Option<StateVector>,
-        covariance_matrix: Option<OpmCovarianceMatrix>,
-        spacecraft_parameters: Option<RdmSpacecraftParameters>,
-        od_parameters: Option<OdParameters>,
-        user_defined_parameters: Option<crate::types::UserDefined>,
+        atmospheric_reentry_parameters: Py<AtmosphericReentryParameters>,
+        ground_impact_parameters: Option<Py<GroundImpactParameters>>,
+        state_vector: Option<Py<StateVector>>,
+        covariance_matrix: Option<Py<OpmCovarianceMatrix>>,
+        spacecraft_parameters: Option<Py<RdmSpacecraftParameters>>,
+        od_parameters: Option<Py<OdParameters>>,
+        user_defined_parameters: Option<Py<crate::types::UserDefined>>,
         comment: Option<Vec<String>>,
-    ) -> PyResult<Self> {
-        Ok(Self {
-            inner: core_rdm::RdmData {
-                comment: comment.unwrap_or_default(),
-                atmospheric_reentry_parameters: atmospheric_reentry_parameters.inner,
-                ground_impact_parameters: ground_impact_parameters.map(|g| g.inner),
-                state_vector: state_vector.map(|sv| sv.inner),
-                covariance_matrix: covariance_matrix.map(|cm| cm.inner),
-                spacecraft_parameters: spacecraft_parameters.map(|sp| sp.inner),
-                od_parameters: od_parameters.map(|op| op.inner),
-                user_defined_parameters: user_defined_parameters.map(|u| u.inner),
-            },
-        })
+    ) -> Self {
+        Self {
+            comment: comment.unwrap_or_default(),
+            atmospheric_reentry_parameters,
+            ground_impact_parameters,
+            state_vector,
+            covariance_matrix,
+            spacecraft_parameters,
+            od_parameters,
+            user_defined_parameters,
+        }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "RdmData(orbit_lifetime={} days)",
-            self.inner
-                .atmospheric_reentry_parameters
+            self.atmospheric_reentry_parameters
+                .borrow(py)
+                .inner
                 .orbit_lifetime
                 .value
         )
@@ -1248,104 +1385,95 @@ impl RdmData {
     ///
     /// :type: AtmosphericReentryParameters
     #[getter]
-    fn get_atmospheric_reentry_parameters(&self) -> AtmosphericReentryParameters {
-        AtmosphericReentryParameters {
-            inner: self.inner.atmospheric_reentry_parameters.clone(),
-        }
+    fn get_atmospheric_reentry_parameters(
+        &self,
+        py: Python<'_>,
+    ) -> Py<AtmosphericReentryParameters> {
+        self.atmospheric_reentry_parameters.clone_ref(py)
     }
     #[setter]
-    fn set_atmospheric_reentry_parameters(&mut self, v: AtmosphericReentryParameters) {
-        self.inner.atmospheric_reentry_parameters = v.inner;
+    fn set_atmospheric_reentry_parameters(&mut self, value: Py<AtmosphericReentryParameters>) {
+        self.atmospheric_reentry_parameters = value;
     }
 
     /// Ground impact parameters.
     ///
     /// :type: Optional[GroundImpactParameters]
     #[getter]
-    fn get_ground_impact_parameters(&self) -> Option<GroundImpactParameters> {
-        self.inner
-            .ground_impact_parameters
+    fn get_ground_impact_parameters(&self, py: Python<'_>) -> Option<Py<GroundImpactParameters>> {
+        self.ground_impact_parameters
             .as_ref()
-            .map(|g| GroundImpactParameters { inner: g.clone() })
+            .map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_ground_impact_parameters(&mut self, v: Option<GroundImpactParameters>) {
-        self.inner.ground_impact_parameters = v.map(|g| g.inner);
+    fn set_ground_impact_parameters(&mut self, value: Option<Py<GroundImpactParameters>>) {
+        self.ground_impact_parameters = value;
     }
 
     /// State vector.
     ///
     /// :type: Optional[StateVector]
     #[getter]
-    fn get_state_vector(&self) -> Option<StateVector> {
-        self.inner
-            .state_vector
-            .as_ref()
-            .map(|sv| StateVector { inner: sv.clone() })
+    fn get_state_vector(&self, py: Python<'_>) -> Option<Py<StateVector>> {
+        self.state_vector.as_ref().map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_state_vector(&mut self, v: Option<StateVector>) {
-        self.inner.state_vector = v.map(|sv| sv.inner);
+    fn set_state_vector(&mut self, value: Option<Py<StateVector>>) {
+        self.state_vector = value;
     }
 
     /// Covariance matrix.
     ///
     /// :type: Optional[OpmCovarianceMatrix]
     #[getter]
-    fn get_covariance_matrix(&self) -> Option<OpmCovarianceMatrix> {
-        self.inner
-            .covariance_matrix
+    fn get_covariance_matrix(&self, py: Python<'_>) -> Option<Py<OpmCovarianceMatrix>> {
+        self.covariance_matrix
             .as_ref()
-            .map(|cm| OpmCovarianceMatrix { inner: cm.clone() })
+            .map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_covariance_matrix(&mut self, v: Option<OpmCovarianceMatrix>) {
-        self.inner.covariance_matrix = v.map(|cm| cm.inner);
+    fn set_covariance_matrix(&mut self, value: Option<Py<OpmCovarianceMatrix>>) {
+        self.covariance_matrix = value;
     }
 
     /// Spacecraft parameters.
     ///
     /// :type: Optional[RdmSpacecraftParameters]
     #[getter]
-    fn get_spacecraft_parameters(&self) -> Option<RdmSpacecraftParameters> {
-        self.inner
-            .spacecraft_parameters
+    fn get_spacecraft_parameters(&self, py: Python<'_>) -> Option<Py<RdmSpacecraftParameters>> {
+        self.spacecraft_parameters
             .as_ref()
-            .map(|sp| RdmSpacecraftParameters { inner: sp.clone() })
+            .map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_spacecraft_parameters(&mut self, v: Option<RdmSpacecraftParameters>) {
-        self.inner.spacecraft_parameters = v.map(|sp| sp.inner);
+    fn set_spacecraft_parameters(&mut self, value: Option<Py<RdmSpacecraftParameters>>) {
+        self.spacecraft_parameters = value;
     }
 
     /// Orbit determination parameters.
     ///
     /// :type: Optional[OdParameters]
     #[getter]
-    fn get_od_parameters(&self) -> Option<OdParameters> {
-        self.inner
-            .od_parameters
-            .as_ref()
-            .map(|op| OdParameters { inner: op.clone() })
+    fn get_od_parameters(&self, py: Python<'_>) -> Option<Py<OdParameters>> {
+        self.od_parameters.as_ref().map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_od_parameters(&mut self, v: Option<OdParameters>) {
-        self.inner.od_parameters = v.map(|op| op.inner);
+    fn set_od_parameters(&mut self, value: Option<Py<OdParameters>>) {
+        self.od_parameters = value;
     }
 
     /// User defined parameters.
     ///
     /// :type: UserDefined | None
     #[getter]
-    fn get_user_defined_parameters(&self) -> Option<crate::types::UserDefined> {
-        self.inner
-            .user_defined_parameters
+    fn get_user_defined_parameters(&self, py: Python<'_>) -> Option<Py<crate::types::UserDefined>> {
+        self.user_defined_parameters
             .as_ref()
-            .map(|ud| crate::types::UserDefined { inner: ud.clone() })
+            .map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_user_defined_parameters(&mut self, v: Option<crate::types::UserDefined>) {
-        self.inner.user_defined_parameters = v.map(|u| u.inner);
+    fn set_user_defined_parameters(&mut self, value: Option<Py<crate::types::UserDefined>>) {
+        self.user_defined_parameters = value;
     }
 
     /// Comments.
@@ -1353,11 +1481,11 @@ impl RdmData {
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
+        self.comment.clone()
     }
     #[setter]
     fn set_comment(&mut self, v: Vec<String>) {
-        self.inner.comment = v;
+        self.comment = v;
     }
 }
 

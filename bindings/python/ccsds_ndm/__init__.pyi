@@ -1,18 +1,12 @@
 # Generated content DO NOT EDIT
-from typing import Optional, TypeVar, Union
+from typing import Optional, Union
 import numpy
-
-T = TypeVar("T")
-
-def edit(message: T) -> T:
-    """Return a live copy-on-write view for nested model updates."""
-    ...
 
 def convert(
     data: str,
     to_format: str,
+    *,
     max_input_bytes: Optional[int] = None,
-    max_xml_depth: Optional[int] = None,
     max_records: Optional[int] = None,
     max_output_bytes: Optional[int] = None,
     version: Optional[str] = None,
@@ -26,8 +20,8 @@ def convert_file(
     source_path: str,
     destination_path: str,
     to_format: str,
+    *,
     max_input_bytes: Optional[int] = None,
-    max_xml_depth: Optional[int] = None,
     max_records: Optional[int] = None,
     max_output_bytes: Optional[int] = None,
     version: Optional[str] = None,
@@ -40,8 +34,8 @@ def convert_file(
 def from_file(
     path: str,
     format: Optional[str] = None,
+    *,
     max_input_bytes: Optional[int] = None,
-    max_xml_depth: Optional[int] = None,
     max_records: Optional[int] = None,
 ) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
     """
@@ -61,8 +55,8 @@ def from_file(
 def from_str(
     data: str,
     format: Optional[str] = None,
+    *,
     max_input_bytes: Optional[int] = None,
-    max_xml_depth: Optional[int] = None,
     max_records: Optional[int] = None,
 ) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
     """
@@ -113,8 +107,8 @@ class Acm:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Acm:
         """ """
@@ -124,8 +118,8 @@ class Acm:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Acm:
         """ """
@@ -1568,8 +1562,8 @@ class Aem:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Aem:
         """ """
@@ -1579,8 +1573,8 @@ class Aem:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Aem:
         """ """
@@ -2146,8 +2140,8 @@ class Apm:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
     ) -> Apm:
         """ """
         ...
@@ -2156,8 +2150,8 @@ class Apm:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
     ) -> Apm:
         """ """
         ...
@@ -2657,8 +2651,8 @@ class Cdm:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
     ) -> Cdm:
         """
         Parse a CDM from a file path with optional format.
@@ -2698,8 +2692,8 @@ class Cdm:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
     ) -> Cdm:
         """
         Parse a CDM from a string with optional format.
@@ -5517,8 +5511,8 @@ class Ndm:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Ndm:
         """
@@ -5530,8 +5524,8 @@ class Ndm:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Ndm:
         """
@@ -5642,8 +5636,8 @@ class Ocm:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Ocm:
         """
@@ -5667,8 +5661,8 @@ class Ocm:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Ocm:
         """
@@ -9570,8 +9564,8 @@ class Oem:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Oem:
         """
@@ -9596,8 +9590,8 @@ class Oem:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Oem:
         """
@@ -10514,8 +10508,8 @@ class Omm:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
     ) -> Omm:
         """
         Create an OMM message from a file.
@@ -10538,8 +10532,8 @@ class Omm:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
     ) -> Omm:
         """ """
         ...
@@ -10979,8 +10973,8 @@ class Opm:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
     ) -> Opm:
         """
         Create an OPM message from a file.
@@ -11003,8 +10997,8 @@ class Opm:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
     ) -> Opm:
         """
         Create an OPM message from a string.
@@ -11859,8 +11853,8 @@ class Rdm:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
     ) -> Rdm:
         """
         Create an RDM message from a file.
@@ -11884,8 +11878,8 @@ class Rdm:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
     ) -> Rdm:
         """
         Create an RDM message from a string.
@@ -13808,8 +13802,8 @@ class Tdm:
     def from_file(
         path: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Tdm:
         """
@@ -13834,8 +13828,8 @@ class Tdm:
     def from_str(
         data: str,
         format: Optional[str] = None,
+        *,
         max_input_bytes: Optional[int] = None,
-        max_xml_depth: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Tdm:
         """

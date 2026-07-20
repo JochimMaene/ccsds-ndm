@@ -162,7 +162,10 @@ pub mod validation;
 pub mod versioning;
 pub(crate) mod xml;
 
-pub use conversion::{convert, convert_file, convert_to_file};
+pub use conversion::{
+    convert, convert_file, convert_file_with_options, convert_to_file,
+    convert_to_file_with_options, convert_with_options,
+};
 pub use detect::Notation;
 use error::{CcsdsNdmError, Result};
 pub use generation::VersionedNdm;

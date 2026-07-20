@@ -13,6 +13,7 @@ use ccsds_ndm::types::{
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 
 use std::str::FromStr;
 
@@ -451,37 +452,82 @@ fn attitude_type_from_content(content: &ccsds_ndm::common::AemAttitudeState) -> 
 /// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
 /// the attitude state at times different from the tabular epochs.
 #[pyclass]
-#[derive(Clone)]
 pub struct Aem {
-    pub inner: core_aem::Aem,
+    id: Option<String>,
+    version: String,
+    header: Py<AdmHeader>,
+    segments: Py<PyList>,
+}
+
+impl Aem {
+    pub(crate) fn from_core(py: Python<'_>, value: core_aem::Aem) -> PyResult<Self> {
+        let segments = value
+            .body
+            .segment
+            .into_iter()
+            .map(|segment| Py::new(py, AemSegment::from_core(py, segment)?))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            id: value.id,
+            version: value.version,
+            header: Py::new(
+                py,
+                AdmHeader {
+                    inner: value.header,
+                },
+            )?,
+            segments: PyList::new(py, segments)?.unbind(),
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_aem::Aem> {
+        let segment = self
+            .segments
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, AemSegment>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("segments[{index}] must be AemSegment"))
+                    })?
+                    .to_core(py)
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(core_aem::Aem {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            header: self.header.borrow(py).inner.clone(),
+            body: core_aem::AemBody { segment },
+        })
+    }
 }
 
 #[pymethods]
 impl Aem {
     #[new]
-    fn new(header: AdmHeader, segments: Vec<AemSegment>) -> Self {
-        Self {
-            inner: core_aem::Aem {
-                header: header.inner,
-                body: core_aem::AemBody {
-                    segment: segments.into_iter().map(|s| s.inner).collect(),
-                },
-                id: Some("CCSDS_AEM_VERS".to_string()),
-                version: "2.0".to_string(),
-            },
-        }
+    fn new(py: Python<'_>, header: Py<AdmHeader>, segments: Vec<Py<AemSegment>>) -> PyResult<Self> {
+        Ok(Self {
+            header,
+            segments: PyList::new(py, segments)?.unbind(),
+            id: Some("CCSDS_AEM_VERS".to_string()),
+            version: "2.0".to_string(),
+        })
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
+        let segments = self.segments.bind(py);
+        let object_name = segments
+            .get_item(0)
+            .ok()
+            .and_then(|value| value.extract::<PyRef<'_, AemSegment>>().ok())
+            .map(|segment| segment.metadata.borrow(py).inner.object_name.clone())
+            .unwrap_or_default();
         format!(
             "Aem(object_name='{}', segments={})",
-            self.inner
-                .body
-                .segment
-                .first()
-                .map(|s| s.metadata.object_name.clone())
-                .unwrap_or_default(),
-            self.inner.body.segment.len()
+            object_name,
+            segments.len()
         )
     }
 
@@ -490,12 +536,12 @@ impl Aem {
     /// :type: Optional[str]
     #[getter]
     fn get_id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     #[setter]
     fn set_id(&mut self, value: Option<String>) {
-        self.inner.id = value;
+        self.id = value;
     }
 
     /// The message version.
@@ -503,13 +549,13 @@ impl Aem {
     /// :type: str
     #[getter]
     fn get_version(&self) -> String {
-        self.inner.version.clone()
+        self.version.clone()
     }
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Aem, &value)?;
-        self.inner.version = value;
+        self.version = value;
         Ok(())
     }
 
@@ -526,33 +572,27 @@ impl Aem {
     ///
     /// :type: AdmHeader
     #[getter]
-    fn get_header(&self) -> AdmHeader {
-        AdmHeader {
-            inner: self.inner.header.clone(),
-        }
+    fn get_header(&self, py: Python<'_>) -> Py<AdmHeader> {
+        self.header.clone_ref(py)
     }
 
     #[setter]
-    fn set_header(&mut self, header: AdmHeader) {
-        self.inner.header = header.inner;
+    fn set_header(&mut self, header: Py<AdmHeader>) {
+        self.header = header;
     }
 
     /// AEM Segments.
     ///
     /// :type: list[AemSegment]
     #[getter]
-    fn get_segments(&self) -> Vec<AemSegment> {
-        self.inner
-            .body
-            .segment
-            .iter()
-            .map(|s| AemSegment { inner: s.clone() })
-            .collect()
+    fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
+        self.segments.clone_ref(py)
     }
 
     #[setter]
-    fn set_segments(&mut self, segments: Vec<AemSegment>) {
-        self.inner.body.segment = segments.into_iter().map(|s| s.inner).collect();
+    fn set_segments(&mut self, py: Python<'_>, segments: Vec<Py<AemSegment>>) -> PyResult<()> {
+        self.segments = PyList::new(py, segments)?.unbind();
+        Ok(())
     }
 
     /// Validate the message against CCSDS rules.
@@ -563,127 +603,160 @@ impl Aem {
     ///     If True (default), raises ValueError on the first error found.
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        crate::api::validate_message(&self.inner, strict)
+    fn validate(&self, py: Python<'_>, strict: bool) -> PyResult<Option<Vec<String>>> {
+        crate::api::validate_message(&self.to_core(py)?, strict)
     }
 
     /// Serialize to KVN, preserving the source version by default.
     #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_kvn(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, "kvn", version, max_output_bytes)
+    fn to_kvn(
+        &self,
+        py: Python<'_>,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.to_core(py)?, "kvn", version, max_output_bytes)
     }
 
     /// Serialize to XML, preserving the source version by default.
     #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_xml(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
+    fn to_xml(
+        &self,
+        py: Python<'_>,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.to_core(py)?, "xml", version, max_output_bytes)
     }
 
     /// Serialize to validated KVN or XML.
     #[pyo3(signature = (format, version=None, max_output_bytes=None))]
     fn to_str(
         &self,
+        py: Python<'_>,
         format: &str,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
+        crate::api::generate_string_with_limit(
+            &self.to_core(py)?,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     /// Write validated KVN or XML directly to a file.
     #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
+        py: Python<'_>,
         path: &str,
         format: &str,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
+        crate::api::generate_file_with_limit(
+            &self.to_core(py)?,
+            path,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_str(
-        _py: Python<'_>,
+        py: Python<'_>,
         data: &str,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
-        max_xml_depth: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, max_records);
+        let options = crate::api::parse_options(max_input_bytes, max_records);
         let inner = crate::api::parse_typed_with_options(data, format, &options)?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
-        _py: Python<'_>,
+        py: Python<'_>,
         path: &str,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
-        max_xml_depth: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, max_records);
+        let options = crate::api::parse_options(max_input_bytes, max_records);
         let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 }
 
 #[pyclass]
-#[derive(Clone)]
 pub struct AemSegment {
-    pub inner: core_aem::AemSegment,
+    metadata: Py<AemMetadata>,
+    data: Py<AemData>,
+}
+
+impl AemSegment {
+    fn from_core(py: Python<'_>, value: core_aem::AemSegment) -> PyResult<Self> {
+        Ok(Self {
+            metadata: Py::new(
+                py,
+                AemMetadata {
+                    inner: value.metadata,
+                },
+            )?,
+            data: Py::new(py, AemData::from_core(py, value.data)?)?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_aem::AemSegment> {
+        Ok(core_aem::AemSegment {
+            metadata: self.metadata.borrow(py).inner.clone(),
+            data: self.data.borrow(py).to_core(py)?,
+        })
+    }
 }
 
 #[pymethods]
 impl AemSegment {
     #[new]
-    fn new(metadata: AemMetadata, data: AemData) -> Self {
-        Self {
-            inner: core_aem::AemSegment {
-                metadata: metadata.inner,
-                data: data.inner,
-            },
-        }
+    fn new(metadata: Py<AemMetadata>, data: Py<AemData>) -> Self {
+        Self { metadata, data }
     }
 
     /// AEM Metadata Section.
     ///
     /// :type: AemMetadata
     #[getter]
-    fn get_metadata(&self) -> AemMetadata {
-        AemMetadata {
-            inner: self.inner.metadata.clone(),
-        }
+    fn get_metadata(&self, py: Python<'_>) -> Py<AemMetadata> {
+        self.metadata.clone_ref(py)
     }
 
     #[setter]
-    fn set_metadata(&mut self, metadata: AemMetadata) {
-        self.inner.metadata = metadata.inner;
+    fn set_metadata(&mut self, metadata: Py<AemMetadata>) {
+        self.metadata = metadata;
     }
 
     /// AEM Data Section.
     ///
     /// :type: AemData
     #[getter]
-    fn get_data(&self) -> AemData {
-        AemData {
-            inner: self.inner.data.clone(),
-        }
+    fn get_data(&self, py: Python<'_>) -> Py<AemData> {
+        self.data.clone_ref(py)
     }
 
     #[setter]
-    fn set_data(&mut self, data: AemData) {
-        self.inner.data = data.inner;
+    fn set_data(&mut self, data: Py<AemData>) {
+        self.data = data;
     }
 
     /// Validate the segment against CCSDS rules.
-    fn validate(&self) -> PyResult<()> {
-        self.inner
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        self.to_core(py)?
             .validate()
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
@@ -1098,9 +1171,103 @@ impl AemMetadata {
 
 /// AEM Data Section.
 #[pyclass]
-#[derive(Clone)]
 pub struct AemData {
-    pub inner: core_aem::AemData,
+    comment: Vec<String>,
+    attitude_states: Py<PyList>,
+    attitude_type: Option<AttitudeTypeType>,
+}
+
+impl AemData {
+    fn from_core(py: Python<'_>, value: core_aem::AemData) -> PyResult<Self> {
+        let mut attitude_type = None;
+        let mut states = Vec::with_capacity(value.attitude_states.len());
+        for state in value.attitude_states {
+            let content = state
+                .content()
+                .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
+            let this_type = attitude_type_from_content(&content);
+            if attitude_type
+                .as_ref()
+                .is_some_and(|existing| existing != &this_type)
+            {
+                return Err(PyValueError::new_err(
+                    "AEM data contains mixed attitude state types",
+                ));
+            }
+            attitude_type = Some(this_type);
+            let (epoch, values) = values_from_content(content);
+            states.push(Py::new(py, AttitudeState { epoch, values })?);
+        }
+        Ok(Self {
+            comment: value.comment,
+            attitude_states: PyList::new(py, states)?.unbind(),
+            attitude_type,
+        })
+    }
+
+    fn state_values(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<Vec<(ccsds_ndm::types::CalendarEpoch, Vec<f64>)>> {
+        self.attitude_states
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, AttitudeState>>()
+                    .map(|state| (state.epoch, state.values.clone()))
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "attitude_states[{index}] must be AttitudeState"
+                        ))
+                    })
+            })
+            .collect()
+    }
+
+    fn resolved_type(
+        &self,
+        values: &[(ccsds_ndm::types::CalendarEpoch, Vec<f64>)],
+    ) -> PyResult<Option<AttitudeTypeType>> {
+        let Some((_, first)) = values.first() else {
+            return Ok(self.attitude_type.clone());
+        };
+        if values.iter().any(|(_, values)| values.len() != first.len()) {
+            return Err(PyValueError::new_err(
+                "All attitude states must have the same number of values",
+            ));
+        }
+        match self.attitude_type.as_ref() {
+            Some(attitude_type) => {
+                let expected = expected_values_len(attitude_type);
+                if first.len() != expected {
+                    return Err(PyValueError::new_err(format!(
+                        "ATTITUDE_TYPE {attitude_type} requires {expected} values per state, got {}",
+                        first.len()
+                    )));
+                }
+                Ok(Some(attitude_type.clone()))
+            }
+            None => parse_attitude_type_or_infer(None, first.len()).map(Some),
+        }
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_aem::AemData> {
+        let values = self.state_values(py)?;
+        let attitude_type = self.resolved_type(&values)?;
+        let attitude_states = match attitude_type {
+            Some(attitude_type) => values
+                .into_iter()
+                .map(|(epoch, values)| build_state_from_values(epoch, &values, &attitude_type))
+                .collect::<PyResult<Vec<_>>>()?,
+            None => Vec::new(),
+        };
+        Ok(core_aem::AemData {
+            comment: self.comment.clone(),
+            attitude_states,
+        })
+    }
 }
 
 #[pymethods]
@@ -1108,50 +1275,50 @@ impl AemData {
     #[new]
     #[pyo3(signature = (attitude_states, attitude_type=None, comment=None))]
     fn new(
-        attitude_states: Vec<AttitudeState>,
+        py: Python<'_>,
+        attitude_states: Vec<Py<AttitudeState>>,
         attitude_type: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let states = if attitude_states.is_empty() {
-            Vec::new()
+        let attitude_type = if attitude_states.is_empty() {
+            attitude_type
+                .as_deref()
+                .map(AttitudeTypeType::from_str)
+                .transpose()
+                .map_err(|error| PyValueError::new_err(error.to_string()))?
         } else {
-            let widths: std::collections::BTreeSet<usize> =
-                attitude_states.iter().map(|s| s.values.len()).collect();
+            let widths: std::collections::BTreeSet<usize> = attitude_states
+                .iter()
+                .map(|state| state.borrow(py).values.len())
+                .collect();
             if widths.len() != 1 {
                 return Err(PyValueError::new_err(
                     "All attitude states must have the same number of values",
                 ));
             }
             let width = *widths.iter().next().unwrap();
-            let resolved_type = parse_attitude_type_or_infer(attitude_type.as_deref(), width)?;
-            let mut mapped = Vec::with_capacity(attitude_states.len());
-            for state in attitude_states {
-                mapped.push(build_state_from_values(
-                    state.epoch,
-                    &state.values,
-                    &resolved_type,
-                )?);
-            }
-            mapped
+            Some(parse_attitude_type_or_infer(
+                attitude_type.as_deref(),
+                width,
+            )?)
         };
 
         Ok(Self {
-            inner: core_aem::AemData {
-                comment: comment.unwrap_or_default(),
-                attitude_states: states,
-            },
+            comment: comment.unwrap_or_default(),
+            attitude_states: PyList::new(py, attitude_states)?.unbind(),
+            attitude_type,
         })
     }
 
-    fn __repr__(&self) -> String {
-        format!("AemData(states={})", self.inner.attitude_states.len())
+    fn __repr__(&self, py: Python<'_>) -> String {
+        format!("AemData(states={})", self.attitude_states.bind(py).len())
     }
 
     /// Validate the data section against CCSDS rules.
-    fn validate(&self, attitude_type: String) -> PyResult<()> {
+    fn validate(&self, py: Python<'_>, attitude_type: String) -> PyResult<()> {
         let attitude_type = AttitudeTypeType::from_str(&attitude_type)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        self.inner
+        self.to_core(py)?
             .validate(&attitude_type)
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
@@ -1159,6 +1326,7 @@ impl AemData {
     #[staticmethod]
     #[pyo3(signature = (epochs, array, attitude_type=None, comment=None))]
     fn from_numpy(
+        py: Python<'_>,
         epochs: Vec<String>,
         array: PyReadonlyArray2<f64>,
         attitude_type: Option<String>,
@@ -1189,18 +1357,19 @@ impl AemData {
         for (i, epoch_str) in epochs.iter().enumerate() {
             let row = array_view.row(i);
             let row_values: Vec<f64> = row.iter().copied().collect();
-            attitude_states.push(build_state_from_values(
-                parse_calendar_epoch(epoch_str)?,
-                &row_values,
-                &resolved_type,
+            attitude_states.push(Py::new(
+                py,
+                AttitudeState {
+                    epoch: parse_calendar_epoch(epoch_str)?,
+                    values: row_values,
+                },
             )?);
         }
 
         Ok(Self {
-            inner: core_aem::AemData {
-                comment: comment.unwrap_or_default(),
-                attitude_states,
-            },
+            comment: comment.unwrap_or_default(),
+            attitude_states: PyList::new(py, attitude_states)?.unbind(),
+            attitude_type: Some(resolved_type),
         })
     }
 
@@ -1210,41 +1379,37 @@ impl AemData {
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
+        self.comment.clone()
     }
 
     #[setter]
     fn set_comment(&mut self, comment: Vec<String>) {
-        self.inner.comment = comment;
+        self.comment = comment;
     }
 
     /// Attitude ephemeris data lines.
     ///
     /// :type: list[AttitudeState]
     #[getter]
-    fn get_attitude_states(&self) -> PyResult<Vec<AttitudeState>> {
-        self.inner
-            .attitude_states
-            .iter()
-            .map(|s| {
-                let content = s
-                    .content()
-                    .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-                let (epoch, values) = values_from_content(content);
-                Ok(AttitudeState { epoch, values })
-            })
-            .collect()
+    fn get_attitude_states(&self, py: Python<'_>) -> Py<PyList> {
+        self.attitude_states.clone_ref(py)
     }
 
     #[setter]
-    fn set_attitude_states(&mut self, attitude_states: Vec<AttitudeState>) -> PyResult<()> {
+    fn set_attitude_states(
+        &mut self,
+        py: Python<'_>,
+        attitude_states: Vec<Py<AttitudeState>>,
+    ) -> PyResult<()> {
         if attitude_states.is_empty() {
-            self.inner.attitude_states.clear();
+            self.attitude_states = PyList::empty(py).unbind();
             return Ok(());
         }
 
-        let widths: std::collections::BTreeSet<usize> =
-            attitude_states.iter().map(|s| s.values.len()).collect();
+        let widths: std::collections::BTreeSet<usize> = attitude_states
+            .iter()
+            .map(|state| state.borrow(py).values.len())
+            .collect();
         if widths.len() != 1 {
             return Err(PyValueError::new_err(
                 "All attitude states must have the same number of values",
@@ -1252,33 +1417,21 @@ impl AemData {
         }
 
         let width = *widths.iter().next().unwrap();
-        let resolved_type = if let Some(existing) = self.inner.attitude_states.first() {
-            let content = existing
-                .content()
-                .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-            let existing_type = attitude_type_from_content(&content);
-            let (_, existing_values) = values_from_content(content);
-            let existing_width = existing_values.len();
+        let resolved_type = if let Some(existing_type) = self.attitude_type.as_ref() {
+            let existing_width = expected_values_len(existing_type);
             if existing_width != width {
                 return Err(PyValueError::new_err(format!(
                     "Expected {} values per state based on existing data, got {}",
                     existing_width, width
                 )));
             }
-            existing_type
+            existing_type.clone()
         } else {
             parse_attitude_type_or_infer(None, width)?
         };
 
-        let mut mapped = Vec::with_capacity(attitude_states.len());
-        for state in attitude_states {
-            mapped.push(build_state_from_values(
-                state.epoch,
-                &state.values,
-                &resolved_type,
-            )?);
-        }
-        self.inner.attitude_states = mapped;
+        self.attitude_type = Some(resolved_type);
+        self.attitude_states = PyList::new(py, attitude_states)?.unbind();
         Ok(())
     }
 
@@ -1286,89 +1439,38 @@ impl AemData {
     ///
     /// :type: list[str]
     #[getter]
-    fn get_attitude_states_epochs(&self) -> PyResult<Vec<String>> {
-        let mut epochs = Vec::with_capacity(self.inner.attitude_states.len());
-        for s in &self.inner.attitude_states {
-            let content = s
-                .content()
-                .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-            let epoch = match content {
-                ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) => v.epoch,
-                ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(v) => v.epoch,
-                ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(v) => v.epoch,
-                ccsds_ndm::common::AemAttitudeState::EulerAngle(v) => v.epoch,
-                ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(v) => v.epoch,
-                ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(v) => v.epoch,
-                ccsds_ndm::common::AemAttitudeState::Spin(v) => v.epoch,
-                ccsds_ndm::common::AemAttitudeState::SpinNutation(v) => v.epoch,
-                ccsds_ndm::common::AemAttitudeState::SpinNutationMom(v) => v.epoch,
-            };
-            epochs.push(epoch.as_str().to_string());
-        }
-        Ok(epochs)
+    fn get_attitude_states_epochs(&self, py: Python<'_>) -> PyResult<Vec<String>> {
+        Ok(self
+            .state_values(py)?
+            .into_iter()
+            .map(|(epoch, _)| epoch.as_str().to_string())
+            .collect())
     }
 
     #[setter]
-    fn set_attitude_states_epochs(&mut self, epochs: Vec<String>) -> PyResult<()> {
-        if self.inner.attitude_states.is_empty() {
+    fn set_attitude_states_epochs(&mut self, py: Python<'_>, epochs: Vec<String>) -> PyResult<()> {
+        let states = self.attitude_states.bind(py);
+        if states.is_empty() {
             return Err(PyValueError::new_err(
                 "Cannot set epochs when no attitude states exist; create states first",
             ));
         }
 
-        if epochs.len() != self.inner.attitude_states.len() {
+        if epochs.len() != states.len() {
             return Err(PyValueError::new_err(
                 "Number of epochs must match number of attitude states",
             ));
         }
 
-        let mut updated = Vec::with_capacity(epochs.len());
-        for (state, epoch_str) in self.inner.attitude_states.iter().zip(epochs.iter()) {
-            let content = state
-                .content()
-                .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-            let epoch = parse_calendar_epoch(epoch_str)?;
-            let updated_state = match content {
-                ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(mut v) => {
-                    v.epoch = epoch;
-                    ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v)
-                }
-                ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(mut v) => {
-                    v.epoch = epoch;
-                    ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(v)
-                }
-                ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(mut v) => {
-                    v.epoch = epoch;
-                    ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(v)
-                }
-                ccsds_ndm::common::AemAttitudeState::EulerAngle(mut v) => {
-                    v.epoch = epoch;
-                    ccsds_ndm::common::AemAttitudeState::EulerAngle(v)
-                }
-                ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(mut v) => {
-                    v.epoch = epoch;
-                    ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(v)
-                }
-                ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(mut v) => {
-                    v.epoch = epoch;
-                    ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(v)
-                }
-                ccsds_ndm::common::AemAttitudeState::Spin(mut v) => {
-                    v.epoch = epoch;
-                    ccsds_ndm::common::AemAttitudeState::Spin(v)
-                }
-                ccsds_ndm::common::AemAttitudeState::SpinNutation(mut v) => {
-                    v.epoch = epoch;
-                    ccsds_ndm::common::AemAttitudeState::SpinNutation(v)
-                }
-                ccsds_ndm::common::AemAttitudeState::SpinNutationMom(mut v) => {
-                    v.epoch = epoch;
-                    ccsds_ndm::common::AemAttitudeState::SpinNutationMom(v)
-                }
-            };
-            updated.push(updated_state.into());
+        for (index, epoch) in epochs.into_iter().enumerate() {
+            let value = states.get_item(index)?;
+            let mut state = value
+                .extract::<PyRefMut<'_, AttitudeState>>()
+                .map_err(|_| {
+                    PyValueError::new_err(format!("attitude_states[{index}] must be AttitudeState"))
+                })?;
+            state.epoch = parse_calendar_epoch(&epoch)?;
         }
-        self.inner.attitude_states = updated;
         Ok(())
     }
 
@@ -1381,34 +1483,24 @@ impl AemData {
     /// :type: numpy.ndarray
     #[getter]
     fn get_attitude_states_numpy<'py>(&self, py: Python<'py>) -> PyResult<Py<PyAny>> {
-        if self.inner.attitude_states.is_empty() {
+        let states = self.state_values(py)?;
+        if states.is_empty() {
             let array = PyArray::from_vec(py, Vec::<f64>::new())
                 .reshape([0, 0])
                 .unwrap();
             return Ok(array.into());
         }
 
-        let first_content = self.inner.attitude_states[0]
-            .content()
-            .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-        let first_type = attitude_type_from_content(&first_content);
-        let (_, first_values) = values_from_content(first_content);
+        let resolved_type = self.resolved_type(&states)?.ok_or_else(|| {
+            PyValueError::new_err("Attitude type is unavailable for non-empty data")
+        })?;
+        let first_values = states[0].1.clone();
         let expected_cols = first_values.len();
 
-        let mut data = Vec::with_capacity(self.inner.attitude_states.len() * expected_cols);
+        let mut data = Vec::with_capacity(states.len() * expected_cols);
         data.extend(first_values);
 
-        for s in self.inner.attitude_states.iter().skip(1) {
-            let content = s
-                .content()
-                .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-            let this_type = attitude_type_from_content(&content);
-            if this_type != first_type {
-                return Err(PyValueError::new_err(
-                    "NumPy access requires all attitude states to be of the same ATTITUDE_TYPE",
-                ));
-            }
-            let (_, values) = values_from_content(content);
+        for (_, values) in states.into_iter().skip(1) {
             if values.len() != expected_cols {
                 return Err(PyValueError::new_err(
                     "NumPy access requires all attitude states to have the same data width",
@@ -1416,36 +1508,41 @@ impl AemData {
             }
             data.extend(values);
         }
+        debug_assert_eq!(expected_values_len(&resolved_type), expected_cols);
 
         let array = PyArray::from_vec(py, data)
-            .reshape([self.inner.attitude_states.len(), expected_cols])
+            .reshape([self.attitude_states.bind(py).len(), expected_cols])
             .unwrap();
         Ok(array.into())
     }
 
     #[setter]
-    fn set_attitude_states_numpy(&mut self, array: PyReadonlyArray2<f64>) -> PyResult<()> {
+    fn set_attitude_states_numpy(
+        &mut self,
+        py: Python<'_>,
+        array: PyReadonlyArray2<f64>,
+    ) -> PyResult<()> {
         let shape = array.shape();
         if shape.len() != 2 {
             return Err(PyValueError::new_err("NumPy array must be 2-dimensional"));
         }
-        if self.inner.attitude_states.is_empty() {
+        let states = self.attitude_states.bind(py);
+        if states.is_empty() {
             return Err(PyValueError::new_err(
                 "Attitude epochs are missing; set attitude_states_epochs or use from_numpy",
             ));
         }
-        if self.inner.attitude_states.len() != shape[0] {
+        if states.len() != shape[0] {
             return Err(PyValueError::new_err(
                 "Number of rows must match number of attitude states",
             ));
         }
 
-        let first_existing = self.inner.attitude_states[0]
-            .content()
-            .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-        let resolved_type = attitude_type_from_content(&first_existing);
-        let (_, first_values) = values_from_content(first_existing);
-        let expected_cols = first_values.len();
+        let current = self.state_values(py)?;
+        let resolved_type = self.resolved_type(&current)?.ok_or_else(|| {
+            PyValueError::new_err("Attitude type is unavailable for non-empty data")
+        })?;
+        let expected_cols = expected_values_len(&resolved_type);
         if shape[1] != expected_cols {
             return Err(PyValueError::new_err(format!(
                 "NumPy array must have {} columns for this attitude state type",
@@ -1453,30 +1550,17 @@ impl AemData {
             )));
         }
         let array_view = array.as_array();
-        let mut attitude_states = Vec::with_capacity(shape[0]);
-
-        for (i, existing) in self.inner.attitude_states.iter().enumerate() {
-            let content = existing
-                .content()
-                .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-            let this_type = attitude_type_from_content(&content);
-            if this_type != resolved_type {
-                return Err(PyValueError::new_err(
-                    "NumPy assignment requires all existing attitude states to have the same ATTITUDE_TYPE",
-                ));
-            }
-            let (epoch, values) = values_from_content(content);
-            if values.len() != expected_cols {
-                return Err(PyValueError::new_err(
-                    "NumPy access requires all attitude states to have the same data width",
-                ));
-            }
-
+        for i in 0..shape[0] {
             let row = array_view.row(i);
             let row_values: Vec<f64> = row.iter().copied().collect();
-            attitude_states.push(build_state_from_values(epoch, &row_values, &resolved_type)?);
+            let value = states.get_item(i)?;
+            let mut state = value
+                .extract::<PyRefMut<'_, AttitudeState>>()
+                .map_err(|_| {
+                    PyValueError::new_err(format!("attitude_states[{i}] must be AttitudeState"))
+                })?;
+            state.values = row_values;
         }
-        self.inner.attitude_states = attitude_states;
         Ok(())
     }
 }

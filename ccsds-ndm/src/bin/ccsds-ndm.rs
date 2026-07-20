@@ -1,7 +1,8 @@
 use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation};
 use ccsds_ndm::{
-    convert as convert_message, convert_to_file as convert_message_to_file, from_str_with_options,
-    GenerateOptions, Notation, ParseOptions,
+    convert_to_file_with_options as convert_message_to_file,
+    convert_with_options as convert_message, from_str_with_options, GenerateOptions, Notation,
+    ParseOptions,
 };
 use serde_json::json;
 use std::io::{Read, Write};

@@ -1,6 +1,8 @@
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{convert, convert_file, GenerateOptions, Notation, ParseOptions};
+use ccsds_ndm::{
+    convert, convert_file, convert_file_with_options, GenerateOptions, Notation, ParseOptions,
+};
 
 const KVN_FIXTURES: [&str; 4] = [
     include_str!("../../data/kvn/opm_g1.kvn"),
@@ -14,13 +16,7 @@ const XML_FIXTURE: &str = include_str!("../../data/xml/opm_g5.xml");
 fn both_conversion_directions_preserve_the_complete_typed_model() {
     for source in KVN_FIXTURES {
         let expected = Opm::from_kvn(source).expect("KVN fixture should parse");
-        let xml = convert(
-            source,
-            Notation::Xml,
-            &ParseOptions::default(),
-            &GenerateOptions::source(),
-        )
-        .expect("KVN to XML conversion should work");
+        let xml = convert(source, Notation::Xml).expect("KVN to XML conversion should work");
         assert_eq!(
             Opm::from_xml(&xml).expect("output XML should parse"),
             expected
@@ -28,13 +24,7 @@ fn both_conversion_directions_preserve_the_complete_typed_model() {
     }
 
     let expected = Opm::from_xml(XML_FIXTURE).expect("XML fixture should parse");
-    let kvn = convert(
-        XML_FIXTURE,
-        Notation::Kvn,
-        &ParseOptions::default(),
-        &GenerateOptions::source(),
-    )
-    .expect("XML to KVN conversion should work");
+    let kvn = convert(XML_FIXTURE, Notation::Kvn).expect("XML to KVN conversion should work");
     assert_eq!(
         Opm::from_kvn(&kvn).expect("output KVN should parse"),
         expected
@@ -47,13 +37,8 @@ fn xml_to_kvn_rounds_values_to_the_ccsds_digit_limit() {
     message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
     let xml = message.to_xml().expect("XML can represent the f64 exactly");
 
-    let kvn = convert(
-        &xml,
-        Notation::Kvn,
-        &ParseOptions::default(),
-        &GenerateOptions::source(),
-    )
-    .expect("finite XML value should round to a conforming KVN value");
+    let kvn = convert(&xml, Notation::Kvn)
+        .expect("finite XML value should round to a conforming KVN value");
     assert!(kvn.contains("X                    = 1.234567890123457e0"));
 }
 
@@ -65,27 +50,13 @@ fn file_conversion_replaces_the_destination_only_after_success() {
     std::fs::write(&source, KVN_FIXTURES[0]).expect("source should be written");
     std::fs::write(&destination, b"sentinel").expect("sentinel should be written");
 
-    convert_file(
-        &source,
-        &destination,
-        Notation::Xml,
-        &ParseOptions::default(),
-        &GenerateOptions::source(),
-    )
-    .expect("valid conversion should succeed");
+    convert_file(&source, &destination, Notation::Xml).expect("valid conversion should succeed");
     let converted = std::fs::read_to_string(&destination).expect("output should be readable");
     Opm::from_xml(&converted).expect("converted output should parse");
 
     std::fs::write(&source, "not an OPM").expect("invalid source should be written");
     std::fs::write(&destination, b"sentinel").expect("sentinel should be restored");
-    assert!(convert_file(
-        &source,
-        &destination,
-        Notation::Xml,
-        &ParseOptions::default(),
-        &GenerateOptions::source(),
-    )
-    .is_err());
+    assert!(convert_file(&source, &destination, Notation::Xml).is_err());
     assert_eq!(
         std::fs::read(&destination).expect("sentinel should remain readable"),
         b"sentinel"
@@ -110,7 +81,7 @@ fn file_conversion_enforces_input_limit_before_materializing_the_document() {
     std::fs::write(&destination, b"sentinel").expect("sentinel should be written");
 
     let options = ParseOptions::default().with_max_input_bytes(16);
-    let error = convert_file(
+    let error = convert_file_with_options(
         &source,
         &destination,
         Notation::Xml,

@@ -9,6 +9,7 @@ default:
 rust_dir := "ccsds-ndm"
 rust_manifest := rust_dir + "/Cargo.toml"
 python_dir := "bindings/python"
+python_manifest := python_dir + "/Cargo.toml"
 
 # --- Setup ------------------------------------------------------------------
 
@@ -77,16 +78,19 @@ audit-strict:
 [private]
 fmt-rust:
     cargo fmt --manifest-path {{rust_manifest}}
+    cargo fmt --manifest-path {{python_manifest}}
 
 # Check the formatting of the Rust code
 [private]
 fmt-rust-check:
     cargo fmt --manifest-path {{rust_manifest}} -- --check
+    cargo fmt --manifest-path {{python_manifest}} -- --check
 
 # Lint the Rust code
 [private]
 lint-rust:
     cargo clippy --manifest-path {{rust_manifest}} -- -D warnings
+    cargo clippy --manifest-path {{python_manifest}} -- -D warnings
 
 # Format the Python code
 [private]
@@ -278,6 +282,10 @@ check-ci: check
 # Run Rust benchmarks
 bench:
     cargo bench --manifest-path {{rust_manifest}}
+
+# Build the wheel and run the optional isolated comparison with ccsds-ndm 3.1.1
+bench-competitor: build
+    uv run python scripts/benchmark-python-competitor.py
 
 # Benchmark materialized and streaming OPM XML generation
 [private]

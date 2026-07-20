@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MPL-2.0
 
+import inspect
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,6 @@ import ccsds_ndm
 REPOSITORY_ROOT = Path(__file__).parents[3]
 OPM_KVN = (REPOSITORY_ROOT / "data/kvn/opm_g1.kvn").read_text()
 OEM_KVN = (REPOSITORY_ROOT / "data/kvn/oem_g11.kvn").read_text()
-OEM_XML = (REPOSITORY_ROOT / "data/xml/oem_g14.xml").read_text()
 COMBINED_XML = (REPOSITORY_ROOT / "data/xml/ndm_g12.xml").read_text()
 PERMISSIVE_XML = (REPOSITORY_ROOT / "data/xml/ndm_g22.xml").read_text()
 STANDALONE_KVN_CASES = [
@@ -148,6 +148,20 @@ def test_python_opm_file_parsing_applies_limits_in_the_rust_core(tmp_path):
         ccsds_ndm.Opm.from_file(str(source), format="kvn", max_input_bytes=16)
     assert limited.value.code == "resource.input_limit_exceeded"
 
+    with pytest.raises(ccsds_ndm.NdmError) as auto_limited:
+        ccsds_ndm.Opm.from_file(str(source), max_input_bytes=16)
+    assert auto_limited.value.code == "resource.input_limit_exceeded"
+    assert auto_limited.value.operation == "parse"
+    assert auto_limited.value.notation is None
+    assert auto_limited.value.message_kind == "opm"
+
+    with pytest.raises(ccsds_ndm.NdmError) as generic_limited:
+        ccsds_ndm.from_file(str(source), max_input_bytes=16)
+    assert generic_limited.value.code == "resource.input_limit_exceeded"
+    assert generic_limited.value.operation == "parse"
+    assert generic_limited.value.notation is None
+    assert generic_limited.value.message_kind is None
+
     with pytest.raises(ccsds_ndm.NdmIoError):
         ccsds_ndm.Opm.from_file(str(tmp_path / "missing.kvn"), format="kvn")
 
@@ -165,10 +179,6 @@ def test_python_oem_uses_the_shared_parse_and_generation_limits(tmp_path):
         ccsds_ndm.Oem.from_str(OEM_KVN, format="kvn", max_records=0)
     assert record_limit.value.code == "resource.record_limit_exceeded"
 
-    with pytest.raises(ccsds_ndm.NdmError) as depth_limit:
-        ccsds_ndm.Oem.from_str(OEM_XML, format="xml", max_xml_depth=1)
-    assert depth_limit.value.code == "resource.xml_depth_limit_exceeded"
-
     message = ccsds_ndm.Oem.from_str(OEM_KVN, format="kvn")
     with pytest.raises(ccsds_ndm.NdmError) as output_limit:
         message.to_xml(max_output_bytes=1)
@@ -184,6 +194,21 @@ def test_python_oem_uses_the_shared_parse_and_generation_limits(tmp_path):
             max_input_bytes=16,
         )
     assert file_limit.value.code == "resource.input_limit_exceeded"
+
+
+def test_parse_resource_limits_are_advanced_keyword_only_options():
+    generic = inspect.signature(ccsds_ndm.from_str)
+    assert generic.parameters["max_input_bytes"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert generic.parameters["max_records"].kind is inspect.Parameter.KEYWORD_ONLY
+
+    oem = inspect.signature(ccsds_ndm.Oem.from_str)
+    assert oem.parameters["max_input_bytes"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert oem.parameters["max_records"].kind is inspect.Parameter.KEYWORD_ONLY
+
+    with pytest.raises(TypeError):
+        ccsds_ndm.Oem.from_str(OEM_KVN, "kvn", 100, 100)
+    with pytest.raises(TypeError, match="max_xml_depth"):
+        ccsds_ndm.from_str(COMBINED_XML, format="xml", max_xml_depth=1)
 
 
 @pytest.mark.parametrize("wrapper,kind,fixture,has_records", STANDALONE_KVN_CASES)
@@ -225,6 +250,10 @@ def test_generic_python_conversion_dispatches_non_opm_messages(tmp_path):
 
 
 def test_combined_python_message_keeps_identity_and_shared_limits():
+    empty = ccsds_ndm.from_str("<ndm/>", format="xml")
+    assert isinstance(empty, ccsds_ndm.Ndm)
+    assert empty.messages == []
+
     message = ccsds_ndm.from_str(COMBINED_XML, format="xml")
     assert isinstance(message, ccsds_ndm.Ndm)
 
@@ -232,11 +261,6 @@ def test_combined_python_message_keeps_identity_and_shared_limits():
         ccsds_ndm.Ndm.from_str(COMBINED_XML, format="xml", max_input_bytes=1)
     assert input_limit.value.code == "resource.input_limit_exceeded"
     assert input_limit.value.message_kind == "ndm"
-
-    with pytest.raises(ccsds_ndm.NdmError) as depth_limit:
-        ccsds_ndm.Ndm.from_str(COMBINED_XML, format="xml", max_xml_depth=1)
-    assert depth_limit.value.code == "resource.xml_depth_limit_exceeded"
-    assert depth_limit.value.message_kind == "ndm"
 
     with pytest.raises(ccsds_ndm.NdmError) as record_limit:
         ccsds_ndm.Ndm.from_str(COMBINED_XML, format="xml", max_records=0)

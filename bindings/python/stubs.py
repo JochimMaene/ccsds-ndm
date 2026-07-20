@@ -25,14 +25,8 @@ from typing import Any
 INDENT = "    "
 GENERATED_HEADER = """\
 # Generated content DO NOT EDIT
-from typing import Optional, TypeVar, Union
+from typing import Optional, Union
 import numpy
-
-T = TypeVar("T")
-
-def edit(message: T) -> T:
-    \"\"\"Return a live copy-on-write view for nested model updates.\"\"\"
-    ...
 
 """
 
@@ -41,7 +35,6 @@ PUBLIC_API_PARAMETER_TYPES = {
         "data": "str",
         "to_format": "str",
         "max_input_bytes": "Optional[int]",
-        "max_xml_depth": "Optional[int]",
         "max_records": "Optional[int]",
         "max_output_bytes": "Optional[int]",
         "version": "Optional[str]",
@@ -51,7 +44,6 @@ PUBLIC_API_PARAMETER_TYPES = {
         "destination_path": "str",
         "to_format": "str",
         "max_input_bytes": "Optional[int]",
-        "max_xml_depth": "Optional[int]",
         "max_records": "Optional[int]",
         "max_output_bytes": "Optional[int]",
         "version": "Optional[str]",
@@ -59,7 +51,6 @@ PUBLIC_API_PARAMETER_TYPES = {
     "from_file": {
         "format": "str",
         "max_input_bytes": "Optional[int]",
-        "max_xml_depth": "Optional[int]",
         "max_records": "Optional[int]",
         "path": "str",
         "strict": "bool",
@@ -68,7 +59,6 @@ PUBLIC_API_PARAMETER_TYPES = {
         "data": "str",
         "format": "str",
         "max_input_bytes": "Optional[int]",
-        "max_xml_depth": "Optional[int]",
         "max_records": "Optional[int]",
         "strict": "bool",
     },

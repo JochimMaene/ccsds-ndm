@@ -25,21 +25,21 @@ improve before 1.0; codes, enum meanings, and canonical paths are the machine in
 ## Python
 
 Install distribution `ccsds-ndm-py` and import `ccsds_ndm`. `Opm.from_str` / `from_file` accept
-`max_input_bytes` and `max_xml_depth`; `to_kvn`, `to_xml`, `to_str`, and `to_file` accept
-`max_output_bytes`. Python calls the Rust core for every parse, validation, and generation decision.
+the keyword-only `max_input_bytes` safety control; record-bearing messages additionally accept
+`max_records`. `to_kvn`, `to_xml`, `to_str`, and `to_file` accept `max_output_bytes`. Python calls
+the Rust core for every parse, validation, and generation decision.
 Raised NDM exceptions expose `code`, `severity`, `operation`, `notation`, `message_kind`, editions,
 field path, and available source location/token fields.
 
 Use `ccsds_ndm.convert(data, "xml")` for strings and
 `ccsds_ndm.convert_file(source, destination, "kvn")` for atomic file conversion. Input notation is
-detected automatically. Both accept the same optional input, XML-depth, and output limits and
-delegate directly to Rust.
+detected automatically. Both accept the same optional input, record, and output limits and delegate
+directly to Rust.
 
-Nested PyO3 properties are owned snapshots. Use `ccsds_ndm.edit(message)` when changing a nested
-field so the update is copied back through every parent:
+Nested model properties are live and can be changed directly:
 
 ```python
-ccsds_ndm.edit(message).segment.metadata.object_name = "UPDATED"
+message.segment.metadata.object_name = "UPDATED"
 ```
 
 Generation is always validated; there is no unchecked `validate=False` mode.
@@ -75,7 +75,7 @@ rejects attempts to relabel or convert them.
 
 - Replace `convert_opm` and `convert_opm_file` with the generic `convert` and `convert_file`.
 - Remove the `validate` argument from `to_str` and `to_file`; output is always validated.
-- Use `edit(message)` for nested Python changes.
+- Change nested Python fields directly; the former editor/proxy API has been removed.
 
 ## Performance and limits
 

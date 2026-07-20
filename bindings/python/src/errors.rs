@@ -9,17 +9,14 @@
 //! error types for more granular error handling.
 
 use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation, FormatError};
+use ccsds_ndm::validation::MessageKind;
+use ccsds_ndm::Notation;
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyOSError, PyValueError};
 use pyo3::prelude::*;
 
 // Generic library error for failures without a more useful built-in category.
-create_exception!(
-    ccsds_ndm,
-    NdmError,
-    PyException,
-    "Generic CCSDS NDM error."
-);
+create_exception!(ccsds_ndm, NdmError, PyException, "Generic CCSDS NDM error.");
 
 // Format/parsing errors.
 create_exception!(
@@ -244,8 +241,64 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
         CcsdsNdmError::UnexpectedEof { context } => {
             NdmFormatError::new_err(format!("Unexpected end of input: {}", context))
         }
+        error @ CcsdsNdmError::ResourceLimitExceeded { .. } => {
+            let code = error.code();
+            let operation = match &error {
+                CcsdsNdmError::ResourceLimitExceeded {
+                    resource: "generated_document",
+                    ..
+                } => "generate",
+                _ => "parse",
+            };
+            enrich_exception(
+                NdmError::new_err(error.to_string()),
+                operation,
+                None,
+                None,
+                None,
+                None,
+                code,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+        }
         _ => NdmError::new_err(e.to_string()),
     }
+}
+
+/// Add the context known by a file entry point when its bounded read fails before detection.
+pub fn file_parse_error_to_pyerr(
+    error: CcsdsNdmError,
+    notation: Option<Notation>,
+    message_kind: Option<MessageKind>,
+) -> PyErr {
+    if !matches!(&error, CcsdsNdmError::ResourceLimitExceeded { .. }) {
+        return ccsds_error_to_pyerr(error);
+    }
+
+    let code = error.code();
+    enrich_exception(
+        NdmError::new_err(error.to_string()),
+        "parse",
+        notation.map(|notation| match notation {
+            Notation::Kvn => DiagnosticNotation::Kvn,
+            Notation::Xml => DiagnosticNotation::Xml,
+        }),
+        message_kind.map(MessageKind::as_str),
+        None,
+        None,
+        code,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]

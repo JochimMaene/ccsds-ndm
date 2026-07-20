@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::errors::ccsds_error_to_pyerr;
-use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation, ParseErrorContext};
+use crate::errors::{ccsds_error_to_pyerr, file_parse_error_to_pyerr};
 use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::options::{GenerateOptions, ParseOptions};
 use ccsds_ndm::traits::{Ndm, Validate};
@@ -60,20 +59,12 @@ fn expect_typed<T: FromMessageType>(message: MessageType) -> PyResult<T> {
         .ok_or_else(|| PyValueError::new_err("input contains a different CCSDS NDM message type"))
 }
 
-pub fn parse_options(
-    max_input_bytes: Option<usize>,
-    max_xml_depth: Option<usize>,
-    max_records: Option<usize>,
-) -> ParseOptions {
-    let mut options = ParseOptions {
+pub fn parse_options(max_input_bytes: Option<usize>, max_records: Option<usize>) -> ParseOptions {
+    ParseOptions {
         max_input_bytes,
         max_records,
         ..ParseOptions::default()
-    };
-    if let Some(depth) = max_xml_depth {
-        options.max_xml_depth = depth;
     }
-    options
 }
 
 pub fn parse_typed<T: FromMessageType>(
@@ -100,30 +91,8 @@ pub fn parse_typed_file_with_options<T: FromMessageType>(
     options: &ParseOptions,
 ) -> PyResult<T> {
     let notation = selected_notation(format)?;
-    let message = ccsds_ndm::from_file_with_options(path, notation, options).map_err(|error| {
-        let error = match (error, notation) {
-            (error @ CcsdsNdmError::ResourceLimitExceeded { .. }, Some(notation)) => {
-                CcsdsNdmError::Parsing {
-                    context: Box::new(ParseErrorContext {
-                        message_kind: T::KIND,
-                        notation: match notation {
-                            Notation::Kvn => DiagnosticNotation::Kvn,
-                            Notation::Xml => DiagnosticNotation::Xml,
-                        },
-                        source_edition: None,
-                        byte_offset: None,
-                        line: None,
-                        column: None,
-                        original_token: None,
-                        expected: None,
-                    }),
-                    source: Box::new(error),
-                }
-            }
-            (error, _) => error,
-        };
-        ccsds_error_to_pyerr(error)
-    })?;
+    let message = ccsds_ndm::from_file_with_options(path, notation, options)
+        .map_err(|error| file_parse_error_to_pyerr(error, notation, Some(T::KIND)))?;
     expect_typed(message)
 }
 

@@ -28,56 +28,56 @@ use common::{
     AdmHeader, ControlledType, ObjectDescription, OdmHeader, ReferenceFrame, StateVector,
     StateVectorAcc, TimeSystem, YesNo,
 };
-use errors::ccsds_error_to_pyerr;
+use errors::{ccsds_error_to_pyerr, file_parse_error_to_pyerr};
 use ndm::Ndm;
 use oem::*;
 use omm::*;
 use opm::*;
 
-fn message_to_py(py: Python<'_>, message: MessageType) -> PyResult<Py<PyAny>> {
+pub(crate) fn message_to_py(py: Python<'_>, message: MessageType) -> PyResult<Py<PyAny>> {
     match message {
         MessageType::Oem(oem) => {
-            let py_obj = Py::new(py, Oem { inner: oem })?;
+            let py_obj = Py::new(py, Oem::from_core(py, oem)?)?;
             Ok(py_obj.into_any())
         }
         MessageType::Cdm(cdm) => {
-            let py_obj = Py::new(py, Cdm { inner: cdm })?;
+            let py_obj = Py::new(py, Cdm::from_core(py, cdm)?)?;
             Ok(py_obj.into_any())
         }
         MessageType::Opm(opm) => {
-            let py_obj = Py::new(py, Opm { inner: opm })?;
+            let py_obj = Py::new(py, Opm::from_core(py, opm)?)?;
             Ok(py_obj.into_any())
         }
         MessageType::Omm(omm) => {
-            let py_obj = Py::new(py, Omm { inner: omm })?;
+            let py_obj = Py::new(py, Omm::from_core(py, omm)?)?;
             Ok(py_obj.into_any())
         }
         MessageType::Ocm(ocm) => {
-            let py_obj = Py::new(py, ocm::Ocm { inner: ocm })?;
+            let py_obj = Py::new(py, ocm::Ocm::from_core(py, ocm)?)?;
             Ok(py_obj.into_any())
         }
         MessageType::Rdm(rdm) => {
-            let py_obj = Py::new(py, rdm::Rdm { inner: rdm })?;
+            let py_obj = Py::new(py, rdm::Rdm::from_core(py, rdm)?)?;
             Ok(py_obj.into_any())
         }
         MessageType::Tdm(tdm) => {
-            let py_obj = Py::new(py, tdm::Tdm { inner: tdm })?;
+            let py_obj = Py::new(py, tdm::Tdm::from_core(py, tdm)?)?;
             Ok(py_obj.into_any())
         }
         MessageType::Ndm(ndm) => {
-            let py_obj = Py::new(py, Ndm { inner: ndm })?;
+            let py_obj = Py::new(py, Ndm::from_core(py, ndm)?)?;
             Ok(py_obj.into_any())
         }
         MessageType::Aem(aem) => {
-            let py_obj = Py::new(py, aem::Aem { inner: aem })?;
+            let py_obj = Py::new(py, aem::Aem::from_core(py, aem)?)?;
             Ok(py_obj.into_any())
         }
         MessageType::Apm(apm) => {
-            let py_obj = Py::new(py, apm::Apm { inner: apm })?;
+            let py_obj = Py::new(py, apm::Apm::from_core(py, apm)?)?;
             Ok(py_obj.into_any())
         }
         MessageType::Acm(acm) => {
-            let py_obj = Py::new(py, acm::Acm { inner: acm })?;
+            let py_obj = Py::new(py, acm::Acm::from_core(py, acm)?)?;
             Ok(py_obj.into_any())
         }
     }
@@ -102,16 +102,15 @@ fn message_to_py(py: Python<'_>, message: MessageType) -> PyResult<Py<PyAny>> {
 /// ValueError
 ///     If the input is invalid or unsupported.
 #[pyfunction]
-#[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+#[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
 fn from_str(
     py: Python,
     data: &str,
     format: Option<&str>,
     max_input_bytes: Option<usize>,
-    max_xml_depth: Option<usize>,
     max_records: Option<usize>,
 ) -> PyResult<Py<PyAny>> {
-    let options = api::parse_options(max_input_bytes, max_xml_depth, max_records);
+    let options = api::parse_options(max_input_bytes, max_records);
     let message =
         ccsds_ndm::from_str_with_options(data, format.map(notation).transpose()?, &options)
             .map_err(ccsds_error_to_pyerr)?;
@@ -129,19 +128,18 @@ fn from_str(
 /// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
 ///     The parsed NDM object.
 #[pyfunction]
-#[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None, max_records=None))]
+#[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
 fn from_file(
     py: Python,
     path: &str,
     format: Option<&str>,
     max_input_bytes: Option<usize>,
-    max_xml_depth: Option<usize>,
     max_records: Option<usize>,
 ) -> PyResult<Py<PyAny>> {
-    let options = api::parse_options(max_input_bytes, max_xml_depth, max_records);
-    let message =
-        ccsds_ndm::from_file_with_options(path, format.map(notation).transpose()?, &options)
-            .map_err(ccsds_error_to_pyerr)?;
+    let options = api::parse_options(max_input_bytes, max_records);
+    let notation = format.map(notation).transpose()?;
+    let message = ccsds_ndm::from_file_with_options(path, notation, &options)
+        .map_err(|error| file_parse_error_to_pyerr(error, notation, None))?;
     message_to_py(py, message)
 }
 
@@ -157,45 +155,38 @@ fn notation(value: &str) -> PyResult<ccsds_ndm::Notation> {
 
 /// Convert any recognized NDM message between KVN and XML through the shared generation gate.
 #[pyfunction]
-#[pyo3(signature = (data, to_format, max_input_bytes=None, max_xml_depth=None, max_records=None, max_output_bytes=None, version=None))]
+#[pyo3(signature = (data, to_format, *, max_input_bytes=None, max_records=None, max_output_bytes=None, version=None))]
 fn convert(
     data: &str,
     to_format: &str,
     max_input_bytes: Option<usize>,
-    max_xml_depth: Option<usize>,
     max_records: Option<usize>,
     max_output_bytes: Option<usize>,
     version: Option<&str>,
 ) -> PyResult<String> {
-    let parse = api::parse_options(max_input_bytes, max_xml_depth, max_records);
+    let parse = api::parse_options(max_input_bytes, max_records);
     let mut generate = api::generate_options(version);
     generate.max_output_bytes = max_output_bytes;
-    ccsds_ndm::convert(
-        data,
-        notation(to_format)?,
-        &parse,
-        &generate,
-    )
-    .map_err(ccsds_error_to_pyerr)
+    ccsds_ndm::convert_with_options(data, notation(to_format)?, &parse, &generate)
+        .map_err(ccsds_error_to_pyerr)
 }
 
 /// Convert any recognized NDM file and atomically replace the destination on success.
 #[pyfunction]
-#[pyo3(signature = (source_path, destination_path, to_format, max_input_bytes=None, max_xml_depth=None, max_records=None, max_output_bytes=None, version=None))]
+#[pyo3(signature = (source_path, destination_path, to_format, *, max_input_bytes=None, max_records=None, max_output_bytes=None, version=None))]
 fn convert_file(
     source_path: &str,
     destination_path: &str,
     to_format: &str,
     max_input_bytes: Option<usize>,
-    max_xml_depth: Option<usize>,
     max_records: Option<usize>,
     max_output_bytes: Option<usize>,
     version: Option<&str>,
 ) -> PyResult<()> {
-    let parse = api::parse_options(max_input_bytes, max_xml_depth, max_records);
+    let parse = api::parse_options(max_input_bytes, max_records);
     let mut generate = api::generate_options(version);
     generate.max_output_bytes = max_output_bytes;
-    ccsds_ndm::convert_file(
+    ccsds_ndm::convert_file_with_options(
         source_path,
         destination_path,
         notation(to_format)?,

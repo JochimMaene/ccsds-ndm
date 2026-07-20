@@ -1,6 +1,8 @@
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{convert, convert_file, GenerateOptions, Notation, ParseOptions};
+use ccsds_ndm::{
+    convert, convert_file, convert_file_with_options, GenerateOptions, Notation, ParseOptions,
+};
 
 const KVN_FIXTURES: [&str; 3] = [
     include_str!("../../data/kvn/oem_g11.kvn"),
@@ -13,24 +15,12 @@ const XML: &str = include_str!("../../data/xml/oem_g14.xml");
 fn both_directions_preserve_the_complete_typed_model() {
     for source in KVN_FIXTURES {
         let expected = Oem::from_kvn(source).unwrap();
-        let xml = convert(
-            source,
-            Notation::Xml,
-            &ParseOptions::default(),
-            &GenerateOptions::source(),
-        )
-        .unwrap();
+        let xml = convert(source, Notation::Xml).unwrap();
         assert_eq!(Oem::from_xml(&xml).unwrap(), expected);
     }
 
     let expected = Oem::from_xml(XML).unwrap();
-    let kvn = convert(
-        XML,
-        Notation::Kvn,
-        &ParseOptions::default(),
-        &GenerateOptions::source(),
-    )
-    .unwrap();
+    let kvn = convert(XML, Notation::Kvn).unwrap();
     assert_eq!(Oem::from_kvn(&kvn).unwrap(), expected);
 }
 
@@ -44,13 +34,8 @@ fn xml_to_kvn_rejects_partial_acceleration_without_emitting_ambiguous_data() {
         .to_xml()
         .expect("partial acceleration is representable in XML");
 
-    let error = convert(
-        &xml,
-        Notation::Kvn,
-        &ParseOptions::default(),
-        &GenerateOptions::source(),
-    )
-    .expect_err("partial acceleration is not representable in OEM KVN");
+    let error = convert(&xml, Notation::Kvn)
+        .expect_err("partial acceleration is not representable in OEM KVN");
     assert_eq!(error.code(), Some("validation.invalid_value"));
     assert_eq!(
         error.field_path().as_deref(),
@@ -67,13 +52,8 @@ fn xml_to_kvn_rejects_comments_that_cannot_keep_their_covariance_association() {
     message.body.segment[0].data.covariance_matrix.push(second);
     let xml = message.to_xml().unwrap();
 
-    let error = convert(
-        &xml,
-        Notation::Kvn,
-        &ParseOptions::default(),
-        &GenerateOptions::source(),
-    )
-    .expect_err("KVN cannot preserve a later covariance's comment association");
+    let error = convert(&xml, Notation::Kvn)
+        .expect_err("KVN cannot preserve a later covariance's comment association");
     assert_eq!(error.code(), Some("validation.invalid_value"));
     assert_eq!(
         error.field_path().as_deref(),
@@ -89,18 +69,11 @@ fn file_conversion_is_atomic_and_bounds_input_before_materialization() {
     std::fs::write(&source, KVN_FIXTURES[0]).unwrap();
     std::fs::write(&destination, b"sentinel").unwrap();
 
-    convert_file(
-        &source,
-        &destination,
-        Notation::Xml,
-        &ParseOptions::default(),
-        &GenerateOptions::source(),
-    )
-    .unwrap();
+    convert_file(&source, &destination, Notation::Xml).unwrap();
     Oem::from_xml(&std::fs::read_to_string(&destination).unwrap()).unwrap();
 
     std::fs::write(&destination, b"sentinel").unwrap();
-    let error = convert_file(
+    let error = convert_file_with_options(
         &source,
         &destination,
         Notation::Xml,

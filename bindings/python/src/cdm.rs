@@ -9,6 +9,7 @@ use ccsds_ndm::types::{self as core_types, *};
 use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 
 // Helper to parse epoch strings
 fn parse_epoch_str(value: &str) -> PyResult<CalendarEpoch> {
@@ -212,22 +213,47 @@ fn build_cdm_covariance_from_array(
 /// - Relative position and velocity of Object2 with respect to Object1.
 /// - Metadata describing how the data was determined (orbit determination settings).
 #[pyclass]
-#[derive(Clone)]
 pub struct Cdm {
-    pub inner: core_cdm::Cdm,
+    id: Option<String>,
+    version: String,
+    header: Py<CdmHeader>,
+    body: Py<CdmBody>,
+}
+
+impl Cdm {
+    pub(crate) fn from_core(py: Python<'_>, value: core_cdm::Cdm) -> PyResult<Self> {
+        Ok(Self {
+            id: value.id,
+            version: value.version,
+            header: Py::new(
+                py,
+                CdmHeader {
+                    inner: value.header,
+                },
+            )?,
+            body: Py::new(py, CdmBody::from_core(py, value.body)?)?,
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_cdm::Cdm> {
+        Ok(core_cdm::Cdm {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            header: self.header.borrow(py).inner.clone(),
+            body: self.body.borrow(py).to_core(py)?,
+        })
+    }
 }
 
 #[pymethods]
 impl Cdm {
     #[new]
-    fn new(header: CdmHeader, body: CdmBody) -> Self {
+    fn new(header: Py<CdmHeader>, body: Py<CdmBody>) -> Self {
         Self {
-            inner: core_cdm::Cdm {
-                header: header.inner,
-                body: body.inner,
-                id: Some("CCSDS_CDM_VERS".to_string()),
-                version: "1.0".to_string(),
-            },
+            header,
+            body,
+            id: Some("CCSDS_CDM_VERS".to_string()),
+            version: "1.0".to_string(),
         }
     }
 
@@ -239,8 +265,8 @@ impl Cdm {
     ///     If True (default), raises ValueError on the first error found.
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        crate::api::validate_message(&self.inner, strict)
+    fn validate(&self, py: Python<'_>, strict: bool) -> PyResult<Option<Vec<String>>> {
+        crate::api::validate_message(&self.to_core(py)?, strict)
     }
 
     /// Parse a CDM from a KVN formatted string.
@@ -255,10 +281,10 @@ impl Cdm {
     /// Cdm
     ///     The parsed CDM object.
     #[staticmethod]
-    fn from_kvn(kvn: &str) -> PyResult<Self> {
+    fn from_kvn(py: Python<'_>, kvn: &str) -> PyResult<Self> {
         core_cdm::Cdm::from_kvn(kvn)
-            .map(|inner| Self { inner })
             .map_err(|e| PyValueError::new_err(e.to_string()))
+            .and_then(|inner| Self::from_core(py, inner))
     }
     /// Parse a CDM from a string with optional format.
     ///
@@ -274,17 +300,16 @@ impl Cdm {
     /// Cdm
     ///     The parsed CDM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None))]
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None))]
     fn from_str(
-        _py: Python<'_>,
+        py: Python<'_>,
         data: &str,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
-        max_xml_depth: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, None);
+        let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_with_options(data, format, &options)?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 
     /// Parse a CDM from a file path with optional format.
@@ -301,40 +326,55 @@ impl Cdm {
     /// Cdm
     ///     The parsed CDM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None))]
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
-        _py: Python<'_>,
+        py: Python<'_>,
         path: &str,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
-        max_xml_depth: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, None);
+        let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 
     /// Serialize to KVN, preserving the source version by default.
     #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_kvn(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, "kvn", version, max_output_bytes)
+    fn to_kvn(
+        &self,
+        py: Python<'_>,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.to_core(py)?, "kvn", version, max_output_bytes)
     }
 
     /// Serialize to XML, preserving the source version by default.
     #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_xml(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
+    fn to_xml(
+        &self,
+        py: Python<'_>,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.to_core(py)?, "xml", version, max_output_bytes)
     }
 
     /// Serialize to validated KVN or XML.
     #[pyo3(signature = (format, version=None, max_output_bytes=None))]
     fn to_str(
         &self,
+        py: Python<'_>,
         format: &str,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
+        crate::api::generate_string_with_limit(
+            &self.to_core(py)?,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     /// Conjunction Data Message (CDM).
@@ -351,30 +391,26 @@ impl Cdm {
     ///
     /// :type: CdmHeader
     #[getter]
-    fn header(&self) -> CdmHeader {
-        CdmHeader {
-            inner: self.inner.header.clone(),
-        }
+    fn header(&self, py: Python<'_>) -> Py<CdmHeader> {
+        self.header.clone_ref(py)
     }
 
     #[setter]
-    fn set_header(&mut self, value: CdmHeader) {
-        self.inner.header = value.inner;
+    fn set_header(&mut self, value: Py<CdmHeader>) {
+        self.header = value;
     }
 
     /// The message body containing relative metadata/data and object segments.
     ///
     /// :type: CdmBody
     #[getter]
-    fn body(&self) -> CdmBody {
-        CdmBody {
-            inner: self.inner.body.clone(),
-        }
+    fn body(&self, py: Python<'_>) -> Py<CdmBody> {
+        self.body.clone_ref(py)
     }
 
     #[setter]
-    fn set_body(&mut self, value: CdmBody) {
-        self.inner.body = value.inner;
+    fn set_body(&mut self, value: Py<CdmBody>) {
+        self.body = value;
     }
 
     /// Unique ID for this message.
@@ -382,7 +418,7 @@ impl Cdm {
     /// :type: Optional[str]
     #[getter]
     fn id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     /// The CDM version.
@@ -390,13 +426,13 @@ impl Cdm {
     /// :type: str
     #[getter]
     fn version(&self) -> String {
-        self.inner.version.clone()
+        self.version.clone()
     }
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Cdm, &value)?;
-        self.inner.version = value;
+        self.version = value;
         Ok(())
     }
 
@@ -413,12 +449,19 @@ impl Cdm {
     #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
+        py: Python<'_>,
         path: &str,
         format: &str,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
+        crate::api::generate_file_with_limit(
+            &self.to_core(py)?,
+            path,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 }
 
@@ -562,26 +605,62 @@ impl CdmHeader {
 /// segments : list of CdmSegment
 ///     The segments containing specific data for each object.
 #[pyclass]
-#[derive(Clone)]
 pub struct CdmBody {
-    pub inner: core_cdm::CdmBody,
+    relative_metadata_data: Py<RelativeMetadataData>,
+    segments: Py<PyList>,
+}
+
+impl CdmBody {
+    fn from_core(py: Python<'_>, value: core_cdm::CdmBody) -> PyResult<Self> {
+        let segments = value
+            .segments
+            .into_iter()
+            .map(|segment| Py::new(py, CdmSegment::from_core(py, segment)?))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            relative_metadata_data: Py::new(
+                py,
+                RelativeMetadataData {
+                    inner: value.relative_metadata_data,
+                },
+            )?,
+            segments: PyList::new(py, segments)?.unbind(),
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_cdm::CdmBody> {
+        let segments = self
+            .segments
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, CdmSegment>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("segments[{index}] must be CdmSegment"))
+                    })?
+                    .to_core(py)
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(core_cdm::CdmBody {
+            relative_metadata_data: self.relative_metadata_data.borrow(py).inner.clone(),
+            segments,
+        })
+    }
 }
 
 #[pymethods]
 impl CdmBody {
     #[new]
     fn new(
-        relative_metadata_data: RelativeMetadataData,
-        segments: Vec<CdmSegment>,
+        py: Python<'_>,
+        relative_metadata_data: Py<RelativeMetadataData>,
+        segments: Vec<Py<CdmSegment>>,
     ) -> PyResult<Self> {
-        // CCSDS Spec implies exactly 2 segments usually, but we allow vector
-        let inner_segs: Vec<core_cdm::CdmSegment> =
-            segments.iter().map(|s| s.inner.clone()).collect();
         Ok(Self {
-            inner: core_cdm::CdmBody {
-                relative_metadata_data: relative_metadata_data.inner,
-                segments: inner_segs,
-            },
+            relative_metadata_data,
+            segments: PyList::new(py, segments)?.unbind(),
         })
     }
 
@@ -589,32 +668,27 @@ impl CdmBody {
     ///
     /// :type: RelativeMetadataData
     #[getter]
-    fn relative_metadata_data(&self) -> RelativeMetadataData {
-        RelativeMetadataData {
-            inner: self.inner.relative_metadata_data.clone(),
-        }
+    fn relative_metadata_data(&self, py: Python<'_>) -> Py<RelativeMetadataData> {
+        self.relative_metadata_data.clone_ref(py)
     }
 
     #[setter]
-    fn set_relative_metadata_data(&mut self, value: RelativeMetadataData) {
-        self.inner.relative_metadata_data = value.inner;
+    fn set_relative_metadata_data(&mut self, value: Py<RelativeMetadataData>) {
+        self.relative_metadata_data = value;
     }
 
     /// The segments containing specific data for each object.
     ///
     /// :type: list[CdmSegment]
     #[getter]
-    fn segments(&self) -> Vec<CdmSegment> {
-        self.inner
-            .segments
-            .iter()
-            .map(|s| CdmSegment { inner: s.clone() })
-            .collect()
+    fn segments(&self, py: Python<'_>) -> Py<PyList> {
+        self.segments.clone_ref(py)
     }
 
     #[setter]
-    fn set_segments(&mut self, value: Vec<CdmSegment>) {
-        self.inner.segments = value.into_iter().map(|s| s.inner).collect();
+    fn set_segments(&mut self, py: Python<'_>, value: Vec<Py<CdmSegment>>) -> PyResult<()> {
+        self.segments = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 }
 
@@ -1194,57 +1268,69 @@ impl RelativeStateVector {
 
 /// A CDM Segment, consisting of metadata and data for a specific object.
 #[pyclass]
-#[derive(Clone)]
 pub struct CdmSegment {
-    pub inner: core_cdm::CdmSegment,
+    metadata: Py<CdmMetadata>,
+    data: Py<CdmData>,
+}
+
+impl CdmSegment {
+    fn from_core(py: Python<'_>, value: core_cdm::CdmSegment) -> PyResult<Self> {
+        Ok(Self {
+            metadata: Py::new(
+                py,
+                CdmMetadata {
+                    inner: value.metadata,
+                },
+            )?,
+            data: Py::new(py, CdmData::from_core(py, value.data)?)?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_cdm::CdmSegment> {
+        Ok(core_cdm::CdmSegment {
+            metadata: self.metadata.borrow(py).inner.clone(),
+            data: self.data.borrow(py).to_core(py),
+        })
+    }
 }
 
 #[pymethods]
 impl CdmSegment {
     #[new]
-    fn new(metadata: CdmMetadata, data: CdmData) -> Self {
-        Self {
-            inner: core_cdm::CdmSegment {
-                metadata: metadata.inner,
-                data: data.inner,
-            },
-        }
+    fn new(metadata: Py<CdmMetadata>, data: Py<CdmData>) -> Self {
+        Self { metadata, data }
     }
 
     /// Metadata for the object.
     ///
     /// :type: CdmMetadata
     #[getter]
-    fn metadata(&self) -> CdmMetadata {
-        CdmMetadata {
-            inner: self.inner.metadata.clone(),
-        }
+    fn metadata(&self, py: Python<'_>) -> Py<CdmMetadata> {
+        self.metadata.clone_ref(py)
     }
 
     #[setter]
-    fn set_metadata(&mut self, value: CdmMetadata) {
-        self.inner.metadata = value.inner;
+    fn set_metadata(&mut self, value: Py<CdmMetadata>) {
+        self.metadata = value;
     }
 
     /// Data section for the object.
     ///
     /// :type: CdmData
     #[getter]
-    fn data(&self) -> CdmData {
-        CdmData {
-            inner: self.inner.data.clone(),
-        }
+    fn data(&self, py: Python<'_>) -> Py<CdmData> {
+        self.data.clone_ref(py)
     }
 
     #[setter]
-    fn set_data(&mut self, value: CdmData) {
-        self.inner.data = value.inner;
+    fn set_data(&mut self, value: Py<CdmData>) {
+        self.data = value;
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "CdmSegment(object_name='{}')",
-            self.inner.metadata.object_name
+            self.metadata.borrow(py).inner.object_name
         )
     }
 }
@@ -1848,9 +1934,57 @@ impl CdmMetadata {
 /// covariance_matrix : CdmCovarianceMatrix
 ///     Object covariance at TCA.
 #[pyclass]
-#[derive(Clone)]
 pub struct CdmData {
-    pub inner: core_cdm::CdmData,
+    comment: Vec<String>,
+    od_parameters: Option<Py<OdParameters>>,
+    additional_parameters: Option<Py<AdditionalParameters>>,
+    state_vector: Py<CdmStateVector>,
+    covariance_matrix: Option<Py<CdmCovarianceMatrix>>,
+}
+
+impl CdmData {
+    fn from_core(py: Python<'_>, value: core_cdm::CdmData) -> PyResult<Self> {
+        Ok(Self {
+            comment: value.comment,
+            od_parameters: value
+                .od_parameters
+                .map(|inner| Py::new(py, OdParameters { inner }))
+                .transpose()?,
+            additional_parameters: value
+                .additional_parameters
+                .map(|inner| Py::new(py, AdditionalParameters { inner }))
+                .transpose()?,
+            state_vector: Py::new(
+                py,
+                CdmStateVector {
+                    inner: value.state_vector,
+                },
+            )?,
+            covariance_matrix: value
+                .covariance_matrix
+                .map(|inner| Py::new(py, CdmCovarianceMatrix { inner }))
+                .transpose()?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> core_cdm::CdmData {
+        core_cdm::CdmData {
+            comment: self.comment.clone(),
+            od_parameters: self
+                .od_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            additional_parameters: self
+                .additional_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            state_vector: self.state_vector.borrow(py).inner.clone(),
+            covariance_matrix: self
+                .covariance_matrix
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+        }
+    }
 }
 
 #[pymethods]
@@ -1864,55 +1998,19 @@ impl CdmData {
         comments=None
     ))]
     fn new(
-        state_vector: CdmStateVector,
-        covariance_matrix: Option<CdmCovarianceMatrix>,
-        od_parameters: Option<Bound<'_, PyAny>>,
-        additional_parameters: Option<Bound<'_, PyAny>>,
+        state_vector: Py<CdmStateVector>,
+        covariance_matrix: Option<Py<CdmCovarianceMatrix>>,
+        od_parameters: Option<Py<OdParameters>>,
+        additional_parameters: Option<Py<AdditionalParameters>>,
         comments: Option<Vec<String>>,
-    ) -> PyResult<Self> {
-        let od_p = match od_parameters {
-            Some(ob) => {
-                if let Ok(list) = ob.cast::<pyo3::types::PyList>() {
-                    if list.is_empty() {
-                        None
-                    } else {
-                        Some(list.get_item(0)?.extract::<OdParameters>()?)
-                    }
-                } else if ob.is_none() {
-                    None
-                } else {
-                    Some(ob.extract::<OdParameters>()?)
-                }
-            }
-            None => None,
-        };
-
-        let add_p = match additional_parameters {
-            Some(ob) => {
-                if let Ok(list) = ob.cast::<pyo3::types::PyList>() {
-                    if list.is_empty() {
-                        None
-                    } else {
-                        Some(list.get_item(0)?.extract::<AdditionalParameters>()?)
-                    }
-                } else if ob.is_none() {
-                    None
-                } else {
-                    Some(ob.extract::<AdditionalParameters>()?)
-                }
-            }
-            None => None,
-        };
-
-        Ok(Self {
-            inner: core_cdm::CdmData {
-                comment: comments.unwrap_or_default(),
-                od_parameters: od_p.map(|o| o.inner),
-                additional_parameters: add_p.map(|a| a.inner),
-                state_vector: state_vector.inner,
-                covariance_matrix: covariance_matrix.map(|c| c.inner),
-            },
-        })
+    ) -> Self {
+        Self {
+            comment: comments.unwrap_or_default(),
+            od_parameters,
+            additional_parameters,
+            state_vector,
+            covariance_matrix,
+        }
     }
 
     #[staticmethod]
@@ -1924,6 +2022,7 @@ impl CdmData {
         comments=None
     ))]
     fn from_numpy(
+        py: Python<'_>,
         state_vector: PyReadonlyArrayDyn<f64>,
         covariance_matrix: Option<PyReadonlyArray2<f64>>,
         od_parameters: Option<OdParameters>,
@@ -1936,46 +2035,44 @@ impl CdmData {
             None => None,
         };
 
-        Ok(Self {
-            inner: core_cdm::CdmData {
+        Self::from_core(
+            py,
+            core_cdm::CdmData {
                 comment: comments.unwrap_or_default(),
                 od_parameters: od_parameters.map(|o| o.inner),
                 additional_parameters: additional_parameters.map(|a| a.inner),
                 state_vector: state.inner,
                 covariance_matrix: cov,
             },
-        })
+        )
     }
 
     /// State Vector.
     ///
     /// :type: CdmStateVector
     #[getter]
-    fn state_vector(&self) -> CdmStateVector {
-        CdmStateVector {
-            inner: self.inner.state_vector.clone(),
-        }
+    fn state_vector(&self, py: Python<'_>) -> Py<CdmStateVector> {
+        self.state_vector.clone_ref(py)
     }
 
     #[setter]
-    fn set_state_vector(&mut self, value: CdmStateVector) {
-        self.inner.state_vector = value.inner;
+    fn set_state_vector(&mut self, value: Py<CdmStateVector>) {
+        self.state_vector = value;
     }
 
     /// Covariance Matrix.
     ///
     /// :type: Optional[CdmCovarianceMatrix]
     #[getter]
-    fn covariance_matrix(&self) -> Option<CdmCovarianceMatrix> {
-        self.inner
-            .covariance_matrix
+    fn covariance_matrix(&self, py: Python<'_>) -> Option<Py<CdmCovarianceMatrix>> {
+        self.covariance_matrix
             .as_ref()
-            .map(|cov| CdmCovarianceMatrix { inner: cov.clone() })
+            .map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_covariance_matrix(&mut self, value: Option<CdmCovarianceMatrix>) {
-        self.inner.covariance_matrix = value.map(|cov| cov.inner);
+    fn set_covariance_matrix(&mut self, value: Option<Py<CdmCovarianceMatrix>>) {
+        self.covariance_matrix = value;
     }
 
     /// Comments.
@@ -1983,41 +2080,37 @@ impl CdmData {
     /// :type: list[str]
     #[getter]
     fn comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
+        self.comment.clone()
     }
     #[setter]
     fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
+        self.comment = value;
     }
 
     /// Orbit Determination Parameters.
     ///
     /// :type: Optional[OdParameters]
     #[getter]
-    fn get_od_parameters(&self) -> Option<OdParameters> {
-        self.inner
-            .od_parameters
-            .as_ref()
-            .map(|o| OdParameters { inner: o.clone() })
+    fn get_od_parameters(&self, py: Python<'_>) -> Option<Py<OdParameters>> {
+        self.od_parameters.as_ref().map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_od_parameters(&mut self, v: Option<OdParameters>) {
-        self.inner.od_parameters = v.map(|o| o.inner);
+    fn set_od_parameters(&mut self, value: Option<Py<OdParameters>>) {
+        self.od_parameters = value;
     }
 
     /// Additional Parameters.
     ///
     /// :type: Optional[AdditionalParameters]
     #[getter]
-    fn get_additional_parameters(&self) -> Option<AdditionalParameters> {
-        self.inner
-            .additional_parameters
+    fn get_additional_parameters(&self, py: Python<'_>) -> Option<Py<AdditionalParameters>> {
+        self.additional_parameters
             .as_ref()
-            .map(|a| AdditionalParameters { inner: a.clone() })
+            .map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_additional_parameters(&mut self, v: Option<AdditionalParameters>) {
-        self.inner.additional_parameters = v.map(|a| a.inner);
+    fn set_additional_parameters(&mut self, value: Option<Py<AdditionalParameters>>) {
+        self.additional_parameters = value;
     }
 
     /// State vector as a NumPy array (convenience method).
@@ -2029,16 +2122,17 @@ impl CdmData {
     /// :type: numpy.ndarray
     #[getter]
     fn get_state_vector_numpy<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
-        CdmStateVector {
-            inner: self.inner.state_vector.clone(),
-        }
-        .to_numpy(py)
+        self.state_vector.borrow(py).to_numpy(py)
     }
 
     #[setter]
-    fn set_state_vector_numpy(&mut self, array: PyReadonlyArrayDyn<f64>) -> PyResult<()> {
+    fn set_state_vector_numpy(
+        &mut self,
+        py: Python<'_>,
+        array: PyReadonlyArrayDyn<f64>,
+    ) -> PyResult<()> {
         let state = CdmStateVector::from_numpy(array)?;
-        self.inner.state_vector = state.inner;
+        self.state_vector.borrow_mut(py).inner = state.inner;
         Ok(())
     }
 
@@ -2053,8 +2147,8 @@ impl CdmData {
         &self,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-        match self.inner.covariance_matrix.as_ref() {
-            Some(cov) => CdmCovarianceMatrix { inner: cov.clone() }.to_numpy(py),
+        match self.covariance_matrix.as_ref() {
+            Some(cov) => cov.borrow(py).to_numpy(py),
             None => Err(PyValueError::new_err(
                 "COVARIANCE_MATRIX is missing; cannot build NumPy array",
             )),
@@ -2064,32 +2158,37 @@ impl CdmData {
     #[setter]
     fn set_covariance_matrix_numpy(
         &mut self,
+        py: Python<'_>,
         array: Option<PyReadonlyArray2<f64>>,
     ) -> PyResult<()> {
         match array {
             Some(arr) => {
                 let comment = self
-                    .inner
                     .covariance_matrix
                     .as_ref()
-                    .map(|c| c.comment.clone())
+                    .map(|value| value.borrow(py).inner.comment.clone())
                     .unwrap_or_default();
                 let cov = build_cdm_covariance_from_array(&arr, comment)?;
-                self.inner.covariance_matrix = Some(cov);
+                match self.covariance_matrix.as_ref() {
+                    Some(value) => value.borrow_mut(py).inner = cov,
+                    None => {
+                        self.covariance_matrix =
+                            Some(Py::new(py, CdmCovarianceMatrix { inner: cov })?)
+                    }
+                }
             }
             None => {
-                self.inner.covariance_matrix = None;
+                self.covariance_matrix = None;
             }
         }
         Ok(())
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
+        let state = self.state_vector.borrow(py);
         format!(
             "CdmData(position=[{:.3}, {:.3}, {:.3}] km)",
-            self.inner.state_vector.x.value,
-            self.inner.state_vector.y.value,
-            self.inner.state_vector.z.value
+            state.inner.x.value, state.inner.y.value, state.inner.z.value
         )
     }
 }

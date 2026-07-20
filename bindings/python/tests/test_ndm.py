@@ -130,7 +130,7 @@ class TestNdm:
             + [None]
         )
         cov1 = CdmCovarianceMatrix(*cov_args)
-        data1 = CdmData(vector1, cov1, [])
+        data1 = CdmData(vector1, cov1, comments=[])
         seg1 = CdmSegment(meta1, data1)
 
         meta2 = CdmMetadata(
@@ -143,7 +143,7 @@ class TestNdm:
         )
         vector2 = CdmStateVector(7100.0, 0.0, 0.0, 0.0, 7.4, 0.0)
         cov2 = CdmCovarianceMatrix(*cov_args)
-        data2 = CdmData(vector2, cov2, [])
+        data2 = CdmData(vector2, cov2, comments=[])
         seg2 = CdmSegment(meta2, data2)
 
         body = CdmBody(rel_meta, [seg1, seg2])

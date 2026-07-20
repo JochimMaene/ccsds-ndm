@@ -38,11 +38,12 @@ Z_DOT = 0
 
 message = ccsds_ndm.from_str(source, format="kvn")
 assert isinstance(message, ccsds_ndm.Opm)
-ccsds_ndm.edit(message).segment.metadata.object_name = "EDITED"
+message.segment.metadata.object_name = "EDITED"
 assert message.segment.metadata.object_name == "EDITED"
 assert message.validate() is None
 xml = message.to_str("xml")
 assert "<OBJECT_NAME>EDITED</OBJECT_NAME>" in xml
 kvn = ccsds_ndm.convert(xml, "kvn")
 assert isinstance(ccsds_ndm.from_str(kvn, format="kvn"), ccsds_ndm.Opm)
+assert isinstance(ccsds_ndm.from_str("<ndm/>", format="xml"), ccsds_ndm.Ndm)
 PY

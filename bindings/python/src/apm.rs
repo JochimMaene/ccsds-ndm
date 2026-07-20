@@ -8,6 +8,7 @@ use crate::common::AdmHeader;
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::apm as core_apm;
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 
 /// Attitude Parameter Message (APM).
 ///
@@ -18,31 +19,61 @@ use pyo3::prelude::*;
 /// The APM requires the use of a propagation technique to determine the attitude state at
 /// times different from the specified epoch.
 #[pyclass]
-#[derive(Clone)]
 pub struct Apm {
-    pub inner: core_apm::Apm,
+    id: Option<String>,
+    version: String,
+    header: Py<AdmHeader>,
+    segment: Py<ApmSegment>,
+}
+
+impl Apm {
+    pub(crate) fn from_core(py: Python<'_>, value: core_apm::Apm) -> PyResult<Self> {
+        Ok(Self {
+            id: value.id,
+            version: value.version,
+            header: Py::new(
+                py,
+                AdmHeader {
+                    inner: value.header,
+                },
+            )?,
+            segment: Py::new(py, ApmSegment::from_core(py, value.body.segment)?)?,
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_apm::Apm> {
+        Ok(core_apm::Apm {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            header: self.header.borrow(py).inner.clone(),
+            body: core_apm::ApmBody {
+                segment: self.segment.borrow(py).to_core(py)?,
+            },
+        })
+    }
 }
 
 #[pymethods]
 impl Apm {
     #[new]
-    fn new(header: AdmHeader, segment: ApmSegment) -> Self {
+    fn new(header: Py<AdmHeader>, segment: Py<ApmSegment>) -> Self {
         Self {
-            inner: core_apm::Apm {
-                header: header.inner,
-                body: core_apm::ApmBody {
-                    segment: segment.inner,
-                },
-                id: Some("CCSDS_APM_VERS".to_string()),
-                version: "2.0".to_string(),
-            },
+            header,
+            segment,
+            id: Some("CCSDS_APM_VERS".to_string()),
+            version: "2.0".to_string(),
         }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "Apm(object_name='{}')",
-            self.inner.body.segment.metadata.object_name
+            self.segment
+                .borrow(py)
+                .metadata
+                .borrow(py)
+                .inner
+                .object_name
         )
     }
 
@@ -51,12 +82,12 @@ impl Apm {
     /// :type: Optional[str]
     #[getter]
     fn get_id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     #[setter]
     fn set_id(&mut self, value: Option<String>) {
-        self.inner.id = value;
+        self.id = value;
     }
 
     /// The message version.
@@ -64,13 +95,13 @@ impl Apm {
     /// :type: str
     #[getter]
     fn get_version(&self) -> String {
-        self.inner.version.clone()
+        self.version.clone()
     }
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Apm, &value)?;
-        self.inner.version = value;
+        self.version = value;
         Ok(())
     }
 
@@ -85,30 +116,26 @@ impl Apm {
     ///
     /// :type: AdmHeader
     #[getter]
-    fn get_header(&self) -> AdmHeader {
-        AdmHeader {
-            inner: self.inner.header.clone(),
-        }
+    fn get_header(&self, py: Python<'_>) -> Py<AdmHeader> {
+        self.header.clone_ref(py)
     }
 
     #[setter]
-    fn set_header(&mut self, header: AdmHeader) {
-        self.inner.header = header.inner;
+    fn set_header(&mut self, header: Py<AdmHeader>) {
+        self.header = header;
     }
 
     /// APM Segment.
     ///
     /// :type: ApmSegment
     #[getter]
-    fn get_segment(&self) -> ApmSegment {
-        ApmSegment {
-            inner: self.inner.body.segment.clone(),
-        }
+    fn get_segment(&self, py: Python<'_>) -> Py<ApmSegment> {
+        self.segment.clone_ref(py)
     }
 
     #[setter]
-    fn set_segment(&mut self, segment: ApmSegment) {
-        self.inner.body.segment = segment.inner;
+    fn set_segment(&mut self, segment: Py<ApmSegment>) {
+        self.segment = segment;
     }
 
     /// Validate the message against CCSDS rules.
@@ -119,120 +146,153 @@ impl Apm {
     ///     If True (default), raises ValueError on the first error found.
     ///     If False, returns a list of validation error messages (or None if valid).
     #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        crate::api::validate_message(&self.inner, strict)
+    fn validate(&self, py: Python<'_>, strict: bool) -> PyResult<Option<Vec<String>>> {
+        crate::api::validate_message(&self.to_core(py)?, strict)
     }
 
     /// Serialize to KVN, preserving the source version by default.
     #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_kvn(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, "kvn", version, max_output_bytes)
+    fn to_kvn(
+        &self,
+        py: Python<'_>,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.to_core(py)?, "kvn", version, max_output_bytes)
     }
 
     /// Serialize to XML, preserving the source version by default.
     #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_xml(&self, version: Option<&str>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, "xml", version, max_output_bytes)
+    fn to_xml(
+        &self,
+        py: Python<'_>,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(&self.to_core(py)?, "xml", version, max_output_bytes)
     }
 
     /// Serialize to validated KVN or XML.
     #[pyo3(signature = (format, version=None, max_output_bytes=None))]
     fn to_str(
         &self,
+        py: Python<'_>,
         format: &str,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.inner, format, version, max_output_bytes)
+        crate::api::generate_string_with_limit(
+            &self.to_core(py)?,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     /// Write validated KVN or XML directly to a file.
     #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
     fn to_file(
         &self,
+        py: Python<'_>,
         path: &str,
         format: &str,
         version: Option<&str>,
         max_output_bytes: Option<usize>,
     ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(&self.inner, path, format, version, max_output_bytes)
+        crate::api::generate_file_with_limit(
+            &self.to_core(py)?,
+            path,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, max_input_bytes=None, max_xml_depth=None))]
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None))]
     fn from_str(
-        _py: Python<'_>,
+        py: Python<'_>,
         data: &str,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
-        max_xml_depth: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, None);
+        let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_with_options(data, format, &options)?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, max_input_bytes=None, max_xml_depth=None))]
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
-        _py: Python<'_>,
+        py: Python<'_>,
         path: &str,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
-        max_xml_depth: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_xml_depth, None);
+        let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
-        Ok(Self { inner })
+        Self::from_core(py, inner)
     }
 }
 
 #[pyclass]
-#[derive(Clone)]
 pub struct ApmSegment {
-    pub inner: core_apm::ApmSegment,
+    metadata: Py<ApmMetadata>,
+    data: Py<ApmData>,
+}
+
+impl ApmSegment {
+    fn from_core(py: Python<'_>, value: core_apm::ApmSegment) -> PyResult<Self> {
+        Ok(Self {
+            metadata: Py::new(
+                py,
+                ApmMetadata {
+                    inner: value.metadata,
+                },
+            )?,
+            data: Py::new(py, ApmData::from_core(py, value.data)?)?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_apm::ApmSegment> {
+        Ok(core_apm::ApmSegment {
+            metadata: self.metadata.borrow(py).inner.clone(),
+            data: self.data.borrow(py).to_core(py)?,
+        })
+    }
 }
 
 #[pymethods]
 impl ApmSegment {
     #[new]
-    fn new(metadata: ApmMetadata, data: ApmData) -> Self {
-        Self {
-            inner: core_apm::ApmSegment {
-                metadata: metadata.inner,
-                data: data.inner,
-            },
-        }
+    fn new(metadata: Py<ApmMetadata>, data: Py<ApmData>) -> Self {
+        Self { metadata, data }
     }
 
     /// APM Metadata Section.
     ///
     /// :type: ApmMetadata
     #[getter]
-    fn get_metadata(&self) -> ApmMetadata {
-        ApmMetadata {
-            inner: self.inner.metadata.clone(),
-        }
+    fn get_metadata(&self, py: Python<'_>) -> Py<ApmMetadata> {
+        self.metadata.clone_ref(py)
     }
 
     #[setter]
-    fn set_metadata(&mut self, metadata: ApmMetadata) {
-        self.inner.metadata = metadata.inner;
+    fn set_metadata(&mut self, metadata: Py<ApmMetadata>) {
+        self.metadata = metadata;
     }
 
     /// APM Data Section.
     ///
     /// :type: ApmData
     #[getter]
-    fn get_data(&self) -> ApmData {
-        ApmData {
-            inner: self.inner.data.clone(),
-        }
+    fn get_data(&self, py: Python<'_>) -> Py<ApmData> {
+        self.data.clone_ref(py)
     }
 
     #[setter]
-    fn set_data(&mut self, data: ApmData) {
-        self.inner.data = data.inner;
+    fn set_data(&mut self, data: Py<ApmData>) {
+        self.data = data;
     }
 }
 
@@ -371,9 +431,84 @@ impl ApmMetadata {
 
 /// APM Data Section.
 #[pyclass]
-#[derive(Clone)]
 pub struct ApmData {
-    pub inner: core_apm::ApmData,
+    comment: Vec<String>,
+    epoch: ccsds_ndm::types::CalendarEpoch,
+    quaternion_state: Py<PyList>,
+    euler_angle_state: Py<PyList>,
+    angular_velocity: Py<PyList>,
+    spin: Py<PyList>,
+    inertia: Py<PyList>,
+    maneuver_parameters: Py<PyList>,
+}
+
+impl ApmData {
+    fn from_core(py: Python<'_>, value: core_apm::ApmData) -> PyResult<Self> {
+        macro_rules! py_list {
+            ($values:expr, $wrapper:ident) => {{
+                let objects = $values
+                    .into_iter()
+                    .map(|inner| Py::new(py, $wrapper { inner }))
+                    .collect::<PyResult<Vec<_>>>()?;
+                PyList::new(py, objects)?.unbind()
+            }};
+        }
+        Ok(Self {
+            comment: value.comment,
+            epoch: value.epoch,
+            quaternion_state: py_list!(value.quaternion_state, QuaternionState),
+            euler_angle_state: py_list!(value.euler_angle_state, EulerAngleState),
+            angular_velocity: py_list!(value.angular_velocity, AngVelState),
+            spin: py_list!(value.spin, SpinState),
+            inertia: py_list!(value.inertia, InertiaState),
+            maneuver_parameters: py_list!(value.maneuver_parameters, ManeuverParameters),
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_apm::ApmData> {
+        macro_rules! core_list {
+            ($values:expr, $wrapper:ty, $name:literal) => {
+                $values
+                    .bind(py)
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| {
+                        value
+                            .extract::<PyRef<'_, $wrapper>>()
+                            .map(|value| value.inner.clone())
+                            .map_err(|_| {
+                                pyo3::exceptions::PyValueError::new_err(format!(
+                                    "{}[{index}] has the wrong type",
+                                    $name
+                                ))
+                            })
+                    })
+                    .collect::<PyResult<Vec<_>>>()?
+            };
+        }
+        Ok(core_apm::ApmData {
+            comment: self.comment.clone(),
+            epoch: self.epoch,
+            quaternion_state: core_list!(
+                self.quaternion_state,
+                QuaternionState,
+                "quaternion_state"
+            ),
+            euler_angle_state: core_list!(
+                self.euler_angle_state,
+                EulerAngleState,
+                "euler_angle_state"
+            ),
+            angular_velocity: core_list!(self.angular_velocity, AngVelState, "angular_velocity"),
+            spin: core_list!(self.spin, SpinState, "spin"),
+            inertia: core_list!(self.inertia, InertiaState, "inertia"),
+            maneuver_parameters: core_list!(
+                self.maneuver_parameters,
+                ManeuverParameters,
+                "maneuver_parameters"
+            ),
+        })
+    }
 }
 
 #[pymethods]
@@ -391,50 +526,25 @@ impl ApmData {
         comment=None
     ))]
     fn new(
+        py: Python<'_>,
         epoch: String,
-        quaternion_state: Option<Vec<QuaternionState>>,
-        euler_angle_state: Option<Vec<EulerAngleState>>,
-        angular_velocity: Option<Vec<AngVelState>>,
-        spin: Option<Vec<SpinState>>,
-        inertia: Option<Vec<InertiaState>>,
-        maneuver_parameters: Option<Vec<ManeuverParameters>>,
+        quaternion_state: Option<Vec<Py<QuaternionState>>>,
+        euler_angle_state: Option<Vec<Py<EulerAngleState>>>,
+        angular_velocity: Option<Vec<Py<AngVelState>>>,
+        spin: Option<Vec<Py<SpinState>>>,
+        inertia: Option<Vec<Py<InertiaState>>>,
+        maneuver_parameters: Option<Vec<Py<ManeuverParameters>>>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         Ok(Self {
-            inner: core_apm::ApmData {
-                comment: comment.unwrap_or_default(),
-                epoch: parse_calendar_epoch(&epoch)?,
-                quaternion_state: quaternion_state
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|s| s.inner)
-                    .collect(),
-                euler_angle_state: euler_angle_state
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|s| s.inner)
-                    .collect(),
-                angular_velocity: angular_velocity
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|s| s.inner)
-                    .collect(),
-                spin: spin
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|s| s.inner)
-                    .collect(),
-                inertia: inertia
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|s| s.inner)
-                    .collect(),
-                maneuver_parameters: maneuver_parameters
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|m| m.inner)
-                    .collect(),
-            },
+            comment: comment.unwrap_or_default(),
+            epoch: parse_calendar_epoch(&epoch)?,
+            quaternion_state: PyList::new(py, quaternion_state.unwrap_or_default())?.unbind(),
+            euler_angle_state: PyList::new(py, euler_angle_state.unwrap_or_default())?.unbind(),
+            angular_velocity: PyList::new(py, angular_velocity.unwrap_or_default())?.unbind(),
+            spin: PyList::new(py, spin.unwrap_or_default())?.unbind(),
+            inertia: PyList::new(py, inertia.unwrap_or_default())?.unbind(),
+            maneuver_parameters: PyList::new(py, maneuver_parameters.unwrap_or_default())?.unbind(),
         })
     }
 
@@ -443,17 +553,18 @@ impl ApmData {
     ///
     /// :type: list[QuaternionState]
     #[getter]
-    fn get_quaternion_state(&self) -> Vec<QuaternionState> {
-        self.inner
-            .quaternion_state
-            .iter()
-            .map(|s| QuaternionState { inner: s.clone() })
-            .collect()
+    fn get_quaternion_state(&self, py: Python<'_>) -> Py<PyList> {
+        self.quaternion_state.clone_ref(py)
     }
 
     #[setter]
-    fn set_quaternion_state(&mut self, value: Vec<QuaternionState>) {
-        self.inner.quaternion_state = value.into_iter().map(|s| s.inner).collect();
+    fn set_quaternion_state(
+        &mut self,
+        py: Python<'_>,
+        value: Vec<Py<QuaternionState>>,
+    ) -> PyResult<()> {
+        self.quaternion_state = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
@@ -461,34 +572,36 @@ impl ApmData {
     ///
     /// :type: list[EulerAngleState]
     #[getter]
-    fn get_euler_angle_state(&self) -> Vec<EulerAngleState> {
-        self.inner
-            .euler_angle_state
-            .iter()
-            .map(|s| EulerAngleState { inner: s.clone() })
-            .collect()
+    fn get_euler_angle_state(&self, py: Python<'_>) -> Py<PyList> {
+        self.euler_angle_state.clone_ref(py)
     }
 
     #[setter]
-    fn set_euler_angle_state(&mut self, value: Vec<EulerAngleState>) {
-        self.inner.euler_angle_state = value.into_iter().map(|s| s.inner).collect();
+    fn set_euler_angle_state(
+        &mut self,
+        py: Python<'_>,
+        value: Vec<Py<EulerAngleState>>,
+    ) -> PyResult<()> {
+        self.euler_angle_state = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Angular velocity vector.
     ///
     /// :type: list[AngVelState]
     #[getter]
-    fn get_angular_velocity(&self) -> Vec<AngVelState> {
-        self.inner
-            .angular_velocity
-            .iter()
-            .map(|s| AngVelState { inner: s.clone() })
-            .collect()
+    fn get_angular_velocity(&self, py: Python<'_>) -> Py<PyList> {
+        self.angular_velocity.clone_ref(py)
     }
 
     #[setter]
-    fn set_angular_velocity(&mut self, value: Vec<AngVelState>) {
-        self.inner.angular_velocity = value.into_iter().map(|s| s.inner).collect();
+    fn set_angular_velocity(
+        &mut self,
+        py: Python<'_>,
+        value: Vec<Py<AngVelState>>,
+    ) -> PyResult<()> {
+        self.angular_velocity = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Spin. All mandatory elements are to be provided if the block is present. (See annex F for
@@ -496,17 +609,14 @@ impl ApmData {
     ///
     /// :type: list[SpinState]
     #[getter]
-    fn get_spin(&self) -> Vec<SpinState> {
-        self.inner
-            .spin
-            .iter()
-            .map(|s| SpinState { inner: s.clone() })
-            .collect()
+    fn get_spin(&self, py: Python<'_>) -> Py<PyList> {
+        self.spin.clone_ref(py)
     }
 
     #[setter]
-    fn set_spin(&mut self, value: Vec<SpinState>) {
-        self.inner.spin = value.into_iter().map(|s| s.inner).collect();
+    fn set_spin(&mut self, py: Python<'_>, value: Vec<Py<SpinState>>) -> PyResult<()> {
+        self.spin = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Inertia. All mandatory elements are to be provided if the block is present. (See annex F
@@ -514,34 +624,32 @@ impl ApmData {
     ///
     /// :type: list[InertiaState]
     #[getter]
-    fn get_inertia(&self) -> Vec<InertiaState> {
-        self.inner
-            .inertia
-            .iter()
-            .map(|s| InertiaState { inner: s.clone() })
-            .collect()
+    fn get_inertia(&self, py: Python<'_>) -> Py<PyList> {
+        self.inertia.clone_ref(py)
     }
 
     #[setter]
-    fn set_inertia(&mut self, value: Vec<InertiaState>) {
-        self.inner.inertia = value.into_iter().map(|s| s.inner).collect();
+    fn set_inertia(&mut self, py: Python<'_>, value: Vec<Py<InertiaState>>) -> PyResult<()> {
+        self.inertia = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Maneuver Parameters.
     ///
     /// :type: list[ManeuverParameters]
     #[getter]
-    fn get_maneuver_parameters(&self) -> Vec<ManeuverParameters> {
-        self.inner
-            .maneuver_parameters
-            .iter()
-            .map(|m| ManeuverParameters { inner: m.clone() })
-            .collect()
+    fn get_maneuver_parameters(&self, py: Python<'_>) -> Py<PyList> {
+        self.maneuver_parameters.clone_ref(py)
     }
 
     #[setter]
-    fn set_maneuver_parameters(&mut self, value: Vec<ManeuverParameters>) {
-        self.inner.maneuver_parameters = value.into_iter().map(|m| m.inner).collect();
+    fn set_maneuver_parameters(
+        &mut self,
+        py: Python<'_>,
+        value: Vec<Py<ManeuverParameters>>,
+    ) -> PyResult<()> {
+        self.maneuver_parameters = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Epoch of the attitude elements and optional logical blocks.
@@ -549,12 +657,12 @@ impl ApmData {
     /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
-        self.inner.epoch.as_str().to_string()
+        self.epoch.as_str().to_string()
     }
 
     #[setter]
     fn set_epoch(&mut self, value: String) -> PyResult<()> {
-        self.inner.epoch = parse_calendar_epoch(&value)?;
+        self.epoch = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -563,12 +671,12 @@ impl ApmData {
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
+        self.comment.clone()
     }
 
     #[setter]
     fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
+        self.comment = value;
     }
 }
 

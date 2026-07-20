@@ -375,7 +375,7 @@ impl CombinedNdm {
             .is_some_and(|limit| kvn.len() > limit)
         {
             return Err(CcsdsNdmError::ResourceLimitExceeded {
-                resource: "input_bytes",
+                resource: "input_document",
                 limit: options.max_input_bytes.unwrap(),
                 actual: kvn.len(),
             });
@@ -461,7 +461,7 @@ impl CombinedNdm {
             .is_some_and(|limit| xml.len() > limit)
         {
             return Err(CcsdsNdmError::ResourceLimitExceeded {
-                resource: "input_bytes",
+                resource: "input_document",
                 limit: options.max_input_bytes.unwrap(),
                 actual: xml.len(),
             });

@@ -406,7 +406,7 @@ fn detect_xml_type(s: &str, options: &ParseOptions) -> Result<MessageType> {
 
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e)) => {
+            Ok(Event::Start(e) | Event::Empty(e)) => {
                 let root_name = e.name();
                 let kind = NdmKind::from_xml_root(root_name.as_ref()).ok_or_else(|| {
                     CcsdsNdmError::UnsupportedMessage(format!(

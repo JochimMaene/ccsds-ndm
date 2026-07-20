@@ -75,11 +75,12 @@ fn combined_xml_rejects_illegal_root_and_constituent_attributes() {
 #[test]
 fn aggregate_parse_limits_apply_to_direct_combined_entry_points() {
     let source = fs::read_to_string(repository_path("data/xml/ndm_g21.xml")).unwrap();
-    assert!(CombinedNdm::from_xml_with_options(
+    let error = CombinedNdm::from_xml_with_options(
         &source,
-        &ParseOptions::default().with_max_input_bytes(source.len() - 1)
+        &ParseOptions::default().with_max_input_bytes(source.len() - 1),
     )
-    .is_err());
+    .unwrap_err();
+    assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
     assert!(CombinedNdm::from_xml_with_options(
         &source,
         &ParseOptions::default().with_max_xml_depth(1)
@@ -106,11 +107,12 @@ fn aggregate_parse_limits_apply_to_direct_combined_entry_points() {
     );
 
     let kvn = format!("{OPM_KVN}{OPM_KVN}");
-    assert!(CombinedNdm::from_kvn_with_options(
+    let error = CombinedNdm::from_kvn_with_options(
         &kvn,
-        &ParseOptions::default().with_max_input_bytes(kvn.len() - 1)
+        &ParseOptions::default().with_max_input_bytes(kvn.len() - 1),
     )
-    .is_err());
+    .unwrap_err();
+    assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
 }
 
 #[test]
