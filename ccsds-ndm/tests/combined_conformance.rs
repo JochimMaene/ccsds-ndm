@@ -9,12 +9,11 @@ use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::{GenerateOptions, MessageType, ParseOptions};
 use tempfile::NamedTempFile;
 
-const OPM_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
+const OPM_WITH_MANEUVERS_KVN: &str = include_str!("../data/kvn/opm_g2.kvn");
 
 fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(relative)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
 #[test]
@@ -87,7 +86,7 @@ fn aggregate_parse_limits_apply_to_direct_combined_entry_points() {
     )
     .is_err());
 
-    let aem = Aem::from_xml(include_str!("../../data/xml/aem_g11.xml")).unwrap();
+    let aem = Aem::from_xml(include_str!("../data/xml/aem_g11.xml")).unwrap();
     let two_children = CombinedNdm {
         id: None,
         comments: Vec::new(),
@@ -113,6 +112,24 @@ fn aggregate_parse_limits_apply_to_direct_combined_entry_points() {
     )
     .unwrap_err();
     assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
+}
+
+#[test]
+fn opm_maneuvers_are_not_history_records_in_standalone_or_combined_messages() {
+    let options = ParseOptions::default().with_max_records(0);
+    let opm = Opm::from_kvn_with_options(OPM_WITH_MANEUVERS_KVN, &options).unwrap();
+    assert!(!opm.body.segment.data.maneuver_parameters.is_empty());
+
+    let combined = CombinedNdm {
+        id: None,
+        comments: Vec::new(),
+        messages: vec![MessageType::Opm(opm)],
+    };
+    let xml = combined.to_xml().unwrap();
+    CombinedNdm::from_xml_with_options(&xml, &options).unwrap();
+
+    let kvn = combined.to_kvn().unwrap();
+    CombinedNdm::from_kvn_with_options(&kvn, &options).unwrap();
 }
 
 #[test]

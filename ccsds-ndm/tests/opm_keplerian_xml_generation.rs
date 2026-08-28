@@ -6,7 +6,7 @@ use ccsds_ndm::error::{Result, ValidationError};
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 
-const OPM_WITH_KEPLERIAN_ELEMENTS: &str = include_str!("../../data/kvn/opm_g2.kvn");
+const OPM_WITH_KEPLERIAN_ELEMENTS: &str = include_str!("../data/kvn/opm_g2.kvn");
 
 fn opm() -> Opm {
     Opm::from_kvn(OPM_WITH_KEPLERIAN_ELEMENTS).expect("the OPM Keplerian fixture must remain valid")

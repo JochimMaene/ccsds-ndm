@@ -2540,7 +2540,7 @@ DATA_STOP
 
     #[test]
     fn test_xml_sample_parsing() {
-        let xml = include_str!("../../../data/xml/tdm_e21.xml");
+        let xml = include_str!("../../data/xml/tdm_e21.xml");
         let mut tdm = Tdm::from_xml(xml).expect("parse xml");
         assert!(!tdm.body.segments.is_empty());
 

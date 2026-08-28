@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const KVN_FIXTURES: [(&str, &str); 3] = [
-    ("oem_g11.kvn", include_str!("../../data/kvn/oem_g11.kvn")),
-    ("oem_g12.kvn", include_str!("../../data/kvn/oem_g12.kvn")),
-    ("oem_g13.kvn", include_str!("../../data/kvn/oem_g13.kvn")),
+    ("oem_g11.kvn", include_str!("../data/kvn/oem_g11.kvn")),
+    ("oem_g12.kvn", include_str!("../data/kvn/oem_g12.kvn")),
+    ("oem_g13.kvn", include_str!("../data/kvn/oem_g13.kvn")),
 ];
-const XML: (&str, &str) = ("oem_g14.xml", include_str!("../../data/xml/oem_g14.xml"));
+const XML: (&str, &str) = ("oem_g14.xml", include_str!("../data/xml/oem_g14.xml"));
 
 fn schema_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/xsd/ndmxml-4.0.0-master-4.0.xsd")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("data/xsd/ndmxml-4.0.0-master-4.0.xsd")
 }
 
 fn validate_xsd(label: &str, xml: &str) {

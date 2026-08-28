@@ -167,9 +167,7 @@ struct MinimalCase<'a> {
 }
 
 fn data_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("data")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("data")
 }
 
 fn sorted_files(dir: &Path, extension: &str) -> Vec<PathBuf> {

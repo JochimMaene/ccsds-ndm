@@ -9,7 +9,7 @@ use std::hint::black_box;
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
 fn oem(records: usize) -> Oem {
-    let mut message = Oem::from_kvn(include_str!("../../data/kvn/oem_g11.kvn")).unwrap();
+    let mut message = Oem::from_kvn(include_str!("../data/kvn/oem_g11.kvn")).unwrap();
     message.body.segment.truncate(1);
     let state = message.body.segment[0].data.state_vector[0].clone();
     message.body.segment[0].data.state_vector = vec![state; records];

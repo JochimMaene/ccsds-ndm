@@ -40,11 +40,6 @@ pip install ccsds-ndm-py
 cargo add ccsds-ndm
 ```
 
-**Command line:**
-```bash
-cargo install ccsds-ndm
-```
-
 ## Quick Start
 
 ### Python
@@ -94,17 +89,6 @@ fn main() -> ccsds_ndm::error::Result<()> {
 }
 ```
 
-### Command line
-
-```bash
-ccsds-ndm validate example.opm
-ccsds-ndm convert --to xml example.opm -o example.xml
-```
-
-Use `--target-version 2.0` or `3.0` for an explicit ODM edition. OPM, OEM, and OMM
-support edition-correct 2.0 and 3.0 output; unsupported cross-edition changes fail instead of
-relabeling the document.
-
 ## Features
 
 - **Type-safe**: Strongly typed structures matching CCSDS XSD schemas
@@ -112,9 +96,6 @@ relabeling the document.
 - **Validation**: Semantic validation via shared Rust core
 - **CCSDS units**: Required units are checked instead of silently reinterpreted
 - **Python bindings**: Native Python API via PyO3 and maturin
-
-Run `just bench-competitor` for the optional isolated Python comparison. The competing distribution
-is kept out of package dependencies and routine CI.
 
 ## Documentation
 

@@ -10,7 +10,7 @@ use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
 fn acm(records: usize) -> Acm {
-    let mut message = Acm::from_kvn(include_str!("../../data/kvn/acm_g7.kvn")).unwrap();
+    let mut message = Acm::from_kvn(include_str!("../data/kvn/acm_g7.kvn")).unwrap();
     let line = message.body.segment.data.att[0].att_lines[0].clone();
     message.body.segment.data.att[0].att_lines = vec![line; records];
     message

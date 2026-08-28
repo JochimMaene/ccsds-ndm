@@ -1,7 +1,7 @@
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::{Ndm, Validate};
 
-const OPM: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const OPM: &str = include_str!("../data/kvn/opm_g1.kvn");
 
 #[test]
 fn opm_validation_collects_independent_errors_in_model_order() {

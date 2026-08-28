@@ -6,7 +6,7 @@ use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::CalendarEpoch;
 
-const OPM_WITH_MANEUVERS: &str = include_str!("../../data/kvn/opm_g2.kvn");
+const OPM_WITH_MANEUVERS: &str = include_str!("../data/kvn/opm_g2.kvn");
 
 fn opm() -> Opm {
     Opm::from_kvn(OPM_WITH_MANEUVERS).expect("failed to parse OPM fixture")

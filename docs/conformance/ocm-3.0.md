@@ -25,7 +25,7 @@ This inventory records maintainer evidence for standalone OCM 3.0. The
 | Generation boundary | Materialized and streaming KVN generation reject non-ASCII free text and overlong keyword records, while finite trajectory/covariance numbers are rounded when necessary to the CCSDS digit limit. The TIME_AND_ANGLE vector regression proves both notation paths. |
 | Resource behaviour | Parsing 10 versus 1,000 trajectory and covariance records uses one owned numeric vector allocation per record without per-record reallocation. Maneuver parsing is bounded by its owned strings/vectors. Validated streaming generation has record-independent temporary allocation overhead for trajectory, covariance, and maneuver histories; materialized storage stays output-proportional. |
 | Reproducible workloads | Existing `ocm_trajectory_10k`, `ocm_covariance_10k`, and `ocm_maneuver_10k` Criterion groups measure KVN/XML parse, generation, and validation. The shared family matrices add representative small-message comparisons. |
-| Shared surfaces and limits | `family_contract`, Python option tests, CLI dispatch tests, and the shared generation plumbing exercise bounded parsing/generation, structured diagnostics, and Rust-core delegation. |
+| Shared surfaces and limits | `family_contract`, Python option tests, and the shared generation plumbing exercise bounded parsing/generation, structured diagnostics, and Rust-core delegation. |
 
 The two shipped KVN comments that used a Greek eta were normalized to the ASCII word `eta`; strict
 KVN processing does not silently accept or regenerate the non-ASCII spelling.
@@ -55,10 +55,9 @@ does not claim byte-preserving regeneration.
 
 `bindings/python/tests/test_ocm.py`, `test_api_consistency.py`, and
 `test_parse_and_generation_options.py` exercise the Python class, typed nested setters, generic
-dispatch, strict parsing/generation options, and shared limits. `family_surface_cli` exercises the
-actual CLI binary for OCM validation, KVN-to-XML conversion, type identity, exit status, and
-zero-stdout limit failure. The repository-wide `package-python` and `package-rust` gates install
-and import the built artifacts; they are release gates shared by all family cells.
+dispatch, strict parsing/generation options, and shared limits. The repository-wide
+`package-python` and `package-rust` gates verify the built artifacts; they are release gates shared
+by all family cells.
 
 ## Status
 

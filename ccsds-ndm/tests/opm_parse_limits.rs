@@ -2,7 +2,7 @@ use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::ParseOptions;
 
-const KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 
 fn xml() -> String {
     Opm::from_kvn(KVN)

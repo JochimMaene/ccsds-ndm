@@ -2,8 +2,8 @@ use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::Epoch;
 
-const MULTI_SEGMENT: &str = include_str!("../../data/kvn/oem_g11.kvn");
-const XML: &str = include_str!("../../data/xml/oem_g14.xml");
+const MULTI_SEGMENT: &str = include_str!("../data/kvn/oem_g11.kvn");
+const XML: &str = include_str!("../data/xml/oem_g14.xml");
 
 fn epoch(value: &str) -> Epoch {
     value.parse().unwrap()

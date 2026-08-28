@@ -6,52 +6,72 @@
 
 from pathlib import Path
 
-import ccsds_ndm
 import pytest
-from ccsds_ndm import Acm, Aem, Apm, Cdm, Ndm, Ocm, Oem, Omm, Opm, Rdm, Tdm
 
+import ccsds_ndm
+from ccsds_ndm import Acm, Aem, Apm, Cdm, Ndm, Ocm, Oem, Omm, Opm, Rdm, Tdm
 
 ROOT = Path(__file__).resolve().parents[3]
 
 CLASS_FIXTURES = [
-    (Acm, ROOT / "data/kvn/acm_g6.kvn"),
-    (Aem, ROOT / "data/kvn/aem_g4.kvn"),
-    (Apm, ROOT / "data/kvn/apm_g1.kvn"),
-    (Cdm, ROOT / "data/kvn/cdm_362.kvn"),
-    (Ndm, ROOT / "data/xml/ndm_g12.xml"),
-    (Ocm, ROOT / "data/kvn/ocm_g15.kvn"),
-    (Oem, ROOT / "data/kvn/oem_g11.kvn"),
-    (Omm, ROOT / "data/kvn/omm_g7.kvn"),
-    (Opm, ROOT / "data/kvn/opm_g1.kvn"),
-    (Rdm, ROOT / "data/kvn/rdm_c1.kvn"),
-    (Tdm, ROOT / "data/kvn/tdm_e1.kvn"),
+    (Acm, ROOT / "ccsds-ndm/data/kvn/acm_g6.kvn"),
+    (Aem, ROOT / "ccsds-ndm/data/kvn/aem_g4.kvn"),
+    (Apm, ROOT / "ccsds-ndm/data/kvn/apm_g1.kvn"),
+    (Cdm, ROOT / "ccsds-ndm/data/kvn/cdm_362.kvn"),
+    (Ndm, ROOT / "ccsds-ndm/data/xml/ndm_g12.xml"),
+    (Ocm, ROOT / "ccsds-ndm/data/kvn/ocm_g15.kvn"),
+    (Oem, ROOT / "ccsds-ndm/data/kvn/oem_g11.kvn"),
+    (Omm, ROOT / "ccsds-ndm/data/kvn/omm_g7.kvn"),
+    (Opm, ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn"),
+    (Rdm, ROOT / "ccsds-ndm/data/kvn/rdm_c1.kvn"),
+    (Tdm, ROOT / "ccsds-ndm/data/kvn/tdm_e1.kvn"),
 ]
 
 LIVE_NESTED_CASES = [
-    (Acm, ROOT / "data/kvn/acm_g6.kvn", lambda value: value.segment.metadata),
-    (Aem, ROOT / "data/kvn/aem_g4.kvn", lambda value: value.segments[0].metadata),
-    (Apm, ROOT / "data/kvn/apm_g1.kvn", lambda value: value.segment.metadata),
-    (Cdm, ROOT / "data/kvn/cdm_362.kvn", lambda value: value.body.segments[0].metadata),
-    (Ocm, ROOT / "data/kvn/ocm_g15.kvn", lambda value: value.segment.metadata),
-    (Oem, ROOT / "data/kvn/oem_g12.kvn", lambda value: value.segments[0].metadata),
-    (Omm, ROOT / "data/kvn/omm_g7.kvn", lambda value: value.segment.metadata),
-    (Opm, ROOT / "data/kvn/opm_g1.kvn", lambda value: value.segment.metadata),
-    (Rdm, ROOT / "data/kvn/rdm_c1.kvn", lambda value: value.segment.metadata),
+    (Acm, ROOT / "ccsds-ndm/data/kvn/acm_g6.kvn", lambda value: value.segment.metadata),
+    (
+        Aem,
+        ROOT / "ccsds-ndm/data/kvn/aem_g4.kvn",
+        lambda value: value.segments[0].metadata,
+    ),
+    (Apm, ROOT / "ccsds-ndm/data/kvn/apm_g1.kvn", lambda value: value.segment.metadata),
+    (
+        Cdm,
+        ROOT / "ccsds-ndm/data/kvn/cdm_362.kvn",
+        lambda value: value.body.segments[0].metadata,
+    ),
+    (
+        Ocm,
+        ROOT / "ccsds-ndm/data/kvn/ocm_g15.kvn",
+        lambda value: value.segment.metadata,
+    ),
+    (
+        Oem,
+        ROOT / "ccsds-ndm/data/kvn/oem_g12.kvn",
+        lambda value: value.segments[0].metadata,
+    ),
+    (Omm, ROOT / "ccsds-ndm/data/kvn/omm_g7.kvn", lambda value: value.segment.metadata),
+    (Opm, ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn", lambda value: value.segment.metadata),
+    (Rdm, ROOT / "ccsds-ndm/data/kvn/rdm_c1.kvn", lambda value: value.segment.metadata),
 ]
 
 LIVE_LIST_CASES = [
-    (Acm, ROOT / "data/kvn/acm_g6.kvn", lambda value: value.segment.data.att),
-    (Aem, ROOT / "data/kvn/aem_g4.kvn", lambda value: value.segments),
+    (Acm, ROOT / "ccsds-ndm/data/kvn/acm_g6.kvn", lambda value: value.segment.data.att),
+    (Aem, ROOT / "ccsds-ndm/data/kvn/aem_g4.kvn", lambda value: value.segments),
     (
         Apm,
-        ROOT / "data/kvn/apm_g1.kvn",
+        ROOT / "ccsds-ndm/data/kvn/apm_g1.kvn",
         lambda value: value.segment.data.quaternion_state,
     ),
-    (Cdm, ROOT / "data/kvn/cdm_362.kvn", lambda value: value.body.segments),
-    (Ndm, ROOT / "data/xml/ndm_g12.xml", lambda value: value.messages),
-    (Ocm, ROOT / "data/kvn/ocm_g15.kvn", lambda value: value.segment.data.traj),
-    (Oem, ROOT / "data/kvn/oem_g11.kvn", lambda value: value.segments),
-    (Tdm, ROOT / "data/kvn/tdm_e1.kvn", lambda value: value.body.segments),
+    (Cdm, ROOT / "ccsds-ndm/data/kvn/cdm_362.kvn", lambda value: value.body.segments),
+    (Ndm, ROOT / "ccsds-ndm/data/xml/ndm_g12.xml", lambda value: value.messages),
+    (
+        Ocm,
+        ROOT / "ccsds-ndm/data/kvn/ocm_g15.kvn",
+        lambda value: value.segment.data.traj,
+    ),
+    (Oem, ROOT / "ccsds-ndm/data/kvn/oem_g11.kvn", lambda value: value.segments),
+    (Tdm, ROOT / "ccsds-ndm/data/kvn/tdm_e1.kvn", lambda value: value.body.segments),
 ]
 
 
@@ -91,7 +111,7 @@ def test_registered_model_types_are_exported_from_the_package(name):
 
 
 def test_nested_model_changes_are_live_without_an_editor():
-    opm = Opm.from_file(str(ROOT / "data/kvn/opm_g1.kvn"))
+    opm = Opm.from_file(str(ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn"))
     assert opm.segment is opm.segment
     assert opm.segment.metadata is opm.segment.metadata
 
@@ -99,7 +119,7 @@ def test_nested_model_changes_are_live_without_an_editor():
     opm.segment.data.state_vector.x = 7000.0
     assert opm.segment.metadata.object_name == "UPDATED"
     assert opm.segment.data.state_vector.x == pytest.approx(7000.0)
-    kvn = opm.to_kvn()
+    kvn = opm.to_str("kvn")
     assert any(
         line.startswith("OBJECT_NAME") and line.endswith("= UPDATED")
         for line in kvn.splitlines()
@@ -108,14 +128,14 @@ def test_nested_model_changes_are_live_without_an_editor():
         line.startswith("X ") and line.endswith("= 7000.0") for line in kvn.splitlines()
     )
 
-    cdm = Cdm.from_file(str(ROOT / "data/kvn/cdm_362.kvn"))
+    cdm = Cdm.from_file(str(ROOT / "ccsds-ndm/data/kvn/cdm_362.kvn"))
     retained_segment = cdm.body.segments[0]
     retained_segment.metadata.object_name = "OBJECT-1"
     assert cdm.body.segments[0].metadata.object_name == "OBJECT-1"
     assert cdm.body.segments[0] is retained_segment
     assert any(
         line.startswith("OBJECT_NAME") and line.endswith("= OBJECT-1")
-        for line in cdm.to_kvn().splitlines()
+        for line in cdm.to_str("kvn").splitlines()
     )
 
     combined = Ndm([opm])
@@ -147,13 +167,15 @@ def test_nested_identity_and_mutation_are_live_for_every_message_family(
     assert any(
         key.strip() == "OBJECT_NAME" and value.strip() == "UPDATED"
         for key, value in (
-            line.split("=", 1) for line in message.to_kvn().splitlines() if "=" in line
+            line.split("=", 1)
+            for line in message.to_str("kvn").splitlines()
+            if "=" in line
         )
     )
 
 
 def test_tdm_nested_identity_and_mutation_are_live():
-    message = Tdm.from_file(str(ROOT / "data/kvn/tdm_e1.kvn"))
+    message = Tdm.from_file(str(ROOT / "ccsds-ndm/data/kvn/tdm_e1.kvn"))
     metadata = message.body.segments[0].metadata
     assert message.body.segments[0].metadata is metadata
 
@@ -162,7 +184,9 @@ def test_tdm_nested_identity_and_mutation_are_live():
     assert any(
         key.strip() == "TIME_SYSTEM" and value.strip() == "TAI"
         for key, value in (
-            line.split("=", 1) for line in message.to_kvn().splitlines() if "=" in line
+            line.split("=", 1)
+            for line in message.to_str("kvn").splitlines()
+            if "=" in line
         )
     )
 
@@ -186,8 +210,8 @@ def test_repeated_model_fields_are_live_python_lists(cls, path, get_records):
 
 
 def test_live_lists_report_the_bad_index_at_the_generation_gate():
-    message = Oem.from_file(str(ROOT / "data/kvn/oem_g12.kvn"))
+    message = Oem.from_file(str(ROOT / "ccsds-ndm/data/kvn/oem_g12.kvn"))
     message.segments.append(object())
 
     with pytest.raises(ValueError, match=r"segments\[1\] must be OemSegment"):
-        message.to_kvn()
+        message.to_str("kvn")

@@ -7,13 +7,11 @@ use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::{GenerateOptions, VersionedNdm};
 use tempfile::NamedTempFile;
 
-const ATT_KVN: &str = include_str!("../../data/kvn/acm_g7.kvn");
-const COV_KVN: &str = include_str!("../../data/kvn/acm_g9.kvn");
+const ATT_KVN: &str = include_str!("../data/kvn/acm_g7.kvn");
+const COV_KVN: &str = include_str!("../data/kvn/acm_g9.kvn");
 
 fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(relative)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
 #[test]
@@ -115,7 +113,7 @@ fn every_shipped_acm_fixture_preserves_the_typed_model_and_generates_valid_xml()
 
 #[test]
 fn acm_vectors_and_units_survive_both_notations() {
-    let physical = Acm::from_kvn(include_str!("../../data/kvn/acm_g8.kvn")).unwrap();
+    let physical = Acm::from_kvn(include_str!("../data/kvn/acm_g8.kvn")).unwrap();
     let normalized = Acm::from_xml(&physical.to_xml().unwrap()).unwrap();
     let cp = normalized.body.segment.data.phys.unwrap().cp.unwrap();
     assert_eq!(cp.elements, [0.04, -0.78, -0.023]);
@@ -158,7 +156,7 @@ fn kvn_generation_rounds_history_numbers_to_the_ccsds_digit_limit() {
     message.body.segment.data.att[0].att_lines[0].values[1] = 1.234_567_890_123_456_7;
     assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
 
-    let mut physical = Acm::from_kvn(include_str!("../../data/kvn/acm_g8.kvn")).unwrap();
+    let mut physical = Acm::from_kvn(include_str!("../data/kvn/acm_g8.kvn")).unwrap();
     physical.body.segment.data.phys.as_mut().unwrap().drag_coeff = Some(1.234_567_890_123_456_7);
     assert!(physical
         .to_kvn()

@@ -24,9 +24,6 @@ Inclusion in this list describes implementation coverage, not verified support f
 notation, operation, or public surface. Exact conformance claims are made only through the project's
 support and conformance matrix.
 
-For a detailed overview of the NDM conceptual framework, refer to the :doc:`ccsds-books/ndm`.
-For the specific Attitude Data Messages standard, see :doc:`ccsds-books/adm`.
-
 .. toctree::
    :maxdepth: 2
    :caption: User Guide
@@ -40,9 +37,3 @@ For the specific Attitude Data Messages standard, see :doc:`ccsds-books/adm`.
    :caption: API Reference
 
    api/python
-
-.. toctree::
-   :maxdepth: 2
-   :caption: CCSDS Standards
-
-   ccsds-books/index

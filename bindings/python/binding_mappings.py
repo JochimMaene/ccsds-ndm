@@ -56,12 +56,6 @@ FIELD_MAPPINGS: dict[str, dict[str, str]] = {
     "RelativeMetadataData": {
         "relative_state_vector": "relative_state_vector",
     },
-    "ManeuverParameters": {
-        "man_epoch_start": "man_epoch_ignition",
-        "man_tor_x": "man_tor_1",
-        "man_tor_y": "man_tor_2",
-        "man_tor_z": "man_tor_3",
-    },
     "QuaternionState": {
         "q1": "quaternion",
         "q2": "quaternion",
@@ -220,6 +214,8 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
 
 STRUCT_MAPPINGS: dict[str, str] = {
     "Ndm": "CombinedNdm",
+    "ApmManeuverParameters": "AttManeuverState",
+    "OpmManeuverParameters": "ManeuverParameters",
 }
 
 # ---------------------------------------------------------------------------

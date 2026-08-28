@@ -5850,7 +5850,7 @@ TRAJ_STOP
     #[test]
     fn test_xsd_sample_ocm_g20_xml() {
         // Parse official CCSDS OCM XML example G-20
-        let xml = include_str!("../../../data/xml/ocm_g20.xml");
+        let xml = include_str!("../../data/xml/ocm_g20.xml");
         let ocm = Ocm::from_xml(xml).unwrap();
 
         // Verify mandatory metadata
@@ -5893,7 +5893,7 @@ TRAJ_STOP
     fn test_to_xml_roundtrip() {
         // Cover to_xml method (lines 79-81)
         // Use the official XML example which is known to be valid
-        let xml = include_str!("../../../data/xml/ocm_g20.xml");
+        let xml = include_str!("../../data/xml/ocm_g20.xml");
         let ocm = Ocm::from_xml(xml).unwrap();
         let xml_out = ocm.to_xml().unwrap();
         assert!(xml_out.contains("ocm"));
@@ -5905,7 +5905,7 @@ TRAJ_STOP
     fn test_xml_roundtrip_with_all_blocks() {
         // Cover XML serialization for TrajLine, CovLine, ManLine
         // Use the official XML example to test XML roundtrip
-        let xml = include_str!("../../../data/xml/ocm_g20.xml");
+        let xml = include_str!("../../data/xml/ocm_g20.xml");
         let ocm = Ocm::from_xml(xml).unwrap();
 
         // Verify structure was parsed

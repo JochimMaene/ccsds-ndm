@@ -22,7 +22,7 @@ This inventory records maintainer evidence for standalone CDM 1.0. The
 | Delimiter-free COMMENT decision | A leading KVN comment run before the first data keyword is normatively retained on the outer data block; no textual delimiter exists from which to infer a split. If the typed model populates the first present nested block's comments, every materialized and streaming KVN generation route rejects the state before output. The shipped XML fixture demonstrates this richer, XML-only association and is therefore intentionally not convertible to KVN. |
 | Typed preservation and generation | All three shipped KVN fixtures retain their complete typed model through deterministic KVN and XML generation. The shipped XML fixture retains its model through XML generation. Every generated XML document validates against the official 4.0.0 master schema. |
 | KVN fixed-point preflight | CDM's shape is a fixed, bounded set of scalar records. A private generation preflight writes and reparses that bounded representation before caller-visible output, rejecting lexical violations, multiline normalization, comment reassociation, or any other typed-model change. Streaming rejection is proven to write zero bytes. |
-| Shared surfaces and limits | `family_contract`, Python option tests, CLI dispatch tests, and the shared generation plumbing exercise bounded parsing/generation, structured diagnostics, and Rust-core delegation. No separate CDM semantics are implemented in an adapter. |
+| Shared surfaces and limits | `family_contract`, Python option tests, and the shared generation plumbing exercise bounded parsing/generation, structured diagnostics, and Rust-core delegation. No separate CDM semantics are implemented in an adapter. |
 
 ## Normative inventory reconciliation
 
@@ -46,9 +46,8 @@ the self-contained two-object/cardinality and required-field rules represented b
 
 `bindings/python/tests/test_cdm.py`, `test_api_consistency.py`, and
 `test_parse_and_generation_options.py` cover Python construction, nested setters, KVN/XML parsing
-and generation, generic identity, and shared limits. `family_surface_cli` invokes the packaged CLI
-binary for CDM validation, KVN-to-XML conversion, identity, exit status, and atomic output-limit
-failure. `package-python` and `package-rust` are the shared built-artifact install gates.
+and generation, generic identity, and shared limits. `package-python` and `package-rust` are the
+shared built-artifact gates.
 
 ## Status
 

@@ -22,7 +22,7 @@ This inventory records maintainer evidence for standalone RDM 1.0. The
 | Conversion preservation | The routed-comment parser associates KVN comments with the logical block selected by the following keyword. KVN generation retains required/optional units for atmospheric, impact, state, covariance, spacecraft, and OD measures. The Annex C XML fixture survives XML-to-KVN conversion modulo the KVN COMMENT separator's non-semantic surrounding-whitespace normalization. |
 | Unrepresentable XML state | An XML `<data><COMMENT>` cannot be distinguished from the first atmospheric logical-block comment in flattened KVN. All materialized and streaming KVN gates reject that state before output instead of silently moving the comment. |
 | Valid input and generation | Both shipped KVN and both shipped XML fixtures preserve their typed model in their source notation; every generated XML document validates against the official 4.0.0 master schema. |
-| Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, CLI dispatch test, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
+| Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
 
 The existing RDM unit suite separately covers required metadata and atmospheric data, controlled
 re-entry/object choices, reference epochs, ground-impact confidence intervals and bounds, state and
@@ -52,8 +52,7 @@ caller supplied; locally decidable controlled values and numeric ranges are type
 ## Allocation and packaged-surface evidence
 
 `fixed_family_allocations` fixes strict KVN parse budgets at 96 allocations/12,000 bytes and
-preflighted streaming generation at 40 allocations/2,000 bytes. `family_surface_cli` exercises
-binary validation/conversion and zero-byte limit failure. `test_rdm.py` and the shared Python
+preflighted streaming generation at 40 allocations/2,000 bytes. `test_rdm.py` and the shared Python
 options matrix cover both notations, files, epochs, generic identity, diagnostics, and limits.
 Strict binding audit, generated stubs/doc checks, wheel verification, and Rust artifact
 verification are the packaged gates.

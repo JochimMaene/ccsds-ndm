@@ -7,6 +7,7 @@ Unit tests for Orbit Comprehensive Message (OCM) Python bindings.
 """
 
 import pytest
+
 from ccsds_ndm import (
     CovLine,
     ManLine,

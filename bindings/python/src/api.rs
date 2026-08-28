@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::errors::{ccsds_error_to_pyerr, file_parse_error_to_pyerr};
+use crate::errors::{ccsds_error_to_pyerr, file_parse_error_to_pyerr, NdmValidationError};
 use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::options::{GenerateOptions, ParseOptions};
 use ccsds_ndm::traits::{Ndm, Validate};
@@ -96,18 +96,17 @@ pub fn parse_typed_file_with_options<T: FromMessageType>(
     expect_typed(message)
 }
 
-pub fn validate_message<T: Validate>(message: &T, strict: bool) -> PyResult<Option<Vec<String>>> {
-    if strict {
-        message.validate().map_err(ccsds_error_to_pyerr)?;
-        return Ok(None);
-    }
-
+pub fn validate_message<T: Validate>(message: &T) -> PyResult<()> {
     let errors = message.validation_errors().map_err(ccsds_error_to_pyerr)?;
     if errors.is_empty() {
-        Ok(None)
+        Ok(())
     } else {
-        Ok(Some(
-            errors.into_iter().map(|error| error.to_string()).collect(),
+        Err(NdmValidationError::new_err(
+            errors
+                .into_iter()
+                .map(|error| error.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
         ))
     }
 }

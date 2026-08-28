@@ -1,10 +1,10 @@
 use ccsds_ndm::messages::{aem::Aem, apm::Apm};
 use ccsds_ndm::traits::Ndm;
 
-const APM_KVN: &str = include_str!("../../data/kvn/apm_g1.kvn");
-const AEM_KVN: &str = include_str!("../../data/kvn/aem_g4.kvn");
-const APM_XML: &str = include_str!("../../data/xml/apm_g10.xml");
-const AEM_XML: &str = include_str!("../../data/xml/aem_g11.xml");
+const APM_KVN: &str = include_str!("../data/kvn/apm_g1.kvn");
+const AEM_KVN: &str = include_str!("../data/kvn/aem_g4.kvn");
+const APM_XML: &str = include_str!("../data/xml/apm_g10.xml");
+const AEM_XML: &str = include_str!("../data/xml/aem_g11.xml");
 
 #[test]
 fn apm_epoch_fields_require_calendar_or_ordinal_form() {

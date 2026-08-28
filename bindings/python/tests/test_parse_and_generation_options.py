@@ -9,12 +9,11 @@ import pytest
 
 import ccsds_ndm
 
-
 REPOSITORY_ROOT = Path(__file__).parents[3]
-OPM_KVN = (REPOSITORY_ROOT / "data/kvn/opm_g1.kvn").read_text()
-OEM_KVN = (REPOSITORY_ROOT / "data/kvn/oem_g11.kvn").read_text()
-COMBINED_XML = (REPOSITORY_ROOT / "data/xml/ndm_g12.xml").read_text()
-PERMISSIVE_XML = (REPOSITORY_ROOT / "data/xml/ndm_g22.xml").read_text()
+OPM_KVN = (REPOSITORY_ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
+OEM_KVN = (REPOSITORY_ROOT / "ccsds-ndm/data/kvn/oem_g11.kvn").read_text()
+COMBINED_XML = (REPOSITORY_ROOT / "ccsds-ndm/data/xml/ndm_g12.xml").read_text()
+PERMISSIVE_XML = (REPOSITORY_ROOT / "ccsds-ndm/data/xml/ndm_g22.xml").read_text()
 STANDALONE_KVN_CASES = [
     (ccsds_ndm.Omm, "omm", "omm_g7.kvn", False),
     (ccsds_ndm.Ocm, "ocm", "ocm_g15.kvn", True),
@@ -36,10 +35,10 @@ def test_generation_preserves_source_version_or_upgrades_explicitly():
     legacy = OPM_KVN.replace("3.0", "2.0", 1)
     message = ccsds_ndm.Opm.from_str(legacy, format="kvn")
 
-    preserved = message.to_kvn()
+    preserved = message.to_str("kvn")
     assert preserved.splitlines()[0].endswith("2.0")
 
-    upgraded = message.to_kvn(version="latest")
+    upgraded = message.to_str("kvn", version="latest")
     assert upgraded.splitlines()[0].endswith("3.0")
 
 
@@ -50,23 +49,21 @@ def test_generation_has_no_misleading_unchecked_mode():
         message.to_str("kvn", validate=False)
 
 
-def test_python_opm_validation_exposes_strict_and_aggregate_core_results():
+def test_python_opm_validation_raises_one_aggregate_error():
     message = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn")
     header = message.header
     header.originator = ""
     message.header = header
+    message.segment.metadata.object_name = ""
 
-    with pytest.raises(ccsds_ndm.NdmValidationError) as strict:
+    with pytest.raises(ccsds_ndm.NdmValidationError) as aggregate:
         message.validate()
-    assert strict.value.code == "validation.missing_required_field"
-    assert strict.value.field_path == "header.originator"
-    assert strict.value.severity == "error"
-    assert strict.value.operation == "validate"
-    assert strict.value.line is None
+    error = str(aggregate.value).lower()
+    assert "originator" in error
+    assert "object_name" in error
 
-    errors = message.validate(strict=False)
-    assert errors is not None
-    assert any("originator" in error.lower() for error in errors)
+    with pytest.raises(TypeError):
+        message.validate(strict=False)
 
 
 def test_unsupported_version_errors_expose_the_common_diagnostic_attributes():
@@ -134,7 +131,7 @@ def test_opm_structured_diagnostics_and_resource_limits_are_exposed():
 
     message = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn")
     with pytest.raises(ccsds_ndm.NdmError) as limited_output:
-        message.to_xml(max_output_bytes=1)
+        message.to_str("xml", max_output_bytes=1)
     assert limited_output.value.code == "resource.output_limit_exceeded"
     assert limited_output.value.operation == "generate"
     assert limited_output.value.notation == "xml"
@@ -181,7 +178,7 @@ def test_python_oem_uses_the_shared_parse_and_generation_limits(tmp_path):
 
     message = ccsds_ndm.Oem.from_str(OEM_KVN, format="kvn")
     with pytest.raises(ccsds_ndm.NdmError) as output_limit:
-        message.to_xml(max_output_bytes=1)
+        message.to_str("xml", max_output_bytes=1)
     assert output_limit.value.code == "resource.output_limit_exceeded"
     assert output_limit.value.message_kind == "oem"
 
@@ -215,7 +212,7 @@ def test_parse_resource_limits_are_advanced_keyword_only_options():
 def test_remaining_python_messages_share_the_bounded_contract(
     wrapper, kind, fixture, has_records
 ):
-    data = (REPOSITORY_ROOT / "data/kvn" / fixture).read_text()
+    data = (REPOSITORY_ROOT / "ccsds-ndm/data/kvn" / fixture).read_text()
 
     with pytest.raises(ccsds_ndm.NdmError) as input_limit:
         wrapper.from_str(data, format="kvn", max_input_bytes=1)
@@ -230,13 +227,13 @@ def test_remaining_python_messages_share_the_bounded_contract(
 
     message = wrapper.from_str(data, format="kvn")
     with pytest.raises(ccsds_ndm.NdmError) as output_limit:
-        message.to_xml(max_output_bytes=1)
+        message.to_str("xml", max_output_bytes=1)
     assert output_limit.value.code == "resource.output_limit_exceeded"
     assert output_limit.value.message_kind == kind
 
 
 def test_generic_python_conversion_dispatches_non_opm_messages(tmp_path):
-    omm = (REPOSITORY_ROOT / "data/kvn/omm_g7.kvn").read_text()
+    omm = (REPOSITORY_ROOT / "ccsds-ndm/data/kvn/omm_g7.kvn").read_text()
     xml = ccsds_ndm.convert(omm, "xml", max_output_bytes=100_000)
     assert isinstance(ccsds_ndm.from_str(xml, format="xml"), ccsds_ndm.Omm)
 
@@ -267,21 +264,21 @@ def test_combined_python_message_keeps_identity_and_shared_limits():
     assert record_limit.value.code == "resource.record_limit_exceeded"
     assert record_limit.value.message_kind == "ndm"
 
-    xml = message.to_xml()
+    xml = message.to_str("xml")
     assert isinstance(ccsds_ndm.from_str(xml, format="xml"), ccsds_ndm.Ndm)
     with pytest.raises(ccsds_ndm.NdmError) as output_limit:
-        message.to_xml(max_output_bytes=len(xml.encode()) - 1)
+        message.to_str("xml", max_output_bytes=len(xml.encode()) - 1)
     assert output_limit.value.code == "resource.output_limit_exceeded"
     assert output_limit.value.message_kind == "ndm"
 
 
 def test_python_conversion_delegates_to_strict_rust_core(tmp_path):
     xml = ccsds_ndm.convert(OPM_KVN, "xml")
-    expected_kvn = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn").to_kvn()
-    assert ccsds_ndm.Opm.from_str(xml, format="xml").to_kvn() == expected_kvn
+    expected_kvn = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn").to_str("kvn")
+    assert ccsds_ndm.Opm.from_str(xml, format="xml").to_str("kvn") == expected_kvn
 
     kvn = ccsds_ndm.convert(xml, "kvn")
-    assert ccsds_ndm.Opm.from_str(kvn, format="kvn").to_kvn() == expected_kvn
+    assert ccsds_ndm.Opm.from_str(kvn, format="kvn").to_str("kvn") == expected_kvn
 
     source = tmp_path / "source.kvn"
     destination = tmp_path / "destination.xml"

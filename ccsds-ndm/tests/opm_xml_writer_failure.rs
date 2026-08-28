@@ -8,7 +8,7 @@ use ccsds_ndm::{GenerateOptions, VersionedNdm};
 use std::io::{self, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-const OPM_3_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const OPM_3_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 
 #[derive(Debug)]
 struct FailAfter {

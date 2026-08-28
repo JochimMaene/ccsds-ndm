@@ -8,14 +8,15 @@ Unit tests for Orbit Ephemeris Message (OEM) Python bindings.
 
 import numpy as np
 import pytest
+
 from ccsds_ndm import (
+    NdmValidationError,
     OdmHeader,
     Oem,
     OemCovarianceMatrix,
     OemData,
     OemMetadata,
     OemSegment,
-    NdmValidationError,
     StateVectorAcc,
 )
 

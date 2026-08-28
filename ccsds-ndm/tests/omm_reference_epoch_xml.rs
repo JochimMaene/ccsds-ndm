@@ -7,7 +7,7 @@ use ccsds_ndm::traits::Ndm;
 
 #[test]
 fn xml_reference_frame_epoch_requires_calendar_form() {
-    let source = include_str!("../../data/xml/omm_g10.xml");
+    let source = include_str!("../data/xml/omm_g10.xml");
     let valid = source.replace(
         "<REF_FRAME>TEME</REF_FRAME>",
         "<REF_FRAME>TEME</REF_FRAME>\n<REF_FRAME_EPOCH>2000-01-01T12:00:00</REF_FRAME_EPOCH>",

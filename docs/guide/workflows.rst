@@ -35,22 +35,6 @@ OPM, OEM, and OMM support edition-correct ODM 2.0 and 3.0 output. Select an edit
 archive <https://sanaregistry.org/r/ndmxml_unqualified/>`_. OPM and OEM ODM 1.0 remain parse-only
 because they do not have an audited schema-backed serializer; attempted relabeling is rejected.
 
-Command line
-------------
-
-Install the executable and use it for shell pipelines or atomic file conversion:
-
-.. code-block:: console
-
-   $ cargo install ccsds-ndm
-   $ ccsds-ndm validate example.opm
-   $ ccsds-ndm convert --to xml example.opm -o example.xml
-   $ ccsds-ndm convert --to xml --target-version 2.0 example.opm
-
-``--to`` is required. Diagnostics go to stderr and document bytes go to stdout unless ``-o`` is
-used. Exit codes distinguish invalid data, unsupported operations, resource limits, I/O, and
-command usage.
-
 Migrating the pre-0.0.9 API
 ---------------------------
 

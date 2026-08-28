@@ -140,36 +140,8 @@ impl Apm {
 
     /// Validate the message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, py: Python<'_>, strict: bool) -> PyResult<Option<Vec<String>>> {
-        crate::api::validate_message(&self.to_core(py)?, strict)
-    }
-
-    /// Serialize to KVN, preserving the source version by default.
-    #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_kvn(
-        &self,
-        py: Python<'_>,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.to_core(py)?, "kvn", version, max_output_bytes)
-    }
-
-    /// Serialize to XML, preserving the source version by default.
-    #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_xml(
-        &self,
-        py: Python<'_>,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.to_core(py)?, "xml", version, max_output_bytes)
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
     /// Serialize to validated KVN or XML.
@@ -461,7 +433,7 @@ impl ApmData {
             angular_velocity: py_list!(value.angular_velocity, AngVelState),
             spin: py_list!(value.spin, SpinState),
             inertia: py_list!(value.inertia, InertiaState),
-            maneuver_parameters: py_list!(value.maneuver_parameters, ManeuverParameters),
+            maneuver_parameters: py_list!(value.maneuver_parameters, ApmManeuverParameters),
         })
     }
 
@@ -504,7 +476,7 @@ impl ApmData {
             inertia: core_list!(self.inertia, InertiaState, "inertia"),
             maneuver_parameters: core_list!(
                 self.maneuver_parameters,
-                ManeuverParameters,
+                ApmManeuverParameters,
                 "maneuver_parameters"
             ),
         })
@@ -533,7 +505,7 @@ impl ApmData {
         angular_velocity: Option<Vec<Py<AngVelState>>>,
         spin: Option<Vec<Py<SpinState>>>,
         inertia: Option<Vec<Py<InertiaState>>>,
-        maneuver_parameters: Option<Vec<Py<ManeuverParameters>>>,
+        maneuver_parameters: Option<Vec<Py<ApmManeuverParameters>>>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         Ok(Self {
@@ -636,7 +608,7 @@ impl ApmData {
 
     /// Maneuver Parameters.
     ///
-    /// :type: list[ManeuverParameters]
+    /// :type: list[ApmManeuverParameters]
     #[getter]
     fn get_maneuver_parameters(&self, py: Python<'_>) -> Py<PyList> {
         self.maneuver_parameters.clone_ref(py)
@@ -646,7 +618,7 @@ impl ApmData {
     fn set_maneuver_parameters(
         &mut self,
         py: Python<'_>,
-        value: Vec<Py<ManeuverParameters>>,
+        value: Vec<Py<ApmManeuverParameters>>,
     ) -> PyResult<()> {
         self.maneuver_parameters = PyList::new(py, value)?.unbind();
         Ok(())
@@ -680,18 +652,18 @@ impl ApmData {
     }
 }
 
-/// Maneuver Parameters (Repeat for each maneuver).
+/// Maneuver Parameters block.
 ///
-/// References:
-/// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
+/// All mandatory elements are to be provided if the block is present.
+/// (See annex F for conventions and further detail.)
 #[pyclass]
 #[derive(Clone)]
-pub struct ManeuverParameters {
+pub struct ApmManeuverParameters {
     pub inner: ccsds_ndm::common::AttManeuverState,
 }
 
 #[pymethods]
-impl ManeuverParameters {
+impl ApmManeuverParameters {
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -735,7 +707,7 @@ impl ManeuverParameters {
         })
     }
 
-    /// Epoch of ignition (see 7.5.10 for formatting rules)
+    /// Epoch of start of maneuver. (For format specification, see 6.8.9.)
     ///
     /// :type: str
     #[getter]
@@ -749,7 +721,7 @@ impl ManeuverParameters {
         Ok(())
     }
 
-    /// Maneuver duration (If = 0, impulsive maneuver)
+    /// Maneuver duration.
     ///
     /// Units: s
     ///
@@ -764,8 +736,8 @@ impl ManeuverParameters {
         self.inner.man_duration.value = value;
     }
 
-    /// Reference frame in which the velocity increment vector data are given. The user must
-    /// select from the accepted set of values indicated in 3.2.4.11.
+    /// Coordinate system for the torque vector. The set of allowed values is described in annex B,
+    /// subsection B3.
     ///
     /// :type: str
     #[getter]
@@ -778,7 +750,7 @@ impl ManeuverParameters {
         self.inner.man_ref_frame = value;
     }
 
-    /// Torque X component.
+    /// 1st component of the torque vector.
     ///
     /// Units: N*m
     ///
@@ -793,7 +765,7 @@ impl ManeuverParameters {
         self.inner.man_tor_x.value = value;
     }
 
-    /// Torque Y component.
+    /// 2nd component of the torque vector.
     ///
     /// Units: N*m
     ///
@@ -808,7 +780,7 @@ impl ManeuverParameters {
         self.inner.man_tor_y.value = value;
     }
 
-    /// Torque Z component.
+    /// 3rd component of the torque vector.
     ///
     /// Units: N*m
     ///
@@ -845,7 +817,7 @@ impl ManeuverParameters {
         });
     }
 
-    /// Comments (see 7.8 for formatting rules).
+    /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
     /// :type: list[str]
     #[getter]

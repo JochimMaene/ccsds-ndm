@@ -1957,7 +1957,7 @@ COVARIANCE_STOP
 
     #[test]
     fn test_xsd_parse_sample_oem_g11() {
-        let kvn = include_str!("../../../data/kvn/oem_g11.kvn");
+        let kvn = include_str!("../../data/kvn/oem_g11.kvn");
         let oem = Oem::from_kvn(kvn).expect("Failed to parse oem_g11.kvn");
         assert_eq!(oem.version, "3.0");
         assert_eq!(oem.header.originator, "NASA/JPL");
@@ -2003,7 +2003,7 @@ META_STOP
 
     #[test]
     fn ref_frame_epoch_requires_calendar_form() {
-        let source = include_str!("../../../data/kvn/oem_g11.kvn");
+        let source = include_str!("../../data/kvn/oem_g11.kvn");
         let with_epoch = source.replacen(
             "REF_FRAME = EME2000\n",
             "REF_FRAME = EME2000\nREF_FRAME_EPOCH = 2000-01-01T12:00:00\n",
@@ -2029,7 +2029,7 @@ META_STOP
 
     #[test]
     fn contextual_epoch_fields_require_absolute_time_tags() {
-        let source = include_str!("../../../data/kvn/oem_g11.kvn");
+        let source = include_str!("../../data/kvn/oem_g11.kvn");
         for (needle, replacement) in [
             (
                 "START_TIME = 2019-12-18T12:00:00.331",

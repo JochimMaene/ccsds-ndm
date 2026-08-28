@@ -7,6 +7,7 @@ Unit tests for shared attitude state classes (QuaternionState, EulerAngleState, 
 """
 
 import pytest
+
 from ccsds_ndm import (
     AngVelState,
     EulerAngleState,

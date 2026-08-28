@@ -151,7 +151,7 @@ class TestNdm:
 
     def test_accepts_tdm_message(self):
         root = Path(__file__).parents[3]
-        tdm = Tdm.from_file(str(root / "data/xml/tdm_e21.xml"), format="xml")
+        tdm = Tdm.from_file(str(root / "ccsds-ndm/data/xml/tdm_e21.xml"), format="xml")
 
         combined = Ndm([tdm])
 
@@ -159,7 +159,7 @@ class TestNdm:
 
     def test_typed_ndm_rejects_single_message_kvn(self):
         root = Path(__file__).parents[3]
-        opm = (root / "data/kvn/opm_g1.kvn").read_text()
+        opm = (root / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
 
         for format_hint in (None, "kvn"):
             with pytest.raises(ValueError, match="different CCSDS NDM message type"):

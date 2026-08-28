@@ -10,9 +10,7 @@ const REMAINING_PREFIXES: [&str; 8] = [
 ];
 
 fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(relative)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
 fn fixture_paths(directory: &str, extension: &str) -> Vec<PathBuf> {

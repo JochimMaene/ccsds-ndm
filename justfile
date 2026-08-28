@@ -45,12 +45,12 @@ dev:
 # Generate Python type stubs (.pyi)
 [private]
 stubs:
-    cd {{python_dir}} && uv run --with ruff python stubs.py
+    cd {{python_dir}} && uv run python stubs.py
 
 # Check if Python type stubs are up to date
 [private]
 stubs-check:
-    cd {{python_dir}} && uv run --with ruff python stubs.py --check
+    cd {{python_dir}} && uv run python stubs.py --check
 
 # Sync docstrings from Rust to Python
 [private]
@@ -95,12 +95,12 @@ lint-rust:
 # Format the Python code
 [private]
 fmt-python:
-    cd {{python_dir}} && uv run --with ruff ruff format .
+    cd {{python_dir}} && uv run ruff format .
 
 # Lint the Python code
 [private]
 lint-python:
-    cd {{python_dir}} && uv run --with ruff ruff check .
+    cd {{python_dir}} && uv run ruff check .
 
 # Format both Rust and Python code
 fmt: fmt-rust fmt-python
@@ -162,10 +162,6 @@ conformance-opm-conversion:
     cargo test --manifest-path {{rust_manifest}} --test opm_conversion
 
 [private]
-conformance-opm-cli:
-    cargo test --manifest-path {{rust_manifest}} --test opm_cli
-
-[private]
 conformance-opm-python:
     cd {{python_dir}} && uv run pytest tests/test_opm.py tests/test_parse_and_generation_options.py
 
@@ -184,20 +180,22 @@ conformance-oem:
 conformance-omm:
     cargo test --manifest-path {{rust_manifest}} --test omm_conformance
     cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
-    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
+
+# Run the focused OEM/OMM Python adapter evidence
+[private]
+conformance-odm-surfaces:
+    cd {{python_dir}} && uv run pytest tests/test_verified_odm_surfaces.py tests/test_parse_and_generation_options.py
 
 # Run the focused standalone OCM 3.0 conformance and history-allocation evidence.
 [private]
 conformance-ocm:
     cargo test --manifest-path {{rust_manifest}} --test ocm_conformance
     cargo test --manifest-path {{rust_manifest}} --test ocm_kvn_allocations
-    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
 
 # Run the focused standalone CDM 1.0 conformance evidence.
 [private]
 conformance-cdm:
     cargo test --manifest-path {{rust_manifest}} --test cdm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
 
 # Run the focused standalone AEM 2.0 conformance and history-allocation evidence.
 [private]
@@ -205,21 +203,18 @@ conformance-aem:
     cargo test --manifest-path {{rust_manifest}} --test aem_conformance
     cargo test --manifest-path {{rust_manifest}} --test aem_semantic_validation
     cargo test --manifest-path {{rust_manifest}} --test aem_kvn_allocations
-    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
 
 # Run the focused standalone ACM 2.0 conformance and history-allocation evidence.
 [private]
 conformance-acm:
     cargo test --manifest-path {{rust_manifest}} --test acm_conformance
     cargo test --manifest-path {{rust_manifest}} --test acm_kvn_allocations
-    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
 
 # Run the focused combined NDM envelope, surface, and allocation evidence.
 [private]
 conformance-combined:
     cargo test --manifest-path {{rust_manifest}} --test combined_conformance
     cargo test --manifest-path {{rust_manifest}} --test combined_ndm
-    cargo test --manifest-path {{rust_manifest}} --test combined_cli
     cargo test --manifest-path {{rust_manifest}} --test combined_allocations
 
 # Run the focused standalone APM 2.0 conformance evidence.
@@ -227,32 +222,40 @@ conformance-combined:
 conformance-apm:
     cargo test --manifest-path {{rust_manifest}} --test apm_conformance
     cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
-    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
 
 # Run the focused standalone RDM 1.0 conformance evidence.
 [private]
 conformance-rdm:
     cargo test --manifest-path {{rust_manifest}} --test rdm_conformance
     cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
-    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
 
 # Run the focused standalone TDM 2.0 conformance and history-allocation evidence.
 [private]
 conformance-tdm:
     cargo test --manifest-path {{rust_manifest}} --test tdm_conformance
     cargo test --manifest-path {{rust_manifest}} --test tdm_kvn_allocations
-    cargo test --manifest-path {{rust_manifest}} --test family_surface_cli
 
 # Reproduce the complete OEM 3.0 Rust technical verification and artifact evidence
 [private]
 verify-oem:
-    just fmt-rust-check
-    just lint-rust
-    cargo test --manifest-path {{rust_manifest}} --all-features
+    just check
     just conformance-oem
+    just conformance-odm-surfaces
     cargo check --manifest-path {{rust_manifest}} --all-features --benches
     just docs
     just package-rust
+    just package-python
+
+# Reproduce the complete OMM 3.0 technical and packaged-surface evidence
+[private]
+verify-omm:
+    just check
+    just conformance-omm
+    just conformance-odm-surfaces
+    cargo check --manifest-path {{rust_manifest}} --all-features --benches
+    just docs
+    just package-rust
+    just package-python
 
 # Reproduce the complete OPM 3.0 technical verification and artifact evidence
 [private]
@@ -263,7 +266,6 @@ verify-opm:
     just conformance-opm-parse
     just conformance-opm-validation
     just conformance-opm-conversion
-    just conformance-opm-cli
     just conformance-opm-python
     cargo check --manifest-path {{rust_manifest}} --all-features --benches
     just docs
@@ -282,10 +284,6 @@ check-ci: check
 # Run Rust benchmarks
 bench:
     cargo bench --manifest-path {{rust_manifest}}
-
-# Build the wheel and run the optional isolated comparison with ccsds-ndm 3.1.1
-bench-competitor: build
-    uv run python scripts/benchmark-python-competitor.py
 
 # Benchmark materialized and streaming OPM XML generation
 [private]
@@ -353,7 +351,7 @@ package-rust:
 
 # Build the documentation
 docs:
-    uv run sphinx-build -b html docs docs/_build/html
+    uv run sphinx-build -E -W -b html docs docs/_build/html
 
 # Serve the documentation locally
 docs-serve:

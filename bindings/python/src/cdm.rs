@@ -4,7 +4,7 @@
 
 use crate::common::{parse_object_description, ObjectDescription, OdParameters};
 use ccsds_ndm::messages::cdm as core_cdm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{self as core_types, *};
 use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
@@ -259,14 +259,8 @@ impl Cdm {
 
     /// Validate the message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, py: Python<'_>, strict: bool) -> PyResult<Option<Vec<String>>> {
-        crate::api::validate_message(&self.to_core(py)?, strict)
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
     /// Parse a CDM from a KVN formatted string.
@@ -336,28 +330,6 @@ impl Cdm {
         let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
         Self::from_core(py, inner)
-    }
-
-    /// Serialize to KVN, preserving the source version by default.
-    #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_kvn(
-        &self,
-        py: Python<'_>,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.to_core(py)?, "kvn", version, max_output_bytes)
-    }
-
-    /// Serialize to XML, preserving the source version by default.
-    #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_xml(
-        &self,
-        py: Python<'_>,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.to_core(py)?, "xml", version, max_output_bytes)
     }
 
     /// Serialize to validated KVN or XML.
@@ -3098,6 +3070,21 @@ impl CdmCovarianceMatrix {
     /// Drag, SRP, and Thrust parameters are provided, as per CCSDS 508.0-B-1.
     fn to_numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
         let c = &self.inner;
+        c.validate().map_err(crate::errors::ccsds_error_to_pyerr)?;
+
+        macro_rules! optional_value {
+            ($field:ident) => {
+                c.$field
+                    .as_ref()
+                    .ok_or_else(|| {
+                        PyValueError::new_err(concat!(
+                            "Missing covariance field ",
+                            stringify!($field)
+                        ))
+                    })?
+                    .value
+            };
+        }
 
         // Determine dimension based on presence of optional rows
         // Rule 5.2.8: If a row is provided, all preceding optional rows must be provided.
@@ -3145,48 +3132,46 @@ impl CdmCovarianceMatrix {
 
         // Optional Row 7: Drag
         if dim >= 7 {
-            // Presence is guaranteed by dim check and Section 5.2.8
-            set(6, 0, c.cdrg_r.as_ref().unwrap().value);
-            set(6, 1, c.cdrg_t.as_ref().unwrap().value);
-            set(6, 2, c.cdrg_n.as_ref().unwrap().value);
-            set(6, 3, c.cdrg_rdot.as_ref().unwrap().value);
-            set(6, 4, c.cdrg_tdot.as_ref().unwrap().value);
-            set(6, 5, c.cdrg_ndot.as_ref().unwrap().value);
-            set(6, 6, c.cdrg_drg.as_ref().unwrap().value);
+            set(6, 0, optional_value!(cdrg_r));
+            set(6, 1, optional_value!(cdrg_t));
+            set(6, 2, optional_value!(cdrg_n));
+            set(6, 3, optional_value!(cdrg_rdot));
+            set(6, 4, optional_value!(cdrg_tdot));
+            set(6, 5, optional_value!(cdrg_ndot));
+            set(6, 6, optional_value!(cdrg_drg));
         }
 
         // Optional Row 8: SRP
         if dim >= 8 {
-            set(7, 0, c.csrp_r.as_ref().unwrap().value);
-            set(7, 1, c.csrp_t.as_ref().unwrap().value);
-            set(7, 2, c.csrp_n.as_ref().unwrap().value);
-            set(7, 3, c.csrp_rdot.as_ref().unwrap().value);
-            set(7, 4, c.csrp_tdot.as_ref().unwrap().value);
-            set(7, 5, c.csrp_ndot.as_ref().unwrap().value);
-            set(7, 6, c.csrp_drg.as_ref().unwrap().value);
-            set(7, 7, c.csrp_srp.as_ref().unwrap().value);
+            set(7, 0, optional_value!(csrp_r));
+            set(7, 1, optional_value!(csrp_t));
+            set(7, 2, optional_value!(csrp_n));
+            set(7, 3, optional_value!(csrp_rdot));
+            set(7, 4, optional_value!(csrp_tdot));
+            set(7, 5, optional_value!(csrp_ndot));
+            set(7, 6, optional_value!(csrp_drg));
+            set(7, 7, optional_value!(csrp_srp));
         }
 
         // Optional Row 9: Thrust
         if dim >= 9 {
-            set(8, 0, c.cthr_r.as_ref().unwrap().value);
-            set(8, 1, c.cthr_t.as_ref().unwrap().value);
-            set(8, 2, c.cthr_n.as_ref().unwrap().value);
-            set(8, 3, c.cthr_rdot.as_ref().unwrap().value);
-            set(8, 4, c.cthr_tdot.as_ref().unwrap().value);
-            set(8, 5, c.cthr_ndot.as_ref().unwrap().value);
-            set(8, 6, c.cthr_drg.as_ref().unwrap().value);
-            set(8, 7, c.cthr_srp.as_ref().unwrap().value);
-            set(8, 8, c.cthr_thr.as_ref().unwrap().value);
+            set(8, 0, optional_value!(cthr_r));
+            set(8, 1, optional_value!(cthr_t));
+            set(8, 2, optional_value!(cthr_n));
+            set(8, 3, optional_value!(cthr_rdot));
+            set(8, 4, optional_value!(cthr_tdot));
+            set(8, 5, optional_value!(cthr_ndot));
+            set(8, 6, optional_value!(cthr_drg));
+            set(8, 7, optional_value!(cthr_srp));
+            set(8, 8, optional_value!(cthr_thr));
         }
 
         // Return dim x dim array
-        let numpy_arr = PyArray2::from_vec2(
+        PyArray2::from_vec2(
             py,
             &array.chunks(dim).map(|c| c.to_vec()).collect::<Vec<_>>(),
         )
-        .unwrap();
-        Ok(numpy_arr)
+        .map_err(|error| PyValueError::new_err(error.to_string()))
     }
 
     /// Object covariance matrix `[1,1]`.

@@ -110,14 +110,8 @@ impl Opm {
 
     /// Validate the message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, py: Python<'_>, strict: bool) -> PyResult<Option<Vec<String>>> {
-        crate::api::validate_message(&self.to_core(py)?, strict)
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
     /// Orbit Parameter Message (OPM).
@@ -212,30 +206,6 @@ impl Opm {
         };
         let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
         Self::from_core(py, inner)
-    }
-
-    /// Serialize to KVN, preserving the source version by default.
-    ///
-    /// Pass ``version="latest"`` or an exact supported version to override it.
-    #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_kvn(
-        &self,
-        py: Python<'_>,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.to_core(py)?, "kvn", version, max_output_bytes)
-    }
-
-    /// Serialize to XML, preserving the source version by default.
-    #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_xml(
-        &self,
-        py: Python<'_>,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.to_core(py)?, "xml", version, max_output_bytes)
     }
 
     /// Serialize to KVN or XML after mandatory CCSDS validation.
@@ -1355,7 +1325,7 @@ impl OpmData {
         let maneuvers = value
             .maneuver_parameters
             .into_iter()
-            .map(|inner| Py::new(py, ManeuverParameters { inner }))
+            .map(|inner| Py::new(py, OpmManeuverParameters { inner }))
             .collect::<PyResult<Vec<_>>>()?;
         Ok(Self {
             comment: value.comment,
@@ -1393,11 +1363,11 @@ impl OpmData {
             .enumerate()
             .map(|(index, value)| {
                 value
-                    .extract::<PyRef<'_, ManeuverParameters>>()
+                    .extract::<PyRef<'_, OpmManeuverParameters>>()
                     .map(|value| value.inner.clone())
                     .map_err(|_| {
                         PyValueError::new_err(format!(
-                            "maneuver_parameters[{index}] must be ManeuverParameters"
+                            "maneuver_parameters[{index}] must be OpmManeuverParameters"
                         ))
                     })
             })
@@ -1533,7 +1503,7 @@ impl OpmData {
 
     /// Maneuver parameters.
     ///
-    /// :type: list[ManeuverParameters]
+    /// :type: list[OpmManeuverParameters]
     #[getter]
     fn get_maneuver_parameters(&self, py: Python<'_>) -> Py<PyList> {
         self.maneuver_parameters.clone_ref(py)
@@ -1543,7 +1513,7 @@ impl OpmData {
     fn set_maneuver_parameters(
         &mut self,
         py: Python<'_>,
-        value: Vec<Py<ManeuverParameters>>,
+        value: Vec<Py<OpmManeuverParameters>>,
     ) -> PyResult<()> {
         self.maneuver_parameters = PyList::new(py, value)?.unbind();
         Ok(())
@@ -1588,12 +1558,12 @@ impl OpmData {
 ///     Velocity change in 3rd axis (km/s).
 #[pyclass]
 #[derive(Clone)]
-pub struct ManeuverParameters {
+pub struct OpmManeuverParameters {
     pub inner: core_opm::ManeuverParameters,
 }
 
 #[pymethods]
-impl ManeuverParameters {
+impl OpmManeuverParameters {
     #[new]
     fn new(
         man_epoch_ignition: String,
@@ -1623,7 +1593,7 @@ impl ManeuverParameters {
 
     fn __repr__(&self) -> String {
         format!(
-            "ManeuverParameters(epoch='{}', duration={:.3} s)",
+            "OpmManeuverParameters(epoch='{}', duration={:.3} s)",
             self.inner.man_epoch_ignition.as_str(),
             self.inner.man_duration.value
         )

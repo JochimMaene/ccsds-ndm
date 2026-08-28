@@ -1434,7 +1434,7 @@ USER_DEFINED_BAZ = QUX
 
     #[test]
     fn test_parse_xml_omm_g10() {
-        let xml = include_str!("../../../data/xml/omm_g10.xml");
+        let xml = include_str!("../../data/xml/omm_g10.xml");
         let omm = Omm::from_xml(xml).expect("Failed to parse omm_g10.xml");
 
         assert_eq!(omm.version, "3.0");

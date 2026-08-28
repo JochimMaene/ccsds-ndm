@@ -31,7 +31,7 @@ The package exposes typed models, parsers, and serializers for the message famil
 pip install ccsds-ndm-py
 ```
 
-Requires Python 3.9+.
+Requires Python 3.10+.
 
 ## Quick Start
 
@@ -54,7 +54,7 @@ if isinstance(msg, ccsds_ndm.Opm):
     msg.to_file("output.xml", "xml")
 
 # Input notation is detected; only choose the output notation.
-xml = ccsds_ndm.convert(msg.to_kvn(), "xml")
+xml = ccsds_ndm.convert(msg.to_str("kvn"), "xml")
 ccsds_ndm.convert_file("input.opm", "output.xml", "xml")
 ```
 

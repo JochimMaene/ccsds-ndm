@@ -7,6 +7,7 @@ Unit tests for Orbit Mean-Elements Message (OMM) Python bindings.
 """
 
 import pytest
+
 from ccsds_ndm import MeanElements, OdmHeader, Omm, OmmData, OmmMetadata, OmmSegment
 
 

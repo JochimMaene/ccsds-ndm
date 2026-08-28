@@ -5,7 +5,7 @@
 [project]
 name = "ccsds-ndm-py"
 description = "Parse and generate CCSDS Navigation Data Messages (NDM) in KVN and XML formats"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MPL-2.0"
 authors = [
     { name = "Jochim Maene", email = "jochim.maene+github@gmail.com" }
@@ -17,7 +17,6 @@ classifiers = [
     "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
     "Programming Language :: Rust",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -41,7 +40,14 @@ Issues = "https://github.com/JochimMaene/ccsds-ndm/issues"
 [dependency-groups]
 dev = [
     "pytest>=8.3.5",
+    "ruff>=0.14.14",
 ]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
 
 [build-system]
 requires = ["maturin>=1.9"]

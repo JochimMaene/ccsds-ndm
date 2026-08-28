@@ -3,8 +3,8 @@ use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::validation::MessageKind;
 
-const KVN: &str = include_str!("../../data/kvn/oem_g11.kvn");
-const XML: &str = include_str!("../../data/xml/oem_g14.xml");
+const KVN: &str = include_str!("../data/kvn/oem_g11.kvn");
+const XML: &str = include_str!("../data/xml/oem_g14.xml");
 
 #[test]
 fn kvn_syntax_diagnostics_are_located_and_machine_readable() {

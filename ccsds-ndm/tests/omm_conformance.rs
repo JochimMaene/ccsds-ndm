@@ -6,13 +6,11 @@ use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::traits::Ndm;
 use tempfile::NamedTempFile;
 
-const KVN: &str = include_str!("../../data/kvn/omm_g9.kvn");
-const XML: &str = include_str!("../../data/xml/omm_g10.xml");
+const KVN: &str = include_str!("../data/kvn/omm_g9.kvn");
+const XML: &str = include_str!("../data/xml/omm_g10.xml");
 
 fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(relative)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
 fn assert_kvn_rejected(label: &str, source: String) {

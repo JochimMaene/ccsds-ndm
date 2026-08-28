@@ -238,7 +238,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<KeplerianElements>()?;
     m.add_class::<OpmCovarianceMatrix>()?;
     m.add_class::<OpmData>()?;
-    m.add_class::<ManeuverParameters>()?;
+    m.add_class::<OpmManeuverParameters>()?;
 
     // Register OCM wrapper classes
     m.add_class::<ocm::Ocm>()?;
@@ -293,7 +293,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<apm::ApmSegment>()?;
     m.add_class::<apm::ApmMetadata>()?;
     m.add_class::<apm::ApmData>()?;
-    m.add_class::<apm::ManeuverParameters>()?;
+    m.add_class::<apm::ApmManeuverParameters>()?;
 
     // Register shared attitude states
     m.add_class::<attitude::QuaternionState>()?;

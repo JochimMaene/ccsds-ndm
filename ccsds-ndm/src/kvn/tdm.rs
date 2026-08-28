@@ -1287,7 +1287,7 @@ DATA_STOP
 
     #[test]
     fn test_xsd_sample_tdm_e1_kvn() {
-        let kvn = include_str!("../../../data/kvn/tdm_e1.kvn");
+        let kvn = include_str!("../../data/kvn/tdm_e1.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
         assert!(!tdm.body.segments[0].metadata.time_system.is_empty());
@@ -1295,21 +1295,21 @@ DATA_STOP
 
     #[test]
     fn test_xsd_sample_tdm_e2_kvn() {
-        let kvn = include_str!("../../../data/kvn/tdm_e2.kvn");
+        let kvn = include_str!("../../data/kvn/tdm_e2.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
     }
 
     #[test]
     fn test_xsd_sample_tdm_e3_kvn() {
-        let kvn = include_str!("../../../data/kvn/tdm_e3.kvn");
+        let kvn = include_str!("../../data/kvn/tdm_e3.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
     }
 
     #[test]
     fn test_xsd_sample_tdm_e16_kvn() {
-        let kvn = include_str!("../../../data/kvn/tdm_e16.kvn");
+        let kvn = include_str!("../../data/kvn/tdm_e16.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
         let seg = &tdm.body.segments[0];
@@ -1318,7 +1318,7 @@ DATA_STOP
 
     #[test]
     fn test_xsd_sample_tdm_e18_kvn() {
-        let kvn = include_str!("../../../data/kvn/tdm_e18.kvn");
+        let kvn = include_str!("../../data/kvn/tdm_e18.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
     }

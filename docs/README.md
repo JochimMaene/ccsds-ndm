@@ -11,8 +11,11 @@ The main project documents are:
 
 - [`project-goal.md`](project-goal.md) — product direction, scope, and feature bar;
 - [`support-matrix.md`](support-matrix.md) — current user-facing support claims;
-- [`opm-guide.md`](opm-guide.md) — focused Rust, Python, and CLI workflows.
+- [`opm-guide.md`](opm-guide.md) — focused Rust and Python workflows.
 
 The [`conformance/`](conformance/) directory contains maintainer evidence connecting CCSDS
 requirements to tests and benchmarks. It supports the public matrix but is not required reading for
 library users.
+
+The [`ccsds-books/`](ccsds-books/) directory contains raw extracted reference material. It is kept
+outside the Sphinx build because it is not curated user documentation.

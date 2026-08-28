@@ -5,7 +5,7 @@
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::traits::Ndm;
 
-const AEM_XML: &str = include_str!("../../data/xml/aem_g11.xml");
+const AEM_XML: &str = include_str!("../data/xml/aem_g11.xml");
 
 #[test]
 fn xml_parsing_rejects_non_calendar_adm_creation_date() {

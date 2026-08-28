@@ -135,7 +135,7 @@ fn bench_generate_kvn_rounding(c: &mut Criterion) {
 // --- Multi-message-type benchmarks ---
 
 fn bench_parse_opm(c: &mut Criterion) {
-    let opm_kvn = include_str!("../../data/kvn/opm_g1.kvn");
+    let opm_kvn = include_str!("../data/kvn/opm_g1.kvn");
 
     c.bench_function("kvn_parse_opm", |b| {
         b.iter(|| Opm::from_kvn(black_box(opm_kvn)).unwrap())
@@ -143,7 +143,7 @@ fn bench_parse_opm(c: &mut Criterion) {
 }
 
 fn bench_parse_opm_failures(c: &mut Criterion) {
-    let valid = include_str!("../../data/kvn/opm_g4.kvn");
+    let valid = include_str!("../data/kvn/opm_g4.kvn");
     let invalid_late = format!("{valid}UNKNOWN_KEY = 1\n");
     let limited = ParseOptions::default().with_max_input_bytes(1);
     let mut group = c.benchmark_group("kvn_parse_opm_failure");
@@ -166,7 +166,7 @@ fn bench_parse_opm_failures(c: &mut Criterion) {
 }
 
 fn bench_generate_opm(c: &mut Criterion) {
-    let opm = Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).unwrap();
+    let opm = Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).unwrap();
     let output_len = opm.to_kvn().unwrap().len() as u64;
     let mut group = c.benchmark_group("kvn_generate_opm");
     group.throughput(Throughput::Bytes(output_len));
@@ -188,7 +188,7 @@ fn bench_generate_opm(c: &mut Criterion) {
 }
 
 fn bench_generate_opm_maneuver_scaling(c: &mut Criterion) {
-    let base = Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).unwrap();
+    let base = Opm::from_kvn(include_str!("../data/kvn/opm_g2.kvn")).unwrap();
     let maneuver = base.body.segment.data.maneuver_parameters[0].clone();
     let mut group = c.benchmark_group("kvn_generate_opm_maneuver_scaling");
     group.sample_size(60);
@@ -206,13 +206,13 @@ fn bench_generate_opm_maneuver_scaling(c: &mut Criterion) {
 }
 
 fn bench_validate_opm(c: &mut Criterion) {
-    let valid = Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).unwrap();
+    let valid = Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).unwrap();
     let mut invalid = valid.clone();
     invalid.header.originator.clear();
     invalid.body.segment.metadata.object_name.clear();
     invalid.body.segment.data.state_vector.x.value = f64::NAN;
 
-    let maneuver_source = Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).unwrap();
+    let maneuver_source = Opm::from_kvn(include_str!("../data/kvn/opm_g2.kvn")).unwrap();
     let mut maneuver_heavy = maneuver_source.clone();
     maneuver_heavy.body.segment.data.maneuver_parameters =
         vec![maneuver_source.body.segment.data.maneuver_parameters[0].clone(); 1000];
@@ -231,7 +231,7 @@ fn bench_validate_opm(c: &mut Criterion) {
 }
 
 fn bench_parse_omm(c: &mut Criterion) {
-    let omm_kvn = include_str!("../../data/kvn/omm_g7.kvn");
+    let omm_kvn = include_str!("../data/kvn/omm_g7.kvn");
 
     c.bench_function("kvn_parse_omm", |b| {
         b.iter(|| Omm::from_kvn(black_box(omm_kvn)).unwrap())
@@ -239,7 +239,7 @@ fn bench_parse_omm(c: &mut Criterion) {
 }
 
 fn bench_parse_tdm(c: &mut Criterion) {
-    let tdm_kvn = include_str!("../../data/kvn/tdm_e1.kvn");
+    let tdm_kvn = include_str!("../data/kvn/tdm_e1.kvn");
 
     c.bench_function("kvn_parse_tdm", |b| {
         b.iter(|| Tdm::from_kvn(black_box(tdm_kvn)).unwrap())
@@ -247,7 +247,7 @@ fn bench_parse_tdm(c: &mut Criterion) {
 }
 
 fn bench_tdm_history_scaling(c: &mut Criterion) {
-    let mut template = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
+    let mut template = Tdm::from_kvn(include_str!("../data/kvn/tdm_e1.kvn")).unwrap();
     template.body.segments.truncate(1);
     let observation = template.body.segments[0].data.observations[0].clone();
     let mut group = c.benchmark_group("tdm_kvn_history_scaling");
@@ -270,7 +270,7 @@ fn bench_tdm_history_scaling(c: &mut Criterion) {
 }
 
 fn bench_aem_history_scaling(c: &mut Criterion) {
-    let template = Aem::from_kvn(include_str!("../../data/kvn/aem_g5.kvn")).unwrap();
+    let template = Aem::from_kvn(include_str!("../data/kvn/aem_g5.kvn")).unwrap();
     let state = template.body.segment[0].data.attitude_states[0].clone();
     let mut group = c.benchmark_group("aem_kvn_history_scaling");
 
@@ -308,7 +308,7 @@ fn bench_aem_history_scaling(c: &mut Criterion) {
 }
 
 fn bench_acm_history_scaling(c: &mut Criterion) {
-    let template = Acm::from_kvn(include_str!("../../data/kvn/acm_g7.kvn")).unwrap();
+    let template = Acm::from_kvn(include_str!("../data/kvn/acm_g7.kvn")).unwrap();
     let line = template.body.segment.data.att[0].att_lines[0].clone();
     let mut group = c.benchmark_group("acm_kvn_history_scaling");
 
@@ -331,16 +331,16 @@ fn bench_acm_history_scaling(c: &mut Criterion) {
 
 fn bench_kvn_message_matrix(c: &mut Criterion) {
     let cases = [
-        ("opm", include_str!("../../data/kvn/opm_g1.kvn")),
-        ("omm", include_str!("../../data/kvn/omm_g7.kvn")),
-        ("oem", include_str!("../../data/kvn/oem_g11.kvn")),
-        ("ocm", include_str!("../../data/kvn/ocm_g15.kvn")),
-        ("cdm", include_str!("../../data/kvn/cdm_362.kvn")),
-        ("tdm", include_str!("../../data/kvn/tdm_e1.kvn")),
-        ("rdm", include_str!("../../data/kvn/rdm_c1.kvn")),
-        ("aem", include_str!("../../data/kvn/aem_g4.kvn")),
-        ("apm", include_str!("../../data/kvn/apm_g1.kvn")),
-        ("acm", include_str!("../../data/kvn/acm_g6.kvn")),
+        ("opm", include_str!("../data/kvn/opm_g1.kvn")),
+        ("omm", include_str!("../data/kvn/omm_g7.kvn")),
+        ("oem", include_str!("../data/kvn/oem_g11.kvn")),
+        ("ocm", include_str!("../data/kvn/ocm_g15.kvn")),
+        ("cdm", include_str!("../data/kvn/cdm_362.kvn")),
+        ("tdm", include_str!("../data/kvn/tdm_e1.kvn")),
+        ("rdm", include_str!("../data/kvn/rdm_c1.kvn")),
+        ("aem", include_str!("../data/kvn/aem_g4.kvn")),
+        ("apm", include_str!("../data/kvn/apm_g1.kvn")),
+        ("acm", include_str!("../data/kvn/acm_g6.kvn")),
     ];
     let mut group = c.benchmark_group("kvn_message_matrix");
     for (name, input) in cases {

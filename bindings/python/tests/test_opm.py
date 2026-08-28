@@ -7,6 +7,7 @@ Unit tests for Orbit Parameter Message (OPM) Python bindings.
 """
 
 import pytest
+
 from ccsds_ndm import (
     KeplerianElements,
     OdmHeader,

@@ -8,7 +8,7 @@ use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::{from_str, GenerateOptions, MessageType};
 
-const OPM_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 
 #[test]
 fn combined_generation_preserves_child_checks_and_aggregate_output_limits() {
@@ -59,6 +59,8 @@ fn combined_xml_parser_enforces_the_normative_envelope() {
     assert!(CombinedNdm::from_xml("<ndm/>").is_ok());
     assert!(CombinedNdm::from_xml("<message></message>").is_err());
     assert!(CombinedNdm::from_xml("<ndm><UNKNOWN/></ndm>").is_err());
+    assert!(CombinedNdm::from_xml("<ndm><message_id>wrong case</message_id></ndm>").is_err());
+    assert!(CombinedNdm::from_xml("<ndm><comment>wrong case</comment></ndm>").is_err());
     assert!(CombinedNdm::from_xml(
         "<ndm><COMMENT>first</COMMENT><MESSAGE_ID>late</MESSAGE_ID></ndm>"
     )
@@ -67,7 +69,7 @@ fn combined_xml_parser_enforces_the_normative_envelope() {
     assert!(CombinedNdm::from_xml("<ndm></ndm><ndm></ndm>").is_err());
     assert!(CombinedNdm::from_xml("<ndm></ndm>").is_ok());
 
-    let aem = Aem::from_xml(include_str!("../../data/xml/aem_g11.xml")).unwrap();
+    let aem = Aem::from_xml(include_str!("../data/xml/aem_g11.xml")).unwrap();
     let input = CombinedNdm {
         id: None,
         comments: Vec::new(),

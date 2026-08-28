@@ -13,8 +13,8 @@ semantics the schema does not express.
 | `MAN_REF_FRAME` | Required when a maneuver block is present, unrestricted `xsd:string` | Sections 3.2.4 and 3.2.4.11 describe RSW, RTN, and TNW. | Keep as `String`. Do not add an enum. |
 
 The relevant declarations are in
-[`ndmxml-4.0.0-opm-3.0.xsd`](../../data/xsd/ndmxml-4.0.0-opm-3.0.xsd) and
-[`ndmxml-4.0.0-common-4.0.xsd`](../../data/xsd/ndmxml-4.0.0-common-4.0.xsd).
+[`ndmxml-4.0.0-opm-3.0.xsd`](../../ccsds-ndm/data/xsd/ndmxml-4.0.0-opm-3.0.xsd) and
+[`ndmxml-4.0.0-common-4.0.xsd`](../../ccsds-ndm/data/xsd/ndmxml-4.0.0-common-4.0.xsd).
 Because all three values are unrestricted strings in the schema, XSD-first generation must not
 turn the book's frame lists into closed wire-format vocabularies. Existing rejection of blank
 required frame values is semantic model validation, not an XSD enumeration rule.

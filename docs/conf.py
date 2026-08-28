@@ -16,7 +16,14 @@ napoleon_custom_sections = [("Units", "units")]
 napoleon_use_ivar = True
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", ".venv", "README.md"]
+exclude_patterns = [
+    "_build",
+    "ccsds-books/**",
+    "Thumbs.db",
+    ".DS_Store",
+    ".venv",
+    "README.md",
+]
 
 # Theme configuration
 html_theme = "shibuya"

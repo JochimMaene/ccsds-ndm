@@ -6,8 +6,8 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 ### Prerequisites
 
-- **Rust** (stable, 1.70+): https://rustup.rs/
-- **Python** (3.9+): https://www.python.org/
+- **Rust** (stable): https://rustup.rs/
+- **Python** (3.10+): https://www.python.org/
 - **uv** (Python package manager): https://docs.astral.sh/uv/
 - **prek** (Pre-commit hook runner): `pip install prek`
 
@@ -101,7 +101,7 @@ When adding support for a new CCSDS message type:
 2. **Python bindings** (`bindings/python/src/`):
    - Create wrapper structs with `#[pyclass]`.
    - Expose properties with `#[getter]`/`#[setter]`.
-   - Add `from_str`, `from_file`, `to_kvn`, `to_xml` methods.
+   - Add `from_str`, `from_file`, `to_str`, and `to_file` methods.
    - Register the class in `bindings/python/src/lib.rs`.
 
 3. **Synchronize**:
@@ -110,7 +110,7 @@ When adding support for a new CCSDS message type:
    - Run `just audit` to ensure all Rust fields are correctly exposed in Python.
 
 4. **Tests & Data**:
-   - Add sample files to `data/kvn/` and `data/xml/`.
+   - Add sample files to `ccsds-ndm/data/kvn/` and `ccsds-ndm/data/xml/`.
    - Add Rust tests in the message module.
    - Add Python tests in `bindings/python/tests/`.
 

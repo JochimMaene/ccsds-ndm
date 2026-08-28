@@ -20,7 +20,7 @@ This inventory records maintainer evidence for standalone TDM 2.0. The
 | XML structure | The shared XML sequence engine covers the root, repeated segments, metadata, data, and the complete observation choice; it rejects unknown, duplicate, reordered, and non-schema nested content while accepting the schema's optional angle/percentage units. |
 | Preservation and generation | All 21 shipped KVN fixtures and both shipped XML fixtures preserve their typed source-notation model. Generated XML validates against the official 4.0.0 master schema. Fixed optional XML units are semantically normalized when crossing unitless KVN. Bare `COMMENT` records are preserved by the shared KVN writer. |
 | History allocation | `tdm_kvn_allocations` compares 10 and 1,000 observations. Parsing allocations grow with vector capacity rather than per record; validated streaming generation has fixed temporary-allocation overhead; materialized storage remains output-proportional. |
-| Shared surfaces and limits | `family_contract`, `family_generation_evidence`, Python option tests, CLI dispatch tests, and the family benchmark matrices exercise shared bounded parsing/generation, diagnostics, and dispatch. |
+| Shared surfaces and limits | `family_contract`, `family_generation_evidence`, Python option tests, and the family benchmark matrices exercise shared bounded parsing/generation, diagnostics, and dispatch. |
 
 The existing exhaustive TDM unit tests exercise every observation variant and the indexed metadata
 families. `tdm_kvn_history_scaling` (100-50,000 observations) and `tdm_xml_history_scaling`
@@ -46,8 +46,7 @@ semantics are enforced.
 
 ## Packaged-surface evidence
 
-`family_surface_cli` covers binary validation/conversion, typed identity, aggregate limits, and
-zero-document-byte failure. `test_tdm.py` and the shared Python options matrix cover both
+`test_tdm.py` and the shared Python options matrix cover both
 notations, file IO, epoch rules, generic identity, diagnostics, and resource limits. Strict binding
 audit, generated stubs/doc checks, wheel verification, and Rust artifact verification are the
 packaged gates.

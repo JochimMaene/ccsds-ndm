@@ -4,7 +4,7 @@ Status: implemented slice, not a blanket OMM conformance claim. Scope: OMM 3.0.
 
 ## Evidence
 
-- The XML schema `data/xsd/ndmxml-4.0.0-omm-3.0.xsd` declares `REF_FRAME_EPOCH` as an optional
+- The XML schema `ccsds-ndm/data/xsd/ndmxml-4.0.0-omm-3.0.xsd` declares `REF_FRAME_EPOCH` as an optional
   `ndm:epochType`, so the wire union remains broader than the field's semantic rule.
 - ODM book section 4.2.3 describes `REF_FRAME_EPOCH` as the epoch of the reference frame and
   points to section 7.5.10 for its formatting. The examples are calendar and ordinal time tags.

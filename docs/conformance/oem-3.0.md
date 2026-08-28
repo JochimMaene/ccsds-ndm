@@ -1,9 +1,9 @@
-# OEM 3.0 Rust Conformance Inventory
+# OEM 3.0 Core Conformance Inventory
 
-This inventory covers the seven advertised Rust cells for CCSDS OEM 3.0: strict KVN and XML
-parsing, typed-model validation, KVN and XML generation, and conversion in both notation
-directions. The normative sources are CCSDS 502.0-B-3 with Editorial Corrigendum 1 and the
-NDM/XML 4.0.0 schema set with OEM schema 3.0.
+This inventory covers the core CCSDS OEM 3.0 behavior: strict KVN and XML parsing, typed-model
+validation, KVN and XML generation, and conversion in both notation directions. The normative
+sources are CCSDS 502.0-B-3 with Editorial Corrigendum 1 and the NDM/XML 4.0.0 schema set with OEM
+schema 3.0. Python delegation is reviewed separately in `odm-3.0-surfaces.md`.
 
 ## Requirement map
 
@@ -32,11 +32,11 @@ NDM/XML 4.0.0 schema set with OEM schema 3.0.
   metadata total span because the normative XML example `oem_g14.xml` places its covariance epoch
   beyond `STOP_TIME`; the library does not invent a stricter rule where the authoritative inputs
   conflict.
-- This verification covers the public Rust surface only. It makes no OEM Python or CLI parity
-  claim.
+- Python parity is covered by the focused adapter and packaged-artifact evidence in
+  `odm-3.0-surfaces.md`; the adapter contains no independent OEM rules.
 
 ## Reproduction
 
-Run `just verify-oem` for formatting/linting, the full Rust regression suite, focused conformance
-tests, benchmark compilation, documentation, and packaged-crate verification. Run
-`just bench-oem` separately to collect informational scaling measurements on the current host.
+Run `just verify-oem` for the full Rust, Python, documentation, binding-audit, and packaged
+artifact verification. Run `just bench-oem` separately to collect informational scaling
+measurements on the current host.

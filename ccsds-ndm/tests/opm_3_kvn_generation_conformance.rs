@@ -7,8 +7,7 @@ use ccsds_ndm::MessageType;
 use std::str::FromStr;
 
 fn opm() -> Opm {
-    Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn"))
-        .expect("Annex G OPM fixture should parse")
+    Opm::from_kvn(include_str!("../data/kvn/opm_g1.kvn")).expect("Annex G OPM fixture should parse")
 }
 
 fn assignment_keys(kvn: &str) -> Vec<&str> {
@@ -70,10 +69,10 @@ fn significant_digits(value: &str) -> usize {
 #[test]
 fn annex_g_opm_fixtures_generate_printable_ordered_kvn_with_preserved_units() {
     for source in [
-        include_str!("../../data/kvn/opm_g1.kvn"),
-        include_str!("../../data/kvn/opm_g2.kvn"),
-        include_str!("../../data/kvn/opm_g3.kvn"),
-        include_str!("../../data/kvn/opm_g4.kvn"),
+        include_str!("../data/kvn/opm_g1.kvn"),
+        include_str!("../data/kvn/opm_g2.kvn"),
+        include_str!("../data/kvn/opm_g3.kvn"),
+        include_str!("../data/kvn/opm_g4.kvn"),
     ] {
         let generated = Opm::from_kvn(source)
             .expect("Annex G OPM fixture should parse")
@@ -144,7 +143,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
     type Mutation = (&'static str, &'static str, fn(&mut Opm));
     let mutations: [Mutation; 4] = [
         (
-            include_str!("../../data/kvn/opm_g2.kvn"),
+            include_str!("../data/kvn/opm_g2.kvn"),
             "body.segment.data.keplerian_elements.semi_major_axis",
             |message| {
                 message
@@ -159,7 +158,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
             },
         ),
         (
-            include_str!("../../data/kvn/opm_g2.kvn"),
+            include_str!("../data/kvn/opm_g2.kvn"),
             "body.segment.data.spacecraft_parameters.mass",
             |message| {
                 message
@@ -176,7 +175,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
             },
         ),
         (
-            include_str!("../../data/kvn/opm_g4.kvn"),
+            include_str!("../data/kvn/opm_g4.kvn"),
             "body.segment.data.covariance_matrix.cx_x",
             |message| {
                 message
@@ -191,7 +190,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
             },
         ),
         (
-            include_str!("../../data/kvn/opm_g2.kvn"),
+            include_str!("../data/kvn/opm_g2.kvn"),
             "body.segment.data.maneuver_parameters.man_duration",
             |message| {
                 message.body.segment.data.maneuver_parameters[0]
@@ -218,7 +217,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
 #[test]
 fn opm_kvn_requires_the_odm_spelling_for_gm_units() {
     let mut message =
-        Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).expect("fixture should parse");
+        Opm::from_kvn(include_str!("../data/kvn/opm_g2.kvn")).expect("fixture should parse");
     message
         .body
         .segment
@@ -242,7 +241,7 @@ fn opm_kvn_requires_the_odm_spelling_for_gm_units() {
 #[test]
 fn opm_kvn_is_identical_across_public_generation_entry_points() {
     let message =
-        Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("fixture should parse");
+        Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).expect("fixture should parse");
     let expected = message.to_kvn().expect("typed generation should succeed");
 
     assert_eq!(
@@ -307,7 +306,7 @@ fn opm_kvn_rejects_invalid_user_defined_keyword_suffixes() {
         "ÉARTH_MODEL",
     ] {
         let mut message =
-            Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("fixture should parse");
+            Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).expect("fixture should parse");
         message
             .body
             .segment
@@ -340,7 +339,7 @@ fn opm_kvn_accepts_normative_user_defined_keyword_forms() {
         "EARTH.MODEL",
     ] {
         let mut message =
-            Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("fixture should parse");
+            Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).expect("fixture should parse");
         message
             .body
             .segment
@@ -400,7 +399,7 @@ fn opm_kvn_enforces_the_line_limit_for_assignment_values() {
 #[test]
 fn opm_kvn_attributes_an_oversized_user_defined_keyword_to_its_parameter() {
     let mut message =
-        Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("fixture should parse");
+        Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).expect("fixture should parse");
     let parameter = &mut message
         .body
         .segment
@@ -448,7 +447,7 @@ fn opm_kvn_epoch_lines_are_bounded_by_the_epoch_type() {
     assert!(CalendarEpoch::from_str(&format!("{longest_epoch}0")).is_err());
 
     let mut message =
-        Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).expect("fixture should parse");
+        Opm::from_kvn(include_str!("../data/kvn/opm_g2.kvn")).expect("fixture should parse");
     message.header.creation_date = epoch;
     message.body.segment.metadata.ref_frame_epoch = Some(epoch);
     message.body.segment.data.state_vector.epoch = epoch;

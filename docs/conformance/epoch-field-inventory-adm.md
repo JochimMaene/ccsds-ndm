@@ -5,7 +5,7 @@ Status: implemented slice, not a blanket ADM conformance claim. Scope: the share
 
 ## Evidence
 
-- The XML schema `data/xsd/ndmxml-4.0.0-common-4.0.xsd` declares `admHeader/CREATION_DATE` as
+- The XML schema `ccsds-ndm/data/xsd/ndmxml-4.0.0-common-4.0.xsd` declares `admHeader/CREATION_DATE` as
   required `ndm:epochType`, so the wire model must continue to accept the XSD calendar/ordinal
   and numeric union at the schema boundary.
 - ADM book sections 3.2.2.2 (APM), 4.2.2.2 (AEM), and 5.3.2.2 (ACM) require `CREATION_DATE` to

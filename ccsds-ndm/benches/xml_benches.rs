@@ -352,7 +352,7 @@ fn bench_ocm_maneuver_10k(c: &mut Criterion) {
 }
 
 fn bench_xml_parse_opm(c: &mut Criterion) {
-    let opm_xml = include_str!("../../data/xml/opm_g5.xml");
+    let opm_xml = include_str!("../data/xml/opm_g5.xml");
 
     c.bench_function("xml_parse_opm", |b| {
         b.iter(|| Opm::from_xml(black_box(opm_xml)).unwrap())
@@ -360,7 +360,7 @@ fn bench_xml_parse_opm(c: &mut Criterion) {
 }
 
 fn bench_xml_parse_opm_failures(c: &mut Criterion) {
-    let valid = include_str!("../../data/xml/opm_g5.xml");
+    let valid = include_str!("../data/xml/opm_g5.xml");
     let invalid_late = format!("{valid}<trailing/>");
     let limited = ccsds_ndm::ParseOptions::default().with_max_input_bytes(1);
     let mut group = c.benchmark_group("xml_parse_opm_failure");
@@ -383,8 +383,7 @@ fn bench_xml_parse_opm_failures(c: &mut Criterion) {
 }
 
 fn bench_xml_generate_opm(c: &mut Criterion) {
-    let opm =
-        Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("invalid OPM benchmark");
+    let opm = Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).expect("invalid OPM benchmark");
     let output_bytes = opm.to_xml().expect("OPM benchmark generation failed").len() as u64;
     let mut group = c.benchmark_group("xml_generate_opm");
     group.throughput(Throughput::Bytes(output_bytes));
@@ -407,7 +406,7 @@ fn bench_xml_generate_opm(c: &mut Criterion) {
 }
 
 fn bench_xml_parse_omm(c: &mut Criterion) {
-    let omm_xml = include_str!("../../data/xml/omm_g10.xml");
+    let omm_xml = include_str!("../data/xml/omm_g10.xml");
 
     c.bench_function("xml_parse_omm", |b| {
         b.iter(|| Omm::from_xml(black_box(omm_xml)).unwrap())
@@ -415,7 +414,7 @@ fn bench_xml_parse_omm(c: &mut Criterion) {
 }
 
 fn bench_xml_parse_tdm(c: &mut Criterion) {
-    let tdm_xml = include_str!("../../data/xml/tdm_e21.xml");
+    let tdm_xml = include_str!("../data/xml/tdm_e21.xml");
 
     c.bench_function("xml_parse_tdm", |b| {
         b.iter(|| Tdm::from_xml(black_box(tdm_xml)).unwrap())
@@ -423,7 +422,7 @@ fn bench_xml_parse_tdm(c: &mut Criterion) {
 }
 
 fn bench_tdm_xml_history_scaling(c: &mut Criterion) {
-    let mut template = Tdm::from_xml(include_str!("../../data/xml/tdm_e21.xml")).unwrap();
+    let mut template = Tdm::from_xml(include_str!("../data/xml/tdm_e21.xml")).unwrap();
     template.body.segments.truncate(1);
     let observation = template.body.segments[0].data.observations[0].clone();
     let mut group = c.benchmark_group("tdm_xml_history_scaling");
@@ -446,22 +445,22 @@ fn bench_tdm_xml_history_scaling(c: &mut Criterion) {
 }
 
 fn bench_xml_message_matrix(c: &mut Criterion) {
-    let acm = ccsds_ndm::from_str(include_str!("../../data/kvn/acm_g6.kvn"))
+    let acm = ccsds_ndm::from_str(include_str!("../data/kvn/acm_g6.kvn"))
         .unwrap()
         .to_xml()
         .unwrap();
     let cases = vec![
-        ("opm", include_str!("../../data/xml/opm_g5.xml").to_owned()),
-        ("omm", include_str!("../../data/xml/omm_g10.xml").to_owned()),
-        ("oem", include_str!("../../data/xml/oem_g14.xml").to_owned()),
-        ("ocm", include_str!("../../data/xml/ocm_g20.xml").to_owned()),
-        ("cdm", include_str!("../../data/xml/cdm_44.xml").to_owned()),
-        ("tdm", include_str!("../../data/xml/tdm_e21.xml").to_owned()),
-        ("rdm", include_str!("../../data/xml/rdm_c3.xml").to_owned()),
-        ("aem", include_str!("../../data/xml/aem_g11.xml").to_owned()),
-        ("apm", include_str!("../../data/xml/apm_g10.xml").to_owned()),
+        ("opm", include_str!("../data/xml/opm_g5.xml").to_owned()),
+        ("omm", include_str!("../data/xml/omm_g10.xml").to_owned()),
+        ("oem", include_str!("../data/xml/oem_g14.xml").to_owned()),
+        ("ocm", include_str!("../data/xml/ocm_g20.xml").to_owned()),
+        ("cdm", include_str!("../data/xml/cdm_44.xml").to_owned()),
+        ("tdm", include_str!("../data/xml/tdm_e21.xml").to_owned()),
+        ("rdm", include_str!("../data/xml/rdm_c3.xml").to_owned()),
+        ("aem", include_str!("../data/xml/aem_g11.xml").to_owned()),
+        ("apm", include_str!("../data/xml/apm_g10.xml").to_owned()),
         ("acm", acm),
-        ("ndm", include_str!("../../data/xml/ndm_g12.xml").to_owned()),
+        ("ndm", include_str!("../data/xml/ndm_g12.xml").to_owned()),
     ];
     let mut group = c.benchmark_group("xml_message_matrix");
     for (name, input) in &cases {

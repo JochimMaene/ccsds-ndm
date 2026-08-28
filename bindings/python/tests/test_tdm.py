@@ -7,6 +7,7 @@ Unit tests for Tracking Data Message (TDM) Python bindings.
 """
 
 import pytest
+
 from ccsds_ndm import (
     Tdm,
     TdmBody,

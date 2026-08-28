@@ -3,7 +3,7 @@
 Status: `implemented-unverified`.
 
 The normative combined instantiation is the XML `ndm` envelope defined by CCSDS 505.0-B-3,
-section 4.11, and `data/xsd/ndmxml-4.0.0-master-4.0.xsd`. Sequential KVN is a library
+section 4.11, and `ccsds-ndm/data/xsd/ndmxml-4.0.0-master-4.0.xsd`. Sequential KVN is a library
 convenience representation, not an advertised CCSDS envelope.
 
 `just conformance-combined` establishes:
@@ -12,8 +12,8 @@ convenience representation, not an advertised CCSDS envelope.
   child ordering, and rejection of unknown or nested message structure;
 - ordered typed preservation of the `ndm_g12.xml` and `ndm_g21.xml` constituents, followed by
   official-master-XSD validation of generated XML;
-- aggregate input-byte, XML-depth, history-record, and output-byte limits through direct Rust,
-  Python, and CLI entry points;
+- aggregate input-byte, XML-depth, history-record, and output-byte limits through direct Rust and
+  Python entry points;
 - complete-envelope generation preflight: invalid children or aggregate output limits write zero
   bytes before the normative XML or sequential KVN representation is streamed;
 - measured linear KVN streaming allocation budgets from 10 to 1,000 constituents (at most ten
@@ -43,9 +43,8 @@ both schema-valid spellings and generation is judged against the official master
 requiring a namespace spelling absent from official examples.
 
 Python combined construction/identity and aggregate limits are exercised by
-`bindings/python/tests/test_ndm.py` and `test_parse_and_generation_options.py`. `combined_cli`
-executes generic validation/conversion and aggregate limit behavior through the CLI binary.
-`package-python` and `package-rust` are the shared built-artifact installation gates.
+`bindings/python/tests/test_ndm.py` and `test_parse_and_generation_options.py`. `package-python`
+and `package-rust` are the shared built-artifact gates.
 
 ## Status
 

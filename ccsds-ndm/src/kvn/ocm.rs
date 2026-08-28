@@ -2130,7 +2130,7 @@ USER_STOP
     #[test]
     fn test_xsd_sample_ocm_g15_kvn() {
         // Parse official CCSDS OCM example G-15
-        let kvn = include_str!("../../../data/kvn/ocm_g15.kvn");
+        let kvn = include_str!("../../data/kvn/ocm_g15.kvn");
         let ocm = Ocm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -2141,7 +2141,7 @@ USER_STOP
     #[test]
     fn test_xsd_sample_ocm_g16_kvn() {
         // Parse official CCSDS OCM example G-16
-        let kvn = include_str!("../../../data/kvn/ocm_g16.kvn");
+        let kvn = include_str!("../../data/kvn/ocm_g16.kvn");
         let ocm = Ocm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -2151,7 +2151,7 @@ USER_STOP
     #[test]
     fn test_xsd_sample_ocm_g17_kvn() {
         // Parse official CCSDS OCM example G-17
-        let kvn = include_str!("../../../data/kvn/ocm_g17.kvn");
+        let kvn = include_str!("../../data/kvn/ocm_g17.kvn");
         let ocm = Ocm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -2161,7 +2161,7 @@ USER_STOP
     #[test]
     fn test_xsd_sample_ocm_g18_kvn() {
         // Parse official CCSDS OCM example G-18
-        let kvn = include_str!("../../../data/kvn/ocm_g18.kvn");
+        let kvn = include_str!("../../data/kvn/ocm_g18.kvn");
         let ocm = Ocm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -2171,7 +2171,7 @@ USER_STOP
     #[test]
     fn test_xsd_sample_ocm_g19_kvn() {
         // Parse official CCSDS OCM example G-19
-        let kvn = include_str!("../../../data/kvn/ocm_g19.kvn");
+        let kvn = include_str!("../../data/kvn/ocm_g19.kvn");
         let ocm = Ocm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata

@@ -1,7 +1,7 @@
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 
-const KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 
 fn assert_rejected(label: &str, kvn: String) {
     assert!(

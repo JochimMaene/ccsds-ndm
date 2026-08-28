@@ -15,7 +15,6 @@ fn is_ascii_whitespace(bytes: &[u8]) -> bool {
 
 fn history_record_count(message: &MessageType) -> usize {
     match message {
-        MessageType::Opm(message) => message.body.segment.data.maneuver_parameters.len(),
         MessageType::Oem(message) => message
             .body
             .segment
@@ -65,7 +64,11 @@ fn history_record_count(message: &MessageType) -> usize {
                 + data.man.len()
         }
         MessageType::Ndm(message) => message.messages.iter().map(history_record_count).sum(),
-        MessageType::Omm(_) | MessageType::Cdm(_) | MessageType::Rdm(_) | MessageType::Apm(_) => 0,
+        MessageType::Opm(_)
+        | MessageType::Omm(_)
+        | MessageType::Cdm(_)
+        | MessageType::Rdm(_)
+        | MessageType::Apm(_) => 0,
     }
 }
 
@@ -535,15 +538,15 @@ impl CombinedNdm {
             match reader.read_event_into(&mut buf)? {
                 Event::Start(e) => {
                     let name_bytes = e.name();
-                    let name = String::from_utf8_lossy(name_bytes.as_ref()).to_lowercase();
+                    let name = name_bytes.as_ref();
 
                     let actual_start_pos = xml[event_start_pos..]
                         .find('<')
                         .map(|o| event_start_pos + o)
                         .unwrap_or(event_start_pos);
 
-                    match name.as_str() {
-                        "message_id" => {
+                    match name {
+                        b"MESSAGE_ID" => {
                             if phase != 0 || id.is_some() {
                                 return Err(invalid(
                                     "MESSAGE_ID must occur at most once before comments and messages",
@@ -552,7 +555,7 @@ impl CombinedNdm {
                             let val = reader.read_text(name_bytes)?;
                             id = Some(val.to_string());
                         }
-                        "comment" => {
+                        b"COMMENT" => {
                             if phase > 1 {
                                 return Err(invalid("COMMENT must precede contained messages"));
                             }
@@ -561,8 +564,8 @@ impl CombinedNdm {
                             comments.push(val.to_string());
                         }
                         // Extract the outer XML of the current element.
-                        "opm" | "omm" | "oem" | "ocm" | "cdm" | "tdm" | "rdm" | "acm" | "aem"
-                        | "apm" => {
+                        b"opm" | b"omm" | b"oem" | b"ocm" | b"cdm" | b"tdm" | b"rdm" | b"acm"
+                        | b"aem" | b"apm" => {
                             validate_combined_child_attributes(&e)?;
                             phase = 2;
                             reader.read_to_end(name_bytes)?;
@@ -589,7 +592,10 @@ impl CombinedNdm {
                             messages.push(msg);
                         }
                         _ => {
-                            return Err(invalid(&format!("unknown combined NDM child <{name}>")));
+                            return Err(invalid(&format!(
+                                "unknown combined NDM child <{}>",
+                                String::from_utf8_lossy(name)
+                            )));
                         }
                     }
                 }
@@ -670,8 +676,8 @@ mod tests {
     #[test]
     fn test_combined_ndm_xml() {
         let xml = r#"<ndm>
-            <message_id>test-id</message_id>
-            <comment>NDM Level Comment</comment>
+            <MESSAGE_ID>test-id</MESSAGE_ID>
+            <COMMENT>NDM Level Comment</COMMENT>
             <opm id="CCSDS_OPM_VERS" version="3.0">
                 <header>
                     <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>

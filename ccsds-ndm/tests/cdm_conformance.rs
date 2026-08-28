@@ -7,13 +7,11 @@ use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::{GenerateOptions, VersionedNdm};
 use tempfile::NamedTempFile;
 
-const KVN: &str = include_str!("../../data/kvn/cdm_363.kvn");
-const XML: &str = include_str!("../../data/xml/cdm_44.xml");
+const KVN: &str = include_str!("../data/kvn/cdm_363.kvn");
+const XML: &str = include_str!("../data/xml/cdm_44.xml");
 
 fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(relative)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
 #[test]
@@ -149,6 +147,23 @@ fn every_kvn_generation_gate_rejects_loss_or_ambiguity_before_output() {
         );
         assert!(output.is_empty(), "streaming wrote bytes for {label}");
     }
+}
+
+#[test]
+fn generation_rejects_partial_optional_covariance_rows() {
+    let mut message = Cdm::from_kvn(KVN).unwrap();
+    let covariance = message.body.segments[0]
+        .data
+        .covariance_matrix
+        .as_mut()
+        .unwrap();
+    covariance.cdrg_t = None;
+
+    let error = message
+        .to_xml()
+        .expect_err("a partial optional covariance row violates CCSDS 508.0-B-1 section 5.2.8");
+    assert_eq!(error.code(), Some("validation.missing_required_field"));
+    assert!(error.to_string().contains("CDRG_T"));
 }
 
 fn validate_xml(label: &str, xml: &str) {

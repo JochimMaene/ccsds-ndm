@@ -21,3 +21,6 @@ Orbit Parameter Message (OPM)
 .. autoclass:: KeplerianElements
    :members:
    :undoc-members:
+.. autoclass:: OpmManeuverParameters
+   :members:
+   :undoc-members:

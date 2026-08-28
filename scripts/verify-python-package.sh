@@ -5,18 +5,24 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 crate_id="$(cargo pkgid --manifest-path "${root}/ccsds-ndm/Cargo.toml")"
 version="${crate_id##*#}"
 version="${version##*@}"
-wheels=("${root}"/dist/ccsds_ndm_py-"${version}"-*.whl)
+wheels=("${root}"/dist/ccsds_ndm_py-"${version}"-cp310-abi3-*.whl)
 if [[ ${#wheels[@]} -ne 1 || ! -f "${wheels[0]}" ]]; then
-    echo "expected exactly one ccsds-ndm-py wheel in dist" >&2
+    echo "expected exactly one CPython 3.10 stable-ABI ccsds-ndm-py wheel in dist" >&2
     exit 1
 fi
 
 temporary="$(mktemp -d)"
 trap 'rm -rf "${temporary}"' EXIT
-uv venv "${temporary}/venv"
+uv venv --python 3.10 "${temporary}/venv"
 uv pip install --python "${temporary}/venv/bin/python" "${wheels[0]}"
-"${temporary}/venv/bin/python" - <<'PY'
+"${temporary}/venv/bin/python" - \
+    "${root}/ccsds-ndm/data/kvn/oem_g11.kvn" \
+    "${root}/ccsds-ndm/data/xml/oem_g14.xml" \
+    "${root}/ccsds-ndm/data/kvn/omm_g9.kvn" \
+    "${root}/ccsds-ndm/data/xml/omm_g10.xml" <<'PY'
 import ccsds_ndm
+from pathlib import Path
+import sys
 
 source = """\
 CCSDS_OPM_VERS = 3.0
@@ -46,4 +52,16 @@ assert "<OBJECT_NAME>EDITED</OBJECT_NAME>" in xml
 kvn = ccsds_ndm.convert(xml, "kvn")
 assert isinstance(ccsds_ndm.from_str(kvn, format="kvn"), ccsds_ndm.Opm)
 assert isinstance(ccsds_ndm.from_str("<ndm/>", format="xml"), ccsds_ndm.Ndm)
+
+for wrapper, kvn_path, xml_path in [
+    (ccsds_ndm.Oem, sys.argv[1], sys.argv[2]),
+    (ccsds_ndm.Omm, sys.argv[3], sys.argv[4]),
+]:
+    kvn_source = Path(kvn_path).read_text()
+    xml_source = Path(xml_path).read_text()
+    assert isinstance(wrapper.from_str(kvn_source, format="kvn"), wrapper)
+    assert isinstance(wrapper.from_str(xml_source, format="xml"), wrapper)
+    generated_xml = ccsds_ndm.convert(kvn_source, "xml")
+    generated_kvn = ccsds_ndm.convert(generated_xml, "kvn")
+    assert isinstance(wrapper.from_str(generated_kvn, format="kvn"), wrapper)
 PY

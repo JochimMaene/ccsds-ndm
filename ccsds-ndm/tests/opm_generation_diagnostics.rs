@@ -44,7 +44,7 @@ fn snapshot(error: CcsdsNdmError) -> Snapshot {
 
 fn invalid_opm() -> Opm {
     let mut message =
-        Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn")).expect("fixture should parse");
+        Opm::from_kvn(include_str!("../data/kvn/opm_g1.kvn")).expect("fixture should parse");
     message.body.segment.metadata.object_name.clear();
     message
 }

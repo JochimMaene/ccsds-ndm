@@ -171,14 +171,8 @@ impl Ocm {
 
     /// Validate the message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, py: Python<'_>, strict: bool) -> PyResult<Option<Vec<String>>> {
-        crate::api::validate_message(&self.to_core(py)?, strict)
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
     /// Orbit Comprehensive Message (OCM).
@@ -217,30 +211,6 @@ impl Ocm {
     fn set_segment(&mut self, segment: Py<OcmSegment>) {
         self.segment = segment;
     }
-    /// Serialize to KVN, preserving the source version by default.
-    ///
-    /// Pass ``version="latest"`` or an exact supported version to override it.
-    #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_kvn(
-        &self,
-        py: Python<'_>,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.to_core(py)?, "kvn", version, max_output_bytes)
-    }
-
-    /// Serialize to XML, preserving the source version by default.
-    #[pyo3(signature = (version=None, max_output_bytes=None))]
-    fn to_xml(
-        &self,
-        py: Python<'_>,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(&self.to_core(py)?, "xml", version, max_output_bytes)
-    }
-
     /// Serialize to KVN or XML after mandatory CCSDS validation.
     #[pyo3(signature = (format, version=None, max_output_bytes=None))]
     fn to_str(

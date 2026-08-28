@@ -22,7 +22,7 @@ This inventory records maintainer evidence for standalone APM 2.0. The
 | XML structure | The shared XML sequence engine is registered for the complete APM root, header, metadata, data, and six attitude logical-block families, including nested quaternion components. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. |
-| Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, CLI dispatch test, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
+| Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
 
 The existing APM unit suite separately covers each attitude logical-block family, optional
 quaternion/Euler derivatives, maneuver delta mass, the spin nutation choice, root versioning,
@@ -43,7 +43,7 @@ executable evidence:
 | 39-47 | Angular-velocity block | `AngVelState`, frame/three-component tests |
 | 48-62 | Spin block and mutually exclusive nutation descriptions | `SpinState`, conditional-choice tests |
 | 63-72 | Inertia block | `InertiaState`, complete tensor tests |
-| 73-82 | Maneuver block | `ManeuverParameters`, required torque/duration and optional mass tests |
+| 73-82 | Maneuver block | `ApmManeuverParameters`, required torque/duration and optional mass tests |
 
 No annex-A APM keyword or block is absent. External SANA frame/time values remain caller-provided
 strings rather than a bundled, time-sensitive registry snapshot.
@@ -52,8 +52,7 @@ strings rather than a bundled, time-sensitive registry snapshot.
 
 `fixed_family_allocations` fixes strict KVN parse budgets at 136 allocations/24,000 bytes and
 preflighted streaming generation at 48 allocations/2,000 bytes for the shipped APM fixture.
-`family_surface_cli` covers binary validation, conversion, identity, and zero-byte output-limit
-failure. `test_apm.py` plus the shared Python options matrix cover construction, setters, both
+`test_apm.py` plus the shared Python options matrix cover construction, setters, both
 notations, files, epochs, and resource limits. Strict binding audit, stubs/doc checks, wheel
 verification, and Rust artifact verification are the packaged gates.
 

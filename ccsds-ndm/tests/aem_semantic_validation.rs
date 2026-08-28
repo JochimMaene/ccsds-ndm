@@ -3,7 +3,7 @@ use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::CalendarEpoch;
 use ccsds_ndm::{GenerateOptions, VersionedNdm};
 
-const KVN: &str = include_str!("../../data/kvn/aem_g4.kvn");
+const KVN: &str = include_str!("../data/kvn/aem_g4.kvn");
 
 fn epoch(value: &str) -> CalendarEpoch {
     value.parse().unwrap()

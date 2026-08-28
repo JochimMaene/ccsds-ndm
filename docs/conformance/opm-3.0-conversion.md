@@ -16,4 +16,4 @@ formatting.
 | Resource and failure behavior | Covered | Source input and target output limits are applied by the shared core. Failed file conversion preserves the existing destination and leaves no temporary file. |
 | Representative performance | Covered | The parse and generation benchmark workloads measure both halves independently without hiding model construction. Deterministic input/output and allocation gates cover resource regressions; wall-clock results are informational before a stable threshold is justified. |
 
-No separate conversion model or rule engine exists: Python and CLI conversion call this Rust path.
+No separate conversion model or rule engine exists: Python conversion calls this Rust path.

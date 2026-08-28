@@ -7,14 +7,12 @@ use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::{GenerateOptions, VersionedNdm};
 use tempfile::NamedTempFile;
 
-const KVN: &str = include_str!("../../data/kvn/aem_g4.kvn");
-const SPIN_KVN: &str = include_str!("../../data/kvn/aem_g5.kvn");
-const XML: &str = include_str!("../../data/xml/aem_g13.xml");
+const KVN: &str = include_str!("../data/kvn/aem_g4.kvn");
+const SPIN_KVN: &str = include_str!("../data/kvn/aem_g5.kvn");
+const XML: &str = include_str!("../data/xml/aem_g13.xml");
 
 fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(relative)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
 #[test]

@@ -1291,7 +1291,7 @@ WEIGHTED_RMS = 1.234
 
     #[test]
     fn test_xsd_rdm_sample_c1_kvn() {
-        let kvn = std::fs::read_to_string("../data/kvn/rdm_c1.kvn").unwrap();
+        let kvn = std::fs::read_to_string("data/kvn/rdm_c1.kvn").unwrap();
         let rdm = Rdm::from_kvn(&kvn).unwrap();
         assert_eq!(rdm.version, "1.0");
         assert_eq!(rdm.header.originator, "ESA");

@@ -22,7 +22,7 @@ This inventory records maintainer evidence for standalone OMM 3.0. The
 | XML structure | The OMM sequence registration rejects unknown, duplicate, and reordered children throughout the root, header, metadata, data, mean-elements, spacecraft, TLE, covariance, and user-defined structures. It rejects non-schema attributes while allowing only the fixed unit and user-defined parameter attributes at their applicable leaves. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. |
-| Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, CLI dispatch test, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
+| Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
 
 The existing OMM unit suite separately covers the mean-elements choice, TLE theory-dependent
 requirements and mutually exclusive choices, numeric constraints, reference-frame epochs, TLE
@@ -52,14 +52,14 @@ and message semantics without embedding a mutable registry snapshot.
 
 `fixed_family_allocations` records strict KVN parse budgets of at most 128 allocations/24,000
 bytes and preflighted streaming-generation budgets of at most 48 allocations/2,000 bytes for the
-shipped OMM fixture. `family_surface_cli` validates and converts OMM through the installed binary,
-including a zero-document-byte output-limit failure. `test_omm.py` and the shared Python options
+shipped OMM fixture. `test_omm.py` and the shared Python options
 matrix exercise typed parsing, both notations, files, TLE conversion, diagnostics, and limits.
 Strict binding audit, generated-stub/doc checks, the full wheel test, and the publishable Rust
 artifact check are the reproducible packaged gates.
 
-## Remaining verification work
+## Verification outcome
 
-OMM remains available rather than verified. The complete ICS feature inventory and current
-packaged surfaces are reconciled; final message-level review remains. Shared delegation is evidence
-for that review, not an automatic verified claim.
+The complete ICS inventory, strict core behavior, Python delegation, allocation budgets, and
+packaged artifacts have received message-level review. OMM 3.0 is verified on the Rust and Python
+surfaces. OMM 2.0 remains available: explicit edition conversion is tested, but it
+has not received this complete edition-specific review.

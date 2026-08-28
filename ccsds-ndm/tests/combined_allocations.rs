@@ -10,7 +10,7 @@ use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 #[global_allocator]
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
-const OPM_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 
 fn combined(children: usize) -> CombinedNdm {
     let child = MessageType::Opm(Opm::from_kvn(OPM_KVN).unwrap());

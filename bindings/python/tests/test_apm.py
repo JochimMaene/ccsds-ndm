@@ -7,13 +7,14 @@ Unit tests for Attitude Parameter Message (APM) Python bindings.
 """
 
 import pytest
+
 from ccsds_ndm import (
     AdmHeader,
     Apm,
     ApmData,
+    ApmManeuverParameters,
     ApmMetadata,
     ApmSegment,
-    ManeuverParameters,
     QuaternionState,
 )
 
@@ -33,7 +34,7 @@ class TestApm:
         assert meta.time_system == "UTC"
 
     def test_maneuver_parameters(self):
-        man = ManeuverParameters(
+        man = ApmManeuverParameters(
             man_epoch_start="2023-01-01T00:00:00",
             man_duration=10.5,
             man_ref_frame="EME2000",
@@ -60,7 +61,7 @@ class TestApm:
             )
 
         with pytest.raises(ValueError):
-            ManeuverParameters(
+            ApmManeuverParameters(
                 man_epoch_start="123.5",
                 man_duration=10.0,
                 man_ref_frame="EME2000",
@@ -209,7 +210,7 @@ class TestApm:
             qc_dot=None,
             comment=None,
         )
-        man = ManeuverParameters(
+        man = ApmManeuverParameters(
             man_epoch_start="2023-01-01T00:00:00",
             man_duration=1.0,
             man_ref_frame="EME2000",

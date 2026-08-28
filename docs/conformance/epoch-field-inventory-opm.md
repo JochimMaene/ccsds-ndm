@@ -4,7 +4,7 @@ Status: implemented slice, not a blanket OPM conformance claim. Scope: OPM 3.0.
 
 ## Evidence
 
-- The OPM schema `data/xsd/ndmxml-4.0.0-opm-3.0.xsd` declares `REF_FRAME_EPOCH` and
+- The OPM schema `ccsds-ndm/data/xsd/ndmxml-4.0.0-opm-3.0.xsd` declares `REF_FRAME_EPOCH` and
   `MAN_EPOCH_IGNITION` as `ndm:epochType`; the common schema declares the required state-vector
   `EPOCH` with the same broad XSD union.
 - ODM book section 3.2.3 lists `REF_FRAME_EPOCH` and section 3.2.4 lists the state-vector

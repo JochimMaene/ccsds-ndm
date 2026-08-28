@@ -117,14 +117,8 @@ impl Ndm {
 
     /// Validate the combined message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, py: Python<'_>, strict: bool) -> PyResult<Option<Vec<String>>> {
-        crate::api::validate_message(&self.to_core(py)?, strict)
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
     /// Parse an NDM combined instantiation from a string.
@@ -157,26 +151,6 @@ impl Ndm {
         Self::from_core(py, inner)
     }
 
-    /// Serialize the contained messages to KVN using their source versions.
-    #[pyo3(signature = (max_output_bytes=None))]
-    fn to_kvn(&self, py: Python<'_>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        let mut options = ccsds_ndm::GenerateOptions::source();
-        options.max_output_bytes = max_output_bytes;
-        MessageType::Ndm(self.to_core(py)?)
-            .to_kvn_with(&options)
-            .map_err(crate::errors::ccsds_error_to_pyerr)
-    }
-
-    /// Serialize the contained messages to XML using their source versions.
-    #[pyo3(signature = (max_output_bytes=None))]
-    fn to_xml(&self, py: Python<'_>, max_output_bytes: Option<usize>) -> PyResult<String> {
-        let mut options = ccsds_ndm::GenerateOptions::source();
-        options.max_output_bytes = max_output_bytes;
-        MessageType::Ndm(self.to_core(py)?)
-            .to_xml_with(&options)
-            .map_err(crate::errors::ccsds_error_to_pyerr)
-    }
-
     /// Serialize to a string.
     #[pyo3(signature = (format, max_output_bytes=None))]
     fn to_str(
@@ -185,11 +159,15 @@ impl Ndm {
         format: &str,
         max_output_bytes: Option<usize>,
     ) -> PyResult<String> {
+        let mut options = ccsds_ndm::GenerateOptions::source();
+        options.max_output_bytes = max_output_bytes;
+        let message = MessageType::Ndm(self.to_core(py)?);
         match format {
-            "kvn" => self.to_kvn(py, max_output_bytes),
-            "xml" => self.to_xml(py, max_output_bytes),
-            other => Err(crate::api::unsupported_format(other)),
+            "kvn" => message.to_kvn_with(&options),
+            "xml" => message.to_xml_with(&options),
+            other => return Err(crate::api::unsupported_format(other)),
         }
+        .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 
     /// Write to file.

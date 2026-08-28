@@ -173,14 +173,6 @@ class Acm:
         """
         ...
 
-    def to_kvn(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to KVN, preserving the source version by default.
-        """
-        ...
-
     def to_str(
         self,
         format: str,
@@ -192,23 +184,9 @@ class Acm:
         """
         ...
 
-    def to_xml(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to XML, preserving the source version by default.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -1628,14 +1606,6 @@ class Aem:
         """
         ...
 
-    def to_kvn(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to KVN, preserving the source version by default.
-        """
-        ...
-
     def to_str(
         self,
         format: str,
@@ -1647,23 +1617,9 @@ class Aem:
         """
         ...
 
-    def to_xml(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to XML, preserving the source version by default.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -2202,14 +2158,6 @@ class Apm:
         """
         ...
 
-    def to_kvn(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to KVN, preserving the source version by default.
-        """
-        ...
-
     def to_str(
         self,
         format: str,
@@ -2221,23 +2169,9 @@ class Apm:
         """
         ...
 
-    def to_xml(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to XML, preserving the source version by default.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -2320,14 +2254,14 @@ class ApmData:
     @inertia.setter
     def inertia(self, value: list[InertiaState]) -> None: ...
     @property
-    def maneuver_parameters(self) -> list[ManeuverParameters]:
+    def maneuver_parameters(self) -> list[ApmManeuverParameters]:
         """
         Maneuver Parameters.
         """
         ...
 
     @maneuver_parameters.setter
-    def maneuver_parameters(self, value: list[ManeuverParameters]) -> None: ...
+    def maneuver_parameters(self, value: list[ApmManeuverParameters]) -> None: ...
     @property
     def quaternion_state(self) -> list[QuaternionState]:
         """
@@ -2348,6 +2282,117 @@ class ApmData:
 
     @spin.setter
     def spin(self, value: list[SpinState]) -> None: ...
+
+class ApmManeuverParameters:
+    """
+    Maneuver Parameters block.
+
+    All mandatory elements are to be provided if the block is present.
+    (See annex F for conventions and further detail.)
+    """
+    def __init__(
+        self,
+        man_epoch_start,
+        man_duration,
+        man_ref_frame,
+        man_tor_1,
+        man_tor_2,
+        man_tor_3,
+        man_delta_mass=None,
+        comment=None,
+    ) -> None: ...
+    def __getstate__(self, /) -> object:
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        One or more comment line(s). Each comment line shall begin with this keyword.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def man_delta_mass(self) -> Optional[float]:
+        """
+        Mass change during maneuver (value is < 0)
+
+        Units: kg
+
+
+        The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
+        """
+        ...
+
+    @man_delta_mass.setter
+    def man_delta_mass(self, value: Optional[float]) -> None: ...
+    @property
+    def man_duration(self) -> float:
+        """
+        Maneuver duration.
+
+        Units: s
+        """
+        ...
+
+    @man_duration.setter
+    def man_duration(self, value: float) -> None: ...
+    @property
+    def man_epoch_start(self) -> str:
+        """
+        Epoch of start of maneuver. (For format specification, see 6.8.9.)
+        """
+        ...
+
+    @man_epoch_start.setter
+    def man_epoch_start(self, value: str) -> None: ...
+    @property
+    def man_ref_frame(self) -> str:
+        """
+        Coordinate system for the torque vector. The set of allowed values is described in annex B,
+        subsection B3.
+        """
+        ...
+
+    @man_ref_frame.setter
+    def man_ref_frame(self, value: str) -> None: ...
+    @property
+    def man_tor_x(self) -> float:
+        """
+        1st component of the torque vector.
+
+        Units: N*m
+        """
+        ...
+
+    @man_tor_x.setter
+    def man_tor_x(self, value: float) -> None: ...
+    @property
+    def man_tor_y(self) -> float:
+        """
+        2nd component of the torque vector.
+
+        Units: N*m
+        """
+        ...
+
+    @man_tor_y.setter
+    def man_tor_y(self, value: float) -> None: ...
+    @property
+    def man_tor_z(self) -> float:
+        """
+        3rd component of the torque vector.
+
+        Units: N*m
+        """
+        ...
+
+    @man_tor_z.setter
+    def man_tor_z(self, value: float) -> None: ...
 
 class ApmMetadata:
     """
@@ -2759,14 +2804,6 @@ class Cdm:
         """
         ...
 
-    def to_kvn(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to KVN, preserving the source version by default.
-        """
-        ...
-
     def to_str(
         self,
         format: str,
@@ -2778,23 +2815,9 @@ class Cdm:
         """
         ...
 
-    def to_xml(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to XML, preserving the source version by default.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -5191,117 +5214,6 @@ class ManLine:
     @values.setter
     def values(self, value: list[str]) -> None: ...
 
-class ManeuverParameters:
-    """
-    Maneuver Parameters (Repeat for each maneuver).
-
-    References:
-    - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
-    """
-    def __init__(
-        self,
-        man_epoch_start,
-        man_duration,
-        man_ref_frame,
-        man_tor_1,
-        man_tor_2,
-        man_tor_3,
-        man_delta_mass=None,
-        comment=None,
-    ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    @property
-    def comment(self) -> list[str]:
-        """
-        Comments (see 7.8 for formatting rules).
-        """
-        ...
-
-    @comment.setter
-    def comment(self, value: list[str]) -> None: ...
-    @property
-    def man_delta_mass(self) -> Optional[float]:
-        """
-        Mass change during maneuver (value is < 0)
-
-        Units: kg
-
-
-        The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
-        """
-        ...
-
-    @man_delta_mass.setter
-    def man_delta_mass(self, value: Optional[float]) -> None: ...
-    @property
-    def man_duration(self) -> float:
-        """
-        Maneuver duration (If = 0, impulsive maneuver)
-
-        Units: s
-        """
-        ...
-
-    @man_duration.setter
-    def man_duration(self, value: float) -> None: ...
-    @property
-    def man_epoch_start(self) -> str:
-        """
-        Epoch of ignition (see 7.5.10 for formatting rules)
-        """
-        ...
-
-    @man_epoch_start.setter
-    def man_epoch_start(self, value: str) -> None: ...
-    @property
-    def man_ref_frame(self) -> str:
-        """
-        Reference frame in which the velocity increment vector data are given. The user must
-        select from the accepted set of values indicated in 3.2.4.11.
-        """
-        ...
-
-    @man_ref_frame.setter
-    def man_ref_frame(self, value: str) -> None: ...
-    @property
-    def man_tor_x(self) -> float:
-        """
-        Torque X component.
-
-        Units: N*m
-        """
-        ...
-
-    @man_tor_x.setter
-    def man_tor_x(self, value: float) -> None: ...
-    @property
-    def man_tor_y(self) -> float:
-        """
-        Torque Y component.
-
-        Units: N*m
-        """
-        ...
-
-    @man_tor_y.setter
-    def man_tor_y(self, value: float) -> None: ...
-    @property
-    def man_tor_z(self) -> float:
-        """
-        Torque Z component.
-
-        Units: N*m
-        """
-        ...
-
-    @man_tor_z.setter
-    def man_tor_z(self, value: float) -> None: ...
-
 class ManeuverableType:
     def __getstate__(self, /) -> object:
         """
@@ -5566,33 +5478,15 @@ class Ndm:
         """
         ...
 
-    def to_kvn(self, max_output_bytes: Optional[int] = None) -> str:
-        """
-        Serialize the contained messages to KVN using their source versions.
-        """
-        ...
-
     def to_str(self, format: str, max_output_bytes: Optional[int] = None) -> str:
         """
         Serialize to a string.
         """
         ...
 
-    def to_xml(self, max_output_bytes: Optional[int] = None) -> str:
-        """
-        Serialize the contained messages to XML using their source versions.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the combined message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -5739,16 +5633,6 @@ class Ocm:
         """
         ...
 
-    def to_kvn(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to KVN, preserving the source version by default.
-
-        Pass ``version="latest"`` or an exact supported version to override it.
-        """
-        ...
-
     def to_str(
         self,
         format: str,
@@ -5760,23 +5644,9 @@ class Ocm:
         """
         ...
 
-    def to_xml(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to XML, preserving the source version by default.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -9658,16 +9528,6 @@ class Oem:
         """
         ...
 
-    def to_kvn(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to KVN, preserving the source version by default.
-
-        Pass ``version="latest"`` or an exact supported version to override it.
-        """
-        ...
-
     def to_str(
         self,
         format: str,
@@ -9679,23 +9539,9 @@ class Oem:
         """
         ...
 
-    def to_xml(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to XML, preserving the source version by default.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -10625,16 +10471,6 @@ class Omm:
         """
         ...
 
-    def to_kvn(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to KVN, preserving the source version by default.
-
-        Pass ``version="latest"`` or an exact supported version to override it.
-        """
-        ...
-
     def to_str(
         self,
         format: str,
@@ -10657,23 +10493,9 @@ class Omm:
         """
         ...
 
-    def to_xml(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to XML, preserving the source version by default.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -11057,16 +10879,6 @@ class Opm:
         """
         ...
 
-    def to_kvn(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to KVN, preserving the source version by default.
-
-        Pass ``version="latest"`` or an exact supported version to override it.
-        """
-        ...
-
     def to_str(
         self,
         format: str,
@@ -11078,23 +10890,9 @@ class Opm:
         """
         ...
 
-    def to_xml(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to XML, preserving the source version by default.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -11495,14 +11293,14 @@ class OpmData:
     @keplerian_elements.setter
     def keplerian_elements(self, value: Optional[KeplerianElements]) -> None: ...
     @property
-    def maneuver_parameters(self) -> list[ManeuverParameters]:
+    def maneuver_parameters(self) -> list[OpmManeuverParameters]:
         """
         Maneuver parameters.
         """
         ...
 
     @maneuver_parameters.setter
-    def maneuver_parameters(self, value: list[ManeuverParameters]) -> None: ...
+    def maneuver_parameters(self, value: list[OpmManeuverParameters]) -> None: ...
     @property
     def spacecraft_parameters(self) -> Optional[SpacecraftParameters]:
         """
@@ -11530,6 +11328,133 @@ class OpmData:
 
     @user_defined_parameters.setter
     def user_defined_parameters(self, value: UserDefined | None) -> None: ...
+
+class OpmManeuverParameters:
+    """
+    Maneuver Parameters (Repeat for each maneuver).
+
+    References:
+    - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
+
+    Parameters
+    ----------
+    man_epoch_ignition : str
+        Epoch of ignition.
+    man_duration : float
+        Duration of maneuver (s).
+    man_delta_mass : float
+        Mass change during maneuver (kg).
+    man_ref_frame : str
+        Reference frame for velocity change.
+    man_dv_1 : float
+        Velocity change in 1st axis (km/s).
+    man_dv_2 : float
+        Velocity change in 2nd axis (km/s).
+    man_dv_3 : float
+        Velocity change in 3rd axis (km/s).
+    """
+    def __init__(
+        self,
+        man_epoch_ignition: str,
+        man_duration: float,
+        man_delta_mass: float,
+        man_ref_frame: str,
+        man_dv_1: float,
+        man_dv_2: float,
+        man_dv_3: float,
+    ) -> None: ...
+    def __getstate__(self, /) -> object:
+        """
+        Helper for pickle.
+        """
+        ...
+
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments (see 7.8 for formatting rules).
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def man_delta_mass(self) -> float:
+        """
+        Mass change during maneuver (value is < 0)
+
+        Units: kg
+
+
+        The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
+        """
+        ...
+
+    @man_delta_mass.setter
+    def man_delta_mass(self, value: float) -> None: ...
+    @property
+    def man_duration(self) -> float:
+        """
+        Maneuver duration (If = 0, impulsive maneuver)
+
+        Units: s
+        """
+        ...
+
+    @man_duration.setter
+    def man_duration(self, value: float) -> None: ...
+    @property
+    def man_dv_1(self) -> float:
+        """
+        1st component of the velocity increment
+
+        Units: km/s
+        """
+        ...
+
+    @man_dv_1.setter
+    def man_dv_1(self, value: float) -> None: ...
+    @property
+    def man_dv_2(self) -> float:
+        """
+        2nd component of the velocity increment
+
+        Units: km/s
+        """
+        ...
+
+    @man_dv_2.setter
+    def man_dv_2(self, value: float) -> None: ...
+    @property
+    def man_dv_3(self) -> float:
+        """
+        3rd component of the velocity increment
+
+        Units: km/s
+        """
+        ...
+
+    @man_dv_3.setter
+    def man_dv_3(self, value: float) -> None: ...
+    @property
+    def man_epoch_ignition(self) -> str:
+        """
+        Epoch of ignition (see 7.5.10 for formatting rules)
+        """
+        ...
+
+    @man_epoch_ignition.setter
+    def man_epoch_ignition(self, value: str) -> None: ...
+    @property
+    def man_ref_frame(self) -> str:
+        """
+        Reference frame in which the velocity increment vector data are given. The user must
+        select from the accepted set of values indicated in 3.2.4.11.
+        """
+        ...
+
+    @man_ref_frame.setter
+    def man_ref_frame(self, value: str) -> None: ...
 
 class OpmMetadata:
     """
@@ -11955,19 +11880,6 @@ class Rdm:
         """
         ...
 
-    def to_kvn(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to KVN, preserving the source version by default.
-
-        Returns
-        -------
-        str
-            The serialized KVN string.
-        """
-        ...
-
     def to_str(
         self,
         format: str,
@@ -11989,28 +11901,9 @@ class Rdm:
         """
         ...
 
-    def to_xml(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to XML, preserving the source version by default.
-
-        Returns
-        -------
-        str
-            The serialized XML string.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -13907,16 +13800,6 @@ class Tdm:
         """
         ...
 
-    def to_kvn(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to KVN, preserving the source version by default.
-
-        Pass ``version="latest"`` or an exact supported version to override it.
-        """
-        ...
-
     def to_str(
         self,
         format: str,
@@ -13928,23 +13811,9 @@ class Tdm:
         """
         ...
 
-    def to_xml(
-        self, version: Optional[str] = None, max_output_bytes: Optional[int] = None
-    ) -> str:
-        """
-        Serialize to XML, preserving the source version by default.
-        """
-        ...
-
-    def validate(self, strict: bool = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 

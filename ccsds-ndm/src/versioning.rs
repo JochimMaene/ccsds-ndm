@@ -51,21 +51,21 @@ pub fn spec(kind: MessageKind) -> Option<VersionSpec> {
         }),
         MessageKind::Aem => Some(VersionSpec {
             id_keyword: "CCSDS_AEM_VERS",
-            supported_versions: &["1.0", "2.0"],
+            supported_versions: &["2.0"],
             default_version: "2.0",
             kvn_output_versions: &["2.0"],
             xml_output_versions: &["2.0"],
         }),
         MessageKind::Apm => Some(VersionSpec {
             id_keyword: "CCSDS_APM_VERS",
-            supported_versions: &["1.0", "2.0"],
+            supported_versions: &["2.0"],
             default_version: "2.0",
             kvn_output_versions: &["2.0"],
             xml_output_versions: &["2.0"],
         }),
         MessageKind::Acm => Some(VersionSpec {
             id_keyword: "CCSDS_ACM_VERS",
-            supported_versions: &["1.0", "2.0"],
+            supported_versions: &["2.0"],
             default_version: "2.0",
             kvn_output_versions: &["2.0"],
             xml_output_versions: &["2.0"],
@@ -79,7 +79,7 @@ pub fn spec(kind: MessageKind) -> Option<VersionSpec> {
         }),
         MessageKind::Tdm => Some(VersionSpec {
             id_keyword: "CCSDS_TDM_VERS",
-            supported_versions: &["1.0", "2.0"],
+            supported_versions: &["2.0"],
             default_version: "2.0",
             kvn_output_versions: &["2.0"],
             xml_output_versions: &["2.0"],

@@ -40,7 +40,7 @@ Section 4.2.4.8.1's strictly increasing, non-repeated epoch requirement and the 
 usable-span rules have direct semantic regression tests in `aem_semantic_validation`.
 
 There is one normative-example conflict that the library resolves in favor of accepting the
-published CCSDS fixture: `data/kvn/aem_g4.kvn` declares interpolation degree 7 but contains four
+published CCSDS fixture: `ccsds-ndm/data/kvn/aem_g4.kvn` declares interpolation degree 7 but contains four
 records. Enforcing “at least degree + 1 records” would reject that official example. The degree
 field and its conditional presence are validated, but record-count capacity is therefore not used
 as a rejection rule. This exception is explicit and must be resolved before any affected semantic
@@ -50,10 +50,8 @@ cell is promoted.
 
 `bindings/python/tests/test_aem.py`, `test_api_consistency.py`, and
 `test_parse_and_generation_options.py` cover typed choices and NumPy construction, KVN/XML
-parsing/generation, generic identity, shared limits, and core-error propagation.
-`family_surface_cli` invokes the CLI binary for AEM validation, KVN-to-XML conversion, type
-identity, exit status, and zero-output limit failure. `package-python` and `package-rust` provide
-the common built-artifact install gates.
+parsing/generation, generic identity, shared limits, and core-error propagation. `package-python`
+and `package-rust` provide the common built-artifact gates.
 
 ## Status
 

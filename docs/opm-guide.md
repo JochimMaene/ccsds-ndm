@@ -26,8 +26,8 @@ improve before 1.0; codes, enum meanings, and canonical paths are the machine in
 
 Install distribution `ccsds-ndm-py` and import `ccsds_ndm`. `Opm.from_str` / `from_file` accept
 the keyword-only `max_input_bytes` safety control; record-bearing messages additionally accept
-`max_records`. `to_kvn`, `to_xml`, `to_str`, and `to_file` accept `max_output_bytes`. Python calls
-the Rust core for every parse, validation, and generation decision.
+`max_records`. `to_str` and `to_file` accept `max_output_bytes`. Python calls the Rust core for
+every parse, validation, and generation decision.
 Raised NDM exceptions expose `code`, `severity`, `operation`, `notation`, `message_kind`, editions,
 field path, and available source location/token fields.
 
@@ -47,24 +47,11 @@ Generation is always validated; there is no unchecked `validate=False` mode.
 ## Construction and optional blocks
 
 [`builder_demo.rs`](../ccsds-ndm/examples/builder_demo.rs) constructs a minimal state-vector OPM
-using only public builders. The shipped [`opm_g4.kvn`](../data/kvn/opm_g4.kvn) fixture demonstrates
-Keplerian elements and covariance; [`opm_g2.kvn`](../data/kvn/opm_g2.kvn) demonstrates spacecraft
-parameters and maneuvers; [`opm_g3.kvn`](../data/kvn/opm_g3.kvn) demonstrates user-defined
+using only public builders. The shipped [`opm_g4.kvn`](../ccsds-ndm/data/kvn/opm_g4.kvn) fixture demonstrates
+Keplerian elements and covariance; [`opm_g2.kvn`](../ccsds-ndm/data/kvn/opm_g2.kvn) demonstrates spacecraft
+parameters and maneuvers; [`opm_g3.kvn`](../ccsds-ndm/data/kvn/opm_g3.kvn) demonstrates user-defined
 parameters. Parsing a fixture, changing typed public fields, calling `validate()`, and generating is
 the shortest advanced workflow; generation revalidates because fields remain mutable before 1.0.
-
-## CLI
-
-The installed `ccsds-ndm` executable intentionally provides only validation and conversion:
-
-```text
-ccsds-ndm validate [--format kvn|xml] [--json] [limits] [FILE|-]
-ccsds-ndm convert --to kvn|xml [-o FILE|-] [--target-version source|latest|VERSION] [--json] [limits] [FILE|-]
-```
-
-Input notation is detected automatically. Converted document bytes go only to stdout (or the
-selected atomic output file); diagnostics go only to stderr. Exit codes are 0 success, 2 invalid
-input/model, 3 unsupported edition/operation, 4 resource limit, 5 I/O, and 64 command usage.
 
 OPM, OEM, and OMM can target ODM 2.0 or 3.0. The 2.0 implementation is checked against the archived
 official [SANA NDM/XML schema archive](https://sanaregistry.org/r/ndmxml_unqualified/). OPM and OEM

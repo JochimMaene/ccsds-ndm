@@ -1,7 +1,7 @@
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::traits::Ndm;
 
-const ACM_KVN: &str = include_str!("../../data/kvn/acm_g7.kvn");
+const ACM_KVN: &str = include_str!("../data/kvn/acm_g7.kvn");
 
 #[test]
 fn acm_metadata_reference_epochs_require_calendar_or_ordinal_form() {

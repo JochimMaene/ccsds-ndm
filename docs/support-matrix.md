@@ -15,21 +15,22 @@ rather than silently discarded.
 
 ## Message support
 
-| Message / edition | KVN | XML | Rust | Python | CLI | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| OPM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | **Verified** |
-| OEM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Available | Available | **Verified in Rust** |
-| OPM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | Available |
-| OEM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | Available |
-| OMM 2.0 / 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | Available |
-| OCM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | Available |
-| CDM 1.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | Available |
-| TDM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | Available |
-| RDM 1.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | Available |
-| APM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | Available |
-| AEM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | Available |
-| ACM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Yes | Available |
-| Combined NDM | Sequential convenience form | Parse and write | Yes | Yes | Yes | Available |
+| Message / edition | KVN | XML | Rust | Python | Status |
+| --- | --- | --- | --- | --- | --- |
+| OPM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
+| OEM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
+| OPM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| OEM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| OMM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
+| OMM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| OCM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| CDM 1.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| TDM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| RDM 1.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| APM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| AEM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| ACM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| Combined NDM | Sequential convenience form | Parse and write | Yes | Yes | Available |
 
 OPM and OEM edition 1.0 remain parse-only. The library rejects unsupported output editions instead
 of relabeling a document. OPM, OEM, and OMM generation supports explicit 2.0 and 3.0 targets where

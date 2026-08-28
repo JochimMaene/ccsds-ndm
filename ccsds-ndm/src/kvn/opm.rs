@@ -408,7 +408,7 @@ Z_DOT = -4.191076 [km/s]
         );
         assert!(Opm::from_kvn_str(&numeric_reference_epoch).is_err());
 
-        let maneuver = include_str!("../../../data/kvn/opm_g2.kvn");
+        let maneuver = include_str!("../../data/kvn/opm_g2.kvn");
         let numeric_maneuver_epoch = maneuver.replace(
             "MAN_EPOCH_IGNITION = 2021-06-03T09:00:34.1",
             "MAN_EPOCH_IGNITION = 12345.5",

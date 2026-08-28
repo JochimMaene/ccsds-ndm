@@ -3156,7 +3156,7 @@ MAN_DV_3 = 0.0 [km/s]
     #[test]
     fn test_xsd_sample_opm_g1_kvn() {
         // Parse official CCSDS OPM example G-1
-        let kvn = include_str!("../../../data/kvn/opm_g1.kvn");
+        let kvn = include_str!("../../data/kvn/opm_g1.kvn");
         let opm = Opm::from_kvn(kvn).unwrap();
 
         // Verify metadata
@@ -3178,7 +3178,7 @@ MAN_DV_3 = 0.0 [km/s]
     #[test]
     fn test_xsd_sample_opm_g2_kvn() {
         // Parse official CCSDS OPM example G-2
-        let kvn = include_str!("../../../data/kvn/opm_g2.kvn");
+        let kvn = include_str!("../../data/kvn/opm_g2.kvn");
         let opm = Opm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -3189,7 +3189,7 @@ MAN_DV_3 = 0.0 [km/s]
     #[test]
     fn test_xsd_sample_opm_g3_kvn() {
         // Parse official CCSDS OPM example G-3
-        let kvn = include_str!("../../../data/kvn/opm_g3.kvn");
+        let kvn = include_str!("../../data/kvn/opm_g3.kvn");
         let opm = Opm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -3200,7 +3200,7 @@ MAN_DV_3 = 0.0 [km/s]
     #[test]
     fn test_xsd_sample_opm_g4_kvn() {
         // Parse official CCSDS OPM example G-4
-        let kvn = include_str!("../../../data/kvn/opm_g4.kvn");
+        let kvn = include_str!("../../data/kvn/opm_g4.kvn");
         let opm = Opm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -3211,7 +3211,7 @@ MAN_DV_3 = 0.0 [km/s]
     #[test]
     fn test_xsd_sample_opm_g5_xml() {
         // Parse official CCSDS OPM XML example G-5
-        let xml = include_str!("../../../data/xml/opm_g5.xml");
+        let xml = include_str!("../../data/xml/opm_g5.xml");
         let opm = Opm::from_xml(xml).unwrap();
 
         // Verify metadata
@@ -3261,7 +3261,7 @@ Z_DOT = -4.191076 [km/s]
     fn test_xsd_xml_roundtrip() {
         // Full roundtrip: XML -> Opm -> XML
         // Note: Roundtrip may not be exact due to formatting differences
-        let xml = include_str!("../../../data/xml/opm_g5.xml");
+        let xml = include_str!("../../data/xml/opm_g5.xml");
         let opm = Opm::from_xml(xml).unwrap();
 
         // Verify we can convert to XML
@@ -3272,7 +3272,7 @@ Z_DOT = -4.191076 [km/s]
     #[test]
     fn test_xsd_kvn_to_xml_conversion() {
         // Cross-format: KVN -> Opm -> verify structure preserved
-        let kvn = include_str!("../../../data/kvn/opm_g1.kvn");
+        let kvn = include_str!("../../data/kvn/opm_g1.kvn");
         let opm = Opm::from_kvn(kvn).unwrap();
 
         // Verify the internal structure is valid

@@ -5,12 +5,12 @@ use ccsds_ndm::{
 };
 
 const KVN_FIXTURES: [&str; 4] = [
-    include_str!("../../data/kvn/opm_g1.kvn"),
-    include_str!("../../data/kvn/opm_g2.kvn"),
-    include_str!("../../data/kvn/opm_g3.kvn"),
-    include_str!("../../data/kvn/opm_g4.kvn"),
+    include_str!("../data/kvn/opm_g1.kvn"),
+    include_str!("../data/kvn/opm_g2.kvn"),
+    include_str!("../data/kvn/opm_g3.kvn"),
+    include_str!("../data/kvn/opm_g4.kvn"),
 ];
-const XML_FIXTURE: &str = include_str!("../../data/xml/opm_g5.xml");
+const XML_FIXTURE: &str = include_str!("../data/xml/opm_g5.xml");
 
 #[test]
 fn both_conversion_directions_preserve_the_complete_typed_model() {
@@ -70,6 +70,23 @@ fn file_conversion_replaces_the_destination_only_after_success() {
         0,
         "atomic conversion left a temporary file behind"
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn new_destination_uses_normal_file_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = tempfile::tempdir().expect("temporary directory should be created");
+    let source = directory.path().join("source.opm");
+    let destination = directory.path().join("destination.xml");
+    std::fs::write(&source, KVN_FIXTURES[0]).expect("source should be written");
+    let expected_mode = std::fs::metadata(&source).unwrap().permissions().mode() & 0o777;
+
+    convert_file(&source, &destination, Notation::Xml).expect("valid conversion should succeed");
+
+    let destination_mode = std::fs::metadata(destination).unwrap().permissions().mode() & 0o777;
+    assert_eq!(destination_mode, expected_mode);
 }
 
 #[test]

@@ -2,7 +2,7 @@ use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 
 fn xml() -> String {
-    Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn"))
+    Opm::from_kvn(include_str!("../data/kvn/opm_g1.kvn"))
         .expect("fixture should parse")
         .to_xml()
         .expect("fixture should generate XML")

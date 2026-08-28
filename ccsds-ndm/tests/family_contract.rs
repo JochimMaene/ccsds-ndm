@@ -4,16 +4,16 @@ use ccsds_ndm::{
 
 fn standalone_cases() -> [(&'static str, &'static str); 10] {
     [
-        ("OPM", include_str!("../../data/kvn/opm_g1.kvn")),
-        ("OMM", include_str!("../../data/kvn/omm_g7.kvn")),
-        ("OEM", include_str!("../../data/kvn/oem_g11.kvn")),
-        ("OCM", include_str!("../../data/kvn/ocm_g15.kvn")),
-        ("CDM", include_str!("../../data/kvn/cdm_362.kvn")),
-        ("TDM", include_str!("../../data/kvn/tdm_e1.kvn")),
-        ("RDM", include_str!("../../data/kvn/rdm_c1.kvn")),
-        ("AEM", include_str!("../../data/kvn/aem_g4.kvn")),
-        ("APM", include_str!("../../data/kvn/apm_g1.kvn")),
-        ("ACM", include_str!("../../data/kvn/acm_g6.kvn")),
+        ("OPM", include_str!("../data/kvn/opm_g1.kvn")),
+        ("OMM", include_str!("../data/kvn/omm_g7.kvn")),
+        ("OEM", include_str!("../data/kvn/oem_g11.kvn")),
+        ("OCM", include_str!("../data/kvn/ocm_g15.kvn")),
+        ("CDM", include_str!("../data/kvn/cdm_362.kvn")),
+        ("TDM", include_str!("../data/kvn/tdm_e1.kvn")),
+        ("RDM", include_str!("../data/kvn/rdm_c1.kvn")),
+        ("AEM", include_str!("../data/kvn/aem_g4.kvn")),
+        ("APM", include_str!("../data/kvn/apm_g1.kvn")),
+        ("ACM", include_str!("../data/kvn/acm_g6.kvn")),
     ]
 }
 
@@ -70,8 +70,50 @@ fn every_standalone_message_uses_the_shared_bounded_contract() {
 }
 
 #[test]
+fn unaudited_legacy_adm_and_tdm_editions_are_rejected() {
+    let cases = [
+        ("AEM", include_str!("../data/kvn/aem_g4.kvn")),
+        ("APM", include_str!("../data/kvn/apm_g1.kvn")),
+        ("ACM", include_str!("../data/kvn/acm_g6.kvn")),
+        ("TDM", include_str!("../data/kvn/tdm_e1.kvn")),
+    ];
+
+    for (message_type, input) in cases {
+        let xml = from_str(input)
+            .expect("2.0 fixture should parse")
+            .to_xml()
+            .expect("2.0 fixture should generate XML");
+        let legacy_inputs = [
+            input.replacen("_VERS = 2.0", "_VERS = 1.0", 1),
+            xml.replacen("version=\"2.0\"", "version=\"1.0\"", 1),
+        ];
+
+        for legacy in legacy_inputs {
+            let error = match from_str(&legacy) {
+                Err(error) => error,
+                Ok(_) => panic!("{message_type} 1.0 should be rejected"),
+            };
+
+            assert_eq!(
+                error.code(),
+                Some("parse.unsupported_input_version"),
+                "{message_type} returned the wrong error: {error}"
+            );
+            assert_eq!(
+                error
+                    .diagnostic()
+                    .expect("unsupported version should have a diagnostic")
+                    .message_kind
+                    .as_str(),
+                message_type
+            );
+        }
+    }
+}
+
+#[test]
 fn combined_ndm_keeps_its_identity_and_aggregate_output_limit() {
-    let input = include_str!("../../data/xml/ndm_g12.xml");
+    let input = include_str!("../data/xml/ndm_g12.xml");
     let message = from_str(input).expect("combined NDM fixture should parse");
     assert!(matches!(message, MessageType::Ndm(_)));
 

@@ -10,7 +10,7 @@ use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
 fn tdm(records: usize) -> Tdm {
-    let mut message = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
+    let mut message = Tdm::from_kvn(include_str!("../data/kvn/tdm_e1.kvn")).unwrap();
     let observation = message.body.segments[0].data.observations[0].clone();
     message.body.segments.truncate(1);
     message.body.segments[0].data.observations = vec![observation; records];

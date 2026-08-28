@@ -10,13 +10,13 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const OPM_3_KVN_FIXTURES: [(&str, &str); 4] = [
-    ("opm_g1.kvn", include_str!("../../data/kvn/opm_g1.kvn")),
-    ("opm_g2.kvn", include_str!("../../data/kvn/opm_g2.kvn")),
-    ("opm_g3.kvn", include_str!("../../data/kvn/opm_g3.kvn")),
-    ("opm_g4.kvn", include_str!("../../data/kvn/opm_g4.kvn")),
+    ("opm_g1.kvn", include_str!("../data/kvn/opm_g1.kvn")),
+    ("opm_g2.kvn", include_str!("../data/kvn/opm_g2.kvn")),
+    ("opm_g3.kvn", include_str!("../data/kvn/opm_g3.kvn")),
+    ("opm_g4.kvn", include_str!("../data/kvn/opm_g4.kvn")),
 ];
 const OPM_3_XML_FIXTURES: [(&str, &str); 1] =
-    [("opm_g5.xml", include_str!("../../data/xml/opm_g5.xml"))];
+    [("opm_g5.xml", include_str!("../data/xml/opm_g5.xml"))];
 
 #[test]
 fn public_opm_xml_generation_signatures_remain_compatible() {
@@ -33,7 +33,7 @@ fn public_opm_xml_generation_signatures_remain_compatible() {
 }
 
 fn schema_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/xsd/ndmxml-4.0.0-master-4.0.xsd")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("data/xsd/ndmxml-4.0.0-master-4.0.xsd")
 }
 
 fn validate_with_official_xsd(label: &str, xml: &str) {

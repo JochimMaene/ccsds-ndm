@@ -20,8 +20,8 @@ Users should choose `ccsds-ndm` because it is:
 ## Scope
 
 The Rust core is the single implementation of parsing, validation, conversion, and generation
-behavior. The Python bindings and command-line interface reuse that behavior rather than developing
-independent interpretations of the standards.
+behavior. The Python bindings reuse that behavior rather than developing an independent
+interpretation of the standards.
 
 The project intends to support the CCSDS NDM family in KVN and XML. Work is prioritized by common
 user workflows, correctness risk, and practical value. Complete, well-tested support for important

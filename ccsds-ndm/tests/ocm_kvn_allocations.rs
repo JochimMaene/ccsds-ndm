@@ -10,7 +10,7 @@ use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
 fn ocm(records: usize) -> Ocm {
-    let mut message = Ocm::from_kvn(include_str!("../../data/kvn/ocm_g15.kvn")).unwrap();
+    let mut message = Ocm::from_kvn(include_str!("../data/kvn/ocm_g15.kvn")).unwrap();
     let line = message.body.segment.data.traj[0].traj_lines[0].clone();
     message.body.segment.data.traj[0].traj_lines = (0..records)
         .map(|index| {
@@ -23,7 +23,7 @@ fn ocm(records: usize) -> Ocm {
 }
 
 fn covariance_ocm(records: usize) -> Ocm {
-    let mut message = Ocm::from_kvn(include_str!("../../data/kvn/ocm_g19.kvn")).unwrap();
+    let mut message = Ocm::from_kvn(include_str!("../data/kvn/ocm_g19.kvn")).unwrap();
     let line = message.body.segment.data.cov[0].cov_lines[0].clone();
     message.body.segment.data.traj.truncate(1);
     message.body.segment.data.traj[0].traj_lines.truncate(1);
@@ -39,7 +39,7 @@ fn covariance_ocm(records: usize) -> Ocm {
 }
 
 fn maneuver_ocm(records: usize) -> Ocm {
-    let mut message = Ocm::from_kvn(include_str!("../../data/kvn/ocm_g18.kvn")).unwrap();
+    let mut message = Ocm::from_kvn(include_str!("../data/kvn/ocm_g18.kvn")).unwrap();
     let line = message.body.segment.data.man[0].man_lines[0].clone();
     message.body.segment.data.traj.truncate(1);
     message.body.segment.data.traj[0].traj_lines.truncate(1);

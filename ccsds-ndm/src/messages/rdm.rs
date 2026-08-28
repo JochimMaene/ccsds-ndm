@@ -1525,7 +1525,7 @@ USER_DEFINED_TEST = VALUE
     /// Parse official RDM XML example C-3 (minimal)
     #[test]
     fn test_xsd_rdm_sample_c3_xml() {
-        let xml = std::fs::read_to_string("../data/xml/rdm_c3.xml").unwrap();
+        let xml = std::fs::read_to_string("data/xml/rdm_c3.xml").unwrap();
         let rdm = Rdm::from_xml(&xml).unwrap();
         assert_eq!(rdm.version, "1.0");
         assert_eq!(rdm.header.originator, "ESA");
@@ -1535,7 +1535,7 @@ USER_DEFINED_TEST = VALUE
     /// Parse official RDM XML example C-4 (comprehensive)
     #[test]
     fn test_xsd_rdm_sample_c4_xml() {
-        let xml = std::fs::read_to_string("../data/xml/rdm_c4.xml").unwrap();
+        let xml = std::fs::read_to_string("data/xml/rdm_c4.xml").unwrap();
         let rdm = Rdm::from_xml(&xml).unwrap();
         assert_eq!(rdm.header.message_id, "ESA/20180422-001");
         assert!(rdm.body.segment.data.ground_impact_parameters.is_some());

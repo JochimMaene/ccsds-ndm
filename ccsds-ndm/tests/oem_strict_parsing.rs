@@ -3,11 +3,11 @@ use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::ParseOptions;
 
 const KVN_FIXTURES: [&str; 3] = [
-    include_str!("../../data/kvn/oem_g11.kvn"),
-    include_str!("../../data/kvn/oem_g12.kvn"),
-    include_str!("../../data/kvn/oem_g13.kvn"),
+    include_str!("../data/kvn/oem_g11.kvn"),
+    include_str!("../data/kvn/oem_g12.kvn"),
+    include_str!("../data/kvn/oem_g13.kvn"),
 ];
-const XML: &str = include_str!("../../data/xml/oem_g14.xml");
+const XML: &str = include_str!("../data/xml/oem_g14.xml");
 
 #[test]
 fn shipped_oem_3_fixtures_parse_strictly() {

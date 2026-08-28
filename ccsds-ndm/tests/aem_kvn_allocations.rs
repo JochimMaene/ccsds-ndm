@@ -11,7 +11,7 @@ use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
 fn aem(records: usize) -> Aem {
-    let mut message = Aem::from_kvn(include_str!("../../data/kvn/aem_g5.kvn")).unwrap();
+    let mut message = Aem::from_kvn(include_str!("../data/kvn/aem_g5.kvn")).unwrap();
     let state = message.body.segment[0].data.attitude_states[0].clone();
     message.body.segment[0].metadata.stop_time =
         "2006-090T23:59:59.999".parse::<CalendarEpoch>().unwrap();

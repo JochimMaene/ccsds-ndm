@@ -928,6 +928,43 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn.to_string()
     }
 
+    const DRAG_COVARIANCE_ROW: &str = "\
+CDRG_R = 0.001 [m**3/kg]
+CDRG_T = 0.002 [m**3/kg]
+CDRG_N = 0.003 [m**3/kg]
+CDRG_RDOT = 0.0001 [m**3/(kg*s)]
+CDRG_TDOT = 0.0002 [m**3/(kg*s)]
+CDRG_NDOT = 0.0003 [m**3/(kg*s)]
+CDRG_DRG = 0.00001 [m**4/kg**2]";
+
+    const SRP_COVARIANCE_ROW: &str = "\
+CSRP_R = 0.001 [m**3/kg]
+CSRP_T = 0.002 [m**3/kg]
+CSRP_N = 0.003 [m**3/kg]
+CSRP_RDOT = 0.0001 [m**3/(kg*s)]
+CSRP_TDOT = 0.0002 [m**3/(kg*s)]
+CSRP_NDOT = 0.0003 [m**3/(kg*s)]
+CSRP_DRG = 0.00001 [m**4/kg**2]
+CSRP_SRP = 0.00002 [m**4/kg**2]";
+
+    const THRUST_COVARIANCE_ROW: &str = "\
+CTHR_R = 0.001 [m**2/s**2]
+CTHR_T = 0.002 [m**2/s**2]
+CTHR_N = 0.003 [m**2/s**2]
+CTHR_RDOT = 0.0001 [m**2/s**3]
+CTHR_TDOT = 0.0002 [m**2/s**3]
+CTHR_NDOT = 0.0003 [m**2/s**3]
+CTHR_DRG = 0.00001 [m**3/(kg*s**2)]
+CTHR_SRP = 0.00002 [m**3/(kg*s**2)]
+CTHR_THR = 0.000001 [m**2/s**4]";
+
+    fn with_optional_covariance_rows(kvn: &str, rows: &str) -> String {
+        kvn.replace(
+            "CNDOT_NDOT = 1.0 [m**2/s**2]",
+            &format!("CNDOT_NDOT = 1.0 [m**2/s**2]\n{rows}"),
+        )
+    }
+
     #[test]
     fn test_parse_cdm_blue_book_example() {
         let result = Cdm::from_kvn_str(CDM_BLUE_BOOK_SAMPLE);
@@ -1525,12 +1562,7 @@ ORIGINATOR = TEST
 
     #[test]
     fn covariance_with_drag_fields() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert CDRG fields
-        kvn = kvn.replace(
-            "CNDOT_NDOT = 1.0 [m**2/s**2]",
-            "CNDOT_NDOT = 1.0 [m**2/s**2]\nCDRG_R = 0.001 [m**3/kg]\nCDRG_T = 0.002 [m**3/kg]\nCDRG_N = 0.003 [m**3/kg]\nCDRG_RDOT = 0.0001 [m**3/(kg*s)]\nCDRG_TDOT = 0.0002 [m**3/(kg*s)]\nCDRG_NDOT = 0.0003 [m**3/(kg*s)]\nCDRG_DRG = 0.00001 [m**4/kg**2]",
-        );
+        let kvn = with_optional_covariance_rows(&sample_cdm_kvn(), DRAG_COVARIANCE_ROW);
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with CDRG fields");
         let cov = &cdm.body.segments[0]
@@ -1549,12 +1581,8 @@ ORIGINATOR = TEST
 
     #[test]
     fn covariance_with_srp_fields() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert CSRP fields
-        kvn = kvn.replace(
-            "CNDOT_NDOT = 1.0 [m**2/s**2]",
-            "CNDOT_NDOT = 1.0 [m**2/s**2]\nCSRP_R = 0.001 [m**3/kg]\nCSRP_T = 0.002 [m**3/kg]\nCSRP_N = 0.003 [m**3/kg]\nCSRP_RDOT = 0.0001 [m**3/(kg*s)]\nCSRP_TDOT = 0.0002 [m**3/(kg*s)]\nCSRP_NDOT = 0.0003 [m**3/(kg*s)]\nCSRP_DRG = 0.00001 [m**4/kg**2]\nCSRP_SRP = 0.00002 [m**4/kg**2]",
-        );
+        let rows = format!("{DRAG_COVARIANCE_ROW}\n{SRP_COVARIANCE_ROW}");
+        let kvn = with_optional_covariance_rows(&sample_cdm_kvn(), &rows);
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with CSRP fields");
         let cov = &cdm.body.segments[0]
@@ -1574,12 +1602,8 @@ ORIGINATOR = TEST
 
     #[test]
     fn covariance_with_thrust_fields() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert CTHR fields
-        kvn = kvn.replace(
-            "CNDOT_NDOT = 1.0 [m**2/s**2]",
-            "CNDOT_NDOT = 1.0 [m**2/s**2]\nCTHR_R = 0.001 [m**2/s**2]\nCTHR_T = 0.002 [m**2/s**2]\nCTHR_N = 0.003 [m**2/s**2]\nCTHR_RDOT = 0.0001 [m**2/s**3]\nCTHR_TDOT = 0.0002 [m**2/s**3]\nCTHR_NDOT = 0.0003 [m**2/s**3]\nCTHR_DRG = 0.00001 [m**3/(kg*s**2)]\nCTHR_SRP = 0.00002 [m**3/(kg*s**2)]\nCTHR_THR = 0.000001 [m**2/s**4]",
-        );
+        let rows = format!("{DRAG_COVARIANCE_ROW}\n{SRP_COVARIANCE_ROW}\n{THRUST_COVARIANCE_ROW}");
+        let kvn = with_optional_covariance_rows(&sample_cdm_kvn(), &rows);
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with CTHR fields");
         let cov = &cdm.body.segments[0]
@@ -1597,6 +1621,24 @@ ORIGINATOR = TEST
         assert!(cov.cthr_srp.is_some());
         assert!(cov.cthr_thr.is_some());
     }
+
+    #[test]
+    fn covariance_rejects_optional_rows_without_preceding_rows() {
+        for (label, rows, missing) in [
+            ("SRP without drag", SRP_COVARIANCE_ROW, "CDRG_R"),
+            (
+                "thrust without drag or SRP",
+                THRUST_COVARIANCE_ROW,
+                "CDRG_R",
+            ),
+        ] {
+            let kvn = with_optional_covariance_rows(&sample_cdm_kvn(), rows);
+            let error = Cdm::from_kvn(&kvn).expect_err(label);
+            assert_eq!(error.code(), Some("validation.missing_required_field"));
+            assert!(error.to_string().contains(missing), "{label}: {error}");
+        }
+    }
+
     #[test]
     fn covariance_unknown_field_error() {
         let mut kvn = sample_cdm_kvn();

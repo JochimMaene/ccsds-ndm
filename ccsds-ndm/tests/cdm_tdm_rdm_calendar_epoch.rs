@@ -1,12 +1,12 @@
 use ccsds_ndm::messages::{cdm::Cdm, rdm::Rdm, tdm::Tdm};
 use ccsds_ndm::traits::Ndm;
 
-const CDM_KVN: &str = include_str!("../../data/kvn/cdm_362.kvn");
-const CDM_XML: &str = include_str!("../../data/xml/cdm_44.xml");
-const TDM_KVN: &str = include_str!("../../data/kvn/tdm_e1.kvn");
-const TDM_XML: &str = include_str!("../../data/xml/tdm_e21.xml");
-const RDM_KVN: &str = include_str!("../../data/kvn/rdm_c2.kvn");
-const RDM_XML: &str = include_str!("../../data/xml/rdm_c4.xml");
+const CDM_KVN: &str = include_str!("../data/kvn/cdm_362.kvn");
+const CDM_XML: &str = include_str!("../data/xml/cdm_44.xml");
+const TDM_KVN: &str = include_str!("../data/kvn/tdm_e1.kvn");
+const TDM_XML: &str = include_str!("../data/xml/tdm_e21.xml");
+const RDM_KVN: &str = include_str!("../data/kvn/rdm_c2.kvn");
+const RDM_XML: &str = include_str!("../data/xml/rdm_c4.xml");
 
 #[test]
 fn cdm_epoch_fields_require_calendar_or_ordinal_form() {

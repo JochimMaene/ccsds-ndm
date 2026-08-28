@@ -16,7 +16,7 @@ static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 // Keep all allocation cases in this one test: the instrumented allocator is process-global.
 #[test]
 fn opm_kvn_generation_has_bounded_allocations() {
-    let opm = Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).unwrap();
+    let opm = Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).unwrap();
     let expected_len = opm.to_kvn().unwrap().len();
     let options = GenerateOptions::source();
 

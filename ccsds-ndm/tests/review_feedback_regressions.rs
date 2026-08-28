@@ -6,7 +6,7 @@ use ccsds_ndm::traits::Ndm;
 
 #[test]
 fn opm_preserves_comment_before_user_defined_after_optional_maneuvers() {
-    let source = include_str!("../../data/kvn/opm_g4.kvn").replace(
+    let source = include_str!("../data/kvn/opm_g4.kvn").replace(
         "USER_DEFINED_EARTH_MODEL",
         "COMMENT belongs to user parameters\nUSER_DEFINED_EARTH_MODEL",
     );
@@ -26,7 +26,7 @@ fn opm_preserves_comment_before_user_defined_after_optional_maneuvers() {
 
 #[test]
 fn opm_rejects_maneuver_fields_without_ignition_epoch() {
-    let source = include_str!("../../data/kvn/opm_g4.kvn").replace(
+    let source = include_str!("../data/kvn/opm_g4.kvn").replace(
         "USER_DEFINED_EARTH_MODEL",
         "MAN_DURATION = 10.0 [s]\n\
          MAN_DELTA_MASS = -1.0 [kg]\n\
@@ -41,7 +41,7 @@ fn opm_rejects_maneuver_fields_without_ignition_epoch() {
 
 #[test]
 fn oem_preserves_the_first_covariance_comment() {
-    let source = include_str!("../../data/kvn/oem_g13.kvn").replace(
+    let source = include_str!("../data/kvn/oem_g13.kvn").replace(
         "COVARIANCE_START\n",
         "COVARIANCE_START\nCOMMENT belongs to first covariance\n",
     );
@@ -54,7 +54,7 @@ fn oem_preserves_the_first_covariance_comment() {
 
 #[test]
 fn oem_enforces_integer_range_but_accepts_large_fixed_point_numbers() {
-    let source = include_str!("../../data/kvn/oem_g13.kvn");
+    let source = include_str!("../data/kvn/oem_g13.kvn");
     let integer = source.replacen("-2432.166", "3000000000", 1);
     let decimal = source.replacen("-2432.166", "3000000000.0", 1);
     Oem::from_kvn(&integer).expect_err("ODM integer-form values are limited to signed 32-bit");
@@ -67,7 +67,7 @@ fn oem_enforces_integer_range_but_accepts_large_fixed_point_numbers() {
 
 #[test]
 fn user_defined_values_may_contain_assignment_delimiters() {
-    let omm_source = include_str!("../../data/kvn/omm_g9.kvn").replace(
+    let omm_source = include_str!("../data/kvn/omm_g9.kvn").replace(
         "USER_DEFINED_EARTH_MODEL = WGS-84",
         "USER_DEFINED_EARTH_MODEL = a=b",
     );
@@ -86,7 +86,7 @@ fn user_defined_values_may_contain_assignment_delimiters() {
 
     let rdm_source = format!(
         "{}\nUSER_DEFINED_EQUATION = a=b\n",
-        include_str!("../../data/kvn/rdm_c1.kvn")
+        include_str!("../data/kvn/rdm_c1.kvn")
     );
     let rdm = Rdm::from_kvn(&rdm_source).unwrap();
     assert_eq!(

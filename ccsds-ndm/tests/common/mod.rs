@@ -6,6 +6,5 @@ use std::path::PathBuf;
 
 pub fn data_dir() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // ccsds-ndm is in root/ccsds-ndm. data is in root/data.
-    manifest_dir.parent().unwrap().join("data")
+    manifest_dir.join("data")
 }

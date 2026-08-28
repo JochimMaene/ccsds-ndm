@@ -7,6 +7,7 @@ Unit tests for Reentry Data Message (RDM) Python bindings.
 """
 
 import pytest
+
 from ccsds_ndm import (
     AtmosphericReentryParameters,
     Rdm,

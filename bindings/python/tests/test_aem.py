@@ -8,6 +8,7 @@ Unit tests for Attitude Ephemeris Message (AEM) Python bindings.
 
 import numpy as np
 import pytest
+
 from ccsds_ndm import (
     AdmHeader,
     Aem,

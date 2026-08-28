@@ -32,7 +32,7 @@ fn measured<T>(
 }
 
 fn omm_budget() {
-    let input = include_str!("../../data/kvn/omm_g7.kvn");
+    let input = include_str!("../data/kvn/omm_g7.kvn");
     let output_len = Omm::from_kvn(input).unwrap().to_kvn().unwrap().len();
     let (parse, generation) = measured(
         input,
@@ -49,7 +49,7 @@ fn omm_budget() {
 }
 
 fn apm_budget() {
-    let input = include_str!("../../data/kvn/apm_g1.kvn");
+    let input = include_str!("../data/kvn/apm_g1.kvn");
     let output_len = Apm::from_kvn(input).unwrap().to_kvn().unwrap().len();
     let (parse, generation) = measured(
         input,
@@ -66,7 +66,7 @@ fn apm_budget() {
 }
 
 fn rdm_budget() {
-    let input = include_str!("../../data/kvn/rdm_c1.kvn");
+    let input = include_str!("../data/kvn/rdm_c1.kvn");
     let output_len = Rdm::from_kvn(input).unwrap().to_kvn().unwrap().len();
     let (parse, generation) = measured(
         input,

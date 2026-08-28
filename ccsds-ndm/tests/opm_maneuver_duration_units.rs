@@ -6,7 +6,7 @@ use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::TimeUnits;
 
-const OPM_3_WITH_MANEUVER: &str = include_str!("../../data/kvn/opm_g2.kvn");
+const OPM_3_WITH_MANEUVER: &str = include_str!("../data/kvn/opm_g2.kvn");
 
 #[test]
 fn opm_xml_generation_rejects_day_as_maneuver_duration_unit() {

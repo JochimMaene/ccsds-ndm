@@ -2608,7 +2608,7 @@ META_STOP
     #[test]
     fn test_xsd_xml_roundtrip() {
         // Parse XML -> Write XML -> Parse XML should produce same result
-        let xml = include_str!("../../../data/xml/oem_g14.xml");
+        let xml = include_str!("../../data/xml/oem_g14.xml");
         let oem1 = Oem::from_xml(xml).unwrap();
         let xml_out = oem1.to_xml().unwrap();
         let oem2 = Oem::from_xml(&xml_out).unwrap();
@@ -2679,7 +2679,7 @@ COVARIANCE_STOP
     #[test]
     fn test_xsd_kvn_sample_file_roundtrip() {
         // Parse sample KVN file and verify roundtrip
-        let kvn = include_str!("../../../data/kvn/oem_g11.kvn");
+        let kvn = include_str!("../../data/kvn/oem_g11.kvn");
         let oem1 = Oem::from_kvn(kvn).unwrap();
         let kvn_out = oem1.to_kvn().unwrap();
         let oem2 = Oem::from_kvn(&kvn_out).unwrap();
@@ -2693,7 +2693,7 @@ COVARIANCE_STOP
 
     #[test]
     fn test_multiple_covariance_matrices_emit_single_covariance_block() {
-        let kvn = include_str!("../../../data/kvn/oem_g13.kvn");
+        let kvn = include_str!("../../data/kvn/oem_g13.kvn");
         let oem = Oem::from_kvn(kvn).expect("parse oem_g13");
         assert_eq!(oem.body.segment[0].data.covariance_matrix.len(), 2);
 
@@ -2706,7 +2706,7 @@ COVARIANCE_STOP
     #[test]
     fn test_xsd_parse_xml_oem_g14() {
         // Parse official CCSDS sample file oem_g14.xml
-        let xml = include_str!("../../../data/xml/oem_g14.xml");
+        let xml = include_str!("../../data/xml/oem_g14.xml");
         let oem = Oem::from_xml(xml).expect("Failed to parse oem_g14.xml");
         assert_eq!(oem.version, "3.0");
         assert_eq!(oem.header.originator, "NASA/JPL");

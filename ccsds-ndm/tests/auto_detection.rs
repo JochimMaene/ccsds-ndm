@@ -6,8 +6,8 @@ use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::{detect::detect_notation, from_str, MessageType, Notation};
 
-const OPM_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
-const OPM_XML: &str = include_str!("../../data/xml/opm_g5.xml");
+const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
+const OPM_XML: &str = include_str!("../data/xml/opm_g5.xml");
 
 #[test]
 fn notation_detection_and_auto_parse_are_bom_safe() {

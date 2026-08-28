@@ -2,8 +2,8 @@ use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::Epoch;
 
-const OEM_KVN: &str = include_str!("../../data/kvn/oem_g11.kvn");
-const OEM_XML: &str = include_str!("../../data/xml/oem_g14.xml");
+const OEM_KVN: &str = include_str!("../data/kvn/oem_g11.kvn");
+const OEM_XML: &str = include_str!("../data/xml/oem_g14.xml");
 
 #[test]
 fn xml_reference_frame_epoch_requires_calendar_form() {

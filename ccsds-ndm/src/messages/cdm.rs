@@ -2158,6 +2158,9 @@ pub struct CdmCovarianceMatrix {
 
 impl Validate for CdmCovarianceMatrix {
     fn validate(&self) -> Result<()> {
+        if let Some(error) = self.optional_row_errors().into_iter().next() {
+            return Err(error.into());
+        }
         for (field, value) in self.values() {
             if let Some(error) = non_finite_error(field, value) {
                 return Err(error.into());
@@ -2167,14 +2170,74 @@ impl Validate for CdmCovarianceMatrix {
     }
 
     fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(self
-            .values()
-            .filter_map(|(field, value)| non_finite_error(field, value))
-            .collect())
+        let mut errors = self.optional_row_errors();
+        errors.extend(
+            self.values()
+                .filter_map(|(field, value)| non_finite_error(field, value)),
+        );
+        Ok(errors)
     }
 }
 
 impl CdmCovarianceMatrix {
+    fn optional_row_errors(&self) -> Vec<ValidationError> {
+        let row_7 = [
+            ("CDRG_R", self.cdrg_r.is_some()),
+            ("CDRG_T", self.cdrg_t.is_some()),
+            ("CDRG_N", self.cdrg_n.is_some()),
+            ("CDRG_RDOT", self.cdrg_rdot.is_some()),
+            ("CDRG_TDOT", self.cdrg_tdot.is_some()),
+            ("CDRG_NDOT", self.cdrg_ndot.is_some()),
+            ("CDRG_DRG", self.cdrg_drg.is_some()),
+        ];
+        let row_8 = [
+            ("CSRP_R", self.csrp_r.is_some()),
+            ("CSRP_T", self.csrp_t.is_some()),
+            ("CSRP_N", self.csrp_n.is_some()),
+            ("CSRP_RDOT", self.csrp_rdot.is_some()),
+            ("CSRP_TDOT", self.csrp_tdot.is_some()),
+            ("CSRP_NDOT", self.csrp_ndot.is_some()),
+            ("CSRP_DRG", self.csrp_drg.is_some()),
+            ("CSRP_SRP", self.csrp_srp.is_some()),
+        ];
+        let row_9 = [
+            ("CTHR_R", self.cthr_r.is_some()),
+            ("CTHR_T", self.cthr_t.is_some()),
+            ("CTHR_N", self.cthr_n.is_some()),
+            ("CTHR_RDOT", self.cthr_rdot.is_some()),
+            ("CTHR_TDOT", self.cthr_tdot.is_some()),
+            ("CTHR_NDOT", self.cthr_ndot.is_some()),
+            ("CTHR_DRG", self.cthr_drg.is_some()),
+            ("CTHR_SRP", self.cthr_srp.is_some()),
+            ("CTHR_THR", self.cthr_thr.is_some()),
+        ];
+        let rows: [(&str, &[(&str, bool)]); 3] = [
+            ("CDM Covariance Matrix row 7", &row_7),
+            ("CDM Covariance Matrix row 8", &row_8),
+            ("CDM Covariance Matrix row 9", &row_9),
+        ];
+        let Some(last_present_row) = rows
+            .iter()
+            .rposition(|(_, fields)| fields.iter().any(|(_, present)| *present))
+        else {
+            return Vec::new();
+        };
+
+        rows.into_iter()
+            .take(last_present_row + 1)
+            .flat_map(|(block, fields)| {
+                fields
+                    .iter()
+                    .filter(|(_, present)| !present)
+                    .map(move |(field, _)| ValidationError::MissingRequiredField {
+                        block: block.into(),
+                        field: (*field).into(),
+                        line: None,
+                    })
+            })
+            .collect()
+    }
+
     fn values(&self) -> impl Iterator<Item = (&'static str, f64)> + '_ {
         let required = [
             ("CR_R", self.cr_r.value),

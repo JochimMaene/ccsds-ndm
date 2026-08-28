@@ -8,6 +8,7 @@ Unit tests for Conjunction Data Message (CDM) Python bindings.
 
 import numpy as np
 import pytest
+
 from ccsds_ndm import (
     Cdm,
     CdmBody,
@@ -207,6 +208,14 @@ class TestCdm:
         )
         with pytest.raises(ValueError, match="Covariance matrix must be"):
             data.covariance_matrix_numpy = np.zeros((5, 5), dtype=float)
+
+    def test_partial_optional_covariance_row_is_rejected_without_panicking(self):
+        cdm = self._create_valid_cdm()
+        covariance = cdm.body.segments[0].data.covariance_matrix
+        covariance.cdrg_r = 1.0
+
+        with pytest.raises(ValueError, match="CDRG_T"):
+            covariance.to_numpy()
 
     def test_relative_metadata_screen_volume_setters(self):
         rel = RelativeMetadataData(

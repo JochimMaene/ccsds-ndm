@@ -8,13 +8,11 @@ use ccsds_ndm::types::{Duration, ManDc, Vec3Double};
 use ccsds_ndm::{GenerateOptions, VersionedNdm};
 use tempfile::NamedTempFile;
 
-const KVN: &str = include_str!("../../data/kvn/ocm_g18.kvn");
-const XML: &str = include_str!("../../data/xml/ocm_g20.xml");
+const KVN: &str = include_str!("../data/kvn/ocm_g18.kvn");
+const XML: &str = include_str!("../data/xml/ocm_g20.xml");
 
 fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(relative)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
 #[test]

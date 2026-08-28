@@ -15,18 +15,18 @@ use ccsds_ndm::{
     from_str, from_str_with_options, GenerateOptions, MessageType, Notation, ParseOptions,
 };
 
-const OPM_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
-const OPM_XML: &str = include_str!("../../data/xml/opm_g5.xml");
-const OEM_XML: &str = include_str!("../../data/xml/oem_g14.xml");
-const OCM_KVN: &str = include_str!("../../data/kvn/ocm_g15.kvn");
-const OCM_MAN_KVN: &str = include_str!("../../data/kvn/ocm_g17.kvn");
-const ACM_KVN: &str = include_str!("../../data/kvn/acm_g7.kvn");
-const RDM_XML: &str = include_str!("../../data/xml/rdm_c4.xml");
-const TDM_XML: &str = include_str!("../../data/xml/tdm_e21.xml");
-const CDM_XML: &str = include_str!("../../data/xml/cdm_44.xml");
-const PERMISSIVE_XML: &str = include_str!("../../data/xml/ndm_g22.xml");
-const OMM_KVN: &str = include_str!("../../data/kvn/omm_g7.kvn");
-const OMM_XML: &str = include_str!("../../data/xml/omm_g10.xml");
+const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
+const OPM_XML: &str = include_str!("../data/xml/opm_g5.xml");
+const OEM_XML: &str = include_str!("../data/xml/oem_g14.xml");
+const OCM_KVN: &str = include_str!("../data/kvn/ocm_g15.kvn");
+const OCM_MAN_KVN: &str = include_str!("../data/kvn/ocm_g17.kvn");
+const ACM_KVN: &str = include_str!("../data/kvn/acm_g7.kvn");
+const RDM_XML: &str = include_str!("../data/xml/rdm_c4.xml");
+const TDM_XML: &str = include_str!("../data/xml/tdm_e21.xml");
+const CDM_XML: &str = include_str!("../data/xml/cdm_44.xml");
+const PERMISSIVE_XML: &str = include_str!("../data/xml/ndm_g22.xml");
+const OMM_KVN: &str = include_str!("../data/kvn/omm_g7.kvn");
+const OMM_XML: &str = include_str!("../data/xml/omm_g10.xml");
 
 #[test]
 fn generic_parse_options_bound_non_opm_inputs_and_xml_depth() {
@@ -51,19 +51,19 @@ fn history_record_limits_cover_each_concrete_history_message() {
 
     let cases = [
         (
-            include_str!("../../data/kvn/tdm_e1.kvn"),
+            include_str!("../data/kvn/tdm_e1.kvn"),
             ccsds_ndm::validation::MessageKind::Tdm,
         ),
         (
-            include_str!("../../data/kvn/aem_g4.kvn"),
+            include_str!("../data/kvn/aem_g4.kvn"),
             ccsds_ndm::validation::MessageKind::Aem,
         ),
         (
-            include_str!("../../data/kvn/ocm_g15.kvn"),
+            include_str!("../data/kvn/ocm_g15.kvn"),
             ccsds_ndm::validation::MessageKind::Ocm,
         ),
         (
-            include_str!("../../data/kvn/acm_g6.kvn"),
+            include_str!("../data/kvn/acm_g6.kvn"),
             ccsds_ndm::validation::MessageKind::Acm,
         ),
     ];
@@ -76,9 +76,9 @@ fn history_record_limits_cover_each_concrete_history_message() {
     }
 
     let xml_cases = [
-        include_str!("../../data/xml/tdm_e23.xml"),
-        include_str!("../../data/xml/aem_g11.xml"),
-        include_str!("../../data/xml/ocm_g20.xml"),
+        include_str!("../data/xml/tdm_e23.xml"),
+        include_str!("../data/xml/aem_g11.xml"),
+        include_str!("../data/xml/ocm_g20.xml"),
     ];
     for input in xml_cases {
         let error = from_str_with_options(input, Some(Notation::Xml), &options).unwrap_err();
@@ -89,7 +89,7 @@ fn history_record_limits_cover_each_concrete_history_message() {
         );
     }
 
-    let acm = ccsds_ndm::from_str(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
+    let acm = ccsds_ndm::from_str(include_str!("../data/kvn/acm_g6.kvn")).unwrap();
     let MessageType::Acm(acm) = acm else {
         panic!("expected ACM fixture");
     };

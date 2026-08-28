@@ -7,6 +7,7 @@ Unit tests for Attitude Comprehensive Message (ACM) Python bindings.
 """
 
 import pytest
+
 from ccsds_ndm import (
     Acm,
     AcmAttitudeDetermination,
@@ -16,8 +17,8 @@ from ccsds_ndm import (
     AcmManeuverParameters,
     AcmMetadata,
     AcmPhysicalDescription,
-    AcmSensor,
     AcmSegment,
+    AcmSensor,
     AdmHeader,
 )
 

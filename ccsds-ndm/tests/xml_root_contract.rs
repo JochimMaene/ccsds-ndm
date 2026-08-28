@@ -6,18 +6,18 @@ use ccsds_ndm::{from_str, MessageType};
 
 #[test]
 fn standalone_xml_roots_allow_schema_hints_but_reject_unknown_attributes() {
-    let acm = from_str(include_str!("../../data/kvn/acm_g6.kvn"))
+    let acm = from_str(include_str!("../data/kvn/acm_g6.kvn"))
         .unwrap()
         .to_xml()
         .unwrap();
     let cases = [
-        ("omm", include_str!("../../data/xml/omm_g10.xml")),
-        ("ocm", include_str!("../../data/xml/ocm_g20.xml")),
-        ("cdm", include_str!("../../data/xml/cdm_44.xml")),
-        ("tdm", include_str!("../../data/xml/tdm_e21.xml")),
-        ("rdm", include_str!("../../data/xml/rdm_c3.xml")),
-        ("aem", include_str!("../../data/xml/aem_g11.xml")),
-        ("apm", include_str!("../../data/xml/apm_g10.xml")),
+        ("omm", include_str!("../data/xml/omm_g10.xml")),
+        ("ocm", include_str!("../data/xml/ocm_g20.xml")),
+        ("cdm", include_str!("../data/xml/cdm_44.xml")),
+        ("tdm", include_str!("../data/xml/tdm_e21.xml")),
+        ("rdm", include_str!("../data/xml/rdm_c3.xml")),
+        ("aem", include_str!("../data/xml/aem_g11.xml")),
+        ("apm", include_str!("../data/xml/apm_g10.xml")),
         ("acm", acm.as_str()),
     ];
 
@@ -35,7 +35,7 @@ fn standalone_xml_roots_allow_schema_hints_but_reject_unknown_attributes() {
 
 #[test]
 fn standalone_xml_roots_reject_trailing_documents() {
-    let input = include_str!("../../data/xml/omm_g10.xml");
+    let input = include_str!("../data/xml/omm_g10.xml");
     let error = from_str(&format!("{input}<omm/>")).unwrap_err();
     assert!(matches!(
         error.diagnostic().unwrap().message_kind,
@@ -46,18 +46,18 @@ fn standalone_xml_roots_reject_trailing_documents() {
 
 #[test]
 fn standalone_xml_metadata_rejects_unknown_elements() {
-    let acm = from_str(include_str!("../../data/kvn/acm_g6.kvn"))
+    let acm = from_str(include_str!("../data/kvn/acm_g6.kvn"))
         .unwrap()
         .to_xml()
         .unwrap();
     let cases = [
-        ("omm", include_str!("../../data/xml/omm_g10.xml")),
-        ("ocm", include_str!("../../data/xml/ocm_g20.xml")),
-        ("cdm", include_str!("../../data/xml/cdm_44.xml")),
-        ("tdm", include_str!("../../data/xml/tdm_e21.xml")),
-        ("rdm", include_str!("../../data/xml/rdm_c3.xml")),
-        ("aem", include_str!("../../data/xml/aem_g11.xml")),
-        ("apm", include_str!("../../data/xml/apm_g10.xml")),
+        ("omm", include_str!("../data/xml/omm_g10.xml")),
+        ("ocm", include_str!("../data/xml/ocm_g20.xml")),
+        ("cdm", include_str!("../data/xml/cdm_44.xml")),
+        ("tdm", include_str!("../data/xml/tdm_e21.xml")),
+        ("rdm", include_str!("../data/xml/rdm_c3.xml")),
+        ("aem", include_str!("../data/xml/aem_g11.xml")),
+        ("apm", include_str!("../data/xml/apm_g10.xml")),
         ("acm", acm.as_str()),
     ];
     for (root, input) in cases {
@@ -69,6 +69,6 @@ fn standalone_xml_metadata_rejects_unknown_elements() {
 
 #[test]
 fn generated_acm_is_still_detected_as_acm() {
-    let message = from_str(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
+    let message = from_str(include_str!("../data/kvn/acm_g6.kvn")).unwrap();
     assert!(matches!(message, MessageType::Acm(_)));
 }

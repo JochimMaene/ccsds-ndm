@@ -48,9 +48,8 @@ external identifier resolution are outside self-contained message validation.
 
 `bindings/python/tests/test_acm.py`, `test_api_consistency.py`, and
 `test_parse_and_generation_options.py` cover every nested section's setters, typed choices,
-KVN/XML parsing and generation, generic identity, and limits. `family_surface_cli` runs ACM through
-the actual CLI validation/conversion/identity/atomic-limit contract. `package-python` and
-`package-rust` are the common built-artifact install gates.
+KVN/XML parsing and generation, generic identity, and limits. `package-python` and `package-rust`
+are the common built-artifact gates.
 
 ## Status
 

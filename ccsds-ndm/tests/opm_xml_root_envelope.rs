@@ -8,7 +8,7 @@ use ccsds_ndm::{GenerateOptions, VersionedNdm};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const OPM: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const OPM: &str = include_str!("../data/kvn/opm_g1.kvn");
 const ROOT: &str = concat!(
     "<opm xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ",
     "id=\"CCSDS_OPM_VERS\" version=\"3.0\">"
@@ -19,7 +19,7 @@ fn opm() -> Opm {
 }
 
 fn schema_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/xsd/ndmxml-4.0.0-master-4.0.xsd")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("data/xsd/ndmxml-4.0.0-master-4.0.xsd")
 }
 
 fn assert_opm_envelope(xml: &str) {

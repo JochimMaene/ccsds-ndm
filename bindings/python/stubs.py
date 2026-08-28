@@ -53,14 +53,12 @@ PUBLIC_API_PARAMETER_TYPES = {
         "max_input_bytes": "Optional[int]",
         "max_records": "Optional[int]",
         "path": "str",
-        "strict": "bool",
     },
     "from_str": {
         "data": "str",
         "format": "str",
         "max_input_bytes": "Optional[int]",
         "max_records": "Optional[int]",
-        "strict": "bool",
     },
     "to_file": {
         "format": "str",
@@ -68,14 +66,11 @@ PUBLIC_API_PARAMETER_TYPES = {
         "max_output_bytes": "Optional[int]",
         "version": "Optional[str]",
     },
-    "to_kvn": {"version": "Optional[str]", "max_output_bytes": "Optional[int]"},
     "to_str": {
         "format": "str",
         "max_output_bytes": "Optional[int]",
         "version": "Optional[str]",
     },
-    "to_xml": {"version": "Optional[str]", "max_output_bytes": "Optional[int]"},
-    "validate": {"strict": "bool"},
 }
 
 
@@ -463,14 +458,14 @@ def _generate_function(obj: Any, indent: str, owner_class: str | None = None) ->
     if not return_type:
         if name in {"to_file", "convert_file", "__setstate__"}:
             return_type = "None"
-        elif name in {"convert", "to_kvn", "to_str", "to_xml"}:
+        elif name in {"convert", "to_str"}:
             return_type = "str"
         elif name == "to_numpy":
             return_type = "numpy.ndarray"
         elif name == "__getstate__":
             return_type = "object"
         elif name == "validate":
-            return_type = "Optional[list[str]]" if "strict" in sig else "None"
+            return_type = "None"
     if not return_type and owner_class and name.startswith("from_"):
         # PyO3 static factory methods usually expose no runtime return annotation.
         # Use class context so type checkers infer `Cdm.from_str(...) -> Cdm`, etc.

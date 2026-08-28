@@ -5,7 +5,7 @@
 use ccsds_ndm::messages::ocm::Ocm;
 use ccsds_ndm::traits::Ndm;
 
-const OCM_XML: &str = include_str!("../../data/xml/ocm_g20.xml");
+const OCM_XML: &str = include_str!("../data/xml/ocm_g20.xml");
 
 const OCM_FRAME_EPOCH_KVN: &str = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00

@@ -6,13 +6,11 @@ use ccsds_ndm::messages::apm::Apm;
 use ccsds_ndm::traits::Ndm;
 use tempfile::NamedTempFile;
 
-const KVN: &str = include_str!("../../data/kvn/apm_g1.kvn");
-const XML: &str = include_str!("../../data/xml/apm_g10.xml");
+const KVN: &str = include_str!("../data/kvn/apm_g1.kvn");
+const XML: &str = include_str!("../data/xml/apm_g10.xml");
 
 fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(relative)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
 #[test]

@@ -4,7 +4,7 @@ use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::{GenerateOptions, VersionedNdm};
 
 fn opm() -> Opm {
-    Opm::from_kvn(include_str!("../../data/kvn/opm_g4.kvn")).expect("rich OPM fixture should parse")
+    Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).expect("rich OPM fixture should parse")
 }
 
 fn assert_limit_error(

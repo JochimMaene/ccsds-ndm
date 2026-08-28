@@ -5,7 +5,7 @@ authorize a public API change.
 
 ## Authority
 
-The official XSDs in `data/xsd/` decide which time-token spellings can appear on the wire. The
+The official XSDs in `ccsds-ndm/data/xsd/` decide which time-token spellings can appear on the wire. The
 applicable CCSDS books in `docs/ccsds-books/` decide whether a field is absolute or relative and
 which records must be ordered or must not repeat. The comparator must never infer a physical time
 system from the token alone.
