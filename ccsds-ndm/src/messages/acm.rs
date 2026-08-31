@@ -79,7 +79,7 @@ impl Ndm for Acm {
         self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        writer.finish_checked()
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -354,7 +354,7 @@ impl Acm {
         let mut sink = AcmKvnLexicalSink::default();
         let mut writer = KvnWriter::from_io(&mut sink);
         self.write_kvn(&mut writer);
-        writer.finish_io().map_err(CcsdsNdmError::from)
+        writer.finish_io()
     }
 }
 
@@ -730,7 +730,7 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             offset += raw_line.len() + 1;
             continue;
         }
-        if let Some(marker) = line.strip_suffix("_START") {
+        if let Some(marker) = line.strip_suffix("_START").filter(|_| !line.contains('=')) {
             if marker == "SENSOR" {
                 if block != Some("AD") || !ad_sensor_started && history_started {
                     return fail("SENSOR block must be nested directly in AD");
@@ -773,7 +773,7 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             offset += raw_line.len() + 1;
             continue;
         }
-        if let Some(marker) = line.strip_suffix("_STOP") {
+        if let Some(marker) = line.strip_suffix("_STOP").filter(|_| !line.contains('=')) {
             if marker == "SENSOR" {
                 if block != Some("SENSOR") {
                     return fail("mismatched ACM SENSOR block end");

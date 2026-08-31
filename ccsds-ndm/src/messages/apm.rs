@@ -71,7 +71,7 @@ impl Ndm for Apm {
         )?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        writer.finish_checked()
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -372,7 +372,7 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             continue;
         }
 
-        if let Some(marker) = line.strip_suffix("_START") {
+        if let Some(marker) = line.strip_suffix("_START").filter(|_| !line.contains('=')) {
             if current_block.is_some()
                 || !matches!(
                     marker,
@@ -396,7 +396,7 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             offset += raw_line.len() + 1;
             continue;
         }
-        if let Some(marker) = line.strip_suffix("_STOP") {
+        if let Some(marker) = line.strip_suffix("_STOP").filter(|_| !line.contains('=')) {
             if current_block != Some(marker) {
                 return fail("mismatched APM logical-block end");
             }

@@ -4,6 +4,7 @@
 
 use crate::types::EpochError;
 use std::borrow::Cow;
+use std::fmt;
 use thiserror::Error;
 use winnow::error::{AddContext, ParserError, StrContext};
 use winnow::stream::Stream;
@@ -48,6 +49,43 @@ pub struct ParseErrorContext {
     pub column: Option<usize>,
     pub original_token: Option<String>,
     pub expected: Option<&'static str>,
+}
+
+impl fmt::Display for DiagnosticNotation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Kvn => "KVN",
+            Self::Xml => "XML",
+        })
+    }
+}
+
+impl fmt::Display for GenerationErrorContext {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "failed to generate {} {} {} -> {}",
+            self.message_kind.as_str(),
+            self.notation,
+            self.source_edition,
+            self.target_edition
+        )
+    }
+}
+
+impl fmt::Display for ParseErrorContext {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "failed to parse {} {}",
+            self.message_kind.as_str(),
+            self.notation
+        )?;
+        if let Some(edition) = &self.source_edition {
+            write!(formatter, " {edition}")?;
+        }
+        Ok(())
+    }
 }
 
 /// Borrowed, machine-readable diagnostic information.
@@ -507,7 +545,7 @@ impl WithLocation for ValidationError {
 #[non_exhaustive]
 pub enum CcsdsNdmError {
     /// An existing error enriched with public generation context.
-    #[error("{source}")]
+    #[error("{context}: {source}")]
     Generation {
         context: Box<GenerationErrorContext>,
         #[source]
@@ -515,7 +553,7 @@ pub enum CcsdsNdmError {
     },
 
     /// An existing error enriched with strict parsing context.
-    #[error("{source}")]
+    #[error("{context}: {source}")]
     Parsing {
         context: Box<ParseErrorContext>,
         #[source]

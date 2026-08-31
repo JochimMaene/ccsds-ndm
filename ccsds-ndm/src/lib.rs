@@ -247,6 +247,22 @@ impl MessageType {
         }
     }
 
+    fn source_edition(&self) -> &str {
+        match self {
+            Self::Opm(message) => &message.version,
+            Self::Omm(message) => &message.version,
+            Self::Oem(message) => &message.version,
+            Self::Ocm(message) => &message.version,
+            Self::Acm(message) => &message.version,
+            Self::Aem(message) => &message.version,
+            Self::Apm(message) => &message.version,
+            Self::Cdm(message) => &message.version,
+            Self::Tdm(message) => &message.version,
+            Self::Rdm(message) => &message.version,
+            Self::Ndm(_) => "combined",
+        }
+    }
+
     pub(crate) fn validate_for_generation(&self, format: generation::OutputFormat) -> Result<()> {
         fn validate<T: VersionedNdm>(message: &T, format: generation::OutputFormat) -> Result<()> {
             let result = generation::validate_output_version(T::KIND, message.version(), format)
@@ -429,14 +445,13 @@ impl MessageType {
     /// Returns a KVN-generation error or an I/O error from writing the destination.
     pub fn to_kvn_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let kvn = self.to_kvn()?;
-        fsutil::atomic_write(path.as_ref(), kvn.as_bytes()).map_err(|error| match self {
-            MessageType::Opm(message) => error.with_generation_context(
-                validation::MessageKind::Opm,
+        fsutil::atomic_write(path.as_ref(), kvn.as_bytes()).map_err(|error| {
+            error.with_generation_context(
+                self.kind(),
                 error::DiagnosticNotation::Kvn,
-                &message.version,
-                &message.version,
-            ),
-            _ => error,
+                self.source_edition(),
+                self.source_edition(),
+            )
         })
     }
 
@@ -450,14 +465,13 @@ impl MessageType {
     /// Returns an XML-generation error or an I/O error from writing the destination.
     pub fn to_xml_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let xml = self.to_xml()?;
-        fsutil::atomic_write(path.as_ref(), xml.as_bytes()).map_err(|error| match self {
-            MessageType::Opm(message) => error.with_generation_context(
-                validation::MessageKind::Opm,
+        fsutil::atomic_write(path.as_ref(), xml.as_bytes()).map_err(|error| {
+            error.with_generation_context(
+                self.kind(),
                 error::DiagnosticNotation::Xml,
-                &message.version,
-                &message.version,
-            ),
-            _ => error,
+                self.source_edition(),
+                self.source_edition(),
+            )
         })
     }
 }

@@ -529,7 +529,6 @@ fn validate_xml_limits(
 fn is_xml_record(kind: crate::validation::MessageKind, name: &[u8]) -> bool {
     use crate::validation::MessageKind;
     match kind {
-        MessageKind::Opm => name == b"maneuverParameters",
         MessageKind::Oem => matches!(name, b"stateVector" | b"covarianceMatrix"),
         MessageKind::Tdm => name == b"observation",
         MessageKind::Aem => name == b"attitudeState",

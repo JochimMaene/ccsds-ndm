@@ -6,7 +6,7 @@ use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{GenerateOptions, MessageType, ParseOptions};
+use ccsds_ndm::{from_str_with_options, GenerateOptions, MessageType, Notation, ParseOptions};
 use tempfile::NamedTempFile;
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
@@ -127,9 +127,11 @@ fn opm_maneuvers_are_not_history_records_in_standalone_or_combined_messages() {
     };
     let xml = combined.to_xml().unwrap();
     CombinedNdm::from_xml_with_options(&xml, &options).unwrap();
+    from_str_with_options(&xml, Some(Notation::Xml), &options).unwrap();
 
     let kvn = combined.to_kvn().unwrap();
     CombinedNdm::from_kvn_with_options(&kvn, &options).unwrap();
+    from_str_with_options(&kvn, Some(Notation::Kvn), &options).unwrap();
 }
 
 #[test]

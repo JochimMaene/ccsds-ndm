@@ -4999,9 +4999,10 @@ impl OcmPerturbations {
         self.inner.gm.as_ref().map(|g| g.value)
     }
     #[setter]
-    fn set_gm(&mut self, value: Option<f64>) {
+    fn set_gm(&mut self, value: Option<f64>) -> PyResult<()> {
         use ccsds_ndm::types::Gm;
-        self.inner.gm = value.map(|v| Gm::new(v, None).unwrap());
+        self.inner.gm = crate::api::checked_optional(value, |v| Gm::new(v, None))?;
+        Ok(())
     }
     /// One OR MORE (N-body) gravitational perturbations bodies used. Values, listed serially
     /// in comma-delimited fashion, denote a natural solar or extra-solar system body (stars,

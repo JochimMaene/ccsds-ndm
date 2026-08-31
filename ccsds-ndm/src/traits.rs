@@ -10,23 +10,6 @@
 use crate::error::{Result, ValidationError};
 use crate::kvn::ser::KvnWriter;
 
-/// Core trait for NDM message types.
-///
-/// All CCSDS message types (OPM, OEM, CDM, etc.) implement this trait,
-/// providing a uniform interface for parsing and serialization.
-///
-/// # Example
-///
-/// ```no_run
-/// use ccsds_ndm::messages::opm::Opm;
-/// use ccsds_ndm::traits::Ndm;
-///
-/// // Parse from KVN
-/// let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
-///
-/// // Serialize to XML
-/// let xml = opm.to_xml().unwrap();
-/// ```
 /// Trait for types that provide semantic validation.
 pub trait Validate {
     /// Perform semantic validation on the object.

@@ -11,6 +11,15 @@ use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::*;
 use std::path::Path;
 
+/// Build an optional validated core value, surfacing a rejection as a Python exception
+/// instead of panicking.
+pub fn checked_optional<T>(
+    value: Option<f64>,
+    make: impl FnOnce(f64) -> ccsds_ndm::error::Result<T>,
+) -> PyResult<Option<T>> {
+    value.map(make).transpose().map_err(ccsds_error_to_pyerr)
+}
+
 pub trait FromMessageType: Ndm {
     const KIND: ccsds_ndm::validation::MessageKind;
 

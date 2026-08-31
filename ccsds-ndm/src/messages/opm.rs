@@ -117,7 +117,7 @@ impl Ndm for Opm {
             ToKvn::validate_kvn(self)?;
             let mut writer = KvnWriter::new();
             self.write_kvn(&mut writer);
-            Ok(writer.finish())
+            writer.finish_checked()
         })()
         .map_err(|error: crate::error::CcsdsNdmError| {
             error.with_generation_context(
@@ -935,17 +935,8 @@ impl Opm {
 
         fn comments(comments: &[String], path: &'static str) -> Result<()> {
             for comment in comments {
-                invalid_text("COMMENT", comment, path)?;
-                let line_len = "COMMENT ".len() + comment.len();
-                if line_len > 254 {
-                    return Err(ValidationError::OutOfRange {
-                        name: "COMMENT".into(),
-                        value: line_len.to_string(),
-                        expected: "a KVN line no longer than 254 characters".into(),
-                        line: None,
-                    }
-                    .at_path(path)
-                    .into());
+                if let Some(error) = crate::validation::kvn_comment_error(comment) {
+                    return Err(error.at_path(path).into());
                 }
             }
             Ok(())

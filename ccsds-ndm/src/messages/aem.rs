@@ -76,7 +76,7 @@ impl Ndm for Aem {
         self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        writer.finish_checked()
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -314,7 +314,7 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             offset += raw_line.len() + 1;
             continue;
         }
-        if let Some(marker) = line.strip_suffix("_START") {
+        if let Some(marker) = line.strip_suffix("_START").filter(|_| !line.contains('=')) {
             if block.is_some() || !matches!(marker, "META" | "DATA") {
                 return fail("unknown or nested AEM marked block");
             }
@@ -329,7 +329,7 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             offset += raw_line.len() + 1;
             continue;
         }
-        if let Some(marker) = line.strip_suffix("_STOP") {
+        if let Some(marker) = line.strip_suffix("_STOP").filter(|_| !line.contains('=')) {
             if block != Some(marker) {
                 return fail("mismatched AEM marked block end");
             }
@@ -456,7 +456,7 @@ impl Aem {
         let mut sink = AemKvnLexicalSink::default();
         let mut writer = KvnWriter::from_io(&mut sink);
         self.write_kvn(&mut writer);
-        writer.finish_io().map_err(CcsdsNdmError::from)
+        writer.finish_io()
     }
 }
 

@@ -74,7 +74,7 @@ impl Ndm for Cdm {
         self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        writer.finish_checked()
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {

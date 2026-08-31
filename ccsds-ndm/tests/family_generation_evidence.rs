@@ -84,15 +84,20 @@ fn every_remaining_xml_fixture_generates_deterministically_and_reparsably() {
         let input = fs::read_to_string(&path).unwrap();
         let message =
             from_str(&input).unwrap_or_else(|error| panic!("{label} strict parse failed: {error}"));
-        if label == "tdm_e21.xml" || label == "cdm_44.xml" {
+        if matches!(label.as_ref(), "tdm_e21.xml" | "cdm_44.xml" | "ocm_g20.xml") {
             // XML permits Unicode strings; TDM KVN is restricted to printable ASCII. The
             // reference participant name contains typographic quotes, so conversion must fail
             // rather than emit KVN that the strict parser cannot accept.
             //
-            // The CDM XML fixture independently populates both the outer data COMMENT and its
+            // OCM G-20 contains multiline assignment and history values that KVN cannot retain
+            // without changing them. The CDM XML fixture independently populates both the outer
+            // data COMMENT and its
             // first nested OD COMMENT. CDM KVN has no delimiter for that boundary, so conversion
             // must likewise reject the ambiguous state instead of guessing a split.
-            assert!(message.to_kvn().is_err());
+            assert!(
+                message.to_kvn().is_err(),
+                "{label} unexpectedly generated KVN"
+            );
             let xml = message.to_xml().unwrap();
             assert_eq!(message.to_xml().unwrap(), xml);
             validate_official_xsd(&label, &xml);

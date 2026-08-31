@@ -80,7 +80,7 @@ impl Ndm for Ocm {
         self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        writer.finish_checked()
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -773,7 +773,7 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             offset += raw_line.len() + 1;
             continue;
         }
-        if let Some(marker) = line.strip_suffix("_START") {
+        if let Some(marker) = line.strip_suffix("_START").filter(|_| !line.contains('=')) {
             if current_block.is_some() {
                 return if current_block == Some("USER") {
                     fail("Unexpected key in USER block")
@@ -798,7 +798,7 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             offset += raw_line.len() + 1;
             continue;
         }
-        if let Some(marker) = line.strip_suffix("_STOP") {
+        if let Some(marker) = line.strip_suffix("_STOP").filter(|_| !line.contains('=')) {
             if current_block != Some(marker) {
                 return fail("mismatched or unexpected OCM block end");
             }
@@ -927,7 +927,7 @@ impl Ocm {
         let mut sink = OcmKvnLexicalSink::default();
         let mut writer = KvnWriter::from_io(&mut sink);
         self.write_kvn(&mut writer);
-        writer.finish_io().map_err(CcsdsNdmError::from)
+        writer.finish_io()
     }
 }
 

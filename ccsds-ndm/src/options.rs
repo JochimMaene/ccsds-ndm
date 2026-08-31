@@ -72,8 +72,8 @@ pub struct ParseOptions {
     pub max_xml_depth: usize,
     /// Maximum number of materialized history records.
     ///
-    /// `None` keeps record count unlimited. OEM counts state vectors and covariance matrices.
-    /// The limit is checked during notation preflight, before the typed history is allocated.
+    /// `None` keeps record count unlimited. Record-bearing families count repeatable history
+    /// entries during notation preflight, before typed records are allocated.
     pub max_records: Option<usize>,
 }
 

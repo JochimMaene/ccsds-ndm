@@ -80,20 +80,26 @@ pub(crate) fn preflight_xml_limit<T: serde::Serialize>(
     if options.max_output_bytes.is_none() {
         return Ok(());
     }
-    let mut counter = CountingWriter::default();
-    crate::xml::to_writer(&mut counter, value)?;
-    enforce_output_limit(counter.bytes, options)
+    enforce_output_limit(crate::xml::preflight(value)?, options)
 }
 
 pub(crate) fn preflight_kvn_limit<T: ToKvn>(value: &T, options: &GenerateOptions) -> Result<()> {
     if options.max_output_bytes.is_none() {
         return Ok(());
     }
+    enforce_output_limit(preflight_kvn(value)?, options)
+}
+
+fn preflight_kvn<T: ToKvn>(value: &T) -> Result<usize> {
     let mut counter = CountingWriter::default();
     let mut writer = crate::kvn::ser::KvnWriter::from_io(&mut counter);
     value.write_kvn(&mut writer);
-    writer.finish_io().map_err(CcsdsNdmError::from)?;
-    enforce_output_limit(counter.bytes, options)
+    writer.finish_io()?;
+    Ok(counter.bytes)
+}
+
+fn validate_kvn_lexical<T: ToKvn>(value: &T) -> Result<()> {
+    preflight_kvn(value).map(|_| ())
 }
 
 pub(crate) fn validate_output_version(
@@ -165,7 +171,7 @@ pub trait VersionedNdm: Ndm + Clone {
     /// writer path.
     #[doc(hidden)]
     fn validate_xml_output(&self) -> Result<()> {
-        Ok(())
+        crate::xml::validate_output_text(self)
     }
 
     /// Validate the complete model and KVN-specific generation constraints.
@@ -314,43 +320,13 @@ where
     W: Write,
 {
     with_target_message(message, options, OutputFormat::Kvn, |selected| {
-        (|| {
-            validate_output_version(T::KIND, selected.version(), OutputFormat::Kvn)?;
-            selected.validate_kvn_output()?;
-            preflight_kvn_limit(selected, options)?;
-            let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
-            ToKvn::write_kvn(selected, &mut writer);
-            writer.finish_io().map_err(CcsdsNdmError::from)
-        })()
+        validate_output_version(T::KIND, selected.version(), OutputFormat::Kvn)?;
+        selected.validate_kvn_output()?;
+        preflight_kvn_limit(selected, options)?;
+        let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
+        ToKvn::write_kvn(selected, &mut writer);
+        writer.finish_io()
     })
-}
-
-macro_rules! impl_versioned_ndm {
-    ($type:ty, $kind:ident) => {
-        impl VersionedNdm for $type {
-            const KIND: MessageKind = MessageKind::$kind;
-
-            fn version(&self) -> &str {
-                &self.version
-            }
-
-            fn set_version(&mut self, version: String) {
-                self.version = version;
-            }
-
-            fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
-                generate_kvn(self, options)
-            }
-
-            fn write_kvn_to<W: Write>(
-                &self,
-                output: &mut W,
-                options: &GenerateOptions,
-            ) -> Result<()> {
-                stream_kvn(self, output, options)
-            }
-        }
-    };
 }
 
 impl VersionedNdm for crate::messages::acm::Acm {
@@ -370,7 +346,8 @@ impl VersionedNdm for crate::messages::acm::Acm {
     }
 
     fn validate_xml_output(&self) -> Result<()> {
-        self.validate_xml_representability()
+        self.validate_xml_representability()?;
+        crate::xml::validate_output_text(self)
     }
 
     fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
@@ -381,7 +358,31 @@ impl VersionedNdm for crate::messages::acm::Acm {
         stream_kvn(self, output, options)
     }
 }
-impl_versioned_ndm!(crate::messages::apm::Apm, Apm);
+
+impl VersionedNdm for crate::messages::apm::Apm {
+    const KIND: MessageKind = MessageKind::Apm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate()?;
+        validate_kvn_lexical(self)
+    }
+
+    fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+        generate_kvn(self, options)
+    }
+
+    fn write_kvn_to<W: Write>(&self, output: &mut W, options: &GenerateOptions) -> Result<()> {
+        stream_kvn(self, output, options)
+    }
+}
 
 impl VersionedNdm for crate::messages::omm::Omm {
     const KIND: MessageKind = MessageKind::Omm;
@@ -403,6 +404,11 @@ impl VersionedNdm for crate::messages::omm::Omm {
                 target_version: target_version.to_owned(),
             }),
         }
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        self.validate()?;
+        validate_kvn_lexical(self)
     }
 
     fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
@@ -527,7 +533,8 @@ impl VersionedNdm for crate::messages::rdm::Rdm {
 
     fn validate_kvn_output(&self) -> Result<()> {
         self.validate()?;
-        self.validate_kvn_representability()
+        self.validate_kvn_representability()?;
+        validate_kvn_lexical(self)
     }
 
     fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {

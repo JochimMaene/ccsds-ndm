@@ -605,7 +605,7 @@ impl Ndm for Oem {
             let estimated_capacity = records.saturating_mul(150).saturating_add(4096);
             let mut writer = KvnWriter::with_capacity(estimated_capacity);
             self.write_validated_kvn(&mut writer)?;
-            Ok(writer.finish())
+            writer.finish_checked()
         })()
         .map_err(|error: crate::error::CcsdsNdmError| {
             error.with_generation_context(
@@ -683,7 +683,9 @@ impl Oem {
         }
         fn comments(values: &[String], path: String) -> Result<()> {
             for value in values {
-                text("COMMENT", value, path.clone(), 7)?;
+                if let Some(error) = crate::validation::kvn_comment_error(value) {
+                    return Err(error.at_path(path.clone()).into());
+                }
             }
             Ok(())
         }
@@ -705,6 +707,7 @@ impl Oem {
             &self.id,
             &self.version,
         )?;
+        crate::versioning::validate_oem_edition(self)?;
         self.header.validate()?;
         validate_within_path(self.body.validate_identity(), || "body".into())?;
 

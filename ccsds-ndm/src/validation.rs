@@ -54,21 +54,46 @@ pub(crate) fn collect_validation_result(
     }
 }
 
+pub(crate) fn is_xml_1_character(character: char) -> bool {
+    matches!(character, '\u{9}' | '\u{A}' | '\u{D}')
+        || ('\u{20}'..='\u{D7FF}').contains(&character)
+        || ('\u{E000}'..='\u{FFFD}').contains(&character)
+        || ('\u{10000}'..='\u{10FFFF}').contains(&character)
+}
+
 pub(crate) fn xml_text_error(field: &'static str, value: &str) -> Option<ValidationError> {
     value
         .chars()
-        .find(|character| {
-            !matches!(*character, '\u{9}' | '\u{A}' | '\u{D}')
-                && !('\u{20}'..='\u{D7FF}').contains(character)
-                && !('\u{E000}'..='\u{FFFD}').contains(character)
-                && !('\u{10000}'..='\u{10FFFF}').contains(character)
-        })
+        .find(|character| !is_xml_1_character(*character))
         .map(|character| ValidationError::InvalidValue {
             field: Cow::Borrowed(field),
             value: format!("contains U+{:04X}", u32::from(character)),
             expected: Cow::Borrowed("text containing only XML 1.0 characters"),
             line: None,
         })
+}
+
+pub(crate) fn kvn_comment_error(value: &str) -> Option<ValidationError> {
+    for line in value.lines() {
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return Some(ValidationError::InvalidValue {
+                field: Cow::Borrowed("COMMENT"),
+                value: line.to_owned(),
+                expected: Cow::Borrowed("printable ASCII characters and blanks"),
+                line: None,
+            });
+        }
+        let line_len = "COMMENT ".len() + line.len();
+        if line_len > 254 {
+            return Some(ValidationError::OutOfRange {
+                name: Cow::Borrowed("COMMENT"),
+                value: line_len.to_string(),
+                expected: Cow::Borrowed("a KVN line no longer than 254 characters"),
+                line: None,
+            });
+        }
+    }
+    None
 }
 
 pub(crate) fn validation_errors_from(result: Result<()>) -> Result<Vec<ValidationError>> {

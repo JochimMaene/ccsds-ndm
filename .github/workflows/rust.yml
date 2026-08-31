@@ -111,10 +111,24 @@ jobs:
       - name: Build and verify crate package
         run: just package-rust
 
+  package-python:
+    name: Package Python wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: astral-sh/setup-uv@v5
+      - uses: taiki-e/install-action@just
+      - name: Build, install, and verify Python wheel
+        run: just package-python
+
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [test, fmt, coverage, bindings, package]
+    needs: [test, fmt, coverage, bindings, package, package-python]
     if: github.ref_type == 'tag'
     steps:
       - name: Checkout sources

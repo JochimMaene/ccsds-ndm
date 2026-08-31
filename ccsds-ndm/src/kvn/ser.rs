@@ -266,11 +266,15 @@ enum KvnOutput<'a> {
 pub struct KvnWriter<'a> {
     output: KvnOutput<'a>,
     io_error: Option<std::io::Error>,
+    lexical_error: bool,
     line_buffer: String,
 }
 
 impl FmtWrite for KvnWriter<'_> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.lexical_error |= !s
+            .bytes()
+            .all(|byte| byte == b'\n' || (b' '..=b'~').contains(&byte));
         match &mut self.output {
             KvnOutput::String(output) => output.write_str(s),
             KvnOutput::Io(output) => output.write_all(s.as_bytes()).map_err(|error| {
@@ -288,6 +292,7 @@ impl KvnWriter<'static> {
         Self {
             output: KvnOutput::String(String::new()),
             io_error: None,
+            lexical_error: false,
             line_buffer: String::new(),
         }
     }
@@ -296,6 +301,7 @@ impl KvnWriter<'static> {
         Self {
             output: KvnOutput::String(String::with_capacity(capacity)),
             io_error: None,
+            lexical_error: false,
             line_buffer: String::new(),
         }
     }
@@ -326,6 +332,7 @@ impl<'a> KvnWriter<'a> {
         Self {
             output: KvnOutput::Io(output),
             io_error: None,
+            lexical_error: false,
             line_buffer: String::new(),
         }
     }
@@ -363,11 +370,30 @@ impl<'a> KvnWriter<'a> {
         std::borrow::Cow::Borrowed(value)
     }
 
+    fn check_text(&mut self, value: &str) {
+        self.lexical_error |= !value.bytes().all(|byte| (b' '..=b'~').contains(&byte));
+    }
+
     /// Writes a simple `KEY = value` line.
     pub fn write_pair<V: Display>(&mut self, key: &str, value: V) {
-        let raw = value.to_string();
-        let normalized = Self::normalize_inline_value(&raw);
-        let _ = writeln!(self, "{:<20} = {}", key, normalized);
+        self.check_text(key);
+        let mut line = std::mem::take(&mut self.line_buffer);
+        line.clear();
+        let _ = write!(line, "{key:<20} = ");
+        let value_start = line.len();
+        let _ = write!(line, "{value}");
+        let invalid = !line[value_start..]
+            .bytes()
+            .all(|byte| (b' '..=b'~').contains(&byte));
+        if invalid {
+            let normalized = Self::normalize_inline_value(&line[value_start..]).into_owned();
+            line.truncate(value_start);
+            line.push_str(&normalized);
+            self.lexical_error = true;
+        }
+        line.push('\n');
+        let _ = self.write_str(&line);
+        self.line_buffer = line;
     }
 
     /// Writes `KEY = value [unit]`.
@@ -503,6 +529,9 @@ impl<'a> KvnWriter<'a> {
 
     /// Writes an OCM maneuver history record without joining or formatting temporary strings.
     pub(crate) fn write_ocm_text_history<E: Display>(&mut self, epoch: &E, values: &[String]) {
+        for value in values {
+            self.check_text(value);
+        }
         let build = |line: &mut String| {
             let _ = write!(line, "{epoch}");
             for value in values {
@@ -531,6 +560,7 @@ impl<'a> KvnWriter<'a> {
                 continue;
             }
             for line in c.lines() {
+                self.check_text(line);
                 let normalized = Self::normalize_inline_value(line);
                 let _ = writeln!(self, "COMMENT {}", normalized);
             }
@@ -565,10 +595,27 @@ impl<'a> KvnWriter<'a> {
         }
     }
 
+    /// Return string-backed output only when every source text value was valid KVN text.
+    pub(crate) fn finish_checked(self) -> crate::error::Result<String> {
+        if self.lexical_error {
+            return Err(crate::error::ValidationError::Generic {
+                message: "KVN output must contain only printable ASCII records".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(self.finish())
+    }
+
     /// Finish writing to an I/O sink and return any deferred write error.
-    pub(crate) fn finish_io(self) -> std::io::Result<()> {
+    pub(crate) fn finish_io(self) -> crate::error::Result<()> {
         match self.io_error {
-            Some(error) => Err(error),
+            Some(error) => Err(error.into()),
+            None if self.lexical_error => Err(crate::error::ValidationError::Generic {
+                message: "KVN output must contain only printable ASCII records".into(),
+                line: None,
+            }
+            .into()),
             None => Ok(()),
         }
     }
@@ -595,18 +642,20 @@ mod tests {
     }
 
     #[test]
-    fn write_pair_normalizes_multiline_value() {
+    fn write_pair_rejects_multiline_value() {
         let mut writer = KvnWriter::new();
         writer.write_pair(
             "ORIGINATOR_POSITION",
             "Flight Dynamics Mission Design\nLead",
         );
-        let out = writer.finish();
+        assert!(writer.finish_checked().is_err());
+    }
 
-        assert_eq!(
-            out,
-            "ORIGINATOR_POSITION  = Flight Dynamics Mission Design Lead\n"
-        );
+    #[test]
+    fn lexical_barrier_checks_units_written_without_write_pair() {
+        let mut writer = KvnWriter::new();
+        writer.write_measure("X", &crate::types::UnitValue::new(1.0, Some("km\u{1}")));
+        assert!(writer.finish_checked().is_err());
     }
 
     #[test]

@@ -21,7 +21,11 @@
 use crate::error::{CcsdsNdmError, FormatError, Result};
 use quick_xml::de::from_str as from_xml_str;
 use quick_xml::events::Event;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::ser::{
+    SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple,
+    SerializeTupleStruct, SerializeTupleVariant,
+};
+use serde::{de::DeserializeOwned, Serialize, Serializer};
 use std::fmt::Write as FmtWrite;
 use std::io::Write as IoWrite;
 
@@ -267,6 +271,11 @@ pub(crate) fn from_str<T: DeserializeOwned>(s: &str) -> Result<T> {
 /// * `s` - The XML string to deserialize
 /// * `type_name` - The name of the message type (e.g., "OPM", "CDM") for error context
 pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &str) -> Result<T> {
+    if let Some(error) = crate::validation::xml_text_error("XML document", s) {
+        return Err(CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(
+            error.to_string(),
+        ))));
+    }
     from_xml_str(s).map_err(|e| {
         crate::error::CcsdsNdmError::Format(Box::new(FormatError::XmlWithContext {
             context: format!("Failed to parse {} from XML", type_name),
@@ -283,9 +292,326 @@ pub(crate) fn to_string<T: Serialize>(t: &T) -> Result<String> {
     let mut output = String::with_capacity(1024);
     output.push_str(XML_HEADER);
     output.push('\n');
-    quick_xml::se::to_writer(&mut output, t)?;
+    let mut writer = XmlStringWriter {
+        output: &mut output,
+        invalid_text: false,
+    };
+    let result = quick_xml::se::to_writer(&mut writer, t);
+    if writer.invalid_text {
+        return Err(invalid_xml_output());
+    }
+    result?;
     Ok(output)
 }
+
+fn invalid_xml_output() -> CcsdsNdmError {
+    crate::error::ValidationError::Generic {
+        message: "XML output must contain only XML 1.0 characters".into(),
+        line: None,
+    }
+    .into()
+}
+
+struct XmlStringWriter<'a> {
+    output: &'a mut String,
+    invalid_text: bool,
+}
+
+impl FmtWrite for XmlStringWriter<'_> {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        if !value.chars().all(crate::validation::is_xml_1_character) {
+            self.invalid_text = true;
+            return Err(std::fmt::Error);
+        }
+        self.output.write_str(value)
+    }
+}
+
+struct XmlPreflightWriter {
+    bytes: usize,
+    invalid_text: bool,
+}
+
+impl FmtWrite for XmlPreflightWriter {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        if !value.chars().all(crate::validation::is_xml_1_character) {
+            self.invalid_text = true;
+            return Err(std::fmt::Error);
+        }
+        self.bytes = self.bytes.saturating_add(value.len());
+        Ok(())
+    }
+}
+
+pub(crate) fn preflight<T: Serialize>(value: &T) -> Result<usize> {
+    let mut writer = XmlPreflightWriter {
+        bytes: XML_HEADER.len() + 1,
+        invalid_text: false,
+    };
+    let result = quick_xml::se::to_writer(&mut writer, value);
+    if writer.invalid_text {
+        return Err(invalid_xml_output());
+    }
+    result?;
+    Ok(writer.bytes)
+}
+
+pub(crate) fn validate_output_text<T: Serialize>(value: &T) -> Result<()> {
+    value
+        .serialize(&mut XmlTextValidator)
+        .map_err(|_| invalid_xml_output())
+}
+
+#[derive(Debug)]
+struct XmlTextValidationError;
+
+impl std::fmt::Display for XmlTextValidationError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("invalid XML text")
+    }
+}
+
+impl std::error::Error for XmlTextValidationError {}
+
+impl serde::ser::Error for XmlTextValidationError {
+    fn custom<T: std::fmt::Display>(_message: T) -> Self {
+        Self
+    }
+}
+
+struct XmlTextValidator;
+
+macro_rules! ignore_scalar {
+    ($($name:ident($value:ident: $type:ty)),+ $(,)?) => {
+        $(fn $name(self, $value: $type) -> std::result::Result<Self::Ok, Self::Error> {
+            let _ = $value;
+            Ok(())
+        })+
+    };
+}
+
+impl Serializer for &mut XmlTextValidator {
+    type Ok = ();
+    type Error = XmlTextValidationError;
+    type SerializeSeq = Self;
+    type SerializeTuple = Self;
+    type SerializeTupleStruct = Self;
+    type SerializeTupleVariant = Self;
+    type SerializeMap = Self;
+    type SerializeStruct = Self;
+    type SerializeStructVariant = Self;
+
+    ignore_scalar!(
+        serialize_bool(value: bool),
+        serialize_i8(value: i8),
+        serialize_i16(value: i16),
+        serialize_i32(value: i32),
+        serialize_i64(value: i64),
+        serialize_i128(value: i128),
+        serialize_u8(value: u8),
+        serialize_u16(value: u16),
+        serialize_u32(value: u32),
+        serialize_u64(value: u64),
+        serialize_u128(value: u128),
+        serialize_f32(value: f32),
+        serialize_f64(value: f64),
+        serialize_bytes(value: &[u8]),
+    );
+
+    fn serialize_char(self, value: char) -> std::result::Result<Self::Ok, Self::Error> {
+        if crate::validation::is_xml_1_character(value) {
+            Ok(())
+        } else {
+            Err(XmlTextValidationError)
+        }
+    }
+
+    fn serialize_str(self, value: &str) -> std::result::Result<Self::Ok, Self::Error> {
+        if value.chars().all(crate::validation::is_xml_1_character) {
+            Ok(())
+        } else {
+            Err(XmlTextValidationError)
+        }
+    }
+
+    fn serialize_none(self) -> std::result::Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_some<T: ?Sized + Serialize>(
+        self,
+        value: &T,
+    ) -> std::result::Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_unit(self) -> std::result::Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_unit_struct(
+        self,
+        _name: &'static str,
+    ) -> std::result::Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+    ) -> std::result::Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_newtype_struct<T: ?Sized + Serialize>(
+        self,
+        _name: &'static str,
+        value: &T,
+    ) -> std::result::Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_newtype_variant<T: ?Sized + Serialize>(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        value: &T,
+    ) -> std::result::Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_seq(
+        self,
+        _length: Option<usize>,
+    ) -> std::result::Result<Self::SerializeSeq, Self::Error> {
+        Ok(self)
+    }
+
+    fn serialize_tuple(
+        self,
+        _length: usize,
+    ) -> std::result::Result<Self::SerializeTuple, Self::Error> {
+        Ok(self)
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        _length: usize,
+    ) -> std::result::Result<Self::SerializeTupleStruct, Self::Error> {
+        Ok(self)
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _length: usize,
+    ) -> std::result::Result<Self::SerializeTupleVariant, Self::Error> {
+        Ok(self)
+    }
+
+    fn serialize_map(
+        self,
+        _length: Option<usize>,
+    ) -> std::result::Result<Self::SerializeMap, Self::Error> {
+        Ok(self)
+    }
+
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        _length: usize,
+    ) -> std::result::Result<Self::SerializeStruct, Self::Error> {
+        Ok(self)
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _length: usize,
+    ) -> std::result::Result<Self::SerializeStructVariant, Self::Error> {
+        Ok(self)
+    }
+}
+
+macro_rules! serialize_element {
+    ($trait_name:ident, $method:ident) => {
+        impl $trait_name for &mut XmlTextValidator {
+            type Ok = ();
+            type Error = XmlTextValidationError;
+
+            fn $method<T: ?Sized + Serialize>(
+                &mut self,
+                value: &T,
+            ) -> std::result::Result<(), Self::Error> {
+                value.serialize(&mut **self)
+            }
+
+            fn end(self) -> std::result::Result<(), Self::Error> {
+                Ok(())
+            }
+        }
+    };
+}
+
+serialize_element!(SerializeSeq, serialize_element);
+serialize_element!(SerializeTuple, serialize_element);
+serialize_element!(SerializeTupleStruct, serialize_field);
+serialize_element!(SerializeTupleVariant, serialize_field);
+
+impl SerializeMap for &mut XmlTextValidator {
+    type Ok = ();
+    type Error = XmlTextValidationError;
+
+    fn serialize_key<T: ?Sized + Serialize>(
+        &mut self,
+        key: &T,
+    ) -> std::result::Result<(), Self::Error> {
+        key.serialize(&mut **self)
+    }
+
+    fn serialize_value<T: ?Sized + Serialize>(
+        &mut self,
+        value: &T,
+    ) -> std::result::Result<(), Self::Error> {
+        value.serialize(&mut **self)
+    }
+
+    fn end(self) -> std::result::Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+macro_rules! serialize_field {
+    ($trait_name:ident) => {
+        impl $trait_name for &mut XmlTextValidator {
+            type Ok = ();
+            type Error = XmlTextValidationError;
+
+            fn serialize_field<T: ?Sized + Serialize>(
+                &mut self,
+                _key: &'static str,
+                value: &T,
+            ) -> std::result::Result<(), Self::Error> {
+                value.serialize(&mut **self)
+            }
+
+            fn end(self) -> std::result::Result<(), Self::Error> {
+                Ok(())
+            }
+        }
+    };
+}
+
+serialize_field!(SerializeStruct);
+serialize_field!(SerializeStructVariant);
 
 struct IoFmtWriter<'a, W> {
     output: &'a mut W,

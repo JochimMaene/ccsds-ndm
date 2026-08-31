@@ -221,7 +221,6 @@ __all__ = [
     "ReferenceFrameType",
     "CovarianceMethodType",
     "ManeuverableType",
-    "ObjectDescription",
     # ADM
     "AdmHeader",
     "Aem",

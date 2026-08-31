@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-crate_id="$(cargo pkgid --manifest-path "${root}/ccsds-ndm/Cargo.toml")"
+crate_id="$(cargo pkgid --manifest-path "${root}/bindings/python/Cargo.toml")"
 version="${crate_id##*#}"
 version="${version##*@}"
 wheels=("${root}"/dist/ccsds_ndm_py-"${version}"-cp310-abi3-*.whl)

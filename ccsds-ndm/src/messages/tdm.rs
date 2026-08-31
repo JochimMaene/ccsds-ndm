@@ -80,7 +80,7 @@ impl Ndm for Tdm {
         self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        writer.finish_checked()
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -112,7 +112,7 @@ impl Ndm for Tdm {
 impl Tdm {
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
         let check = |field: &'static str, value: &str| -> Result<()> {
-            if value.is_ascii() {
+            if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
                 Ok(())
             } else {
                 Err(ValidationError::InvalidValue {

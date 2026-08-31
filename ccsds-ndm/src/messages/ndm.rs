@@ -252,7 +252,7 @@ impl Ndm for CombinedNdm {
         }
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        writer.finish_checked()
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -260,6 +260,7 @@ impl Ndm for CombinedNdm {
     }
 
     fn to_xml(&self) -> Result<String> {
+        self.validate_xml_envelope()?;
         crate::traits::Validate::validate(self)?;
         for message in &self.messages {
             message.validate_for_generation(crate::generation::OutputFormat::Xml)?;
@@ -294,14 +295,22 @@ impl CombinedNdm {
             .into());
         }
         for comment in &self.comments {
-            if !comment.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-                return Err(crate::error::ValidationError::InvalidValue {
-                    field: "COMMENT".into(),
-                    value: "non-ASCII or multiline text".into(),
-                    expected: "printable ASCII on one KVN record".into(),
-                    line: None,
-                }
-                .into());
+            if let Some(error) = crate::validation::kvn_comment_error(comment) {
+                return Err(error.into());
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_xml_envelope(&self) -> Result<()> {
+        if let Some(value) = &self.id {
+            if let Some(error) = crate::validation::xml_text_error("MESSAGE_ID", value) {
+                return Err(error.into());
+            }
+        }
+        for value in &self.comments {
+            if let Some(error) = crate::validation::xml_text_error("COMMENT", value) {
+                return Err(error.into());
             }
         }
         Ok(())
@@ -345,7 +354,7 @@ impl CombinedNdm {
 
         let mut writer = KvnWriter::from_io(output);
         self.write_kvn(&mut writer);
-        writer.finish_io().map_err(CcsdsNdmError::from)
+        writer.finish_io()
     }
 
     /// Stream the normative XML combined instantiation after aggregate preflight.
@@ -355,6 +364,7 @@ impl CombinedNdm {
         options: &crate::options::GenerateOptions,
     ) -> Result<()> {
         Self::validate_source_options(options)?;
+        self.validate_xml_envelope()?;
         self.validate_children_for_generation(crate::generation::OutputFormat::Xml)?;
 
         crate::generation::preflight_xml_limit(self, options)?;
