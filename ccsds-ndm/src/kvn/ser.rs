@@ -347,14 +347,26 @@ impl<'a> KvnWriter<'a> {
         self.line_buffer = line;
     }
 
-    /// Builds one line and commits it only when the fallible builder succeeds.
-    pub(crate) fn try_write_built_line<E>(
+    /// Builds one validated line and commits it only when the fallible builder succeeds.
+    /// `line_start` is the offset at which the current line begins.
+    pub(crate) fn try_write_validated_line<E>(
         &mut self,
-        build: impl FnOnce(&mut String) -> std::result::Result<(), E>,
+        build: impl FnOnce(&mut String, usize) -> std::result::Result<(), E>,
     ) -> std::result::Result<(), E> {
+        if let KvnOutput::String(output) = &mut self.output {
+            let line_start = output.len();
+            let result = build(output, line_start);
+            if result.is_ok() {
+                output.push('\n');
+            } else {
+                output.truncate(line_start);
+            }
+            return result;
+        }
+
         let mut line = std::mem::take(&mut self.line_buffer);
         line.clear();
-        let result = build(&mut line);
+        let result = build(&mut line, 0);
         if result.is_ok() {
             line.push('\n');
             let _ = self.write_str(&line);
@@ -708,13 +720,13 @@ mod tests {
     fn fallible_line_builder_commits_only_successful_lines() {
         let mut writer = KvnWriter::new();
         writer
-            .try_write_built_line(|line| -> Result<(), ()> {
+            .try_write_validated_line(|line, _| -> Result<(), ()> {
                 line.push_str("accepted");
                 Ok(())
             })
             .unwrap();
         assert_eq!(
-            writer.try_write_built_line(|line| -> Result<(), ()> {
+            writer.try_write_validated_line(|line, _| -> Result<(), ()> {
                 line.push_str("rejected");
                 Err(())
             }),

@@ -807,7 +807,7 @@ impl Oem {
                     ("Z_DDOT", &state.z_ddot, "z_ddot"),
                 ];
                 if let Some(writer) = writer.as_deref_mut() {
-                    writer.try_write_built_line(|line| -> Result<()> {
+                    writer.try_write_validated_line(|line, line_start| -> Result<()> {
                         line.push_str(state.epoch.as_str());
                         for (field, value, member) in required_values {
                             line.push(' ');
@@ -841,10 +841,11 @@ impl Oem {
                                 }
                             }
                         }
-                        if line.len() > 254 {
+                        let line_len = line.len() - line_start;
+                        if line_len > 254 {
                             return Err(ValidationError::OutOfRange {
                                 name: "stateVector".into(),
-                                value: line.len().to_string(),
+                                value: line_len.to_string(),
                                 expected: "a KVN line no longer than 254 characters".into(),
                                 line: None,
                             }
@@ -957,7 +958,7 @@ impl Oem {
                     .into_iter()
                     .enumerate()
                     {
-                        writer.try_write_built_line(|line| -> Result<()> {
+                        writer.try_write_validated_line(|line, line_start| -> Result<()> {
                             for (value_index, (field, value)) in row.iter().enumerate() {
                                 if value_index > 0 {
                                     line.push(' ');
@@ -976,10 +977,11 @@ impl Oem {
                                     .into());
                                 }
                             }
-                            if line.len() > 254 {
+                            let line_len = line.len() - line_start;
+                            if line_len > 254 {
                                 return Err(ValidationError::OutOfRange {
                                     name: "covariance row".into(),
-                                    value: line.len().to_string(),
+                                    value: line_len.to_string(),
                                     expected: "a KVN line no longer than 254 characters".into(),
                                     line: None,
                                 }
