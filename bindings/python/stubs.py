@@ -573,6 +573,8 @@ def _generate_class(cls: type, indent: str) -> str:
     # Collect member stubs
     member_stubs: list[str] = []
     for member_name, member in inspect.getmembers(cls, _should_include_member):
+        if member_name not in cls.__dict__:
+            continue
         if inspect.isgetsetdescriptor(member):
             member_stubs.append(
                 _generate_property(

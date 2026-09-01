@@ -143,9 +143,7 @@ jobs:
       - name: Verify release tag matches crate version
         working-directory: ./ccsds-ndm
         run: |
-          crate_id="$(cargo pkgid)"
-          crate_version="${crate_id##*#}"
-          crate_version="${crate_version##*@}"
+          crate_version="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
           if [[ "${GITHUB_REF_NAME}" != "v${crate_version}" ]]; then
             echo "Release tag ${GITHUB_REF_NAME} does not match crate version ${crate_version}" >&2
             exit 1
@@ -155,4 +153,4 @@ jobs:
         working-directory: ./ccsds-ndm
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
-        run: cargo publish --locked --token ${CRATES_TOKEN}
+        run: cargo publish --token ${CRATES_TOKEN}

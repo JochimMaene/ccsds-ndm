@@ -27,7 +27,7 @@ guarantee.
 
 ## Crate packaging
 
-Run `just package-rust` from a clean checkout before publishing. It runs `cargo package --locked`,
+Run `just package-rust` from a clean checkout before publishing. It runs `cargo package`,
 extracts the produced `.crate`, and runs its complete test suite. This applies Cargo's package-file
 selection and verifies that the artifact—not merely the working tree—
 builds, tests, and installs using the locked dependency resolution. The Rust release workflow runs

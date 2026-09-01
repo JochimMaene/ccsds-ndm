@@ -97,12 +97,6 @@ class Acm:
     - Optional estimator information
     """
     def __init__(self, header, segment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
     def from_file(
         path: str,
@@ -205,12 +199,6 @@ class AcmAttitudeDetermination:
     ACM Data: Attitude Determination Data Section.
     """
     def __init__(self, ad_id=None, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def ad_epoch(self) -> str | None:
         """
@@ -386,12 +374,6 @@ class AcmAttitudeState:
     def __init__(
         self, ref_frame_a, ref_frame_b, att_type, att_lines, comment=None
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def att_basis(self) -> str | None:
         """
@@ -523,12 +505,6 @@ class AcmCovarianceMatrix:
     def __init__(
         self, cov_basis, cov_ref_frame, cov_type, cov_lines, comment=None
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -628,12 +604,6 @@ class AcmData:
     def __init__(
         self, att=None, phys=None, cov=None, man=None, ad=None, user=None
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def ad(self) -> AcmAttitudeDetermination | None:
         """
@@ -701,12 +671,6 @@ class AcmManeuverParameters:
     ACM Data: Maneuver Specification Section.
     """
     def __init__(self, man_id=None, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def actuator_used(self) -> str | None:
         """
@@ -830,12 +794,6 @@ class AcmMetadata:
         international_designator=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def acm_data_elements(self) -> str | None:
         """
@@ -1054,12 +1012,6 @@ class AcmPhysicalDescription:
     ACM Data: Space Object Physical Characteristics Section.
     """
     def __init__(self, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -1182,12 +1134,6 @@ class AcmPhysicalDescription:
 
 class AcmSegment:
     def __init__(self, metadata, data) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> AcmData:
         """
@@ -1224,12 +1170,6 @@ class AcmSensor:
         sensor_frequency=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -1327,12 +1267,6 @@ class AdditionalParameters:
         sedr: Optional[float],
         comment: Optional[list[str]],
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def area_drg(self) -> Optional[float]:
         """
@@ -1449,12 +1383,6 @@ class AdmHeader:
         message_id=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def classification(self) -> Optional[str]:
         """
@@ -1530,12 +1458,6 @@ class Aem:
     the attitude state at times different from the tabular epochs.
     """
     def __init__(self, header, segments) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
     def from_file(
         path: str,
@@ -1638,12 +1560,6 @@ class AemData:
     AEM Data Section.
     """
     def __init__(self, attitude_states, attitude_type=None, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def attitude_states(self) -> list[AttitudeState]:
         """
@@ -1719,12 +1635,6 @@ class AemMetadata:
         interpolation_degree=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def angvel_frame(self) -> str | None:
         """
@@ -1948,12 +1858,6 @@ class AemMetadata:
 
 class AemSegment:
     def __init__(self, metadata, data) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> AemData:
         """
@@ -1995,12 +1899,6 @@ class AngVelState:
         angvel_z,
         comment,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def angvel_frame(self) -> str:
         """
@@ -2086,12 +1984,6 @@ class Apm:
     times different from the specified epoch.
     """
     def __init__(self, header, segment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
     def from_file(
         path: str,
@@ -2200,12 +2092,6 @@ class ApmData:
         maneuver_parameters=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def angular_velocity(self) -> list[AngVelState]:
         """
@@ -2301,12 +2187,6 @@ class ApmManeuverParameters:
         man_delta_mass=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -2401,12 +2281,6 @@ class ApmMetadata:
     def __init__(
         self, object_name, object_id, time_system=None, center_name=None, comment=None
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def center_name(self) -> str | None:
         """
@@ -2481,12 +2355,6 @@ class ApmMetadata:
 
 class ApmSegment:
     def __init__(self, metadata, data) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> ApmData:
         """
@@ -2530,12 +2398,6 @@ class AtmosphericReentryParameters:
         orbit_lifetime_confidence_level=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -2647,12 +2509,6 @@ class AtmosphericReentryParameters:
 
 class AttitudeState:
     def __init__(self, epoch, values) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self): ...
     @epoch.setter
@@ -2677,12 +2533,6 @@ class Cdm:
     - Metadata describing how the data was determined (orbit determination settings).
     """
     def __init__(self, header, body) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def body(self) -> CdmBody:
         """
@@ -2848,12 +2698,6 @@ class CdmBody:
     def __init__(
         self, relative_metadata_data: RelativeMetadataData, segments: list[CdmSegment]
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def relative_metadata_data(self) -> RelativeMetadataData:
         """
@@ -3021,12 +2865,6 @@ class CdmCovarianceMatrix:
         cthr_thr: Optional[float] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def cdrg_drg(self) -> Optional[float]:
         """
@@ -3566,12 +3404,6 @@ class CdmData:
         additional_parameters=None,
         comments=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def additional_parameters(self) -> Optional[AdditionalParameters]:
         """
@@ -3679,12 +3511,6 @@ class CdmHeader:
         message_for: Optional[str] = None,
         comment: Optional[list[str]] = ...,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -3827,12 +3653,6 @@ class CdmMetadata:
         intrack_thrust: Optional[bool] = None,
         comment: Optional[list[str]] = ...,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def atmospheric_model(self) -> Optional[str]:
         """
@@ -4099,23 +3919,12 @@ class CdmObjectType:
     Provides uncertainty information for the state vector.
     Can be converted to a NumPy array using `to_numpy()`.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
 
 class CdmSegment:
     """
     A CDM Segment, consisting of metadata and data for a specific object.
     """
     def __init__(self, metadata, data) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> CdmData:
         """
@@ -4164,12 +3973,6 @@ class CdmStateVector:
         z_dot: float,
         comments=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -4261,12 +4064,7 @@ class CdmStateVector:
     @z_dot.setter
     def z_dot(self, value: float) -> None: ...
 
-class ControlledType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class ControlledType: ...
 
 class CovLine:
     """
@@ -4280,12 +4078,6 @@ class CovLine:
         Covariance matrix elements for this epoch.
     """
     def __init__(self, *, epoch: str, values: list[float]) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self) -> str:
         """
@@ -4305,12 +4097,7 @@ class CovLine:
     @values.setter
     def values(self, value: list[float]) -> None: ...
 
-class CovarianceMethodType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class CovarianceMethodType: ...
 
 class EulerAngleState:
     """
@@ -4332,12 +4119,6 @@ class EulerAngleState:
         angle_3_dot,
         comment,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def angle_1(self) -> float:
         """
@@ -4551,12 +4332,6 @@ class GroundImpactParameters:
         impact_3_cross_track: Optional[float] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -4924,12 +4699,6 @@ class InertiaState:
     def __init__(
         self, inertia_ref_frame, ixx, iyy, izz, ixy, ixz, iyz, comment
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -5073,12 +4842,6 @@ class KeplerianElements:
         true_anomaly: Optional[float] = None,
         mean_anomaly: Optional[float] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def arg_of_pericenter(self) -> float:
         """
@@ -5189,12 +4952,6 @@ class ManLine:
         Maneuver elements for this epoch.
     """
     def __init__(self, *, epoch: str, values: list[str]) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self) -> str:
         """
@@ -5214,12 +4971,7 @@ class ManLine:
     @values.setter
     def values(self, value: list[str]) -> None: ...
 
-class ManeuverableType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class ManeuverableType: ...
 
 class MeanElements:
     """
@@ -5258,12 +5010,6 @@ class MeanElements:
         mean_motion: Optional[float] = None,
         gm: Optional[float] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def arg_of_pericenter(self) -> float:
         """
@@ -5404,12 +5150,6 @@ class Ndm:
     with the set of tracking data messages used in the orbit determination.
     """
     def __init__(self, messages, id=None, comments=...) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comments(self) -> list[str]:
         """
@@ -5490,12 +5230,7 @@ class Ndm:
         """
         ...
 
-class ObjectDescription:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class ObjectDescription: ...
 
 class Ocm:
     """
@@ -5520,12 +5255,6 @@ class Ocm:
         The OCM data segment.
     """
     def __init__(self, header: OdmHeader, segment: OcmSegment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
     def from_file(
         path: str,
@@ -5725,12 +5454,6 @@ class OcmCovarianceMatrix:
         cov_units: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -5941,12 +5664,6 @@ class OcmData:
     maneuvers, and other related information.
     """
     def __init__(self) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def cov(self) -> list[OcmCovarianceMatrix]:
         """
@@ -6090,12 +5807,6 @@ class OcmManeuverParameters:
         man_units: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -6653,12 +6364,6 @@ class OcmMetadata:
         celestial_source: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def adm_msg_link(self) -> Optional[str]:
         """
@@ -7294,12 +6999,6 @@ class OcmOdParameters:
         od_prev_id: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def actual_od_span(self) -> Optional[float]:
         """
@@ -7651,12 +7350,6 @@ class OcmPerturbations:
         (Optional)
     """
     def __init__(self) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def albedo_grid_size(self) -> Optional[int]:
         """
@@ -8066,12 +7759,6 @@ class OcmPhysicalDescription:
         iyz=None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def area_along_oeb_int(self) -> Optional[float]:
         """
@@ -8749,12 +8436,6 @@ class OcmSegment:
         Segment data blocks.
     """
     def __init__(self, metadata: OcmMetadata, data: OcmData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> OcmData:
         """
@@ -8847,12 +8528,6 @@ class OcmTrajState:
         traj_units: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def center_name(self) -> str:
         """
@@ -9189,12 +8864,6 @@ class OdParameters:
         weighted_rms: Optional[float] = None,
         comment: Optional[list[str]] = ...,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def actual_od_span(self) -> Optional[float]:
         """
@@ -9335,12 +9004,6 @@ class OdmHeader:
         message_id: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def classification(self) -> Optional[str]:
         """
@@ -9424,12 +9087,6 @@ class Oem:
         The list of data segments.
     """
     def __init__(self, header: OdmHeader, segments: list[OemSegment]) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
     def from_file(
         path: str,
@@ -9628,12 +9285,6 @@ class OemCovarianceMatrix:
         cov_ref_frame: Optional[str],
         comment: Optional[list[str]],
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -9915,12 +9566,6 @@ class OemData:
         covariance_matrix=None,
         comments: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -10085,12 +9730,6 @@ class OemMetadata:
         interpolation_degree: Optional[int] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def center_name(self) -> str:
         """
@@ -10291,12 +9930,6 @@ class OemSegment:
         Segment data.
     """
     def __init__(self, metadata: OemMetadata, data: OemData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> OemData:
         """
@@ -10344,12 +9977,6 @@ class Omm:
         The data segment.
     """
     def __init__(self, header: OdmHeader, segment: OmmSegment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
     def from_file(
         path: str,
@@ -10514,12 +10141,6 @@ class OmmData:
     OMM Data section.
     """
     def __init__(self, mean_elements, comments=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -10609,12 +10230,6 @@ class OmmMetadata:
         ref_frame_epoch: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def center_name(self) -> str:
         """
@@ -10742,12 +10357,6 @@ class OmmSegment:
         Segment data.
     """
     def __init__(self, metadata: OmmMetadata, data: OmmData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> OmmData:
         """
@@ -10785,12 +10394,6 @@ class Opm:
         The data segment.
     """
     def __init__(self, header: OdmHeader, segment: OpmSegment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
     def from_file(
         path: str,
@@ -10992,12 +10595,6 @@ class OpmCovarianceMatrix:
         cov_ref_frame: Optional[str] = None,
         comments: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -11259,12 +10856,6 @@ class OpmData:
         State vector.
     """
     def __init__(self, state_vector: StateVector, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -11363,12 +10954,6 @@ class OpmManeuverParameters:
         man_dv_2: float,
         man_dv_3: float,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -11487,12 +11072,6 @@ class OpmMetadata:
         ref_frame_epoch: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def center_name(self) -> str:
         """
@@ -11605,12 +11184,6 @@ class OpmSegment:
         Segment data.
     """
     def __init__(self, metadata: OpmMetadata, data: OpmData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> OpmData:
         """
@@ -11653,12 +11226,6 @@ class QuaternionState:
         qc_dot,
         comment,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -11768,12 +11335,6 @@ class Rdm:
         (Mandatory)
     """
     def __init__(self, *, header: RdmHeader, segment: RdmSegment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
     def from_file(
         path: str,
@@ -11952,12 +11513,6 @@ class RdmData:
         user_defined_parameters: Optional[UserDefined] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def atmospheric_reentry_parameters(self) -> AtmosphericReentryParameters:
         """
@@ -12064,12 +11619,6 @@ class RdmHeader:
         message_id: str,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -12168,12 +11717,6 @@ class RdmMetadata:
         next_message_epoch=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def atmospheric_model(self) -> Optional[str]:
         """
@@ -12563,12 +12106,6 @@ class RdmSegment:
         (Mandatory)
     """
     def __init__(self, *, metadata: RdmMetadata, data: RdmData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> RdmData:
         """
@@ -12593,12 +12130,6 @@ class RdmSpacecraftParameters:
     RDM spacecraft parameters (rdmSpacecraftParametersType).
     """
     def __init__(self, *, wet_mass=None, dry_mass=None, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def ballistic_coeff(self) -> Optional[float]:
         """
@@ -12714,19 +12245,8 @@ class RdmSpacecraftParameters:
     @wet_mass.setter
     def wet_mass(self, value: Optional[float]) -> None: ...
 
-class ReferenceFrame:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-class ReferenceFrameType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class ReferenceFrame: ...
+class ReferenceFrameType: ...
 
 class RelativeMetadataData:
     """
@@ -12795,12 +12315,6 @@ class RelativeMetadataData:
         comment: Optional[list[str]] = ...,
         miss_distance_unit: Optional[str] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def collision_probability(self) -> Optional[float]:
         """
@@ -12997,12 +12511,6 @@ class RelativeStateVector:
         relative_velocity_t: float,
         relative_velocity_n: float,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def relative_position_n(self) -> float:
         """
@@ -13079,19 +12587,8 @@ class RelativeStateVector:
         """
         ...
 
-class ScreenVolumeFrameType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-class ScreenVolumeShapeType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class ScreenVolumeFrameType: ...
+class ScreenVolumeShapeType: ...
 
 class SpacecraftParameters:
     """
@@ -13121,12 +12618,6 @@ class SpacecraftParameters:
         drag_area: Optional[float] = None,
         drag_coeff: Optional[float] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -13225,12 +12716,6 @@ class SpinState:
         nutation_vel,
         comment,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -13403,12 +12888,6 @@ class StateVector:
         z_dot: float,
         comments=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -13534,12 +13013,6 @@ class StateVectorAcc:
         y_ddot: Optional[float] = None,
         z_ddot: Optional[float] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self) -> str:
         """
@@ -13676,12 +13149,6 @@ class Tdm:
         (Mandatory)
     """
     def __init__(self, *, header: TdmHeader, body: TdmBody) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def body(self) -> TdmBody:
         """
@@ -13837,12 +13304,6 @@ class TdmBody:
         List of data segments.
     """
     def __init__(self, *, segments: list[TdmSegment]) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def segments(self) -> list[TdmSegment]:
         """
@@ -13873,12 +13334,6 @@ class TdmData:
         observations: Optional[list[TdmObservation]] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[TdmObservation]:
         """
@@ -13925,12 +13380,6 @@ class TdmHeader:
         message_id: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -14062,12 +13511,6 @@ class TdmMetadata:
         ephemeris_name_5=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def angle_type(self) -> Optional[str]:
         """
@@ -14801,12 +14244,7 @@ class TdmMetadata:
     @turnaround_numerator.setter
     def turnaround_numerator(self, value: Optional[int]) -> None: ...
 
-class TdmMode:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class TdmMode: ...
 
 class TdmObservation:
     """
@@ -14824,12 +14262,6 @@ class TdmObservation:
         but the object can hold string representations internally).
     """
     def __init__(self, *, epoch: str, keyword: str, value: float) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self) -> str:
         """
@@ -14864,12 +14296,7 @@ class TdmObservation:
         """
         ...
 
-class TdmPath:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class TdmPath: ...
 
 class TdmSegment:
     """
@@ -14888,12 +14315,6 @@ class TdmSegment:
         (Mandatory)
     """
     def __init__(self, *, metadata: TdmMetadata, data: TdmData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> TdmData:
         """
@@ -14913,12 +14334,7 @@ class TdmSegment:
     @metadata.setter
     def metadata(self, value: TdmMetadata) -> None: ...
 
-class TimeSystem:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class TimeSystem: ...
 
 class TleParameters:
     """
@@ -14960,12 +14376,6 @@ class TleParameters:
         mean_motion_ddot: Optional[float] = None,
         agom: Optional[float] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def agom(self) -> Optional[float]:
         """
@@ -15104,12 +14514,6 @@ class TrajLine:
         (Mandatory)
     """
     def __init__(self, *, epoch: str, values: list[float]) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self) -> str:
         """
@@ -15148,12 +14552,6 @@ class UserDefined:
         parameters: Optional[dict[str, str]] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -15173,147 +14571,44 @@ class UserDefined:
     @user_defined.setter
     def user_defined(self, value: dict[str, str]) -> None: ...
 
-class YesNo:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class YesNo: ...
 
 class NdmError(Exception):
     """
     Generic CCSDS NDM error.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmEpochError(ValueError):
     """
     Error parsing a CCSDS epoch string.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmFormatError(ValueError):
     """
     Error during parsing of NDM data (KVN or XML).
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmIoError(OSError):
     """
     I/O error during file operations.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
-    @property
-    def characters_written(self): ...
 
 class NdmUnsupportedMessageError(ValueError):
     """
     Unsupported CCSDS message type.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmValidationError(ValueError):
     """
     Validation error against CCSDS rules.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmKvnParseError(NdmFormatError):
     """
     Error during KVN parsing.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmXmlError(NdmFormatError):
     """
     Error during XML parsing or serialization.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...

@@ -2,9 +2,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-crate_id="$(cargo pkgid --manifest-path "${root}/bindings/python/Cargo.toml")"
-version="${crate_id##*#}"
-version="${version##*@}"
+version="$(awk -F '"' '/^version = / { print $2; exit }' "${root}/bindings/python/Cargo.toml")"
 wheels=("${root}"/dist/ccsds_ndm_py-"${version}"-cp310-abi3-*.whl)
 if [[ ${#wheels[@]} -ne 1 || ! -f "${wheels[0]}" ]]; then
     echo "expected exactly one CPython 3.10 stable-ABI ccsds-ndm-py wheel in dist" >&2

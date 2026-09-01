@@ -164,7 +164,7 @@ impl Omm {
 
         let mut line1_no_checksum = format!(
             "1 {}{} {}{}{} {:02}{} {} {} {} {} {:>4}",
-            &norad_cat_id_field,
+            norad_cat_id_field,
             classification_char,
             launch
                 .as_ref()
@@ -192,7 +192,7 @@ impl Omm {
 
         let mut line2_no_checksum = format!(
             "2 {} {:8.4} {:8.4} {:07} {:8.4} {:8.4} {:11.8}{:5}",
-            &norad_cat_id_field,
+            norad_cat_id_field,
             inclination,
             raan,
             ecc_scaled as u32,

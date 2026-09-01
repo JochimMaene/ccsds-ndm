@@ -339,7 +339,7 @@ bench-run:
 
 # Build the Python bindings
 build:
-    cd {{python_dir}} && uv run maturin build --release --strip --out ../../dist
+    cd {{python_dir}} && uv run --with maturin maturin build --release --strip --out ../../dist
 
 # Build and import the wheel in an isolated environment
 package-python: build
