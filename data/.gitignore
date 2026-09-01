@@ -1,0 +1,9 @@
+#
+# SPDX-License-Identifier: MPL-2.0
+
+orekit/
+lox/
+ccsds/
+more_tests/
+ccsds_test/
+*.pdf

@@ -13,7 +13,9 @@ A Rust crate for parsing, validating, and generating CCSDS Navigation Data Messa
 cargo add ccsds-ndm
 ```
 
-## Supported Message Types
+## Implemented Message Families
+
+The crate contains typed models, parsers, and serializers for the message families below. Inclusion in this table does not by itself claim verified support for every edition, notation, or operation. Exact support claims will be published in the project support and conformance matrix.
 
 | Message | Description |
 |---------|-------------|
@@ -65,7 +67,6 @@ let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
 - Semantic validation via the shared `Validate` trait
 - KVN and XML read/write support
 - Builder APIs for constructing messages
-```
 
 ## License
 

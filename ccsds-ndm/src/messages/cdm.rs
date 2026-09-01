@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::OdParameters;
-use crate::error::{Result, ValidationError};
+use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
 use crate::traits::{Ndm, ToKvn, Validate};
@@ -51,29 +51,584 @@ impl crate::traits::Validate for Cdm {
         self.header.validate()?;
         self.body.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::collect_message_validation_errors(
+            crate::validation::MessageKind::Cdm,
+            &self.id,
+            &self.version,
+            &self.header,
+            &self.body,
+        )
+    }
 }
 
 impl Ndm for Cdm {
     fn to_kvn(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Cdm,
+            &self.version,
+            crate::generation::OutputFormat::Kvn,
+            self,
+        )?;
+        self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        writer.finish_checked()
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        validate_kvn_syntax(kvn)?;
         let cdm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Cdm, &cdm)?;
+        crate::traits::Validate::validate(&cdm)?;
         Ok(cdm)
     }
 
     fn to_xml(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Cdm,
+            &self.version,
+            crate::generation::OutputFormat::Xml,
+            self,
+        )?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        crate::xml::validate_document_root(xml, b"cdm", "CDM")?;
+        validate_xml_sequences(xml)?;
         let cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Cdm, &cdm)?;
+        crate::traits::Validate::validate(&cdm)?;
         Ok(cdm)
+    }
+}
+
+fn validate_xml_sequences(xml: &str) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
+
+    crate::xml::validate_element_sequences(
+        xml,
+        "CDM",
+        |parent, child| {
+            let children = cdm_xml_children(parent)?;
+            let rank = children.iter().position(|candidate| *candidate == child)? as u16;
+            let repeatable = child == b"COMMENT" || (parent == b"body" && child == b"segment");
+            Some(XmlSequenceRule { rank, repeatable })
+        },
+        |element, attribute| {
+            attribute == b"units"
+                && matches!(
+                    element,
+                    b"MISS_DISTANCE"
+                        | b"RELATIVE_SPEED"
+                        | b"RELATIVE_POSITION_R"
+                        | b"RELATIVE_POSITION_T"
+                        | b"RELATIVE_POSITION_N"
+                        | b"RELATIVE_VELOCITY_R"
+                        | b"RELATIVE_VELOCITY_T"
+                        | b"RELATIVE_VELOCITY_N"
+                        | b"SCREEN_VOLUME_X"
+                        | b"SCREEN_VOLUME_Y"
+                        | b"SCREEN_VOLUME_Z"
+                        | b"COLLISION_PROBABILITY"
+                        | b"RECOMMENDED_OD_SPAN"
+                        | b"ACTUAL_OD_SPAN"
+                        | b"RESIDUALS_ACCEPTED"
+                        | b"WEIGHTED_RMS"
+                        | b"AREA_PC"
+                        | b"AREA_DRG"
+                        | b"AREA_SRP"
+                        | b"MASS"
+                        | b"CD_AREA_OVER_MASS"
+                        | b"CR_AREA_OVER_MASS"
+                        | b"THRUST_ACCELERATION"
+                        | b"SEDR"
+                        | b"X"
+                        | b"Y"
+                        | b"Z"
+                        | b"X_DOT"
+                        | b"Y_DOT"
+                        | b"Z_DOT"
+                        | b"CR_R"
+                        | b"CT_R"
+                        | b"CT_T"
+                        | b"CN_R"
+                        | b"CN_T"
+                        | b"CN_N"
+                        | b"CRDOT_R"
+                        | b"CRDOT_T"
+                        | b"CRDOT_N"
+                        | b"CRDOT_RDOT"
+                        | b"CTDOT_R"
+                        | b"CTDOT_T"
+                        | b"CTDOT_N"
+                        | b"CTDOT_RDOT"
+                        | b"CTDOT_TDOT"
+                        | b"CNDOT_R"
+                        | b"CNDOT_T"
+                        | b"CNDOT_N"
+                        | b"CNDOT_RDOT"
+                        | b"CNDOT_TDOT"
+                        | b"CNDOT_NDOT"
+                        | b"CDRG_R"
+                        | b"CDRG_T"
+                        | b"CDRG_N"
+                        | b"CDRG_RDOT"
+                        | b"CDRG_TDOT"
+                        | b"CDRG_NDOT"
+                        | b"CDRG_DRG"
+                        | b"CSRP_R"
+                        | b"CSRP_T"
+                        | b"CSRP_N"
+                        | b"CSRP_RDOT"
+                        | b"CSRP_TDOT"
+                        | b"CSRP_NDOT"
+                        | b"CSRP_DRG"
+                        | b"CSRP_SRP"
+                        | b"CTHR_R"
+                        | b"CTHR_T"
+                        | b"CTHR_N"
+                        | b"CTHR_RDOT"
+                        | b"CTHR_TDOT"
+                        | b"CTHR_NDOT"
+                        | b"CTHR_DRG"
+                        | b"CTHR_SRP"
+                        | b"CTHR_THR"
+                )
+        },
+    )
+}
+
+fn cdm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
+    Some(match parent {
+        b"cdm" => &[b"header", b"body"],
+        b"header" => &[
+            b"COMMENT",
+            b"CREATION_DATE",
+            b"ORIGINATOR",
+            b"MESSAGE_FOR",
+            b"MESSAGE_ID",
+        ],
+        b"body" => &[b"relativeMetadataData", b"segment"],
+        b"relativeMetadataData" => &[
+            b"COMMENT",
+            b"TCA",
+            b"MISS_DISTANCE",
+            b"RELATIVE_SPEED",
+            b"relativeStateVector",
+            b"START_SCREEN_PERIOD",
+            b"STOP_SCREEN_PERIOD",
+            b"SCREEN_VOLUME_FRAME",
+            b"SCREEN_VOLUME_SHAPE",
+            b"SCREEN_VOLUME_X",
+            b"SCREEN_VOLUME_Y",
+            b"SCREEN_VOLUME_Z",
+            b"SCREEN_ENTRY_TIME",
+            b"SCREEN_EXIT_TIME",
+            b"COLLISION_PROBABILITY",
+            b"COLLISION_PROBABILITY_METHOD",
+        ],
+        b"relativeStateVector" => &[
+            b"RELATIVE_POSITION_R",
+            b"RELATIVE_POSITION_T",
+            b"RELATIVE_POSITION_N",
+            b"RELATIVE_VELOCITY_R",
+            b"RELATIVE_VELOCITY_T",
+            b"RELATIVE_VELOCITY_N",
+        ],
+        b"segment" => &[b"metadata", b"data"],
+        b"metadata" => &[
+            b"COMMENT",
+            b"OBJECT",
+            b"OBJECT_DESIGNATOR",
+            b"CATALOG_NAME",
+            b"OBJECT_NAME",
+            b"INTERNATIONAL_DESIGNATOR",
+            b"OBJECT_TYPE",
+            b"OPERATOR_CONTACT_POSITION",
+            b"OPERATOR_ORGANIZATION",
+            b"OPERATOR_PHONE",
+            b"OPERATOR_EMAIL",
+            b"EPHEMERIS_NAME",
+            b"COVARIANCE_METHOD",
+            b"MANEUVERABLE",
+            b"ORBIT_CENTER",
+            b"REF_FRAME",
+            b"GRAVITY_MODEL",
+            b"ATMOSPHERIC_MODEL",
+            b"N_BODY_PERTURBATIONS",
+            b"SOLAR_RAD_PRESSURE",
+            b"EARTH_TIDES",
+            b"INTRACK_THRUST",
+        ],
+        b"data" => &[
+            b"COMMENT",
+            b"odParameters",
+            b"additionalParameters",
+            b"stateVector",
+            b"covarianceMatrix",
+        ],
+        b"odParameters" => &[
+            b"COMMENT",
+            b"TIME_LASTOB_START",
+            b"TIME_LASTOB_END",
+            b"RECOMMENDED_OD_SPAN",
+            b"ACTUAL_OD_SPAN",
+            b"OBS_AVAILABLE",
+            b"OBS_USED",
+            b"TRACKS_AVAILABLE",
+            b"TRACKS_USED",
+            b"RESIDUALS_ACCEPTED",
+            b"WEIGHTED_RMS",
+        ],
+        b"additionalParameters" => &[
+            b"COMMENT",
+            b"AREA_PC",
+            b"AREA_DRG",
+            b"AREA_SRP",
+            b"MASS",
+            b"CD_AREA_OVER_MASS",
+            b"CR_AREA_OVER_MASS",
+            b"THRUST_ACCELERATION",
+            b"SEDR",
+        ],
+        b"stateVector" => &[b"COMMENT", b"X", b"Y", b"Z", b"X_DOT", b"Y_DOT", b"Z_DOT"],
+        b"covarianceMatrix" => &[
+            b"COMMENT",
+            b"CR_R",
+            b"CT_R",
+            b"CT_T",
+            b"CN_R",
+            b"CN_T",
+            b"CN_N",
+            b"CRDOT_R",
+            b"CRDOT_T",
+            b"CRDOT_N",
+            b"CRDOT_RDOT",
+            b"CTDOT_R",
+            b"CTDOT_T",
+            b"CTDOT_N",
+            b"CTDOT_RDOT",
+            b"CTDOT_TDOT",
+            b"CNDOT_R",
+            b"CNDOT_T",
+            b"CNDOT_N",
+            b"CNDOT_RDOT",
+            b"CNDOT_TDOT",
+            b"CNDOT_NDOT",
+            b"CDRG_R",
+            b"CDRG_T",
+            b"CDRG_N",
+            b"CDRG_RDOT",
+            b"CDRG_TDOT",
+            b"CDRG_NDOT",
+            b"CDRG_DRG",
+            b"CSRP_R",
+            b"CSRP_T",
+            b"CSRP_N",
+            b"CSRP_RDOT",
+            b"CSRP_TDOT",
+            b"CSRP_NDOT",
+            b"CSRP_DRG",
+            b"CSRP_SRP",
+            b"CTHR_R",
+            b"CTHR_T",
+            b"CTHR_N",
+            b"CTHR_RDOT",
+            b"CTHR_TDOT",
+            b"CTHR_NDOT",
+            b"CTHR_DRG",
+            b"CTHR_SRP",
+            b"CTHR_THR",
+        ],
+        _ => return None,
+    })
+}
+
+fn cdm_kvn_key(key: &str) -> Option<(u8, u16)> {
+    const HEADER: &[&str] = &["CREATION_DATE", "ORIGINATOR", "MESSAGE_FOR", "MESSAGE_ID"];
+    const RELATIVE: &[&str] = &[
+        "TCA",
+        "MISS_DISTANCE",
+        "RELATIVE_SPEED",
+        "RELATIVE_POSITION_R",
+        "RELATIVE_POSITION_T",
+        "RELATIVE_POSITION_N",
+        "RELATIVE_VELOCITY_R",
+        "RELATIVE_VELOCITY_T",
+        "RELATIVE_VELOCITY_N",
+        "START_SCREEN_PERIOD",
+        "STOP_SCREEN_PERIOD",
+        "SCREEN_VOLUME_FRAME",
+        "SCREEN_VOLUME_SHAPE",
+        "SCREEN_VOLUME_X",
+        "SCREEN_VOLUME_Y",
+        "SCREEN_VOLUME_Z",
+        "SCREEN_ENTRY_TIME",
+        "SCREEN_EXIT_TIME",
+        "COLLISION_PROBABILITY",
+        "COLLISION_PROBABILITY_METHOD",
+    ];
+    const METADATA: &[&str] = &[
+        "OBJECT",
+        "OBJECT_DESIGNATOR",
+        "CATALOG_NAME",
+        "OBJECT_NAME",
+        "INTERNATIONAL_DESIGNATOR",
+        "OBJECT_TYPE",
+        "OPERATOR_CONTACT_POSITION",
+        "OPERATOR_ORGANIZATION",
+        "OPERATOR_PHONE",
+        "OPERATOR_EMAIL",
+        "EPHEMERIS_NAME",
+        "COVARIANCE_METHOD",
+        "MANEUVERABLE",
+        "ORBIT_CENTER",
+        "REF_FRAME",
+        "GRAVITY_MODEL",
+        "ATMOSPHERIC_MODEL",
+        "N_BODY_PERTURBATIONS",
+        "SOLAR_RAD_PRESSURE",
+        "EARTH_TIDES",
+        "INTRACK_THRUST",
+    ];
+    const OD: &[&str] = &[
+        "TIME_LASTOB_START",
+        "TIME_LASTOB_END",
+        "RECOMMENDED_OD_SPAN",
+        "ACTUAL_OD_SPAN",
+        "OBS_AVAILABLE",
+        "OBS_USED",
+        "TRACKS_AVAILABLE",
+        "TRACKS_USED",
+        "RESIDUALS_ACCEPTED",
+        "WEIGHTED_RMS",
+    ];
+    const ADDITIONAL: &[&str] = &[
+        "AREA_PC",
+        "AREA_DRG",
+        "AREA_SRP",
+        "MASS",
+        "CD_AREA_OVER_MASS",
+        "CR_AREA_OVER_MASS",
+        "THRUST_ACCELERATION",
+        "SEDR",
+    ];
+    const STATE: &[&str] = &["X", "Y", "Z", "X_DOT", "Y_DOT", "Z_DOT"];
+    const COVARIANCE: &[&str] = &[
+        "CR_R",
+        "CT_R",
+        "CT_T",
+        "CN_R",
+        "CN_T",
+        "CN_N",
+        "CRDOT_R",
+        "CRDOT_T",
+        "CRDOT_N",
+        "CRDOT_RDOT",
+        "CTDOT_R",
+        "CTDOT_T",
+        "CTDOT_N",
+        "CTDOT_RDOT",
+        "CTDOT_TDOT",
+        "CNDOT_R",
+        "CNDOT_T",
+        "CNDOT_N",
+        "CNDOT_RDOT",
+        "CNDOT_TDOT",
+        "CNDOT_NDOT",
+        "CDRG_R",
+        "CDRG_T",
+        "CDRG_N",
+        "CDRG_RDOT",
+        "CDRG_TDOT",
+        "CDRG_NDOT",
+        "CDRG_DRG",
+        "CSRP_R",
+        "CSRP_T",
+        "CSRP_N",
+        "CSRP_RDOT",
+        "CSRP_TDOT",
+        "CSRP_NDOT",
+        "CSRP_DRG",
+        "CSRP_SRP",
+        "CTHR_R",
+        "CTHR_T",
+        "CTHR_N",
+        "CTHR_RDOT",
+        "CTHR_TDOT",
+        "CTHR_NDOT",
+        "CTHR_DRG",
+        "CTHR_SRP",
+        "CTHR_THR",
+    ];
+
+    for (block, keys) in [
+        (0, HEADER),
+        (1, RELATIVE),
+        (2, METADATA),
+        (3, OD),
+        (4, ADDITIONAL),
+        (5, STATE),
+        (6, COVARIANCE),
+    ] {
+        if let Some(rank) = keys.iter().position(|candidate| *candidate == key) {
+            return Some((block, rank as u16));
+        }
+    }
+    None
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating CDM KVN structure"],
+            offset,
+        }))))
+    };
+    let mut saw_version = false;
+    let mut current_block = None;
+    let mut previous_key = None;
+    let mut pending_comments = false;
+    let mut segment_count = 0u8;
+    let mut offset = 0usize;
+
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        if line.len() > 254 {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            pending_comments = true;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if !line.contains('=') {
+            return fail("expected exactly one CDM assignment");
+        }
+        let key = line.split_once('=').unwrap().0.trim();
+        if key == "CCSDS_CDM_VERS" {
+            if saw_version || current_block.is_some() || pending_comments {
+                return fail("CCSDS_CDM_VERS must be the first record");
+            }
+            saw_version = true;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if !saw_version {
+            return fail("expected CCSDS_CDM_VERS as the first record");
+        }
+        let (block, rank) = cdm_kvn_key(key)
+            .ok_or_else(|| invalid(number, offset, "unknown CDM keyword".into()))?;
+
+        match current_block {
+            None => {
+                if block != 0 {
+                    return fail("expected CDM header");
+                }
+            }
+            Some(current) if block == current => {
+                if pending_comments && previous_key.is_some() {
+                    return fail("COMMENT is not at the beginning of a CDM logical block");
+                }
+                if previous_key.is_some_and(|previous| rank <= previous) {
+                    return fail("duplicate or out-of-order CDM keyword");
+                }
+            }
+            Some(5 | 6) if block == 2 => {
+                segment_count += 1;
+                if segment_count > 2 {
+                    return fail("CDM contains more than two segments");
+                }
+            }
+            Some(current) => {
+                let allowed = matches!(
+                    (current, block),
+                    (0, 1) | (1, 2) | (2, 3..=5) | (3, 4..=5) | (4, 5) | (5, 6)
+                );
+                if !allowed {
+                    return fail("out-of-order CDM logical block");
+                }
+            }
+        }
+        if block == 2 && key == "OBJECT" && current_block != Some(2) && segment_count == 0 {
+            segment_count = 1;
+        }
+        current_block = Some(block);
+        previous_key = Some(rank);
+        pending_comments = false;
+        offset += raw_line.len() + 1;
+    }
+
+    if pending_comments {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "trailing CDM COMMENT has no logical block".into(),
+        ));
+    }
+    if !saw_version {
+        return Err(invalid(1, 0, "missing CCSDS_CDM_VERS".into()));
+    }
+    Ok(())
+}
+
+impl Cdm {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        for segment in &self.body.segments {
+            let first_nested_comments = if let Some(od) = &segment.data.od_parameters {
+                &od.comment
+            } else if let Some(additional) = &segment.data.additional_parameters {
+                &additional.comment
+            } else {
+                &segment.data.state_vector.comment
+            };
+            if !first_nested_comments.is_empty() {
+                return Err(ValidationError::Generic {
+                    message: Cow::Borrowed(
+                        "CDM KVN cannot distinguish the outer data COMMENT run from the first nested logical-block COMMENT run",
+                    ),
+                    line: None,
+                }
+                .into());
+            }
+        }
+
+        // CDM has a fixed, bounded scalar shape. A private model fixed-point preflight therefore
+        // catches every lossy KVN scalar spelling and lexical record without introducing an
+        // unbounded history-sized allocation or emitting caller-visible bytes.
+        let mut writer = KvnWriter::new();
+        self.write_kvn(&mut writer);
+        let output = writer.finish();
+        validate_kvn_syntax(&output)?;
+        let reparsed = Self::from_kvn_str(&output)?;
+        crate::traits::Validate::validate(&reparsed)?;
+        if reparsed != *self {
+            return Err(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "CDM model cannot be represented in KVN without changing typed content",
+                ),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
     }
 }
 
@@ -83,7 +638,7 @@ impl Ndm for Cdm {
 
 /// Represents the `cdmHeader` complex type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmHeader {
     /// Comments (allowed in the CDM Header only immediately after the CDM version number).
     /// (See 6.3.4 for formatting rules.)
@@ -100,7 +655,7 @@ pub struct CdmHeader {
     /// **Examples**: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
-    pub creation_date: Epoch,
+    pub creation_date: CalendarEpoch,
     /// Creating agency or owner/operator. Value should be the 'Abbreviation' value from the
     /// SANA 'Organizations' registry (<https://sanaregistry.org/r/organizations>) for an
     /// organization that has the Role of 'Conjunction Data Message Originator'. (See 5.2.9
@@ -181,6 +736,17 @@ impl crate::traits::Validate for CdmHeader {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "CDM Header",
+            [
+                ("CREATION_DATE", self.creation_date.is_empty()),
+                ("ORIGINATOR", self.originator.trim().is_empty()),
+                ("MESSAGE_ID", self.message_id.trim().is_empty()),
+            ],
+        ))
+    }
 }
 
 impl ToKvn for CdmHeader {
@@ -201,6 +767,7 @@ impl ToKvn for CdmHeader {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct CdmBody {
     #[serde(rename = "relativeMetadataData")]
     pub relative_metadata_data: RelativeMetadataData,
@@ -242,6 +809,39 @@ impl crate::traits::Validate for CdmBody {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        if self.segments.len() != 2 {
+            errors.push(ValidationError::Generic {
+                message: Cow::Borrowed("CDM Body must have exactly 2 segments"),
+                line: None,
+            });
+        }
+        let object1_count = self
+            .segments
+            .iter()
+            .filter(|segment| segment.metadata.object == CdmObjectType::Object1)
+            .count();
+        let object2_count = self
+            .segments
+            .iter()
+            .filter(|segment| segment.metadata.object == CdmObjectType::Object2)
+            .count();
+        if object1_count != 1 || object2_count != 1 {
+            errors.push(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "CDM Body segments must contain exactly one OBJECT1 and one OBJECT2",
+                ),
+                line: None,
+            });
+        }
+        errors.extend(self.relative_metadata_data.validation_errors()?);
+        for segment in &self.segments {
+            errors.extend(segment.validation_errors()?);
+        }
+        Ok(errors)
+    }
 }
 
 impl ToKvn for CdmBody {
@@ -269,7 +869,7 @@ pub struct RelativeMetadataData {
     /// The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.3.
-    pub tca: Epoch,
+    pub tca: CalendarEpoch,
     /// The norm of the relative position vector. It indicates how close the two objects are at
     /// TCA. Data type = double.
     ///
@@ -305,7 +905,7 @@ pub struct RelativeMetadataData {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub start_screen_period: Option<Epoch>,
+    pub start_screen_period: Option<CalendarEpoch>,
     /// The stop time in UTC of the screening period for the conjunction assessment. (See
     /// 6.3.2.6 for formatting rules.)
     ///
@@ -315,7 +915,7 @@ pub struct RelativeMetadataData {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub stop_screen_period: Option<Epoch>,
+    pub stop_screen_period: Option<CalendarEpoch>,
     /// Name of the Object1 centered reference frame in which the screening volume data are
     /// given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
     /// E for definition.)
@@ -382,7 +982,7 @@ pub struct RelativeMetadataData {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub screen_entry_time: Option<Epoch>,
+    pub screen_entry_time: Option<CalendarEpoch>,
     /// The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
     /// rules.)
     ///
@@ -392,7 +992,7 @@ pub struct RelativeMetadataData {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub screen_exit_time: Option<Epoch>,
+    pub screen_exit_time: Option<CalendarEpoch>,
     /// The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will collide.
     /// Data type = double.
     ///
@@ -430,6 +1030,10 @@ impl crate::traits::Validate for RelativeMetadataData {
             }
         }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::validation_errors_from(self.validate())
     }
 }
 
@@ -517,6 +1121,7 @@ impl ToKvn for RelativeStateVector {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct CdmSegment {
     pub metadata: CdmMetadata,
     pub data: CdmData,
@@ -528,6 +1133,12 @@ impl crate::traits::Validate for CdmSegment {
         self.data.validate()?;
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = self.metadata.validation_errors()?;
+        errors.extend(self.data.validation_errors()?);
+        Ok(errors)
+    }
 }
 
 impl ToKvn for CdmSegment {
@@ -538,7 +1149,7 @@ impl ToKvn for CdmSegment {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmMetadata {
     /// Comments (see 6.3.4 for formatting rules).
     ///
@@ -866,6 +1477,25 @@ impl crate::traits::Validate for CdmMetadata {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "CDM Metadata",
+            [
+                (
+                    "OBJECT_DESIGNATOR",
+                    self.object_designator.trim().is_empty(),
+                ),
+                ("CATALOG_NAME", self.catalog_name.trim().is_empty()),
+                ("OBJECT_NAME", self.object_name.trim().is_empty()),
+                (
+                    "INTERNATIONAL_DESIGNATOR",
+                    self.international_designator.trim().is_empty(),
+                ),
+                ("EPHEMERIS_NAME", self.ephemeris_name.trim().is_empty()),
+            ],
+        ))
+    }
 }
 
 impl CdmMetadata {
@@ -879,7 +1509,7 @@ impl CdmMetadata {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -921,7 +1551,23 @@ impl crate::traits::Validate for CdmData {
             }
             .into());
         }
+        self.state_vector.validate()?;
+        if let Some(covariance_matrix) = &self.covariance_matrix {
+            covariance_matrix.validate()?;
+        }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "CDM Data",
+            [("covarianceMatrix", self.covariance_matrix.is_none())],
+        );
+        errors.extend(self.state_vector.validation_errors()?);
+        if let Some(covariance_matrix) = &self.covariance_matrix {
+            errors.extend(covariance_matrix.validation_errors()?);
+        }
+        Ok(errors)
     }
 }
 
@@ -1114,6 +1760,12 @@ pub struct AdditionalParameters {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct CdmStateVector {
+    /// Comments (see 6.3.4 for formatting rules).
+    ///
+    /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
+    pub comment: Vec<String>,
     /// Object Position Vector X component.
     ///
     /// Units: km
@@ -1140,8 +1792,50 @@ pub struct CdmStateVector {
     pub z_dot: VelocityRequired,
 }
 
+fn non_finite_error(field: &'static str, value: f64) -> Option<ValidationError> {
+    (!value.is_finite()).then(|| ValidationError::InvalidValue {
+        field: field.into(),
+        value: value.to_string(),
+        expected: "a finite number".into(),
+        line: None,
+    })
+}
+
+impl Validate for CdmStateVector {
+    fn validate(&self) -> Result<()> {
+        for (field, value) in self.values() {
+            if let Some(error) = non_finite_error(field, value) {
+                return Err(error.into());
+            }
+        }
+        Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(self
+            .values()
+            .filter_map(|(field, value)| non_finite_error(field, value))
+            .collect())
+    }
+}
+
+impl CdmStateVector {
+    fn values(&self) -> impl Iterator<Item = (&'static str, f64)> {
+        [
+            ("X", self.x.value),
+            ("Y", self.y.value),
+            ("Z", self.z.value),
+            ("X_DOT", self.x_dot.value),
+            ("Y_DOT", self.y_dot.value),
+            ("Z_DOT", self.z_dot.value),
+        ]
+        .into_iter()
+    }
+}
+
 impl ToKvn for CdmStateVector {
     fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
         writer.write_measure("X", &self.x.to_unit_value());
         writer.write_measure("Y", &self.y.to_unit_value());
         writer.write_measure("Z", &self.z.to_unit_value());
@@ -1460,6 +2154,174 @@ pub struct CdmCovarianceMatrix {
         with = "crate::utils::nullable"
     )]
     pub cthr_thr: Option<M2s4>,
+}
+
+impl Validate for CdmCovarianceMatrix {
+    fn validate(&self) -> Result<()> {
+        if let Some(error) = self.optional_row_errors().into_iter().next() {
+            return Err(error.into());
+        }
+        for (field, value) in self.values() {
+            if let Some(error) = non_finite_error(field, value) {
+                return Err(error.into());
+            }
+        }
+        Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = self.optional_row_errors();
+        errors.extend(
+            self.values()
+                .filter_map(|(field, value)| non_finite_error(field, value)),
+        );
+        Ok(errors)
+    }
+}
+
+impl CdmCovarianceMatrix {
+    fn optional_row_errors(&self) -> Vec<ValidationError> {
+        let row_7 = [
+            ("CDRG_R", self.cdrg_r.is_some()),
+            ("CDRG_T", self.cdrg_t.is_some()),
+            ("CDRG_N", self.cdrg_n.is_some()),
+            ("CDRG_RDOT", self.cdrg_rdot.is_some()),
+            ("CDRG_TDOT", self.cdrg_tdot.is_some()),
+            ("CDRG_NDOT", self.cdrg_ndot.is_some()),
+            ("CDRG_DRG", self.cdrg_drg.is_some()),
+        ];
+        let row_8 = [
+            ("CSRP_R", self.csrp_r.is_some()),
+            ("CSRP_T", self.csrp_t.is_some()),
+            ("CSRP_N", self.csrp_n.is_some()),
+            ("CSRP_RDOT", self.csrp_rdot.is_some()),
+            ("CSRP_TDOT", self.csrp_tdot.is_some()),
+            ("CSRP_NDOT", self.csrp_ndot.is_some()),
+            ("CSRP_DRG", self.csrp_drg.is_some()),
+            ("CSRP_SRP", self.csrp_srp.is_some()),
+        ];
+        let row_9 = [
+            ("CTHR_R", self.cthr_r.is_some()),
+            ("CTHR_T", self.cthr_t.is_some()),
+            ("CTHR_N", self.cthr_n.is_some()),
+            ("CTHR_RDOT", self.cthr_rdot.is_some()),
+            ("CTHR_TDOT", self.cthr_tdot.is_some()),
+            ("CTHR_NDOT", self.cthr_ndot.is_some()),
+            ("CTHR_DRG", self.cthr_drg.is_some()),
+            ("CTHR_SRP", self.cthr_srp.is_some()),
+            ("CTHR_THR", self.cthr_thr.is_some()),
+        ];
+        let rows: [(&str, &[(&str, bool)]); 3] = [
+            ("CDM Covariance Matrix row 7", &row_7),
+            ("CDM Covariance Matrix row 8", &row_8),
+            ("CDM Covariance Matrix row 9", &row_9),
+        ];
+        let Some(last_present_row) = rows
+            .iter()
+            .rposition(|(_, fields)| fields.iter().any(|(_, present)| *present))
+        else {
+            return Vec::new();
+        };
+
+        rows.into_iter()
+            .take(last_present_row + 1)
+            .flat_map(|(block, fields)| {
+                fields
+                    .iter()
+                    .filter(|(_, present)| !present)
+                    .map(move |(field, _)| ValidationError::MissingRequiredField {
+                        block: block.into(),
+                        field: (*field).into(),
+                        line: None,
+                    })
+            })
+            .collect()
+    }
+
+    fn values(&self) -> impl Iterator<Item = (&'static str, f64)> + '_ {
+        let required = [
+            ("CR_R", self.cr_r.value),
+            ("CT_R", self.ct_r.value),
+            ("CT_T", self.ct_t.value),
+            ("CN_R", self.cn_r.value),
+            ("CN_T", self.cn_t.value),
+            ("CN_N", self.cn_n.value),
+            ("CRDOT_R", self.crdot_r.value),
+            ("CRDOT_T", self.crdot_t.value),
+            ("CRDOT_N", self.crdot_n.value),
+            ("CRDOT_RDOT", self.crdot_rdot.value),
+            ("CTDOT_R", self.ctdot_r.value),
+            ("CTDOT_T", self.ctdot_t.value),
+            ("CTDOT_N", self.ctdot_n.value),
+            ("CTDOT_RDOT", self.ctdot_rdot.value),
+            ("CTDOT_TDOT", self.ctdot_tdot.value),
+            ("CNDOT_R", self.cndot_r.value),
+            ("CNDOT_T", self.cndot_t.value),
+            ("CNDOT_N", self.cndot_n.value),
+            ("CNDOT_RDOT", self.cndot_rdot.value),
+            ("CNDOT_TDOT", self.cndot_tdot.value),
+            ("CNDOT_NDOT", self.cndot_ndot.value),
+        ];
+        let optional = [
+            ("CDRG_R", self.cdrg_r.as_ref().map(|value| value.value)),
+            ("CDRG_T", self.cdrg_t.as_ref().map(|value| value.value)),
+            ("CDRG_N", self.cdrg_n.as_ref().map(|value| value.value)),
+            (
+                "CDRG_RDOT",
+                self.cdrg_rdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CDRG_TDOT",
+                self.cdrg_tdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CDRG_NDOT",
+                self.cdrg_ndot.as_ref().map(|value| value.value),
+            ),
+            ("CDRG_DRG", self.cdrg_drg.as_ref().map(|value| value.value)),
+            ("CSRP_R", self.csrp_r.as_ref().map(|value| value.value)),
+            ("CSRP_T", self.csrp_t.as_ref().map(|value| value.value)),
+            ("CSRP_N", self.csrp_n.as_ref().map(|value| value.value)),
+            (
+                "CSRP_RDOT",
+                self.csrp_rdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CSRP_TDOT",
+                self.csrp_tdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CSRP_NDOT",
+                self.csrp_ndot.as_ref().map(|value| value.value),
+            ),
+            ("CSRP_DRG", self.csrp_drg.as_ref().map(|value| value.value)),
+            ("CSRP_SRP", self.csrp_srp.as_ref().map(|value| value.value)),
+            ("CTHR_R", self.cthr_r.as_ref().map(|value| value.value)),
+            ("CTHR_T", self.cthr_t.as_ref().map(|value| value.value)),
+            ("CTHR_N", self.cthr_n.as_ref().map(|value| value.value)),
+            (
+                "CTHR_RDOT",
+                self.cthr_rdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CTHR_TDOT",
+                self.cthr_tdot.as_ref().map(|value| value.value),
+            ),
+            (
+                "CTHR_NDOT",
+                self.cthr_ndot.as_ref().map(|value| value.value),
+            ),
+            ("CTHR_DRG", self.cthr_drg.as_ref().map(|value| value.value)),
+            ("CTHR_SRP", self.cthr_srp.as_ref().map(|value| value.value)),
+            ("CTHR_THR", self.cthr_thr.as_ref().map(|value| value.value)),
+        ];
+
+        required.into_iter().chain(
+            optional
+                .into_iter()
+                .filter_map(|(field, value)| value.map(|value| (field, value))),
+        )
+    }
 }
 
 impl ToKvn for CdmCovarianceMatrix {

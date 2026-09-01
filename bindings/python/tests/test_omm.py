@@ -7,6 +7,7 @@ Unit tests for Orbit Mean-Elements Message (OMM) Python bindings.
 """
 
 import pytest
+
 from ccsds_ndm import MeanElements, OdmHeader, Omm, OmmData, OmmMetadata, OmmSegment
 
 
@@ -69,6 +70,22 @@ class TestOmm:
 
         omm2 = Omm.from_str(xml, format="xml")
         assert omm2.segment.data.mean_elements.eccentricity == 0.001
+
+    def test_ref_frame_epoch_requires_calendar_form(self):
+        with pytest.raises(ValueError):
+            OmmMetadata(
+                object_name="SAT1",
+                object_id="2023-001A",
+                center_name="EARTH",
+                ref_frame="TEME",
+                time_system="UTC",
+                mean_element_theory="DSST",
+                ref_frame_epoch="123.5",
+            )
+
+        omm = self._create_valid_omm()
+        with pytest.raises(ValueError):
+            omm.segment.data.mean_elements.epoch = "123.5"
 
     def test_file_io(self, tmp_path):
         omm = self._create_valid_omm()

@@ -30,6 +30,49 @@ import numpy
 
 """
 
+PUBLIC_API_PARAMETER_TYPES = {
+    "convert": {
+        "data": "str",
+        "to_format": "str",
+        "max_input_bytes": "Optional[int]",
+        "max_records": "Optional[int]",
+        "max_output_bytes": "Optional[int]",
+        "version": "Optional[str]",
+    },
+    "convert_file": {
+        "source_path": "str",
+        "destination_path": "str",
+        "to_format": "str",
+        "max_input_bytes": "Optional[int]",
+        "max_records": "Optional[int]",
+        "max_output_bytes": "Optional[int]",
+        "version": "Optional[str]",
+    },
+    "from_file": {
+        "format": "str",
+        "max_input_bytes": "Optional[int]",
+        "max_records": "Optional[int]",
+        "path": "str",
+    },
+    "from_str": {
+        "data": "str",
+        "format": "str",
+        "max_input_bytes": "Optional[int]",
+        "max_records": "Optional[int]",
+    },
+    "to_file": {
+        "format": "str",
+        "path": "str",
+        "max_output_bytes": "Optional[int]",
+        "version": "Optional[str]",
+    },
+    "to_str": {
+        "format": "str",
+        "max_output_bytes": "Optional[int]",
+        "version": "Optional[str]",
+    },
+}
+
 
 def _extract_pymethod_bodies(content: str) -> list[tuple[str, str]]:
     """Extract (class_name, impl_body) from #[pymethods] impl blocks."""
@@ -344,6 +387,12 @@ def _annotate_signature(sig: str, param_types: dict[str, str]) -> str:
         if not annotation:
             inferred = param_types.get(name)
             if inferred:
+                if (
+                    default == "=None"
+                    and not inferred.startswith("Optional[")
+                    and "None" not in inferred
+                ):
+                    inferred = f"Optional[{inferred}]"
                 left = f"{name}: {inferred}"
             else:
                 left = name
@@ -400,22 +449,23 @@ def _generate_function(obj: Any, indent: str, owner_class: str | None = None) ->
 
     doc = obj.__doc__ or ""
     param_types = _extract_numpy_parameter_types(doc)
+    param_types.update(PUBLIC_API_PARAMETER_TYPES.get(name, {}))
     sig = _annotate_signature(sig, param_types)
 
     return_type = _extract_annotation(doc, "rtype") or _extract_annotation(doc, "type")
     if not return_type:
         return_type = _extract_numpy_returns_type(doc)
     if not return_type:
-        if name in {"to_file", "__setstate__"}:
+        if name in {"to_file", "convert_file", "__setstate__"}:
             return_type = "None"
-        elif name == "to_str":
+        elif name in {"convert", "to_str"}:
             return_type = "str"
         elif name == "to_numpy":
             return_type = "numpy.ndarray"
         elif name == "__getstate__":
             return_type = "object"
         elif name == "validate":
-            return_type = "Optional[list[str]]" if "strict" in sig else "None"
+            return_type = "None"
     if not return_type and owner_class and name.startswith("from_"):
         # PyO3 static factory methods usually expose no runtime return annotation.
         # Use class context so type checkers infer `Cdm.from_str(...) -> Cdm`, etc.
@@ -523,6 +573,8 @@ def _generate_class(cls: type, indent: str) -> str:
     # Collect member stubs
     member_stubs: list[str] = []
     for member_name, member in inspect.getmembers(cls, _should_include_member):
+        if member_name not in cls.__dict__:
+            continue
         if inspect.isgetsetdescriptor(member):
             member_stubs.append(
                 _generate_property(

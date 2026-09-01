@@ -9,10 +9,10 @@ use crate::common::{
 use crate::error::Result;
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn, Validate};
+use crate::traits::{Ndm, ToKvn};
 use crate::types::{
-    ControlledType, DisintegrationType, Distance, Epoch, ImpactUncertaintyType, ObjectDescription,
-    ReentryUncertaintyMethodType, UserDefined, YesNo,
+    CalendarEpoch, ControlledType, DisintegrationType, Distance, ImpactUncertaintyType,
+    ObjectDescription, ReentryUncertaintyMethodType, UserDefined, YesNo,
 };
 use serde::{Deserialize, Serialize};
 
@@ -52,31 +52,494 @@ impl crate::traits::Validate for Rdm {
         self.header.validate()?;
         self.body.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        crate::validation::collect_message_validation_errors(
+            crate::validation::MessageKind::Rdm,
+            &self.id,
+            &self.version,
+            &self.header,
+            &self.body,
+        )
+    }
 }
 
 impl Ndm for Rdm {
     fn to_kvn(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Rdm,
+            &self.version,
+            crate::generation::OutputFormat::Kvn,
+            self,
+        )?;
+        self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        writer.finish_checked()
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        validate_kvn_syntax(kvn)?;
         let rdm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Rdm, &rdm)?;
+        crate::traits::Validate::validate(&rdm)?;
         Ok(rdm)
     }
 
     fn to_xml(&self) -> Result<String> {
-        self.validate()?;
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Rdm,
+            &self.version,
+            crate::generation::OutputFormat::Xml,
+            self,
+        )?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        crate::xml::validate_document_root(xml, b"rdm", "RDM")?;
+        validate_xml_sequences(xml)?;
         let rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Rdm, &rdm)?;
+        crate::traits::Validate::validate(&rdm)?;
         Ok(rdm)
     }
+}
+
+impl Rdm {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        if !self.body.segment.data.comment.is_empty() {
+            return Err(crate::error::ValidationError::Generic {
+                message: "RDM XML data-level COMMENT cannot be represented distinctly from the first KVN logical-block COMMENT".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+fn validate_xml_sequences(xml: &str) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
+
+    const HEADER: &[&[u8]] = &[b"COMMENT", b"CREATION_DATE", b"ORIGINATOR", b"MESSAGE_ID"];
+    const METADATA: &[&[u8]] = &[
+        b"COMMENT",
+        b"OBJECT_NAME",
+        b"INTERNATIONAL_DESIGNATOR",
+        b"CATALOG_NAME",
+        b"OBJECT_DESIGNATOR",
+        b"OBJECT_TYPE",
+        b"OBJECT_OWNER",
+        b"OBJECT_OPERATOR",
+        b"CONTROLLED_REENTRY",
+        b"CENTER_NAME",
+        b"TIME_SYSTEM",
+        b"EPOCH_TZERO",
+        b"REF_FRAME",
+        b"REF_FRAME_EPOCH",
+        b"EPHEMERIS_NAME",
+        b"GRAVITY_MODEL",
+        b"ATMOSPHERIC_MODEL",
+        b"SOLAR_FLUX_PREDICTION",
+        b"N_BODY_PERTURBATIONS",
+        b"SOLAR_RAD_PRESSURE",
+        b"EARTH_TIDES",
+        b"INTRACK_THRUST",
+        b"DRAG_PARAMETERS_SOURCE",
+        b"DRAG_PARAMETERS_ALTITUDE",
+        b"REENTRY_UNCERTAINTY_METHOD",
+        b"REENTRY_DISINTEGRATION",
+        b"IMPACT_UNCERTAINTY_METHOD",
+        b"PREVIOUS_MESSAGE_ID",
+        b"PREVIOUS_MESSAGE_EPOCH",
+        b"NEXT_MESSAGE_EPOCH",
+    ];
+    const DATA: &[&[u8]] = &[
+        b"COMMENT",
+        b"atmosphericReentryParameters",
+        b"groundImpactParameters",
+        b"stateVector",
+        b"covarianceMatrix",
+        b"spacecraftParameters",
+        b"odParameters",
+        b"userDefinedParameters",
+    ];
+    const ATMOSPHERIC: &[&[u8]] = &[
+        b"COMMENT",
+        b"ORBIT_LIFETIME",
+        b"REENTRY_ALTITUDE",
+        b"ORBIT_LIFETIME_WINDOW_START",
+        b"ORBIT_LIFETIME_WINDOW_END",
+        b"NOMINAL_REENTRY_EPOCH",
+        b"REENTRY_WINDOW_START",
+        b"REENTRY_WINDOW_END",
+        b"ORBIT_LIFETIME_CONFIDENCE_LEVEL",
+    ];
+    const GROUND: &[&[u8]] = &[
+        b"COMMENT",
+        b"PROBABILITY_OF_IMPACT",
+        b"PROBABILITY_OF_BURN_UP",
+        b"PROBABILITY_OF_BREAK_UP",
+        b"PROBABILITY_OF_LAND_IMPACT",
+        b"PROBABILITY_OF_CASUALTY",
+        b"NOMINAL_IMPACT_EPOCH",
+        b"IMPACT_WINDOW_START",
+        b"IMPACT_WINDOW_END",
+        b"IMPACT_REF_FRAME",
+        b"NOMINAL_IMPACT_LON",
+        b"NOMINAL_IMPACT_LAT",
+        b"NOMINAL_IMPACT_ALT",
+        b"IMPACT_1_CONFIDENCE",
+        b"IMPACT_1_START_LON",
+        b"IMPACT_1_START_LAT",
+        b"IMPACT_1_STOP_LON",
+        b"IMPACT_1_STOP_LAT",
+        b"IMPACT_1_CROSS_TRACK",
+        b"IMPACT_2_CONFIDENCE",
+        b"IMPACT_2_START_LON",
+        b"IMPACT_2_START_LAT",
+        b"IMPACT_2_STOP_LON",
+        b"IMPACT_2_STOP_LAT",
+        b"IMPACT_2_CROSS_TRACK",
+        b"IMPACT_3_CONFIDENCE",
+        b"IMPACT_3_START_LON",
+        b"IMPACT_3_START_LAT",
+        b"IMPACT_3_STOP_LON",
+        b"IMPACT_3_STOP_LAT",
+        b"IMPACT_3_CROSS_TRACK",
+    ];
+    const STATE: &[&[u8]] = &[
+        b"COMMENT", b"EPOCH", b"X", b"Y", b"Z", b"X_DOT", b"Y_DOT", b"Z_DOT",
+    ];
+    const COVARIANCE: &[&[u8]] = &[
+        b"COMMENT",
+        b"COV_REF_FRAME",
+        b"CX_X",
+        b"CY_X",
+        b"CY_Y",
+        b"CZ_X",
+        b"CZ_Y",
+        b"CZ_Z",
+        b"CX_DOT_X",
+        b"CX_DOT_Y",
+        b"CX_DOT_Z",
+        b"CX_DOT_X_DOT",
+        b"CY_DOT_X",
+        b"CY_DOT_Y",
+        b"CY_DOT_Z",
+        b"CY_DOT_X_DOT",
+        b"CY_DOT_Y_DOT",
+        b"CZ_DOT_X",
+        b"CZ_DOT_Y",
+        b"CZ_DOT_Z",
+        b"CZ_DOT_X_DOT",
+        b"CZ_DOT_Y_DOT",
+        b"CZ_DOT_Z_DOT",
+    ];
+    const SPACECRAFT: &[&[u8]] = &[
+        b"COMMENT",
+        b"WET_MASS",
+        b"DRY_MASS",
+        b"HAZARDOUS_SUBSTANCES",
+        b"SOLAR_RAD_AREA",
+        b"SOLAR_RAD_COEFF",
+        b"DRAG_AREA",
+        b"DRAG_COEFF",
+        b"RCS",
+        b"BALLISTIC_COEFF",
+        b"THRUST_ACCELERATION",
+    ];
+    const OD: &[&[u8]] = &[
+        b"COMMENT",
+        b"TIME_LASTOB_START",
+        b"TIME_LASTOB_END",
+        b"RECOMMENDED_OD_SPAN",
+        b"ACTUAL_OD_SPAN",
+        b"OBS_AVAILABLE",
+        b"OBS_USED",
+        b"TRACKS_AVAILABLE",
+        b"TRACKS_USED",
+        b"RESIDUALS_ACCEPTED",
+        b"WEIGHTED_RMS",
+    ];
+    const USER_DEFINED: &[&[u8]] = &[b"COMMENT", b"USER_DEFINED"];
+
+    fn in_sequence(child: &[u8], sequence: &[&[u8]]) -> Option<XmlSequenceRule> {
+        sequence
+            .iter()
+            .position(|candidate| *candidate == child)
+            .map(|rank| XmlSequenceRule {
+                rank: rank as u16,
+                repeatable: matches!(child, b"COMMENT" | b"USER_DEFINED"),
+            })
+    }
+
+    crate::xml::validate_element_sequences(
+        xml,
+        "RDM",
+        |parent, child| match parent {
+            b"rdm" => in_sequence(child, &[b"header", b"body"]),
+            b"header" => in_sequence(child, HEADER),
+            b"body" => in_sequence(child, &[b"segment"]),
+            b"segment" => in_sequence(child, &[b"metadata", b"data"]),
+            b"metadata" => in_sequence(child, METADATA),
+            b"data" => in_sequence(child, DATA),
+            b"atmosphericReentryParameters" => in_sequence(child, ATMOSPHERIC),
+            b"groundImpactParameters" => in_sequence(child, GROUND),
+            b"stateVector" => in_sequence(child, STATE),
+            b"covarianceMatrix" => in_sequence(child, COVARIANCE),
+            b"spacecraftParameters" => in_sequence(child, SPACECRAFT),
+            b"odParameters" => in_sequence(child, OD),
+            b"userDefinedParameters" => in_sequence(child, USER_DEFINED),
+            _ => None,
+        },
+        |element, attribute| match attribute {
+            b"parameter" => element == b"USER_DEFINED",
+            b"units" => matches!(
+                element,
+                b"DRAG_PARAMETERS_ALTITUDE"
+                    | b"ORBIT_LIFETIME"
+                    | b"REENTRY_ALTITUDE"
+                    | b"ORBIT_LIFETIME_WINDOW_START"
+                    | b"ORBIT_LIFETIME_WINDOW_END"
+                    | b"ORBIT_LIFETIME_CONFIDENCE_LEVEL"
+                    | b"NOMINAL_IMPACT_LON"
+                    | b"NOMINAL_IMPACT_LAT"
+                    | b"NOMINAL_IMPACT_ALT"
+                    | b"IMPACT_1_CONFIDENCE"
+                    | b"IMPACT_1_START_LON"
+                    | b"IMPACT_1_START_LAT"
+                    | b"IMPACT_1_STOP_LON"
+                    | b"IMPACT_1_STOP_LAT"
+                    | b"IMPACT_1_CROSS_TRACK"
+                    | b"IMPACT_2_CONFIDENCE"
+                    | b"IMPACT_2_START_LON"
+                    | b"IMPACT_2_START_LAT"
+                    | b"IMPACT_2_STOP_LON"
+                    | b"IMPACT_2_STOP_LAT"
+                    | b"IMPACT_2_CROSS_TRACK"
+                    | b"IMPACT_3_CONFIDENCE"
+                    | b"IMPACT_3_START_LON"
+                    | b"IMPACT_3_START_LAT"
+                    | b"IMPACT_3_STOP_LON"
+                    | b"IMPACT_3_STOP_LAT"
+                    | b"IMPACT_3_CROSS_TRACK"
+                    | b"X"
+                    | b"Y"
+                    | b"Z"
+                    | b"X_DOT"
+                    | b"Y_DOT"
+                    | b"Z_DOT"
+                    | b"CX_X"
+                    | b"CY_X"
+                    | b"CY_Y"
+                    | b"CZ_X"
+                    | b"CZ_Y"
+                    | b"CZ_Z"
+                    | b"CX_DOT_X"
+                    | b"CX_DOT_Y"
+                    | b"CX_DOT_Z"
+                    | b"CX_DOT_X_DOT"
+                    | b"CY_DOT_X"
+                    | b"CY_DOT_Y"
+                    | b"CY_DOT_Z"
+                    | b"CY_DOT_X_DOT"
+                    | b"CY_DOT_Y_DOT"
+                    | b"CZ_DOT_X"
+                    | b"CZ_DOT_Y"
+                    | b"CZ_DOT_Z"
+                    | b"CZ_DOT_X_DOT"
+                    | b"CZ_DOT_Y_DOT"
+                    | b"CZ_DOT_Z_DOT"
+                    | b"WET_MASS"
+                    | b"DRY_MASS"
+                    | b"SOLAR_RAD_AREA"
+                    | b"DRAG_AREA"
+                    | b"RCS"
+                    | b"BALLISTIC_COEFF"
+                    | b"THRUST_ACCELERATION"
+                    | b"RECOMMENDED_OD_SPAN"
+                    | b"ACTUAL_OD_SPAN"
+                    | b"RESIDUALS_ACCEPTED"
+            ),
+            _ => false,
+        },
+    )
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    const KEYS: &[&str] = &[
+        "CCSDS_RDM_VERS",
+        "CREATION_DATE",
+        "ORIGINATOR",
+        "MESSAGE_ID",
+        "OBJECT_NAME",
+        "INTERNATIONAL_DESIGNATOR",
+        "CATALOG_NAME",
+        "OBJECT_DESIGNATOR",
+        "OBJECT_TYPE",
+        "OBJECT_OWNER",
+        "OBJECT_OPERATOR",
+        "CONTROLLED_REENTRY",
+        "CENTER_NAME",
+        "TIME_SYSTEM",
+        "EPOCH_TZERO",
+        "REF_FRAME",
+        "REF_FRAME_EPOCH",
+        "EPHEMERIS_NAME",
+        "GRAVITY_MODEL",
+        "ATMOSPHERIC_MODEL",
+        "SOLAR_FLUX_PREDICTION",
+        "N_BODY_PERTURBATIONS",
+        "SOLAR_RAD_PRESSURE",
+        "EARTH_TIDES",
+        "INTRACK_THRUST",
+        "DRAG_PARAMETERS_SOURCE",
+        "DRAG_PARAMETERS_ALTITUDE",
+        "REENTRY_UNCERTAINTY_METHOD",
+        "REENTRY_DISINTEGRATION",
+        "IMPACT_UNCERTAINTY_METHOD",
+        "PREVIOUS_MESSAGE_ID",
+        "PREVIOUS_MESSAGE_EPOCH",
+        "NEXT_MESSAGE_EPOCH",
+        "ORBIT_LIFETIME",
+        "REENTRY_ALTITUDE",
+        "ORBIT_LIFETIME_WINDOW_START",
+        "ORBIT_LIFETIME_WINDOW_END",
+        "NOMINAL_REENTRY_EPOCH",
+        "REENTRY_WINDOW_START",
+        "REENTRY_WINDOW_END",
+        "ORBIT_LIFETIME_CONFIDENCE_LEVEL",
+        "PROBABILITY_OF_IMPACT",
+        "PROBABILITY_OF_BURN_UP",
+        "PROBABILITY_OF_BREAK_UP",
+        "PROBABILITY_OF_LAND_IMPACT",
+        "PROBABILITY_OF_CASUALTY",
+        "NOMINAL_IMPACT_EPOCH",
+        "IMPACT_WINDOW_START",
+        "IMPACT_WINDOW_END",
+        "IMPACT_REF_FRAME",
+        "NOMINAL_IMPACT_LON",
+        "NOMINAL_IMPACT_LAT",
+        "NOMINAL_IMPACT_ALT",
+        "IMPACT_1_CONFIDENCE",
+        "IMPACT_1_START_LON",
+        "IMPACT_1_START_LAT",
+        "IMPACT_1_STOP_LON",
+        "IMPACT_1_STOP_LAT",
+        "IMPACT_1_CROSS_TRACK",
+        "IMPACT_2_CONFIDENCE",
+        "IMPACT_2_START_LON",
+        "IMPACT_2_START_LAT",
+        "IMPACT_2_STOP_LON",
+        "IMPACT_2_STOP_LAT",
+        "IMPACT_2_CROSS_TRACK",
+        "IMPACT_3_CONFIDENCE",
+        "IMPACT_3_START_LON",
+        "IMPACT_3_START_LAT",
+        "IMPACT_3_STOP_LON",
+        "IMPACT_3_STOP_LAT",
+        "IMPACT_3_CROSS_TRACK",
+        "EPOCH",
+        "X",
+        "Y",
+        "Z",
+        "X_DOT",
+        "Y_DOT",
+        "Z_DOT",
+        "COV_REF_FRAME",
+        "CX_X",
+        "CY_X",
+        "CY_Y",
+        "CZ_X",
+        "CZ_Y",
+        "CZ_Z",
+        "CX_DOT_X",
+        "CX_DOT_Y",
+        "CX_DOT_Z",
+        "CX_DOT_X_DOT",
+        "CY_DOT_X",
+        "CY_DOT_Y",
+        "CY_DOT_Z",
+        "CY_DOT_X_DOT",
+        "CY_DOT_Y_DOT",
+        "CZ_DOT_X",
+        "CZ_DOT_Y",
+        "CZ_DOT_Z",
+        "CZ_DOT_X_DOT",
+        "CZ_DOT_Y_DOT",
+        "CZ_DOT_Z_DOT",
+        "WET_MASS",
+        "DRY_MASS",
+        "HAZARDOUS_SUBSTANCES",
+        "SOLAR_RAD_AREA",
+        "SOLAR_RAD_COEFF",
+        "DRAG_AREA",
+        "DRAG_COEFF",
+        "RCS",
+        "BALLISTIC_COEFF",
+        "THRUST_ACCELERATION",
+        "TIME_LASTOB_START",
+        "TIME_LASTOB_END",
+        "RECOMMENDED_OD_SPAN",
+        "ACTUAL_OD_SPAN",
+        "OBS_AVAILABLE",
+        "OBS_USED",
+        "TRACKS_AVAILABLE",
+        "TRACKS_USED",
+        "RESIDUALS_ACCEPTED",
+        "WEIGHTED_RMS",
+    ];
+
+    fn rank(key: &str) -> Option<u16> {
+        if key.starts_with("USER_DEFINED_") {
+            return Some(KEYS.len() as u16);
+        }
+        KEYS.iter()
+            .position(|candidate| *candidate == key)
+            .map(|rank| rank as u16)
+    }
+
+    fn group(rank: u16) -> u8 {
+        match rank {
+            0 => 0,
+            1..=3 => 1,
+            4..=32 => 2,
+            33..=40 => 3,
+            41..=70 => 4,
+            71..=77 => 5,
+            78..=99 => 6,
+            100..=109 => 7,
+            110..=119 => 8,
+            _ => 9,
+        }
+    }
+
+    fn comments_start_block(previous: u16, key: &str) -> bool {
+        let Some(current) = rank(key) else {
+            return false;
+        };
+        match current {
+            1 => previous == 0,
+            4 => previous == 3,
+            33 => group(previous) == 2,
+            _ => group(current) >= 4 && group(previous) < group(current),
+        }
+    }
+
+    crate::kvn::strict::validate_odm_assignments(
+        kvn,
+        &crate::kvn::strict::OdmAssignmentRules {
+            context: "while validating RDM KVN structure",
+            message_name: "RDM",
+            rank,
+            comment_starts_block: comments_start_block,
+            allows_non_increasing: |previous, current, key| {
+                current == KEYS.len() as u16
+                    && previous == current
+                    && key.starts_with("USER_DEFINED_")
+            },
+        },
+    )
 }
 
 impl ToKvn for Rdm {
@@ -92,7 +555,7 @@ impl ToKvn for Rdm {
 //----------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct RdmHeader {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -101,7 +564,7 @@ pub struct RdmHeader {
     /// File creation date and time in UTC.
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23
-    pub creation_date: Epoch,
+    pub creation_date: CalendarEpoch,
     /// Creating agency or entity.
     ///
     /// Examples: DLR, ESA
@@ -142,6 +605,17 @@ impl crate::traits::Validate for RdmHeader {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "RDM Header",
+            [
+                ("CREATION_DATE", self.creation_date.is_empty()),
+                ("ORIGINATOR", self.originator.trim().is_empty()),
+                ("MESSAGE_ID", self.message_id.trim().is_empty()),
+            ],
+        ))
+    }
 }
 
 impl ToKvn for RdmHeader {
@@ -159,6 +633,7 @@ impl ToKvn for RdmHeader {
 
 /// The RDM Body consists of a single segment.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct RdmBody {
     pub segment: Box<RdmSegment>,
 }
@@ -166,6 +641,10 @@ pub struct RdmBody {
 impl crate::traits::Validate for RdmBody {
     fn validate(&self) -> Result<()> {
         self.segment.validate()
+    }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        self.segment.validation_errors()
     }
 }
 
@@ -176,6 +655,7 @@ impl ToKvn for RdmBody {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct RdmSegment {
     /// The metadata for this RDM segment.
     pub metadata: RdmMetadata,
@@ -203,6 +683,26 @@ impl crate::traits::Validate for RdmSegment {
         }
         self.data.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        let mut errors = self.metadata.validation_errors()?;
+        if self.data.state_vector.is_some()
+            && self
+                .metadata
+                .ref_frame
+                .as_deref()
+                .map(str::trim)
+                .is_none_or(str::is_empty)
+        {
+            errors.push(crate::error::ValidationError::MissingRequiredField {
+                block: "RDM Metadata".into(),
+                field: "REF_FRAME (required when state vector is provided)".into(),
+                line: None,
+            });
+        }
+        errors.extend(self.data.validation_errors()?);
+        Ok(errors)
+    }
 }
 
 impl ToKvn for RdmSegment {
@@ -218,7 +718,7 @@ impl ToKvn for RdmSegment {
 
 /// The RDM Metadata provides information about the re-entry event.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct RdmMetadata {
     /// Comments (allowed only at the beginning of RDM metadata).
     ///
@@ -346,7 +846,7 @@ pub struct RdmMetadata {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
-    pub epoch_tzero: Epoch,
+    pub epoch_tzero: CalendarEpoch,
     /// Reference frame in which the (optional) orbit information will be provided. The value
     /// should be taken from the keyword value name column in the SANA celestial body reference
     /// frames registry, reference `[11]`. The reference frame must be the same for all orbit
@@ -375,7 +875,7 @@ pub struct RdmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub ref_frame_epoch: Option<Epoch>,
+    pub ref_frame_epoch: Option<CalendarEpoch>,
     /// Unique identifier of an external ephemeris file used or NONE.
     ///
     /// **Examples**: NONE, EPHEMERIS, INTELSAT2
@@ -564,7 +1064,7 @@ pub struct RdmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub previous_message_epoch: Option<Epoch>,
+    pub previous_message_epoch: Option<CalendarEpoch>,
     /// Scheduled UTC epoch of the next RDM for the same object (formatting rules specified in
     /// 5.3.3.5); N/A if no other message is scheduled.
     ///
@@ -576,7 +1076,7 @@ pub struct RdmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub next_message_epoch: Option<Epoch>,
+    pub next_message_epoch: Option<CalendarEpoch>,
 }
 
 impl ToKvn for RdmMetadata {
@@ -666,7 +1166,7 @@ impl ToKvn for RdmMetadata {
 
 /// The RDM Data section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct RdmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -763,6 +1263,22 @@ impl crate::traits::Validate for RdmMetadata {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "RDM Metadata",
+            [
+                ("OBJECT_NAME", self.object_name.trim().is_empty()),
+                (
+                    "INTERNATIONAL_DESIGNATOR",
+                    self.international_designator.trim().is_empty(),
+                ),
+                ("CENTER_NAME", self.center_name.trim().is_empty()),
+                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
+                ("EPOCH_TZERO", self.epoch_tzero.is_empty()),
+            ],
+        ))
+    }
 }
 
 impl crate::traits::Validate for RdmData {
@@ -789,7 +1305,37 @@ impl crate::traits::Validate for RdmData {
                 .into());
             }
         }
+        if let Some(state_vector) = &self.state_vector {
+            state_vector.validate()?;
+        }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "RDM Data",
+            [(
+                "stateVector (required when covarianceMatrix is provided)",
+                self.covariance_matrix.is_some() && self.state_vector.is_none(),
+            )],
+        );
+        let reentry = &self.atmospheric_reentry_parameters;
+        if let (Some(start), Some(end)) = (
+            &reentry.orbit_lifetime_window_start,
+            &reentry.orbit_lifetime_window_end,
+        ) {
+            if start.value > end.value {
+                errors.push(crate::error::ValidationError::Generic {
+                    message: "ORBIT_LIFETIME_WINDOW_START must be <= ORBIT_LIFETIME_WINDOW_END"
+                        .into(),
+                    line: None,
+                });
+            }
+        }
+        if let Some(state_vector) = &self.state_vector {
+            errors.extend(state_vector.validation_errors()?);
+        }
+        Ok(errors)
     }
 }
 
@@ -817,39 +1363,40 @@ impl RdmData {
             cov.write_kvn(writer);
         }
         if let Some(sp) = &self.spacecraft_parameters {
-            // Write minimal known fields
+            writer.write_comments(&sp.comment);
             if let Some(v) = &sp.wet_mass {
-                writer.write_pair("WET_MASS", v);
+                writer.write_measure("WET_MASS", &v.to_unit_value());
             }
             if let Some(v) = &sp.dry_mass {
-                writer.write_pair("DRY_MASS", v);
+                writer.write_measure("DRY_MASS", &v.to_unit_value());
             }
             if let Some(v) = &sp.hazardous_substances {
                 writer.write_pair("HAZARDOUS_SUBSTANCES", v);
             }
             if let Some(v) = &sp.solar_rad_area {
-                writer.write_pair("SOLAR_RAD_AREA", v);
+                writer.write_measure("SOLAR_RAD_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.solar_rad_coeff {
                 writer.write_pair("SOLAR_RAD_COEFF", v);
             }
             if let Some(v) = &sp.drag_area {
-                writer.write_pair("DRAG_AREA", v);
+                writer.write_measure("DRAG_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.drag_coeff {
                 writer.write_pair("DRAG_COEFF", v);
             }
             if let Some(v) = &sp.rcs {
-                writer.write_pair("RCS", v);
+                writer.write_measure("RCS", &v.to_unit_value());
             }
             if let Some(v) = &sp.ballistic_coeff {
-                writer.write_pair("BALLISTIC_COEFF", v);
+                writer.write_measure("BALLISTIC_COEFF", v);
             }
             if let Some(v) = &sp.thrust_acceleration {
-                writer.write_pair("THRUST_ACCELERATION", v);
+                writer.write_measure("THRUST_ACCELERATION", &v.to_unit_value());
             }
         }
         if let Some(od) = &self.od_parameters {
+            writer.write_comments(&od.comment);
             if let Some(v) = &od.time_lastob_start {
                 writer.write_pair("TIME_LASTOB_START", v);
             }
@@ -857,10 +1404,10 @@ impl RdmData {
                 writer.write_pair("TIME_LASTOB_END", v);
             }
             if let Some(v) = &od.recommended_od_span {
-                writer.write_pair("RECOMMENDED_OD_SPAN", v);
+                writer.write_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.actual_od_span {
-                writer.write_pair("ACTUAL_OD_SPAN", v);
+                writer.write_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.obs_available {
                 writer.write_pair("OBS_AVAILABLE", v);
@@ -875,7 +1422,7 @@ impl RdmData {
                 writer.write_pair("TRACKS_USED", v);
             }
             if let Some(v) = &od.residuals_accepted {
-                writer.write_pair("RESIDUALS_ACCEPTED", v);
+                writer.write_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());
             }
             if let Some(v) = &od.weighted_rms {
                 writer.write_pair("WEIGHTED_RMS", v);
@@ -978,7 +1525,7 @@ USER_DEFINED_TEST = VALUE
     /// Parse official RDM XML example C-3 (minimal)
     #[test]
     fn test_xsd_rdm_sample_c3_xml() {
-        let xml = std::fs::read_to_string("../data/xml/rdm_c3.xml").unwrap();
+        let xml = std::fs::read_to_string("data/xml/rdm_c3.xml").unwrap();
         let rdm = Rdm::from_xml(&xml).unwrap();
         assert_eq!(rdm.version, "1.0");
         assert_eq!(rdm.header.originator, "ESA");
@@ -988,7 +1535,7 @@ USER_DEFINED_TEST = VALUE
     /// Parse official RDM XML example C-4 (comprehensive)
     #[test]
     fn test_xsd_rdm_sample_c4_xml() {
-        let xml = std::fs::read_to_string("../data/xml/rdm_c4.xml").unwrap();
+        let xml = std::fs::read_to_string("data/xml/rdm_c4.xml").unwrap();
         let rdm = Rdm::from_xml(&xml).unwrap();
         assert_eq!(rdm.header.message_id, "ESA/20180422-001");
         assert!(rdm.body.segment.data.ground_impact_parameters.is_some());

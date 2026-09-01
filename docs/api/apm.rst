@@ -19,7 +19,7 @@ Attitude Parameter Message (APM)
 Parameter Blocks
 ----------------
 
-.. autoclass:: ManeuverParameters
+.. autoclass:: ApmManeuverParameters
    :members:
    :undoc-members:
 .. autoclass:: InertiaState

@@ -2,7 +2,85 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::{from_str, MessageType};
+use ccsds_ndm::messages::aem::Aem;
+use ccsds_ndm::messages::ndm::CombinedNdm;
+use ccsds_ndm::messages::opm::Opm;
+use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::{from_str, GenerateOptions, MessageType};
+
+const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
+
+#[test]
+fn combined_generation_preserves_child_checks_and_aggregate_output_limits() {
+    let opm = Opm::from_kvn(OPM_KVN).unwrap();
+    let combined = CombinedNdm {
+        id: None,
+        comments: Vec::new(),
+        messages: vec![MessageType::Opm(opm.clone())],
+    };
+    let message = MessageType::Ndm(combined.clone());
+
+    let exact_xml = message.to_xml().unwrap();
+    let exact = GenerateOptions::source().with_max_output_bytes(exact_xml.len());
+    assert_eq!(message.to_xml_with(&exact).unwrap(), exact_xml);
+    let too_small = GenerateOptions::source().with_max_output_bytes(exact_xml.len() - 1);
+    let error = message.to_xml_with(&too_small).unwrap_err();
+    assert_eq!(error.code(), Some("resource.output_limit_exceeded"));
+    assert_eq!(
+        error.diagnostic().unwrap().message_kind,
+        ccsds_ndm::validation::MessageKind::Ndm
+    );
+
+    let mut invalid_kvn = opm.clone();
+    invalid_kvn.header.originator = "non-ASCII é".into();
+    let invalid_kvn = CombinedNdm {
+        id: None,
+        comments: Vec::new(),
+        messages: vec![MessageType::Opm(invalid_kvn)],
+    };
+    let error = invalid_kvn.to_kvn().unwrap_err();
+    assert_eq!(
+        error.diagnostic().unwrap().message_kind,
+        ccsds_ndm::validation::MessageKind::Opm
+    );
+
+    let mut invalid_xml = opm;
+    invalid_xml.header.originator = "control \u{1}".into();
+    let invalid_xml = CombinedNdm {
+        id: None,
+        comments: Vec::new(),
+        messages: vec![MessageType::Opm(invalid_xml)],
+    };
+    assert!(invalid_xml.to_xml().is_err());
+}
+
+#[test]
+fn combined_xml_parser_enforces_the_normative_envelope() {
+    assert!(CombinedNdm::from_xml("<ndm/>").is_ok());
+    assert!(CombinedNdm::from_xml("<message></message>").is_err());
+    assert!(CombinedNdm::from_xml("<ndm><UNKNOWN/></ndm>").is_err());
+    assert!(CombinedNdm::from_xml("<ndm><message_id>wrong case</message_id></ndm>").is_err());
+    assert!(CombinedNdm::from_xml("<ndm><comment>wrong case</comment></ndm>").is_err());
+    assert!(CombinedNdm::from_xml(
+        "<ndm><COMMENT>first</COMMENT><MESSAGE_ID>late</MESSAGE_ID></ndm>"
+    )
+    .is_err());
+    assert!(CombinedNdm::from_xml("<ndm>").is_err());
+    assert!(CombinedNdm::from_xml("<ndm></ndm><ndm></ndm>").is_err());
+    assert!(CombinedNdm::from_xml("<ndm></ndm>").is_ok());
+
+    let aem = Aem::from_xml(include_str!("../data/xml/aem_g11.xml")).unwrap();
+    let input = CombinedNdm {
+        id: None,
+        comments: Vec::new(),
+        messages: vec![MessageType::Aem(aem)],
+    }
+    .to_xml()
+    .unwrap();
+    let options = ccsds_ndm::ParseOptions::default().with_max_records(0);
+    let error = CombinedNdm::from_xml_with_options(&input, &options).unwrap_err();
+    assert_eq!(error.code(), Some("resource.record_limit_exceeded"));
+}
 
 #[test]
 fn test_combined_ndm_kvn() {
@@ -215,7 +293,7 @@ fn test_combined_ndm_xml_attitude() {
                     <att>
                         <REF_FRAME_A>J2000</REF_FRAME_A>
                         <REF_FRAME_B>SC_BODY</REF_FRAME_B>
-                        <NUMBER_STATES>1</NUMBER_STATES>
+                        <NUMBER_STATES>4</NUMBER_STATES>
                         <ATT_TYPE>QUATERNION</ATT_TYPE>
                         <attLine>0.0 0.73566 -0.50547 0.41390 0.180707</attLine>
                     </att>

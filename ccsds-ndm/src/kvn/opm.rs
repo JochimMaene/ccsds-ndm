@@ -41,7 +41,6 @@ use crate::messages::opm::{
     KeplerianElements, ManeuverParameters, Opm, OpmBody, OpmData, OpmMetadata, OpmSegment,
 };
 use crate::parse_block;
-use winnow::combinator::peek;
 use winnow::prelude::*;
 use winnow::stream::Offset;
 
@@ -78,7 +77,7 @@ pub fn opm_metadata(input: &mut &str) -> KvnResult<OpmMetadata> {
         "OBJECT_ID" => object_id: kv_string,
         "CENTER_NAME" => center_name: kv_string,
         "REF_FRAME" => ref_frame: kv_string,
-        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_epoch,
+        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_calendar_epoch,
         "TIME_SYSTEM" => time_system: kv_string,
     }, |_| false);
 
@@ -161,7 +160,9 @@ pub fn keplerian_elements(input: &mut &str) -> KvnResult<Option<KeplerianElement
 
 /// Parses a single maneuver parameter block.
 pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParameters>> {
-    let mut comment = Vec::new();
+    // ODM §7.8.7 permits comments only at the beginning of a maneuver logical block. Collecting
+    // comments inside the assignment loop would steal comments belonging to the next maneuver.
+    let comment = collect_comments.parse_next(input)?;
     let mut man_epoch_ignition = None;
     let mut man_duration = None;
     let mut man_delta_mass = None;
@@ -170,15 +171,35 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParamet
     let mut man_dv_2 = None;
     let mut man_dv_3 = None;
 
-    parse_block!(input, comment, {
-        "MAN_EPOCH_IGNITION" => man_epoch_ignition: kv_epoch,
-        "MAN_DURATION" => man_duration: kv_from_kvn,
-        "MAN_DELTA_MASS" => man_delta_mass: kv_from_kvn,
-        "MAN_REF_FRAME" => man_ref_frame: kv_string,
-        "MAN_DV_1" => man_dv_1: kv_from_kvn,
-        "MAN_DV_2" => man_dv_2: kv_from_kvn,
-        "MAN_DV_3" => man_dv_3: kv_from_kvn,
-    }, |i: &mut &str| man_epoch_ignition.is_some() && peek(key_token).parse_next(i).map(|k| k == "MAN_EPOCH_IGNITION").unwrap_or(false));
+    loop {
+        let checkpoint = input.checkpoint();
+        let key = match key_token.parse_next(input) {
+            Ok(key) => key,
+            Err(_) => {
+                input.reset(&checkpoint);
+                break;
+            }
+        };
+        if key == "MAN_EPOCH_IGNITION" && man_epoch_ignition.is_some() {
+            input.reset(&checkpoint);
+            break;
+        }
+        match key {
+            "MAN_EPOCH_IGNITION" => {
+                man_epoch_ignition = Some(kv_calendar_epoch.parse_next(input)?);
+            }
+            "MAN_DURATION" => man_duration = Some(kv_from_kvn.parse_next(input)?),
+            "MAN_DELTA_MASS" => man_delta_mass = Some(kv_from_kvn.parse_next(input)?),
+            "MAN_REF_FRAME" => man_ref_frame = Some(kv_string.parse_next(input)?),
+            "MAN_DV_1" => man_dv_1 = Some(kv_from_kvn.parse_next(input)?),
+            "MAN_DV_2" => man_dv_2 = Some(kv_from_kvn.parse_next(input)?),
+            "MAN_DV_3" => man_dv_3 = Some(kv_from_kvn.parse_next(input)?),
+            _ => {
+                input.reset(&checkpoint);
+                break;
+            }
+        }
+    }
 
     if let Some(ignition) = man_epoch_ignition {
         Ok(Some(ManeuverParameters {
@@ -197,6 +218,18 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParamet
             man_dv_3: man_dv_3
                 .ok_or_else(|| missing_field_err(input, "Maneuver Parameters", "MAN_DV_3"))?,
         }))
+    } else if man_duration.is_some()
+        || man_delta_mass.is_some()
+        || man_ref_frame.is_some()
+        || man_dv_1.is_some()
+        || man_dv_2.is_some()
+        || man_dv_3.is_some()
+    {
+        Err(missing_field_err(
+            input,
+            "Maneuver Parameters",
+            "MAN_EPOCH_IGNITION",
+        ))
     } else {
         Ok(None)
     }
@@ -210,7 +243,10 @@ pub fn all_maneuvers(input: &mut &str) -> KvnResult<Vec<ManeuverParameters>> {
         let checkpoint = input.checkpoint();
         match maneuver_parameters.parse_next(input) {
             Ok(Some(man)) => maneuvers.push(man),
-            Ok(None) => break,
+            Ok(None) => {
+                input.reset(&checkpoint);
+                break;
+            }
             Err(e) => return Err(e),
         }
 
@@ -357,6 +393,30 @@ Z_DOT = -4.191076 [km/s]
     }
 
     #[test]
+    fn opm_epoch_fields_require_calendar_form() {
+        let numeric_state_epoch =
+            MINIMAL_OPM.replace("EPOCH = 2022-12-18T14:28:15.1172", "EPOCH = 12345.5");
+        assert!(Opm::from_kvn_str(&numeric_state_epoch).is_err());
+
+        let with_reference_epoch = MINIMAL_OPM.replace(
+            "REF_FRAME = ITRF2000\n",
+            "REF_FRAME = ITRF2000\nREF_FRAME_EPOCH = 2000-01-01T12:00:00\n",
+        );
+        let numeric_reference_epoch = with_reference_epoch.replace(
+            "REF_FRAME_EPOCH = 2000-01-01T12:00:00",
+            "REF_FRAME_EPOCH = 12345.5",
+        );
+        assert!(Opm::from_kvn_str(&numeric_reference_epoch).is_err());
+
+        let maneuver = include_str!("../../data/kvn/opm_g2.kvn");
+        let numeric_maneuver_epoch = maneuver.replace(
+            "MAN_EPOCH_IGNITION = 2021-06-03T09:00:34.1",
+            "MAN_EPOCH_IGNITION = 12345.5",
+        );
+        assert!(Opm::from_kvn_str(&numeric_maneuver_epoch).is_err());
+    }
+
+    #[test]
     fn test_parse_opm_version() {
         let mut input = "CCSDS_OPM_VERS = 3.0\n";
         let version = opm_version.parse_next(&mut input).unwrap();
@@ -432,16 +492,12 @@ DRAG_COEFF = 2.5
         // Version error
         let bad_version = MINIMAL_OPM.replacen("CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = BAD", 1);
         let err = Opm::from_kvn(&bad_version).unwrap_err();
-        match err {
-            crate::error::CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
-                crate::error::ValidationError::InvalidValue { field, value, .. } => {
-                    assert_eq!(field, "version");
-                    assert_eq!(value, "BAD");
-                }
-                _ => panic!("Expected Validation error, got {:?}", boxed_err),
-            },
-            _ => panic!("Expected Validation error, got {:?}", err),
-        }
+        assert_eq!(err.code(), Some("parse.unsupported_input_version"));
+        assert_eq!(
+            err.diagnostic()
+                .and_then(|diagnostic| diagnostic.source_edition),
+            Some("BAD")
+        );
 
         // Metadata errors
         let mut kvn_meta_err = "OBJECT_NAME = SAT\nUNKNOWN_KEY = VAL\n";

@@ -1,48 +1,21 @@
-## Building the Documentation Locally
+# Documentation
 
-This project uses **Sphinx** for documentation, and all required dependencies are listed in `pyproject.toml`.
-We use **uv** to manage and run everything.
+User-facing documentation is built with Sphinx:
 
----
-
-## 1. Install dependencies
-
-Install all documentation dependencies by running:
-
-```
+```console
 uv sync
-```
-
-This creates (or updates) a `.venv/` environment and installs Sphinx plus any Sphinx extensions.
-
-
-## 2. Build the HTML documentation
-
-Run Sphinx directly through uv:
-
-```
 uv run sphinx-build -b html docs docs/_build/html
 ```
 
-The generated HTML files will be available under:
+The main project documents are:
 
-```
-docs/_build/html/
-```
+- [`project-goal.md`](project-goal.md) — product direction, scope, and feature bar;
+- [`support-matrix.md`](support-matrix.md) — current user-facing support claims;
+- [`opm-guide.md`](opm-guide.md) — focused Rust and Python workflows.
 
+The [`conformance/`](conformance/) directory contains maintainer evidence connecting CCSDS
+requirements to tests and benchmarks. It supports the public matrix but is not required reading for
+library users.
 
-## 3. Live-reload documentation (autobuild)
-
-If you have **sphinx-autobuild** installed (declared in your `pyproject.toml`), you can start a live-reloading server:
-
-```
-uv run sphinx-autobuild docs docs/_build/html
-```
-
-## 4. Clean previous builds
-
-To remove all generated documentation output:
-
-```
-rm -rf docs/_build
-```
+The [`ccsds-books/`](ccsds-books/) directory contains raw extracted reference material. It is kept
+outside the Sphinx build because it is not curated user documentation.

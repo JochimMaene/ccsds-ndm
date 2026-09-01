@@ -72,9 +72,9 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
         "ODM_MSG_LINK" => val: kv_string => { odm_msg_link = Some(val); },
         "CENTER_NAME" => val: kv_string => { center_name = Some(val); },
         "TIME_SYSTEM" => val: kv_string => { time_system = Some(val); },
-        "EPOCH_TZERO" => val: kv_epoch => { epoch_tzero = Some(val); },
+        "EPOCH_TZERO" => val: kv_calendar_epoch => { epoch_tzero = Some(val); },
         "TAIMUTC_AT_TZERO" => val: kv_from_kvn => { taimutc_at_tzero = Some(val); },
-        "NEXT_LEAP_EPOCH" => val: kv_epoch => { next_leap_epoch = Some(val); },
+        "NEXT_LEAP_EPOCH" => val: kv_calendar_epoch => { next_leap_epoch = Some(val); },
         "NEXT_LEAP_TAIMUTC" => val: kv_from_kvn => { next_leap_taimutc = Some(val); },
         "ACM_DATA_ELEMENTS" => val: kv_string => { acm_data_elements = Some(val); },
         "START_TIME" => val: kv_epoch => { start_time = Some(val); },
@@ -113,13 +113,14 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
 
 fn parse_att_line(input: &mut &str) -> KvnResult<AttLine> {
     let line = terminated(raw_line, opt_line_ending).parse_next(input)?;
-    let values = line
-        .split_whitespace()
-        .map(|s| {
-            s.parse::<f64>()
-                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut values = Vec::with_capacity(line.split_whitespace().count());
+    for value in line.split_whitespace() {
+        values.push(
+            value
+                .parse::<f64>()
+                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))?,
+        );
+    }
     Ok(AttLine { values })
 }
 
@@ -156,14 +157,6 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
         if at_block_end("ATT", input) {
             break;
         }
-        let start = input.checkpoint();
-        if peek((ws, "COMMENT")).parse_next(input).is_ok() {
-            comment.extend(collect_comments.parse_next(input)?);
-            if input.offset_from(&start) == 0 {
-                return Err(ErrMode::Cut(InternalParserError::from_input(input)));
-            }
-            continue;
-        }
         let checkpoint = input.checkpoint();
         let res = parse_att_line.parse_next(input)?;
         if input.offset_from(&checkpoint) == 0 && input.is_empty() {
@@ -198,10 +191,7 @@ fn parse_phys_block(input: &mut &str) -> KvnResult<AcmPhysicalDescription> {
         "WET_MASS" => val: kv_from_kvn => { block.wet_mass = Some(val); },
         "DRY_MASS" => val: kv_from_kvn => { block.dry_mass = Some(val); },
         "CP_REF_FRAME" => val: kv_string => { block.cp_ref_frame = Some(val); },
-        "CP_X" => val: kv_float => { block.cp.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[0] = val; },
-        "CP_Y" => val: kv_float => { block.cp.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[1] = val; },
-        "CP_Z" => val: kv_float => { block.cp.get_or_insert_with(|| crate::types::Vector3 { elements: vec![0.0, 0.0, 0.0], units: None }).elements[2] = val; },
-        "CP" => val: kv_vector3 => { block.cp = Some(crate::types::Vector3 { elements: val, units: None }); },
+        "CP" => val: kv_cp => { block.cp = Some(val); },
         "INERTIA_REF_FRAME" => val: kv_string => { block.inertia_ref_frame = Some(val); },
         "IXX" => val: kv_from_kvn => { block.ixx = Some(val); },
         "IYY" => val: kv_from_kvn => { block.iyy = Some(val); },
@@ -217,31 +207,36 @@ fn parse_phys_block(input: &mut &str) -> KvnResult<AcmPhysicalDescription> {
 
 fn parse_cov_line(input: &mut &str) -> KvnResult<CovLine> {
     let line = terminated(raw_line, opt_line_ending).parse_next(input)?;
-    let values = line
-        .split_whitespace()
-        .map(|s| {
-            s.parse::<f64>()
-                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut values = Vec::with_capacity(line.split_whitespace().count());
+    for value in line.split_whitespace() {
+        values.push(
+            value
+                .parse::<f64>()
+                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))?,
+        );
+    }
     Ok(CovLine { values })
 }
 
 fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
     let mut comment = Vec::new();
+    let mut cov_id = None;
+    let mut cov_prev_id = None;
     let mut cov_basis = None;
+    let mut cov_basis_id = None;
     let mut cov_ref_frame = None;
     let mut cov_type = None;
-    let mut cov_confidence = None;
     let mut cov_lines = Vec::new();
 
     expect_block_start("COV").parse_next(input)?;
 
     parse_block!(input, comment, {
-        "COV_BASIS" => val: kv_string => { cov_basis = Some(val); },
+        "COV_ID" => val: kv_string => { cov_id = Some(val); },
+        "COV_PREV_ID" => val: kv_string => { cov_prev_id = Some(val); },
+        "COV_BASIS" => val: kv_enum => { cov_basis = Some(val); },
+        "COV_BASIS_ID" => val: kv_string => { cov_basis_id = Some(val); },
         "COV_REF_FRAME" => val: kv_string => { cov_ref_frame = Some(val); },
         "COV_TYPE" => val: kv_enum => { cov_type = Some(val); },
-        "COV_CONFIDENCE" => val: kv_float => { cov_confidence = Some(val); },
     }, |i: &mut &str| matches!(i.trim_start().chars().next(), Some('0'..='9' | '-' | '+')) || at_block_end("COV", i));
 
     loop {
@@ -259,11 +254,13 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
     expect_block_end("COV").parse_next(input)?;
     Ok(AcmCovarianceMatrix {
         comment,
-        cov_basis: cov_basis.ok_or_else(|| missing_field_err(input, "ACM COV", "COV_BASIS"))?,
-        cov_ref_frame: cov_ref_frame
-            .ok_or_else(|| missing_field_err(input, "ACM COV", "COV_REF_FRAME"))?,
+        cov_id,
+        cov_prev_id,
+        cov_basis,
+        cov_basis_id,
+        cov_ref_frame,
         cov_type: cov_type.ok_or_else(|| missing_field_err(input, "ACM COV", "COV_TYPE"))?,
-        cov_confidence,
+        cov_confidence: None,
         cov_lines,
     })
 }
@@ -312,14 +309,11 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
         "MAN_ID" => val: kv_string => { man_id = Some(val); },
         "MAN_PREV_ID" => val: kv_string => { man_prev_id = Some(val); },
         "MAN_PURPOSE" => val: kv_string => { man_purpose = Some(val); },
-        "MAN_BEGIN_TIME" => val: kv_epoch => { man_begin_time = Some(val); },
-        "MAN_END_TIME" => val: kv_epoch => { man_end_time = Some(val); },
+        "MAN_BEGIN_TIME" => val: kv_relative_time => { man_begin_time = Some(val); },
+        "MAN_END_TIME" => val: kv_relative_time => { man_end_time = Some(val); },
         "MAN_DURATION" => val: kv_from_kvn => { man_duration = Some(val); },
         "ACTUATOR_USED" => val: kv_string => { actuator_used = Some(val); },
         "TARGET_MOMENTUM" => val: kv_target_momentum => { target_momentum = Some(val); },
-        "TARGET_MOM_X" => val: kv_float => { target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[0] = val; },
-        "TARGET_MOM_Y" => val: kv_float => { target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[1] = val; },
-        "TARGET_MOM_Z" => val: kv_float => { target_momentum.get_or_insert_with(|| crate::types::TargetMomentum { elements: vec![0.0, 0.0, 0.0], units: None }).elements[2] = val; },
         "TARGET_MOM_FRAME" => val: kv_string => { target_mom_frame = Some(val); },
         "TARGET_ATTITUDE" => val: kv_from_kvn_value => { target_attitude = Some(val); },
         "TARGET_SPINRATE" => val: kv_from_kvn => { target_spinrate = Some(val); },
@@ -363,8 +357,8 @@ fn kv_sensor_noise(input: &mut &str) -> KvnResult<crate::types::SensorNoise> {
     Ok(crate::types::SensorNoise { values, units })
 }
 
-fn kv_vector3(input: &mut &str) -> KvnResult<Vec<f64>> {
-    let (val_str, _unit_str) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
+fn kv_cp(input: &mut &str) -> KvnResult<crate::types::Vector3> {
+    let (val_str, unit_str) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
     let values = val_str
         .split_whitespace()
         .map(|s| {
@@ -372,13 +366,21 @@ fn kv_vector3(input: &mut &str) -> KvnResult<Vec<f64>> {
                 .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(values)
+    let units = unit_str
+        .map(crate::types::LengthUnits::from_str)
+        .transpose()
+        .map_err(|error| ErrMode::Cut(InternalParserError::from_external_error(input, error)))?;
+    Ok(crate::types::Vector3 {
+        elements: values,
+        units,
+    })
 }
 
 fn parse_sensor_block(input: &mut &str) -> KvnResult<AcmSensor> {
     let mut comment = Vec::new();
     let mut sensor_number = None;
     let mut sensor_used = None;
+    let mut number_sensor_noise_covariance = None;
     let mut sensor_noise_stddev = None;
     let mut sensor_frequency = None;
 
@@ -387,16 +389,17 @@ fn parse_sensor_block(input: &mut &str) -> KvnResult<AcmSensor> {
     parse_block!(input, comment, {
         "SENSOR_NUMBER" => val: kv_u32 => { sensor_number = Some(val); },
         "SENSOR_USED" => val: kv_string => { sensor_used = Some(val); },
+        "NUMBER_SENSOR_NOISE_COVARIANCE" => val: kv_u32 => { number_sensor_noise_covariance = Some(val); },
         "SENSOR_NOISE_STDDEV" => val: kv_sensor_noise => { sensor_noise_stddev = Some(val); },
-        "SENSOR_FREQUENCY" => val: kv_float => { sensor_frequency = Some(val); },
+        "SENSOR_FREQUENCY" => val: kv_from_kvn => { sensor_frequency = Some(val); },
     }, |i: &mut &str| at_block_end("SENSOR", i), "Unexpected ACM Sensor key");
 
     expect_block_end("SENSOR").parse_next(input)?;
     Ok(AcmSensor {
         comment,
-        sensor_number: sensor_number
-            .ok_or_else(|| missing_field_err(input, "ACM Sensor", "SENSOR_NUMBER"))?,
+        sensor_number,
         sensor_used,
+        number_sensor_noise_covariance,
         sensor_noise_stddev,
         sensor_frequency,
     })
@@ -410,11 +413,10 @@ fn parse_ad_block(input: &mut &str) -> KvnResult<AcmAttitudeDetermination> {
     let mut attitude_source = None;
     let mut number_states = None;
     let mut attitude_states = None;
+    let mut euler_rot_seq = None;
     let mut cov_type = None;
-    let mut ad_epoch = None;
     let mut ref_frame_a = None;
     let mut ref_frame_b = None;
-    let mut attitude_type = None;
     let mut rate_states = None;
     let mut sigma_u = None;
     let mut sigma_v = None;
@@ -430,11 +432,10 @@ fn parse_ad_block(input: &mut &str) -> KvnResult<AcmAttitudeDetermination> {
         "ATTITUDE_SOURCE" => val: kv_string => { attitude_source = Some(val); },
         "NUMBER_STATES" => val: kv_u32 => { number_states = Some(val); },
         "ATTITUDE_STATES" => val: kv_enum => { attitude_states = Some(val); },
+        "EULER_ROT_SEQ" => val: kv_enum => { euler_rot_seq = Some(val); },
         "COV_TYPE" => val: kv_enum => { cov_type = Some(val); },
-        "AD_EPOCH" => val: kv_epoch => { ad_epoch = Some(val); },
         "REF_FRAME_A" => val: kv_string => { ref_frame_a = Some(val); },
         "REF_FRAME_B" => val: kv_string => { ref_frame_b = Some(val); },
-        "ATTITUDE_TYPE" => val: kv_string => { attitude_type = Some(val); },
         "RATE_STATES" => val: kv_enum => { rate_states = Some(val); },
         "SIGMA_U" => val: kv_from_kvn => { sigma_u = Some(val); },
         "SIGMA_V" => val: kv_from_kvn => { sigma_v = Some(val); },
@@ -461,11 +462,12 @@ fn parse_ad_block(input: &mut &str) -> KvnResult<AcmAttitudeDetermination> {
         attitude_source,
         number_states,
         attitude_states,
+        euler_rot_seq,
         cov_type,
-        ad_epoch,
+        ad_epoch: None,
         ref_frame_a,
         ref_frame_b,
-        attitude_type,
+        attitude_type: None,
         rate_states,
         sigma_u,
         sigma_v,
@@ -601,7 +603,7 @@ META_STOP
 
     #[test]
     fn test_parse_acm_minimal() {
-        let input = format!("{}{}\nATT_START\nREF_FRAME_A = EME2000\nREF_FRAME_B = SC_BODY_1\nATT_TYPE = QUATERNION\nNUMBER_STATES = 4\n0.0 0.5 0.5 0.5 0.5\nATT_STOP\n",
+        let input = format!("{}{}\nATT_START\nREF_FRAME_A = EME2000\nREF_FRAME_B = SC_BODY_1\nNUMBER_STATES = 4\nATT_TYPE = QUATERNION\n0.0 0.5 0.5 0.5 0.5\nATT_STOP\n",
             sample_acm_header(), sample_acm_meta());
         let acm = Acm::from_kvn(&input).unwrap();
         assert_eq!(acm.version, "2.0");
@@ -622,21 +624,17 @@ META_STOP
 ATT_START
 REF_FRAME_A = EME2000
 REF_FRAME_B = SC_BODY_1
-ATT_TYPE = QUATERNION
 NUMBER_STATES = 4
+ATT_TYPE = QUATERNION
 0.0 0.5 0.5 0.5 0.5
 ATT_STOP
 "#;
         let err = Acm::from_kvn(input).unwrap_err();
         match err {
-            CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
-                ValidationError::InvalidValue { field, value, .. } => {
-                    assert_eq!(field, "version");
-                    assert_eq!(value, "3.0");
-                }
-                _ => panic!("Expected Validation error, got {:?}", boxed_err),
-            },
-            _ => panic!("Expected Validation error, got {:?}", err),
+            CcsdsNdmError::UnsupportedInputVersion { version, .. } => {
+                assert_eq!(version, "3.0");
+            }
+            _ => panic!("Expected unsupported input version, got {:?}", err),
         }
     }
 
@@ -652,8 +650,8 @@ META_STOP
 ATT_START
 REF_FRAME_A = GCRF
 REF_FRAME_B = SC_BODY
-ATT_TYPE = QUATERNION
 NUMBER_STATES = 4
+ATT_TYPE = QUATERNION
 0.0 0 0 0 1
 ATT_STOP
 "#;
@@ -674,9 +672,9 @@ ATT_STOP
         let att_block = r#"ATT_START
 REF_FRAME_A = EME2000
 REF_FRAME_B = SC_BODY_1
+NUMBER_STATES = 3
 ATT_TYPE = EULER_ANGLES
 EULER_ROT_SEQ = ZYX
-NUMBER_STATES = 3
 0.0 10.0 20.0 30.0
 ATT_STOP
 "#;
@@ -717,18 +715,20 @@ PHYS_STOP
     #[test]
     fn test_acm_cov_block() {
         let cov_block = r#"COV_START
-COV_BASIS = DETERMINED
+COV_BASIS = DETERMINED_OBC
 COV_REF_FRAME = EME2000
 COV_TYPE = ANGLE
-COV_CONFIDENCE = 0.99
 0.0 1.0e-6
 COV_STOP
 "#;
         let input = format!("{}{}{}", sample_acm_header(), sample_acm_meta(), cov_block);
         let acm = Acm::from_kvn(&input).unwrap();
         let cov = &acm.body.segment.data.cov[0];
-        assert_eq!(cov.cov_basis, "DETERMINED");
-        assert_eq!(cov.cov_confidence, Some(0.99));
+        assert_eq!(
+            cov.cov_basis.as_ref().unwrap().to_string(),
+            "DETERMINED_OBC"
+        );
+        assert_eq!(cov.cov_confidence, None);
         assert_eq!(cov.cov_lines[0].values[1], 1.0e-6);
     }
 
@@ -736,19 +736,16 @@ COV_STOP
     fn test_acm_man_block() {
         let man_block = r#"MAN_START
 MAN_ID = MAN_001
+MAN_PURPOSE = ATT_ADJUST
 MAN_BEGIN_TIME = 100.0
-MAN_END_TIME = 200.0
 MAN_DURATION = 100.0 [s]
 ACTUATOR_USED = THRUSTER_1
 TARGET_MOMENTUM = 0.1 0.2 0.3 [N*m*s]
+TARGET_MOM_FRAME = J2000
 MAN_STOP
 "#;
         let input = format!("{}{}{}", sample_acm_header(), sample_acm_meta(), man_block);
-        let acm = crate::validation::with_validation_mode(
-            crate::validation::ValidationMode::Lenient,
-            || Acm::from_kvn(&input),
-        )
-        .unwrap();
+        let acm = Acm::from_kvn(&input).unwrap();
         let man = &acm.body.segment.data.man[0];
         assert_eq!(man.man_id.as_deref(), Some("MAN_001"));
         assert_eq!(man.man_duration.as_ref().unwrap().value, 100.0);
@@ -789,20 +786,20 @@ AD_STOP
         let blocks = r#"ATT_START
 REF_FRAME_A = A
 REF_FRAME_B = B
+NUMBER_STATES = 4
 ATT_TYPE = QUATERNION
-NUMBER_STATES = 1
 0 0 0 0 0
+ATT_STOP
+ATT_START
+REF_FRAME_A = A
+REF_FRAME_B = B
+NUMBER_STATES = 4
+ATT_TYPE = QUATERNION
+10 0 0 0 0
 ATT_STOP
 PHYS_START
 DRAG_COEFF = 1.0
 PHYS_STOP
-ATT_START
-REF_FRAME_A = A
-REF_FRAME_B = B
-ATT_TYPE = QUATERNION
-NUMBER_STATES = 1
-10 0 0 0 0
-ATT_STOP
 "#;
         let input = format!("{}{}{}", sample_acm_header(), sample_acm_meta(), blocks);
         let acm = Acm::from_kvn(&input).unwrap();

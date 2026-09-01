@@ -8,6 +8,7 @@ Unit tests for Attitude Ephemeris Message (AEM) Python bindings.
 
 import numpy as np
 import pytest
+
 from ccsds_ndm import (
     AdmHeader,
     Aem,
@@ -20,6 +21,15 @@ from ccsds_ndm import (
 
 class TestAem:
     """Tests for AEM bindings."""
+
+    def test_adm_creation_date_requires_absolute_epoch(self):
+        with pytest.raises(ValueError):
+            AdmHeader("123.5", "TEST")
+
+        header = AdmHeader("2002-204T15:56:23Z", "TEST")
+        assert header.creation_date == "2002-204T15:56:23Z"
+        with pytest.raises(ValueError):
+            header.creation_date = "123.5"
 
     def test_aem_metadata(self):
         meta = AemMetadata(
@@ -61,6 +71,20 @@ class TestAem:
 
         with pytest.raises(ValueError):
             state.epoch = "not-an-epoch"
+
+        with pytest.raises(ValueError):
+            AttitudeState("123.5", [0.0, 0.0, 0.0, 1.0])
+
+        meta = AemMetadata(
+            object_name="SAT1",
+            object_id="2023-001A",
+            ref_frame_a="EME2000",
+            ref_frame_b="SC_BODY_1",
+            start_time="2023-01-01T00:00:00",
+            stop_time="2023-01-01T01:00:00",
+        )
+        with pytest.raises(ValueError):
+            meta.start_time = "123.5"
 
     def test_aem_data_numpy(self):
         # Create data using python list of states

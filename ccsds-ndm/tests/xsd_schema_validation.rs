@@ -20,13 +20,11 @@ fn xmllint_available() -> bool {
 }
 
 fn schema_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/xsd/ndmxml-4.0.0-master-4.0.xsd")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("data/xsd/ndmxml-4.0.0-master-4.0.xsd")
 }
 
 fn load_sample(rel_path: &str) -> String {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../")
-        .join(rel_path);
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(rel_path);
     fs::read_to_string(path).expect("failed to read sample XML")
 }
 

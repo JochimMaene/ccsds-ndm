@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::types::parse_epoch;
+use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::types::{Acc, Position, Velocity};
 use pyo3::exceptions::PyValueError;
@@ -42,7 +42,7 @@ impl OdmHeader {
     ) -> PyResult<Self> {
         Ok(Self {
             inner: core_common::OdmHeader {
-                creation_date: parse_epoch(&creation_date)?,
+                creation_date: parse_calendar_epoch(&creation_date)?,
                 originator,
                 message_id,
                 classification,
@@ -71,7 +71,7 @@ impl OdmHeader {
 
     #[setter]
     fn set_creation_date(&mut self, value: String) -> PyResult<()> {
-        self.inner.creation_date = parse_epoch(&value)?;
+        self.inner.creation_date = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -162,7 +162,7 @@ impl AdmHeader {
     ) -> PyResult<Self> {
         Ok(Self {
             inner: core_common::AdmHeader {
-                creation_date: parse_epoch(&creation_date)?,
+                creation_date: parse_calendar_epoch(&creation_date)?,
                 originator,
                 message_id,
                 classification,
@@ -191,7 +191,7 @@ impl AdmHeader {
 
     #[setter]
     fn set_creation_date(&mut self, value: String) -> PyResult<()> {
-        self.inner.creation_date = parse_epoch(&value)?;
+        self.inner.creation_date = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -565,7 +565,7 @@ impl StateVector {
         Ok(Self {
             inner: core_common::StateVector {
                 comment: comments.unwrap_or_default(),
-                epoch: parse_epoch(&epoch)?,
+                epoch: parse_calendar_epoch(&epoch)?,
                 x: Position {
                     value: x,
                     units: None,
@@ -630,7 +630,7 @@ impl StateVector {
 
     #[setter]
     fn set_epoch(&mut self, value: String) -> PyResult<()> {
-        self.inner.epoch = parse_epoch(&value)?;
+        self.inner.epoch = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -963,8 +963,12 @@ impl OdParameters {
         Ok(Self {
             inner: core_common::OdParameters {
                 comment,
-                time_lastob_start: time_lastob_start.map(|s| parse_epoch(&s)).transpose()?,
-                time_lastob_end: time_lastob_end.map(|s| parse_epoch(&s)).transpose()?,
+                time_lastob_start: time_lastob_start
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
+                time_lastob_end: time_lastob_end
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 recommended_od_span: recommended_od_span
                     .map(|v| {
                         DayInterval::new(v, None).map_err(|e| PyValueError::new_err(e.to_string()))
@@ -1012,7 +1016,7 @@ impl OdParameters {
     }
     #[setter]
     fn set_time_lastob_start(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.time_lastob_start = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.time_lastob_start = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1027,7 +1031,7 @@ impl OdParameters {
     }
     #[setter]
     fn set_time_lastob_end(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.time_lastob_end = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.time_lastob_end = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1317,9 +1321,15 @@ impl GroundImpactParameters {
                 probability_of_casualty: probability_of_casualty
                     .map(|v| Probability::new(v).map_err(|e| PyValueError::new_err(e.to_string())))
                     .transpose()?,
-                nominal_impact_epoch: nominal_impact_epoch.map(|s| parse_epoch(&s)).transpose()?,
-                impact_window_start: impact_window_start.map(|s| parse_epoch(&s)).transpose()?,
-                impact_window_end: impact_window_end.map(|s| parse_epoch(&s)).transpose()?,
+                nominal_impact_epoch: nominal_impact_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
+                impact_window_start: impact_window_start
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
+                impact_window_end: impact_window_end
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 impact_ref_frame,
                 nominal_impact_lon: nominal_impact_lon
                     .map(|v| {
@@ -1539,7 +1549,7 @@ impl GroundImpactParameters {
     }
     #[setter]
     fn set_nominal_impact_epoch(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.nominal_impact_epoch = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.nominal_impact_epoch = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1555,7 +1565,7 @@ impl GroundImpactParameters {
     }
     #[setter]
     fn set_impact_window_start(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.impact_window_start = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.impact_window_start = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1568,7 +1578,7 @@ impl GroundImpactParameters {
     }
     #[setter]
     fn set_impact_window_end(&mut self, v: Option<String>) -> PyResult<()> {
-        self.inner.impact_window_end = v.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.impact_window_end = v.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 

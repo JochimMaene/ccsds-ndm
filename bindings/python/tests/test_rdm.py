@@ -7,6 +7,7 @@ Unit tests for Reentry Data Message (RDM) Python bindings.
 """
 
 import pytest
+
 from ccsds_ndm import (
     AtmosphericReentryParameters,
     Rdm,
@@ -85,6 +86,26 @@ class TestRdm:
 
         rdm2 = Rdm.from_file(str(path), format="kvn")
         assert rdm2.header.originator == "TEST"
+
+    def test_epoch_fields_reject_numeric_xsd_branch(self):
+        with pytest.raises(ValueError):
+            RdmHeader(originator="TEST", creation_date="123.5", message_id="ID")
+
+        with pytest.raises(ValueError):
+            RdmMetadata(
+                object_name="SAT1",
+                international_designator="2023-001A",
+                epoch_tzero="123.5",
+                center_name="EARTH",
+                time_system="UTC",
+            )
+
+        with pytest.raises(ValueError):
+            AtmosphericReentryParameters(
+                orbit_lifetime=5.0,
+                reentry_altitude=120.0,
+                nominal_reentry_epoch="123.5",
+            )
 
 
 if __name__ == "__main__":

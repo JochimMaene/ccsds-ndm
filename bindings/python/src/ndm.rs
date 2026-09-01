@@ -3,11 +3,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::ndm as core_ndm;
-use ccsds_ndm::traits::{Ndm as _, Validate};
 use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
+use pyo3::types::PyList;
 
 use crate::cdm::Cdm;
 use crate::ocm::Ocm;
@@ -27,32 +26,64 @@ use crate::tdm::Tdm;
 /// associated OPM could be conveniently conveyed in a single NDM); (3) an ephemeris message
 /// with the set of tracking data messages used in the orbit determination.
 #[pyclass]
-#[derive(Clone)]
 pub struct Ndm {
-    pub inner: core_ndm::CombinedNdm,
+    id: Option<String>,
+    comments: Vec<String>,
+    messages: Py<PyList>,
+}
+
+impl Ndm {
+    pub(crate) fn from_core(py: Python<'_>, value: core_ndm::CombinedNdm) -> PyResult<Self> {
+        let messages = value
+            .messages
+            .into_iter()
+            .map(|message| crate::message_to_py(py, message))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            id: value.id,
+            comments: value.comments,
+            messages: PyList::new(py, messages)?.unbind(),
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_ndm::CombinedNdm> {
+        let messages = self
+            .messages
+            .bind(py)
+            .iter()
+            .map(|message| py_message_to_core(py, &message.unbind()))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(core_ndm::CombinedNdm {
+            id: self.id.clone(),
+            comments: self.comments.clone(),
+            messages,
+        })
+    }
 }
 
 fn py_message_to_core(py: Python<'_>, msg: &Py<PyAny>) -> PyResult<MessageType> {
-    if let Ok(oem) = msg.extract::<Oem>(py) {
-        Ok(MessageType::Oem(oem.inner))
-    } else if let Ok(cdm) = msg.extract::<Cdm>(py) {
-        Ok(MessageType::Cdm(cdm.inner))
-    } else if let Ok(opm) = msg.extract::<Opm>(py) {
-        Ok(MessageType::Opm(opm.inner))
-    } else if let Ok(omm) = msg.extract::<Omm>(py) {
-        Ok(MessageType::Omm(omm.inner))
-    } else if let Ok(ocm) = msg.extract::<Ocm>(py) {
-        Ok(MessageType::Ocm(ocm.inner))
-    } else if let Ok(rdm) = msg.extract::<Rdm>(py) {
-        Ok(MessageType::Rdm(rdm.inner))
-    } else if let Ok(aem) = msg.extract::<crate::aem::Aem>(py) {
-        Ok(MessageType::Aem(aem.inner))
-    } else if let Ok(apm) = msg.extract::<crate::apm::Apm>(py) {
-        Ok(MessageType::Apm(apm.inner))
-    } else if let Ok(acm) = msg.extract::<crate::acm::Acm>(py) {
-        Ok(MessageType::Acm(acm.inner))
-    } else if let Ok(ndm) = msg.extract::<Ndm>(py) {
-        Ok(MessageType::Ndm(ndm.inner))
+    if let Ok(oem) = msg.bind(py).extract::<PyRef<'_, Oem>>() {
+        Ok(MessageType::Oem(oem.to_core(py)?))
+    } else if let Ok(cdm) = msg.bind(py).extract::<PyRef<'_, Cdm>>() {
+        Ok(MessageType::Cdm(cdm.to_core(py)?))
+    } else if let Ok(opm) = msg.bind(py).extract::<PyRef<'_, Opm>>() {
+        Ok(MessageType::Opm(opm.to_core(py)?))
+    } else if let Ok(omm) = msg.bind(py).extract::<PyRef<'_, Omm>>() {
+        Ok(MessageType::Omm(omm.to_core(py)?))
+    } else if let Ok(ocm) = msg.bind(py).extract::<PyRef<'_, Ocm>>() {
+        Ok(MessageType::Ocm(ocm.to_core(py)?))
+    } else if let Ok(rdm) = msg.bind(py).extract::<PyRef<'_, Rdm>>() {
+        Ok(MessageType::Rdm(rdm.to_core(py)?))
+    } else if let Ok(tdm) = msg.bind(py).extract::<PyRef<'_, Tdm>>() {
+        Ok(MessageType::Tdm(tdm.to_core(py)?))
+    } else if let Ok(aem) = msg.bind(py).extract::<PyRef<'_, crate::aem::Aem>>() {
+        Ok(MessageType::Aem(aem.to_core(py)?))
+    } else if let Ok(apm) = msg.bind(py).extract::<PyRef<'_, crate::apm::Apm>>() {
+        Ok(MessageType::Apm(apm.to_core(py)?))
+    } else if let Ok(acm) = msg.bind(py).extract::<PyRef<'_, crate::acm::Acm>>() {
+        Ok(MessageType::Acm(acm.to_core(py)?))
+    } else if let Ok(ndm) = msg.bind(py).extract::<PyRef<'_, Ndm>>() {
+        Ok(MessageType::Ndm(ndm.to_core(py)?))
     } else {
         Err(PyValueError::new_err(
             "Unsupported message type in NDM combined instantiation",
@@ -77,117 +108,66 @@ impl Ndm {
         comments: Vec<String>,
         py: Python,
     ) -> PyResult<Self> {
-        let core_messages = py_messages_to_core(py, &messages)?;
-
         Ok(Self {
-            inner: core_ndm::CombinedNdm {
-                id,
-                comments,
-                messages: core_messages,
-            },
+            id,
+            comments,
+            messages: PyList::new(py, messages)?.unbind(),
         })
     }
 
     /// Validate the combined message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        if strict {
-            self.inner
-                .validate()
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
-            Ok(None)
-        } else {
-            let mut issues = Vec::new();
-            let _ = ccsds_ndm::validation::with_validation_mode(
-                ccsds_ndm::validation::ValidationMode::Lenient,
-                || match self.inner.validate() {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        issues.push(e.to_string());
-                        Ok(())
-                    }
-                },
-            );
-
-            let warnings = ccsds_ndm::validation::take_warnings();
-            for w in warnings {
-                issues.push(w.error.to_string());
-            }
-
-            if issues.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(issues))
-            }
-        }
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
     /// Parse an NDM combined instantiation from a string.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = match format {
-            Some("kvn") => core_ndm::CombinedNdm::from_kvn(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some("xml") => core_ndm::CombinedNdm::from_xml(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some(other) => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                    other
-                )))
-            }
-            None => {
-                // For NDM, we need to be careful with auto-detection if it's not clearly XML <ndm>
-                // The core's from_str might return MessageType::Ndm
-                match ccsds_ndm::from_str(data) {
-                    Ok(MessageType::Ndm(ndm)) => ndm,
-                    Ok(other) => {
-                        return Err(PyValueError::new_err(format!(
-                            "Parsed message is not an NDM combined instantiation (got {:?})",
-                            other
-                        )))
-                    }
-                    Err(e) => return Err(PyValueError::new_err(e.to_string())),
-                }
-            }
-        };
-        Ok(Self { inner })
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_str(
+        py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_records);
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        Self::from_core(py, inner)
     }
 
     /// Parse an NDM combined instantiation from a file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(&content, format)
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_file(
+        py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_records);
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Self::from_core(py, inner)
     }
 
     /// Serialize to a string.
-    #[pyo3(signature = (format, validate=true))]
-    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
-        if validate {
-            self.validate(true)?;
-        }
+    #[pyo3(signature = (format, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        format: &str,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        let mut options = ccsds_ndm::GenerateOptions::source();
+        options.max_output_bytes = max_output_bytes;
+        let message = MessageType::Ndm(self.to_core(py)?);
         match format {
-            "kvn" => self
-                .inner
-                .to_kvn()
-                .map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner)
-                .map_err(|e| PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!(
-                "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                other
-            ))),
+            "kvn" => message.to_kvn_with(&options),
+            "xml" => message.to_xml_with(&options),
+            other => return Err(crate::api::unsupported_format(other)),
         }
+        .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 
     /// Write to file.
@@ -198,54 +178,35 @@ impl Ndm {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    #[pyo3(signature = (path, format, validate=true))]
-    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
-        let data = self.to_str(format, validate)?;
-        match fs::write(path, data) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!(
-                "Failed to write file: {}",
-                e
-            ))),
-        }
+    #[pyo3(signature = (path, format, max_output_bytes=None))]
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        path: &str,
+        format: &str,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<()> {
+        let data = self.to_str(py, format, max_output_bytes)?;
+        crate::api::atomic_write(path, |output| {
+            use std::io::Write;
+            output
+                .write_all(data.as_bytes())
+                .map_err(|error| pyo3::exceptions::PyOSError::new_err(error.to_string()))
+        })
     }
 
     /// List of contained navigation messages.
     ///
     /// :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
     #[getter]
-    fn messages(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
-        let mut py_messages = Vec::new();
-        for msg in &self.inner.messages {
-            let py_msg = match msg {
-                MessageType::Oem(m) => Py::new(py, Oem { inner: m.clone() })?.into_any(),
-                MessageType::Cdm(m) => Py::new(py, Cdm { inner: m.clone() })?.into_any(),
-                MessageType::Opm(m) => Py::new(py, Opm { inner: m.clone() })?.into_any(),
-                MessageType::Omm(m) => Py::new(py, Omm { inner: m.clone() })?.into_any(),
-                MessageType::Ocm(m) => Py::new(py, Ocm { inner: m.clone() })?.into_any(),
-                MessageType::Rdm(m) => Py::new(py, Rdm { inner: m.clone() })?.into_any(),
-                MessageType::Tdm(m) => Py::new(py, Tdm { inner: m.clone() })?.into_any(),
-                MessageType::Ndm(m) => Py::new(py, Ndm { inner: m.clone() })?.into_any(),
-                MessageType::Aem(m) => {
-                    Py::new(py, crate::aem::Aem { inner: m.clone() })?.into_any()
-                }
-                MessageType::Apm(m) => {
-                    Py::new(py, crate::apm::Apm { inner: m.clone() })?.into_any()
-                }
-                MessageType::Acm(m) => {
-                    Py::new(py, crate::acm::Acm { inner: m.clone() })?.into_any()
-                }
-            };
-            py_messages.push(py_msg);
-        }
-        Ok(py_messages)
+    fn messages(&self, py: Python<'_>) -> Py<PyList> {
+        self.messages.clone_ref(py)
     }
 
     #[setter]
     fn set_messages(&mut self, py: Python, messages: Vec<Py<PyAny>>) -> PyResult<()> {
-        self.inner.messages = py_messages_to_core(py, &messages)?;
+        py_messages_to_core(py, &messages)?;
+        self.messages = PyList::new(py, messages)?.unbind();
         Ok(())
     }
 
@@ -254,7 +215,7 @@ impl Ndm {
     /// :type: Optional[str]
     #[getter]
     fn id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     /// Comments (optional).
@@ -262,19 +223,19 @@ impl Ndm {
     /// :type: list[str]
     #[getter]
     fn comments(&self) -> Vec<String> {
-        self.inner.comments.clone()
+        self.comments.clone()
     }
 
     #[setter]
     fn set_comments(&mut self, comments: Vec<String>) {
-        self.inner.comments = comments;
+        self.comments = comments;
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "Ndm(messages={}, id={:?})",
-            self.inner.messages.len(),
-            self.inner.id
+            self.messages.bind(py).len(),
+            self.id
         )
     }
 }

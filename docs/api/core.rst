@@ -5,6 +5,8 @@ Core & Common Types
 
 .. autofunction:: from_str
 .. autofunction:: from_file
+.. autofunction:: convert
+.. autofunction:: convert_file
 
 .. autoclass:: Ndm
    :members:

@@ -106,7 +106,7 @@ pub mod nullable {
                 if v.trim().is_empty() {
                     return Ok(None);
                 }
-                if v == "n/a" {
+                if v.trim().eq_ignore_ascii_case("n/a") {
                     return Ok(None);
                 }
 

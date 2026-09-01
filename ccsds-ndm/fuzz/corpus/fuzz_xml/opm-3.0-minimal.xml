@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="CCSDS_OPM_VERS" version="3.0">
+  <header>
+    <CREATION_DATE>2022-11-06T09:23:57</CREATION_DATE>
+    <ORIGINATOR>JAXA</ORIGINATOR>
+  </header>
+  <body>
+    <segment>
+      <metadata>
+        <OBJECT_NAME>OSPREY 5</OBJECT_NAME>
+        <OBJECT_ID>1998-999A</OBJECT_ID>
+        <CENTER_NAME>EARTH</CENTER_NAME>
+        <REF_FRAME>ITRF2000</REF_FRAME>
+        <TIME_SYSTEM>UTC</TIME_SYSTEM>
+      </metadata>
+      <data>
+        <stateVector>
+          <EPOCH>2022-12-18T14:28:15.1172</EPOCH>
+          <X>6503.514</X>
+          <Y>1239.647</Y>
+          <Z>-717.49</Z>
+          <X_DOT>-0.87316</X_DOT>
+          <Y_DOT>8.74042</Y_DOT>
+          <Z_DOT>-4.191076</Z_DOT>
+        </stateVector>
+      </data>
+    </segment>
+  </body>
+</opm>

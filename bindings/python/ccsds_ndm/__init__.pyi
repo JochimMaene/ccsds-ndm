@@ -2,8 +2,41 @@
 from typing import Optional, Union
 import numpy
 
+def convert(
+    data: str,
+    to_format: str,
+    *,
+    max_input_bytes: Optional[int] = None,
+    max_records: Optional[int] = None,
+    max_output_bytes: Optional[int] = None,
+    version: Optional[str] = None,
+) -> str:
+    """
+    Convert any recognized NDM message between KVN and XML through the shared generation gate.
+    """
+    ...
+
+def convert_file(
+    source_path: str,
+    destination_path: str,
+    to_format: str,
+    *,
+    max_input_bytes: Optional[int] = None,
+    max_records: Optional[int] = None,
+    max_output_bytes: Optional[int] = None,
+    version: Optional[str] = None,
+) -> None:
+    """
+    Convert any recognized NDM file and atomically replace the destination on success.
+    """
+    ...
+
 def from_file(
     path: str,
+    format: Optional[str] = None,
+    *,
+    max_input_bytes: Optional[int] = None,
+    max_records: Optional[int] = None,
 ) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
     """
     Parse from a file path (KVN or XML).
@@ -12,7 +45,6 @@ def from_file(
     ----------
     path : str
         Path to the file.
-
     Returns
     -------
     Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
@@ -20,14 +52,22 @@ def from_file(
     """
     ...
 
-def from_str(data: str) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
+def from_str(
+    data: str,
+    format: Optional[str] = None,
+    *,
+    max_input_bytes: Optional[int] = None,
+    max_records: Optional[int] = None,
+) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
     """
-    Parse a string (KVN or XML) and return the corresponding NDM object.
+    Parse a string containing KVN or XML.
 
     Parameters
     ----------
     data : str
         The content to parse.
+    format : str, optional
+        ``"kvn"`` or ``"xml"``. Detected automatically when omitted.
 
     Returns
     -------
@@ -37,7 +77,7 @@ def from_str(data: str) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Ap
     Raises
     ------
     ValueError
-        If parsing fails.
+        If the input is invalid or unsupported.
     """
     ...
 
@@ -57,19 +97,25 @@ class Acm:
     - Optional estimator information
     """
     def __init__(self, header, segment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
-    def from_file(path, format=None) -> Acm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Acm:
         """ """
         ...
 
     @staticmethod
-    def from_str(data, format=None) -> Acm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Acm:
         """ """
         ...
 
@@ -109,23 +155,32 @@ class Acm:
 
     @segment.setter
     def segment(self, value: AcmSegment) -> None: ...
-    def to_file(self, path, format, validate=True) -> None:
-        """ """
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
+        """
+        Write validated KVN or XML directly to a file.
+        """
         ...
 
-    def to_str(self, format, validate=True) -> str:
-        """ """
+    def to_str(
+        self,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> str:
+        """
+        Serialize to validated KVN or XML.
+        """
         ...
 
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -144,16 +199,10 @@ class AcmAttitudeDetermination:
     ACM Data: Attitude Determination Data Section.
     """
     def __init__(self, ad_id=None, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def ad_epoch(self) -> str | None:
         """
-        Attitude determination epoch.
+        Epoch of the attitude determination.
         """
         ...
 
@@ -207,7 +256,10 @@ class AcmAttitudeDetermination:
     @property
     def attitude_type(self) -> str | None:
         """
-        Attitude type keyword.
+        Type of attitude data, selected per annex B, subsection B4. Attitude states must always be
+        listed before rate states.
+
+        Examples: QUATERNION
         """
         ...
 
@@ -233,6 +285,15 @@ class AcmAttitudeDetermination:
 
     @cov_type.setter
     def cov_type(self, value: str | None) -> None: ...
+    @property
+    def euler_rot_seq(self) -> str | None:
+        """
+        Euler rotation sequence used by Euler-angle attitude states.
+        """
+        ...
+
+    @euler_rot_seq.setter
+    def euler_rot_seq(self, value: str | None) -> None: ...
     @property
     def number_states(self) -> int | None:
         """
@@ -313,12 +374,6 @@ class AcmAttitudeState:
     def __init__(
         self, ref_frame_a, ref_frame_b, att_type, att_lines, comment=None
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def att_basis(self) -> str | None:
         """
@@ -450,12 +505,6 @@ class AcmCovarianceMatrix:
     def __init__(
         self, cov_basis, cov_ref_frame, cov_type, cov_lines, comment=None
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -468,7 +517,7 @@ class AcmCovarianceMatrix:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def cov_basis(self) -> str:
+    def cov_basis(self) -> str | None:
         """
         Basis of this covariance time history data.
 
@@ -477,16 +526,34 @@ class AcmCovarianceMatrix:
         ...
 
     @cov_basis.setter
-    def cov_basis(self, value: str) -> None: ...
+    def cov_basis(self, value: str | None) -> None: ...
+    @property
+    def cov_basis_id(self) -> str | None:
+        """
+        Identifier for the covariance basis.
+        """
+        ...
+
+    @cov_basis_id.setter
+    def cov_basis_id(self, value: str | None) -> None: ...
     @property
     def cov_confidence(self) -> float | None:
         """
-        Optional covariance confidence.
+        Optional confidence level of the covariance matrix.
         """
         ...
 
     @cov_confidence.setter
     def cov_confidence(self, value: float | None) -> None: ...
+    @property
+    def cov_id(self) -> str | None:
+        """
+        Covariance history identifier.
+        """
+        ...
+
+    @cov_id.setter
+    def cov_id(self, value: str | None) -> None: ...
     @property
     def cov_lines(self) -> list[list[float]]:
         """
@@ -498,7 +565,16 @@ class AcmCovarianceMatrix:
     @cov_lines.setter
     def cov_lines(self, value: list[list[float]]) -> None: ...
     @property
-    def cov_ref_frame(self) -> str:
+    def cov_prev_id(self) -> str | None:
+        """
+        Previous covariance history identifier.
+        """
+        ...
+
+    @cov_prev_id.setter
+    def cov_prev_id(self, value: str | None) -> None: ...
+    @property
+    def cov_ref_frame(self) -> str | None:
         """
         Reference frame of the covariance time history. The full set of values is enumerated in
         annex B, subsection B3.
@@ -508,7 +584,7 @@ class AcmCovarianceMatrix:
         ...
 
     @cov_ref_frame.setter
-    def cov_ref_frame(self, value: str) -> None: ...
+    def cov_ref_frame(self, value: str | None) -> None: ...
     @property
     def cov_type(self) -> str:
         """
@@ -528,12 +604,6 @@ class AcmData:
     def __init__(
         self, att=None, phys=None, cov=None, man=None, ad=None, user=None
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def ad(self) -> AcmAttitudeDetermination | None:
         """
@@ -601,12 +671,6 @@ class AcmManeuverParameters:
     ACM Data: Maneuver Specification Section.
     """
     def __init__(self, man_id=None, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def actuator_used(self) -> str | None:
         """
@@ -630,7 +694,7 @@ class AcmManeuverParameters:
     @property
     def man_begin_time(self) -> str | None:
         """
-        Maneuver begin time (relative or absolute epoch string).
+        Maneuver begin time in seconds relative to EPOCH_TZERO.
         """
         ...
 
@@ -648,7 +712,7 @@ class AcmManeuverParameters:
     @property
     def man_end_time(self) -> str | None:
         """
-        Maneuver end time (relative or absolute epoch string).
+        Maneuver end time in seconds relative to EPOCH_TZERO.
         """
         ...
 
@@ -730,12 +794,6 @@ class AcmMetadata:
         international_designator=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def acm_data_elements(self) -> str | None:
         """
@@ -954,12 +1012,6 @@ class AcmPhysicalDescription:
     ACM Data: Space Object Physical Characteristics Section.
     """
     def __init__(self, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -1082,12 +1134,6 @@ class AcmPhysicalDescription:
 
 class AcmSegment:
     def __init__(self, metadata, data) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> AcmData:
         """
@@ -1118,18 +1164,12 @@ class AcmSensor:
     """
     def __init__(
         self,
-        sensor_number,
+        sensor_number=None,
         sensor_used=None,
         sensor_noise_stddev=None,
         sensor_frequency=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -1141,6 +1181,15 @@ class AcmSensor:
 
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
+    @property
+    def number_sensor_noise_covariance(self) -> int | None:
+        """
+        Number of sensor-noise covariance elements.
+        """
+        ...
+
+    @number_sensor_noise_covariance.setter
+    def number_sensor_noise_covariance(self, value: int | None) -> None: ...
     @property
     def sensor_frequency(self) -> float | None:
         """
@@ -1160,7 +1209,7 @@ class AcmSensor:
     @sensor_noise_stddev.setter
     def sensor_noise_stddev(self, value: list[float] | None) -> None: ...
     @property
-    def sensor_number(self) -> int:
+    def sensor_number(self) -> int | None:
         """
         Sensor number. Multiple sensors may be included, with each having a unique, ascending
         number.
@@ -1170,7 +1219,7 @@ class AcmSensor:
         ...
 
     @sensor_number.setter
-    def sensor_number(self, value: int) -> None: ...
+    def sensor_number(self, value: int | None) -> None: ...
     @property
     def sensor_used(self) -> str | None:
         """
@@ -1218,12 +1267,6 @@ class AdditionalParameters:
         sedr: Optional[float],
         comment: Optional[list[str]],
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def area_drg(self) -> Optional[float]:
         """
@@ -1340,12 +1383,6 @@ class AdmHeader:
         message_id=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def classification(self) -> Optional[str]:
         """
@@ -1421,19 +1458,25 @@ class Aem:
     the attitude state at times different from the tabular epochs.
     """
     def __init__(self, header, segments) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
-    def from_file(path, format=None) -> Aem:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Aem:
         """ """
         ...
 
     @staticmethod
-    def from_str(data, format=None) -> Aem:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Aem:
         """ """
         ...
 
@@ -1473,27 +1516,32 @@ class Aem:
 
     @segments.setter
     def segments(self, value: list[AemSegment]) -> None: ...
-    def to_file(self, path, format, validate=True) -> None:
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
         """
-        Write to file.
+        Write validated KVN or XML directly to a file.
         """
         ...
 
-    def to_str(self, format, validate=True) -> str:
+    def to_str(
+        self,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> str:
         """
-        Serialize to string.
+        Serialize to validated KVN or XML.
         """
         ...
 
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -1512,12 +1560,6 @@ class AemData:
     AEM Data Section.
     """
     def __init__(self, attitude_states, attitude_type=None, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def attitude_states(self) -> list[AttitudeState]:
         """
@@ -1593,12 +1635,6 @@ class AemMetadata:
         interpolation_degree=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def angvel_frame(self) -> str | None:
         """
@@ -1822,12 +1858,6 @@ class AemMetadata:
 
 class AemSegment:
     def __init__(self, metadata, data) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> AemData:
         """
@@ -1869,12 +1899,6 @@ class AngVelState:
         angvel_z,
         comment,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def angvel_frame(self) -> str:
         """
@@ -1960,19 +1984,23 @@ class Apm:
     times different from the specified epoch.
     """
     def __init__(self, header, segment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
-    def from_file(path, format=None) -> Apm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Apm:
         """ """
         ...
 
     @staticmethod
-    def from_str(data, format=None) -> Apm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Apm:
         """ """
         ...
 
@@ -2010,27 +2038,32 @@ class Apm:
 
     @segment.setter
     def segment(self, value: ApmSegment) -> None: ...
-    def to_file(self, path, format, validate=True) -> None:
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
         """
-        Write to file.
+        Write validated KVN or XML directly to a file.
         """
         ...
 
-    def to_str(self, format, validate=True) -> str:
+    def to_str(
+        self,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> str:
         """
-        Serialize to string.
+        Serialize to validated KVN or XML.
         """
         ...
 
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -2059,12 +2092,6 @@ class ApmData:
         maneuver_parameters=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def angular_velocity(self) -> list[AngVelState]:
         """
@@ -2113,14 +2140,14 @@ class ApmData:
     @inertia.setter
     def inertia(self, value: list[InertiaState]) -> None: ...
     @property
-    def maneuver_parameters(self) -> list[ManeuverParameters]:
+    def maneuver_parameters(self) -> list[ApmManeuverParameters]:
         """
         Maneuver Parameters.
         """
         ...
 
     @maneuver_parameters.setter
-    def maneuver_parameters(self, value: list[ManeuverParameters]) -> None: ...
+    def maneuver_parameters(self, value: list[ApmManeuverParameters]) -> None: ...
     @property
     def quaternion_state(self) -> list[QuaternionState]:
         """
@@ -2142,6 +2169,111 @@ class ApmData:
     @spin.setter
     def spin(self, value: list[SpinState]) -> None: ...
 
+class ApmManeuverParameters:
+    """
+    Maneuver Parameters block.
+
+    All mandatory elements are to be provided if the block is present.
+    (See annex F for conventions and further detail.)
+    """
+    def __init__(
+        self,
+        man_epoch_start,
+        man_duration,
+        man_ref_frame,
+        man_tor_1,
+        man_tor_2,
+        man_tor_3,
+        man_delta_mass=None,
+        comment=None,
+    ) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        One or more comment line(s). Each comment line shall begin with this keyword.
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def man_delta_mass(self) -> Optional[float]:
+        """
+        Mass change during maneuver (value is < 0)
+
+        Units: kg
+
+
+        The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
+        """
+        ...
+
+    @man_delta_mass.setter
+    def man_delta_mass(self, value: Optional[float]) -> None: ...
+    @property
+    def man_duration(self) -> float:
+        """
+        Maneuver duration.
+
+        Units: s
+        """
+        ...
+
+    @man_duration.setter
+    def man_duration(self, value: float) -> None: ...
+    @property
+    def man_epoch_start(self) -> str:
+        """
+        Epoch of start of maneuver. (For format specification, see 6.8.9.)
+        """
+        ...
+
+    @man_epoch_start.setter
+    def man_epoch_start(self, value: str) -> None: ...
+    @property
+    def man_ref_frame(self) -> str:
+        """
+        Coordinate system for the torque vector. The set of allowed values is described in annex B,
+        subsection B3.
+        """
+        ...
+
+    @man_ref_frame.setter
+    def man_ref_frame(self, value: str) -> None: ...
+    @property
+    def man_tor_x(self) -> float:
+        """
+        1st component of the torque vector.
+
+        Units: N*m
+        """
+        ...
+
+    @man_tor_x.setter
+    def man_tor_x(self, value: float) -> None: ...
+    @property
+    def man_tor_y(self) -> float:
+        """
+        2nd component of the torque vector.
+
+        Units: N*m
+        """
+        ...
+
+    @man_tor_y.setter
+    def man_tor_y(self, value: float) -> None: ...
+    @property
+    def man_tor_z(self) -> float:
+        """
+        3rd component of the torque vector.
+
+        Units: N*m
+        """
+        ...
+
+    @man_tor_z.setter
+    def man_tor_z(self, value: float) -> None: ...
+
 class ApmMetadata:
     """
     APM Metadata Section.
@@ -2149,12 +2281,6 @@ class ApmMetadata:
     def __init__(
         self, object_name, object_id, time_system=None, center_name=None, comment=None
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def center_name(self) -> str | None:
         """
@@ -2229,12 +2355,6 @@ class ApmMetadata:
 
 class ApmSegment:
     def __init__(self, metadata, data) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> ApmData:
         """
@@ -2278,12 +2398,6 @@ class AtmosphericReentryParameters:
         orbit_lifetime_confidence_level=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -2395,12 +2509,6 @@ class AtmosphericReentryParameters:
 
 class AttitudeState:
     def __init__(self, epoch, values) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self): ...
     @epoch.setter
@@ -2425,12 +2533,6 @@ class Cdm:
     - Metadata describing how the data was determined (orbit determination settings).
     """
     def __init__(self, header, body) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def body(self) -> CdmBody:
         """
@@ -2441,7 +2543,12 @@ class Cdm:
     @body.setter
     def body(self, value: CdmBody) -> None: ...
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Cdm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Cdm:
         """
         Parse a CDM from a file path with optional format.
 
@@ -2477,7 +2584,12 @@ class Cdm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Cdm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Cdm:
         """
         Parse a CDM from a string with optional format.
 
@@ -2521,7 +2633,13 @@ class Cdm:
         """
         ...
 
-    def to_file(self, path: str, format: str, validate: Optional[bool] = True) -> None:
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
         """
         Write the CDM to a file.
 
@@ -2531,38 +2649,25 @@ class Cdm:
             The output file path.
         format : str
             The output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
+        version : str, optional
+            Source version by default, ``"latest"``, or an exact supported version.
         """
         ...
 
-    def to_str(self, format: str, validate: Optional[bool] = True) -> str:
+    def to_str(
+        self,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> str:
         """
-        Serialize the CDM to a string.
-
-        Parameters
-        ----------
-        format : str
-            The output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
-
-        Returns
-        -------
-        str
-            The serialized CDM string.
+        Serialize to validated KVN or XML.
         """
         ...
 
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -2593,12 +2698,6 @@ class CdmBody:
     def __init__(
         self, relative_metadata_data: RelativeMetadataData, segments: list[CdmSegment]
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def relative_metadata_data(self) -> RelativeMetadataData:
         """
@@ -2740,38 +2839,32 @@ class CdmCovarianceMatrix:
         cndot_rdot: float,
         cndot_tdot: float,
         cndot_ndot: float,
-        cdrg_r: float = None,
-        cdrg_t: float = None,
-        cdrg_n: float = None,
-        cdrg_rdot: float = None,
-        cdrg_tdot: float = None,
-        cdrg_ndot: float = None,
-        cdrg_drg: float = None,
-        csrp_r: float = None,
-        csrp_t: float = None,
-        csrp_n: float = None,
-        csrp_rdot: float = None,
-        csrp_tdot: float = None,
-        csrp_ndot: float = None,
-        csrp_drg: float = None,
-        csrp_srp: float = None,
-        cthr_r: float = None,
-        cthr_t: float = None,
-        cthr_n: float = None,
-        cthr_rdot: float = None,
-        cthr_tdot: float = None,
-        cthr_ndot: float = None,
-        cthr_drg: float = None,
-        cthr_srp: float = None,
-        cthr_thr: float = None,
+        cdrg_r: Optional[float] = None,
+        cdrg_t: Optional[float] = None,
+        cdrg_n: Optional[float] = None,
+        cdrg_rdot: Optional[float] = None,
+        cdrg_tdot: Optional[float] = None,
+        cdrg_ndot: Optional[float] = None,
+        cdrg_drg: Optional[float] = None,
+        csrp_r: Optional[float] = None,
+        csrp_t: Optional[float] = None,
+        csrp_n: Optional[float] = None,
+        csrp_rdot: Optional[float] = None,
+        csrp_tdot: Optional[float] = None,
+        csrp_ndot: Optional[float] = None,
+        csrp_drg: Optional[float] = None,
+        csrp_srp: Optional[float] = None,
+        cthr_r: Optional[float] = None,
+        cthr_t: Optional[float] = None,
+        cthr_n: Optional[float] = None,
+        cthr_rdot: Optional[float] = None,
+        cthr_tdot: Optional[float] = None,
+        cthr_ndot: Optional[float] = None,
+        cthr_drg: Optional[float] = None,
+        cthr_srp: Optional[float] = None,
+        cthr_thr: Optional[float] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def cdrg_drg(self) -> Optional[float]:
         """
@@ -3306,17 +3399,11 @@ class CdmData:
     def __init__(
         self,
         state_vector: CdmStateVector,
-        covariance_matrix: CdmCovarianceMatrix = None,
+        covariance_matrix: Optional[CdmCovarianceMatrix] = None,
         od_parameters=None,
         additional_parameters=None,
         comments=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def additional_parameters(self) -> Optional[AdditionalParameters]:
         """
@@ -3424,12 +3511,6 @@ class CdmHeader:
         message_for: Optional[str] = None,
         comment: Optional[list[str]] = ...,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -3556,8 +3637,8 @@ class CdmMetadata:
         international_designator: str,
         ref_frame: Union[ReferenceFrameType, str],
         ephemeris_name: str = ...,
-        covariance_method: Union[CovarianceMethodType, str] = None,
-        maneuverable: Union[ManeuverableType, str] = None,
+        covariance_method: Optional[Union[CovarianceMethodType, str]] = None,
+        maneuverable: Optional[Union[ManeuverableType, str]] = None,
         object_type: Optional[Union[ObjectDescription, str]] = None,
         operator_contact_position: Optional[str] = None,
         operator_organization: Optional[str] = None,
@@ -3572,12 +3653,6 @@ class CdmMetadata:
         intrack_thrust: Optional[bool] = None,
         comment: Optional[list[str]] = ...,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def atmospheric_model(self) -> Optional[str]:
         """
@@ -3844,23 +3919,12 @@ class CdmObjectType:
     Provides uncertainty information for the state vector.
     Can be converted to a NumPy array using `to_numpy()`.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
 
 class CdmSegment:
     """
     A CDM Segment, consisting of metadata and data for a specific object.
     """
     def __init__(self, metadata, data) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> CdmData:
         """
@@ -3900,14 +3964,24 @@ class CdmStateVector:
         Velocity Z component. Units: km/s.
     """
     def __init__(
-        self, x: float, y: float, z: float, x_dot: float, y_dot: float, z_dot: float
+        self,
+        x: float,
+        y: float,
+        z: float,
+        x_dot: float,
+        y_dot: float,
+        z_dot: float,
+        comments=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
+    @property
+    def comment(self) -> list[str]:
         """
-        Helper for pickle.
+        Comments (see 6.3.4 for formatting rules).
         """
         ...
 
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
     @staticmethod
     def from_numpy(array) -> CdmStateVector:
         """ """
@@ -3990,12 +4064,7 @@ class CdmStateVector:
     @z_dot.setter
     def z_dot(self, value: float) -> None: ...
 
-class ControlledType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class ControlledType: ...
 
 class CovLine:
     """
@@ -4009,12 +4078,6 @@ class CovLine:
         Covariance matrix elements for this epoch.
     """
     def __init__(self, *, epoch: str, values: list[float]) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self) -> str:
         """
@@ -4034,12 +4097,7 @@ class CovLine:
     @values.setter
     def values(self, value: list[float]) -> None: ...
 
-class CovarianceMethodType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class CovarianceMethodType: ...
 
 class EulerAngleState:
     """
@@ -4061,12 +4119,6 @@ class EulerAngleState:
         angle_3_dot,
         comment,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def angle_1(self) -> float:
         """
@@ -4280,12 +4332,6 @@ class GroundImpactParameters:
         impact_3_cross_track: Optional[float] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -4653,12 +4699,6 @@ class InertiaState:
     def __init__(
         self, inertia_ref_frame, ixx, iyy, izz, ixy, ixz, iyz, comment
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -4802,12 +4842,6 @@ class KeplerianElements:
         true_anomaly: Optional[float] = None,
         mean_anomaly: Optional[float] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def arg_of_pericenter(self) -> float:
         """
@@ -4918,12 +4952,6 @@ class ManLine:
         Maneuver elements for this epoch.
     """
     def __init__(self, *, epoch: str, values: list[str]) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self) -> str:
         """
@@ -4943,125 +4971,7 @@ class ManLine:
     @values.setter
     def values(self, value: list[str]) -> None: ...
 
-class ManeuverParameters:
-    """
-    Maneuver Parameters (Repeat for each maneuver).
-
-    References:
-    - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
-    """
-    def __init__(
-        self,
-        man_epoch_start,
-        man_duration,
-        man_ref_frame,
-        man_tor_1,
-        man_tor_2,
-        man_tor_3,
-        man_delta_mass=None,
-        comment=None,
-    ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    @property
-    def comment(self) -> list[str]:
-        """
-        Comments (see 7.8 for formatting rules).
-        """
-        ...
-
-    @comment.setter
-    def comment(self, value: list[str]) -> None: ...
-    @property
-    def man_delta_mass(self) -> Optional[float]:
-        """
-        Mass change during maneuver (value is < 0)
-
-        Units: kg
-
-
-        **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
-        This implementation follows the underlying schema type and allows non-positive values
-        (`<= 0`) for interoperability.
-        """
-        ...
-
-    @man_delta_mass.setter
-    def man_delta_mass(self, value: Optional[float]) -> None: ...
-    @property
-    def man_duration(self) -> float:
-        """
-        Maneuver duration (If = 0, impulsive maneuver)
-
-        Units: s
-        """
-        ...
-
-    @man_duration.setter
-    def man_duration(self, value: float) -> None: ...
-    @property
-    def man_epoch_start(self) -> str:
-        """
-        Epoch of ignition (see 7.5.10 for formatting rules)
-        """
-        ...
-
-    @man_epoch_start.setter
-    def man_epoch_start(self, value: str) -> None: ...
-    @property
-    def man_ref_frame(self) -> str:
-        """
-        Reference frame in which the velocity increment vector data are given. The user must
-        select from the accepted set of values indicated in 3.2.4.11.
-        """
-        ...
-
-    @man_ref_frame.setter
-    def man_ref_frame(self, value: str) -> None: ...
-    @property
-    def man_tor_x(self) -> float:
-        """
-        Torque X component.
-
-        Units: N*m
-        """
-        ...
-
-    @man_tor_x.setter
-    def man_tor_x(self, value: float) -> None: ...
-    @property
-    def man_tor_y(self) -> float:
-        """
-        Torque Y component.
-
-        Units: N*m
-        """
-        ...
-
-    @man_tor_y.setter
-    def man_tor_y(self, value: float) -> None: ...
-    @property
-    def man_tor_z(self) -> float:
-        """
-        Torque Z component.
-
-        Units: N*m
-        """
-        ...
-
-    @man_tor_z.setter
-    def man_tor_z(self, value: float) -> None: ...
-
-class ManeuverableType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class ManeuverableType: ...
 
 class MeanElements:
     """
@@ -5100,12 +5010,6 @@ class MeanElements:
         mean_motion: Optional[float] = None,
         gm: Optional[float] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def arg_of_pericenter(self) -> float:
         """
@@ -5246,12 +5150,6 @@ class Ndm:
     with the set of tracking data messages used in the orbit determination.
     """
     def __init__(self, messages, id=None, comments=...) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comments(self) -> list[str]:
         """
@@ -5262,14 +5160,26 @@ class Ndm:
     @comments.setter
     def comments(self, value: list[str]) -> None: ...
     @staticmethod
-    def from_file(path, format=None) -> Ndm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Ndm:
         """
         Parse an NDM combined instantiation from a file.
         """
         ...
 
     @staticmethod
-    def from_str(data, format=None) -> Ndm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Ndm:
         """
         Parse an NDM combined instantiation from a string.
         """
@@ -5293,7 +5203,9 @@ class Ndm:
     def messages(
         self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
     ) -> None: ...
-    def to_file(self, path: str, format: str, validate: Optional[bool] = True) -> None:
+    def to_file(
+        self, path: str, format: str, max_output_bytes: Optional[int] = None
+    ) -> None:
         """
         Write to file.
 
@@ -5303,35 +5215,22 @@ class Ndm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
         """
         ...
 
-    def to_str(self, format, validate=True) -> str:
+    def to_str(self, format: str, max_output_bytes: Optional[int] = None) -> str:
         """
         Serialize to a string.
         """
         ...
 
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the combined message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
-class ObjectDescription:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class ObjectDescription: ...
 
 class Ocm:
     """
@@ -5356,14 +5255,14 @@ class Ocm:
         The OCM data segment.
     """
     def __init__(self, header: OdmHeader, segment: OcmSegment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Ocm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Ocm:
         """
         Create an OCM message from a file.
 
@@ -5382,7 +5281,13 @@ class Ocm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Ocm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Ocm:
         """
         Create an OCM message from a string.
 
@@ -5436,7 +5341,13 @@ class Ocm:
 
     @segment.setter
     def segment(self, value: OcmSegment) -> None: ...
-    def to_file(self, path: str, format: str, validate: Optional[bool] = True) -> None:
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
         """
         Write to file.
 
@@ -5446,38 +5357,25 @@ class Ocm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
+        version : str, optional
+            Source version by default, ``"latest"``, or an exact supported version.
         """
         ...
 
-    def to_str(self, format: str, validate: Optional[bool] = True) -> str:
+    def to_str(
+        self,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> str:
         """
-        Serialize to string.
-
-        Parameters
-        ----------
-        format : str
-            Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
-
-        Returns
-        -------
-        str
-            The serialized string.
+        Serialize to KVN or XML after mandatory CCSDS validation.
         """
         ...
 
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -5556,12 +5454,6 @@ class OcmCovarianceMatrix:
         cov_units: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -5772,12 +5664,6 @@ class OcmData:
     maneuvers, and other related information.
     """
     def __init__(self) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def cov(self) -> list[OcmCovarianceMatrix]:
         """
@@ -5921,12 +5807,6 @@ class OcmManeuverParameters:
         man_units: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -6436,7 +6316,7 @@ class OcmMetadata:
         self,
         *,
         epoch_tzero: str,
-        time_system: str = None,
+        time_system: Optional[str] = None,
         object_name: Optional[str] = None,
         international_designator: Optional[str] = None,
         catalog_name: Optional[str] = None,
@@ -6484,12 +6364,6 @@ class OcmMetadata:
         celestial_source: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def adm_msg_link(self) -> Optional[str]:
         """
@@ -7125,12 +6999,6 @@ class OcmOdParameters:
         od_prev_id: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def actual_od_span(self) -> Optional[float]:
         """
@@ -7482,12 +7350,6 @@ class OcmPerturbations:
         (Optional)
     """
     def __init__(self) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def albedo_grid_size(self) -> Optional[int]:
         """
@@ -7897,12 +7759,6 @@ class OcmPhysicalDescription:
         iyz=None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def area_along_oeb_int(self) -> Optional[float]:
         """
@@ -8580,12 +8436,6 @@ class OcmSegment:
         Segment data blocks.
     """
     def __init__(self, metadata: OcmMetadata, data: OcmData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> OcmData:
         """
@@ -8678,12 +8528,6 @@ class OcmTrajState:
         traj_units: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def center_name(self) -> str:
         """
@@ -9020,12 +8864,6 @@ class OdParameters:
         weighted_rms: Optional[float] = None,
         comment: Optional[list[str]] = ...,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def actual_od_span(self) -> Optional[float]:
         """
@@ -9166,12 +9004,6 @@ class OdmHeader:
         message_id: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def classification(self) -> Optional[str]:
         """
@@ -9255,14 +9087,14 @@ class Oem:
         The list of data segments.
     """
     def __init__(self, header: OdmHeader, segments: list[OemSegment]) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Oem:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Oem:
         """
         Create an OEM message from a file.
 
@@ -9282,7 +9114,13 @@ class Oem:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Oem:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Oem:
         """
         Create an OEM message from a string.
 
@@ -9326,9 +9164,15 @@ class Oem:
 
     @segments.setter
     def segments(self, value: list[OemSegment]) -> None: ...
-    def to_file(self, path: str, format: str, validate: Optional[bool] = True) -> None:
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
         """
-        Write to file.
+        Write directly to a KVN or XML file.
 
         Parameters
         ----------
@@ -9336,57 +9180,25 @@ class Oem:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        Write to file.
-
-        Parameters
-        ----------
-        path : str
-            Output file path.
-        format : str
-            Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
+        version : str, optional
+            Source version by default, ``"latest"``, or an exact supported version.
         """
         ...
 
-    def to_str(self, format: str, validate: Optional[bool] = True) -> str:
+    def to_str(
+        self,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> str:
         """
-        Serialize to string.
-
-        Parameters
-        ----------
-        format : str
-            Output format ('kvn' or 'xml').
-
-        Returns
-        -------
-        str
-            The serialized string.
-        Serialize to string.
-
-        Parameters
-        ----------
-        format : str
-            Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
-
-        Returns
-        -------
-        str
-            The serialized string.
+        Serialize to validated KVN or XML.
         """
         ...
 
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -9473,12 +9285,6 @@ class OemCovarianceMatrix:
         cov_ref_frame: Optional[str],
         comment: Optional[list[str]],
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -9760,12 +9566,6 @@ class OemData:
         covariance_matrix=None,
         comments: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -9921,8 +9721,8 @@ class OemMetadata:
         start_time: str,
         stop_time: str,
         center_name: str = ...,
-        ref_frame: str = None,
-        time_system: str = None,
+        ref_frame: Optional[str] = None,
+        time_system: Optional[str] = None,
         ref_frame_epoch: Optional[str] = None,
         useable_start_time: Optional[str] = None,
         useable_stop_time: Optional[str] = None,
@@ -9930,12 +9730,6 @@ class OemMetadata:
         interpolation_degree: Optional[int] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def center_name(self) -> str:
         """
@@ -10136,12 +9930,6 @@ class OemSegment:
         Segment data.
     """
     def __init__(self, metadata: OemMetadata, data: OemData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> OemData:
         """
@@ -10189,14 +9977,13 @@ class Omm:
         The data segment.
     """
     def __init__(self, header: OdmHeader, segment: OmmSegment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Omm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Omm:
         """
         Create an OMM message from a file.
 
@@ -10215,7 +10002,12 @@ class Omm:
         ...
 
     @staticmethod
-    def from_str(data, format=None) -> Omm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Omm:
         """ """
         ...
 
@@ -10285,7 +10077,13 @@ class Omm:
 
     @segment.setter
     def segment(self, value: OmmSegment) -> None: ...
-    def to_file(self, path: str, format: str, validate: Optional[bool] = True) -> None:
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
         """
         Write to file.
 
@@ -10295,27 +10093,19 @@ class Omm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
+        version : str, optional
+            Source version by default, ``"latest"``, or an exact supported version.
         """
         ...
 
-    def to_str(self, format: str, validate: Optional[bool] = True) -> str:
+    def to_str(
+        self,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> str:
         """
-        Serialize to string.
-
-        Parameters
-        ----------
-        format : str
-            Output format ('kvn' or 'xml').
-            (Mandatory)
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
-
-        Returns
-        -------
-        str
-            The serialized string.
+        Serialize to validated KVN or XML.
         """
         ...
 
@@ -10330,15 +10120,9 @@ class Omm:
         """
         ...
 
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -10357,12 +10141,6 @@ class OmmData:
     OMM Data section.
     """
     def __init__(self, mean_elements, comments=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -10446,18 +10224,12 @@ class OmmMetadata:
         object_name: str,
         object_id: str,
         center_name: str = ...,
-        ref_frame: str = None,
-        time_system: str = None,
+        ref_frame: Optional[str] = None,
+        time_system: Optional[str] = None,
         mean_element_theory: str = ...,
         ref_frame_epoch: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def center_name(self) -> str:
         """
@@ -10585,12 +10357,6 @@ class OmmSegment:
         Segment data.
     """
     def __init__(self, metadata: OmmMetadata, data: OmmData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> OmmData:
         """
@@ -10628,14 +10394,13 @@ class Opm:
         The data segment.
     """
     def __init__(self, header: OdmHeader, segment: OpmSegment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Opm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Opm:
         """
         Create an OPM message from a file.
 
@@ -10654,7 +10419,12 @@ class Opm:
         ...
 
     @staticmethod
-    def from_str(data, format=None) -> Opm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Opm:
         """
         Create an OPM message from a string.
         """
@@ -10691,7 +10461,13 @@ class Opm:
 
     @segment.setter
     def segment(self, value: OpmSegment) -> None: ...
-    def to_file(self, path: str, format: str, validate: Optional[bool] = True) -> None:
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
         """
         Write to file.
 
@@ -10701,38 +10477,25 @@ class Opm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
+        version : str, optional
+            Source version by default, ``"latest"``, or an exact supported version.
         """
         ...
 
-    def to_str(self, format: str, validate: Optional[bool] = True) -> str:
+    def to_str(
+        self,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> str:
         """
-        Serialize to string.
-
-        Parameters
-        ----------
-        format : str
-            Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
-
-        Returns
-        -------
-        str
-            The serialized string.
+        Serialize to KVN or XML after mandatory CCSDS validation.
         """
         ...
 
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -10832,12 +10595,6 @@ class OpmCovarianceMatrix:
         cov_ref_frame: Optional[str] = None,
         comments: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -11099,12 +10856,6 @@ class OpmData:
         State vector.
     """
     def __init__(self, state_vector: StateVector, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -11133,14 +10884,14 @@ class OpmData:
     @keplerian_elements.setter
     def keplerian_elements(self, value: Optional[KeplerianElements]) -> None: ...
     @property
-    def maneuver_parameters(self) -> list[ManeuverParameters]:
+    def maneuver_parameters(self) -> list[OpmManeuverParameters]:
         """
         Maneuver parameters.
         """
         ...
 
     @maneuver_parameters.setter
-    def maneuver_parameters(self, value: list[ManeuverParameters]) -> None: ...
+    def maneuver_parameters(self, value: list[OpmManeuverParameters]) -> None: ...
     @property
     def spacecraft_parameters(self) -> Optional[SpacecraftParameters]:
         """
@@ -11169,6 +10920,127 @@ class OpmData:
     @user_defined_parameters.setter
     def user_defined_parameters(self, value: UserDefined | None) -> None: ...
 
+class OpmManeuverParameters:
+    """
+    Maneuver Parameters (Repeat for each maneuver).
+
+    References:
+    - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
+
+    Parameters
+    ----------
+    man_epoch_ignition : str
+        Epoch of ignition.
+    man_duration : float
+        Duration of maneuver (s).
+    man_delta_mass : float
+        Mass change during maneuver (kg).
+    man_ref_frame : str
+        Reference frame for velocity change.
+    man_dv_1 : float
+        Velocity change in 1st axis (km/s).
+    man_dv_2 : float
+        Velocity change in 2nd axis (km/s).
+    man_dv_3 : float
+        Velocity change in 3rd axis (km/s).
+    """
+    def __init__(
+        self,
+        man_epoch_ignition: str,
+        man_duration: float,
+        man_delta_mass: float,
+        man_ref_frame: str,
+        man_dv_1: float,
+        man_dv_2: float,
+        man_dv_3: float,
+    ) -> None: ...
+    @property
+    def comment(self) -> list[str]:
+        """
+        Comments (see 7.8 for formatting rules).
+        """
+        ...
+
+    @comment.setter
+    def comment(self, value: list[str]) -> None: ...
+    @property
+    def man_delta_mass(self) -> float:
+        """
+        Mass change during maneuver (value is < 0)
+
+        Units: kg
+
+
+        The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
+        """
+        ...
+
+    @man_delta_mass.setter
+    def man_delta_mass(self, value: float) -> None: ...
+    @property
+    def man_duration(self) -> float:
+        """
+        Maneuver duration (If = 0, impulsive maneuver)
+
+        Units: s
+        """
+        ...
+
+    @man_duration.setter
+    def man_duration(self, value: float) -> None: ...
+    @property
+    def man_dv_1(self) -> float:
+        """
+        1st component of the velocity increment
+
+        Units: km/s
+        """
+        ...
+
+    @man_dv_1.setter
+    def man_dv_1(self, value: float) -> None: ...
+    @property
+    def man_dv_2(self) -> float:
+        """
+        2nd component of the velocity increment
+
+        Units: km/s
+        """
+        ...
+
+    @man_dv_2.setter
+    def man_dv_2(self, value: float) -> None: ...
+    @property
+    def man_dv_3(self) -> float:
+        """
+        3rd component of the velocity increment
+
+        Units: km/s
+        """
+        ...
+
+    @man_dv_3.setter
+    def man_dv_3(self, value: float) -> None: ...
+    @property
+    def man_epoch_ignition(self) -> str:
+        """
+        Epoch of ignition (see 7.5.10 for formatting rules)
+        """
+        ...
+
+    @man_epoch_ignition.setter
+    def man_epoch_ignition(self, value: str) -> None: ...
+    @property
+    def man_ref_frame(self) -> str:
+        """
+        Reference frame in which the velocity increment vector data are given. The user must
+        select from the accepted set of values indicated in 3.2.4.11.
+        """
+        ...
+
+    @man_ref_frame.setter
+    def man_ref_frame(self, value: str) -> None: ...
+
 class OpmMetadata:
     """
     OPM Metadata Section.
@@ -11195,17 +11067,11 @@ class OpmMetadata:
         object_name: str,
         object_id: str,
         center_name: str = ...,
-        ref_frame: str = None,
-        time_system: str = None,
+        ref_frame: Optional[str] = None,
+        time_system: Optional[str] = None,
         ref_frame_epoch: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def center_name(self) -> str:
         """
@@ -11318,12 +11184,6 @@ class OpmSegment:
         Segment data.
     """
     def __init__(self, metadata: OpmMetadata, data: OpmData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> OpmData:
         """
@@ -11366,12 +11226,6 @@ class QuaternionState:
         qc_dot,
         comment,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -11481,14 +11335,13 @@ class Rdm:
         (Mandatory)
     """
     def __init__(self, *, header: RdmHeader, segment: RdmSegment) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Rdm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Rdm:
         """
         Create an RDM message from a file.
 
@@ -11508,7 +11361,12 @@ class Rdm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Rdm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Rdm:
         """
         Create an RDM message from a string.
 
@@ -11562,7 +11420,13 @@ class Rdm:
 
     @segment.setter
     def segment(self, value: RdmSegment) -> None: ...
-    def to_file(self, path: str, format: str, validate: Optional[bool] = True) -> None:
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
         """
         Write to a file.
 
@@ -11572,23 +11436,17 @@ class Rdm:
             Output file path.
         format : str
             Format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
+        version : str, optional
+            Source version by default, ``"latest"``, or an exact supported version.
         """
         ...
 
-    def to_kvn(self) -> str:
-        """
-        Serialize to KVN string.
-
-        Returns
-        -------
-        str
-            The serialized KVN string.
-        """
-        ...
-
-    def to_str(self, format: str, validate: Optional[bool] = True) -> str:
+    def to_str(
+        self,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> str:
         """
         Serialize to string (generic).
 
@@ -11596,36 +11454,17 @@ class Rdm:
         ----------
         format : str
             Format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
-
         Returns
         -------
         str
             The serialized string.
+        ``version`` preserves the source version unless explicitly overridden.
         """
         ...
 
-    def to_xml(self) -> str:
-        """
-        Serialize to XML string.
-
-        Returns
-        -------
-        str
-            The serialized XML string.
-        """
-        ...
-
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -11674,12 +11513,6 @@ class RdmData:
         user_defined_parameters: Optional[UserDefined] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def atmospheric_reentry_parameters(self) -> AtmosphericReentryParameters:
         """
@@ -11786,12 +11619,6 @@ class RdmHeader:
         message_id: str,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -11862,9 +11689,9 @@ class RdmMetadata:
         object_name: str,
         international_designator: str,
         epoch_tzero: str,
-        controlled_reentry: str = None,
+        controlled_reentry: Optional[str] = None,
         center_name: str = ...,
-        time_system: str = None,
+        time_system: Optional[str] = None,
         catalog_name=None,
         object_designator=None,
         object_type=None,
@@ -11890,12 +11717,6 @@ class RdmMetadata:
         next_message_epoch=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def atmospheric_model(self) -> Optional[str]:
         """
@@ -12285,12 +12106,6 @@ class RdmSegment:
         (Mandatory)
     """
     def __init__(self, *, metadata: RdmMetadata, data: RdmData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> RdmData:
         """
@@ -12315,12 +12130,6 @@ class RdmSpacecraftParameters:
     RDM spacecraft parameters (rdmSpacecraftParametersType).
     """
     def __init__(self, *, wet_mass=None, dry_mass=None, comment=None) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def ballistic_coeff(self) -> Optional[float]:
         """
@@ -12436,19 +12245,8 @@ class RdmSpacecraftParameters:
     @wet_mass.setter
     def wet_mass(self, value: Optional[float]) -> None: ...
 
-class ReferenceFrame:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-class ReferenceFrameType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class ReferenceFrame: ...
+class ReferenceFrameType: ...
 
 class RelativeMetadataData:
     """
@@ -12517,12 +12315,6 @@ class RelativeMetadataData:
         comment: Optional[list[str]] = ...,
         miss_distance_unit: Optional[str] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def collision_probability(self) -> Optional[float]:
         """
@@ -12719,12 +12511,6 @@ class RelativeStateVector:
         relative_velocity_t: float,
         relative_velocity_n: float,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def relative_position_n(self) -> float:
         """
@@ -12801,19 +12587,8 @@ class RelativeStateVector:
         """
         ...
 
-class ScreenVolumeFrameType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-class ScreenVolumeShapeType:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class ScreenVolumeFrameType: ...
+class ScreenVolumeShapeType: ...
 
 class SpacecraftParameters:
     """
@@ -12843,12 +12618,6 @@ class SpacecraftParameters:
         drag_area: Optional[float] = None,
         drag_coeff: Optional[float] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -12947,12 +12716,6 @@ class SpinState:
         nutation_vel,
         comment,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -13125,12 +12888,6 @@ class StateVector:
         z_dot: float,
         comments=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -13256,12 +13013,6 @@ class StateVectorAcc:
         y_ddot: Optional[float] = None,
         z_ddot: Optional[float] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self) -> str:
         """
@@ -13398,12 +13149,6 @@ class Tdm:
         (Mandatory)
     """
     def __init__(self, *, header: TdmHeader, body: TdmBody) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def body(self) -> TdmBody:
         """
@@ -13414,7 +13159,13 @@ class Tdm:
     @body.setter
     def body(self, value: TdmBody) -> None: ...
     @staticmethod
-    def from_file(path: str, format: Optional[str] = None) -> Tdm:
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Tdm:
         """
         Create a TDM message from a file.
 
@@ -13434,7 +13185,13 @@ class Tdm:
         ...
 
     @staticmethod
-    def from_str(data: str, format: Optional[str] = None) -> Tdm:
+    def from_str(
+        data: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Tdm:
         """
         Create a TDM message from a string.
 
@@ -13489,7 +13246,13 @@ class Tdm:
         """
         ...
 
-    def to_file(self, path: str, format: str, validate: Optional[bool] = True) -> None:
+    def to_file(
+        self,
+        path: str,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> None:
         """
         Write to file.
 
@@ -13499,38 +13262,25 @@ class Tdm:
             Output file path.
         format : str
             Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
+        version : str, optional
+            Source version by default, ``"latest"``, or an exact supported version.
         """
         ...
 
-    def to_str(self, format: str, validate: Optional[bool] = True) -> str:
+    def to_str(
+        self,
+        format: str,
+        version: Optional[str] = None,
+        max_output_bytes: Optional[int] = None,
+    ) -> str:
         """
-        Serialize to string.
-
-        Parameters
-        ----------
-        format : str
-            Output format ('kvn' or 'xml').
-        validate : bool, optional
-            Whether to validate the message before writing (default: True).
-
-        Returns
-        -------
-        str
-            The serialized string.
+        Serialize to validated KVN or XML.
         """
         ...
 
-    def validate(self, strict: Optional[bool] = True) -> Optional[list[str]]:
+    def validate(self) -> None:
         """
         Validate the message against CCSDS rules.
-
-        Parameters
-        ----------
-        strict : bool, optional
-            If True (default), raises ValueError on the first error found.
-            If False, returns a list of validation error messages (or None if valid).
         """
         ...
 
@@ -13554,12 +13304,6 @@ class TdmBody:
         List of data segments.
     """
     def __init__(self, *, segments: list[TdmSegment]) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def segments(self) -> list[TdmSegment]:
         """
@@ -13590,12 +13334,6 @@ class TdmData:
         observations: Optional[list[TdmObservation]] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[TdmObservation]:
         """
@@ -13642,12 +13380,6 @@ class TdmHeader:
         message_id: Optional[str] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -13779,12 +13511,6 @@ class TdmMetadata:
         ephemeris_name_5=None,
         comment=None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def angle_type(self) -> Optional[str]:
         """
@@ -14518,12 +14244,7 @@ class TdmMetadata:
     @turnaround_numerator.setter
     def turnaround_numerator(self, value: Optional[int]) -> None: ...
 
-class TdmMode:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class TdmMode: ...
 
 class TdmObservation:
     """
@@ -14541,12 +14262,6 @@ class TdmObservation:
         but the object can hold string representations internally).
     """
     def __init__(self, *, epoch: str, keyword: str, value: float) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self) -> str:
         """
@@ -14581,12 +14296,7 @@ class TdmObservation:
         """
         ...
 
-class TdmPath:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class TdmPath: ...
 
 class TdmSegment:
     """
@@ -14605,12 +14315,6 @@ class TdmSegment:
         (Mandatory)
     """
     def __init__(self, *, metadata: TdmMetadata, data: TdmData) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def data(self) -> TdmData:
         """
@@ -14630,12 +14334,7 @@ class TdmSegment:
     @metadata.setter
     def metadata(self, value: TdmMetadata) -> None: ...
 
-class TimeSystem:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class TimeSystem: ...
 
 class TleParameters:
     """
@@ -14677,12 +14376,6 @@ class TleParameters:
         mean_motion_ddot: Optional[float] = None,
         agom: Optional[float] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def agom(self) -> Optional[float]:
         """
@@ -14821,12 +14514,6 @@ class TrajLine:
         (Mandatory)
     """
     def __init__(self, *, epoch: str, values: list[float]) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def epoch(self) -> str:
         """
@@ -14865,12 +14552,6 @@ class UserDefined:
         parameters: Optional[dict[str, str]] = None,
         comment: Optional[list[str]] = None,
     ) -> None: ...
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
     @property
     def comment(self) -> list[str]:
         """
@@ -14890,147 +14571,44 @@ class UserDefined:
     @user_defined.setter
     def user_defined(self, value: dict[str, str]) -> None: ...
 
-class YesNo:
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
+class YesNo: ...
 
 class NdmError(Exception):
     """
-    Base exception for all CCSDS NDM errors.
+    Generic CCSDS NDM error.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmEpochError(ValueError):
     """
     Error parsing a CCSDS epoch string.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmFormatError(ValueError):
     """
     Error during parsing of NDM data (KVN or XML).
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmIoError(OSError):
     """
     I/O error during file operations.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
 
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
-    @property
-    def characters_written(self): ...
-
-class NdmUnsupportedMessageError(NdmError):
+class NdmUnsupportedMessageError(ValueError):
     """
     Unsupported CCSDS message type.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
 
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
-
-class NdmValidationError(NdmError):
+class NdmValidationError(ValueError):
     """
     Validation error against CCSDS rules.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmKvnParseError(NdmFormatError):
     """
     Error during KVN parsing.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...
 
 class NdmXmlError(NdmFormatError):
     """
     Error during XML parsing or serialization.
     """
-    def __getstate__(self, /) -> object:
-        """
-        Helper for pickle.
-        """
-        ...
-
-    def __setstate__(self, state) -> None:
-        """ """
-        ...
-
-    @property
-    def args(self): ...

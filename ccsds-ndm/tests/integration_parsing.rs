@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::{from_str, from_str_with_mode, take_validation_warnings, ValidationMode};
+use ccsds_ndm::from_str;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -26,15 +26,12 @@ fn test_parse_minimal_fixtures() {
                         } else {
                             failures.push(format!("{} failed to serialize to XML", case.name));
                         }
-                    } else {
-                        if let Ok(kvn_out) = msg.to_kvn() {
-                            if let Err(e) = from_str(&kvn_out) {
-                                failures
-                                    .push(format!("{} KVN round-trip failed: {}", case.name, e));
-                            }
-                        } else {
-                            failures.push(format!("{} failed to serialize to KVN", case.name));
+                    } else if let Ok(kvn_out) = msg.to_kvn() {
+                        if let Err(e) = from_str(&kvn_out) {
+                            failures.push(format!("{} KVN round-trip failed: {}", case.name, e));
                         }
+                    } else {
+                        failures.push(format!("{} failed to serialize to KVN", case.name));
                     }
                 }
                 Err(e) => failures.push(format!("{} failed to parse: {}", case.name, e)),
@@ -81,28 +78,17 @@ fn test_parse_data_samples() {
             }
         };
 
-        let is_lenient_only = file
+        let is_known_nonconformant = file
             .file_name()
             .and_then(|name| name.to_str())
             .is_some_and(|name| name.eq_ignore_ascii_case("ndm_g22.xml"));
 
-        if is_lenient_only {
-            let _ = take_validation_warnings();
-            match from_str_with_mode(&content, ValidationMode::Lenient) {
-                Ok(_) => {
-                    let warnings = take_validation_warnings();
-                    if warnings.is_empty() {
-                        failures.push(format!(
-                            "{} parsed in lenient mode but emitted no warnings",
-                            file.display()
-                        ));
-                    }
-                }
-                Err(e) => failures.push(format!(
-                    "{} failed to parse in lenient mode: {}",
-                    file.display(),
-                    e
-                )),
+        if is_known_nonconformant {
+            if from_str(&content).is_ok() {
+                failures.push(format!(
+                    "{} parsed strictly but is missing conditionally required OPM data",
+                    file.display()
+                ));
             }
         } else if let Err(e) = from_str(&content) {
             failures.push(format!("{} failed to parse: {}", file.display(), e));
@@ -122,16 +108,15 @@ fn test_parse_data_samples() {
 fn test_roundtrip_known_edge_samples() {
     let data_root = data_dir();
     let samples = [
-        ("kvn/acm_g7.kvn", true, ValidationMode::Strict),
-        ("kvn/acm_g8.kvn", true, ValidationMode::Strict),
-        ("kvn/acm_g9.kvn", true, ValidationMode::Strict),
-        ("kvn/tdm_e14.kvn", true, ValidationMode::Strict),
-        ("xml/ndm_g22.xml", false, ValidationMode::Lenient),
+        ("kvn/acm_g7.kvn", true),
+        ("kvn/acm_g8.kvn", true),
+        ("kvn/acm_g9.kvn", true),
+        ("kvn/tdm_e14.kvn", true),
     ];
 
     let mut failures = Vec::new();
 
-    for (rel_path, is_kvn, mode) in samples {
+    for (rel_path, is_kvn) in samples {
         let path = data_root.join(rel_path);
         let content = match fs::read_to_string(&path) {
             Ok(content) => content,
@@ -141,52 +126,19 @@ fn test_roundtrip_known_edge_samples() {
             }
         };
 
-        let msg = match mode {
-            ValidationMode::Strict => from_str(&content),
-            ValidationMode::Lenient => {
-                let _ = take_validation_warnings();
-                from_str_with_mode(&content, ValidationMode::Lenient)
-            }
-        };
-        let msg = match msg {
+        let msg = match from_str(&content) {
             Ok(msg) => msg,
             Err(e) => {
                 failures.push(format!("{} failed to parse: {}", path.display(), e));
                 continue;
             }
         };
-        if mode == ValidationMode::Lenient && take_validation_warnings().is_empty() {
-            failures.push(format!(
-                "{} parsed in lenient mode but emitted no warnings",
-                path.display()
-            ));
-            continue;
-        }
 
         let roundtrip = if is_kvn {
-            msg.to_xml().and_then(|xml| match mode {
-                ValidationMode::Strict => from_str(&xml).map(|_| ()),
-                ValidationMode::Lenient => {
-                    let _ = take_validation_warnings();
-                    from_str_with_mode(&xml, ValidationMode::Lenient).map(|_| ())
-                }
-            })
+            msg.to_xml().and_then(|xml| from_str(&xml).map(|_| ()))
         } else {
-            msg.to_kvn().and_then(|kvn| match mode {
-                ValidationMode::Strict => from_str(&kvn).map(|_| ()),
-                ValidationMode::Lenient => {
-                    let _ = take_validation_warnings();
-                    from_str_with_mode(&kvn, ValidationMode::Lenient).map(|_| ())
-                }
-            })
+            msg.to_kvn().and_then(|kvn| from_str(&kvn).map(|_| ()))
         };
-
-        if mode == ValidationMode::Lenient && take_validation_warnings().is_empty() {
-            failures.push(format!(
-                "{} lenient round-trip parse emitted no warnings",
-                path.display()
-            ));
-        }
 
         if let Err(err) = roundtrip {
             let label = if is_kvn {
@@ -215,9 +167,7 @@ struct MinimalCase<'a> {
 }
 
 fn data_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("data")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("data")
 }
 
 fn sorted_files(dir: &Path, extension: &str) -> Vec<PathBuf> {
@@ -357,8 +307,8 @@ META_STOP
 ATT_START
 REF_FRAME_A = GCRF
 REF_FRAME_B = SC_BODY
-ATT_TYPE = QUATERNION
 NUMBER_STATES = 4
+ATT_TYPE = QUATERNION
 0.0 0 0 0 1
 ATT_STOP
 "#;
@@ -549,9 +499,9 @@ INCLINATION = 98.0
 RA_OF_ASC_NODE = 10.0
 ARG_OF_PERICENTER = 20.0
 MEAN_ANOMALY = 30.0
+BSTAR = 0.0001 [1/ER]
 MEAN_MOTION_DOT = 0.000001 [rev/day**2]
 MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-BSTAR = 0.0001 [1/ER]
 "#;
 
 const OPM_MINIMAL_KVN: &str = r#"CCSDS_OPM_VERS = 3.0

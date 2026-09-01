@@ -4,14 +4,12 @@
 
 use crate::common::OdmHeader;
 use crate::common::{parse_object_description, parse_time_system};
-use crate::types::parse_epoch;
+use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::messages::ocm as core_ocm;
-use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::Duration;
-use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
+use pyo3::types::PyList;
 
 /// Orbit Comprehensive Message (OCM).
 ///
@@ -33,9 +31,38 @@ use std::fs;
 /// segment : OcmSegment
 ///     The OCM data segment.
 #[pyclass]
-#[derive(Clone)]
 pub struct Ocm {
-    pub inner: core_ocm::Ocm,
+    id: Option<String>,
+    version: String,
+    header: Py<OdmHeader>,
+    segment: Py<OcmSegment>,
+}
+
+impl Ocm {
+    pub(crate) fn from_core(py: Python<'_>, value: core_ocm::Ocm) -> PyResult<Self> {
+        Ok(Self {
+            id: value.id,
+            version: value.version,
+            header: Py::new(
+                py,
+                OdmHeader {
+                    inner: value.header,
+                },
+            )?,
+            segment: Py::new(py, OcmSegment::from_core(py, *value.body.segment)?)?,
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::Ocm> {
+        Ok(core_ocm::Ocm {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            header: self.header.borrow(py).inner.clone(),
+            body: core_ocm::OcmBody {
+                segment: Box::new(self.segment.borrow(py).to_core(py)?),
+            },
+        })
+    }
 }
 
 #[pymethods]
@@ -54,31 +81,17 @@ impl Ocm {
     /// Ocm
     ///     The parsed Ocm object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = match format {
-            Some("kvn") => ccsds_ndm::messages::ocm::Ocm::from_kvn(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some("xml") => ccsds_ndm::messages::ocm::Ocm::from_xml(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some(other) => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                    other
-                )))
-            }
-            None => match ccsds_ndm::from_str(data) {
-                Ok(MessageType::Ocm(ocm)) => ocm,
-                Ok(other) => {
-                    return Err(PyValueError::new_err(format!(
-                        "Parsed message is not OCM (got {:?})",
-                        other
-                    )))
-                }
-                Err(e) => return Err(PyValueError::new_err(e.to_string())),
-            },
-        };
-        Ok(Self { inner })
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_str(
+        py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_records);
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        Self::from_core(py, inner)
     }
 
     /// Create an OCM message from a file.
@@ -95,35 +108,38 @@ impl Ocm {
     /// Ocm
     ///     The parsed OCM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(&content, format)
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_file(
+        py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_records);
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Self::from_core(py, inner)
     }
 
     /// Create a new OCM message.
     #[new]
-    fn new(header: OdmHeader, segment: OcmSegment) -> Self {
+    fn new(header: Py<OdmHeader>, segment: Py<OcmSegment>) -> Self {
         Self {
-            inner: core_ocm::Ocm {
-                header: header.inner,
-                body: core_ocm::OcmBody {
-                    segment: Box::new(segment.inner),
-                },
-                id: Some("CCSDS_OCM_VERS".to_string()),
-                version: "3.0".to_string(),
-            },
+            header,
+            segment,
+            id: Some("CCSDS_OCM_VERS".to_string()),
+            version: "3.0".to_string(),
         }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "Ocm(object_name='{}')",
-            self.inner
-                .body
-                .segment
+            self.segment
+                .borrow(py)
                 .metadata
+                .borrow(py)
+                .inner
                 .object_name
                 .as_ref()
                 .unwrap_or(&"N/A".to_string())
@@ -135,7 +151,7 @@ impl Ocm {
     /// :type: Optional[str]
     #[getter]
     fn get_id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     /// The message version.
@@ -143,54 +159,20 @@ impl Ocm {
     /// :type: str
     #[getter]
     fn get_version(&self) -> String {
-        self.inner.version.clone()
+        self.version.clone()
     }
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Ocm, &value)?;
-        self.inner.version = value;
+        self.version = value;
         Ok(())
     }
 
     /// Validate the message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        if strict {
-            self.inner
-                .validate()
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
-            Ok(None)
-        } else {
-            let mut issues = Vec::new();
-            let _ = ccsds_ndm::validation::with_validation_mode(
-                ccsds_ndm::validation::ValidationMode::Lenient,
-                || match self.inner.validate() {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        issues.push(e.to_string());
-                        Ok(())
-                    }
-                },
-            );
-
-            let warnings = ccsds_ndm::validation::take_warnings();
-            for w in warnings {
-                issues.push(w.error.to_string());
-            }
-
-            if issues.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(issues))
-            }
-        }
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
     /// Orbit Comprehensive Message (OCM).
@@ -208,61 +190,42 @@ impl Ocm {
     ///
     /// :type: OdmHeader
     #[getter]
-    fn get_header(&self) -> OdmHeader {
-        OdmHeader {
-            inner: self.inner.header.clone(),
-        }
+    fn get_header(&self, py: Python<'_>) -> Py<OdmHeader> {
+        self.header.clone_ref(py)
     }
 
     #[setter]
-    fn set_header(&mut self, header: OdmHeader) {
-        self.inner.header = header.inner;
+    fn set_header(&mut self, header: Py<OdmHeader>) {
+        self.header = header;
     }
 
     /// The OCM data segment.
     ///
     /// :type: OcmSegment
     #[getter]
-    fn get_segment(&self) -> OcmSegment {
-        OcmSegment {
-            inner: *self.inner.body.segment.clone(),
-        }
+    fn get_segment(&self, py: Python<'_>) -> Py<OcmSegment> {
+        self.segment.clone_ref(py)
     }
 
     #[setter]
-    fn set_segment(&mut self, segment: OcmSegment) {
-        self.inner.body.segment = Box::new(segment.inner);
+    fn set_segment(&mut self, segment: Py<OcmSegment>) {
+        self.segment = segment;
     }
-    /// Serialize to string.
-    ///
-    /// Parameters
-    /// ----------
-    /// format : str
-    ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     The serialized string.
-    #[pyo3(signature = (format, validate=true))]
-    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
-        if validate {
-            self.validate(true)?;
-        }
-        match format {
-            "kvn" => self
-                .inner
-                .to_kvn()
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!(
-                "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                other
-            ))),
-        }
+    /// Serialize to KVN or XML after mandatory CCSDS validation.
+    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        format: &str,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(
+            &self.to_core(py)?,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     /// Write to file.
@@ -273,18 +236,24 @@ impl Ocm {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    #[pyo3(signature = (path, format, validate=true))]
-    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
-        let data = self.to_str(format, validate)?;
-        match fs::write(path, data) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!(
-                "Failed to write file: {}",
-                e
-            ))),
-        }
+    /// version : str, optional
+    ///     Source version by default, ``"latest"``, or an exact supported version.
+    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        path: &str,
+        format: &str,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<()> {
+        crate::api::generate_file_with_limit(
+            &self.to_core(py)?,
+            path,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 }
 
@@ -299,32 +268,49 @@ impl Ocm {
 /// data : OcmData
 ///     Segment data blocks.
 #[pyclass]
-#[derive(Clone)]
 pub struct OcmSegment {
-    pub inner: core_ocm::OcmSegment,
+    metadata: Py<OcmMetadata>,
+    data: Py<OcmData>,
+}
+
+impl OcmSegment {
+    fn from_core(py: Python<'_>, value: core_ocm::OcmSegment) -> PyResult<Self> {
+        Ok(Self {
+            metadata: Py::new(
+                py,
+                OcmMetadata {
+                    inner: value.metadata,
+                },
+            )?,
+            data: Py::new(py, OcmData::from_core(py, value.data)?)?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmSegment> {
+        Ok(core_ocm::OcmSegment {
+            metadata: self.metadata.borrow(py).inner.clone(),
+            data: self.data.borrow(py).to_core(py)?,
+        })
+    }
 }
 
 #[pymethods]
 impl OcmSegment {
     /// Create a new OCM Segment.
     #[new]
-    fn new(metadata: OcmMetadata, data: OcmData) -> Self {
-        Self {
-            inner: core_ocm::OcmSegment {
-                metadata: metadata.inner,
-                data: data.inner,
-            },
-        }
+    fn new(metadata: Py<OcmMetadata>, data: Py<OcmData>) -> Self {
+        Self { metadata, data }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "OcmSegment(object_name='{}')",
-            self.inner
-                .metadata
+            self.metadata
+                .borrow(py)
+                .inner
                 .object_name
-                .as_ref()
-                .unwrap_or(&"N/A".to_string())
+                .as_deref()
+                .unwrap_or("N/A")
         )
     }
 
@@ -334,30 +320,26 @@ impl OcmSegment {
     ///
     /// :type: OcmMetadata
     #[getter]
-    fn get_metadata(&self) -> OcmMetadata {
-        OcmMetadata {
-            inner: self.inner.metadata.clone(),
-        }
+    fn get_metadata(&self, py: Python<'_>) -> Py<OcmMetadata> {
+        self.metadata.clone_ref(py)
     }
 
     #[setter]
-    fn set_metadata(&mut self, metadata: OcmMetadata) {
-        self.inner.metadata = metadata.inner;
+    fn set_metadata(&mut self, metadata: Py<OcmMetadata>) {
+        self.metadata = metadata;
     }
 
     /// Segment data blocks.
     ///
     /// :type: OcmData
     #[getter]
-    fn get_data(&self) -> OcmData {
-        OcmData {
-            inner: self.inner.data.clone(),
-        }
+    fn get_data(&self, py: Python<'_>) -> Py<OcmData> {
+        self.data.clone_ref(py)
     }
 
     #[setter]
-    fn set_data(&mut self, data: OcmData) {
-        self.inner.data = data.inner;
+    fn set_data(&mut self, data: Py<OcmData>) {
+        self.data = data;
     }
 }
 
@@ -627,7 +609,7 @@ impl OcmMetadata {
                 constellation,
                 object_type: object_type_enum,
                 time_system,
-                epoch_tzero: parse_epoch(&epoch_tzero)?,
+                epoch_tzero: parse_calendar_epoch(&epoch_tzero)?,
                 ops_status,
                 orbit_category,
                 ocm_data_elements,
@@ -640,9 +622,11 @@ impl OcmMetadata {
                     units: None,
                 }),
                 previous_message_epoch: previous_message_epoch
-                    .map(|s| parse_epoch(&s))
+                    .map(|s| parse_calendar_epoch(&s))
                     .transpose()?,
-                next_message_epoch: next_message_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                next_message_epoch: next_message_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 start_time: start_time.map(|s| parse_epoch(&s)).transpose()?,
                 stop_time: stop_time.map(|s| parse_epoch(&s)).transpose()?,
                 time_span: time_span.map(|v| DayInterval {
@@ -653,7 +637,9 @@ impl OcmMetadata {
                     value: v,
                     units: None,
                 }),
-                next_leap_epoch: next_leap_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                next_leap_epoch: next_leap_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 next_leap_taimutc: next_leap_taimutc.map(|v| TimeOffset {
                     value: v,
                     units: None,
@@ -712,7 +698,7 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_epoch_tzero(&mut self, value: String) -> PyResult<()> {
-        self.inner.epoch_tzero = parse_epoch(&value)?;
+        self.inner.epoch_tzero = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -1274,7 +1260,7 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_previous_message_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.previous_message_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.previous_message_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
     /// Anticipated (or actual) epoch of the next message from this originator for this space
@@ -1293,7 +1279,7 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_next_message_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.next_message_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.next_message_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
     /// Time of the earliest data contained in the OCM, specified as either a relative or
@@ -1383,7 +1369,7 @@ impl OcmMetadata {
     }
     #[setter]
     fn set_next_leap_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.next_leap_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.next_leap_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
     /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since
@@ -1475,132 +1461,207 @@ impl OcmMetadata {
 /// different data blocks, such as trajectory, physical properties, covariance,
 /// maneuvers, and other related information.
 #[pyclass]
-#[derive(Clone)]
 pub struct OcmData {
-    pub inner: core_ocm::OcmData,
+    traj: Py<PyList>,
+    phys: Option<Py<OcmPhysicalDescription>>,
+    man: Py<PyList>,
+    cov: Py<PyList>,
+    pert: Option<Py<OcmPerturbations>>,
+    od: Option<Py<OcmOdParameters>>,
+    user: Option<Py<crate::types::UserDefined>>,
+}
+
+impl OcmData {
+    fn from_core(py: Python<'_>, value: core_ocm::OcmData) -> PyResult<Self> {
+        let traj = value
+            .traj
+            .into_iter()
+            .map(|value| Py::new(py, OcmTrajState::from_core(py, value)?))
+            .collect::<PyResult<Vec<_>>>()?;
+        let man = value
+            .man
+            .into_iter()
+            .map(|value| Py::new(py, OcmManeuverParameters::from_core(py, value)?))
+            .collect::<PyResult<Vec<_>>>()?;
+        let cov = value
+            .cov
+            .into_iter()
+            .map(|value| Py::new(py, OcmCovarianceMatrix::from_core(py, value)?))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            traj: PyList::new(py, traj)?.unbind(),
+            phys: value
+                .phys
+                .map(|inner| Py::new(py, OcmPhysicalDescription { inner }))
+                .transpose()?,
+            man: PyList::new(py, man)?.unbind(),
+            cov: PyList::new(py, cov)?.unbind(),
+            pert: value
+                .pert
+                .map(|inner| Py::new(py, OcmPerturbations { inner }))
+                .transpose()?,
+            od: value
+                .od
+                .map(|inner| Py::new(py, OcmOdParameters { inner }))
+                .transpose()?,
+            user: value
+                .user
+                .map(|inner| Py::new(py, crate::types::UserDefined { inner }))
+                .transpose()?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmData> {
+        macro_rules! core_list {
+            ($values:expr, $wrapper:ty, $name:literal, $convert:expr) => {
+                $values
+                    .bind(py)
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| {
+                        let value = value.extract::<PyRef<'_, $wrapper>>().map_err(|_| {
+                            PyValueError::new_err(format!(
+                                "{}[{index}] must be {}",
+                                $name,
+                                stringify!($wrapper)
+                            ))
+                        })?;
+                        $convert(&value)
+                    })
+                    .collect::<PyResult<Vec<_>>>()?
+            };
+        }
+        Ok(core_ocm::OcmData {
+            traj: core_list!(self.traj, OcmTrajState, "traj", |value: &OcmTrajState| {
+                value.to_core(py)
+            }),
+            phys: self
+                .phys
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            man: core_list!(
+                self.man,
+                OcmManeuverParameters,
+                "man",
+                |value: &OcmManeuverParameters| { value.to_core(py) }
+            ),
+            cov: core_list!(
+                self.cov,
+                OcmCovarianceMatrix,
+                "cov",
+                |value: &OcmCovarianceMatrix| { value.to_core(py) }
+            ),
+            pert: self
+                .pert
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            od: self.od.as_ref().map(|value| value.borrow(py).inner.clone()),
+            user: self
+                .user
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+        })
+    }
 }
 
 #[pymethods]
 impl OcmData {
     #[new]
-    fn new() -> Self {
-        Self {
-            inner: core_ocm::OcmData::default(),
-        }
+    fn new(py: Python<'_>) -> PyResult<Self> {
+        Self::from_core(py, core_ocm::OcmData::default())
     }
 
-    fn __repr__(&self) -> String {
-        format!("OcmData(traj_states={})", self.inner.traj.len())
+    fn __repr__(&self, py: Python<'_>) -> String {
+        format!("OcmData(traj_states={})", self.traj.bind(py).len())
     }
 
     /// List of trajectory state time history blocks.
     ///
     /// :type: list[OcmTrajState]
     #[getter]
-    fn get_traj(&self) -> Vec<OcmTrajState> {
-        self.inner
-            .traj
-            .iter()
-            .map(|t| OcmTrajState { inner: t.clone() })
-            .collect()
+    fn get_traj(&self, py: Python<'_>) -> Py<PyList> {
+        self.traj.clone_ref(py)
     }
 
     #[setter]
-    fn set_traj(&mut self, value: Vec<OcmTrajState>) {
-        self.inner.traj = value.into_iter().map(|t| t.inner).collect();
+    fn set_traj(&mut self, py: Python<'_>, value: Vec<Py<OcmTrajState>>) -> PyResult<()> {
+        self.traj = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Space object physical characteristics.
     ///
     /// :type: Optional[OcmPhysicalDescription]
     #[getter]
-    fn get_phys(&self) -> Option<OcmPhysicalDescription> {
-        self.inner
-            .phys
-            .as_ref()
-            .map(|p| OcmPhysicalDescription { inner: p.clone() })
+    fn get_phys(&self, py: Python<'_>) -> Option<Py<OcmPhysicalDescription>> {
+        self.phys.as_ref().map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_phys(&mut self, value: Option<OcmPhysicalDescription>) {
-        self.inner.phys = value.map(|p| p.inner);
+    fn set_phys(&mut self, value: Option<Py<OcmPhysicalDescription>>) {
+        self.phys = value;
     }
 
     /// List of maneuver specifications.
     ///
     /// :type: list[OcmManeuverParameters]
     #[getter]
-    fn get_man(&self) -> Vec<OcmManeuverParameters> {
-        self.inner
-            .man
-            .iter()
-            .map(|m| OcmManeuverParameters { inner: m.clone() })
-            .collect()
+    fn get_man(&self, py: Python<'_>) -> Py<PyList> {
+        self.man.clone_ref(py)
     }
     #[setter]
-    fn set_man(&mut self, value: Vec<OcmManeuverParameters>) {
-        self.inner.man = value.into_iter().map(|m| m.inner).collect();
+    fn set_man(&mut self, py: Python<'_>, value: Vec<Py<OcmManeuverParameters>>) -> PyResult<()> {
+        self.man = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// List of covariance time history blocks.
     ///
     /// :type: list[OcmCovarianceMatrix]
     #[getter]
-    fn get_cov(&self) -> Vec<OcmCovarianceMatrix> {
-        self.inner
-            .cov
-            .iter()
-            .map(|c| OcmCovarianceMatrix { inner: c.clone() })
-            .collect()
+    fn get_cov(&self, py: Python<'_>) -> Py<PyList> {
+        self.cov.clone_ref(py)
     }
     #[setter]
-    fn set_cov(&mut self, value: Vec<OcmCovarianceMatrix>) {
-        self.inner.cov = value.into_iter().map(|c| c.inner).collect();
+    fn set_cov(&mut self, py: Python<'_>, value: Vec<Py<OcmCovarianceMatrix>>) -> PyResult<()> {
+        self.cov = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Perturbation parameters.
     ///
     /// :type: Optional[OcmPerturbations]
     #[getter]
-    fn get_pert(&self) -> Option<OcmPerturbations> {
-        self.inner
-            .pert
-            .as_ref()
-            .map(|p| OcmPerturbations { inner: p.clone() })
+    fn get_pert(&self, py: Python<'_>) -> Option<Py<OcmPerturbations>> {
+        self.pert.as_ref().map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_pert(&mut self, value: Option<OcmPerturbations>) {
-        self.inner.pert = value.map(|p| p.inner);
+    fn set_pert(&mut self, value: Option<Py<OcmPerturbations>>) {
+        self.pert = value;
     }
 
     /// Orbit determination data.
     ///
     /// :type: Optional[OcmOdParameters]
     #[getter]
-    fn get_od(&self) -> Option<OcmOdParameters> {
-        self.inner
-            .od
-            .as_ref()
-            .map(|o| OcmOdParameters { inner: o.clone() })
+    fn get_od(&self, py: Python<'_>) -> Option<Py<OcmOdParameters>> {
+        self.od.as_ref().map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_od(&mut self, value: Option<OcmOdParameters>) {
-        self.inner.od = value.map(|o| o.inner);
+    fn set_od(&mut self, value: Option<Py<OcmOdParameters>>) {
+        self.od = value;
     }
 
     /// User-defined parameters.
     ///
     /// :type: UserDefined | None
     #[getter]
-    fn get_user(&self) -> Option<crate::types::UserDefined> {
-        self.inner
-            .user
-            .as_ref()
-            .map(|u| crate::types::UserDefined { inner: u.clone() })
+    fn get_user(&self, py: Python<'_>) -> Option<Py<crate::types::UserDefined>> {
+        self.user.as_ref().map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_user(&mut self, value: Option<crate::types::UserDefined>) {
-        self.inner.user = value.map(|u| u.inner);
+    fn set_user(&mut self, value: Option<Py<crate::types::UserDefined>>) {
+        self.user = value;
     }
 }
 
@@ -1649,9 +1710,42 @@ impl OcmData {
 /// comment : list[str], optional
 ///     Comments.
 #[pyclass]
-#[derive(Clone)]
 pub struct OcmTrajState {
-    pub inner: core_ocm::OcmTrajState,
+    inner: core_ocm::OcmTrajState,
+    traj_lines: Py<PyList>,
+}
+
+impl OcmTrajState {
+    fn from_core(py: Python<'_>, mut value: core_ocm::OcmTrajState) -> PyResult<Self> {
+        let lines = std::mem::take(&mut value.traj_lines)
+            .into_iter()
+            .map(|inner| Py::new(py, TrajLine { inner }))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            inner: value,
+            traj_lines: PyList::new(py, lines)?.unbind(),
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmTrajState> {
+        let traj_lines = self
+            .traj_lines
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, TrajLine>>()
+                    .map(|value| value.inner.clone())
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("traj_lines[{index}] must be TrajLine"))
+                    })
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        let mut value = self.inner.clone();
+        value.traj_lines = traj_lines;
+        Ok(value)
+    }
 }
 
 #[pymethods]
@@ -1683,10 +1777,11 @@ impl OcmTrajState {
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
+        py: Python<'_>,
         center_name: String,
         traj_ref_frame: String,
         traj_type: String,
-        traj_lines: Vec<TrajLine>,
+        traj_lines: Vec<Py<TrajLine>>,
         traj_id: Option<String>,
         traj_prev_id: Option<String>,
         traj_next_id: Option<String>,
@@ -1722,24 +1817,31 @@ impl OcmTrajState {
                 propagator,
                 center_name,
                 traj_ref_frame,
-                traj_frame_epoch: traj_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
-                useable_start_time: useable_start_time.map(|s| parse_epoch(&s)).transpose()?,
-                useable_stop_time: useable_stop_time.map(|s| parse_epoch(&s)).transpose()?,
+                traj_frame_epoch: traj_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
+                useable_start_time: useable_start_time
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
+                useable_stop_time: useable_stop_time
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 orb_revnum,
                 orb_revnum_basis: None, // RevNumBasis enum doesn't implement FromStr
                 traj_type,
                 orb_averaging,
                 traj_units,
-                traj_lines: traj_lines.into_iter().map(|t| t.inner).collect(),
+                traj_lines: Vec::new(),
             },
+            traj_lines: PyList::new(py, traj_lines)?.unbind(),
         })
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "OcmTrajState(traj_type='{}', lines={})",
             self.inner.traj_type,
-            self.inner.traj_lines.len()
+            self.traj_lines.bind(py).len()
         )
     }
 
@@ -1799,16 +1901,13 @@ impl OcmTrajState {
     ///
     /// :type: list[TrajLine]
     #[getter]
-    fn get_traj_lines(&self) -> Vec<TrajLine> {
-        self.inner
-            .traj_lines
-            .iter()
-            .map(|t| TrajLine { inner: t.clone() })
-            .collect()
+    fn get_traj_lines(&self, py: Python<'_>) -> Py<PyList> {
+        self.traj_lines.clone_ref(py)
     }
     #[setter]
-    fn set_traj_lines(&mut self, value: Vec<TrajLine>) {
-        self.inner.traj_lines = value.into_iter().map(|t| t.inner).collect();
+    fn set_traj_lines(&mut self, py: Python<'_>, value: Vec<Py<TrajLine>>) -> PyResult<()> {
+        self.traj_lines = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Comments (a contiguous set of one or more comment lines may be provided in the
@@ -1985,7 +2084,7 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_traj_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.traj_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.traj_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -2009,7 +2108,7 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_useable_start_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.useable_start_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.useable_start_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -2033,7 +2132,7 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_useable_stop_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.useable_stop_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.useable_stop_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -2147,10 +2246,13 @@ impl TrajLine {
     /// Create a new TrajLine object.
     #[new]
     #[pyo3(signature = (*, epoch, values))]
-    fn new(epoch: String, values: Vec<f64>) -> Self {
-        Self {
-            inner: core_ocm::TrajLine { epoch, values },
-        }
+    fn new(epoch: String, values: Vec<f64>) -> PyResult<Self> {
+        Ok(Self {
+            inner: core_ocm::TrajLine {
+                epoch: parse_epoch(&epoch)?,
+                values,
+            },
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -2166,11 +2268,12 @@ impl TrajLine {
     /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
-        self.inner.epoch.clone()
+        self.inner.epoch.as_str().to_string()
     }
     #[setter]
-    fn set_epoch(&mut self, value: String) {
-        self.inner.epoch = value;
+    fn set_epoch(&mut self, value: String) -> PyResult<()> {
+        self.inner.epoch = parse_epoch(&value)?;
+        Ok(())
     }
 
     /// Trajectory state elements for this epoch.
@@ -2348,7 +2451,7 @@ impl OcmPhysicalDescription {
                 }),
                 oeb_parent_frame,
                 oeb_parent_frame_epoch: oeb_parent_frame_epoch
-                    .map(|s| parse_epoch(&s))
+                    .map(|s| parse_calendar_epoch(&s))
                     .transpose()?,
                 oeb_q1,
                 oeb_q2,
@@ -2746,7 +2849,7 @@ impl OcmPhysicalDescription {
     }
     #[setter]
     fn set_oeb_parent_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.oeb_parent_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.oeb_parent_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
     /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
@@ -3469,9 +3572,42 @@ impl OcmPhysicalDescription {
 ///     Comments.
 ///     (Optional)
 #[pyclass]
-#[derive(Clone)]
 pub struct OcmCovarianceMatrix {
-    pub inner: core_ocm::OcmCovarianceMatrix,
+    inner: core_ocm::OcmCovarianceMatrix,
+    cov_lines: Py<PyList>,
+}
+
+impl OcmCovarianceMatrix {
+    fn from_core(py: Python<'_>, mut value: core_ocm::OcmCovarianceMatrix) -> PyResult<Self> {
+        let lines = std::mem::take(&mut value.cov_lines)
+            .into_iter()
+            .map(|inner| Py::new(py, CovLine { inner }))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            inner: value,
+            cov_lines: PyList::new(py, lines)?.unbind(),
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmCovarianceMatrix> {
+        let cov_lines = self
+            .cov_lines
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, CovLine>>()
+                    .map(|value| value.inner.clone())
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("cov_lines[{index}] must be CovLine"))
+                    })
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        let mut value = self.inner.clone();
+        value.cov_lines = cov_lines;
+        Ok(value)
+    }
 }
 
 #[pymethods]
@@ -3480,10 +3616,11 @@ impl OcmCovarianceMatrix {
     #[pyo3(signature = (*, cov_ref_frame, cov_type, cov_ordering, cov_lines, cov_id=None, cov_prev_id=None, cov_next_id=None, cov_basis=None, cov_basis_id=None, cov_frame_epoch=None, cov_scale_min=None, cov_scale_max=None, cov_confidence=None, cov_units=None, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
+        py: Python<'_>,
         cov_ref_frame: String,
         cov_type: String,
         cov_ordering: String,
-        cov_lines: Vec<CovLine>,
+        cov_lines: Vec<Py<CovLine>>,
         cov_id: Option<String>,
         cov_prev_id: Option<String>,
         cov_next_id: Option<String>,
@@ -3508,7 +3645,9 @@ impl OcmCovarianceMatrix {
                 )?,
                 cov_basis_id,
                 cov_ref_frame,
-                cov_frame_epoch: cov_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                cov_frame_epoch: cov_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 cov_scale_min,
                 cov_scale_max,
                 cov_confidence: cov_confidence.map(|v| Percentage {
@@ -3520,16 +3659,17 @@ impl OcmCovarianceMatrix {
                     |e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()),
                 )?,
                 cov_units,
-                cov_lines: cov_lines.into_iter().map(|c| c.inner).collect(),
+                cov_lines: Vec::new(),
             },
+            cov_lines: PyList::new(py, cov_lines)?.unbind(),
         })
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "OcmCovarianceMatrix(cov_type='{}', lines={})",
             self.inner.cov_type,
-            self.inner.cov_lines.len()
+            self.cov_lines.bind(py).len()
         )
     }
 
@@ -3656,7 +3796,7 @@ impl OcmCovarianceMatrix {
     }
     #[setter]
     fn set_cov_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.cov_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.cov_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -3769,16 +3909,13 @@ impl OcmCovarianceMatrix {
     ///
     /// :type: list[CovLine]
     #[getter]
-    fn get_cov_lines(&self) -> Vec<CovLine> {
-        self.inner
-            .cov_lines
-            .iter()
-            .map(|c| CovLine { inner: c.clone() })
-            .collect()
+    fn get_cov_lines(&self, py: Python<'_>) -> Py<PyList> {
+        self.cov_lines.clone_ref(py)
     }
     #[setter]
-    fn set_cov_lines(&mut self, value: Vec<CovLine>) {
-        self.inner.cov_lines = value.into_iter().map(|c| c.inner).collect();
+    fn set_cov_lines(&mut self, py: Python<'_>, value: Vec<Py<CovLine>>) -> PyResult<()> {
+        self.cov_lines = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
@@ -3815,10 +3952,13 @@ impl CovLine {
     /// Create a new CovLine object.
     #[new]
     #[pyo3(signature = (*, epoch, values))]
-    fn new(epoch: String, values: Vec<f64>) -> Self {
-        Self {
-            inner: core_ocm::CovLine { epoch, values },
-        }
+    fn new(epoch: String, values: Vec<f64>) -> PyResult<Self> {
+        Ok(Self {
+            inner: core_ocm::CovLine {
+                epoch: parse_epoch(&epoch)?,
+                values,
+            },
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -3834,11 +3974,12 @@ impl CovLine {
     /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
-        self.inner.epoch.clone()
+        self.inner.epoch.as_str().to_string()
     }
     #[setter]
-    fn set_epoch(&mut self, value: String) {
-        self.inner.epoch = value;
+    fn set_epoch(&mut self, value: String) -> PyResult<()> {
+        self.inner.epoch = parse_epoch(&value)?;
+        Ok(())
     }
 
     /// Covariance matrix elements for this epoch.
@@ -3899,9 +4040,42 @@ impl CovLine {
 /// comment : list of str, optional
 ///     Comments for this maneuver block.
 #[pyclass]
-#[derive(Clone)]
 pub struct OcmManeuverParameters {
-    pub inner: core_ocm::OcmManeuverParameters,
+    inner: core_ocm::OcmManeuverParameters,
+    man_lines: Py<PyList>,
+}
+
+impl OcmManeuverParameters {
+    fn from_core(py: Python<'_>, mut value: core_ocm::OcmManeuverParameters) -> PyResult<Self> {
+        let lines = std::mem::take(&mut value.man_lines)
+            .into_iter()
+            .map(|inner| Py::new(py, ManLine { inner }))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            inner: value,
+            man_lines: PyList::new(py, lines)?.unbind(),
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmManeuverParameters> {
+        let man_lines = self
+            .man_lines
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, ManLine>>()
+                    .map(|value| value.inner.clone())
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("man_lines[{index}] must be ManLine"))
+                    })
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        let mut value = self.inner.clone();
+        value.man_lines = man_lines;
+        Ok(value)
+    }
 }
 
 #[pymethods]
@@ -3945,11 +4119,12 @@ impl OcmManeuverParameters {
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
+        py: Python<'_>,
         man_id: String,
         man_device_id: String,
         man_composition: String,
         man_ref_frame: String,
-        man_lines: Vec<ManLine>,
+        man_lines: Vec<Py<ManLine>>,
         man_prev_id: Option<String>,
         man_next_id: Option<String>,
         man_basis: Option<String>,
@@ -4026,7 +4201,9 @@ impl OcmManeuverParameters {
                 man_purpose,
                 man_pred_source,
                 man_ref_frame,
-                man_frame_epoch: man_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                man_frame_epoch: man_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 grav_assist_name,
                 dc_type: dc_type
                     .map(|s| s.parse())
@@ -4063,8 +4240,9 @@ impl OcmManeuverParameters {
                 }),
                 man_composition,
                 man_units,
-                man_lines: man_lines.into_iter().map(|l| l.inner).collect(),
+                man_lines: Vec::new(),
             },
+            man_lines: PyList::new(py, man_lines)?.unbind(),
         })
     }
 
@@ -4264,7 +4442,7 @@ impl OcmManeuverParameters {
     }
     #[setter]
     fn set_man_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.man_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.man_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -4629,16 +4807,13 @@ impl OcmManeuverParameters {
     ///
     /// :type: list[ManLine]
     #[getter]
-    fn get_man_lines(&self) -> Vec<ManLine> {
-        self.inner
-            .man_lines
-            .iter()
-            .map(|l| ManLine { inner: l.clone() })
-            .collect()
+    fn get_man_lines(&self, py: Python<'_>) -> Py<PyList> {
+        self.man_lines.clone_ref(py)
     }
     #[setter]
-    fn set_man_lines(&mut self, value: Vec<ManLine>) {
-        self.inner.man_lines = value.into_iter().map(|l| l.inner).collect();
+    fn set_man_lines(&mut self, py: Python<'_>, value: Vec<Py<ManLine>>) -> PyResult<()> {
+        self.man_lines = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
@@ -4675,10 +4850,13 @@ impl ManLine {
     /// Create a new ManLine object.
     #[new]
     #[pyo3(signature = (*, epoch, values))]
-    fn new(epoch: String, values: Vec<String>) -> Self {
-        Self {
-            inner: core_ocm::ManLine { epoch, values },
-        }
+    fn new(epoch: String, values: Vec<String>) -> PyResult<Self> {
+        Ok(Self {
+            inner: core_ocm::ManLine {
+                epoch: parse_epoch(&epoch)?,
+                values,
+            },
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -4694,11 +4872,12 @@ impl ManLine {
     /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
-        self.inner.epoch.clone()
+        self.inner.epoch.as_str().to_string()
     }
     #[setter]
-    fn set_epoch(&mut self, value: String) {
-        self.inner.epoch = value;
+    fn set_epoch(&mut self, value: String) -> PyResult<()> {
+        self.inner.epoch = parse_epoch(&value)?;
+        Ok(())
     }
 
     /// Maneuver elements for this epoch.
@@ -4820,9 +4999,10 @@ impl OcmPerturbations {
         self.inner.gm.as_ref().map(|g| g.value)
     }
     #[setter]
-    fn set_gm(&mut self, value: Option<f64>) {
+    fn set_gm(&mut self, value: Option<f64>) -> PyResult<()> {
         use ccsds_ndm::types::Gm;
-        self.inner.gm = value.map(|v| Gm::new(v, None).unwrap());
+        self.inner.gm = crate::api::checked_optional(value, |v| Gm::new(v, None))?;
+        Ok(())
     }
     /// One OR MORE (N-body) gravitational perturbations bodies used. Values, listed serially
     /// in comma-delimited fashion, denote a natural solar or extra-solar system body (stars,

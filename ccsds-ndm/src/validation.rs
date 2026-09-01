@@ -4,13 +4,7 @@
 
 use crate::error::{CcsdsNdmError, Result, ValidationError};
 use crate::traits::Validate;
-use std::cell::{Cell, RefCell};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ValidationMode {
-    Strict,
-    Lenient,
-}
+use std::borrow::Cow;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MessageKind {
@@ -27,68 +21,132 @@ pub enum MessageKind {
     Ndm,
 }
 
-#[derive(Debug, Clone)]
-pub struct ValidationIssue {
-    pub message_kind: MessageKind,
-    pub error: ValidationError,
-}
-
-thread_local! {
-    static VALIDATION_MODE: Cell<ValidationMode> = const { Cell::new(ValidationMode::Strict) };
-    static VALIDATION_WARNINGS: RefCell<Vec<ValidationIssue>> = const { RefCell::new(Vec::new()) };
-}
-
-pub fn current_mode() -> ValidationMode {
-    VALIDATION_MODE.with(|mode| mode.get())
-}
-
-pub fn with_validation_mode<T>(mode: ValidationMode, f: impl FnOnce() -> Result<T>) -> Result<T> {
-    struct Guard {
-        prev: ValidationMode,
-    }
-
-    let prev = VALIDATION_MODE.with(|m| {
-        let prev = m.get();
-        m.set(mode);
-        prev
-    });
-
-    let _guard = Guard { prev };
-    let res = f();
-
-    VALIDATION_MODE.with(|m| m.set(_guard.prev));
-    res
-}
-
-pub fn take_warnings() -> Vec<ValidationIssue> {
-    VALIDATION_WARNINGS.with(|warnings| warnings.borrow_mut().drain(..).collect())
-}
-
-pub fn validate_with_mode(kind: MessageKind, value: &impl Validate) -> Result<()> {
-    match value.validate() {
-        Ok(()) => Ok(()),
-        Err(err) => handle_validation_error(kind, err),
-    }
-}
-
-pub fn handle_validation_error(kind: MessageKind, err: CcsdsNdmError) -> Result<()> {
-    match err {
-        CcsdsNdmError::Validation(val) => handle_validation_error_inner(kind, *val),
-        other => Err(other),
-    }
-}
-
-fn handle_validation_error_inner(kind: MessageKind, err: ValidationError) -> Result<()> {
-    match current_mode() {
-        ValidationMode::Strict => Err(err.into()),
-        ValidationMode::Lenient => {
-            VALIDATION_WARNINGS.with(|warnings| {
-                warnings.borrow_mut().push(ValidationIssue {
-                    message_kind: kind,
-                    error: err,
-                });
-            });
-            Ok(())
+impl MessageKind {
+    /// Standard abbreviation for the message family.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Opm => "OPM",
+            Self::Omm => "OMM",
+            Self::Oem => "OEM",
+            Self::Ocm => "OCM",
+            Self::Acm => "ACM",
+            Self::Aem => "AEM",
+            Self::Apm => "APM",
+            Self::Cdm => "CDM",
+            Self::Tdm => "TDM",
+            Self::Rdm => "RDM",
+            Self::Ndm => "NDM",
         }
     }
+}
+
+pub(crate) fn collect_validation_result(
+    errors: &mut Vec<ValidationError>,
+    result: Result<()>,
+) -> Result<()> {
+    match result {
+        Ok(()) => Ok(()),
+        Err(CcsdsNdmError::Validation(error)) => {
+            errors.push(*error);
+            Ok(())
+        }
+        Err(error) => Err(error),
+    }
+}
+
+pub(crate) fn is_xml_1_character(character: char) -> bool {
+    matches!(character, '\u{9}' | '\u{A}' | '\u{D}')
+        || ('\u{20}'..='\u{D7FF}').contains(&character)
+        || ('\u{E000}'..='\u{FFFD}').contains(&character)
+        || ('\u{10000}'..='\u{10FFFF}').contains(&character)
+}
+
+pub(crate) fn xml_text_error(field: &'static str, value: &str) -> Option<ValidationError> {
+    value
+        .chars()
+        .find(|character| !is_xml_1_character(*character))
+        .map(|character| ValidationError::InvalidValue {
+            field: Cow::Borrowed(field),
+            value: format!("contains U+{:04X}", u32::from(character)),
+            expected: Cow::Borrowed("text containing only XML 1.0 characters"),
+            line: None,
+        })
+}
+
+pub(crate) fn kvn_comment_error(value: &str) -> Option<ValidationError> {
+    for line in value.lines() {
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return Some(ValidationError::InvalidValue {
+                field: Cow::Borrowed("COMMENT"),
+                value: line.to_owned(),
+                expected: Cow::Borrowed("printable ASCII characters and blanks"),
+                line: None,
+            });
+        }
+        let line_len = "COMMENT ".len() + line.len();
+        if line_len > 254 {
+            return Some(ValidationError::OutOfRange {
+                name: Cow::Borrowed("COMMENT"),
+                value: line_len.to_string(),
+                expected: Cow::Borrowed("a KVN line no longer than 254 characters"),
+                line: None,
+            });
+        }
+    }
+    None
+}
+
+pub(crate) fn validation_errors_from(result: Result<()>) -> Result<Vec<ValidationError>> {
+    let mut errors = Vec::new();
+    collect_validation_result(&mut errors, result)?;
+    Ok(errors)
+}
+
+pub(crate) fn validate_at_field_path(result: Result<()>, parent_path: &'static str) -> Result<()> {
+    match result {
+        Err(CcsdsNdmError::Validation(error)) => Err((*error).at_field_in(parent_path).into()),
+        result => result,
+    }
+}
+
+pub(crate) fn at_field_paths(
+    errors: Vec<ValidationError>,
+    parent_path: &'static str,
+) -> Vec<ValidationError> {
+    errors
+        .into_iter()
+        .map(|error| error.at_field_in(parent_path))
+        .collect()
+}
+
+pub(crate) fn collect_message_validation_errors(
+    kind: MessageKind,
+    id: &Option<String>,
+    version: &str,
+    header: &impl Validate,
+    body: &impl Validate,
+) -> Result<Vec<ValidationError>> {
+    let mut errors = Vec::new();
+    collect_validation_result(
+        &mut errors,
+        crate::versioning::validate_root(kind, id, version),
+    )?;
+    errors.extend(header.validation_errors()?);
+    errors.extend(body.validation_errors()?);
+    Ok(errors)
+}
+
+pub(crate) fn missing_required_fields<const N: usize>(
+    block: &'static str,
+    fields: [(&'static str, bool); N],
+) -> Vec<ValidationError> {
+    fields
+        .into_iter()
+        .filter(|(_, missing)| *missing)
+        .map(|(field, _)| ValidationError::MissingRequiredField {
+            block: block.into(),
+            field: field.into(),
+            line: None,
+        })
+        .collect()
 }

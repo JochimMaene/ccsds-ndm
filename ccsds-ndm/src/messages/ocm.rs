@@ -3,14 +3,18 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::OdmHeader;
-use crate::error::{Result, ValidationError};
+use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn, Validate};
+#[cfg(test)]
+use crate::traits::Validate;
+use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use fast_float;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::cmp::Ordering;
+use std::io::Write;
 
 //----------------------------------------------------------------------
 // Root OCM Structure
@@ -53,35 +57,939 @@ impl crate::traits::Validate for Ocm {
         self.header.validate()?;
         self.body.validate()
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::collect_message_validation_errors(
+            crate::validation::MessageKind::Ocm,
+            &self.id,
+            &self.version,
+            &self.header,
+            &self.body,
+        )
+    }
 }
 
 impl Ndm for Ocm {
     fn to_kvn(&self) -> Result<String> {
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Ocm,
+            &self.version,
+            crate::generation::OutputFormat::Kvn,
+            self,
+        )?;
+        self.validate_kvn_representability()?;
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        Ok(writer.finish())
+        writer.finish_checked()
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        validate_kvn_syntax(kvn)?;
         let ocm = Self::from_kvn_str(kvn)?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Ocm, &ocm)?;
+        crate::traits::Validate::validate(&ocm)?;
         Ok(ocm)
     }
 
     fn to_xml(&self) -> Result<String> {
-        self.validate()?;
+        crate::generation::validate_for_generation(
+            crate::validation::MessageKind::Ocm,
+            &self.version,
+            crate::generation::OutputFormat::Xml,
+            self,
+        )?;
         crate::xml::to_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        crate::xml::validate_document_root(xml, b"ocm", "OCM")?;
+        validate_xml_sequences(xml)?;
         let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
-        crate::validation::validate_with_mode(crate::validation::MessageKind::Ocm, &ocm)?;
+        crate::traits::Validate::validate(&ocm)?;
         Ok(ocm)
     }
 }
 
+fn ocm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
+    Some(match parent {
+        b"ocm" => &[b"header", b"body"],
+        b"header" => &[
+            b"COMMENT",
+            b"CLASSIFICATION",
+            b"CREATION_DATE",
+            b"ORIGINATOR",
+            b"MESSAGE_ID",
+        ],
+        b"body" => &[b"segment"],
+        b"segment" => &[b"metadata", b"data"],
+        b"metadata" => &[
+            b"COMMENT",
+            b"OBJECT_NAME",
+            b"INTERNATIONAL_DESIGNATOR",
+            b"CATALOG_NAME",
+            b"OBJECT_DESIGNATOR",
+            b"ALTERNATE_NAMES",
+            b"ORIGINATOR_POC",
+            b"ORIGINATOR_POSITION",
+            b"ORIGINATOR_PHONE",
+            b"ORIGINATOR_EMAIL",
+            b"ORIGINATOR_ADDRESS",
+            b"TECH_ORG",
+            b"TECH_POC",
+            b"TECH_POSITION",
+            b"TECH_PHONE",
+            b"TECH_EMAIL",
+            b"TECH_ADDRESS",
+            b"PREVIOUS_MESSAGE_ID",
+            b"NEXT_MESSAGE_ID",
+            b"ADM_MSG_LINK",
+            b"CDM_MSG_LINK",
+            b"PRM_MSG_LINK",
+            b"RDM_MSG_LINK",
+            b"TDM_MSG_LINK",
+            b"OPERATOR",
+            b"OWNER",
+            b"COUNTRY",
+            b"CONSTELLATION",
+            b"OBJECT_TYPE",
+            b"TIME_SYSTEM",
+            b"EPOCH_TZERO",
+            b"OPS_STATUS",
+            b"ORBIT_CATEGORY",
+            b"OCM_DATA_ELEMENTS",
+            b"SCLK_OFFSET_AT_EPOCH",
+            b"SCLK_SEC_PER_SI_SEC",
+            b"PREVIOUS_MESSAGE_EPOCH",
+            b"NEXT_MESSAGE_EPOCH",
+            b"START_TIME",
+            b"STOP_TIME",
+            b"TIME_SPAN",
+            b"TAIMUTC_AT_TZERO",
+            b"NEXT_LEAP_EPOCH",
+            b"NEXT_LEAP_TAIMUTC",
+            b"UT1MUTC_AT_TZERO",
+            b"EOP_SOURCE",
+            b"INTERP_METHOD_EOP",
+            b"CELESTIAL_SOURCE",
+        ],
+        b"data" => &[b"traj", b"phys", b"cov", b"man", b"pert", b"od", b"user"],
+        b"traj" => &[
+            b"COMMENT",
+            b"TRAJ_ID",
+            b"TRAJ_PREV_ID",
+            b"TRAJ_NEXT_ID",
+            b"TRAJ_BASIS",
+            b"TRAJ_BASIS_ID",
+            b"INTERPOLATION",
+            b"INTERPOLATION_DEGREE",
+            b"PROPAGATOR",
+            b"CENTER_NAME",
+            b"TRAJ_REF_FRAME",
+            b"TRAJ_FRAME_EPOCH",
+            b"USEABLE_START_TIME",
+            b"USEABLE_STOP_TIME",
+            b"ORB_REVNUM",
+            b"ORB_REVNUM_BASIS",
+            b"TRAJ_TYPE",
+            b"ORB_AVERAGING",
+            b"TRAJ_UNITS",
+            b"trajLine",
+        ],
+        b"phys" => &[
+            b"COMMENT",
+            b"MANUFACTURER",
+            b"BUS_MODEL",
+            b"DOCKED_WITH",
+            b"DRAG_CONST_AREA",
+            b"DRAG_COEFF_NOM",
+            b"DRAG_UNCERTAINTY",
+            b"INITIAL_WET_MASS",
+            b"WET_MASS",
+            b"DRY_MASS",
+            b"OEB_PARENT_FRAME",
+            b"OEB_PARENT_FRAME_EPOCH",
+            b"OEB_Q1",
+            b"OEB_Q2",
+            b"OEB_Q3",
+            b"OEB_QC",
+            b"OEB_MAX",
+            b"OEB_INT",
+            b"OEB_MIN",
+            b"AREA_ALONG_OEB_MAX",
+            b"AREA_ALONG_OEB_INT",
+            b"AREA_ALONG_OEB_MIN",
+            b"AREA_MIN_FOR_PC",
+            b"AREA_MAX_FOR_PC",
+            b"AREA_TYP_FOR_PC",
+            b"RCS",
+            b"RCS_MIN",
+            b"RCS_MAX",
+            b"SRP_CONST_AREA",
+            b"SOLAR_RAD_COEFF",
+            b"SOLAR_RAD_UNCERTAINTY",
+            b"VM_ABSOLUTE",
+            b"VM_APPARENT_MIN",
+            b"VM_APPARENT",
+            b"VM_APPARENT_MAX",
+            b"REFLECTANCE",
+            b"ATT_CONTROL_MODE",
+            b"ATT_ACTUATOR_TYPE",
+            b"ATT_KNOWLEDGE",
+            b"ATT_CONTROL",
+            b"ATT_POINTING",
+            b"AVG_MANEUVER_FREQ",
+            b"MAX_THRUST",
+            b"DV_BOL",
+            b"DV_REMAINING",
+            b"IXX",
+            b"IYY",
+            b"IZZ",
+            b"IXY",
+            b"IXZ",
+            b"IYZ",
+        ],
+        b"cov" => &[
+            b"COMMENT",
+            b"COV_ID",
+            b"COV_PREV_ID",
+            b"COV_NEXT_ID",
+            b"COV_BASIS",
+            b"COV_BASIS_ID",
+            b"COV_REF_FRAME",
+            b"COV_FRAME_EPOCH",
+            b"COV_SCALE_MIN",
+            b"COV_SCALE_MAX",
+            b"COV_CONFIDENCE",
+            b"COV_TYPE",
+            b"COV_ORDERING",
+            b"COV_UNITS",
+            b"covLine",
+        ],
+        b"man" => &[
+            b"COMMENT",
+            b"MAN_ID",
+            b"MAN_PREV_ID",
+            b"MAN_NEXT_ID",
+            b"MAN_BASIS",
+            b"MAN_BASIS_ID",
+            b"MAN_DEVICE_ID",
+            b"MAN_PREV_EPOCH",
+            b"MAN_NEXT_EPOCH",
+            b"MAN_PURPOSE",
+            b"MAN_PRED_SOURCE",
+            b"MAN_REF_FRAME",
+            b"MAN_FRAME_EPOCH",
+            b"GRAV_ASSIST_NAME",
+            b"DC_TYPE",
+            b"DC_WIN_OPEN",
+            b"DC_WIN_CLOSE",
+            b"DC_MIN_CYCLES",
+            b"DC_MAX_CYCLES",
+            b"DC_EXEC_START",
+            b"DC_EXEC_STOP",
+            b"DC_REF_TIME",
+            b"DC_TIME_PULSE_DURATION",
+            b"DC_TIME_PULSE_PERIOD",
+            b"DC_REF_DIR",
+            b"DC_BODY_FRAME",
+            b"DC_BODY_TRIGGER",
+            b"DC_PA_START_ANGLE",
+            b"DC_PA_STOP_ANGLE",
+            b"MAN_COMPOSITION",
+            b"MAN_UNITS",
+            b"manLine",
+        ],
+        b"pert" => &[
+            b"COMMENT",
+            b"ATMOSPHERIC_MODEL",
+            b"GRAVITY_MODEL",
+            b"EQUATORIAL_RADIUS",
+            b"GM",
+            b"N_BODY_PERTURBATIONS",
+            b"CENTRAL_BODY_ROTATION",
+            b"OBLATE_FLATTENING",
+            b"OCEAN_TIDES_MODEL",
+            b"SOLID_TIDES_MODEL",
+            b"REDUCTION_THEORY",
+            b"ALBEDO_MODEL",
+            b"ALBEDO_GRID_SIZE",
+            b"SHADOW_MODEL",
+            b"SHADOW_BODIES",
+            b"SRP_MODEL",
+            b"SW_DATA_SOURCE",
+            b"SW_DATA_EPOCH",
+            b"SW_INTERP_METHOD",
+            b"FIXED_GEOMAG_KP",
+            b"FIXED_GEOMAG_AP",
+            b"FIXED_GEOMAG_DST",
+            b"FIXED_F10P7",
+            b"FIXED_F10P7_MEAN",
+            b"FIXED_M10P7",
+            b"FIXED_M10P7_MEAN",
+            b"FIXED_S10P7",
+            b"FIXED_S10P7_MEAN",
+            b"FIXED_Y10P7",
+            b"FIXED_Y10P7_MEAN",
+        ],
+        b"od" => &[
+            b"COMMENT",
+            b"OD_ID",
+            b"OD_PREV_ID",
+            b"OD_METHOD",
+            b"OD_EPOCH",
+            b"DAYS_SINCE_FIRST_OBS",
+            b"DAYS_SINCE_LAST_OBS",
+            b"RECOMMENDED_OD_SPAN",
+            b"ACTUAL_OD_SPAN",
+            b"OBS_AVAILABLE",
+            b"OBS_USED",
+            b"TRACKS_AVAILABLE",
+            b"TRACKS_USED",
+            b"MAXIMUM_OBS_GAP",
+            b"OD_EPOCH_EIGMAJ",
+            b"OD_EPOCH_EIGINT",
+            b"OD_EPOCH_EIGMIN",
+            b"OD_MAX_PRED_EIGMAJ",
+            b"OD_MIN_PRED_EIGMIN",
+            b"OD_CONFIDENCE",
+            b"GDOP",
+            b"SOLVE_N",
+            b"SOLVE_STATES",
+            b"CONSIDER_N",
+            b"CONSIDER_PARAMS",
+            b"SEDR",
+            b"SENSORS_N",
+            b"SENSORS",
+            b"WEIGHTED_RMS",
+            b"DATA_TYPES",
+        ],
+        b"user" => &[b"COMMENT", b"USER_DEFINED"],
+        _ => return None,
+    })
+}
+
+fn validate_xml_sequences(xml: &str) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
+    crate::xml::validate_element_sequences(
+        xml,
+        "OCM",
+        |parent, child| {
+            let children = ocm_xml_children(parent)?;
+            let rank = children.iter().position(|candidate| *candidate == child)? as u16;
+            let repeatable = matches!(
+                child,
+                b"COMMENT"
+                    | b"traj"
+                    | b"cov"
+                    | b"man"
+                    | b"trajLine"
+                    | b"covLine"
+                    | b"manLine"
+                    | b"USER_DEFINED"
+            );
+            Some(XmlSequenceRule { rank, repeatable })
+        },
+        |element, attribute| {
+            (attribute == b"parameter" && element == b"USER_DEFINED")
+                || (attribute == b"units"
+                    && matches!(
+                        element,
+                        b"SCLK_OFFSET_AT_EPOCH"
+                            | b"SCLK_SEC_PER_SI_SEC"
+                            | b"TIME_SPAN"
+                            | b"TAIMUTC_AT_TZERO"
+                            | b"NEXT_LEAP_TAIMUTC"
+                            | b"UT1MUTC_AT_TZERO"
+                            | b"DRAG_CONST_AREA"
+                            | b"DRAG_UNCERTAINTY"
+                            | b"INITIAL_WET_MASS"
+                            | b"WET_MASS"
+                            | b"DRY_MASS"
+                            | b"OEB_MAX"
+                            | b"OEB_INT"
+                            | b"OEB_MIN"
+                            | b"AREA_ALONG_OEB_MAX"
+                            | b"AREA_ALONG_OEB_INT"
+                            | b"AREA_ALONG_OEB_MIN"
+                            | b"AREA_MIN_FOR_PC"
+                            | b"AREA_MAX_FOR_PC"
+                            | b"AREA_TYP_FOR_PC"
+                            | b"RCS"
+                            | b"RCS_MIN"
+                            | b"RCS_MAX"
+                            | b"SRP_CONST_AREA"
+                            | b"SOLAR_RAD_UNCERTAINTY"
+                            | b"ATT_KNOWLEDGE"
+                            | b"ATT_CONTROL"
+                            | b"ATT_POINTING"
+                            | b"AVG_MANEUVER_FREQ"
+                            | b"MAX_THRUST"
+                            | b"DV_BOL"
+                            | b"DV_REMAINING"
+                            | b"IXX"
+                            | b"IYY"
+                            | b"IZZ"
+                            | b"IXY"
+                            | b"IXZ"
+                            | b"IYZ"
+                            | b"COV_CONFIDENCE"
+                            | b"DC_TIME_PULSE_DURATION"
+                            | b"DC_TIME_PULSE_PERIOD"
+                            | b"DC_PA_START_ANGLE"
+                            | b"DC_PA_STOP_ANGLE"
+                            | b"EQUATORIAL_RADIUS"
+                            | b"GM"
+                            | b"CENTRAL_BODY_ROTATION"
+                            | b"FIXED_GEOMAG_KP"
+                            | b"FIXED_GEOMAG_AP"
+                            | b"FIXED_GEOMAG_DST"
+                            | b"FIXED_F10P7"
+                            | b"FIXED_F10P7_MEAN"
+                            | b"FIXED_M10P7"
+                            | b"FIXED_M10P7_MEAN"
+                            | b"FIXED_S10P7"
+                            | b"FIXED_S10P7_MEAN"
+                            | b"FIXED_Y10P7"
+                            | b"FIXED_Y10P7_MEAN"
+                            | b"DAYS_SINCE_FIRST_OBS"
+                            | b"DAYS_SINCE_LAST_OBS"
+                            | b"RECOMMENDED_OD_SPAN"
+                            | b"ACTUAL_OD_SPAN"
+                            | b"MAXIMUM_OBS_GAP"
+                            | b"OD_EPOCH_EIGMAJ"
+                            | b"OD_EPOCH_EIGINT"
+                            | b"OD_EPOCH_EIGMIN"
+                            | b"OD_MAX_PRED_EIGMAJ"
+                            | b"OD_MIN_PRED_EIGMIN"
+                            | b"OD_CONFIDENCE"
+                            | b"SEDR"
+                            | b"WEIGHTED_RMS"
+                    ))
+        },
+    )
+}
+
+fn ocm_kvn_keys(block: &str) -> Option<&'static [&'static str]> {
+    Some(match block {
+        "META" => &[
+            "OBJECT_NAME",
+            "INTERNATIONAL_DESIGNATOR",
+            "CATALOG_NAME",
+            "OBJECT_DESIGNATOR",
+            "ALTERNATE_NAMES",
+            "ORIGINATOR_POC",
+            "ORIGINATOR_POSITION",
+            "ORIGINATOR_PHONE",
+            "ORIGINATOR_EMAIL",
+            "ORIGINATOR_ADDRESS",
+            "TECH_ORG",
+            "TECH_POC",
+            "TECH_POSITION",
+            "TECH_PHONE",
+            "TECH_EMAIL",
+            "TECH_ADDRESS",
+            "PREVIOUS_MESSAGE_ID",
+            "NEXT_MESSAGE_ID",
+            "ADM_MSG_LINK",
+            "CDM_MSG_LINK",
+            "PRM_MSG_LINK",
+            "RDM_MSG_LINK",
+            "TDM_MSG_LINK",
+            "OPERATOR",
+            "OWNER",
+            "COUNTRY",
+            "CONSTELLATION",
+            "OBJECT_TYPE",
+            "TIME_SYSTEM",
+            "EPOCH_TZERO",
+            "OPS_STATUS",
+            "ORBIT_CATEGORY",
+            "OCM_DATA_ELEMENTS",
+            "SCLK_OFFSET_AT_EPOCH",
+            "SCLK_SEC_PER_SI_SEC",
+            "PREVIOUS_MESSAGE_EPOCH",
+            "NEXT_MESSAGE_EPOCH",
+            "START_TIME",
+            "STOP_TIME",
+            "TIME_SPAN",
+            "TAIMUTC_AT_TZERO",
+            "NEXT_LEAP_EPOCH",
+            "NEXT_LEAP_TAIMUTC",
+            "UT1MUTC_AT_TZERO",
+            "EOP_SOURCE",
+            "INTERP_METHOD_EOP",
+            "CELESTIAL_SOURCE",
+        ],
+        "TRAJ" => &[
+            "TRAJ_ID",
+            "TRAJ_PREV_ID",
+            "TRAJ_NEXT_ID",
+            "TRAJ_BASIS",
+            "TRAJ_BASIS_ID",
+            "INTERPOLATION",
+            "INTERPOLATION_DEGREE",
+            "PROPAGATOR",
+            "CENTER_NAME",
+            "TRAJ_REF_FRAME",
+            "TRAJ_FRAME_EPOCH",
+            "USEABLE_START_TIME",
+            "USEABLE_STOP_TIME",
+            "ORB_REVNUM",
+            "ORB_REVNUM_BASIS",
+            "TRAJ_TYPE",
+            "ORB_AVERAGING",
+            "TRAJ_UNITS",
+        ],
+        "PHYS" => &[
+            "MANUFACTURER",
+            "BUS_MODEL",
+            "DOCKED_WITH",
+            "DRAG_CONST_AREA",
+            "DRAG_COEFF_NOM",
+            "DRAG_UNCERTAINTY",
+            "INITIAL_WET_MASS",
+            "WET_MASS",
+            "DRY_MASS",
+            "OEB_PARENT_FRAME",
+            "OEB_PARENT_FRAME_EPOCH",
+            "OEB_Q1",
+            "OEB_Q2",
+            "OEB_Q3",
+            "OEB_QC",
+            "OEB_MAX",
+            "OEB_INT",
+            "OEB_MIN",
+            "AREA_ALONG_OEB_MAX",
+            "AREA_ALONG_OEB_INT",
+            "AREA_ALONG_OEB_MIN",
+            "AREA_MIN_FOR_PC",
+            "AREA_MAX_FOR_PC",
+            "AREA_TYP_FOR_PC",
+            "RCS",
+            "RCS_MIN",
+            "RCS_MAX",
+            "SRP_CONST_AREA",
+            "SOLAR_RAD_COEFF",
+            "SOLAR_RAD_UNCERTAINTY",
+            "VM_ABSOLUTE",
+            "VM_APPARENT_MIN",
+            "VM_APPARENT",
+            "VM_APPARENT_MAX",
+            "REFLECTANCE",
+            "ATT_CONTROL_MODE",
+            "ATT_ACTUATOR_TYPE",
+            "ATT_KNOWLEDGE",
+            "ATT_CONTROL",
+            "ATT_POINTING",
+            "AVG_MANEUVER_FREQ",
+            "MAX_THRUST",
+            "DV_BOL",
+            "DV_REMAINING",
+            "IXX",
+            "IYY",
+            "IZZ",
+            "IXY",
+            "IXZ",
+            "IYZ",
+        ],
+        "COV" => &[
+            "COV_ID",
+            "COV_PREV_ID",
+            "COV_NEXT_ID",
+            "COV_BASIS",
+            "COV_BASIS_ID",
+            "COV_REF_FRAME",
+            "COV_FRAME_EPOCH",
+            "COV_SCALE_MIN",
+            "COV_SCALE_MAX",
+            "COV_CONFIDENCE",
+            "COV_TYPE",
+            "COV_ORDERING",
+            "COV_UNITS",
+        ],
+        "MAN" => &[
+            "MAN_ID",
+            "MAN_PREV_ID",
+            "MAN_NEXT_ID",
+            "MAN_BASIS",
+            "MAN_BASIS_ID",
+            "MAN_DEVICE_ID",
+            "MAN_PREV_EPOCH",
+            "MAN_NEXT_EPOCH",
+            "MAN_PURPOSE",
+            "MAN_PRED_SOURCE",
+            "MAN_REF_FRAME",
+            "MAN_FRAME_EPOCH",
+            "GRAV_ASSIST_NAME",
+            "DC_TYPE",
+            "DC_WIN_OPEN",
+            "DC_WIN_CLOSE",
+            "DC_MIN_CYCLES",
+            "DC_MAX_CYCLES",
+            "DC_EXEC_START",
+            "DC_EXEC_STOP",
+            "DC_REF_TIME",
+            "DC_TIME_PULSE_DURATION",
+            "DC_TIME_PULSE_PERIOD",
+            "DC_REF_DIR",
+            "DC_BODY_FRAME",
+            "DC_BODY_TRIGGER",
+            "DC_PA_START_ANGLE",
+            "DC_PA_STOP_ANGLE",
+            "MAN_COMPOSITION",
+            "MAN_UNITS",
+        ],
+        "PERT" => &[
+            "ATMOSPHERIC_MODEL",
+            "GRAVITY_MODEL",
+            "EQUATORIAL_RADIUS",
+            "GM",
+            "N_BODY_PERTURBATIONS",
+            "CENTRAL_BODY_ROTATION",
+            "OBLATE_FLATTENING",
+            "OCEAN_TIDES_MODEL",
+            "SOLID_TIDES_MODEL",
+            "REDUCTION_THEORY",
+            "ALBEDO_MODEL",
+            "ALBEDO_GRID_SIZE",
+            "SHADOW_MODEL",
+            "SHADOW_BODIES",
+            "SRP_MODEL",
+            "SW_DATA_SOURCE",
+            "SW_DATA_EPOCH",
+            "SW_INTERP_METHOD",
+            "FIXED_GEOMAG_KP",
+            "FIXED_GEOMAG_AP",
+            "FIXED_GEOMAG_DST",
+            "FIXED_F10P7",
+            "FIXED_F10P7_MEAN",
+            "FIXED_M10P7",
+            "FIXED_M10P7_MEAN",
+            "FIXED_S10P7",
+            "FIXED_S10P7_MEAN",
+            "FIXED_Y10P7",
+            "FIXED_Y10P7_MEAN",
+        ],
+        "OD" => &[
+            "OD_ID",
+            "OD_PREV_ID",
+            "OD_METHOD",
+            "OD_EPOCH",
+            "DAYS_SINCE_FIRST_OBS",
+            "DAYS_SINCE_LAST_OBS",
+            "RECOMMENDED_OD_SPAN",
+            "ACTUAL_OD_SPAN",
+            "OBS_AVAILABLE",
+            "OBS_USED",
+            "TRACKS_AVAILABLE",
+            "TRACKS_USED",
+            "MAXIMUM_OBS_GAP",
+            "OD_EPOCH_EIGMAJ",
+            "OD_EPOCH_EIGINT",
+            "OD_EPOCH_EIGMIN",
+            "OD_MAX_PRED_EIGMAJ",
+            "OD_MIN_PRED_EIGMIN",
+            "OD_CONFIDENCE",
+            "GDOP",
+            "SOLVE_N",
+            "SOLVE_STATES",
+            "CONSIDER_N",
+            "CONSIDER_PARAMS",
+            "SEDR",
+            "SENSORS_N",
+            "SENSORS",
+            "WEIGHTED_RMS",
+            "DATA_TYPES",
+        ],
+        "USER" => &[],
+        _ => return None,
+    })
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating OCM KVN structure"],
+            offset,
+        }))))
+    };
+    let block_rank = |block: &str| match block {
+        "META" => Some((0u8, false)),
+        "TRAJ" => Some((1, true)),
+        "PHYS" => Some((2, false)),
+        "COV" => Some((3, true)),
+        "MAN" => Some((4, true)),
+        "PERT" => Some((5, false)),
+        "OD" => Some((6, false)),
+        "USER" => Some((7, false)),
+        _ => None,
+    };
+    let mut current_block: Option<&str> = None;
+    let mut previous_key = None;
+    let mut last_block_rank = None;
+    let mut block_has_content = false;
+    let mut history_started = false;
+    let mut pending_block_comment = false;
+    let mut top_rank = None;
+    let mut offset = 0usize;
+
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        // ODM's 254-character KVN limit applies to keyword records. OCM covariance history
+        // records are fixed logical records and the official Annex G example contains complete
+        // lower-triangular records longer than 254 characters; splitting one would change it.
+        if line.len() > 254
+            && (line.contains('=') || !matches!(current_block, Some("TRAJ" | "COV" | "MAN")))
+        {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            if block_has_content {
+                return fail("COMMENT is not at the beginning of a logical block");
+            }
+            if current_block.is_none()
+                && top_rank != Some(0)
+                && top_rank.is_none_or(|rank| rank < 3)
+            {
+                return fail("COMMENT is not at the beginning of the header or a data block");
+            }
+            pending_block_comment =
+                current_block.is_none() && top_rank.is_some_and(|rank| rank >= 3);
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if let Some(marker) = line.strip_suffix("_START").filter(|_| !line.contains('=')) {
+            if current_block.is_some() {
+                return if current_block == Some("USER") {
+                    fail("Unexpected key in USER block")
+                } else {
+                    fail("nested OCM marked block")
+                };
+            }
+            let (rank, repeatable) = block_rank(marker)
+                .ok_or_else(|| invalid(number, offset, "unknown OCM block".into()))?;
+            if last_block_rank.is_some_and(|last| rank < last || (rank == last && !repeatable)) {
+                return fail("duplicate or out-of-order OCM block");
+            }
+            if marker != "META" && last_block_rank.is_none() {
+                return fail("Expected META_START");
+            }
+            current_block = Some(marker);
+            previous_key = None;
+            block_has_content = false;
+            history_started = false;
+            pending_block_comment = false;
+            last_block_rank = Some(rank);
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if let Some(marker) = line.strip_suffix("_STOP").filter(|_| !line.contains('=')) {
+            if current_block != Some(marker) {
+                return fail("mismatched or unexpected OCM block end");
+            }
+            current_block = None;
+            previous_key = None;
+            block_has_content = false;
+            history_started = false;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+
+        if let Some(block) = current_block {
+            if !line.contains('=') {
+                if !matches!(block, "TRAJ" | "COV" | "MAN") {
+                    return fail("unexpected non-assignment in OCM logical block");
+                }
+                block_has_content = true;
+                history_started = true;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            if !line.contains('=') {
+                return fail("expected an assignment");
+            }
+            let key = line.split_once('=').unwrap().0.trim();
+            if block == "USER" {
+                if !key.starts_with("USER_DEFINED_") || key.len() == "USER_DEFINED_".len() {
+                    return fail("unknown OCM USER keyword");
+                }
+                block_has_content = true;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            let keys = ocm_kvn_keys(block).unwrap();
+            let rank = keys
+                .iter()
+                .position(|candidate| *candidate == key)
+                .ok_or_else(|| {
+                    let block_name = match block {
+                        "META" => "Metadata",
+                        "TRAJ" => "Trajectory",
+                        "PHYS" => "Physical",
+                        "COV" => "Covariance",
+                        "MAN" => "Maneuver",
+                        "PERT" => "Perturbations",
+                        "OD" => "Orbit Determination",
+                        _ => block,
+                    };
+                    invalid(number, offset, format!("Unexpected OCM {block_name} key"))
+                })?;
+            if previous_key.is_some_and(|previous| rank <= previous) {
+                return fail("duplicate or out-of-order OCM block keyword");
+            }
+            if history_started && !(block == "MAN" && key == "MAN_UNITS") {
+                return fail("assignment after OCM history data");
+            }
+            previous_key = Some(rank);
+            block_has_content = true;
+        } else {
+            if pending_block_comment {
+                return fail("Unexpected OCM Data key");
+            }
+            if !line.contains('=') {
+                return fail("expected exactly one top-level assignment");
+            }
+            let key = line.split_once('=').unwrap().0.trim();
+            let rank = match key {
+                "CCSDS_OCM_VERS" => 0,
+                "CLASSIFICATION" => 1,
+                "CREATION_DATE" => 2,
+                "ORIGINATOR" => 3,
+                "MESSAGE_ID" => 4,
+                _ if last_block_rank.is_none() => return fail("Expected META_START"),
+                _ => return fail("Unexpected OCM Data key"),
+            };
+            if top_rank.is_some_and(|previous| rank <= previous) || last_block_rank.is_some() {
+                return fail("duplicate or out-of-order OCM top-level keyword");
+            }
+            top_rank = Some(rank);
+        }
+        offset += raw_line.len() + 1;
+    }
+    if current_block.is_some() {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "unclosed OCM marked block".into(),
+        ));
+    }
+    Ok(())
+}
+
 impl Ocm {
-    // No inherent validate() anymore
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        for trajectory in &self.body.segment.data.traj {
+            for line in &trajectory.traj_lines {
+                for value in &line.values {
+                    if !crate::kvn::ser::OdmFloat::is_valid(*value) {
+                        return Err(ValidationError::InvalidValue {
+                            field: Cow::Borrowed("trajLine"),
+                            value: value.to_string(),
+                            expected: Cow::Borrowed("a finite number"),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+            }
+        }
+        for covariance in &self.body.segment.data.cov {
+            for line in &covariance.cov_lines {
+                for value in &line.values {
+                    if !crate::kvn::ser::OdmFloat::is_valid(*value) {
+                        return Err(ValidationError::InvalidValue {
+                            field: Cow::Borrowed("covLine"),
+                            value: value.to_string(),
+                            expected: Cow::Borrowed("a finite number"),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+            }
+        }
+
+        let mut sink = OcmKvnLexicalSink::default();
+        let mut writer = KvnWriter::from_io(&mut sink);
+        self.write_kvn(&mut writer);
+        writer.finish_io()
+    }
+}
+
+#[derive(Default)]
+struct OcmKvnLexicalSink {
+    line_len: usize,
+    has_equals: bool,
+    history_block: bool,
+    prefix: [u8; 16],
+    prefix_len: usize,
+}
+
+impl OcmKvnLexicalSink {
+    fn finish_line(&mut self) -> std::io::Result<()> {
+        if self.line_len > 254 && (self.has_equals || !self.history_block) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "generated OCM KVN keyword record exceeds 254 characters",
+            ));
+        }
+        let prefix = &self.prefix[..self.prefix_len];
+        if matches!(prefix, b"TRAJ_START" | b"COV_START" | b"MAN_START") {
+            self.history_block = true;
+        } else if matches!(prefix, b"TRAJ_STOP" | b"COV_STOP" | b"MAN_STOP") {
+            self.history_block = false;
+        }
+        self.line_len = 0;
+        self.has_equals = false;
+        self.prefix_len = 0;
+        Ok(())
+    }
+}
+
+impl Write for OcmKvnLexicalSink {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        for byte in buffer {
+            if *byte == b'\n' {
+                self.finish_line()?;
+                continue;
+            }
+            if !(b' '..=b'~').contains(byte) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "generated OCM KVN contains non-printable or non-ASCII content",
+                ));
+            }
+            self.line_len = self.line_len.saturating_add(1);
+            self.has_equals |= *byte == b'=';
+            if self.prefix_len < self.prefix.len() {
+                self.prefix[self.prefix_len] = *byte;
+                self.prefix_len += 1;
+            }
+        }
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        if self.line_len > 0 {
+            self.finish_line()?;
+        }
+        Ok(())
+    }
 }
 
 impl ToKvn for Ocm {
@@ -96,6 +1004,12 @@ impl crate::traits::Validate for OcmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate_with_metadata(&self.metadata)
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = self.metadata.validation_errors()?;
+        errors.extend(self.data.validation_errors()?);
+        Ok(errors)
     }
 }
 
@@ -127,6 +1041,36 @@ impl crate::traits::Validate for OcmData {
         }
         OcmTrajState::validate_all(&self.traj)?;
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        for trajectory in &self.traj {
+            crate::validation::collect_validation_result(&mut errors, trajectory.validate())?;
+        }
+        if let Some(physical) = &self.phys {
+            crate::validation::collect_validation_result(&mut errors, physical.validate())?;
+        }
+        for covariance in &self.cov {
+            crate::validation::collect_validation_result(&mut errors, covariance.validate())?;
+        }
+        for maneuver in &self.man {
+            crate::validation::collect_validation_result(&mut errors, maneuver.validate())?;
+        }
+        if let Some(perturbations) = &self.pert {
+            crate::validation::collect_validation_result(&mut errors, perturbations.validate())?;
+        }
+        if let Some(orbit_determination) = &self.od {
+            crate::validation::collect_validation_result(
+                &mut errors,
+                orbit_determination.validate(),
+            )?;
+        }
+        crate::validation::collect_validation_result(
+            &mut errors,
+            OcmTrajState::validate_all(&self.traj),
+        )?;
+        Ok(errors)
     }
 }
 
@@ -201,6 +1145,12 @@ impl OcmTrajState {
             }
         }
 
+        validate_ocm_history_epoch_sequence(
+            self.traj_lines.iter().map(|line| &line.epoch),
+            "trajLine epoch",
+            "TRAJ",
+        )?;
+
         let traj_type = self.traj_type.trim().to_uppercase();
 
         if let Some(units) = &self.traj_units {
@@ -245,6 +1195,98 @@ impl OcmTrajState {
     }
 }
 
+#[inline(always)]
+fn validate_ocm_history_epoch(epoch: &Epoch, field: &'static str) -> Result<EpochKind> {
+    let kind = epoch.kind();
+    let valid = match kind {
+        EpochKind::Calendar => epoch.calendar_fields_are_valid() == Some(true),
+        EpochKind::Numeric => epoch.numeric_is_non_degenerate() == Some(true),
+    };
+    if valid {
+        Ok(kind)
+    } else {
+        Err(ValidationError::InvalidValue {
+            field: Cow::Borrowed(field),
+            value: epoch.to_string(),
+            expected: Cow::Borrowed("a valid calendar, ordinal, or numeric epoch"),
+            line: None,
+        }
+        .into())
+    }
+}
+
+/// Validates the per-block epoch branch rule from ODM §6.2.2.5.
+///
+/// Classification is computed when each [`Epoch`] is constructed. Ordering state is derived once
+/// per record and retained only until the next record, so this remains a single allocation-free
+/// pass without adding a cache to every stored epoch.
+#[inline(always)]
+fn validate_ocm_history_epoch_sequence<'a>(
+    epochs: impl IntoIterator<Item = &'a Epoch>,
+    field: &'static str,
+    block: &'static str,
+) -> Result<()> {
+    let mut expected_kind = None;
+    let mut previous_key: Option<crate::types::EpochOrderKey<'a>> = None;
+    for epoch in epochs {
+        let kind = validate_ocm_history_epoch(epoch, field)?;
+        if let Some(expected) = expected_kind {
+            if kind != expected {
+                let branch = match expected {
+                    EpochKind::Calendar => "calendar",
+                    EpochKind::Numeric => "numeric",
+                };
+                return Err(ValidationError::InvalidValue {
+                    field: Cow::Borrowed(field),
+                    value: epoch.to_string(),
+                    expected: format!(
+                        "the same {branch} time-tag branch as earlier records in the {block} block"
+                    )
+                    .into(),
+                    line: None,
+                }
+                .into());
+            }
+        } else {
+            expected_kind = Some(kind);
+        }
+        let key = epoch
+            .order_key()
+            .ok_or_else(|| ValidationError::InvalidValue {
+                field: Cow::Borrowed(field),
+                value: epoch.to_string(),
+                expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
+                line: None,
+            })?;
+        if let Some(previous) = previous_key {
+            let ordering = previous
+                .compare(&key)
+                .ok_or_else(|| ValidationError::InvalidValue {
+                    field: Cow::Borrowed(field),
+                    value: epoch.to_string(),
+                    expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
+                    line: None,
+                })?;
+            if ordering != Ordering::Less {
+                let expected = if ordering == Ordering::Equal {
+                    "a unique epoch strictly after the previous record"
+                } else {
+                    "an epoch strictly after the previous record"
+                };
+                return Err(ValidationError::InvalidValue {
+                    field: Cow::Borrowed(field),
+                    value: epoch.to_string(),
+                    expected: Cow::Borrowed(expected),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        previous_key = Some(key);
+    }
+    Ok(())
+}
+
 impl OcmCovarianceMatrix {
     fn validate(&self) -> Result<()> {
         if self.cov_ref_frame.trim().is_empty() {
@@ -271,6 +1313,11 @@ impl OcmCovarianceMatrix {
             }
             .into());
         }
+        validate_ocm_history_epoch_sequence(
+            self.cov_lines.iter().map(|line| &line.epoch),
+            "covLine epoch",
+            "COV",
+        )?;
         Ok(())
     }
 }
@@ -310,23 +1357,278 @@ impl OcmManeuverParameters {
             .into());
         }
         let tokens = parse_csv_list(&self.man_composition);
-        let time_tags = tokens.iter().filter(|t| is_man_time_tag(t)).count();
-        let expected = tokens.len().saturating_sub(time_tags);
-        if expected > 0 {
-            for line in &self.man_lines {
-                if line.values.len() < expected {
+        let Some(time_tag) = tokens.first().and_then(|token| man_time_tag(token)) else {
+            return Err(ValidationError::InvalidValue {
+                field: Cow::Borrowed("MAN_COMPOSITION"),
+                value: self.man_composition.clone(),
+                expected: Cow::Borrowed(
+                    "first element TIME_ABSOLUTE or TIME_RELATIVE, with no additional time tag",
+                ),
+                line: None,
+            }
+            .into());
+        };
+        if tokens
+            .iter()
+            .skip(1)
+            .any(|token| man_time_tag(token).is_some())
+        {
+            return Err(ValidationError::InvalidValue {
+                field: Cow::Borrowed("MAN_COMPOSITION"),
+                value: self.man_composition.clone(),
+                expected: Cow::Borrowed(
+                    "first element TIME_ABSOLUTE or TIME_RELATIVE, with no additional time tag",
+                ),
+                line: None,
+            }
+            .into());
+        }
+
+        for (field, epoch) in [
+            ("MAN_PREV_EPOCH", self.man_prev_epoch.as_ref()),
+            ("MAN_NEXT_EPOCH", self.man_next_epoch.as_ref()),
+            ("DC_WIN_OPEN", self.dc_win_open.as_ref()),
+            ("DC_WIN_CLOSE", self.dc_win_close.as_ref()),
+            ("DC_EXEC_START", self.dc_exec_start.as_ref()),
+            ("DC_EXEC_STOP", self.dc_exec_stop.as_ref()),
+            ("DC_REF_TIME", self.dc_ref_time.as_ref()),
+        ] {
+            if let Some(epoch) = epoch {
+                validate_man_epoch_field(epoch, time_tag, field)?;
+            }
+        }
+
+        validate_man_duty_cycle(self)?;
+
+        let expected = tokens.len().saturating_sub(1);
+        let mut previous_key: Option<crate::types::EpochOrderKey<'_>> = None;
+        for line in &self.man_lines {
+            validate_man_history_epoch(&line.epoch, time_tag)?;
+            let key = line
+                .epoch
+                .order_key()
+                .ok_or_else(|| ValidationError::InvalidValue {
+                    field: Cow::Borrowed("manLine epoch"),
+                    value: line.epoch.to_string(),
+                    expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
+                    line: None,
+                })?;
+            if let Some(previous) = previous_key {
+                let ordering =
+                    previous
+                        .compare(&key)
+                        .ok_or_else(|| ValidationError::InvalidValue {
+                            field: Cow::Borrowed("manLine epoch"),
+                            value: line.epoch.to_string(),
+                            expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
+                            line: None,
+                        })?;
+                if ordering == Ordering::Equal {
                     return Err(ValidationError::InvalidValue {
-                        field: Cow::Borrowed("MAN_COMPOSITION"),
-                        value: format!("{} ({} values)", self.man_composition, line.values.len()),
-                        expected: format!("{} values per line", expected).into(),
+                        field: Cow::Borrowed("manLine epoch"),
+                        value: line.epoch.to_string(),
+                        expected: Cow::Borrowed("a unique epoch within the MAN block"),
                         line: None,
                     }
                     .into());
                 }
             }
+            previous_key = Some(key);
+            if line.values.len() < expected {
+                return Err(ValidationError::InvalidValue {
+                    field: Cow::Borrowed("MAN_COMPOSITION"),
+                    value: format!("{} ({} values)", self.man_composition, line.values.len()),
+                    expected: format!("{} values per line", expected).into(),
+                    line: None,
+                }
+                .into());
+            }
         }
         Ok(())
     }
+}
+
+#[derive(Clone, Copy)]
+enum ManTimeTag {
+    Absolute,
+    Relative,
+}
+
+fn man_time_tag(value: &str) -> Option<ManTimeTag> {
+    match value.trim().to_ascii_uppercase().as_str() {
+        "TIME_ABSOLUTE" => Some(ManTimeTag::Absolute),
+        "TIME_RELATIVE" => Some(ManTimeTag::Relative),
+        _ => None,
+    }
+}
+
+fn validate_man_history_epoch(epoch: &Epoch, time_tag: ManTimeTag) -> Result<()> {
+    validate_man_epoch_field(epoch, time_tag, "manLine epoch")
+}
+
+fn validate_man_epoch_field(
+    epoch: &Epoch,
+    time_tag: ManTimeTag,
+    field: &'static str,
+) -> Result<()> {
+    let valid = match time_tag {
+        ManTimeTag::Absolute => {
+            epoch.kind() == EpochKind::Calendar && epoch.calendar_fields_are_valid() == Some(true)
+        }
+        ManTimeTag::Relative => {
+            epoch.kind() == EpochKind::Numeric && epoch.numeric_is_non_degenerate() == Some(true)
+        }
+    };
+    if valid {
+        return Ok(());
+    }
+
+    let expected = match time_tag {
+        ManTimeTag::Absolute => "a valid calendar or ordinal epoch for TIME_ABSOLUTE",
+        ManTimeTag::Relative => "a non-degenerate numeric epoch for TIME_RELATIVE",
+    };
+    Err(ValidationError::InvalidValue {
+        field: Cow::Borrowed(field),
+        value: epoch.to_string(),
+        expected: Cow::Borrowed(expected),
+        line: None,
+    }
+    .into())
+}
+
+fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
+    if !matches!(man.dc_type, ManDc::Continuous) {
+        for (field, present) in [
+            ("DC_WIN_OPEN", man.dc_win_open.is_some()),
+            ("DC_WIN_CLOSE", man.dc_win_close.is_some()),
+            ("DC_EXEC_START", man.dc_exec_start.is_some()),
+            ("DC_EXEC_STOP", man.dc_exec_stop.is_some()),
+            ("DC_REF_TIME", man.dc_ref_time.is_some()),
+            (
+                "DC_TIME_PULSE_DURATION",
+                man.dc_time_pulse_duration.is_some(),
+            ),
+            ("DC_TIME_PULSE_PERIOD", man.dc_time_pulse_period.is_some()),
+        ] {
+            if !present {
+                return Err(ValidationError::missing_required("MAN", field).into());
+            }
+        }
+    }
+
+    if matches!(man.dc_type, ManDc::TimeAndAngle) {
+        for (field, present) in [
+            ("DC_REF_DIR", man.dc_ref_dir.is_some()),
+            ("DC_BODY_FRAME", man.dc_body_frame.is_some()),
+            ("DC_BODY_TRIGGER", man.dc_body_trigger.is_some()),
+            ("DC_PA_START_ANGLE", man.dc_pa_start_angle.is_some()),
+            ("DC_PA_STOP_ANGLE", man.dc_pa_stop_angle.is_some()),
+        ] {
+            if !present {
+                return Err(ValidationError::missing_required("MAN", field).into());
+            }
+        }
+    }
+
+    if let Some(max_cycles) = man.dc_max_cycles {
+        if max_cycles == 0 {
+            return Err(ValidationError::invalid_value(
+                "DC_MAX_CYCLES",
+                max_cycles.to_string(),
+                "a positive integer",
+            )
+            .into());
+        }
+    }
+
+    for (field, angle) in [
+        ("DC_PA_START_ANGLE", man.dc_pa_start_angle.as_ref()),
+        ("DC_PA_STOP_ANGLE", man.dc_pa_stop_angle.as_ref()),
+    ] {
+        if let Some(angle) = angle {
+            if !(-360.0..360.0).contains(&angle.value) {
+                return Err(ValidationError::invalid_value(
+                    field,
+                    angle.value.to_string(),
+                    "a finite angle in the XSD range [-360, 360)",
+                )
+                .into());
+            }
+        }
+    }
+
+    if let (Some(window_open), Some(execution_start)) =
+        (man.dc_win_open.as_ref(), man.dc_exec_start.as_ref())
+    {
+        let ordering = window_open
+            .cmp_same_branch(execution_start)
+            .ok_or_else(|| {
+                ValidationError::invalid_value(
+                    "DC_EXEC_START",
+                    execution_start.to_string(),
+                    "a comparable epoch coincident with or after DC_WIN_OPEN",
+                )
+            })?;
+        if ordering == Ordering::Greater {
+            return Err(ValidationError::invalid_value(
+                "DC_EXEC_START",
+                execution_start.to_string(),
+                "coincident with or after DC_WIN_OPEN",
+            )
+            .into());
+        }
+    }
+
+    if let (Some(execution_stop), Some(window_close)) =
+        (man.dc_exec_stop.as_ref(), man.dc_win_close.as_ref())
+    {
+        let ordering = execution_stop
+            .cmp_same_branch(window_close)
+            .ok_or_else(|| {
+                ValidationError::invalid_value(
+                    "DC_EXEC_STOP",
+                    execution_stop.to_string(),
+                    "a comparable epoch coincident with or before DC_WIN_CLOSE",
+                )
+            })?;
+        if ordering == Ordering::Greater {
+            return Err(ValidationError::invalid_value(
+                "DC_EXEC_STOP",
+                execution_stop.to_string(),
+                "coincident with or before DC_WIN_CLOSE",
+            )
+            .into());
+        }
+    }
+
+    for (field, duration) in [
+        (
+            "DC_TIME_PULSE_DURATION",
+            man.dc_time_pulse_duration.as_ref(),
+        ),
+        ("DC_TIME_PULSE_PERIOD", man.dc_time_pulse_period.as_ref()),
+    ] {
+        if let Some(duration) = duration {
+            if let Some(error) = validate_ocm_seconds_duration(field, duration) {
+                return Err(error.into());
+            }
+        }
+    }
+
+    if let (Some(duration), Some(period)) = (
+        man.dc_time_pulse_duration.as_ref(),
+        man.dc_time_pulse_period.as_ref(),
+    ) {
+        if period.value < duration.value {
+            return Err(ValidationError::invalid_value(
+                "DC_TIME_PULSE_PERIOD",
+                period.value.to_string(),
+                "greater than or equal to DC_TIME_PULSE_DURATION",
+            )
+            .into());
+        }
+    }
+    Ok(())
 }
 
 fn expected_traj_units(traj_type: &str) -> Option<Vec<&'static str>> {
@@ -368,11 +1670,6 @@ fn parse_csv_list(value: &str) -> Vec<String> {
         .collect()
 }
 
-fn is_man_time_tag(value: &str) -> bool {
-    let v = value.trim().to_ascii_uppercase();
-    matches!(v.as_str(), "EPOCH" | "TIME_ABSOLUTE" | "TIME_RELATIVE")
-}
-
 //----------------------------------------------------------------------
 // Body & Segment
 //----------------------------------------------------------------------
@@ -382,6 +1679,7 @@ fn is_man_time_tag(value: &str) -> bool {
 /// This struct serves as a container for the `OcmSegment`, which holds the
 /// metadata and data for the Orbit Comprehensive Message.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct OcmBody {
     #[serde(rename = "segment")]
     pub segment: Box<OcmSegment>,
@@ -390,6 +1688,10 @@ pub struct OcmBody {
 impl crate::traits::Validate for OcmBody {
     fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self.segment.as_ref())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        self.segment.validation_errors()
     }
 }
 
@@ -403,6 +1705,7 @@ impl ToKvn for OcmBody {
 ///
 /// Contains metadata and data sections.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(deny_unknown_fields)]
 pub struct OcmSegment {
     pub metadata: OcmMetadata,
     pub data: OcmData,
@@ -421,7 +1724,7 @@ impl ToKvn for OcmSegment {
 
 /// OCM Metadata Section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OcmMetadata {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// Metadata section; see 7.8 for comment formatting rules).
@@ -830,7 +2133,7 @@ pub struct OcmMetadata {
     /// **Examples**: 2001-11-06T11:17:33
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
-    pub epoch_tzero: Epoch,
+    pub epoch_tzero: CalendarEpoch,
     /// Specification of the operational status of the space object. Select from the accepted
     /// set of values indicated in annex B, subsection B12.
     ///
@@ -910,7 +2213,7 @@ pub struct OcmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub previous_message_epoch: Option<Epoch>,
+    pub previous_message_epoch: Option<CalendarEpoch>,
     /// Anticipated (or actual) epoch of the next message from this originator for this space
     /// object. (For format specification, see 7.5.10.) NOTE—One may provide the next message
     /// epoch without supplying the NEXT_MESSAGE_ID, and vice versa.
@@ -923,7 +2226,7 @@ pub struct OcmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub next_message_epoch: Option<Epoch>,
+    pub next_message_epoch: Option<CalendarEpoch>,
     /// Time of the earliest data contained in the OCM, specified as either a relative or
     /// absolute time tag.
     ///
@@ -983,7 +2286,7 @@ pub struct OcmMetadata {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub next_leap_epoch: Option<Epoch>,
+    pub next_leap_epoch: Option<CalendarEpoch>,
     /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since
     /// 1958) incorporated by the message originator at epoch 'NEXT_LEAP_EPOCH'. This keyword
     /// should be provided if NEXT_LEAP_EPOCH is supplied.
@@ -1049,25 +2352,103 @@ pub struct OcmMetadata {
     pub celestial_source: Option<String>,
 }
 
+fn validate_ocm_time_offset_units(
+    field: &'static str,
+    offset: &TimeOffset,
+) -> Option<ValidationError> {
+    matches!(offset.units, Some(TimeUnits::Day)).then(|| {
+        ValidationError::invalid_value(format!("{field} units"), "d", "seconds ('s') or omitted")
+    })
+}
+
+fn validate_ocm_seconds_duration(
+    field: &'static str,
+    duration: &Duration,
+) -> Option<ValidationError> {
+    if !duration.value.is_finite() {
+        return Some(ValidationError::invalid_value(
+            field,
+            duration.value.to_string(),
+            "a finite non-negative number in seconds",
+        ));
+    }
+    if duration.value < 0.0 {
+        return Some(ValidationError::invalid_value(
+            field,
+            duration.value.to_string(),
+            "a non-negative number in seconds",
+        ));
+    }
+    matches!(duration.units, Some(TimeUnits::Day)).then(|| {
+        ValidationError::invalid_value(format!("{field} units"), "d", "seconds ('s') or omitted")
+    })
+}
+
+fn ocm_metadata_validation_errors(metadata: &OcmMetadata) -> Vec<ValidationError> {
+    let mut errors = crate::validation::missing_required_fields(
+        "OCM Metadata",
+        [
+            ("TIME_SYSTEM", metadata.time_system.trim().is_empty()),
+            ("EPOCH_TZERO", metadata.epoch_tzero.is_empty()),
+        ],
+    );
+
+    if metadata.time_system.trim().eq_ignore_ascii_case("SCLK") {
+        errors.extend(crate::validation::missing_required_fields(
+            "OCM Metadata",
+            [
+                (
+                    "SCLK_OFFSET_AT_EPOCH",
+                    metadata.sclk_offset_at_epoch.is_none(),
+                ),
+                (
+                    "SCLK_SEC_PER_SI_SEC",
+                    metadata.sclk_sec_per_si_sec.is_none(),
+                ),
+            ],
+        ));
+    }
+
+    for (field, offset) in [
+        (
+            "SCLK_OFFSET_AT_EPOCH",
+            metadata.sclk_offset_at_epoch.as_ref(),
+        ),
+        ("TAIMUTC_AT_TZERO", metadata.taimutc_at_tzero.as_ref()),
+        ("NEXT_LEAP_TAIMUTC", metadata.next_leap_taimutc.as_ref()),
+        ("UT1MUTC_AT_TZERO", metadata.ut1mutc_at_tzero.as_ref()),
+    ] {
+        if let Some(offset) = offset {
+            if let Some(error) = validate_ocm_time_offset_units(field, offset) {
+                errors.push(error);
+            }
+        }
+    }
+    if let Some(rate) = metadata.sclk_sec_per_si_sec.as_ref() {
+        if let Some(error) = validate_ocm_seconds_duration("SCLK_SEC_PER_SI_SEC", rate) {
+            errors.push(error);
+        }
+    }
+    if metadata.next_leap_epoch.is_some() && metadata.next_leap_taimutc.is_none() {
+        errors.push(ValidationError::missing_required(
+            "OCM Metadata",
+            "NEXT_LEAP_TAIMUTC (required when NEXT_LEAP_EPOCH is present)",
+        ));
+    }
+
+    errors
+}
+
 impl crate::traits::Validate for OcmMetadata {
     fn validate(&self) -> Result<()> {
-        if self.time_system.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OCM Metadata".into(),
-                field: "TIME_SYSTEM".into(),
-                line: None,
-            }
-            .into());
+        match self.validation_errors()?.into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
         }
-        if self.epoch_tzero.is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OCM Metadata".into(),
-                field: "EPOCH_TZERO".into(),
-                line: None,
-            }
-            .into());
-        }
-        Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(ocm_metadata_validation_errors(self))
     }
 }
 
@@ -1226,19 +2607,14 @@ impl ToKvn for OcmMetadata {
 /// different data blocks, such as trajectory, physical properties, covariance,
 /// maneuvers, and other related information.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OcmData {
     /// List of trajectory state time history blocks.
     #[serde(rename = "traj", default)]
     #[builder(default)]
     pub traj: Vec<OcmTrajState>,
     /// Space object physical characteristics.
-    #[serde(
-        rename = "phys",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "phys", default, skip_serializing_if = "Option::is_none")]
     pub phys: Option<OcmPhysicalDescription>,
     /// List of covariance time history blocks.
     #[serde(rename = "cov", default)]
@@ -1249,28 +2625,13 @@ pub struct OcmData {
     #[builder(default)]
     pub man: Vec<OcmManeuverParameters>,
     /// Perturbation parameters.
-    #[serde(
-        rename = "pert",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "pert", default, skip_serializing_if = "Option::is_none")]
     pub pert: Option<OcmPerturbations>,
     /// Orbit determination data.
-    #[serde(
-        rename = "od",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "od", default, skip_serializing_if = "Option::is_none")]
     pub od: Option<OcmOdParameters>,
     /// User-defined parameters.
-    #[serde(
-        rename = "user",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "user", default, skip_serializing_if = "Option::is_none")]
     pub user: Option<UserDefined>,
 }
 
@@ -1476,7 +2837,7 @@ pub struct OcmTrajState {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub traj_frame_epoch: Option<Epoch>,
+    pub traj_frame_epoch: Option<CalendarEpoch>,
     /// Start time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
     /// allows the message creator to introduce fictitious (but numerically smooth) data nodes
@@ -1493,7 +2854,7 @@ pub struct OcmTrajState {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub useable_start_time: Option<Epoch>,
+    pub useable_start_time: Option<CalendarEpoch>,
     /// Stop time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
     /// allows the message creator to introduce fictitious (but numerically smooth) data nodes
@@ -1510,7 +2871,7 @@ pub struct OcmTrajState {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub useable_stop_time: Option<Epoch>,
+    pub useable_stop_time: Option<CalendarEpoch>,
     /// The integer orbit revolution number associated with the first trajectory state in this
     /// trajectory state time history block. NOTE—The first ascending node crossing that occurs
     /// AFTER launch or deployment is designated to be the beginning of orbit revolution number
@@ -1597,7 +2958,7 @@ pub struct OcmTrajState {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TrajLine {
-    pub epoch: String,
+    pub epoch: Epoch,
     pub values: Vec<f64>,
 }
 
@@ -1606,7 +2967,7 @@ impl Serialize for TrajLine {
     where
         S: serde::Serializer,
     {
-        let mut s = self.epoch.clone();
+        let mut s = self.epoch.to_string();
         for v in &self.values {
             s.push(' ');
             s.push_str(&v.to_string());
@@ -1625,7 +2986,8 @@ impl<'de> Deserialize<'de> for TrajLine {
         let epoch = parts
             .next()
             .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
-            .to_string();
+            .parse()
+            .map_err(serde::de::Error::custom)?;
         let values: std::result::Result<Vec<f64>, _> = parts
             .map(|v| fast_float::parse(v).map_err(serde::de::Error::custom))
             .collect();
@@ -1695,8 +3057,7 @@ impl ToKvn for OcmTrajState {
             writer.write_pair("TRAJ_UNITS", v);
         }
         for line in &self.traj_lines {
-            let vals: Vec<String> = line.values.iter().map(|v| v.to_string()).collect();
-            writer.write_line(format!("{} {}", line.epoch, vals.join(" ")));
+            writer.write_ocm_numeric_history(&line.epoch, &line.values);
         }
         writer.write_section("TRAJ_STOP");
     }
@@ -1858,7 +3219,7 @@ pub struct OcmPhysicalDescription {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub oeb_parent_frame_epoch: Option<Epoch>,
+    pub oeb_parent_frame_epoch: Option<CalendarEpoch>,
     /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
     /// (defined above) to the frame aligned with the OEB (defined in annex F, subsection F1).
@@ -2641,7 +4002,7 @@ pub struct OcmCovarianceMatrix {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub cov_frame_epoch: Option<Epoch>,
+    pub cov_frame_epoch: Option<CalendarEpoch>,
     /// Minimum scale factor to apply to this covariance data to achieve realism.
     ///
     /// **Examples**: 0.5
@@ -2725,7 +4086,7 @@ pub struct OcmCovarianceMatrix {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct CovLine {
-    pub epoch: String,
+    pub epoch: Epoch,
     pub values: Vec<f64>,
 }
 
@@ -2734,7 +4095,7 @@ impl Serialize for CovLine {
     where
         S: serde::Serializer,
     {
-        let mut s = self.epoch.clone();
+        let mut s = self.epoch.to_string();
         for v in &self.values {
             s.push(' ');
             s.push_str(&v.to_string());
@@ -2753,7 +4114,8 @@ impl<'de> Deserialize<'de> for CovLine {
         let epoch = parts
             .next()
             .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
-            .to_string();
+            .parse()
+            .map_err(serde::de::Error::custom)?;
         let values: std::result::Result<Vec<f64>, _> = parts
             .map(|v| fast_float::parse(v).map_err(serde::de::Error::custom))
             .collect();
@@ -2802,8 +4164,7 @@ impl ToKvn for OcmCovarianceMatrix {
             writer.write_pair("COV_UNITS", v);
         }
         for line in &self.cov_lines {
-            let vals: Vec<String> = line.values.iter().map(|v| v.to_string()).collect();
-            writer.write_line(format!("{} {}", line.epoch, vals.join(" ")));
+            writer.write_ocm_numeric_history(&line.epoch, &line.values);
         }
         writer.write_section("COV_STOP");
     }
@@ -2955,7 +4316,7 @@ pub struct OcmManeuverParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub man_frame_epoch: Option<Epoch>,
+    pub man_frame_epoch: Option<CalendarEpoch>,
     /// Origin of maneuver gravitational assist body, which may be a natural solar system body
     /// (planets, asteroids, comets, and natural satellites), including any planet barycenter
     /// or the solar system barycenter. (See annex B, subsection B2, for acceptable
@@ -3192,7 +4553,7 @@ pub struct OcmManeuverParameters {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ManLine {
-    pub epoch: String,
+    pub epoch: Epoch,
     pub values: Vec<String>,
 }
 
@@ -3201,7 +4562,7 @@ impl Serialize for ManLine {
     where
         S: serde::Serializer,
     {
-        let mut s = self.epoch.clone();
+        let mut s = self.epoch.to_string();
         for v in &self.values {
             s.push(' ');
             s.push_str(v);
@@ -3220,7 +4581,8 @@ impl<'de> Deserialize<'de> for ManLine {
         let epoch = parts
             .next()
             .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
-            .to_string();
+            .parse()
+            .map_err(serde::de::Error::custom)?;
         let values: Vec<String> = parts.map(|s| s.to_string()).collect();
         Ok(ManLine { epoch, values })
     }
@@ -3311,7 +4673,7 @@ impl ToKvn for OcmManeuverParameters {
             writer.write_pair("MAN_UNITS", v);
         }
         for line in &self.man_lines {
-            writer.write_line(format!("{} {}", line.epoch, line.values.join(" ")));
+            writer.write_ocm_text_history(&line.epoch, &line.values);
         }
         writer.write_section("MAN_STOP");
     }
@@ -3680,8 +5042,8 @@ impl ToKvn for OcmPerturbations {
             writer.write_measure("EQUATORIAL_RADIUS", v);
         }
         if let Some(v) = &self.gm {
-            writer.write_pair("GM", v.value.to_string());
-        } // GM units are optional/complex
+            writer.write_measure("GM", &v.to_unit_value());
+        }
         if let Some(v) = &self.n_body_perturbations {
             writer.write_pair("N_BODY_PERTURBATIONS", v);
         }
@@ -4300,10 +5662,144 @@ mod tests {
 
         // Fix it
         ocm.body.segment.data.traj[0].traj_lines.push(TrajLine {
-            epoch: "2000-01-01T00:00:00".to_string(),
+            epoch: "2000-01-01T00:00:00".parse().unwrap(),
             values: vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
         });
         assert!(ocm.validate().is_ok());
+
+        for value in ["2000-366T23:59:60Z", "12345.5"] {
+            ocm.body.segment.data.traj[0].traj_lines[0].epoch = value.parse().unwrap();
+            assert!(ocm.validate().is_ok(), "valid trajectory epoch {value}");
+        }
+
+        for value in ["2001-366T00:00:00", "2023-01-01T24:00:00", "+", "123."] {
+            ocm.body.segment.data.traj[0].traj_lines[0].epoch = value.parse().unwrap();
+            assert!(ocm.validate().is_err(), "invalid trajectory epoch {value}");
+        }
+    }
+
+    #[test]
+    fn traj_line_deserialization_rejects_non_epoch_first_token() {
+        let xml = "<trajLine>not-an-epoch 1 2 3</trajLine>";
+        assert!(crate::xml::from_str::<TrajLine>(xml).is_err());
+    }
+
+    #[test]
+    fn test_ocm_validation_cov_lines_epochs() {
+        let mut cov = OcmCovarianceMatrix::builder()
+            .cov_ref_frame("GCRF")
+            .cov_type("CARTPV")
+            .cov_lines(vec![CovLine {
+                epoch: "2000-01-01T00:00:00".parse().unwrap(),
+                values: vec![1.0],
+            }])
+            .build();
+        assert!(cov.validate().is_ok());
+
+        for value in ["2000-366T23:59:60Z", "12345.5"] {
+            cov.cov_lines[0].epoch = value.parse().unwrap();
+            assert!(cov.validate().is_ok(), "valid covariance epoch {value}");
+        }
+
+        for value in ["2001-366T00:00:00", "2023-01-01T24:00:00", "+", "123."] {
+            cov.cov_lines[0].epoch = value.parse().unwrap();
+            assert!(cov.validate().is_err(), "invalid covariance epoch {value}");
+        }
+    }
+
+    #[test]
+    fn ocm_history_blocks_reject_mixed_epoch_branches() {
+        let mut traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("CARTPV")
+            .traj_lines(vec![
+                TrajLine {
+                    epoch: "2000-01-01T00:00:00".parse().unwrap(),
+                    values: vec![1.0],
+                },
+                TrajLine {
+                    epoch: "1.0".parse().unwrap(),
+                    values: vec![2.0],
+                },
+            ])
+            .build();
+        assert!(traj.validate().is_err());
+
+        traj.traj_lines[1].epoch = "2000-01-01T00:00:01".parse().unwrap();
+        assert!(traj.validate().is_ok());
+
+        let mut cov = OcmCovarianceMatrix::builder()
+            .cov_ref_frame("GCRF")
+            .cov_type("CARTPV")
+            .cov_lines(vec![
+                CovLine {
+                    epoch: "1.0".parse().unwrap(),
+                    values: vec![1.0],
+                },
+                CovLine {
+                    epoch: "2000-01-01T00:00:01".parse().unwrap(),
+                    values: vec![2.0],
+                },
+            ])
+            .build();
+        assert!(cov.validate().is_err());
+
+        cov.cov_lines[1].epoch = "2.0".parse().unwrap();
+        assert!(cov.validate().is_ok());
+    }
+
+    #[test]
+    fn ocm_history_blocks_reject_duplicate_and_decreasing_epochs() {
+        let mut traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("CARTPV")
+            .traj_lines(vec![
+                TrajLine {
+                    epoch: "1".parse().unwrap(),
+                    values: vec![1.0],
+                },
+                TrajLine {
+                    epoch: "+1.0".parse().unwrap(),
+                    values: vec![2.0],
+                },
+            ])
+            .build();
+        assert!(traj.validate().is_err());
+
+        traj.traj_lines[1].epoch = "0.5".parse().unwrap();
+        assert!(traj.validate().is_err());
+
+        traj.traj_lines[1].epoch = "2".parse().unwrap();
+        assert!(traj.validate().is_ok());
+
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .man_composition("TIME_RELATIVE, THR_X")
+            .man_lines(vec![
+                ManLine {
+                    epoch: "1".parse().unwrap(),
+                    values: vec!["1".to_string()],
+                },
+                ManLine {
+                    epoch: "1.0".parse().unwrap(),
+                    values: vec!["2".to_string()],
+                },
+            ])
+            .build();
+        assert!(man.validate().is_err());
+
+        man.man_lines[1].epoch = "2".parse().unwrap();
+        assert!(man.validate().is_ok());
+    }
+
+    #[test]
+    fn cov_line_deserialization_rejects_non_epoch_first_token() {
+        let xml = "<covLine>not-an-epoch 1 2 3</covLine>";
+        assert!(crate::xml::from_str::<CovLine>(xml).is_err());
     }
 
     #[test]
@@ -4314,7 +5810,7 @@ mod tests {
             .traj_type("CARTPV")
             .build();
         traj.traj_lines.push(TrajLine {
-            epoch: "2000-01-01T00:00:00".to_string(),
+            epoch: "2000-01-01T00:00:00".parse().unwrap(),
             values: vec![1.0],
         });
         traj.orb_revnum = Some(-1.0);
@@ -4354,7 +5850,7 @@ TRAJ_STOP
     #[test]
     fn test_xsd_sample_ocm_g20_xml() {
         // Parse official CCSDS OCM XML example G-20
-        let xml = include_str!("../../../data/xml/ocm_g20.xml");
+        let xml = include_str!("../../data/xml/ocm_g20.xml");
         let ocm = Ocm::from_xml(xml).unwrap();
 
         // Verify mandatory metadata
@@ -4397,7 +5893,7 @@ TRAJ_STOP
     fn test_to_xml_roundtrip() {
         // Cover to_xml method (lines 79-81)
         // Use the official XML example which is known to be valid
-        let xml = include_str!("../../../data/xml/ocm_g20.xml");
+        let xml = include_str!("../../data/xml/ocm_g20.xml");
         let ocm = Ocm::from_xml(xml).unwrap();
         let xml_out = ocm.to_xml().unwrap();
         assert!(xml_out.contains("ocm"));
@@ -4409,7 +5905,7 @@ TRAJ_STOP
     fn test_xml_roundtrip_with_all_blocks() {
         // Cover XML serialization for TrajLine, CovLine, ManLine
         // Use the official XML example to test XML roundtrip
-        let xml = include_str!("../../../data/xml/ocm_g20.xml");
+        let xml = include_str!("../../data/xml/ocm_g20.xml");
         let ocm = Ocm::from_xml(xml).unwrap();
 
         // Verify structure was parsed
@@ -4426,12 +5922,12 @@ TRAJ_STOP
         // The official file may not have covariance data in line format
         // So we manually build one and check serialization
         let cov_line = CovLine {
-            epoch: "2023-01-01T00:00:00".to_string(),
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
         };
 
-        // Test Display trait which is used in to_kvn - use debug instead
-        let display = format!("{:?}", cov_line);
+        // Test the epoch's wire spelling used by KVN/XML generation.
+        let display = format!("{}", cov_line.epoch);
         assert!(display.contains("2023-01-01T00:00:00"));
     }
 
@@ -4447,7 +5943,7 @@ TRAJ_STOP
         }
 
         let cov_line = CovLine {
-            epoch: "2023-01-01T00:00:00".to_string(),
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec![1.0, 2.0, 3.0],
         };
 
@@ -4462,7 +5958,7 @@ TRAJ_STOP
 
         // Deserialize and verify using quick-xml
         let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
-        assert_eq!(deserialized.cov_line.epoch, "2023-01-01T00:00:00");
+        assert_eq!(deserialized.cov_line.epoch.as_str(), "2023-01-01T00:00:00");
         assert_eq!(deserialized.cov_line.values.len(), 3);
     }
 
@@ -4477,7 +5973,7 @@ TRAJ_STOP
         }
 
         let man_line = ManLine {
-            epoch: "2023-01-01T00:00:00".to_string(),
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec!["1.0".to_string(), "2.0".to_string(), "3.0".to_string()],
         };
 
@@ -4489,15 +5985,205 @@ TRAJ_STOP
 
         // Deserialize and verify
         let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
-        assert_eq!(deserialized.man_line.epoch, "2023-01-01T00:00:00");
+        assert_eq!(deserialized.man_line.epoch.as_str(), "2023-01-01T00:00:00");
         assert_eq!(deserialized.man_line.values.len(), 3);
+    }
+
+    #[test]
+    fn test_ocm_validation_man_line_epoch_matches_composition() {
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .man_composition("TIME_RELATIVE, MAN_DURA")
+            .man_lines(vec![ManLine {
+                epoch: "123.5".parse().unwrap(),
+                values: vec!["10.0".to_string()],
+            }])
+            .build();
+        assert!(man.validate().is_ok());
+
+        man.man_lines[0].epoch = "2023-001T00:00:00".parse().unwrap();
+        assert!(man.validate().is_err());
+
+        man.man_composition = "TIME_ABSOLUTE, MAN_DURA".to_string();
+        assert!(man.validate().is_ok());
+
+        man.man_lines[0].epoch = "123.5".parse().unwrap();
+        assert!(man.validate().is_err());
+    }
+
+    #[test]
+    fn test_ocm_validation_man_duty_cycle_requirements_and_period() {
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .dc_type(ManDc::Time)
+            .man_composition("TIME_ABSOLUTE, DV_X")
+            .man_lines(vec![ManLine {
+                epoch: "2023-01-01T00:00:00".parse().unwrap(),
+                values: vec!["1.0".to_string()],
+            }])
+            .build();
+        man.dc_win_open = Some("2023-01-01T00:00:00".parse().unwrap());
+        man.dc_win_close = Some("2023-01-01T01:00:00".parse().unwrap());
+        man.dc_exec_start = Some("2023-01-01T00:10:00".parse().unwrap());
+        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
+        man.dc_ref_time = Some("2023-01-01T00:00:00".parse().unwrap());
+        man.dc_time_pulse_duration = Some(Duration::new(60.0, Some(TimeUnits::Seconds)).unwrap());
+        man.dc_time_pulse_period = Some(Duration::new(120.0, Some(TimeUnits::Seconds)).unwrap());
+        assert!(man.validate().is_ok());
+
+        man.dc_exec_start = Some("2022-12-31T23:50:00".parse().unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_EXEC_START"));
+        man.dc_exec_start = Some("2023-01-01T00:10:00".parse().unwrap());
+
+        man.dc_exec_stop = Some("2023-01-01T01:10:00".parse().unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_EXEC_STOP"));
+        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
+
+        man.dc_time_pulse_period = Some(Duration::new(30.0, Some(TimeUnits::Seconds)).unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_TIME_PULSE_PERIOD"));
+        assert!(error.contains("DC_TIME_PULSE_DURATION"));
+
+        man.dc_time_pulse_period = Some(Duration::new(120.0, Some(TimeUnits::Seconds)).unwrap());
+        man.dc_exec_stop = None;
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_EXEC_STOP"));
+
+        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
+        man.dc_max_cycles = Some(0);
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_MAX_CYCLES"));
+    }
+
+    #[test]
+    fn test_ocm_metadata_sclk_and_next_leap_requirements() {
+        let mut metadata = OcmMetadata::builder()
+            .time_system("SCLK")
+            .epoch_tzero("2023-01-01T00:00:00".parse().unwrap())
+            .build();
+        let error = metadata.validate().unwrap_err().to_string();
+        assert!(error.contains("SCLK_OFFSET_AT_EPOCH"));
+
+        metadata.sclk_offset_at_epoch = Some(TimeOffset {
+            value: 100.0,
+            units: Some(TimeUnits::Seconds),
+        });
+        let error = metadata.validate().unwrap_err().to_string();
+        assert!(error.contains("SCLK_SEC_PER_SI_SEC"));
+
+        metadata.sclk_sec_per_si_sec = Some(Duration {
+            value: 1.0,
+            units: Some(TimeUnits::Seconds),
+        });
+        assert!(metadata.validate().is_ok());
+
+        metadata.next_leap_epoch = Some("2024-01-01T00:00:00".parse().unwrap());
+        let error = metadata.validate().unwrap_err().to_string();
+        assert!(error.contains("NEXT_LEAP_TAIMUTC"));
+
+        metadata.next_leap_taimutc = Some(TimeOffset {
+            value: 37.0,
+            units: Some(TimeUnits::Seconds),
+        });
+        assert!(metadata.validate().is_ok());
+
+        metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Day);
+        let error = metadata.validate().unwrap_err().to_string();
+        assert!(error.contains("SCLK_OFFSET_AT_EPOCH"));
+
+        metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Seconds);
+        metadata.sclk_sec_per_si_sec.as_mut().unwrap().units = Some(TimeUnits::Day);
+        let error = metadata.validate().unwrap_err().to_string();
+        assert!(error.contains("SCLK_SEC_PER_SI_SEC"));
+    }
+
+    #[test]
+    fn test_ocm_validation_man_duty_cycle_angle_requirements_and_epoch_branch() {
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .dc_type(ManDc::TimeAndAngle)
+            .man_composition("TIME_RELATIVE, DV_X")
+            .man_lines(vec![ManLine {
+                epoch: "1".parse().unwrap(),
+                values: vec!["1.0".to_string()],
+            }])
+            .build();
+        man.dc_win_open = Some("0".parse().unwrap());
+        man.dc_win_close = Some("10".parse().unwrap());
+        man.dc_exec_start = Some("1".parse().unwrap());
+        man.dc_exec_stop = Some("9".parse().unwrap());
+        man.dc_ref_time = Some("0".parse().unwrap());
+        man.dc_time_pulse_duration = Some(Duration::new(1.0, None).unwrap());
+        man.dc_time_pulse_period = Some(Duration::new(2.0, None).unwrap());
+        man.dc_ref_dir = Some(Vec3Double::new(1.0, 0.0, 0.0));
+        man.dc_body_frame = Some("SC_BODY".to_string());
+        man.dc_body_trigger = Some(Vec3Double::new(0.0, 1.0, 0.0));
+        man.dc_pa_start_angle = Some("0".parse().unwrap());
+        man.dc_pa_stop_angle = Some("180".parse().unwrap());
+        assert!(man.validate().is_ok());
+
+        man.dc_body_trigger = None;
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_BODY_TRIGGER"));
+
+        man.dc_body_trigger = Some(Vec3Double::new(0.0, 1.0, 0.0));
+        man.dc_win_open = Some("2023-01-01T00:00:00".parse().unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_WIN_OPEN"));
+
+        man.dc_win_open = Some("0".parse().unwrap());
+        man.dc_pa_start_angle = Some(Angle {
+            value: 360.0,
+            units: Some(AngleUnits::Deg),
+        });
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_PA_START_ANGLE"));
+    }
+
+    #[test]
+    fn test_ocm_validation_man_composition_requires_one_time_tag_first() {
+        let line = ManLine {
+            epoch: "2023-001T00:00:00".parse().unwrap(),
+            values: vec!["10.0".to_string()],
+        };
+        for composition in [
+            "EPOCH, MAN_DURA",
+            "MAN_DURA, TIME_ABSOLUTE",
+            "TIME_RELATIVE, TIME_ABSOLUTE, MAN_DURA",
+            "",
+        ] {
+            let man = OcmManeuverParameters::builder()
+                .man_id("MAN-1")
+                .man_device_id("THR-1")
+                .man_ref_frame("GCRF")
+                .man_composition(composition)
+                .man_lines(vec![line.clone()])
+                .build();
+            assert!(man.validate().is_err(), "invalid composition {composition}");
+        }
+    }
+
+    #[test]
+    fn man_line_deserialization_rejects_non_epoch_first_token() {
+        let xml = "<manLine>not-an-epoch 1 2 3</manLine>";
+        assert!(crate::xml::from_str::<ManLine>(xml).is_err());
     }
 
     #[test]
     fn test_ocm_validation_gaps() {
         // 1. DRAG_COEFF_NOM <= 0.0
-        let mut phys = OcmPhysicalDescription::default();
-        phys.drag_coeff_nom = Some(-1.0);
+        let mut phys = OcmPhysicalDescription {
+            drag_coeff_nom: Some(-1.0),
+            ..Default::default()
+        };
         assert!(phys.validate().is_err());
         phys.drag_coeff_nom = Some(0.0);
         assert!(phys.validate().is_err());
@@ -4511,7 +6197,7 @@ TRAJ_STOP
         traj.orb_revnum = Some(-1.0);
         // Also needs at least one line to pass first check
         traj.traj_lines.push(TrajLine {
-            epoch: "2023-01-01T00:00:00".to_string(),
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec![0.0],
         });
         assert!(traj.validate().is_err());
@@ -4544,7 +6230,7 @@ TRAJ_STOP
             .build();
         traj.orb_revnum_basis = Some(RevNumBasis::One);
         traj.traj_lines.push(TrajLine {
-            epoch: "2023-01-01T00:00:00".to_string(),
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec![0.0],
         });
         let mut writer = crate::kvn::ser::KvnWriter::new();

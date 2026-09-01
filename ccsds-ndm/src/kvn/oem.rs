@@ -52,6 +52,7 @@ use winnow::combinator::{preceded, repeat};
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
 use winnow::stream::Offset;
+use winnow::token::take_while;
 
 //----------------------------------------------------------------------
 // OEM Version Parser
@@ -97,7 +98,7 @@ pub fn oem_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 classification = Some(kv_string.parse_next(input)?);
             }
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -152,7 +153,7 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
         "OBJECT_ID" => object_id: kv_string,
         "CENTER_NAME" => center_name: kv_string,
         "REF_FRAME" => ref_frame: kv_string,
-        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_epoch,
+        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_calendar_epoch,
         "TIME_SYSTEM" => time_system: kv_string,
         "START_TIME" => start_time: kv_epoch,
         "USEABLE_START_TIME" => useable_start_time: kv_epoch,
@@ -196,6 +197,16 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
 // State Vector (Raw Line) Parser
 //----------------------------------------------------------------------
 
+fn parse_odm_f64(input: &mut &str) -> KvnResult<f64> {
+    let token = take_while::<_, _, ()>(1.., ('0'..='9', '.', '-', '+', 'e', 'E'))
+        .parse_next(input)
+        .map_err(|_| cut_err(input, "Invalid ODM number"))?;
+    if !crate::messages::oem::valid_odm_number(token) {
+        return Err(cut_err(input, "Invalid ODM number"));
+    }
+    fast_float::parse(token).map_err(|_| cut_err(input, "Invalid ODM number"))
+}
+
 /// Parses a raw state vector line.
 /// Format: EPOCH X Y Z X_DOT Y_DOT Z_DOT [X_DDOT Y_DDOT Z_DDOT]
 fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
@@ -206,7 +217,7 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
     for f in &mut floats {
         let checkpoint = input.checkpoint();
-        match preceded(space1, parse_f64_winnow).parse_next(input) {
+        match preceded(space1, parse_odm_f64).parse_next(input) {
             Ok(val) => {
                 *f = val;
                 count += 1;
@@ -304,8 +315,8 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
         comment.extend(collect_comments.parse_next(input)?);
 
         let line_vals = (
-            preceded(ws, parse_f64_winnow),
-            repeat(expected_count - 1, preceded(space1, parse_f64_winnow)),
+            preceded(ws, parse_odm_f64),
+            repeat(expected_count - 1, preceded(space1, parse_odm_f64)),
         )
             .map(|(first, rest): (f64, Vec<f64>)| {
                 let mut all = vec![first];
@@ -383,7 +394,6 @@ fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix
 
     loop {
         let checkpoint = input.checkpoint();
-        comment_line.parse_next(input).ok(); // Consume any comments
         if at_block_end("COVARIANCE", input) {
             break;
         }
@@ -983,22 +993,24 @@ META_STOP
 
     #[test]
     fn test_block_checks() {
-        let mut input = "META_STAR";
-        assert!(!at_block_start("META", &mut input));
-        let mut input = "META_START_EXTRA";
-        assert!(!at_block_start("META", &mut input));
-        let mut input = "META_STOP_EXTRA";
-        assert!(!at_block_end("META", &mut input));
-        let mut input = "META_END_EXTRA";
-        assert!(!at_block_end("META", &mut input));
+        let input = "META_STAR";
+        assert!(!at_block_start("META", input));
+        let input = "META_START_EXTRA";
+        assert!(!at_block_start("META", input));
+        let input = "META_STOP_EXTRA";
+        assert!(!at_block_end("META", input));
+        let input = "META_END_EXTRA";
+        assert!(!at_block_end("META", input));
     }
 
     #[test]
     fn test_odm_header_errors() {
         // Invalid creation date
-        let kvn = "CREATION_DATE = INVALID\nORIGINATOR = TEST\n";
-        let mut input = kvn;
-        assert!(odm_header.parse_next(&mut input).is_err());
+        for value in ["INVALID", "123.5", "2023-02-29T00:00:00"] {
+            let kvn = format!("CREATION_DATE = {value}\nORIGINATOR = TEST\n");
+            let mut input = kvn.as_str();
+            assert!(odm_header.parse_next(&mut input).is_err());
+        }
     }
 
     #[test]
@@ -1121,9 +1133,9 @@ CENTER_NAME = EARTH
 REF_FRAME = GCRF
 TIME_SYSTEM = UTC
 START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
 INTERPOLATION = LAGRANGE
 INTERPOLATION_DEGREE = 5
-STOP_TIME = 2023-01-02T00:00:00
 META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
@@ -1142,8 +1154,8 @@ CENTER_NAME = EARTH
 REF_FRAME = GCRF
 TIME_SYSTEM = UTC
 START_TIME = 2023-01-01T00:00:00
-INTERPOLATION_DEGREE = 0
 STOP_TIME = 2023-01-02T00:00:00
+INTERPOLATION_DEGREE = 0
 META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
@@ -1262,7 +1274,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref msg, .. } if msg.contains("CCSDS_OEM_VERS")))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref msg, .. } if msg.contains("CCSDS_OEM_VERS")))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1303,7 +1315,7 @@ CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("segment")))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("segment")))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1316,7 +1328,7 @@ ORIGINATOR = TEST
 OBJECT_NAME = SAT1
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false || err.is_validation_error() || err.is_kvn_error();
+        let ok = err.is_validation_error() || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
 
@@ -1336,7 +1348,7 @@ STOP_TIME = 2023-01-02T00:00:00
 META_STOP
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("must contain at least one state vector")))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("must contain at least one state vector")))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1412,7 +1424,7 @@ META_STOP
 bad-epoch 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        assert!(matches!(err, CcsdsNdmError::Epoch(_)) | err.is_kvn_error() | false);
+        assert!(matches!(err, CcsdsNdmError::Parsing { .. }));
     }
 
     #[test]
@@ -1431,7 +1443,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "OBJECT_ID"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "OBJECT_ID"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1452,7 +1464,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "CENTER_NAME"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "CENTER_NAME"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1473,7 +1485,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "REF_FRAME"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "REF_FRAME"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1494,7 +1506,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "TIME_SYSTEM"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "TIME_SYSTEM"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1515,7 +1527,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "START_TIME"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "START_TIME"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1536,7 +1548,7 @@ META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "STOP_TIME"))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k == "STOP_TIME"))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1548,7 +1560,7 @@ CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 "#;
         let err = Oem::from_kvn(kvn).unwrap_err();
-        let ok = false             || err.as_validation_error().map_or(false, |e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("segment")))
+        let ok = err.as_validation_error().is_some_and(|e| matches!(e, ValidationError::MissingRequiredField { field: ref k, .. } if k.contains("segment")))
             || err.is_kvn_error();
         assert!(ok, "unexpected error: {:?}", err);
     }
@@ -1945,7 +1957,7 @@ COVARIANCE_STOP
 
     #[test]
     fn test_xsd_parse_sample_oem_g11() {
-        let kvn = include_str!("../../../data/kvn/oem_g11.kvn");
+        let kvn = include_str!("../../data/kvn/oem_g11.kvn");
         let oem = Oem::from_kvn(kvn).expect("Failed to parse oem_g11.kvn");
         assert_eq!(oem.version, "3.0");
         assert_eq!(oem.header.originator, "NASA/JPL");
@@ -1990,6 +2002,78 @@ META_STOP
     }
 
     #[test]
+    fn ref_frame_epoch_requires_calendar_form() {
+        let source = include_str!("../../data/kvn/oem_g11.kvn");
+        let with_epoch = source.replacen(
+            "REF_FRAME = EME2000\n",
+            "REF_FRAME = EME2000\nREF_FRAME_EPOCH = 2000-01-01T12:00:00\n",
+            1,
+        );
+        let oem = Oem::from_kvn(&with_epoch).expect("calendar frame epoch should parse");
+        assert_eq!(
+            oem.body.segment[0]
+                .metadata
+                .ref_frame_epoch
+                .as_ref()
+                .unwrap()
+                .as_str(),
+            "2000-01-01T12:00:00"
+        );
+
+        let numeric = with_epoch.replace(
+            "REF_FRAME_EPOCH = 2000-01-01T12:00:00",
+            "REF_FRAME_EPOCH = 123.5",
+        );
+        assert!(Oem::from_kvn(&numeric).is_err());
+    }
+
+    #[test]
+    fn contextual_epoch_fields_require_absolute_time_tags() {
+        let source = include_str!("../../data/kvn/oem_g11.kvn");
+        for (needle, replacement) in [
+            (
+                "START_TIME = 2019-12-18T12:00:00.331",
+                "START_TIME = 2023-02-29T12:00:00",
+            ),
+            (
+                "USEABLE_START_TIME = 2019-12-18T12:10:00.331",
+                "USEABLE_START_TIME = +",
+            ),
+            ("2019-12-18T12:00:00.331 2789.619", "+ 2789.619"),
+        ] {
+            let invalid = source.replacen(needle, replacement, 1);
+            assert!(
+                Oem::from_kvn(&invalid).is_err(),
+                "accepted invalid contextual epoch replacement {replacement:?}"
+            );
+        }
+
+        let relative = source
+            .replace("TIME_SYSTEM = UTC", "TIME_SYSTEM = MET")
+            .replacen(
+                "START_TIME = 2019-12-18T12:00:00.331",
+                "START_TIME = 123.5",
+                1,
+            )
+            .replacen(
+                "USEABLE_START_TIME = 2019-12-18T12:10:00.331",
+                "USEABLE_START_TIME = 124.0",
+                1,
+            )
+            .replacen(
+                "USEABLE_STOP_TIME = 2019-12-28T21:23:00.331",
+                "USEABLE_STOP_TIME = 125.0",
+                1,
+            )
+            .replacen(
+                "STOP_TIME = 2019-12-28T21:28:00.331",
+                "STOP_TIME = 126.0",
+                1,
+            );
+        assert!(Oem::from_kvn(&relative).is_err());
+    }
+
+    #[test]
     fn test_xsd_metadata_optional_useable_times() {
         let kvn_with = r#"CCSDS_OEM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -2023,9 +2107,9 @@ CENTER_NAME = EARTH
 REF_FRAME = GCRF
 TIME_SYSTEM = UTC
 START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
 INTERPOLATION = LAGRANGE
 INTERPOLATION_DEGREE = 7
-STOP_TIME = 2023-01-02T00:00:00
 META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;
@@ -2048,8 +2132,8 @@ CENTER_NAME = EARTH
 REF_FRAME = GCRF
 TIME_SYSTEM = UTC
 START_TIME = 2023-01-01T00:00:00
-INTERPOLATION_DEGREE = 0
 STOP_TIME = 2023-01-02T00:00:00
+INTERPOLATION_DEGREE = 0
 META_STOP
 2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
 "#;

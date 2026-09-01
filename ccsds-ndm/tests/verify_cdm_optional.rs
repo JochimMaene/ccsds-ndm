@@ -22,30 +22,30 @@ RELATIVE_POSITION_N = 5.0 [m]
 RELATIVE_VELOCITY_R = 0.1 [m/s]
 RELATIVE_VELOCITY_T = -0.2 [m/s]
 RELATIVE_VELOCITY_N = 0.05 [m/s]
+START_SCREEN_PERIOD =
+STOP_SCREEN_PERIOD =
 SCREEN_VOLUME_FRAME = RTN
 SCREEN_VOLUME_SHAPE = BOX
 SCREEN_VOLUME_X = 1000.0 [m]
 SCREEN_VOLUME_Y = 2000.0 [m]
 SCREEN_VOLUME_Z = 3000.0 [m]
-START_SCREEN_PERIOD =
-STOP_SCREEN_PERIOD =
 COLLISION_PROBABILITY = 0.001
 OBJECT = OBJECT1
 OBJECT_DESIGNATOR = 00001
-OBJECT_NAME = OBJ1
 CATALOG_NAME = CAT
+OBJECT_NAME = OBJ1
 INTERNATIONAL_DESIGNATOR = 1998-067A
 OBJECT_TYPE = PAYLOAD
 EPHEMERIS_NAME = EPH1
 COVARIANCE_METHOD = CALCULATED
 MANEUVERABLE = YES
 REF_FRAME = GCRF
-X = 1000.0 [m]
-Y = 2000.0 [m]
-Z = 3000.0 [m]
-X_DOT = 1.0 [m/s]
-Y_DOT = 2.0 [m/s]
-Z_DOT = 3.0 [m/s]
+X = 1.0 [km]
+Y = 2.0 [km]
+Z = 3.0 [km]
+X_DOT = 0.001 [km/s]
+Y_DOT = 0.002 [km/s]
+Z_DOT = 0.003 [km/s]
 CR_R = 1.0 [m**2]
 CT_R = 0.0 [m**2]
 CT_T = 1.0 [m**2]
@@ -77,12 +77,12 @@ EPHEMERIS_NAME = EPH1
 COVARIANCE_METHOD = CALCULATED
 MANEUVERABLE = NO
 REF_FRAME = GCRF
-X = 1500.0 [m]
-Y = 2500.0 [m]
-Z = 3500.0 [m]
-X_DOT = 1.5 [m/s]
-Y_DOT = 2.5 [m/s]
-Z_DOT = 3.5 [m/s]
+X = 1.5 [km]
+Y = 2.5 [km]
+Z = 3.5 [km]
+X_DOT = 0.0015 [km/s]
+Y_DOT = 0.0025 [km/s]
+Z_DOT = 0.0035 [km/s]
 CR_R = 1.0 [m**2]
 CT_R = 0.0 [m**2]
 CT_T = 1.0 [m**2]
@@ -123,7 +123,7 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 }
 
 #[test]
-fn test_cdm_xml_optional_nil() {
+fn test_cdm_xml_optional_omission() {
     let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
 <cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sanaregistry.org/r/ndmxml/ndmxml-1.0-master.xsd" id="CCSDS_CDM_VERS" version="1.0">
     <header>
@@ -145,8 +145,6 @@ fn test_cdm_xml_optional_nil() {
                 <RELATIVE_VELOCITY_T units="m/s">-0.2</RELATIVE_VELOCITY_T>
                 <RELATIVE_VELOCITY_N units="m/s">0.05</RELATIVE_VELOCITY_N>
             </relativeStateVector>
-            <START_SCREEN_PERIOD nil="true"/>
-            <STOP_SCREEN_PERIOD></STOP_SCREEN_PERIOD>
             <SCREEN_VOLUME_FRAME>RTN</SCREEN_VOLUME_FRAME>
             <SCREEN_VOLUME_SHAPE>BOX</SCREEN_VOLUME_SHAPE>
             <SCREEN_VOLUME_X units="m">1000.0</SCREEN_VOLUME_X>
@@ -252,9 +250,9 @@ fn test_cdm_xml_optional_nil() {
 </cdm>
 "#;
 
-    let cdm = Cdm::from_xml(xml).expect("Failed to parse CDM XML with nil optional fields");
+    let cdm = Cdm::from_xml(xml).expect("Failed to parse CDM XML with omitted optional fields");
 
-    // START_SCREEN_PERIOD was nil="true", so it should be None
+    // Optional XML elements are represented by omission, as required by the CDM XSD.
     assert!(
         cdm.body
             .relative_metadata_data
@@ -263,7 +261,6 @@ fn test_cdm_xml_optional_nil() {
         "START_SCREEN_PERIOD should be None"
     );
 
-    // STOP_SCREEN_PERIOD is an empty optional tag and should deserialize as None.
     assert!(
         cdm.body.relative_metadata_data.stop_screen_period.is_none(),
         "STOP_SCREEN_PERIOD should be None"

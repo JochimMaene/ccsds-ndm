@@ -4,14 +4,13 @@
 
 use crate::common::{parse_reference_frame, parse_time_system};
 use crate::common::{OdmHeader, StateVector};
-use crate::types::parse_epoch;
+use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::opm as core_opm;
-use ccsds_ndm::traits::{Ndm, Validate};
+use ccsds_ndm::options::ParseOptions;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
-use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
+use pyo3::types::PyList;
 
 /// Orbit Parameter Message (OPM).
 ///
@@ -28,31 +27,61 @@ use std::fs;
 /// segment : OpmSegment
 ///     The data segment.
 #[pyclass]
-#[derive(Clone)]
 pub struct Opm {
-    pub inner: core_opm::Opm,
+    id: Option<String>,
+    version: String,
+    header: Py<OdmHeader>,
+    segment: Py<OpmSegment>,
+}
+
+impl Opm {
+    pub(crate) fn from_core(py: Python<'_>, value: core_opm::Opm) -> PyResult<Self> {
+        Ok(Self {
+            id: value.id,
+            version: value.version,
+            header: Py::new(
+                py,
+                OdmHeader {
+                    inner: value.header,
+                },
+            )?,
+            segment: Py::new(py, OpmSegment::from_core(py, value.body.segment)?)?,
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_opm::Opm> {
+        Ok(core_opm::Opm {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            header: self.header.borrow(py).inner.clone(),
+            body: core_opm::OpmBody {
+                segment: self.segment.borrow(py).to_core(py)?,
+            },
+        })
+    }
 }
 
 #[pymethods]
 impl Opm {
     #[new]
-    fn new(header: OdmHeader, segment: OpmSegment) -> Self {
+    fn new(header: Py<OdmHeader>, segment: Py<OpmSegment>) -> Self {
         Self {
-            inner: core_opm::Opm {
-                header: header.inner,
-                body: core_opm::OpmBody {
-                    segment: segment.inner,
-                },
-                id: Some("CCSDS_OPM_VERS".to_string()),
-                version: "3.0".to_string(),
-            },
+            header,
+            segment,
+            id: Some("CCSDS_OPM_VERS".to_string()),
+            version: "3.0".to_string(),
         }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "Opm(object_name='{}')",
-            self.inner.body.segment.metadata.object_name
+            self.segment
+                .borrow(py)
+                .metadata
+                .borrow(py)
+                .inner
+                .object_name
         )
     }
 
@@ -61,7 +90,7 @@ impl Opm {
     /// :type: Optional[str]
     #[getter]
     fn get_id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     /// The message version.
@@ -69,54 +98,20 @@ impl Opm {
     /// :type: str
     #[getter]
     fn get_version(&self) -> String {
-        self.inner.version.clone()
+        self.version.clone()
     }
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Opm, &value)?;
-        self.inner.version = value;
+        self.version = value;
         Ok(())
     }
 
     /// Validate the message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        if strict {
-            self.inner
-                .validate()
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
-            Ok(None)
-        } else {
-            let mut issues = Vec::new();
-            let _ = ccsds_ndm::validation::with_validation_mode(
-                ccsds_ndm::validation::ValidationMode::Lenient,
-                || match self.inner.validate() {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        issues.push(e.to_string());
-                        Ok(())
-                    }
-                },
-            );
-
-            let warnings = ccsds_ndm::validation::take_warnings();
-            for w in warnings {
-                issues.push(w.error.to_string());
-            }
-
-            if issues.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(issues))
-            }
-        }
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
     /// Orbit Parameter Message (OPM).
@@ -129,60 +124,59 @@ impl Opm {
     ///
     /// :type: OdmHeader
     #[getter]
-    fn get_header(&self) -> OdmHeader {
-        OdmHeader {
-            inner: self.inner.header.clone(),
-        }
+    fn get_header(&self, py: Python<'_>) -> Py<OdmHeader> {
+        self.header.clone_ref(py)
     }
 
     #[setter]
-    fn set_header(&mut self, header: OdmHeader) {
-        self.inner.header = header.inner;
+    fn set_header(&mut self, header: Py<OdmHeader>) {
+        self.header = header;
     }
 
     /// The data segment.
     ///
     /// :type: OpmSegment
     #[getter]
-    fn get_segment(&self) -> OpmSegment {
-        OpmSegment {
-            inner: self.inner.body.segment.clone(),
-        }
+    fn get_segment(&self, py: Python<'_>) -> Py<OpmSegment> {
+        self.segment.clone_ref(py)
     }
 
     #[setter]
-    fn set_segment(&mut self, segment: OpmSegment) {
-        self.inner.body.segment = segment.inner;
+    fn set_segment(&mut self, segment: Py<OpmSegment>) {
+        self.segment = segment;
     }
 
     /// Create an OPM message from a string.
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = match format {
-            Some("kvn") => ccsds_ndm::messages::opm::Opm::from_kvn(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some("xml") => ccsds_ndm::messages::opm::Opm::from_xml(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None))]
+    fn from_str(
+        py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = ParseOptions {
+            max_input_bytes,
+            ..ParseOptions::default()
+        };
+        let parsed = match format {
+            Some("kvn") => core_opm::Opm::from_kvn_with_options(data, &options),
+            Some("xml") => core_opm::Opm::from_xml_with_options(data, &options),
             Some(other) => {
                 return Err(PyValueError::new_err(format!(
-                    "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                    other
+                    "Unsupported format '{other}'. Use 'kvn' or 'xml'"
                 )))
             }
-            None => match ccsds_ndm::from_str(data) {
-                Ok(MessageType::Opm(opm)) => opm,
-                Ok(other) => {
-                    return Err(PyValueError::new_err(format!(
-                        "Parsed message is not OPM (got {:?})",
-                        other
-                    )))
-                }
-                Err(e) => return Err(PyValueError::new_err(e.to_string())),
+            None => match ccsds_ndm::detect::detect_notation(data)
+                .map_err(crate::errors::ccsds_error_to_pyerr)?
+            {
+                ccsds_ndm::Notation::Kvn => core_opm::Opm::from_kvn_with_options(data, &options),
+                ccsds_ndm::Notation::Xml => core_opm::Opm::from_xml_with_options(data, &options),
             },
         };
-        Ok(Self { inner })
+        let inner = parsed.map_err(crate::errors::ccsds_error_to_pyerr)?;
+        Self::from_core(py, inner)
     }
 
     /// Create an OPM message from a file.
@@ -199,43 +193,36 @@ impl Opm {
     /// Opm
     ///     The parsed OPM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(&content, format)
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
+    fn from_file(
+        py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = ParseOptions {
+            max_input_bytes,
+            ..ParseOptions::default()
+        };
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Self::from_core(py, inner)
     }
 
-    /// Serialize to string.
-    ///
-    /// Parameters
-    /// ----------
-    /// format : str
-    ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     The serialized string.
-    #[pyo3(signature = (format, validate=true))]
-    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
-        if validate {
-            self.validate(true)?;
-        }
-        match format {
-            "kvn" => self
-                .inner
-                .to_kvn()
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!(
-                "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                other
-            ))),
-        }
+    /// Serialize to KVN or XML after mandatory CCSDS validation.
+    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        format: &str,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(
+            &self.to_core(py)?,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     /// Write to file.
@@ -246,18 +233,24 @@ impl Opm {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    #[pyo3(signature = (path, format, validate=true))]
-    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
-        let data = self.to_str(format, validate)?;
-        match fs::write(path, data) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!(
-                "Failed to write file: {}",
-                e
-            ))),
-        }
+    /// version : str, optional
+    ///     Source version by default, ``"latest"``, or an exact supported version.
+    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        path: &str,
+        format: &str,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<()> {
+        crate::api::generate_file_with_limit(
+            &self.to_core(py)?,
+            path,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 }
 
@@ -272,9 +265,30 @@ impl Opm {
 /// data : OpmData
 ///     Segment data.
 #[pyclass]
-#[derive(Clone)]
 pub struct OpmSegment {
-    pub inner: core_opm::OpmSegment,
+    metadata: Py<OpmMetadata>,
+    data: Py<OpmData>,
+}
+
+impl OpmSegment {
+    fn from_core(py: Python<'_>, value: core_opm::OpmSegment) -> PyResult<Self> {
+        Ok(Self {
+            metadata: Py::new(
+                py,
+                OpmMetadata {
+                    inner: value.metadata,
+                },
+            )?,
+            data: Py::new(py, OpmData::from_core(py, value.data)?)?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_opm::OpmSegment> {
+        Ok(core_opm::OpmSegment {
+            metadata: self.metadata.borrow(py).inner.clone(),
+            data: self.data.borrow(py).to_core(py)?,
+        })
+    }
 }
 
 #[pymethods]
@@ -288,19 +302,14 @@ impl OpmSegment {
     /// data : OpmData
     ///     Segment data.
     #[new]
-    fn new(metadata: OpmMetadata, data: OpmData) -> Self {
-        Self {
-            inner: core_opm::OpmSegment {
-                metadata: metadata.inner,
-                data: data.inner,
-            },
-        }
+    fn new(metadata: Py<OpmMetadata>, data: Py<OpmData>) -> Self {
+        Self { metadata, data }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "OpmSegment(object_name='{}')",
-            self.inner.metadata.object_name
+            self.metadata.borrow(py).inner.object_name
         )
     }
 
@@ -310,30 +319,26 @@ impl OpmSegment {
     ///
     /// :type: OpmMetadata
     #[getter]
-    fn get_metadata(&self) -> OpmMetadata {
-        OpmMetadata {
-            inner: self.inner.metadata.clone(),
-        }
+    fn get_metadata(&self, py: Python<'_>) -> Py<OpmMetadata> {
+        self.metadata.clone_ref(py)
     }
 
     #[setter]
-    fn set_metadata(&mut self, metadata: OpmMetadata) {
-        self.inner.metadata = metadata.inner;
+    fn set_metadata(&mut self, metadata: Py<OpmMetadata>) {
+        self.metadata = metadata;
     }
 
     /// Segment data.
     ///
     /// :type: OpmData
     #[getter]
-    fn get_data(&self) -> OpmData {
-        OpmData {
-            inner: self.inner.data.clone(),
-        }
+    fn get_data(&self, py: Python<'_>) -> Py<OpmData> {
+        self.data.clone_ref(py)
     }
 
     #[setter]
-    fn set_data(&mut self, data: OpmData) {
-        self.inner.data = data.inner;
+    fn set_data(&mut self, data: Py<OpmData>) {
+        self.data = data;
     }
 }
 
@@ -398,7 +403,9 @@ impl OpmMetadata {
                 center_name,
                 ref_frame,
                 time_system,
-                ref_frame_epoch: ref_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                ref_frame_epoch: ref_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 comment: comment.unwrap_or_default(),
             },
         })
@@ -518,7 +525,7 @@ impl OpmMetadata {
 
     #[setter]
     fn set_ref_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.ref_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.ref_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1303,27 +1310,111 @@ impl OpmCovarianceMatrix {
 /// state_vector : StateVector
 ///     State vector.
 #[pyclass]
-#[derive(Clone)]
 pub struct OpmData {
-    pub inner: core_opm::OpmData,
+    comment: Vec<String>,
+    state_vector: Py<StateVector>,
+    keplerian_elements: Option<Py<KeplerianElements>>,
+    spacecraft_parameters: Option<Py<crate::common::SpacecraftParameters>>,
+    covariance_matrix: Option<Py<OpmCovarianceMatrix>>,
+    maneuver_parameters: Py<PyList>,
+    user_defined_parameters: Option<Py<crate::types::UserDefined>>,
+}
+
+impl OpmData {
+    fn from_core(py: Python<'_>, value: core_opm::OpmData) -> PyResult<Self> {
+        let maneuvers = value
+            .maneuver_parameters
+            .into_iter()
+            .map(|inner| Py::new(py, OpmManeuverParameters { inner }))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            comment: value.comment,
+            state_vector: Py::new(
+                py,
+                StateVector {
+                    inner: value.state_vector,
+                },
+            )?,
+            keplerian_elements: value
+                .keplerian_elements
+                .map(|inner| Py::new(py, KeplerianElements { inner }))
+                .transpose()?,
+            spacecraft_parameters: value
+                .spacecraft_parameters
+                .map(|inner| Py::new(py, crate::common::SpacecraftParameters { inner }))
+                .transpose()?,
+            covariance_matrix: value
+                .covariance_matrix
+                .map(|inner| Py::new(py, OpmCovarianceMatrix { inner }))
+                .transpose()?,
+            maneuver_parameters: PyList::new(py, maneuvers)?.unbind(),
+            user_defined_parameters: value
+                .user_defined_parameters
+                .map(|inner| Py::new(py, crate::types::UserDefined { inner }))
+                .transpose()?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_opm::OpmData> {
+        let maneuver_parameters = self
+            .maneuver_parameters
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, OpmManeuverParameters>>()
+                    .map(|value| value.inner.clone())
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "maneuver_parameters[{index}] must be OpmManeuverParameters"
+                        ))
+                    })
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+
+        Ok(core_opm::OpmData {
+            comment: self.comment.clone(),
+            state_vector: self.state_vector.borrow(py).inner.clone(),
+            keplerian_elements: self
+                .keplerian_elements
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            spacecraft_parameters: self
+                .spacecraft_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            covariance_matrix: self
+                .covariance_matrix
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            maneuver_parameters,
+            user_defined_parameters: self
+                .user_defined_parameters
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+        })
+    }
 }
 
 #[pymethods]
 impl OpmData {
     #[new]
     #[pyo3(signature = (state_vector, comment=None))]
-    fn new(state_vector: StateVector, comment: Option<Vec<String>>) -> Self {
-        Self {
-            inner: core_opm::OpmData {
-                comment: comment.unwrap_or_default(),
-                state_vector: state_vector.inner,
-                keplerian_elements: None,
-                spacecraft_parameters: None,
-                covariance_matrix: None,
-                maneuver_parameters: vec![],
-                user_defined_parameters: None,
-            },
-        }
+    fn new(
+        py: Python<'_>,
+        state_vector: Py<StateVector>,
+        comment: Option<Vec<String>>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            comment: comment.unwrap_or_default(),
+            state_vector,
+            keplerian_elements: None,
+            spacecraft_parameters: None,
+            covariance_matrix: None,
+            maneuver_parameters: PyList::empty(py).unbind(),
+            user_defined_parameters: None,
+        })
     }
 
     /// Comments (see 7.8 for formatting rules).
@@ -1331,18 +1422,18 @@ impl OpmData {
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
+        self.comment.clone()
     }
 
     #[setter]
     fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
+        self.comment = value;
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "OpmData(epoch='{}')",
-            self.inner.state_vector.epoch.as_str()
+            self.state_vector.borrow(py).inner.epoch.as_str()
         )
     }
 
@@ -1350,96 +1441,97 @@ impl OpmData {
     ///
     /// :type: StateVector
     #[getter]
-    fn get_state_vector(&self) -> StateVector {
-        StateVector {
-            inner: self.inner.state_vector.clone(),
-        }
+    fn get_state_vector(&self, py: Python<'_>) -> Py<StateVector> {
+        self.state_vector.clone_ref(py)
     }
 
     #[setter]
-    fn set_state_vector(&mut self, value: StateVector) {
-        self.inner.state_vector = value.inner;
+    fn set_state_vector(&mut self, value: Py<StateVector>) {
+        self.state_vector = value;
     }
 
     /// Keplerian elements.
     ///
     /// :type: Optional[KeplerianElements]
     #[getter]
-    fn get_keplerian_elements(&self) -> Option<KeplerianElements> {
-        self.inner
-            .keplerian_elements
+    fn get_keplerian_elements(&self, py: Python<'_>) -> Option<Py<KeplerianElements>> {
+        self.keplerian_elements
             .as_ref()
-            .map(|k| KeplerianElements { inner: k.clone() })
+            .map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_keplerian_elements(&mut self, value: Option<KeplerianElements>) {
-        self.inner.keplerian_elements = value.map(|k| k.inner);
+    fn set_keplerian_elements(&mut self, value: Option<Py<KeplerianElements>>) {
+        self.keplerian_elements = value;
     }
 
     /// Spacecraft parameters.
     ///
     /// :type: Optional[SpacecraftParameters]
     #[getter]
-    fn get_spacecraft_parameters(&self) -> Option<crate::common::SpacecraftParameters> {
-        self.inner
-            .spacecraft_parameters
+    fn get_spacecraft_parameters(
+        &self,
+        py: Python<'_>,
+    ) -> Option<Py<crate::common::SpacecraftParameters>> {
+        self.spacecraft_parameters
             .as_ref()
-            .map(|s| crate::common::SpacecraftParameters { inner: s.clone() })
+            .map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_spacecraft_parameters(&mut self, value: Option<crate::common::SpacecraftParameters>) {
-        self.inner.spacecraft_parameters = value.map(|s| s.inner);
+    fn set_spacecraft_parameters(
+        &mut self,
+        value: Option<Py<crate::common::SpacecraftParameters>>,
+    ) {
+        self.spacecraft_parameters = value;
     }
 
     /// Covariance matrix.
     ///
     /// :type: Optional[OpmCovarianceMatrix]
     #[getter]
-    fn get_covariance_matrix(&self) -> Option<OpmCovarianceMatrix> {
-        self.inner
-            .covariance_matrix
+    fn get_covariance_matrix(&self, py: Python<'_>) -> Option<Py<OpmCovarianceMatrix>> {
+        self.covariance_matrix
             .as_ref()
-            .map(|c| OpmCovarianceMatrix { inner: c.clone() })
+            .map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_covariance_matrix(&mut self, value: Option<OpmCovarianceMatrix>) {
-        self.inner.covariance_matrix = value.map(|c| c.inner);
+    fn set_covariance_matrix(&mut self, value: Option<Py<OpmCovarianceMatrix>>) {
+        self.covariance_matrix = value;
     }
 
     /// Maneuver parameters.
     ///
-    /// :type: list[ManeuverParameters]
+    /// :type: list[OpmManeuverParameters]
     #[getter]
-    fn get_maneuver_parameters(&self) -> Vec<ManeuverParameters> {
-        self.inner
-            .maneuver_parameters
-            .iter()
-            .map(|m| ManeuverParameters { inner: m.clone() })
-            .collect()
+    fn get_maneuver_parameters(&self, py: Python<'_>) -> Py<PyList> {
+        self.maneuver_parameters.clone_ref(py)
     }
 
     #[setter]
-    fn set_maneuver_parameters(&mut self, value: Vec<ManeuverParameters>) {
-        self.inner.maneuver_parameters = value.into_iter().map(|m| m.inner).collect();
+    fn set_maneuver_parameters(
+        &mut self,
+        py: Python<'_>,
+        value: Vec<Py<OpmManeuverParameters>>,
+    ) -> PyResult<()> {
+        self.maneuver_parameters = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// User defined parameters.
     ///
     /// :type: UserDefined | None
     #[getter]
-    fn get_user_defined_parameters(&self) -> Option<crate::types::UserDefined> {
-        self.inner
-            .user_defined_parameters
+    fn get_user_defined_parameters(&self, py: Python<'_>) -> Option<Py<crate::types::UserDefined>> {
+        self.user_defined_parameters
             .as_ref()
-            .map(|u| crate::types::UserDefined { inner: u.clone() })
+            .map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_user_defined_parameters(&mut self, value: Option<crate::types::UserDefined>) {
-        self.inner.user_defined_parameters = value.map(|u| u.inner);
+    fn set_user_defined_parameters(&mut self, value: Option<Py<crate::types::UserDefined>>) {
+        self.user_defined_parameters = value;
     }
 }
 
@@ -1466,12 +1558,12 @@ impl OpmData {
 ///     Velocity change in 3rd axis (km/s).
 #[pyclass]
 #[derive(Clone)]
-pub struct ManeuverParameters {
+pub struct OpmManeuverParameters {
     pub inner: core_opm::ManeuverParameters,
 }
 
 #[pymethods]
-impl ManeuverParameters {
+impl OpmManeuverParameters {
     #[new]
     fn new(
         man_epoch_ignition: String,
@@ -1486,7 +1578,7 @@ impl ManeuverParameters {
         Ok(Self {
             inner: core_opm::ManeuverParameters {
                 comment: vec![],
-                man_epoch_ignition: parse_epoch(&man_epoch_ignition)?,
+                man_epoch_ignition: parse_calendar_epoch(&man_epoch_ignition)?,
                 man_duration: Duration::new(man_duration, None)
                     .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
                 man_delta_mass: DeltaMassZ::new(man_delta_mass, None)
@@ -1501,7 +1593,7 @@ impl ManeuverParameters {
 
     fn __repr__(&self) -> String {
         format!(
-            "ManeuverParameters(epoch='{}', duration={:.3} s)",
+            "OpmManeuverParameters(epoch='{}', duration={:.3} s)",
             self.inner.man_epoch_ignition.as_str(),
             self.inner.man_duration.value
         )
@@ -1530,7 +1622,7 @@ impl ManeuverParameters {
 
     #[setter]
     fn set_man_epoch_ignition(&mut self, value: String) -> PyResult<()> {
-        self.inner.man_epoch_ignition = parse_epoch(&value)?;
+        self.inner.man_epoch_ignition = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -1554,9 +1646,7 @@ impl ManeuverParameters {
     /// Units: kg
     ///
     ///
-    /// **Note**: The CCSDS standard text describes this value as strictly negative (`< 0`).
-    /// This implementation follows the underlying schema type and allows non-positive values
-    /// (`<= 0`) for interoperability.
+    /// The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
     ///
     /// :type: float
     #[getter]

@@ -4,14 +4,12 @@
 
 use crate::common::parse_time_system;
 use crate::common::AdmHeader;
-use crate::types::parse_epoch;
+use crate::types::{parse_calendar_epoch, parse_epoch, parse_relative_time};
 use ccsds_ndm::messages::acm as core_acm;
-use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, AttBasisType, AttRateType, RotSeq};
-use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
+use pyo3::types::PyList;
 use std::str::FromStr;
 
 /// Attitude Comprehensive Message (ACM).
@@ -27,31 +25,61 @@ use std::str::FromStr;
 /// - Optional maneuver parameters
 /// - Optional estimator information
 #[pyclass]
-#[derive(Clone)]
 pub struct Acm {
-    pub inner: core_acm::Acm,
+    id: Option<String>,
+    version: String,
+    header: Py<AdmHeader>,
+    segment: Py<AcmSegment>,
+}
+
+impl Acm {
+    pub(crate) fn from_core(py: Python<'_>, value: core_acm::Acm) -> PyResult<Self> {
+        Ok(Self {
+            id: value.id,
+            version: value.version,
+            header: Py::new(
+                py,
+                AdmHeader {
+                    inner: value.header,
+                },
+            )?,
+            segment: Py::new(py, AcmSegment::from_core(py, *value.body.segment)?)?,
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_acm::Acm> {
+        Ok(core_acm::Acm {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            header: self.header.borrow(py).inner.clone(),
+            body: core_acm::AcmBody {
+                segment: Box::new(self.segment.borrow(py).to_core(py)?),
+            },
+        })
+    }
 }
 
 #[pymethods]
 impl Acm {
     #[new]
-    fn new(header: AdmHeader, segment: AcmSegment) -> Self {
+    fn new(header: Py<AdmHeader>, segment: Py<AcmSegment>) -> Self {
         Self {
-            inner: core_acm::Acm {
-                header: header.inner,
-                body: core_acm::AcmBody {
-                    segment: Box::new(segment.inner),
-                },
-                id: Some("CCSDS_ACM_VERS".to_string()),
-                version: "2.0".to_string(),
-            },
+            header,
+            segment,
+            id: Some("CCSDS_ACM_VERS".to_string()),
+            version: "2.0".to_string(),
         }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "Acm(object_name='{}')",
-            self.inner.body.segment.metadata.object_name
+            self.segment
+                .borrow(py)
+                .metadata
+                .borrow(py)
+                .inner
+                .object_name
         )
     }
 
@@ -60,7 +88,7 @@ impl Acm {
     /// :type: Optional[str]
     #[getter]
     fn get_id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     /// The message version.
@@ -68,121 +96,84 @@ impl Acm {
     /// :type: str
     #[getter]
     fn get_version(&self) -> String {
-        self.inner.version.clone()
+        self.version.clone()
     }
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Acm, &value)?;
-        self.inner.version = value;
+        self.version = value;
         Ok(())
     }
 
     /// Validate the message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        if strict {
-            self.inner
-                .validate()
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
-            Ok(None)
-        } else {
-            let mut issues = Vec::new();
-            let _ = ccsds_ndm::validation::with_validation_mode(
-                ccsds_ndm::validation::ValidationMode::Lenient,
-                || match self.inner.validate() {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        issues.push(e.to_string());
-                        Ok(())
-                    }
-                },
-            );
-
-            let warnings = ccsds_ndm::validation::take_warnings();
-            for w in warnings {
-                issues.push(w.error.to_string());
-            }
-
-            if issues.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(issues))
-            }
-        }
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner = match format {
-            Some("kvn") => ccsds_ndm::messages::acm::Acm::from_kvn(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some("xml") => ccsds_ndm::messages::acm::Acm::from_xml(data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            Some(other) => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                    other
-                )))
-            }
-            None => match ccsds_ndm::from_str(data) {
-                Ok(MessageType::Acm(acm)) => acm,
-                Ok(other) => {
-                    return Err(PyValueError::new_err(format!(
-                        "Parsed message is not ACM (got {:?})",
-                        other
-                    )))
-                }
-                Err(e) => return Err(PyValueError::new_err(e.to_string())),
-            },
-        };
-        Ok(Self { inner })
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_str(
+        py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_records);
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        Self::from_core(py, inner)
     }
 
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(&content, format)
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_file(
+        py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_records);
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Self::from_core(py, inner)
     }
 
-    #[pyo3(signature = (format, validate=true))]
-    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
-        if validate {
-            self.validate(true)?;
-        }
-        match format {
-            "kvn" => self
-                .inner
-                .to_kvn()
-                .map_err(|e| PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner)
-                .map_err(|e| PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!(
-                "Unsupported format '{}'",
-                other
-            ))),
-        }
+    /// Serialize to validated KVN or XML.
+    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        format: &str,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(
+            &self.to_core(py)?,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
-    #[pyo3(signature = (path, format, validate=true))]
-    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
-        let data = self.to_str(format, validate)?;
-        match fs::write(path, data) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!(
-                "Failed to write file: {}",
-                e
-            ))),
-        }
+    /// Write validated KVN or XML directly to a file.
+    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        path: &str,
+        format: &str,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<()> {
+        crate::api::generate_file_with_limit(
+            &self.to_core(py)?,
+            path,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     /// Attitude Comprehensive Message (ACM).
@@ -200,84 +191,92 @@ impl Acm {
     ///
     /// :type: AdmHeader
     #[getter]
-    fn get_header(&self) -> AdmHeader {
-        AdmHeader {
-            inner: self.inner.header.clone(),
-        }
+    fn get_header(&self, py: Python<'_>) -> Py<AdmHeader> {
+        self.header.clone_ref(py)
     }
 
     #[setter]
-    fn set_header(&mut self, header: AdmHeader) {
-        self.inner.header = header.inner;
+    fn set_header(&mut self, header: Py<AdmHeader>) {
+        self.header = header;
     }
 
     /// ACM Segment.
     ///
     /// :type: AcmSegment
     #[getter]
-    fn get_segment(&self) -> AcmSegment {
-        AcmSegment {
-            inner: (*self.inner.body.segment).clone(),
-        }
+    fn get_segment(&self, py: Python<'_>) -> Py<AcmSegment> {
+        self.segment.clone_ref(py)
     }
 
     #[setter]
-    fn set_segment(&mut self, value: AcmSegment) {
-        self.inner.body.segment = Box::new(value.inner);
+    fn set_segment(&mut self, value: Py<AcmSegment>) {
+        self.segment = value;
     }
 }
 
 #[pyclass]
-#[derive(Clone)]
 pub struct AcmSegment {
-    pub inner: core_acm::AcmSegment,
+    metadata: Py<AcmMetadata>,
+    data: Py<AcmData>,
+}
+
+impl AcmSegment {
+    fn from_core(py: Python<'_>, value: core_acm::AcmSegment) -> PyResult<Self> {
+        Ok(Self {
+            metadata: Py::new(
+                py,
+                AcmMetadata {
+                    inner: value.metadata,
+                },
+            )?,
+            data: Py::new(py, AcmData::from_core(py, value.data)?)?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_acm::AcmSegment> {
+        Ok(core_acm::AcmSegment {
+            metadata: self.metadata.borrow(py).inner.clone(),
+            data: self.data.borrow(py).to_core(py)?,
+        })
+    }
 }
 
 #[pymethods]
 impl AcmSegment {
     #[new]
-    fn new(metadata: AcmMetadata, data: AcmData) -> Self {
-        Self {
-            inner: core_acm::AcmSegment {
-                metadata: metadata.inner,
-                data: data.inner,
-            },
-        }
+    fn new(metadata: Py<AcmMetadata>, data: Py<AcmData>) -> Self {
+        Self { metadata, data }
     }
 
     /// ACM Metadata Section.
     ///
     /// :type: AcmMetadata
     #[getter]
-    fn get_metadata(&self) -> AcmMetadata {
-        AcmMetadata {
-            inner: self.inner.metadata.clone(),
-        }
+    fn get_metadata(&self, py: Python<'_>) -> Py<AcmMetadata> {
+        self.metadata.clone_ref(py)
     }
 
     #[setter]
-    fn set_metadata(&mut self, value: AcmMetadata) {
-        self.inner.metadata = value.inner;
+    fn set_metadata(&mut self, value: Py<AcmMetadata>) {
+        self.metadata = value;
     }
 
     /// ACM Data Section.
     ///
     /// :type: AcmData
     #[getter]
-    fn get_data(&self) -> AcmData {
-        AcmData {
-            inner: self.inner.data.clone(),
-        }
+    fn get_data(&self, py: Python<'_>) -> Py<AcmData> {
+        self.data.clone_ref(py)
     }
 
     #[setter]
-    fn set_data(&mut self, value: AcmData) {
-        self.inner.data = value.inner;
+    fn set_data(&mut self, value: Py<AcmData>) {
+        self.data = value;
     }
 
     /// Validate the segment against CCSDS rules.
-    fn validate(&self, header: AdmHeader) -> PyResult<()> {
-        self.inner
+    fn validate(&self, py: Python<'_>, header: AdmHeader) -> PyResult<()> {
+        self.to_core(py)?
             .validate(&header.inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
@@ -319,7 +318,7 @@ impl AcmMetadata {
                 object_name,
                 international_designator,
                 time_system,
-                epoch_tzero: parse_epoch(&epoch_tzero)?,
+                epoch_tzero: parse_calendar_epoch(&epoch_tzero)?,
                 catalog_name: None,
                 object_designator: None,
                 originator_poc: None,
@@ -546,7 +545,7 @@ impl AcmMetadata {
 
     #[setter]
     fn set_epoch_tzero(&mut self, value: String) -> PyResult<()> {
-        self.inner.epoch_tzero = parse_epoch(&value)?;
+        self.inner.epoch_tzero = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -627,7 +626,7 @@ impl AcmMetadata {
 
     #[setter]
     fn set_next_leap_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.next_leap_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.next_leap_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -658,9 +657,86 @@ impl AcmMetadata {
 
 /// ACM Data Section.
 #[pyclass]
-#[derive(Clone)]
 pub struct AcmData {
-    pub inner: core_acm::AcmData,
+    att: Py<PyList>,
+    phys: Option<Py<AcmPhysicalDescription>>,
+    cov: Py<PyList>,
+    man: Py<PyList>,
+    ad: Option<Py<AcmAttitudeDetermination>>,
+    user: Option<Py<crate::types::UserDefined>>,
+}
+
+impl AcmData {
+    fn from_core(py: Python<'_>, value: core_acm::AcmData) -> PyResult<Self> {
+        macro_rules! py_list {
+            ($values:expr, $wrapper:ident) => {{
+                let objects = $values
+                    .into_iter()
+                    .map(|inner| Py::new(py, $wrapper { inner }))
+                    .collect::<PyResult<Vec<_>>>()?;
+                PyList::new(py, objects)?.unbind()
+            }};
+        }
+        Ok(Self {
+            att: py_list!(value.att, AcmAttitudeState),
+            phys: value
+                .phys
+                .map(|inner| Py::new(py, AcmPhysicalDescription { inner }))
+                .transpose()?,
+            cov: py_list!(value.cov, AcmCovarianceMatrix),
+            man: py_list!(value.man, AcmManeuverParameters),
+            ad: value
+                .ad
+                .map(|inner| Py::new(py, AcmAttitudeDetermination::from_core(py, inner)?))
+                .transpose()?,
+            user: value
+                .user
+                .map(|inner| Py::new(py, crate::types::UserDefined { inner }))
+                .transpose()?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_acm::AcmData> {
+        macro_rules! core_list {
+            ($values:expr, $wrapper:ty, $name:literal) => {
+                $values
+                    .bind(py)
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| {
+                        value
+                            .extract::<PyRef<'_, $wrapper>>()
+                            .map(|value| value.inner.clone())
+                            .map_err(|_| {
+                                PyValueError::new_err(format!(
+                                    "{}[{index}] must be {}",
+                                    $name,
+                                    stringify!($wrapper)
+                                ))
+                            })
+                    })
+                    .collect::<PyResult<Vec<_>>>()?
+            };
+        }
+        Ok(core_acm::AcmData {
+            att: core_list!(self.att, AcmAttitudeState, "att"),
+            phys: self
+                .phys
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+            cov: core_list!(self.cov, AcmCovarianceMatrix, "cov"),
+            man: core_list!(self.man, AcmManeuverParameters, "man"),
+            ad: self
+                .ad
+                .as_ref()
+                .map(|value| value.borrow(py).to_core(py))
+                .transpose()?,
+            user: self
+                .user
+                .as_ref()
+                .map(|value| value.borrow(py).inner.clone()),
+        })
+    }
 }
 
 #[pymethods]
@@ -668,51 +744,35 @@ impl AcmData {
     #[new]
     #[pyo3(signature = (att=None, phys=None, cov=None, man=None, ad=None, user=None))]
     fn new(
-        att: Option<Vec<AcmAttitudeState>>,
-        phys: Option<AcmPhysicalDescription>,
-        cov: Option<Vec<AcmCovarianceMatrix>>,
-        man: Option<Vec<AcmManeuverParameters>>,
-        ad: Option<AcmAttitudeDetermination>,
-        user: Option<crate::types::UserDefined>,
-    ) -> Self {
-        Self {
-            inner: core_acm::AcmData {
-                att: att
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|s| s.inner)
-                    .collect(),
-                phys: phys.map(|p| p.inner),
-                cov: cov
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|c| c.inner)
-                    .collect(),
-                man: man
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|m| m.inner)
-                    .collect(),
-                ad: ad.map(|a| a.inner),
-                user: user.map(|u| u.inner),
-            },
-        }
+        py: Python<'_>,
+        att: Option<Vec<Py<AcmAttitudeState>>>,
+        phys: Option<Py<AcmPhysicalDescription>>,
+        cov: Option<Vec<Py<AcmCovarianceMatrix>>>,
+        man: Option<Vec<Py<AcmManeuverParameters>>>,
+        ad: Option<Py<AcmAttitudeDetermination>>,
+        user: Option<Py<crate::types::UserDefined>>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            att: PyList::new(py, att.unwrap_or_default())?.unbind(),
+            phys,
+            cov: PyList::new(py, cov.unwrap_or_default())?.unbind(),
+            man: PyList::new(py, man.unwrap_or_default())?.unbind(),
+            ad,
+            user,
+        })
     }
 
     /// A single user-defined Data section.
     ///
     /// :type: UserDefined | None
     #[getter]
-    fn get_user(&self) -> Option<crate::types::UserDefined> {
-        self.inner
-            .user
-            .as_ref()
-            .map(|u| crate::types::UserDefined { inner: u.clone() })
+    fn get_user(&self, py: Python<'_>) -> Option<Py<crate::types::UserDefined>> {
+        self.user.as_ref().map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_user(&mut self, user: Option<crate::types::UserDefined>) {
-        self.inner.user = user.map(|u| u.inner);
+    fn set_user(&mut self, user: Option<Py<crate::types::UserDefined>>) {
+        self.user = user;
     }
 
     /// One or more optional attitude state time histories (each consisting of one or more attitude
@@ -720,33 +780,27 @@ impl AcmData {
     ///
     /// :type: list[AcmAttitudeState]
     #[getter]
-    fn get_att(&self) -> Vec<AcmAttitudeState> {
-        self.inner
-            .att
-            .iter()
-            .map(|s| AcmAttitudeState { inner: s.clone() })
-            .collect()
+    fn get_att(&self, py: Python<'_>) -> Py<PyList> {
+        self.att.clone_ref(py)
     }
 
     #[setter]
-    fn set_att(&mut self, value: Vec<AcmAttitudeState>) {
-        self.inner.att = value.into_iter().map(|s| s.inner).collect();
+    fn set_att(&mut self, py: Python<'_>, value: Vec<Py<AcmAttitudeState>>) -> PyResult<()> {
+        self.att = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// A single space object physical characteristics section.
     ///
     /// :type: AcmPhysicalDescription | None
     #[getter]
-    fn get_phys(&self) -> Option<AcmPhysicalDescription> {
-        self.inner
-            .phys
-            .as_ref()
-            .map(|p| AcmPhysicalDescription { inner: p.clone() })
+    fn get_phys(&self, py: Python<'_>) -> Option<Py<AcmPhysicalDescription>> {
+        self.phys.as_ref().map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_phys(&mut self, value: Option<AcmPhysicalDescription>) {
-        self.inner.phys = value.map(|p| p.inner);
+    fn set_phys(&mut self, value: Option<Py<AcmPhysicalDescription>>) {
+        self.phys = value;
     }
 
     /// One or more optional covariance time histories (each consisting of one or more covariance
@@ -754,55 +808,46 @@ impl AcmData {
     ///
     /// :type: list[AcmCovarianceMatrix]
     #[getter]
-    fn get_cov(&self) -> Vec<AcmCovarianceMatrix> {
-        self.inner
-            .cov
-            .iter()
-            .map(|c| AcmCovarianceMatrix { inner: c.clone() })
-            .collect()
+    fn get_cov(&self, py: Python<'_>) -> Py<PyList> {
+        self.cov.clone_ref(py)
     }
 
     #[setter]
-    fn set_cov(&mut self, value: Vec<AcmCovarianceMatrix>) {
-        self.inner.cov = value.into_iter().map(|c| c.inner).collect();
+    fn set_cov(&mut self, py: Python<'_>, value: Vec<Py<AcmCovarianceMatrix>>) -> PyResult<()> {
+        self.cov = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// One or more optional maneuver specification section(s).
     ///
     /// :type: list[AcmManeuverParameters]
     #[getter]
-    fn get_man(&self) -> Vec<AcmManeuverParameters> {
-        self.inner
-            .man
-            .iter()
-            .map(|m| AcmManeuverParameters { inner: m.clone() })
-            .collect()
+    fn get_man(&self, py: Python<'_>) -> Py<PyList> {
+        self.man.clone_ref(py)
     }
 
     #[setter]
-    fn set_man(&mut self, value: Vec<AcmManeuverParameters>) {
-        self.inner.man = value.into_iter().map(|m| m.inner).collect();
+    fn set_man(&mut self, py: Python<'_>, value: Vec<Py<AcmManeuverParameters>>) -> PyResult<()> {
+        self.man = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 
     /// A single attitude determination Data section.
     ///
     /// :type: AcmAttitudeDetermination | None
     #[getter]
-    fn get_ad(&self) -> Option<AcmAttitudeDetermination> {
-        self.inner
-            .ad
-            .as_ref()
-            .map(|a| AcmAttitudeDetermination { inner: a.clone() })
+    fn get_ad(&self, py: Python<'_>) -> Option<Py<AcmAttitudeDetermination>> {
+        self.ad.as_ref().map(|value| value.clone_ref(py))
     }
 
     #[setter]
-    fn set_ad(&mut self, value: Option<AcmAttitudeDetermination>) {
-        self.inner.ad = value.map(|a| a.inner);
+    fn set_ad(&mut self, value: Option<Py<AcmAttitudeDetermination>>) {
+        self.ad = value;
     }
 
     /// Validate the data section against CCSDS rules.
-    fn validate(&self, metadata: AcmMetadata) -> PyResult<()> {
-        self.inner
+    fn validate(&self, py: Python<'_>, metadata: AcmMetadata) -> PyResult<()> {
+        self.to_core(py)?
             .validate_with_metadata(&metadata.inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
@@ -828,12 +873,27 @@ impl AcmAttitudeState {
     ) -> PyResult<Self> {
         let att_type = AcmAttitudeType::from_str(&att_type)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let number_states = att_lines
+            .first()
+            .and_then(|line| line.len().checked_sub(1))
+            .ok_or_else(|| {
+                PyValueError::new_err(
+                    "att_lines must contain relative time followed by at least one state",
+                )
+            })?;
+        if att_lines.iter().any(|line| line.len() != number_states + 1) {
+            return Err(PyValueError::new_err(
+                "all att_lines must contain the same number of states",
+            ));
+        }
+        let number_states = u32::try_from(number_states)
+            .map_err(|_| PyValueError::new_err("attitude state count exceeds u32"))?;
         Ok(Self {
             inner: core_acm::AcmAttitudeState {
                 comment: comment.unwrap_or_default(),
                 ref_frame_a,
                 ref_frame_b,
-                number_states: att_lines.len() as u32,
+                number_states,
                 att_type,
                 att_lines: att_lines
                     .into_iter()
@@ -1308,8 +1368,14 @@ impl AcmCovarianceMatrix {
         Ok(Self {
             inner: core_acm::AcmCovarianceMatrix {
                 comment: comment.unwrap_or_default(),
-                cov_basis,
-                cov_ref_frame,
+                cov_id: None,
+                cov_prev_id: None,
+                cov_basis: Some(
+                    AttBasisType::from_str(&cov_basis)
+                        .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                ),
+                cov_basis_id: None,
+                cov_ref_frame: Some(cov_ref_frame),
                 cov_type,
                 cov_lines: cov_lines
                     .into_iter()
@@ -1335,19 +1401,62 @@ impl AcmCovarianceMatrix {
         self.inner.comment = value;
     }
 
+    /// Covariance history identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_cov_id(&self) -> Option<String> {
+        self.inner.cov_id.clone()
+    }
+
+    #[setter]
+    fn set_cov_id(&mut self, value: Option<String>) {
+        self.inner.cov_id = value;
+    }
+
+    /// Previous covariance history identifier.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_cov_prev_id(&self) -> Option<String> {
+        self.inner.cov_prev_id.clone()
+    }
+
+    #[setter]
+    fn set_cov_prev_id(&mut self, value: Option<String>) {
+        self.inner.cov_prev_id = value;
+    }
+
     /// Basis of this covariance time history data.
     ///
     /// Examples: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
     ///
-    /// :type: str
+    /// :type: str | None
     #[getter]
-    fn get_cov_basis(&self) -> String {
-        self.inner.cov_basis.clone()
+    fn get_cov_basis(&self) -> Option<String> {
+        self.inner.cov_basis.as_ref().map(ToString::to_string)
     }
 
     #[setter]
-    fn set_cov_basis(&mut self, value: String) {
-        self.inner.cov_basis = value;
+    fn set_cov_basis(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.cov_basis = value
+            .map(|value| AttBasisType::from_str(&value))
+            .transpose()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Identifier for the covariance basis.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_cov_basis_id(&self) -> Option<String> {
+        self.inner.cov_basis_id.clone()
+    }
+
+    #[setter]
+    fn set_cov_basis_id(&mut self, value: Option<String>) {
+        self.inner.cov_basis_id = value;
     }
 
     /// Reference frame of the covariance time history. The full set of values is enumerated in
@@ -1355,14 +1464,14 @@ impl AcmCovarianceMatrix {
     ///
     /// Examples: SC_BODY_1
     ///
-    /// :type: str
+    /// :type: str | None
     #[getter]
-    fn get_cov_ref_frame(&self) -> String {
+    fn get_cov_ref_frame(&self) -> Option<String> {
         self.inner.cov_ref_frame.clone()
     }
 
     #[setter]
-    fn set_cov_ref_frame(&mut self, value: String) {
+    fn set_cov_ref_frame(&mut self, value: Option<String>) {
         self.inner.cov_ref_frame = value;
     }
 
@@ -1383,7 +1492,7 @@ impl AcmCovarianceMatrix {
         Ok(())
     }
 
-    /// Optional covariance confidence.
+    /// Optional confidence level of the covariance matrix.
     ///
     /// :type: float | None
     #[getter]
@@ -1502,7 +1611,7 @@ impl AcmManeuverParameters {
         self.inner.man_purpose = value;
     }
 
-    /// Maneuver begin time (relative or absolute epoch string).
+    /// Maneuver begin time in seconds relative to EPOCH_TZERO.
     ///
     /// :type: str | None
     #[getter]
@@ -1515,11 +1624,11 @@ impl AcmManeuverParameters {
 
     #[setter]
     fn set_man_begin_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.man_begin_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.man_begin_time = value.map(|s| parse_relative_time(&s)).transpose()?;
         Ok(())
     }
 
-    /// Maneuver end time (relative or absolute epoch string).
+    /// Maneuver end time in seconds relative to EPOCH_TZERO.
     ///
     /// :type: str | None
     #[getter]
@@ -1532,7 +1641,7 @@ impl AcmManeuverParameters {
 
     #[setter]
     fn set_man_end_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.man_end_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.man_end_time = value.map(|s| parse_relative_time(&s)).transpose()?;
         Ok(())
     }
 
@@ -1662,9 +1771,9 @@ pub struct AcmSensor {
 #[pymethods]
 impl AcmSensor {
     #[new]
-    #[pyo3(signature = (sensor_number, sensor_used=None, sensor_noise_stddev=None, sensor_frequency=None, comment=None))]
+    #[pyo3(signature = (sensor_number=None, sensor_used=None, sensor_noise_stddev=None, sensor_frequency=None, comment=None))]
     fn new(
-        sensor_number: u32,
+        sensor_number: Option<u32>,
         sensor_used: Option<String>,
         sensor_noise_stddev: Option<Vec<f64>>,
         sensor_frequency: Option<f64>,
@@ -1675,13 +1784,15 @@ impl AcmSensor {
                 comment: comment.unwrap_or_default(),
                 sensor_number,
                 sensor_used,
+                number_sensor_noise_covariance: None,
                 sensor_noise_stddev: sensor_noise_stddev.map(|values| {
                     ccsds_ndm::types::SensorNoise {
                         values,
                         units: None,
                     }
                 }),
-                sensor_frequency,
+                sensor_frequency: sensor_frequency
+                    .map(|value| ccsds_ndm::types::Frequency { value, units: None }),
             },
         }
     }
@@ -1706,14 +1817,14 @@ impl AcmSensor {
     ///
     /// Examples: 1, 2, 3
     ///
-    /// :type: int
+    /// :type: int | None
     #[getter]
-    fn get_sensor_number(&self) -> u32 {
+    fn get_sensor_number(&self) -> Option<u32> {
         self.inner.sensor_number
     }
 
     #[setter]
-    fn set_sensor_number(&mut self, value: u32) {
+    fn set_sensor_number(&mut self, value: Option<u32>) {
         self.inner.sensor_number = value;
     }
 
@@ -1728,6 +1839,19 @@ impl AcmSensor {
     #[setter]
     fn set_sensor_used(&mut self, value: Option<String>) {
         self.inner.sensor_used = value;
+    }
+
+    /// Number of sensor-noise covariance elements.
+    ///
+    /// :type: int | None
+    #[getter]
+    fn get_number_sensor_noise_covariance(&self) -> Option<u32> {
+        self.inner.number_sensor_noise_covariance
+    }
+
+    #[setter]
+    fn set_number_sensor_noise_covariance(&mut self, value: Option<u32>) {
+        self.inner.number_sensor_noise_covariance = value;
     }
 
     /// Sensor noise standard deviation values.
@@ -1754,28 +1878,65 @@ impl AcmSensor {
     /// :type: float | None
     #[getter]
     fn get_sensor_frequency(&self) -> Option<f64> {
-        self.inner.sensor_frequency
+        self.inner
+            .sensor_frequency
+            .as_ref()
+            .map(|value| value.value)
     }
 
     #[setter]
     fn set_sensor_frequency(&mut self, value: Option<f64>) {
-        self.inner.sensor_frequency = value;
+        self.inner.sensor_frequency =
+            value.map(|value| ccsds_ndm::types::Frequency { value, units: None });
     }
 }
 
 /// ACM Data: Attitude Determination Data Section.
 #[pyclass]
-#[derive(Clone)]
 pub struct AcmAttitudeDetermination {
-    pub inner: core_acm::AcmAttitudeDetermination,
+    inner: core_acm::AcmAttitudeDetermination,
+    sensors: Py<PyList>,
+}
+
+impl AcmAttitudeDetermination {
+    fn from_core(py: Python<'_>, mut value: core_acm::AcmAttitudeDetermination) -> PyResult<Self> {
+        let sensors = std::mem::take(&mut value.sensors)
+            .into_iter()
+            .map(|inner| Py::new(py, AcmSensor { inner }))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            inner: value,
+            sensors: PyList::new(py, sensors)?.unbind(),
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_acm::AcmAttitudeDetermination> {
+        let sensors = self
+            .sensors
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, AcmSensor>>()
+                    .map(|value| value.inner.clone())
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("sensors[{index}] must be AcmSensor"))
+                    })
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        let mut value = self.inner.clone();
+        value.sensors = sensors;
+        Ok(value)
+    }
 }
 
 #[pymethods]
 impl AcmAttitudeDetermination {
     #[new]
     #[pyo3(signature = (ad_id=None, comment=None))]
-    fn new(ad_id: Option<String>, comment: Option<Vec<String>>) -> Self {
-        Self {
+    fn new(py: Python<'_>, ad_id: Option<String>, comment: Option<Vec<String>>) -> PyResult<Self> {
+        Ok(Self {
             inner: core_acm::AcmAttitudeDetermination {
                 comment: comment.unwrap_or_default(),
                 ad_id,
@@ -1784,6 +1945,7 @@ impl AcmAttitudeDetermination {
                 attitude_source: None,
                 number_states: None,
                 attitude_states: None,
+                euler_rot_seq: None,
                 cov_type: None,
                 ad_epoch: None,
                 ref_frame_a: None,
@@ -1795,7 +1957,8 @@ impl AcmAttitudeDetermination {
                 rate_process_noise_stddev: None,
                 sensors: vec![],
             },
-        }
+            sensors: PyList::empty(py).unbind(),
+        })
     }
 
     /// Comments allowed only immediately after the AD_START keyword.
@@ -1895,6 +2058,23 @@ impl AcmAttitudeDetermination {
         Ok(())
     }
 
+    /// Euler rotation sequence used by Euler-angle attitude states.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_euler_rot_seq(&self) -> Option<String> {
+        self.inner.euler_rot_seq.as_ref().map(ToString::to_string)
+    }
+
+    #[setter]
+    fn set_euler_rot_seq(&mut self, value: Option<String>) -> PyResult<()> {
+        self.inner.euler_rot_seq = value
+            .map(|value| RotSeq::from_str(&value))
+            .transpose()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
     /// Covariance type for estimator.
     ///
     /// :type: str | None
@@ -1912,7 +2092,7 @@ impl AcmAttitudeDetermination {
         Ok(())
     }
 
-    /// Attitude determination epoch.
+    /// Epoch of the attitude determination.
     ///
     /// :type: str | None
     #[getter]
@@ -1952,7 +2132,10 @@ impl AcmAttitudeDetermination {
         self.inner.ref_frame_b = value;
     }
 
-    /// Attitude type keyword.
+    /// Type of attitude data, selected per annex B, subsection B4. Attitude states must always be
+    /// listed before rate states.
+    ///
+    /// Examples: QUATERNION
     ///
     /// :type: str | None
     #[getter]
@@ -2037,16 +2220,13 @@ impl AcmAttitudeDetermination {
     ///
     /// :type: list[AcmSensor]
     #[getter]
-    fn get_sensors(&self) -> Vec<AcmSensor> {
-        self.inner
-            .sensors
-            .iter()
-            .map(|s| AcmSensor { inner: s.clone() })
-            .collect()
+    fn get_sensors(&self, py: Python<'_>) -> Py<PyList> {
+        self.sensors.clone_ref(py)
     }
 
     #[setter]
-    fn set_sensors(&mut self, value: Vec<AcmSensor>) {
-        self.inner.sensors = value.into_iter().map(|s| s.inner).collect();
+    fn set_sensors(&mut self, py: Python<'_>, value: Vec<Py<AcmSensor>>) -> PyResult<()> {
+        self.sensors = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 }

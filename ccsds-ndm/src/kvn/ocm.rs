@@ -13,7 +13,7 @@ use crate::messages::ocm::*;
 use crate::parse_block;
 use crate::types::*;
 use winnow::ascii::{space1, till_line_ending};
-use winnow::combinator::repeat;
+use winnow::combinator::{peek, repeat};
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
 use winnow::stream::Offset;
@@ -122,19 +122,19 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
         "CONSTELLATION" => constellation: kv_string,
         "OBJECT_TYPE" => object_type: kv_enum,
         "TIME_SYSTEM" => time_system: kv_string,
-        "EPOCH_TZERO" => epoch_tzero: kv_epoch,
+        "EPOCH_TZERO" => epoch_tzero: kv_calendar_epoch,
         "OPS_STATUS" => ops_status: kv_string,
         "ORBIT_CATEGORY" => orbit_category: kv_string,
         "OCM_DATA_ELEMENTS" => ocm_data_elements: kv_string,
         "SCLK_OFFSET_AT_EPOCH" => sclk_offset_at_epoch: kv_from_kvn,
         "SCLK_SEC_PER_SI_SEC" => sclk_sec_per_si_sec: kv_from_kvn,
-        "PREVIOUS_MESSAGE_EPOCH" => previous_message_epoch: kv_epoch,
-        "NEXT_MESSAGE_EPOCH" => next_message_epoch: kv_epoch,
+        "PREVIOUS_MESSAGE_EPOCH" => previous_message_epoch: kv_calendar_epoch,
+        "NEXT_MESSAGE_EPOCH" => next_message_epoch: kv_calendar_epoch,
         "START_TIME" => start_time: kv_epoch,
         "STOP_TIME" => stop_time: kv_epoch,
         "TIME_SPAN" => time_span: kv_from_kvn,
         "TAIMUTC_AT_TZERO" => taimutc_at_tzero: kv_from_kvn,
-        "NEXT_LEAP_EPOCH" => next_leap_epoch: kv_epoch,
+        "NEXT_LEAP_EPOCH" => next_leap_epoch: kv_calendar_epoch,
         "NEXT_LEAP_TAIMUTC" => next_leap_taimutc: kv_from_kvn,
         "UT1MUTC_AT_TZERO" => ut1mutc_at_tzero: kv_from_kvn,
         "EOP_SOURCE" => eop_source: kv_string,
@@ -183,14 +183,10 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
         ops_status,
         orbit_category,
         ocm_data_elements,
-        sclk_offset_at_epoch: sclk_offset_at_epoch.or(Some(TimeOffset {
-            value: 0.0,
-            units: None,
-        })),
-        sclk_sec_per_si_sec: sclk_sec_per_si_sec.or(Some(Duration {
-            value: 1.0,
-            units: None,
-        })),
+        // These fields are conditional in ODM table 6-3. Preserve omission so validation can
+        // enforce the SCLK-only requirement instead of manufacturing values on the KVN path.
+        sclk_offset_at_epoch,
+        sclk_sec_per_si_sec,
         previous_message_epoch,
         next_message_epoch,
         start_time,
@@ -217,13 +213,21 @@ pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
     {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    let epoch = till_space.parse_next(input)?;
-    let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
+    let epoch = kv_epoch_token.parse_next(input)?;
+    space1.parse_next(input)?;
+    let raw_values = till_line_ending.parse_next(input)?;
+    let mut values = Vec::with_capacity(raw_values.split_whitespace().count());
+    for value in raw_values.split_whitespace() {
+        values.push(
+            fast_float::parse(value)
+                .map_err(|_| cut_err(input, "Malformed OCM trajectory numeric value"))?,
+        );
+    }
+    if values.is_empty() {
+        return Err(cut_err(input, "Missing OCM trajectory values"));
+    }
     opt_line_ending.parse_next(input)?;
-    Ok(TrajLine {
-        epoch: epoch.to_string(),
-        values,
-    })
+    Ok(TrajLine { epoch, values })
 }
 
 pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
@@ -262,9 +266,9 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         "PROPAGATOR" => propagator: kv_string,
         "CENTER_NAME" => center_name: kv_string,
         "TRAJ_REF_FRAME" => traj_ref_frame: kv_string,
-        "TRAJ_FRAME_EPOCH" => traj_frame_epoch: kv_epoch,
-        "USEABLE_START_TIME" => useable_start_time: kv_epoch,
-        "USEABLE_STOP_TIME" => useable_stop_time: kv_epoch,
+        "TRAJ_FRAME_EPOCH" => traj_frame_epoch: kv_calendar_epoch,
+        "USEABLE_START_TIME" => useable_start_time: kv_calendar_epoch,
+        "USEABLE_STOP_TIME" => useable_stop_time: kv_calendar_epoch,
         "ORB_REVNUM" => orb_revnum: kv_float,
         "ORB_REVNUM_BASIS" => orb_revnum_basis: kv_enum,
         "TRAJ_TYPE" => traj_type: kv_string,
@@ -273,26 +277,33 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
     }, |i| at_block_end("TRAJ", i), "Unexpected OCM Trajectory key");
 
     loop {
-        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
+        comment.extend(comments);
 
         if at_block_end("TRAJ", input) {
-            comment.extend(comments);
             expect_block_end("TRAJ").parse_next(input)?;
             break;
         }
+        if input.is_empty() {
+            return Err(cut_err(input, "Missing TRAJ_STOP before end of input"));
+        }
 
+        let checkpoint = input.checkpoint();
         if let Ok(line) = ocm_traj_line.parse_next(input) {
             traj_lines.push(line);
             continue;
         }
 
-        // Otherwise, skip the line (handles continuations) or break
+        input.reset(&checkpoint);
+        let raw = peek(till_line_ending).parse_next(input)?;
+        if !raw.trim().is_empty() {
+            return Err(cut_err(input, "Malformed OCM trajectory record"));
+        }
+        let remaining = input.len();
         let _ = till_line_ending.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
-
-        if input.offset_from(&checkpoint) == 0 {
-            break;
+        if input.len() == remaining {
+            return Err(cut_err(input, "OCM trajectory parser made no progress"));
         }
     }
 
@@ -400,7 +411,7 @@ pub fn ocm_phys(input: &mut &str) -> KvnResult<OcmPhysicalDescription> {
         "WET_MASS" => wet_mass: kv_from_kvn,
         "DRY_MASS" => dry_mass: kv_from_kvn,
         "OEB_PARENT_FRAME" => oeb_parent_frame: kv_string,
-        "OEB_PARENT_FRAME_EPOCH" => oeb_parent_frame_epoch: kv_epoch,
+        "OEB_PARENT_FRAME_EPOCH" => oeb_parent_frame_epoch: kv_calendar_epoch,
         "OEB_Q1" => oeb_q1: kv_float,
         "OEB_Q2" => oeb_q2: kv_float,
         "OEB_Q3" => oeb_q3: kv_float,
@@ -508,13 +519,21 @@ pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
     {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    let epoch = till_space.parse_next(input)?;
-    let values = repeat(1.., (space1, parse_f64_winnow).map(|(_, v)| v)).parse_next(input)?;
+    let epoch = kv_epoch_token.parse_next(input)?;
+    space1.parse_next(input)?;
+    let raw_values = till_line_ending.parse_next(input)?;
+    let mut values = Vec::with_capacity(raw_values.split_whitespace().count());
+    for value in raw_values.split_whitespace() {
+        values.push(
+            fast_float::parse(value)
+                .map_err(|_| cut_err(input, "Malformed OCM covariance numeric value"))?,
+        );
+    }
+    if values.is_empty() {
+        return Err(cut_err(input, "Missing OCM covariance values"));
+    }
     opt_line_ending.parse_next(input)?;
-    Ok(CovLine {
-        epoch: epoch.to_string(),
-        values,
-    })
+    Ok(CovLine { epoch, values })
 }
 
 pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
@@ -544,7 +563,7 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         "COV_BASIS" => cov_basis: kv_enum,
         "COV_BASIS_ID" => cov_basis_id: kv_string,
         "COV_REF_FRAME" => cov_ref_frame: kv_string,
-        "COV_FRAME_EPOCH" => cov_frame_epoch: kv_epoch,
+        "COV_FRAME_EPOCH" => cov_frame_epoch: kv_calendar_epoch,
         "COV_TYPE" => cov_type: kv_string,
         "COV_UNITS" => cov_units: kv_string,
         "COV_ORDERING" => cov_ordering: kv_enum,
@@ -599,14 +618,34 @@ pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
     if input.starts_with(|c: char| c.is_ascii_uppercase()) {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    let epoch = till_space.parse_next(input)?;
+    let epoch = kv_epoch_token.parse_next(input)?;
     let values =
         repeat(1.., (space1, till_space_or_eol).map(|(_, v)| v.to_string())).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
-    Ok(ManLine {
-        epoch: epoch.to_string(),
-        values,
-    })
+    Ok(ManLine { epoch, values })
+}
+
+fn kv_man_composition(input: &mut &str) -> KvnResult<String> {
+    let mut composition = kv_string.parse_next(input)?;
+    loop {
+        let trimmed = composition.trim_end();
+        if !trimmed.ends_with(',') && !trimmed.ends_with("<cont.>") {
+            break;
+        }
+
+        let continuation = peek(till_line_ending).parse_next(input)?.trim();
+        if continuation.is_empty() || continuation.contains('=') || at_block_end("MAN", input) {
+            return Err(cut_err(input, "Malformed MAN_COMPOSITION continuation"));
+        }
+        let _ = till_line_ending.parse_next(input)?;
+        opt_line_ending.parse_next(input)?;
+        let prefix = trimmed
+            .strip_suffix("<cont.>")
+            .unwrap_or(trimmed)
+            .trim_end();
+        composition = format!("{prefix} {continuation}");
+    }
+    Ok(composition)
 }
 
 pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
@@ -658,7 +697,7 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         "MAN_PURPOSE" => man_purpose: kv_string,
         "MAN_PRED_SOURCE" => man_pred_source: kv_string,
         "MAN_REF_FRAME" => man_ref_frame: kv_string,
-        "MAN_FRAME_EPOCH" => man_frame_epoch: kv_epoch,
+        "MAN_FRAME_EPOCH" => man_frame_epoch: kv_calendar_epoch,
         "GRAV_ASSIST_NAME" => grav_assist_name: kv_string,
         "DC_TYPE" => dc_type: kv_enum,
         "DC_WIN_OPEN" => dc_win_open: kv_epoch,
@@ -675,31 +714,38 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         "DC_BODY_TRIGGER" => dc_body_trigger: kv_from_kvn_value,
         "DC_PA_START_ANGLE" => dc_pa_start_angle: kv_from_kvn,
         "DC_PA_STOP_ANGLE" => dc_pa_stop_angle: kv_from_kvn,
-        "MAN_COMPOSITION" => man_composition: kv_string,
+        "MAN_COMPOSITION" => man_composition: kv_man_composition,
         "MAN_UNITS" => man_units: kv_string,
     }, |i| at_block_end("MAN", i), "Unexpected OCM Maneuver key");
 
     loop {
-        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
+        comment.extend(comments);
 
         if at_block_end("MAN", input) {
-            comment.extend(comments);
             expect_block_end("MAN").parse_next(input)?;
             break;
         }
+        if input.is_empty() {
+            return Err(cut_err(input, "Missing MAN_STOP before end of input"));
+        }
 
+        let checkpoint = input.checkpoint();
         if let Ok(line) = ocm_man_line.parse_next(input) {
             man_lines.push(line);
             continue;
         }
 
-        // Otherwise, skip the line (handles continuations like in G17) or break
+        input.reset(&checkpoint);
+        let raw = peek(till_line_ending).parse_next(input)?;
+        if !raw.trim().is_empty() {
+            return Err(cut_err(input, "Malformed OCM maneuver record"));
+        }
+        let remaining = input.len();
         let _ = till_line_ending.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
-
-        if input.offset_from(&checkpoint) == 0 {
-            break;
+        if input.len() == remaining {
+            return Err(cut_err(input, "OCM maneuver parser made no progress"));
         }
     }
 
@@ -881,15 +927,12 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
     let mut sensors = None;
     let mut weighted_rms = None;
     let mut data_types = None;
-    let mut _max_resi_accepted = None;
 
     parse_block!(input, comment, {
         "OD_ID" => od_id: kv_string,
         "OD_PREV_ID" => od_prev_id: kv_string,
         "OD_METHOD" => od_method: kv_string,
         "OD_EPOCH" => od_epoch: kv_epoch,
-        "OD_TIME_TAG" => od_epoch: kv_epoch,
-        "MAX_RESI_ACCEPTED" => _max_resi_accepted: kv_string,
         "DAYS_SINCE_FIRST_OBS" => days_since_first_obs: kv_from_kvn,
         "DAYS_SINCE_LAST_OBS" => days_since_last_obs: kv_from_kvn,
         "RECOMMENDED_OD_SPAN" => recommended_od_span: kv_from_kvn,
@@ -1004,6 +1047,10 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<UserDefined> {
 // OCM Data Parser
 //----------------------------------------------------------------------
 
+// The inline Epoch comparison key intentionally keeps history records allocation-free.  That
+// makes the MAN variant large enough to trigger Clippy's layout heuristic; boxing it would add a
+// heap allocation for every parsed block, which is worse for the hot KVN path.
+#[allow(clippy::large_enum_variant)]
 enum OcmBlock {
     Traj(OcmTrajState),
     Phys(OcmPhysicalDescription),
@@ -1150,7 +1197,7 @@ pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 classification = Some(kv_string.parse_next(input)?);
             }
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -1260,6 +1307,50 @@ TRAJ_STOP
     }
 
     #[test]
+    fn metadata_reference_epochs_require_calendar_form() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+PREVIOUS_MESSAGE_EPOCH = 2022-12-31T23:00:00
+NEXT_MESSAGE_EPOCH = 2023-01-01T01:00:00
+NEXT_LEAP_EPOCH = 2024-01-01T00:00:00
+NEXT_LEAP_TAIMUTC = 37 [s]
+META_STOP
+"#;
+
+        for key in [
+            "EPOCH_TZERO",
+            "PREVIOUS_MESSAGE_EPOCH",
+            "NEXT_MESSAGE_EPOCH",
+            "NEXT_LEAP_EPOCH",
+        ] {
+            let needle = format!("{key} = ");
+            let start = kvn.find(&needle).expect("reference epoch key in fixture") + needle.len();
+            let end = kvn[start..]
+                .find('\n')
+                .map_or(kvn.len(), |offset| start + offset);
+            let invalid = format!("{}123.5{}", &kvn[..start], &kvn[end..]);
+            assert!(
+                Ocm::from_kvn(&invalid).is_err(),
+                "{key} must reject a numeric epoch"
+            );
+        }
+
+        let ocm = Ocm::from_kvn(kvn).expect("calendar reference epochs should parse");
+        assert_eq!(
+            ocm.body.segment.metadata.epoch_tzero.as_str(),
+            "2023-01-01T00:00:00"
+        );
+        assert_eq!(
+            ocm.body.segment.metadata.next_leap_epoch.unwrap().as_str(),
+            "2024-01-01T00:00:00"
+        );
+    }
+
+    #[test]
     fn test_xsd_metadata_all_optional_fields() {
         // XSD: Most metadata fields are minOccurs="0" - verify they can all be set
         let kvn = r#"CCSDS_OCM_VERS = 3.0
@@ -1308,8 +1399,7 @@ TRAJ_STOP
     }
 
     #[test]
-    fn test_xsd_metadata_sclk_defaults() {
-        // XSD: SCLK_OFFSET_AT_EPOCH default="0.0", SCLK_SEC_PER_SI_SEC default="1.0"
+    fn test_metadata_sclk_parameters_remain_optional_outside_sclk() {
         let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -1325,9 +1415,8 @@ TRAJ_TYPE = CARTPV
 TRAJ_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
-        // XSD defaults
-        assert!(ocm.body.segment.metadata.sclk_offset_at_epoch.is_some());
-        assert!(ocm.body.segment.metadata.sclk_sec_per_si_sec.is_some());
+        assert!(ocm.body.segment.metadata.sclk_offset_at_epoch.is_none());
+        assert!(ocm.body.segment.metadata.sclk_sec_per_si_sec.is_none());
     }
 
     // =========================================================================
@@ -1662,7 +1751,7 @@ MAN_START
 MAN_DEVICE_ID = THRUSTER_1
 MAN_REF_FRAME = RSW
 DC_TYPE = CONTINUOUS
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
 2023-01-01T00:00:00 0.1 0 0
 MAN_STOP
 "#;
@@ -1696,7 +1785,7 @@ MAN_START
 MAN_ID = MANEUVER_1
 MAN_REF_FRAME = RSW
 DC_TYPE = CONTINUOUS
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
 2023-01-01T00:00:00 0.1 0 0
 MAN_STOP
 "#;
@@ -1769,7 +1858,7 @@ MAN_ID = MANEUVER_1
 MAN_DEVICE_ID = THRUSTER_1
 MAN_REF_FRAME = RSW
 DC_TYPE = CONTINUOUS
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
 2023-01-01T00:00:00 0.1 0 0
 MAN_STOP
 MAN_START
@@ -1777,7 +1866,14 @@ MAN_ID = MANEUVER_2
 MAN_DEVICE_ID = THRUSTER_2
 MAN_REF_FRAME = TNW
 DC_TYPE = TIME
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
+DC_WIN_OPEN = 2023-01-02T00:00:00
+DC_WIN_CLOSE = 2023-01-02T02:00:00
+DC_EXEC_START = 2023-01-02T00:30:00
+DC_EXEC_STOP = 2023-01-02T01:30:00
+DC_REF_TIME = 2023-01-02T01:00:00
+DC_TIME_PULSE_DURATION = 60 [s]
+DC_TIME_PULSE_PERIOD = 120 [s]
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
 2023-01-02T00:00:00 0 0.1 0
 MAN_STOP
 "#;
@@ -1810,7 +1906,7 @@ MAN_FRAME_EPOCH = 2023-01-01T00:00:00
 DC_TYPE = CONTINUOUS
 DC_WIN_OPEN = 2023-01-01T00:00:00
 DC_WIN_CLOSE = 2023-01-01T01:00:00
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
 MAN_UNITS = km/s km/s km/s
 2023-01-01T00:00:00 0.1 0 0
 MAN_STOP
@@ -1862,13 +1958,13 @@ META_STOP
 PHYS_START
 MANUFACTURER = ACME_CORP
 BUS_MODEL = LEO_BUS
-WET_MASS = 500 [kg]
-DRY_MASS = 400 [kg]
 DRAG_CONST_AREA = 10.0 [m**2]
 DRAG_COEFF_NOM = 2.2
+WET_MASS = 500 [kg]
+DRY_MASS = 400 [kg]
+RCS = 1.0 [m**2]
 SRP_CONST_AREA = 8.0 [m**2]
 SOLAR_RAD_COEFF = 1.2
-RCS = 1.0 [m**2]
 MAX_THRUST = 0.1 [N]
 DV_BOL = 0.3 [km/s]
 DV_REMAINING = 0.15 [km/s]
@@ -2034,7 +2130,7 @@ USER_STOP
     #[test]
     fn test_xsd_sample_ocm_g15_kvn() {
         // Parse official CCSDS OCM example G-15
-        let kvn = include_str!("../../../data/kvn/ocm_g15.kvn");
+        let kvn = include_str!("../../data/kvn/ocm_g15.kvn");
         let ocm = Ocm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -2045,7 +2141,7 @@ USER_STOP
     #[test]
     fn test_xsd_sample_ocm_g16_kvn() {
         // Parse official CCSDS OCM example G-16
-        let kvn = include_str!("../../../data/kvn/ocm_g16.kvn");
+        let kvn = include_str!("../../data/kvn/ocm_g16.kvn");
         let ocm = Ocm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -2055,7 +2151,7 @@ USER_STOP
     #[test]
     fn test_xsd_sample_ocm_g17_kvn() {
         // Parse official CCSDS OCM example G-17
-        let kvn = include_str!("../../../data/kvn/ocm_g17.kvn");
+        let kvn = include_str!("../../data/kvn/ocm_g17.kvn");
         let ocm = Ocm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -2065,7 +2161,7 @@ USER_STOP
     #[test]
     fn test_xsd_sample_ocm_g18_kvn() {
         // Parse official CCSDS OCM example G-18
-        let kvn = include_str!("../../../data/kvn/ocm_g18.kvn");
+        let kvn = include_str!("../../data/kvn/ocm_g18.kvn");
         let ocm = Ocm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -2075,7 +2171,7 @@ USER_STOP
     #[test]
     fn test_xsd_sample_ocm_g19_kvn() {
         // Parse official CCSDS OCM example G-19
-        let kvn = include_str!("../../../data/kvn/ocm_g19.kvn");
+        let kvn = include_str!("../../data/kvn/ocm_g19.kvn");
         let ocm = Ocm::from_kvn(kvn).unwrap();
 
         // Verify mandatory metadata
@@ -2110,7 +2206,7 @@ MAN_ID = MAN_1
 MAN_DEVICE_ID = THRUSTER_1
 MAN_REF_FRAME = RSW
 DC_TYPE = CONTINUOUS
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
 2023-01-01T00:00:00 0.1 0 0
 MAN_STOP
 "#;
@@ -2140,7 +2236,7 @@ MAN_STOP
             _ => panic!("Expected first keyword error, got: {:?}", err),
         }
 
-        // Comments before version should be OK
+        // Comments before version cannot be retained and are rejected rather than discarded.
         let kvn = r#"
 COMMENT leading comment
 CCSDS_OCM_VERS = 3.0
@@ -2151,7 +2247,7 @@ TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-01-01T00:00:00
 META_STOP
 "#;
-        assert!(Ocm::from_kvn(kvn).is_ok());
+        assert!(Ocm::from_kvn(kvn).is_err());
 
         // Unexpected segment start
         let kvn = r#"CCSDS_OCM_VERS = 3.0
@@ -2183,6 +2279,7 @@ META_STOP
             assert!(
                 err.message.contains("Expected META_STOP")
                     || err.message.contains("Unexpected OCM Data key")
+                    || err.message.contains("Unexpected OCM Metadata key")
                     || err.contexts.contains(&"Expected META_STOP")
                     || err.contexts.contains(&"Unexpected OCM Data key")
                     || err.contexts.contains(&"Unexpected OCM Metadata key")
@@ -2313,6 +2410,7 @@ USER_STOP
                     || err.message.contains("Expected TRAJ_START")
                     || err.contexts.contains(&"Expected META_START")
                     || err.contexts.contains(&"Expected TRAJ_START")
+                    || err.message.contains("Unexpected key in USER block")
                     || err.contexts.contains(&"Unexpected key in USER block")
             );
         } else {
@@ -2361,6 +2459,85 @@ TRAJ_STOP
         let output = ocm.to_kvn().unwrap();
         assert!(output.contains("ORB_REVNUM_BASIS"));
         assert!(output.contains("1"));
+    }
+
+    #[test]
+    fn frame_reference_epochs_require_calendar_form() {
+        let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+TRAJ_START
+CENTER_NAME = EARTH
+TRAJ_REF_FRAME = GCRF
+TRAJ_FRAME_EPOCH = 2023-01-01T00:00:00
+TRAJ_TYPE = CARTPV
+2023-01-01T00:00:00 1 2 3 4 5 6
+TRAJ_STOP
+PHYS_START
+OEB_PARENT_FRAME_EPOCH = 2023-01-01T00:00:00
+PHYS_STOP
+COV_START
+COV_REF_FRAME = GCRF
+COV_FRAME_EPOCH = 2023-01-01T00:00:00
+COV_TYPE = CARTPV
+COV_ORDERING = LTM
+2023-01-01T00:00:00 1 0 0 0 0 1
+COV_STOP
+MAN_START
+MAN_ID = MAN-1
+MAN_DEVICE_ID = THR-1
+MAN_REF_FRAME = GCRF
+MAN_FRAME_EPOCH = 2023-01-01T00:00:00
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X
+2023-01-01T00:00:00 1
+MAN_STOP
+"#;
+
+        let ocm = Ocm::from_kvn(kvn).expect("calendar frame epochs should parse");
+        let segment = &ocm.body.segment;
+        assert_eq!(
+            segment.data.traj[0].traj_frame_epoch.unwrap().as_str(),
+            "2023-01-01T00:00:00"
+        );
+        assert_eq!(
+            segment
+                .data
+                .phys
+                .as_ref()
+                .unwrap()
+                .oeb_parent_frame_epoch
+                .unwrap()
+                .as_str(),
+            "2023-01-01T00:00:00"
+        );
+        assert_eq!(
+            segment.data.cov[0].cov_frame_epoch.unwrap().as_str(),
+            "2023-01-01T00:00:00"
+        );
+        assert_eq!(
+            segment.data.man[0].man_frame_epoch.unwrap().as_str(),
+            "2023-01-01T00:00:00"
+        );
+
+        for key in [
+            "TRAJ_FRAME_EPOCH",
+            "OEB_PARENT_FRAME_EPOCH",
+            "COV_FRAME_EPOCH",
+            "MAN_FRAME_EPOCH",
+        ] {
+            let invalid = kvn.replace(
+                &format!("{key} = 2023-01-01T00:00:00"),
+                &format!("{key} = 123.5"),
+            );
+            assert!(
+                Ocm::from_kvn(&invalid).is_err(),
+                "{key} must reject a numeric epoch"
+            );
+        }
     }
 
     #[test]
@@ -2506,7 +2683,6 @@ OD_ID = OD1
 OD_PREV_ID = OD0
 OD_METHOD = LS
 OD_EPOCH = 2023-01-01T00:00:00
-OD_TIME_TAG = 2023-01-01T00:00:00
 DAYS_SINCE_FIRST_OBS = 10 [d]
 DAYS_SINCE_LAST_OBS = 1 [d]
 RECOMMENDED_OD_SPAN = 7 [d]
@@ -2515,7 +2691,6 @@ OBS_AVAILABLE = 100
 OBS_USED = 95
 TRACKS_AVAILABLE = 10
 TRACKS_USED = 9
-MAX_RESI_ACCEPTED = 3 [%]
 WEIGHTED_RMS = 0.5
 OD_STOP
 "#;
@@ -2645,7 +2820,7 @@ MAN_ID = MAN_1
 MAN_DEVICE_ID = THRUSTER_1
 MAN_REF_FRAME = RSW
 DC_TYPE = CONTINUOUS
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
 2023-01-01T00:00:00 0.1 0 0
 MAN_STOP
 COMMENT Comment before PERT
@@ -2660,7 +2835,7 @@ OD_EPOCH = 2023-01-01T00:00:00
 OD_STOP
 COMMENT Comment before USER
 USER_START
-PARAM = VAL
+USER_DEFINED_PARAM = VAL
 USER_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
@@ -2716,7 +2891,7 @@ EPOCH_TZERO = 2023-01-01T00:00:00
 META_STOP
 USER_START
 COMMENT inside user block
-PARAM = VAL
+USER_DEFINED_PARAM = VAL
 USER_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
@@ -2742,9 +2917,9 @@ TIME_SYSTEM = UTC
 EPOCH_TZERO = 2023-01-01T00:00:00
 META_STOP
 USER_START
-PARAM1 = VAL1
+USER_DEFINED_PARAM1 = VAL1
 
-PARAM2 = VAL2
+USER_DEFINED_PARAM2 = VAL2
 USER_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
@@ -3467,10 +3642,13 @@ CENTER_NAME = EARTH
 "#;
         let err = Ocm::from_kvn(kvn).unwrap_err();
         assert!(
-            err.as_kvn_parse_error().map_or(false, |err| err
-                .contexts
-                .iter()
-                .any(|c| c.contains("Expected META_START"))),
+            err.as_kvn_parse_error().is_some_and(|err| {
+                err.message.contains("Expected META_START")
+                    || err
+                        .contexts
+                        .iter()
+                        .any(|context| context.contains("Expected META_START"))
+            }),
             "Expected 'expected meta' error, got: {:?}",
             err
         );
@@ -3497,7 +3675,7 @@ MAN_ID = MAN1
 MAN_DEVICE_ID = DEV1
 
 MAN_REF_FRAME = TNW
-MAN_COMPOSITION = abc
+MAN_COMPOSITION = TIME_ABSOLUTE
 MAN_UNITS = km/s
 2023-01-01T00:00:00.000 0.1 0.2 0.3
 MAN_STOP
@@ -3527,7 +3705,7 @@ MAN_ID = MAN1
 MAN_DEVICE_ID = DEV1
 DC_MIN_CYCLES = not_a_number
 MAN_REF_FRAME = TNW
-MAN_COMPOSITION = abc
+MAN_COMPOSITION = TIME_ABSOLUTE
 MAN_UNITS = km/s
 MAN_STOP
 "#;
@@ -3557,7 +3735,7 @@ MAN_ID = MAN1
 MAN_DEVICE_ID = DEV1
 DC_MAX_CYCLES = invalid
 MAN_REF_FRAME = TNW
-MAN_COMPOSITION = abc
+MAN_COMPOSITION = TIME_ABSOLUTE
 MAN_UNITS = km/s
 MAN_STOP
 "#;
@@ -3751,7 +3929,7 @@ MAN_ID = MAN_1
 MAN_DEVICE_ID = THRUSTER_1
 MAN_REF_FRAME = RSW
 DC_TYPE = CONTINUOUS
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
 2023-01-01T00:00:00 0.1 0 0
 MAN_STOP
 PERT_START
@@ -3764,7 +3942,7 @@ OD_EPOCH = 2023-01-01T00:00:00
 OD_STOP
 USER_START
 COMMENT user comment
-CUSTOM_PARAM = custom_value
+USER_DEFINED_CUSTOM_PARAM = custom_value
 USER_STOP
 "#;
         let ocm = Ocm::from_kvn(kvn).unwrap();
@@ -3873,7 +4051,7 @@ DC_BODY_FRAME = SC_BODY
 DC_BODY_TRIGGER = 0 1 0
 DC_PA_START_ANGLE = 0 [deg]
 DC_PA_STOP_ANGLE = 180 [deg]
-MAN_COMPOSITION = EPOCH DV_X DV_Y DV_Z
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
 MAN_UNITS = km/s km/s km/s
 2023-01-01T00:00:00 0.1 0 0
 MAN_STOP
@@ -3980,9 +4158,9 @@ META_STOP
 TRAJ_START
 CENTER_NAME = EARTH
 TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
 ORB_REVNUM = 100
 ORB_REVNUM_BASIS = 0
+TRAJ_TYPE = CARTPV
 2023-01-01T00:00:00 1 2 3 4 5 6
 TRAJ_STOP
 "#;

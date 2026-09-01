@@ -3,14 +3,12 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::{parse_time_system, parse_yes_no};
-use crate::types::parse_epoch;
+use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::tdm as core_tdm;
-use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{self as core_types};
-use ccsds_ndm::MessageType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
+use pyo3::types::PyList;
 use std::str::FromStr;
 
 // ============================================================================
@@ -41,23 +39,48 @@ use std::str::FromStr;
 ///     The message body containing segments.
 ///     (Mandatory)
 #[pyclass]
-#[derive(Clone)]
 pub struct Tdm {
-    pub inner: core_tdm::Tdm,
+    id: Option<String>,
+    version: String,
+    header: Py<TdmHeader>,
+    body: Py<TdmBody>,
+}
+
+impl Tdm {
+    pub(crate) fn from_core(py: Python<'_>, value: core_tdm::Tdm) -> PyResult<Self> {
+        Ok(Self {
+            id: value.id,
+            version: value.version,
+            header: Py::new(
+                py,
+                TdmHeader {
+                    inner: value.header,
+                },
+            )?,
+            body: Py::new(py, TdmBody::from_core(py, value.body)?)?,
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_tdm::Tdm> {
+        Ok(core_tdm::Tdm {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            header: self.header.borrow(py).inner.clone(),
+            body: self.body.borrow(py).to_core(py)?,
+        })
+    }
 }
 
 #[pymethods]
 impl Tdm {
     #[new]
     #[pyo3(signature = (*, header, body))]
-    fn new(header: TdmHeader, body: TdmBody) -> Self {
+    fn new(header: Py<TdmHeader>, body: Py<TdmBody>) -> Self {
         Self {
-            inner: core_tdm::Tdm {
-                header: header.inner,
-                body: body.inner,
-                id: Some("CCSDS_TDM_VERS".to_string()),
-                version: "2.0".to_string(),
-            },
+            header,
+            body,
+            id: Some("CCSDS_TDM_VERS".to_string()),
+            version: "2.0".to_string(),
         }
     }
 
@@ -66,7 +89,7 @@ impl Tdm {
     /// :type: Optional[str]
     #[getter]
     fn get_id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     /// The message version.
@@ -74,61 +97,27 @@ impl Tdm {
     /// :type: str
     #[getter]
     fn get_version(&self) -> String {
-        self.inner.version.clone()
+        self.version.clone()
     }
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Tdm, &value)?;
-        self.inner.version = value;
+        self.version = value;
         Ok(())
     }
 
     /// Validate the message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        if strict {
-            self.inner
-                .validate()
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
-            Ok(None)
-        } else {
-            let mut issues = Vec::new();
-            let _ = ccsds_ndm::validation::with_validation_mode(
-                ccsds_ndm::validation::ValidationMode::Lenient,
-                || match self.inner.validate() {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        issues.push(e.to_string());
-                        Ok(())
-                    }
-                },
-            );
-
-            let warnings = ccsds_ndm::validation::take_warnings();
-            for w in warnings {
-                issues.push(w.error.to_string());
-            }
-
-            if issues.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(issues))
-            }
-        }
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "Tdm(version='{}', segments={})",
-            self.inner.version,
-            self.inner.body.segments.len()
+            self.version,
+            self.body.borrow(py).segments.bind(py).len()
         )
     }
 
@@ -149,43 +138,34 @@ impl Tdm {
     ///
     /// :type: TdmHeader
     #[getter]
-    fn get_header(&self) -> TdmHeader {
-        TdmHeader {
-            inner: self.inner.header.clone(),
-        }
+    fn get_header(&self, py: Python<'_>) -> Py<TdmHeader> {
+        self.header.clone_ref(py)
     }
 
     #[setter]
-    fn set_header(&mut self, header: TdmHeader) {
-        self.inner.header = header.inner;
+    fn set_header(&mut self, header: Py<TdmHeader>) {
+        self.header = header;
     }
 
     /// The message body.
     ///
     /// :type: TdmBody
     #[getter]
-    fn get_body(&self) -> TdmBody {
-        TdmBody {
-            inner: self.inner.body.clone(),
-        }
+    fn get_body(&self, py: Python<'_>) -> Py<TdmBody> {
+        self.body.clone_ref(py)
     }
 
     #[setter]
-    fn set_body(&mut self, body: TdmBody) {
-        self.inner.body = body.inner;
+    fn set_body(&mut self, body: Py<TdmBody>) {
+        self.body = body;
     }
 
     /// Shortcut to access segments directly from the body.
     ///
     /// :type: list[TdmSegment]
     #[getter]
-    fn get_segments(&self) -> Vec<TdmSegment> {
-        self.inner
-            .body
-            .segments
-            .iter()
-            .map(|s| TdmSegment { inner: s.clone() })
-            .collect()
+    fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
+        self.body.borrow(py).segments.clone_ref(py)
     }
 
     /// Create a TDM message from a string.
@@ -203,32 +183,17 @@ impl Tdm {
     /// Tdm
     ///     The parsed TDM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner =
-            match format {
-                Some("kvn") => core_tdm::Tdm::from_kvn(data)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
-                Some("xml") => core_tdm::Tdm::from_xml(data)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
-                Some(other) => {
-                    return Err(PyValueError::new_err(format!(
-                        "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                        other
-                    )))
-                }
-                None => match ccsds_ndm::from_str(data) {
-                    Ok(MessageType::Tdm(tdm)) => tdm,
-                    Ok(other) => {
-                        return Err(PyValueError::new_err(format!(
-                            "Parsed message is not TDM (got {:?})",
-                            other
-                        )))
-                    }
-                    Err(e) => return Err(PyValueError::new_err(e.to_string())),
-                },
-            };
-        Ok(Self { inner })
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_str(
+        py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_records);
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        Self::from_core(py, inner)
     }
 
     /// Create a TDM message from a file.
@@ -246,43 +211,34 @@ impl Tdm {
     /// Tdm
     ///     The parsed TDM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(&content, format)
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_file(
+        py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_records);
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Self::from_core(py, inner)
     }
 
-    /// Serialize to string.
-    ///
-    /// Parameters
-    /// ----------
-    /// format : str
-    ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     The serialized string.
-    #[pyo3(signature = (format, validate=true))]
-    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
-        if validate {
-            self.validate(true)?;
-        }
-        match format {
-            "kvn" => self
-                .inner
-                .to_kvn()
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => ccsds_ndm::xml::to_string(&self.inner)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            other => Err(PyValueError::new_err(format!(
-                "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                other
-            ))),
-        }
+    /// Serialize to validated KVN or XML.
+    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        format: &str,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(
+            &self.to_core(py)?,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
     /// Write to file.
@@ -293,18 +249,24 @@ impl Tdm {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    #[pyo3(signature = (path, format, validate=true))]
-    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
-        let data = self.to_str(format, validate)?;
-        match fs::write(path, data) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!(
-                "Failed to write file: {}",
-                e
-            ))),
-        }
+    /// version : str, optional
+    ///     Source version by default, ``"latest"``, or an exact supported version.
+    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        path: &str,
+        format: &str,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<()> {
+        crate::api::generate_file_with_limit(
+            &self.to_core(py)?,
+            path,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 }
 
@@ -347,7 +309,7 @@ impl TdmHeader {
         Ok(Self {
             inner: core_tdm::TdmHeader {
                 comment: comment.unwrap_or_default(),
-                creation_date: parse_epoch(&creation_date)?,
+                creation_date: parse_calendar_epoch(&creation_date)?,
                 originator,
                 message_id,
             },
@@ -387,7 +349,7 @@ impl TdmHeader {
 
     #[setter]
     fn set_creation_date(&mut self, value: String) -> PyResult<()> {
-        self.inner.creation_date = parse_epoch(&value)?;
+        self.inner.creation_date = parse_calendar_epoch(&value)?;
         Ok(())
     }
 
@@ -435,25 +397,53 @@ impl TdmHeader {
 /// segments : list[TdmSegment]
 ///     List of data segments.
 #[pyclass]
-#[derive(Clone)]
 pub struct TdmBody {
-    pub inner: core_tdm::TdmBody,
+    segments: Py<PyList>,
+}
+
+impl TdmBody {
+    fn from_core(py: Python<'_>, value: core_tdm::TdmBody) -> PyResult<Self> {
+        let segments = value
+            .segments
+            .into_iter()
+            .map(|segment| Py::new(py, TdmSegment::from_core(py, segment)?))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            segments: PyList::new(py, segments)?.unbind(),
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_tdm::TdmBody> {
+        let segments = self
+            .segments
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, TdmSegment>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("segments[{index}] must be TdmSegment"))
+                    })?
+                    .to_core(py)
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(core_tdm::TdmBody { segments })
+    }
 }
 
 #[pymethods]
 impl TdmBody {
     #[new]
     #[pyo3(signature = (*, segments))]
-    fn new(segments: Vec<TdmSegment>) -> Self {
-        Self {
-            inner: core_tdm::TdmBody {
-                segments: segments.into_iter().map(|s| s.inner).collect(),
-            },
-        }
+    fn new(py: Python<'_>, segments: Vec<Py<TdmSegment>>) -> PyResult<Self> {
+        Ok(Self {
+            segments: PyList::new(py, segments)?.unbind(),
+        })
     }
 
-    fn __repr__(&self) -> String {
-        format!("TdmBody(segments={})", self.inner.segments.len())
+    fn __repr__(&self, py: Python<'_>) -> String {
+        format!("TdmBody(segments={})", self.segments.bind(py).len())
     }
 
     /// List of TDM segments.
@@ -462,17 +452,14 @@ impl TdmBody {
     ///
     /// :type: list[TdmSegment]
     #[getter]
-    fn get_segments(&self) -> Vec<TdmSegment> {
-        self.inner
-            .segments
-            .iter()
-            .map(|s| TdmSegment { inner: s.clone() })
-            .collect()
+    fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
+        self.segments.clone_ref(py)
     }
 
     #[setter]
-    fn set_segments(&mut self, value: Vec<TdmSegment>) {
-        self.inner.segments = value.into_iter().map(|s| s.inner).collect();
+    fn set_segments(&mut self, py: Python<'_>, value: Vec<Py<TdmSegment>>) -> PyResult<()> {
+        self.segments = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 }
 
@@ -494,29 +481,45 @@ impl TdmBody {
 ///     Segment data.
 ///     (Mandatory)
 #[pyclass]
-#[derive(Clone)]
 pub struct TdmSegment {
-    pub inner: core_tdm::TdmSegment,
+    metadata: Py<TdmMetadata>,
+    data: Py<TdmData>,
+}
+
+impl TdmSegment {
+    fn from_core(py: Python<'_>, value: core_tdm::TdmSegment) -> PyResult<Self> {
+        Ok(Self {
+            metadata: Py::new(
+                py,
+                TdmMetadata {
+                    inner: value.metadata,
+                },
+            )?,
+            data: Py::new(py, TdmData::from_core(py, value.data)?)?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_tdm::TdmSegment> {
+        Ok(core_tdm::TdmSegment {
+            metadata: self.metadata.borrow(py).inner.clone(),
+            data: self.data.borrow(py).to_core(py)?,
+        })
+    }
 }
 
 #[pymethods]
 impl TdmSegment {
     #[new]
     #[pyo3(signature = (*, metadata, data))]
-    fn new(metadata: TdmMetadata, data: TdmData) -> Self {
-        Self {
-            inner: core_tdm::TdmSegment {
-                metadata: metadata.inner,
-                data: data.inner,
-            },
-        }
+    fn new(metadata: Py<TdmMetadata>, data: Py<TdmData>) -> Self {
+        Self { metadata, data }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "TdmSegment(participant_1='{}', observations={})",
-            self.inner.metadata.participant_1,
-            self.inner.data.observations.len()
+            self.metadata.borrow(py).inner.participant_1,
+            self.data.borrow(py).observations.bind(py).len()
         )
     }
 
@@ -524,30 +527,26 @@ impl TdmSegment {
     ///
     /// :type: TdmMetadata
     #[getter]
-    fn get_metadata(&self) -> TdmMetadata {
-        TdmMetadata {
-            inner: self.inner.metadata.clone(),
-        }
+    fn get_metadata(&self, py: Python<'_>) -> Py<TdmMetadata> {
+        self.metadata.clone_ref(py)
     }
 
     #[setter]
-    fn set_metadata(&mut self, metadata: TdmMetadata) {
-        self.inner.metadata = metadata.inner;
+    fn set_metadata(&mut self, metadata: Py<TdmMetadata>) {
+        self.metadata = metadata;
     }
 
     /// Data section for this TDM segment.
     ///
     /// :type: TdmData
     #[getter]
-    fn get_data(&self) -> TdmData {
-        TdmData {
-            inner: self.inner.data.clone(),
-        }
+    fn get_data(&self, py: Python<'_>) -> Py<TdmData> {
+        self.data.clone_ref(py)
     }
 
     #[setter]
-    fn set_data(&mut self, data: TdmData) {
-        self.inner.data = data.inner;
+    fn set_data(&mut self, data: Py<TdmData>) {
+        self.data = data;
     }
 }
 
@@ -736,8 +735,8 @@ impl TdmMetadata {
                 track_id,
                 data_types,
                 time_system,
-                start_time: start_time.map(|s| parse_epoch(&s)).transpose()?,
-                stop_time: stop_time.map(|s| parse_epoch(&s)).transpose()?,
+                start_time: start_time.map(|s| parse_calendar_epoch(&s)).transpose()?,
+                stop_time: stop_time.map(|s| parse_calendar_epoch(&s)).transpose()?,
                 participant_1,
                 participant_2,
                 participant_3,
@@ -930,7 +929,7 @@ impl TdmMetadata {
     }
     #[setter]
     fn set_start_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.start_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.start_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -950,7 +949,7 @@ impl TdmMetadata {
     }
     #[setter]
     fn set_stop_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.stop_time = value.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.stop_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -1863,28 +1862,65 @@ impl TdmMetadata {
 ///     Comments in the data section.
 ///     (Optional)
 #[pyclass]
-#[derive(Clone)]
 pub struct TdmData {
-    pub inner: core_tdm::TdmData,
+    comment: Vec<String>,
+    observations: Py<PyList>,
+}
+
+impl TdmData {
+    fn from_core(py: Python<'_>, value: core_tdm::TdmData) -> PyResult<Self> {
+        let observations = value
+            .observations
+            .into_iter()
+            .map(|inner| Py::new(py, TdmObservation { inner }))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            comment: value.comment,
+            observations: PyList::new(py, observations)?.unbind(),
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_tdm::TdmData> {
+        let observations = self
+            .observations
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, TdmObservation>>()
+                    .map(|value| value.inner.clone())
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "observations[{index}] must be TdmObservation"
+                        ))
+                    })
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(core_tdm::TdmData {
+            comment: self.comment.clone(),
+            observations,
+        })
+    }
 }
 
 #[pymethods]
 impl TdmData {
     #[new]
     #[pyo3(signature = (observations=None, comment=None))]
-    fn new(observations: Option<Vec<TdmObservation>>, comment: Option<Vec<String>>) -> Self {
-        Self {
-            inner: core_tdm::TdmData {
-                comment: comment.unwrap_or_default(),
-                observations: observations
-                    .map(|obs| obs.into_iter().map(|o| o.inner).collect())
-                    .unwrap_or_default(),
-            },
-        }
+    fn new(
+        py: Python<'_>,
+        observations: Option<Vec<Py<TdmObservation>>>,
+        comment: Option<Vec<String>>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            comment: comment.unwrap_or_default(),
+            observations: PyList::new(py, observations.unwrap_or_default())?.unbind(),
+        })
     }
 
-    fn __repr__(&self) -> String {
-        format!("TdmData(observations={})", self.inner.observations.len())
+    fn __repr__(&self, py: Python<'_>) -> String {
+        format!("TdmData(observations={})", self.observations.bind(py).len())
     }
 
     /// Comments.
@@ -1892,29 +1928,26 @@ impl TdmData {
     /// :type: list[TdmObservation]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
+        self.comment.clone()
     }
 
     #[setter]
     fn set_comment(&mut self, value: Vec<String>) {
-        self.inner.comment = value;
+        self.comment = value;
     }
 
     /// Tracking data records.
     ///
     /// :type: list[TdmObservation]
     #[getter]
-    fn get_observations(&self) -> Vec<TdmObservation> {
-        self.inner
-            .observations
-            .iter()
-            .map(|o| TdmObservation { inner: o.clone() })
-            .collect()
+    fn get_observations(&self, py: Python<'_>) -> Py<PyList> {
+        self.observations.clone_ref(py)
     }
 
     #[setter]
-    fn set_observations(&mut self, value: Vec<TdmObservation>) {
-        self.inner.observations = value.into_iter().map(|o| o.inner).collect();
+    fn set_observations(&mut self, py: Python<'_>, value: Vec<Py<TdmObservation>>) -> PyResult<()> {
+        self.observations = PyList::new(py, value)?.unbind();
+        Ok(())
     }
 }
 
@@ -2008,7 +2041,7 @@ impl TdmObservation {
 
         Ok(Self {
             inner: core_tdm::TdmObservation {
-                epoch: parse_epoch(&epoch)?,
+                epoch: parse_calendar_epoch(&epoch)?,
                 data,
             },
         })
@@ -2033,7 +2066,7 @@ impl TdmObservation {
 
     #[setter]
     fn set_epoch(&mut self, value: String) -> PyResult<()> {
-        self.inner.epoch = parse_epoch(&value)?;
+        self.inner.epoch = parse_calendar_epoch(&value)?;
         Ok(())
     }
 

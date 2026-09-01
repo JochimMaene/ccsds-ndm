@@ -20,9 +20,9 @@ Cargo.lock
 __pycache__/
 *.py[cod]
 
-# Virtual environments and uv lock file
+# Virtual environments and obsolete nested lock file
 .venv/
-uv.lock
+/bindings/python/uv.lock
 
 # Maturin / PyO3 build outputs
 /build/
@@ -61,6 +61,13 @@ htmlcov/
 # ------------------------------
 
 xsd/
+!ccsds-ndm/data/xsd/
+ccsds-ndm/data/xsd/*
+!ccsds-ndm/data/xsd/ndmxml-2.0.0-common-2.0.xsd
+!ccsds-ndm/data/xsd/ndmxml-2.0.0-oem-2.0.xsd
+!ccsds-ndm/data/xsd/ndmxml-2.0.0-omm-2.0.xsd
+!ccsds-ndm/data/xsd/ndmxml-2.0.0-opm-2.0.xsd
+!ccsds-ndm/data/xsd/ndmxml-4.0.0-*.xsd
 
 # ------------------------------
 # Profiling outputs
@@ -76,6 +83,14 @@ perf.data.old
 ccsds-ndm/fuzz/target/
 ccsds-ndm/fuzz/artifacts/
 ccsds-ndm/fuzz/corpus/
+!ccsds-ndm/fuzz/corpus/
+ccsds-ndm/fuzz/corpus/*
+!ccsds-ndm/fuzz/corpus/fuzz_kvn/
+!ccsds-ndm/fuzz/corpus/fuzz_xml/
+ccsds-ndm/fuzz/corpus/fuzz_kvn/*
+ccsds-ndm/fuzz/corpus/fuzz_xml/*
+!ccsds-ndm/fuzz/corpus/fuzz_kvn/opm-3.0-minimal.kvn
+!ccsds-ndm/fuzz/corpus/fuzz_xml/opm-3.0-minimal.xml
 
 # ------------------------------
 # Build artifacts
@@ -93,3 +108,5 @@ copilot-instructions.md
 GEMINI.md
 CLAUDE.md
 AGENTS.md
+
+bindings/cpp

@@ -7,9 +7,10 @@
 
 use super::types::*;
 use crate::error::{Result, ValidationError};
-use crate::kvn::ser::KvnWriter;
+use crate::kvn::ser::{KvnWriter, OdmFloat};
 use crate::traits::ToKvn;
 use serde::{Deserialize, Serialize};
+use std::fmt::Write;
 
 /// Represents the `ndmHeader` complex type from the XSD.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
@@ -66,10 +67,20 @@ impl crate::traits::Validate for NdmHeader {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "NDM Header",
+            [
+                ("ORIGINATOR", self.originator.trim().is_empty()),
+                ("CREATION_DATE", self.creation_date.is_empty()),
+            ],
+        ))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct AdmHeader {
     /// User-defined comments. (See 7.8 for formatting rules.)
     ///
@@ -96,7 +107,7 @@ pub struct AdmHeader {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
-    pub creation_date: Epoch,
+    pub creation_date: CalendarEpoch,
     /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
     /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
     /// Abbreviation column is not populated. If desired organization is not listed there, follow
@@ -156,11 +167,21 @@ impl crate::traits::Validate for AdmHeader {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "ADM Header",
+            [
+                ("ORIGINATOR", self.originator.trim().is_empty()),
+                ("CREATION_DATE", self.creation_date.is_empty()),
+            ],
+        ))
+    }
 }
 
 /// Represents the `odmHeader` complex type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OdmHeader {
     /// Comments (allowed in the ODM Header only immediately after the ODM version number).
     /// (See 7.8 for formatting rules.)
@@ -188,7 +209,7 @@ pub struct OdmHeader {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.2.
-    pub creation_date: Epoch,
+    pub creation_date: CalendarEpoch,
     /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
     /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
     /// Abbreviation column is not populated. If desired organization is not listed there, follow
@@ -248,6 +269,16 @@ impl crate::traits::Validate for OdmHeader {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::missing_required_fields(
+            "ODM Header",
+            [
+                ("ORIGINATOR", self.originator.trim().is_empty()),
+                ("CREATION_DATE", self.creation_date.is_empty()),
+            ],
+        ))
+    }
 }
 
 /// Spacecraft Parameters (if maneuver is specified, then mass must be provided).
@@ -255,7 +286,7 @@ impl crate::traits::Validate for OdmHeader {
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct SpacecraftParameters {
     /// Comments (see 7.8 for formatting rules).
     ///
@@ -330,6 +361,58 @@ pub struct SpacecraftParameters {
     pub drag_coeff: Option<NonNegativeDouble>,
 }
 
+impl crate::traits::Validate for SpacecraftParameters {
+    fn validate(&self) -> Result<()> {
+        match self.validation_errors()?.into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        for (field, value) in [
+            ("MASS", self.mass.as_ref().map(|value| value.value)),
+            (
+                "SOLAR_RAD_AREA",
+                self.solar_rad_area.as_ref().map(|value| value.value),
+            ),
+            (
+                "SOLAR_RAD_COEFF",
+                self.solar_rad_coeff.as_ref().map(|value| value.value),
+            ),
+            (
+                "DRAG_AREA",
+                self.drag_area.as_ref().map(|value| value.value),
+            ),
+            (
+                "DRAG_COEFF",
+                self.drag_coeff.as_ref().map(|value| value.value),
+            ),
+        ] {
+            let Some(value) = value else {
+                continue;
+            };
+            if !value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            } else if value < 0.0 {
+                errors.push(ValidationError::OutOfRange {
+                    name: field.into(),
+                    value: value.to_string(),
+                    expected: ">= 0".into(),
+                    line: None,
+                });
+            }
+        }
+        Ok(errors)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdParameters {
@@ -350,7 +433,7 @@ pub struct OdParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub time_lastob_start: Option<Epoch>,
+    pub time_lastob_start: Option<CalendarEpoch>,
 
     /// The end of a time interval (UTC) that contains the time of the last accepted
     /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
@@ -362,7 +445,7 @@ pub struct OdParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub time_lastob_end: Option<Epoch>,
+    pub time_lastob_end: Option<CalendarEpoch>,
 
     /// The recommended OD time span calculated for the object.
     ///
@@ -458,7 +541,7 @@ pub struct OdParameters {
 
 /// State Vector Components in the Specified Coordinate System.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct StateVectorAcc {
     /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
     ///
@@ -546,49 +629,125 @@ pub struct StateVectorAcc {
 
 impl ToKvn for StateVectorAcc {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut buffer = zmij::Buffer::new();
-        let mut line_buf = [0u8; 256];
-        let mut cursor = 0;
+        writer.write_built_line(|line| {
+            line.push_str(self.epoch.as_str());
+            for value in [
+                self.x.value,
+                self.y.value,
+                self.z.value,
+                self.x_dot.value,
+                self.y_dot.value,
+                self.z_dot.value,
+            ] {
+                line.push(' ');
+                let _ = write!(line, "{}", OdmFloat::new(value));
+            }
+            for acceleration in [&self.x_ddot, &self.y_ddot, &self.z_ddot]
+                .into_iter()
+                .flatten()
+            {
+                line.push(' ');
+                let _ = write!(line, "{}", OdmFloat::new(acceleration.value));
+            }
+        });
+    }
+}
 
-        macro_rules! append {
-            ($s:expr) => {
-                let bytes = $s.as_bytes();
-                line_buf[cursor..cursor + bytes.len()].copy_from_slice(bytes);
-                cursor += bytes.len();
+impl crate::traits::Validate for StateVectorAcc {
+    fn validate(&self) -> Result<()> {
+        if !self.epoch.is_contextually_valid() {
+            return Err(ValidationError::InvalidValue {
+                field: "EPOCH".into(),
+                value: self.epoch.to_string(),
+                expected: "a valid calendar, ordinal, or non-degenerate numeric epoch".into(),
+                line: None,
+            }
+            .into());
+        }
+        for (field, value) in [
+            ("X", self.x.value),
+            ("Y", self.y.value),
+            ("Z", self.z.value),
+            ("X_DOT", self.x_dot.value),
+            ("Y_DOT", self.y_dot.value),
+            ("Z_DOT", self.z_dot.value),
+        ] {
+            if !value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        for (field, acceleration) in [
+            ("X_DDOT", &self.x_ddot),
+            ("Y_DDOT", &self.y_ddot),
+            ("Z_DDOT", &self.z_ddot),
+        ] {
+            let Some(acceleration) = acceleration else {
+                continue;
             };
+            if !acceleration.value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: acceleration.value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                }
+                .into());
+            }
         }
+        Ok(())
+    }
 
-        append!(self.epoch.as_str());
-        append!(" ");
-        append!(buffer.format_finite(self.x.value));
-        append!(" ");
-        append!(buffer.format_finite(self.y.value));
-        append!(" ");
-        append!(buffer.format_finite(self.z.value));
-        append!(" ");
-        append!(buffer.format_finite(self.x_dot.value));
-        append!(" ");
-        append!(buffer.format_finite(self.y_dot.value));
-        append!(" ");
-        append!(buffer.format_finite(self.z_dot.value));
-
-        if let Some(acc) = &self.x_ddot {
-            append!(" ");
-            append!(buffer.format_finite(acc.value));
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        if !self.epoch.is_contextually_valid() {
+            errors.push(ValidationError::InvalidValue {
+                field: "EPOCH".into(),
+                value: self.epoch.to_string(),
+                expected: "a valid calendar, ordinal, or non-degenerate numeric epoch".into(),
+                line: None,
+            });
         }
-        if let Some(acc) = &self.y_ddot {
-            append!(" ");
-            append!(buffer.format_finite(acc.value));
+        for (field, value) in [
+            ("X", self.x.value),
+            ("Y", self.y.value),
+            ("Z", self.z.value),
+            ("X_DOT", self.x_dot.value),
+            ("Y_DOT", self.y_dot.value),
+            ("Z_DOT", self.z_dot.value),
+        ] {
+            if !value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            }
         }
-        if let Some(acc) = &self.z_ddot {
-            append!(" ");
-            append!(buffer.format_finite(acc.value));
+        for (field, acceleration) in [
+            ("X_DDOT", &self.x_ddot),
+            ("Y_DDOT", &self.y_ddot),
+            ("Z_DDOT", &self.z_ddot),
+        ] {
+            let Some(acceleration) = acceleration else {
+                continue;
+            };
+            if !acceleration.value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: acceleration.value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            }
         }
-
-        // We only append valid UTF-8 fragments (epoch, float digits, spaces)
-        let line = std::str::from_utf8(&line_buf[..cursor])
-            .expect("Formatted KVN line must be valid UTF-8");
-        writer.write_line(line);
+        Ok(errors)
     }
 }
 
@@ -631,6 +790,10 @@ impl crate::traits::Validate for Quaternion {
         }
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        crate::validation::validation_errors_from(self.validate())
+    }
 }
 
 // Quaternion derivative (dot components with units 1/s)
@@ -654,7 +817,7 @@ pub struct AngularVelocity {
 
 /// State Vector Components in the Specified Coordinate System.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct StateVector {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
@@ -665,7 +828,7 @@ pub struct StateVector {
     /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Position vector X-component.
     ///
     /// **Units**: km
@@ -727,7 +890,50 @@ impl crate::traits::Validate for StateVector {
             }
             .into());
         }
+        for (field, value) in [
+            ("X", self.x.value),
+            ("Y", self.y.value),
+            ("Z", self.z.value),
+            ("X_DOT", self.x_dot.value),
+            ("Y_DOT", self.y_dot.value),
+            ("Z_DOT", self.z_dot.value),
+        ] {
+            if !value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
         Ok(())
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "State Vector",
+            [("EPOCH", self.epoch.is_empty())],
+        );
+        for (field, value) in [
+            ("X", self.x.value),
+            ("Y", self.y.value),
+            ("Z", self.z.value),
+            ("X_DOT", self.x_dot.value),
+            ("Y_DOT", self.y_dot.value),
+            ("Z_DOT", self.z_dot.value),
+        ] {
+            if !value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            }
+        }
+        Ok(errors)
     }
 }
 
@@ -1090,6 +1296,50 @@ impl crate::traits::Validate for SpinState {
 
         Ok(())
     }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = crate::validation::missing_required_fields(
+            "Spin",
+            [
+                ("REF_FRAME_A", self.ref_frame_a.trim().is_empty()),
+                ("REF_FRAME_B", self.ref_frame_b.trim().is_empty()),
+            ],
+        );
+        let nutation_present =
+            self.nutation.is_some() || self.nutation_per.is_some() || self.nutation_phase.is_some();
+        let momentum_present = self.momentum_alpha.is_some()
+            || self.momentum_delta.is_some()
+            || self.nutation_vel.is_some();
+        if nutation_present && momentum_present {
+            errors.push(ValidationError::Conflict {
+                fields: vec!["NUTATION".into(), "MOMENTUM_ALPHA".into()],
+                line: None,
+            });
+        }
+        if nutation_present
+            && (self.nutation.is_none()
+                || self.nutation_per.is_none()
+                || self.nutation_phase.is_none())
+        {
+            errors.push(ValidationError::MissingRequiredField {
+                block: "Spin".into(),
+                field: "NUTATION/NUTATION_PER/NUTATION_PHASE".into(),
+                line: None,
+            });
+        }
+        if momentum_present
+            && (self.momentum_alpha.is_none()
+                || self.momentum_delta.is_none()
+                || self.nutation_vel.is_none())
+        {
+            errors.push(ValidationError::MissingRequiredField {
+                block: "Spin".into(),
+                field: "MOMENTUM_ALPHA/MOMENTUM_DELTA/NUTATION_VEL".into(),
+                line: None,
+            });
+        }
+        Ok(errors)
+    }
 }
 
 /// Inertia block.
@@ -1165,7 +1415,7 @@ pub struct AttManeuverState {
     /// Epoch of start of maneuver. (For format specification, see 6.8.9.)
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.4.
-    pub man_epoch_start: Epoch,
+    pub man_epoch_start: CalendarEpoch,
     /// Maneuver duration.
     ///
     /// **Units**: s
@@ -1285,7 +1535,7 @@ impl ToKvn for AemAttitudeState {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionEphemeris {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Quaternion components Q1, Q2, Q3, QC.
     #[serde(rename = "quaternion")]
     pub quaternion: Quaternion,
@@ -1293,12 +1543,15 @@ pub struct QuaternionEphemeris {
 
 impl ToKvn for QuaternionEphemeris {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {}",
-            self.quaternion.q1, self.quaternion.q2, self.quaternion.q3, self.quaternion.qc
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.quaternion.q1,
+                self.quaternion.q2,
+                self.quaternion.q3,
+                self.quaternion.qc,
+            ],
+        );
     }
 }
 
@@ -1307,7 +1560,7 @@ impl ToKvn for QuaternionEphemeris {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionDerivative {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Quaternion components Q1, Q2, Q3, QC.
     #[serde(rename = "quaternion")]
     pub quaternion: Quaternion,
@@ -1318,19 +1571,19 @@ pub struct QuaternionDerivative {
 
 impl ToKvn for QuaternionDerivative {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {}",
-            self.quaternion.q1, self.quaternion.q2, self.quaternion.q3, self.quaternion.qc
-        ));
-        line.push_str(&format!(
-            " {} {} {} {}",
-            self.quaternion_dot.q1_dot.value,
-            self.quaternion_dot.q2_dot.value,
-            self.quaternion_dot.q3_dot.value,
-            self.quaternion_dot.qc_dot.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.quaternion.q1,
+                self.quaternion.q2,
+                self.quaternion.q3,
+                self.quaternion.qc,
+                self.quaternion_dot.q1_dot.value,
+                self.quaternion_dot.q2_dot.value,
+                self.quaternion_dot.q3_dot.value,
+                self.quaternion_dot.qc_dot.value,
+            ],
+        );
     }
 }
 
@@ -1340,7 +1593,7 @@ impl ToKvn for QuaternionDerivative {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionAngVel {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Quaternion components Q1, Q2, Q3, QC.
     #[serde(rename = "quaternion")]
     pub quaternion: Quaternion,
@@ -1351,16 +1604,18 @@ pub struct QuaternionAngVel {
 
 impl ToKvn for QuaternionAngVel {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {}",
-            self.quaternion.q1, self.quaternion.q2, self.quaternion.q3, self.quaternion.qc
-        ));
-        line.push_str(&format!(
-            " {} {} {}",
-            self.ang_vel.angvel_x.value, self.ang_vel.angvel_y.value, self.ang_vel.angvel_z.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.quaternion.q1,
+                self.quaternion.q2,
+                self.quaternion.q3,
+                self.quaternion.qc,
+                self.ang_vel.angvel_x.value,
+                self.ang_vel.angvel_y.value,
+                self.ang_vel.angvel_z.value,
+            ],
+        );
     }
 }
 
@@ -1369,7 +1624,7 @@ impl ToKvn for QuaternionAngVel {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngle {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Angle of the first rotation.
     pub angle_1: Angle,
     /// Angle of the second rotation.
@@ -1380,12 +1635,10 @@ pub struct EulerAngle {
 
 impl ToKvn for EulerAngle {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {}",
-            self.angle_1.value, self.angle_2.value, self.angle_3.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[self.angle_1.value, self.angle_2.value, self.angle_3.value],
+        );
     }
 }
 
@@ -1394,7 +1647,7 @@ impl ToKvn for EulerAngle {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleDerivative {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Angle of the first rotation.
     pub angle_1: Angle,
     /// Angle of the second rotation.
@@ -1411,16 +1664,17 @@ pub struct EulerAngleDerivative {
 
 impl ToKvn for EulerAngleDerivative {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {}",
-            self.angle_1.value, self.angle_2.value, self.angle_3.value
-        ));
-        line.push_str(&format!(
-            " {} {} {}",
-            self.angle_1_dot.value, self.angle_2_dot.value, self.angle_3_dot.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.angle_1.value,
+                self.angle_2.value,
+                self.angle_3.value,
+                self.angle_1_dot.value,
+                self.angle_2_dot.value,
+                self.angle_3_dot.value,
+            ],
+        );
     }
 }
 
@@ -1429,7 +1683,7 @@ impl ToKvn for EulerAngleDerivative {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct EulerAngleAngVel {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Angle of the first rotation.
     pub angle_1: Angle,
     /// Angle of the second rotation.
@@ -1449,16 +1703,17 @@ pub struct EulerAngleAngVel {
 
 impl ToKvn for EulerAngleAngVel {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {}",
-            self.angle_1.value, self.angle_2.value, self.angle_3.value
-        ));
-        line.push_str(&format!(
-            " {} {} {}",
-            self.angvel_x.value, self.angvel_y.value, self.angvel_z.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.angle_1.value,
+                self.angle_2.value,
+                self.angle_3.value,
+                self.angvel_x.value,
+                self.angvel_y.value,
+                self.angvel_z.value,
+            ],
+        );
     }
 }
 
@@ -1467,7 +1722,7 @@ impl ToKvn for EulerAngleAngVel {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct Spin {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Right ascension of spin axis vector in frame A.
     pub spin_alpha: Angle,
     /// Declination of the spin axis vector in frame A.
@@ -1480,15 +1735,15 @@ pub struct Spin {
 
 impl ToKvn for Spin {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {}",
-            self.spin_alpha.value,
-            self.spin_delta.value,
-            self.spin_angle.value,
-            self.spin_angle_vel.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.spin_alpha.value,
+                self.spin_delta.value,
+                self.spin_angle.value,
+                self.spin_angle_vel.value,
+            ],
+        );
     }
 }
 
@@ -1497,7 +1752,7 @@ impl ToKvn for Spin {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinNutation {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Right ascension of spin axis vector in frame A.
     pub spin_alpha: Angle,
     /// Declination of the spin axis vector in frame A.
@@ -1516,18 +1771,18 @@ pub struct SpinNutation {
 
 impl ToKvn for SpinNutation {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {} {} {} {}",
-            self.spin_alpha.value,
-            self.spin_delta.value,
-            self.spin_angle.value,
-            self.spin_angle_vel.value,
-            self.nutation.value,
-            self.nutation_per.value,
-            self.nutation_phase.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.spin_alpha.value,
+                self.spin_delta.value,
+                self.spin_angle.value,
+                self.spin_angle_vel.value,
+                self.nutation.value,
+                self.nutation_per.value,
+                self.nutation_phase.value,
+            ],
+        );
     }
 }
 
@@ -1536,7 +1791,7 @@ impl ToKvn for SpinNutation {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct SpinNutationMom {
     /// Epoch of the attitude state.
-    pub epoch: Epoch,
+    pub epoch: CalendarEpoch,
     /// Right ascension of spin axis vector in frame A.
     pub spin_alpha: Angle,
     /// Declination of the spin axis vector in frame A.
@@ -1555,18 +1810,18 @@ pub struct SpinNutationMom {
 
 impl ToKvn for SpinNutationMom {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        let mut line = self.epoch.to_string();
-        line.push_str(&format!(
-            " {} {} {} {} {} {} {}",
-            self.spin_alpha.value,
-            self.spin_delta.value,
-            self.spin_angle.value,
-            self.spin_angle_vel.value,
-            self.momentum_alpha.value,
-            self.momentum_delta.value,
-            self.nutation_vel.value
-        ));
-        writer.write_line(&line);
+        writer.write_aem_attitude_state(
+            &self.epoch,
+            &[
+                self.spin_alpha.value,
+                self.spin_delta.value,
+                self.spin_angle.value,
+                self.spin_angle_vel.value,
+                self.momentum_alpha.value,
+                self.momentum_delta.value,
+                self.nutation_vel.value,
+            ],
+        );
     }
 }
 
@@ -1773,7 +2028,7 @@ impl ToKvn for InertiaState {
 /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. None or all parameters of the
 /// matrix must be given. COV_REF_FRAME may be omitted if it is the same as REF_FRAME.)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OpmCovarianceMatrix {
     /// Comments (see 7.8 for formatting rules).
     ///
@@ -1923,6 +2178,52 @@ pub struct OpmCovarianceMatrix {
     pub cz_dot_z_dot: VelocityCovariance,
 }
 
+impl crate::traits::Validate for OpmCovarianceMatrix {
+    fn validate(&self) -> Result<()> {
+        match self.validation_errors()?.into_iter().next() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
+    }
+
+    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        for (field, value) in [
+            ("CX_X", self.cx_x.value),
+            ("CY_X", self.cy_x.value),
+            ("CY_Y", self.cy_y.value),
+            ("CZ_X", self.cz_x.value),
+            ("CZ_Y", self.cz_y.value),
+            ("CZ_Z", self.cz_z.value),
+            ("CX_DOT_X", self.cx_dot_x.value),
+            ("CX_DOT_Y", self.cx_dot_y.value),
+            ("CX_DOT_Z", self.cx_dot_z.value),
+            ("CX_DOT_X_DOT", self.cx_dot_x_dot.value),
+            ("CY_DOT_X", self.cy_dot_x.value),
+            ("CY_DOT_Y", self.cy_dot_y.value),
+            ("CY_DOT_Z", self.cy_dot_z.value),
+            ("CY_DOT_X_DOT", self.cy_dot_x_dot.value),
+            ("CY_DOT_Y_DOT", self.cy_dot_y_dot.value),
+            ("CZ_DOT_X", self.cz_dot_x.value),
+            ("CZ_DOT_Y", self.cz_dot_y.value),
+            ("CZ_DOT_Z", self.cz_dot_z.value),
+            ("CZ_DOT_X_DOT", self.cz_dot_x_dot.value),
+            ("CZ_DOT_Y_DOT", self.cz_dot_y_dot.value),
+            ("CZ_DOT_Z_DOT", self.cz_dot_z_dot.value),
+        ] {
+            if !value.is_finite() {
+                errors.push(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                });
+            }
+        }
+        Ok(errors)
+    }
+}
+
 impl ToKvn for OpmCovarianceMatrix {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -1930,30 +2231,30 @@ impl ToKvn for OpmCovarianceMatrix {
             writer.write_pair("COV_REF_FRAME", frame);
         }
 
-        writer.write_pair("CX_X", &self.cx_x);
-        writer.write_pair("CY_X", &self.cy_x);
-        writer.write_pair("CY_Y", &self.cy_y);
-        writer.write_pair("CZ_X", &self.cz_x);
-        writer.write_pair("CZ_Y", &self.cz_y);
-        writer.write_pair("CZ_Z", &self.cz_z);
+        writer.write_measure("CX_X", &self.cx_x);
+        writer.write_measure("CY_X", &self.cy_x);
+        writer.write_measure("CY_Y", &self.cy_y);
+        writer.write_measure("CZ_X", &self.cz_x);
+        writer.write_measure("CZ_Y", &self.cz_y);
+        writer.write_measure("CZ_Z", &self.cz_z);
 
-        writer.write_pair("CX_DOT_X", &self.cx_dot_x);
-        writer.write_pair("CX_DOT_Y", &self.cx_dot_y);
-        writer.write_pair("CX_DOT_Z", &self.cx_dot_z);
-        writer.write_pair("CX_DOT_X_DOT", &self.cx_dot_x_dot);
+        writer.write_measure("CX_DOT_X", &self.cx_dot_x);
+        writer.write_measure("CX_DOT_Y", &self.cx_dot_y);
+        writer.write_measure("CX_DOT_Z", &self.cx_dot_z);
+        writer.write_measure("CX_DOT_X_DOT", &self.cx_dot_x_dot);
 
-        writer.write_pair("CY_DOT_X", &self.cy_dot_x);
-        writer.write_pair("CY_DOT_Y", &self.cy_dot_y);
-        writer.write_pair("CY_DOT_Z", &self.cy_dot_z);
-        writer.write_pair("CY_DOT_X_DOT", &self.cy_dot_x_dot);
-        writer.write_pair("CY_DOT_Y_DOT", &self.cy_dot_y_dot);
+        writer.write_measure("CY_DOT_X", &self.cy_dot_x);
+        writer.write_measure("CY_DOT_Y", &self.cy_dot_y);
+        writer.write_measure("CY_DOT_Z", &self.cy_dot_z);
+        writer.write_measure("CY_DOT_X_DOT", &self.cy_dot_x_dot);
+        writer.write_measure("CY_DOT_Y_DOT", &self.cy_dot_y_dot);
 
-        writer.write_pair("CZ_DOT_X", &self.cz_dot_x);
-        writer.write_pair("CZ_DOT_Y", &self.cz_dot_y);
-        writer.write_pair("CZ_DOT_Z", &self.cz_dot_z);
-        writer.write_pair("CZ_DOT_X_DOT", &self.cz_dot_x_dot);
-        writer.write_pair("CZ_DOT_Y_DOT", &self.cz_dot_y_dot);
-        writer.write_pair("CZ_DOT_Z_DOT", &self.cz_dot_z_dot);
+        writer.write_measure("CZ_DOT_X", &self.cz_dot_x);
+        writer.write_measure("CZ_DOT_Y", &self.cz_dot_y);
+        writer.write_measure("CZ_DOT_Z", &self.cz_dot_z);
+        writer.write_measure("CZ_DOT_X_DOT", &self.cz_dot_x_dot);
+        writer.write_measure("CZ_DOT_Y_DOT", &self.cz_dot_y_dot);
+        writer.write_measure("CZ_DOT_Z_DOT", &self.cz_dot_z_dot);
     }
 }
 
@@ -2021,7 +2322,7 @@ pub struct AtmosphericReentryParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub nominal_reentry_epoch: Option<Epoch>,
+    pub nominal_reentry_epoch: Option<CalendarEpoch>,
     /// Start epoch of the predicted atmospheric re-entry window (formatting rules specified in
     /// 5.3.3.5).
     ///
@@ -2031,7 +2332,7 @@ pub struct AtmosphericReentryParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub reentry_window_start: Option<Epoch>,
+    pub reentry_window_start: Option<CalendarEpoch>,
     /// End epoch of the predicted atmospheric re-entry window (formatting rules specified in
     /// 5.3.3.5).
     ///
@@ -2041,7 +2342,7 @@ pub struct AtmosphericReentryParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub reentry_window_end: Option<Epoch>,
+    pub reentry_window_end: Option<CalendarEpoch>,
     /// Confidence level of the orbit lifetime or re-entry epoch being inside the window
     /// defined by ORBIT_LIFETIME_WINDOW_START and ORBIT_LIFETIME_WINDOW_END or
     /// REENTRY_WINDOW_START and REENTRY_WINDOW_END.
@@ -2059,13 +2360,14 @@ pub struct AtmosphericReentryParameters {
 
 impl ToKvn for AtmosphericReentryParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_pair("ORBIT_LIFETIME", &self.orbit_lifetime);
-        writer.write_pair("REENTRY_ALTITUDE", &self.reentry_altitude);
+        writer.write_comments(&self.comment);
+        writer.write_measure("ORBIT_LIFETIME", &self.orbit_lifetime.to_unit_value());
+        writer.write_measure("REENTRY_ALTITUDE", &self.reentry_altitude.to_unit_value());
         if let Some(v) = &self.orbit_lifetime_window_start {
-            writer.write_pair("ORBIT_LIFETIME_WINDOW_START", v);
+            writer.write_measure("ORBIT_LIFETIME_WINDOW_START", &v.to_unit_value());
         }
         if let Some(v) = &self.orbit_lifetime_window_end {
-            writer.write_pair("ORBIT_LIFETIME_WINDOW_END", v);
+            writer.write_measure("ORBIT_LIFETIME_WINDOW_END", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_reentry_epoch {
             writer.write_pair("NOMINAL_REENTRY_EPOCH", v);
@@ -2077,7 +2379,7 @@ impl ToKvn for AtmosphericReentryParameters {
             writer.write_pair("REENTRY_WINDOW_END", v);
         }
         if let Some(v) = &self.orbit_lifetime_confidence_level {
-            writer.write_pair("ORBIT_LIFETIME_CONFIDENCE_LEVEL", v);
+            writer.write_measure("ORBIT_LIFETIME_CONFIDENCE_LEVEL", &v.to_unit_value());
         }
     }
 }
@@ -2146,7 +2448,7 @@ pub struct GroundImpactParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub nominal_impact_epoch: Option<Epoch>,
+    pub nominal_impact_epoch: Option<CalendarEpoch>,
     /// Start epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
@@ -2155,7 +2457,7 @@ pub struct GroundImpactParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub impact_window_start: Option<Epoch>,
+    pub impact_window_start: Option<CalendarEpoch>,
     /// End epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
@@ -2164,7 +2466,7 @@ pub struct GroundImpactParameters {
         skip_serializing_if = "Option::is_none",
         with = "crate::utils::nullable"
     )]
-    pub impact_window_end: Option<Epoch>,
+    pub impact_window_end: Option<CalendarEpoch>,
     /// Reference frame of the impact location data. The value should be taken from the keyword
     /// value name column in the SANA celestial body reference frames registry, reference `[11]`.
     /// Only frames with the value ‘Body-Fixed’ in the Frame Type column shall be used.
@@ -2471,70 +2773,70 @@ impl ToKvn for GroundImpactParameters {
             writer.write_pair("IMPACT_REF_FRAME", v);
         }
         if let Some(v) = &self.nominal_impact_lon {
-            writer.write_pair("NOMINAL_IMPACT_LON", v);
+            writer.write_measure("NOMINAL_IMPACT_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_impact_lat {
-            writer.write_pair("NOMINAL_IMPACT_LAT", v);
+            writer.write_measure("NOMINAL_IMPACT_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_impact_alt {
-            writer.write_pair("NOMINAL_IMPACT_ALT", v);
+            writer.write_measure("NOMINAL_IMPACT_ALT", &v.to_unit_value());
         }
 
         if let Some(v) = &self.impact_1_confidence {
-            writer.write_pair("IMPACT_1_CONFIDENCE", v);
+            writer.write_measure("IMPACT_1_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_start_lon {
-            writer.write_pair("IMPACT_1_START_LON", v);
+            writer.write_measure("IMPACT_1_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_start_lat {
-            writer.write_pair("IMPACT_1_START_LAT", v);
+            writer.write_measure("IMPACT_1_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_stop_lon {
-            writer.write_pair("IMPACT_1_STOP_LON", v);
+            writer.write_measure("IMPACT_1_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_stop_lat {
-            writer.write_pair("IMPACT_1_STOP_LAT", v);
+            writer.write_measure("IMPACT_1_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_cross_track {
-            writer.write_pair("IMPACT_1_CROSS_TRACK", v);
+            writer.write_measure("IMPACT_1_CROSS_TRACK", v);
         }
 
         if let Some(v) = &self.impact_2_confidence {
-            writer.write_pair("IMPACT_2_CONFIDENCE", v);
+            writer.write_measure("IMPACT_2_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_start_lon {
-            writer.write_pair("IMPACT_2_START_LON", v);
+            writer.write_measure("IMPACT_2_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_start_lat {
-            writer.write_pair("IMPACT_2_START_LAT", v);
+            writer.write_measure("IMPACT_2_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_stop_lon {
-            writer.write_pair("IMPACT_2_STOP_LON", v);
+            writer.write_measure("IMPACT_2_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_stop_lat {
-            writer.write_pair("IMPACT_2_STOP_LAT", v);
+            writer.write_measure("IMPACT_2_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_cross_track {
-            writer.write_pair("IMPACT_2_CROSS_TRACK", v);
+            writer.write_measure("IMPACT_2_CROSS_TRACK", v);
         }
 
         if let Some(v) = &self.impact_3_confidence {
-            writer.write_pair("IMPACT_3_CONFIDENCE", v);
+            writer.write_measure("IMPACT_3_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_start_lon {
-            writer.write_pair("IMPACT_3_START_LON", v);
+            writer.write_measure("IMPACT_3_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_start_lat {
-            writer.write_pair("IMPACT_3_START_LAT", v);
+            writer.write_measure("IMPACT_3_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_stop_lon {
-            writer.write_pair("IMPACT_3_STOP_LON", v);
+            writer.write_measure("IMPACT_3_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_stop_lat {
-            writer.write_pair("IMPACT_3_STOP_LAT", v);
+            writer.write_measure("IMPACT_3_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_cross_track {
-            writer.write_pair("IMPACT_3_CROSS_TRACK", v);
+            writer.write_measure("IMPACT_3_CROSS_TRACK", v);
         }
     }
 }
@@ -2905,7 +3207,7 @@ mod tests {
         };
         let mut w = KvnWriter::new();
         qe.write_kvn(&mut w);
-        assert!(w.finish().contains("2000-01-01T00:00:00 1 0 0 0"));
+        assert!(w.finish().contains("2000-01-01T00:00:00 1.0 0.0 0.0 0.0"));
 
         let qd = QuaternionDerivative {
             epoch,
@@ -2926,7 +3228,7 @@ mod tests {
         qd.write_kvn(&mut w);
         assert!(w
             .finish()
-            .contains("2000-01-01T00:00:00 1 0 0 0 0.1 0.2 0.3 0.4"));
+            .contains("2000-01-01T00:00:00 1.0 0.0 0.0 0.0 0.1 0.2 0.3 0.4"));
     }
 
     #[test]
@@ -2986,17 +3288,7 @@ mod tests {
             .build();
         assert!(h.validate().is_err());
 
-        let h = AdmHeader::builder()
-            .creation_date(Epoch::new("").unwrap())
-            .originator("ESA")
-            .build();
-        assert!(h.validate().is_err());
-
-        let h = OdmHeader::builder()
-            .creation_date(Epoch::new("").unwrap())
-            .originator("JAXA")
-            .build();
-        assert!(h.validate().is_err());
+        assert!(CalendarEpoch::new("").is_err());
     }
 
     #[test]
@@ -3020,7 +3312,7 @@ mod tests {
         };
         let mut w = KvnWriter::new();
         AemAttitudeState::QuaternionAngVel(qav).write_kvn(&mut w);
-        assert!(w.finish().contains("1 0 0 0"));
+        assert!(w.finish().contains("1.0 0.0 0.0 0.0"));
 
         // EulerAngleDerivative
         let ead = EulerAngleDerivative {
@@ -3034,7 +3326,7 @@ mod tests {
         };
         let mut w = KvnWriter::new();
         AemAttitudeState::EulerAngleDerivative(ead).write_kvn(&mut w);
-        assert!(w.finish().contains("10 20 30"));
+        assert!(w.finish().contains("10.0 20.0 30.0"));
 
         // SpinNutation
         let sn = SpinNutation {
@@ -3050,7 +3342,7 @@ mod tests {
         let mut w = KvnWriter::new();
         AemAttitudeState::SpinNutation(sn).write_kvn(&mut w);
         let kvn = w.finish();
-        assert!(kvn.contains("10 20 30 0.1 5 1 0"));
+        assert!(kvn.contains("10.0 20.0 30.0 0.1 5.0 1.0 0.0"));
 
         // SpinNutationMom
         let snm = SpinNutationMom {

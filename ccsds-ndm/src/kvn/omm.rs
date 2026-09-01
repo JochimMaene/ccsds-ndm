@@ -44,7 +44,7 @@ pub fn omm_metadata(input: &mut &str) -> KvnResult<OmmMetadata> {
         "OBJECT_ID" => object_id: kv_string,
         "CENTER_NAME" => center_name: kv_string,
         "REF_FRAME" => ref_frame: kv_string,
-        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_epoch,
+        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_calendar_epoch,
         "TIME_SYSTEM" => time_system: kv_string,
         "MEAN_ELEMENT_THEORY" => mean_element_theory: kv_string,
     }, |_| false);
@@ -85,7 +85,7 @@ pub fn mean_elements(input: &mut &str) -> KvnResult<(Vec<String>, MeanElements)>
     let mut gm = None;
 
     parse_block!(input, comment, {
-        "EPOCH" => epoch: kv_epoch,
+        "EPOCH" => epoch: kv_calendar_epoch,
         "SEMI_MAJOR_AXIS" => semi_major_axis: kv_from_kvn,
         "MEAN_MOTION" => mean_motion: kv_from_kvn,
         "ECCENTRICITY" => eccentricity: kv_from_kvn,
@@ -259,9 +259,9 @@ INCLINATION = 3.053900 [deg]
 RA_OF_ASC_NODE = 81.793900 [deg]
 ARG_OF_PERICENTER = 249.236300 [deg]
 MEAN_ANOMALY = 150.160200 [deg]
+BSTAR = 0.0001 [1/ER]
 MEAN_MOTION_DOT = 0.000001 [rev/day**2]
 MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-BSTAR = 0.0001 [1/ER]
 "#;
 
     #[test]
@@ -309,9 +309,9 @@ CLASSIFICATION_TYPE = U
 NORAD_CAT_ID = 23581
 ELEMENT_SET_NO = 999
 REV_AT_EPOCH = 1234
+BSTAR = 0.0001 [1/ER]
 MEAN_MOTION_DOT = 0.000001 [rev/day**2]
 MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-BSTAR = 0.0001 [1/ER]
 COV_REF_FRAME = TEME
 CX_X = 1.0
 CY_X = 0.1
@@ -348,6 +348,35 @@ USER_DEFINED_FOO = BAR
         assert!(omm.body.segment.data.tle_parameters.is_some());
         assert!(omm.body.segment.data.covariance_matrix.is_some());
         assert!(omm.body.segment.data.user_defined_parameters.is_some());
+    }
+
+    #[test]
+    fn frame_reference_epoch_requires_calendar_form() {
+        let valid = MINIMAL_OMM.replace(
+            "REF_FRAME = TEME\n",
+            "REF_FRAME = TEME\nREF_FRAME_EPOCH = 2000-01-01T12:00:00\n",
+        );
+        let omm = Omm::from_kvn_str(&valid).expect("calendar frame epoch should parse");
+        assert_eq!(
+            omm.body
+                .segment
+                .metadata
+                .ref_frame_epoch
+                .as_ref()
+                .unwrap()
+                .as_str(),
+            "2000-01-01T12:00:00"
+        );
+
+        let numeric = valid.replace(
+            "REF_FRAME_EPOCH = 2000-01-01T12:00:00",
+            "REF_FRAME_EPOCH = 123.5",
+        );
+        assert!(Omm::from_kvn_str(&numeric).is_err());
+
+        let numeric_mean_epoch =
+            valid.replace("EPOCH = 2000-06-28T11:59:28.000000", "EPOCH = 123.5");
+        assert!(Omm::from_kvn_str(&numeric_mean_epoch).is_err());
     }
 
     #[test]
@@ -569,7 +598,6 @@ INCLINATION = 98.0 [deg]
 RA_OF_ASC_NODE = 10.0 [deg]
 ARG_OF_PERICENTER = 20.0 [deg]
 MEAN_ANOMALY = 30.0 [deg]
-COMMENT No TLE Parameters at all!
 "#;
         let res = Omm::from_kvn(kvn_sgp4_missing_bstar);
         assert!(res.is_err());

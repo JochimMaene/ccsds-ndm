@@ -24,7 +24,6 @@ use crate::error::{
 };
 use crate::traits::{CcsdsNullable, FromKvnFloat, FromKvnValue};
 use crate::types::{UserDefined, UserDefinedParameter, *};
-use fast_float;
 use std::str::FromStr;
 use winnow::ascii::{line_ending, space0, till_line_ending};
 use winnow::combinator::{alt, delimited, opt, peek, preceded, repeat, terminated};
@@ -233,33 +232,13 @@ pub fn kvn_value<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>
 // Line-level Parsers
 //----------------------------------------------------------------------
 
-/// A parsed KVN line.
-#[derive(Debug, Clone, PartialEq)]
-pub enum KvnToken<'a> {
-    /// A key-value pair with optional unit.
-    KeyValue {
-        key: &'a str,
-        value: &'a str,
-        unit: Option<&'a str>,
-    },
-    /// A comment line.
-    Comment(&'a str),
-    /// A block start marker (e.g., "META" from "META_START").
-    BlockStart(&'a str),
-    /// A block end marker (e.g., "META" from "META_STOP").
-    BlockEnd(&'a str),
-    /// A raw data line (space-separated values).
-    Raw(&'a str),
-    /// An empty line.
-    Empty,
-}
-
 /// Parses a COMMENT line.
 pub fn comment_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     preceded((ws, "COMMENT", space0), till_line_ending).parse_next(input)
 }
 
 /// Parses a key-value pair line.
+#[cfg(test)]
 pub fn key_value_line<'a>(input: &mut &'a str) -> KvnResult<(&'a str, &'a str, Option<&'a str>)> {
     (preceded(ws, keyword), kv_sep, kvn_value)
         .map(|(key, _, (value, unit))| (key, value, unit))
@@ -296,16 +275,6 @@ pub fn block_end<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     Err(ErrMode::Backtrack(InternalParserError::from_input(input)))
 }
 
-/// Parses an empty line.
-pub fn empty_line(input: &mut &str) -> KvnResult<()> {
-    (
-        ws,
-        peek(alt((line_ending.void(), winnow::combinator::eof.void()))),
-    )
-        .void()
-        .parse_next(input)
-}
-
 /// Parses a raw data line (no equals sign, not a keyword).
 pub fn raw_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     let content = preceded(ws, till_line_ending).parse_next(input)?;
@@ -325,29 +294,27 @@ pub fn raw_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     Ok(trimmed)
 }
 
-/// Parses any KVN line into a token.
-pub fn kvn_token<'a>(input: &mut &'a str) -> KvnResult<KvnToken<'a>> {
-    // Skip leading whitespace on the line
-    ws.parse_next(input)?;
-
-    alt((
-        empty_line.map(|_| KvnToken::Empty),
-        comment_line.map(KvnToken::Comment),
-        block_start.map(KvnToken::BlockStart),
-        block_end.map(KvnToken::BlockEnd),
-        key_value_line.map(|(k, v, u)| KvnToken::KeyValue {
-            key: k,
-            value: v,
-            unit: u,
-        }),
-        raw_line.map(KvnToken::Raw),
-    ))
-    .parse_next(input)
-}
-
 /// Parses "KEY =" and returns the key.
 pub fn key_token<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     terminated(preceded(ws, keyword), kv_sep).parse_next(input)
+}
+
+/// Parses a user-defined KVN keyword.
+///
+/// ODM 7.4.4 requires uppercase keywords without blanks but does not make Annex F's recommended
+/// alphanumeric-and-underscore regex normative. `=` remains excluded because it delimits the
+/// single assignment permitted by 7.4.3.
+fn user_defined_key_token<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+    terminated(
+        preceded(
+            ws,
+            take_while(1.., |character: char| {
+                character.is_ascii_graphic() && !character.is_ascii_lowercase() && character != '='
+            }),
+        ),
+        kv_sep,
+    )
+    .parse_next(input)
 }
 
 /// Parses the rest of a KVN line (value and optional unit).
@@ -358,12 +325,11 @@ pub fn kv_rest<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)>
 /// Fast float parser for KVN values.
 pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
     let checkpoint = input.checkpoint();
-    terminated(
+    let (value, unit) = terminated(
         (
             parse_f64_winnow.context(StrContext::Label("float")),
             kv_unit,
-        )
-            .map(|(f, _)| f),
+        ),
         opt_line_ending,
     )
     .parse_next(input)
@@ -375,21 +341,27 @@ pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
         } else {
             e
         }
-    })
+    })?;
+    if unit.is_some() {
+        return Err(cut_err(
+            input,
+            "Units are not allowed for this dimensionless or implicitly scaled field",
+        ));
+    }
+    Ok(value)
 }
 
 /// Fast i32 parser for KVN values.
 pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
     let checkpoint = input.checkpoint();
-    terminated(
+    let (value, unit) = terminated(
         (
             take_while(1.., ('0'..='9', '-', '+'))
                 .map(|s: &str| s.parse::<i32>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
-        )
-            .map(|(i, _)| i),
+        ),
         opt_line_ending,
     )
     .parse_next(input)
@@ -401,21 +373,24 @@ pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
         } else {
             e
         }
-    })
+    })?;
+    if unit.is_some() {
+        return Err(cut_err(input, "Units are not allowed for integer fields"));
+    }
+    Ok(value)
 }
 
 /// Fast u32 parser for KVN values.
 pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     let checkpoint = input.checkpoint();
-    terminated(
+    let (value, unit) = terminated(
         (
             take_while(1.., '0'..='9')
                 .map(|s: &str| s.parse::<u32>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
-        )
-            .map(|(u, _)| u),
+        ),
         opt_line_ending,
     )
     .parse_next(input)
@@ -431,7 +406,11 @@ pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
         } else {
             e
         }
-    })
+    })?;
+    if unit.is_some() {
+        return Err(cut_err(input, "Units are not allowed for integer fields"));
+    }
+    Ok(value)
 }
 
 /// Parses an optional u32 value from a KVN line.
@@ -442,20 +421,21 @@ pub fn kv_u32_opt(input: &mut &str) -> KvnResult<Option<u32>> {
     // Check if line contains only whitespace/unit or is empty
     let remainder = peek(till_line_ending).parse_next(input)?;
     if remainder.is_null() || remainder.trim().starts_with('[') {
-        let _ = kv_unit.parse_next(input)?;
+        if kv_unit.parse_next(input)?.is_some() {
+            return Err(cut_err(input, "Units are not allowed for integer fields"));
+        }
         opt_line_ending.parse_next(input)?;
         return Ok(None);
     }
 
-    terminated(
+    let (value, unit) = terminated(
         (
             take_while(1.., '0'..='9')
                 .map(|s: &str| s.parse::<u32>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.ok()),
             kv_unit,
-        )
-            .map(|(u, _)| u),
+        ),
         opt_line_ending,
     )
     .parse_next(input)
@@ -471,21 +451,24 @@ pub fn kv_u32_opt(input: &mut &str) -> KvnResult<Option<u32>> {
         } else {
             e
         }
-    })
+    })?;
+    if unit.is_some() {
+        return Err(cut_err(input, "Units are not allowed for integer fields"));
+    }
+    Ok(value)
 }
 
 /// Fast u64 parser for KVN values.
 pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
     let checkpoint = input.checkpoint();
-    terminated(
+    let (value, unit) = terminated(
         (
             take_while(1.., '0'..='9')
                 .map(|s: &str| s.parse::<u64>())
                 .verify(|res| res.is_ok())
                 .map(|res| res.unwrap()),
             kv_unit,
-        )
-            .map(|(u, _)| u),
+        ),
         opt_line_ending,
     )
     .parse_next(input)
@@ -501,47 +484,11 @@ pub fn kv_u64(input: &mut &str) -> KvnResult<u64> {
         } else {
             e
         }
-    })
-}
-
-/// Parses an optional u64 value from a KVN line.
-pub fn kv_u64_opt(input: &mut &str) -> KvnResult<Option<u64>> {
-    let checkpoint = input.checkpoint();
-    ws.parse_next(input)?;
-
-    // Check if line contains only whitespace/unit or is empty
-    let remainder = peek(till_line_ending).parse_next(input)?;
-    if remainder.is_null() || remainder.trim().starts_with('[') {
-        let _ = kv_unit.parse_next(input)?;
-        opt_line_ending.parse_next(input)?;
-        return Ok(None);
+    })?;
+    if unit.is_some() {
+        return Err(cut_err(input, "Units are not allowed for integer fields"));
     }
-
-    terminated(
-        (
-            take_while(1.., '0'..='9')
-                .map(|s: &str| s.parse::<u64>())
-                .verify(|res| res.is_ok())
-                .map(|res| res.ok()),
-            kv_unit,
-        )
-            .map(|(u, _)| u),
-        opt_line_ending,
-    )
-    .parse_next(input)
-    .map_err(|e| {
-        if e.is_backtrack() {
-            let mut err = InternalParserError::from_input(input);
-            err.message = std::borrow::Cow::Borrowed("Invalid unsigned integer");
-            ErrMode::Cut(err.add_context(
-                input,
-                &checkpoint,
-                StrContext::Label("Invalid unsigned integer"),
-            ))
-        } else {
-            e
-        }
-    })
+    Ok(value)
 }
 
 /// Skips whitespace and empty lines.
@@ -585,14 +532,21 @@ pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
-/// Parses an optional Epoch value from a KVN line.
-pub fn kv_epoch_opt(input: &mut &str) -> KvnResult<Option<Epoch>> {
+/// Parses a calendar/ordinal epoch value from a KVN line.
+pub fn kv_calendar_epoch(input: &mut &str) -> KvnResult<CalendarEpoch> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    CalendarEpoch::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+}
+
+/// Parses an optional calendar/ordinal epoch value from a KVN line.
+pub fn kv_calendar_epoch_opt(input: &mut &str) -> KvnResult<Option<CalendarEpoch>> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     let trimmed = v.trim();
     if trimmed.is_null() {
         Ok(None)
     } else {
-        Epoch::from_str(trimmed)
+        CalendarEpoch::from_str(trimmed)
             .map(Some)
             .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
     }
@@ -602,6 +556,20 @@ pub fn kv_epoch_opt(input: &mut &str) -> KvnResult<Option<Epoch>> {
 pub fn kv_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
     let v = till_space.parse_next(input)?;
     Epoch::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+}
+
+/// Parses a calendar/ordinal epoch value as a single KVN token (until the next space).
+pub fn kv_calendar_epoch_token(input: &mut &str) -> KvnResult<CalendarEpoch> {
+    let v = till_space.parse_next(input)?;
+    CalendarEpoch::from_str(v.trim())
+        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+}
+
+/// Parses a finite relative time using the ADM/ACM `relTimeType` lexical rules.
+pub fn kv_relative_time(input: &mut &str) -> KvnResult<RelativeTime> {
+    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    RelativeTime::from_str(v.trim())
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
 }
 
@@ -690,30 +658,6 @@ pub fn kv_float_unit<'a>(input: &mut &'a str) -> KvnResult<(f64, Option<&'a str>
 }
 
 //----------------------------------------------------------------------
-// Value Parsing Helpers
-//----------------------------------------------------------------------
-
-/// Parses an f64 value from a string slice.
-pub fn parse_f64(value: &str) -> crate::error::Result<f64> {
-    value.trim().parse::<f64>().map_err(CcsdsNdmError::from)
-}
-
-/// Parses an i32 value from a string slice.
-pub fn parse_i32(value: &str) -> crate::error::Result<i32> {
-    value.trim().parse::<i32>().map_err(CcsdsNdmError::from)
-}
-
-/// Parses a u32 value from a string slice.
-pub fn parse_u32(value: &str) -> crate::error::Result<u32> {
-    value.trim().parse::<u32>().map_err(CcsdsNdmError::from)
-}
-
-/// Parses a u64 value from a string slice.
-pub fn parse_u64(value: &str) -> crate::error::Result<u64> {
-    value.trim().parse::<u64>().map_err(CcsdsNdmError::from)
-}
-
-//----------------------------------------------------------------------
 // High-level Parsing Traits
 //----------------------------------------------------------------------
 
@@ -780,27 +724,6 @@ fn kvn_value_only<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
         .parse_next(input)
 }
 
-/// Parses a key-value pair where the key matches a predicate.
-/// Returns (key, value, unit).
-pub fn key_matching<'a, F>(
-    predicate: F,
-) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, &'a str, Option<&'a str>)>
-where
-    F: Fn(&str) -> bool + Copy,
-{
-    move |input: &mut &'a str| {
-        ws.parse_next(input)?;
-        let key = keyword.parse_next(input)?;
-        if !predicate(key) {
-            return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
-        }
-        kv_sep.parse_next(input)?;
-        let (value, unit) = kvn_value.parse_next(input)?;
-        opt_line_ending.parse_next(input)?;
-        Ok((key, value, unit))
-    }
-}
-
 /// Skips comment lines and collects them into a Vec.
 pub fn collect_comments(input: &mut &str) -> KvnResult<Vec<String>> {
     // Fast path: if no COMMENT or newline, return empty Vec immediately
@@ -864,7 +787,6 @@ where
 ///
 /// This macro generates a loop that matches keys using `dispatch!`,
 /// handles comment collection, and provides helpful context on errors.
-#[macro_export]
 macro_rules! parse_block {
     // Flexible variant that supports both simple assignment and action blocks, with or without error label
     ($input:ident, $comments:expr, {
@@ -925,6 +847,63 @@ macro_rules! parse_block {
     };
 }
 
+pub(crate) use parse_block;
+
+/// Parse a flattened KVN block while allowing the caller to associate comments with the logical
+/// sub-block selected by the following keyword. Unlike `parse_block!`, comments at a boundary can
+/// remain unread for the following parser.
+macro_rules! parse_routed_block {
+    ($input:ident, $route_comments:expr, {
+        $($($key:literal)|+ => $target:ident : $parser:expr $(=> $action:block)? ),* $(,)?
+    }, $break_condition:expr, $error_label:expr) => {
+        loop {
+            let checkpoint = $input.checkpoint();
+            let loop_comments = collect_comments.parse_next($input)?;
+
+            if ($break_condition)(&mut *$input) {
+                $input.reset(&checkpoint);
+                break;
+            }
+
+            let key = match key_token.parse_next($input) {
+                Ok(key) => key,
+                Err(_) => {
+                    $input.reset(&checkpoint);
+                    break;
+                }
+            };
+
+            match key {
+                $($($key)|+ => {
+                    let value = $parser.parse_next($input)?;
+                    ($route_comments)(key, loop_comments);
+                    parse_routed_block!(@action value, $target $(, $action)?);
+                })*
+                _ => {
+                    $input.reset(&checkpoint);
+                    return Err(winnow::error::ErrMode::Cut(
+                        winnow::error::AddContext::add_context(
+                            crate::error::InternalParserError::from_input($input),
+                            $input,
+                            &$input.checkpoint(),
+                            winnow::error::StrContext::Label($error_label),
+                        ),
+                    ));
+                }
+            }
+        }
+    };
+    (@action $value:ident, $target:ident) => {
+        $target = Some($value);
+    };
+    (@action $value:ident, $binding:ident, $action:block) => {
+        let $binding = $value;
+        $action
+    };
+}
+
+pub(crate) use parse_routed_block;
+
 /// Checks if we're at a specific block start without full string scan.
 pub fn at_block_start(tag: &str, input: &str) -> bool {
     let s = input.trim_start_matches([' ', '\t']);
@@ -984,7 +963,10 @@ pub fn expect_block_end<'a>(
 
 /// Parses the ODM header section.
 pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
-    let mut comment = Vec::new();
+    // ODM §7.8 permits header comments only immediately after the version keyword. Comments
+    // encountered after header assignments belong to the next logical block and must not be
+    // consumed speculatively here.
+    let comment = collect_comments.parse_next(input)?;
     let mut classification = None;
     let mut creation_date = None;
     let mut originator = None;
@@ -992,7 +974,6 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
 
     loop {
         let checkpoint = input.checkpoint();
-        comment.extend(collect_comments.parse_next(input)?);
 
         let key = match preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
@@ -1003,7 +984,7 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
         };
 
         // Stop if we encounter a metadata key
-        if key == "OBJECT_NAME" || key == "META_START" {
+        if key == "COMMENT" || key == "OBJECT_NAME" || key == "META_START" {
             input.reset(&checkpoint);
             break;
         }
@@ -1014,7 +995,7 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 classification = Some(kv_string.parse_next(input)?);
             }
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -1075,7 +1056,7 @@ pub fn adm_header(input: &mut &str) -> KvnResult<AdmHeader> {
                 classification = Some(kv_string.parse_next(input)?);
             }
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -1119,7 +1100,7 @@ pub fn state_vector(input: &mut &str) -> KvnResult<(Vec<String>, StateVector)> {
     let mut z_dot = None;
 
     parse_block!(input, comment, {
-        "EPOCH" => epoch: kv_epoch,
+        "EPOCH" => epoch: kv_calendar_epoch,
         "X" => x: kv_from_kvn,
         "Y" => y: kv_from_kvn,
         "Z" => z: kv_from_kvn,
@@ -1281,7 +1262,7 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
         let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
-        let key = match key_token.parse_next(input) {
+        let key = match user_defined_key_token.parse_next(input) {
             Ok(k) => k,
             Err(_) => {
                 input.reset(&checkpoint);
@@ -1473,5 +1454,20 @@ mod tests {
             },
             _ => panic!("Expected cut error"),
         }
+    }
+
+    #[test]
+    fn adm_header_creation_date_requires_calendar_epoch() {
+        for value in ["123.5", "2023-02-29T00:00:00", ""] {
+            let input = format!("CREATION_DATE = {value}\nORIGINATOR = TEST\n");
+            assert!(
+                adm_header.parse(input.as_str()).is_err(),
+                "accepted {value:?}"
+            );
+        }
+
+        let mut input = "CREATION_DATE = 2023-060T00:00:00\nORIGINATOR = TEST\n";
+        let header = adm_header.parse_next(&mut input).unwrap();
+        assert_eq!(header.creation_date.as_str(), "2023-060T00:00:00");
     }
 }

@@ -6,7 +6,10 @@
 Unit tests for Navigation Data Message (NDM) Python bindings.
 """
 
+from pathlib import Path
+
 import pytest
+
 from ccsds_ndm import (
     Cdm,
     CdmBody,
@@ -17,6 +20,7 @@ from ccsds_ndm import (
     CdmSegment,
     CdmStateVector,
     Ndm,
+    NdmValidationError,
     OdmHeader,  # Correct header for OEM
     Oem,
     OemData,
@@ -24,6 +28,7 @@ from ccsds_ndm import (
     OemSegment,
     RelativeMetadataData,
     StateVectorAcc,  # Verified class name
+    Tdm,
 )
 
 
@@ -125,7 +130,7 @@ class TestNdm:
             + [None]
         )
         cov1 = CdmCovarianceMatrix(*cov_args)
-        data1 = CdmData(vector1, cov1, [])
+        data1 = CdmData(vector1, cov1, comments=[])
         seg1 = CdmSegment(meta1, data1)
 
         meta2 = CdmMetadata(
@@ -138,11 +143,27 @@ class TestNdm:
         )
         vector2 = CdmStateVector(7100.0, 0.0, 0.0, 0.0, 7.4, 0.0)
         cov2 = CdmCovarianceMatrix(*cov_args)
-        data2 = CdmData(vector2, cov2, [])
+        data2 = CdmData(vector2, cov2, comments=[])
         seg2 = CdmSegment(meta2, data2)
 
         body = CdmBody(rel_meta, [seg1, seg2])
         return Cdm(header, body)
+
+    def test_accepts_tdm_message(self):
+        root = Path(__file__).parents[3]
+        tdm = Tdm.from_file(str(root / "ccsds-ndm/data/xml/tdm_e21.xml"), format="xml")
+
+        combined = Ndm([tdm])
+
+        assert isinstance(combined.messages[0], Tdm)
+
+    def test_typed_ndm_rejects_single_message_kvn(self):
+        root = Path(__file__).parents[3]
+        opm = (root / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
+
+        for format_hint in (None, "kvn"):
+            with pytest.raises(ValueError, match="different CCSDS NDM message type"):
+                Ndm.from_str(opm, format=format_hint)
 
     def test_ndm_roundtrip_xml(self):
         oem = self._create_valid_oem()
@@ -168,6 +189,19 @@ class TestNdm:
 
         ndm2 = Ndm.from_file(str(path), format="xml")
         assert len(ndm2.messages) == 1
+
+    def test_failed_file_generation_preserves_existing_file(self, tmp_path):
+        oem = self._create_valid_oem()
+        oem.version = "1.0"
+        ndm = Ndm([oem])
+        path = tmp_path / "test.ndm"
+        path.write_text("keep me")
+
+        with pytest.raises(NdmValidationError, match="output version 1.0") as caught:
+            ndm.to_file(str(path), format="xml")
+
+        assert caught.value.code == "generation.unsupported_output_version"
+        assert path.read_text() == "keep me"
 
     def test_ndm_message_and_comment_setters(self):
         oem = self._create_valid_oem()

@@ -5,10 +5,10 @@
 use ccsds_ndm::MessageType;
 use pyo3::prelude::*;
 use pyo3::Py;
-use std::fs;
 
 pub mod acm;
 pub mod aem;
+pub mod api;
 pub mod apm;
 pub mod attitude;
 pub mod cdm;
@@ -28,18 +28,69 @@ use common::{
     AdmHeader, ControlledType, ObjectDescription, OdmHeader, ReferenceFrame, StateVector,
     StateVectorAcc, TimeSystem, YesNo,
 };
-use errors::ccsds_error_to_pyerr;
+use errors::{ccsds_error_to_pyerr, file_parse_error_to_pyerr};
 use ndm::Ndm;
 use oem::*;
 use omm::*;
 use opm::*;
 
-/// Parse a string (KVN or XML) and return the corresponding NDM object.
+pub(crate) fn message_to_py(py: Python<'_>, message: MessageType) -> PyResult<Py<PyAny>> {
+    match message {
+        MessageType::Oem(oem) => {
+            let py_obj = Py::new(py, Oem::from_core(py, oem)?)?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Cdm(cdm) => {
+            let py_obj = Py::new(py, Cdm::from_core(py, cdm)?)?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Opm(opm) => {
+            let py_obj = Py::new(py, Opm::from_core(py, opm)?)?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Omm(omm) => {
+            let py_obj = Py::new(py, Omm::from_core(py, omm)?)?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Ocm(ocm) => {
+            let py_obj = Py::new(py, ocm::Ocm::from_core(py, ocm)?)?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Rdm(rdm) => {
+            let py_obj = Py::new(py, rdm::Rdm::from_core(py, rdm)?)?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Tdm(tdm) => {
+            let py_obj = Py::new(py, tdm::Tdm::from_core(py, tdm)?)?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Ndm(ndm) => {
+            let py_obj = Py::new(py, Ndm::from_core(py, ndm)?)?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Aem(aem) => {
+            let py_obj = Py::new(py, aem::Aem::from_core(py, aem)?)?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Apm(apm) => {
+            let py_obj = Py::new(py, apm::Apm::from_core(py, apm)?)?;
+            Ok(py_obj.into_any())
+        }
+        MessageType::Acm(acm) => {
+            let py_obj = Py::new(py, acm::Acm::from_core(py, acm)?)?;
+            Ok(py_obj.into_any())
+        }
+    }
+}
+
+/// Parse a string containing KVN or XML.
 ///
 /// Parameters
 /// ----------
 /// data : str
 ///     The content to parse.
+/// format : str, optional
+///     ``"kvn"`` or ``"xml"``. Detected automatically when omitted.
 ///
 /// Returns
 /// -------
@@ -49,58 +100,21 @@ use opm::*;
 /// Raises
 /// ------
 /// ValueError
-///     If parsing fails.
+///     If the input is invalid or unsupported.
 #[pyfunction]
-fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
-    // Call the core library's auto-detection function
-    let message = ccsds_ndm::from_str(data).map_err(ccsds_error_to_pyerr)?;
-
-    match message {
-        MessageType::Oem(oem) => {
-            let py_obj = Py::new(py, Oem { inner: oem })?;
-            Ok(py_obj.into_any())
-        }
-        MessageType::Cdm(cdm) => {
-            let py_obj = Py::new(py, Cdm { inner: cdm })?;
-            Ok(py_obj.into_any())
-        }
-        MessageType::Opm(opm) => {
-            let py_obj = Py::new(py, Opm { inner: opm })?;
-            Ok(py_obj.into_any())
-        }
-        MessageType::Omm(omm) => {
-            let py_obj = Py::new(py, Omm { inner: omm })?;
-            Ok(py_obj.into_any())
-        }
-        MessageType::Ocm(ocm) => {
-            let py_obj = Py::new(py, ocm::Ocm { inner: ocm })?;
-            Ok(py_obj.into_any())
-        }
-        MessageType::Rdm(rdm) => {
-            let py_obj = Py::new(py, rdm::Rdm { inner: rdm })?;
-            Ok(py_obj.into_any())
-        }
-        MessageType::Tdm(tdm) => {
-            let py_obj = Py::new(py, tdm::Tdm { inner: tdm })?;
-            Ok(py_obj.into_any())
-        }
-        MessageType::Ndm(ndm) => {
-            let py_obj = Py::new(py, Ndm { inner: ndm })?;
-            Ok(py_obj.into_any())
-        }
-        MessageType::Aem(aem) => {
-            let py_obj = Py::new(py, aem::Aem { inner: aem })?;
-            Ok(py_obj.into_any())
-        }
-        MessageType::Apm(apm) => {
-            let py_obj = Py::new(py, apm::Apm { inner: apm })?;
-            Ok(py_obj.into_any())
-        }
-        MessageType::Acm(acm) => {
-            let py_obj = Py::new(py, acm::Acm { inner: acm })?;
-            Ok(py_obj.into_any())
-        }
-    }
+#[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+fn from_str(
+    py: Python,
+    data: &str,
+    format: Option<&str>,
+    max_input_bytes: Option<usize>,
+    max_records: Option<usize>,
+) -> PyResult<Py<PyAny>> {
+    let options = api::parse_options(max_input_bytes, max_records);
+    let message =
+        ccsds_ndm::from_str_with_options(data, format.map(notation).transpose()?, &options)
+            .map_err(ccsds_error_to_pyerr)?;
+    message_to_py(py, message)
 }
 
 /// Parse from a file path (KVN or XML).
@@ -109,16 +123,77 @@ fn from_str(py: Python, data: &str) -> PyResult<Py<PyAny>> {
 /// ----------
 /// path : str
 ///     Path to the file.
-///
 /// Returns
 /// -------
 /// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
 ///     The parsed NDM object.
 #[pyfunction]
-fn from_file(py: Python, path: &str) -> PyResult<Py<PyAny>> {
-    let content =
-        fs::read_to_string(path).map_err(|e| errors::NdmIoError::new_err(e.to_string()))?;
-    from_str(py, &content)
+#[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+fn from_file(
+    py: Python,
+    path: &str,
+    format: Option<&str>,
+    max_input_bytes: Option<usize>,
+    max_records: Option<usize>,
+) -> PyResult<Py<PyAny>> {
+    let options = api::parse_options(max_input_bytes, max_records);
+    let notation = format.map(notation).transpose()?;
+    let message = ccsds_ndm::from_file_with_options(path, notation, &options)
+        .map_err(|error| file_parse_error_to_pyerr(error, notation, None))?;
+    message_to_py(py, message)
+}
+
+fn notation(value: &str) -> PyResult<ccsds_ndm::Notation> {
+    match value {
+        "kvn" => Ok(ccsds_ndm::Notation::Kvn),
+        "xml" => Ok(ccsds_ndm::Notation::Xml),
+        other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "Unsupported format '{other}'. Use 'kvn' or 'xml'"
+        ))),
+    }
+}
+
+/// Convert any recognized NDM message between KVN and XML through the shared generation gate.
+#[pyfunction]
+#[pyo3(signature = (data, to_format, *, max_input_bytes=None, max_records=None, max_output_bytes=None, version=None))]
+fn convert(
+    data: &str,
+    to_format: &str,
+    max_input_bytes: Option<usize>,
+    max_records: Option<usize>,
+    max_output_bytes: Option<usize>,
+    version: Option<&str>,
+) -> PyResult<String> {
+    let parse = api::parse_options(max_input_bytes, max_records);
+    let mut generate = api::generate_options(version);
+    generate.max_output_bytes = max_output_bytes;
+    ccsds_ndm::convert_with_options(data, notation(to_format)?, &parse, &generate)
+        .map_err(ccsds_error_to_pyerr)
+}
+
+/// Convert any recognized NDM file and atomically replace the destination on success.
+#[pyfunction]
+#[pyo3(signature = (source_path, destination_path, to_format, *, max_input_bytes=None, max_records=None, max_output_bytes=None, version=None))]
+fn convert_file(
+    source_path: &str,
+    destination_path: &str,
+    to_format: &str,
+    max_input_bytes: Option<usize>,
+    max_records: Option<usize>,
+    max_output_bytes: Option<usize>,
+    version: Option<&str>,
+) -> PyResult<()> {
+    let parse = api::parse_options(max_input_bytes, max_records);
+    let mut generate = api::generate_options(version);
+    generate.max_output_bytes = max_output_bytes;
+    ccsds_ndm::convert_file_with_options(
+        source_path,
+        destination_path,
+        notation(to_format)?,
+        &parse,
+        &generate,
+    )
+    .map_err(ccsds_error_to_pyerr)
 }
 
 /// The Python module definition.
@@ -131,6 +206,8 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // High-level API aligned with Rust core
     m.add_function(wrap_pyfunction!(from_str, m)?)?;
     m.add_function(wrap_pyfunction!(from_file, m)?)?;
+    m.add_function(wrap_pyfunction!(convert, m)?)?;
+    m.add_function(wrap_pyfunction!(convert_file, m)?)?;
 
     // Common types shared across message types
     m.add_class::<OdmHeader>()?;
@@ -161,7 +238,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<KeplerianElements>()?;
     m.add_class::<OpmCovarianceMatrix>()?;
     m.add_class::<OpmData>()?;
-    m.add_class::<ManeuverParameters>()?;
+    m.add_class::<OpmManeuverParameters>()?;
 
     // Register OCM wrapper classes
     m.add_class::<ocm::Ocm>()?;
@@ -216,7 +293,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<apm::ApmSegment>()?;
     m.add_class::<apm::ApmMetadata>()?;
     m.add_class::<apm::ApmData>()?;
-    m.add_class::<apm::ManeuverParameters>()?;
+    m.add_class::<apm::ApmManeuverParameters>()?;
 
     // Register shared attitude states
     m.add_class::<attitude::QuaternionState>()?;

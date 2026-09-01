@@ -26,6 +26,18 @@ pub fn parse_epoch(s: &str) -> PyResult<core_types::Epoch> {
         .map_err(|e: core_types::EpochError| PyValueError::new_err(e.to_string()))
 }
 
+/// Parse an absolute calendar/ordinal epoch string into the core CalendarEpoch type.
+pub fn parse_calendar_epoch(s: &str) -> PyResult<core_types::CalendarEpoch> {
+    s.parse()
+        .map_err(|e: core_types::EpochError| PyValueError::new_err(e.to_string()))
+}
+
+/// Parse a finite ACM/ADM relative time string into the core RelativeTime type.
+pub fn parse_relative_time(s: &str) -> PyResult<core_types::RelativeTime> {
+    s.parse()
+        .map_err(|e: core_types::EpochError| PyValueError::new_err(e.to_string()))
+}
+
 /// USER DEFINED PARAMETERS block (`userDefinedType`).
 /// User-defined parameters.
 ///

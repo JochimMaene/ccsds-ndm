@@ -7,15 +7,12 @@
 //! This module implements KVN parsing for CDM using winnow parser combinators.
 
 use crate::common::OdParameters;
-use crate::error::InternalParserError;
 use crate::kvn::parser::*;
 use crate::messages::cdm::{
     AdditionalParameters, Cdm, CdmBody, CdmCovarianceMatrix, CdmData, CdmHeader, CdmMetadata,
     CdmSegment, CdmStateVector, RelativeMetadataData, RelativeStateVector,
 };
-use crate::parse_block;
 use winnow::combinator::peek;
-use winnow::error::AddContext;
 use winnow::prelude::*;
 use winnow::stream::Offset;
 
@@ -35,7 +32,8 @@ pub fn cdm_version(input: &mut &str) -> KvnResult<String> {
 //----------------------------------------------------------------------
 
 pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
-    let mut comment = Vec::new();
+    // Header comments are only permitted immediately after the version line.
+    let comment = collect_comments.parse_next(input)?;
     let mut creation_date = None;
 
     let mut originator = None;
@@ -44,7 +42,11 @@ pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
 
     loop {
         let checkpoint = input.checkpoint();
-        comment.extend(collect_comments.parse_next(input)?);
+        let upcoming_comments = collect_comments.parse_next(input)?;
+        if !upcoming_comments.is_empty() {
+            input.reset(&checkpoint);
+            break;
+        }
 
         let key = match keyword.parse_next(input) {
             Ok(k) => k,
@@ -62,7 +64,7 @@ pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
         kv_sep.parse_next(input)?;
         match key {
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -121,8 +123,8 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
     let mut collision_probability = None;
     let mut collision_probability_method = None;
 
-    parse_block!(input, comment, {
-        "TCA" => tca: kv_epoch,
+    parse_routed_block!(input, |_, comments| comment.extend(comments), {
+        "TCA" => tca: kv_calendar_epoch,
         "MISS_DISTANCE" => miss_distance: kv_from_kvn,
         "RELATIVE_SPEED" => val: kv_from_kvn_opt => { relative_speed = val; },
         "RELATIVE_POSITION_R" => val: kv_from_kvn_opt => { rel_pos_r = val; },
@@ -131,15 +133,15 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
         "RELATIVE_VELOCITY_R" => val: kv_from_kvn_opt => { rel_vel_r = val; },
         "RELATIVE_VELOCITY_T" => val: kv_from_kvn_opt => { rel_vel_t = val; },
         "RELATIVE_VELOCITY_N" => val: kv_from_kvn_opt => { rel_vel_n = val; },
-        "START_SCREEN_PERIOD" => val: kv_epoch_opt => { start_screen_period = val; },
-        "STOP_SCREEN_PERIOD" => val: kv_epoch_opt => { stop_screen_period = val; },
+        "START_SCREEN_PERIOD" => val: kv_calendar_epoch_opt => { start_screen_period = val; },
+        "STOP_SCREEN_PERIOD" => val: kv_calendar_epoch_opt => { stop_screen_period = val; },
         "SCREEN_VOLUME_FRAME" => val: kv_enum_opt => { screen_volume_frame = val; },
         "SCREEN_VOLUME_SHAPE" => val: kv_enum_opt => { screen_volume_shape = val; },
         "SCREEN_VOLUME_X" => val: kv_from_kvn_opt => { screen_volume_x = val; },
         "SCREEN_VOLUME_Y" => val: kv_from_kvn_opt => { screen_volume_y = val; },
         "SCREEN_VOLUME_Z" => val: kv_from_kvn_opt => { screen_volume_z = val; },
-        "SCREEN_ENTRY_TIME" => val: kv_epoch_opt => { screen_entry_time = val; },
-        "SCREEN_EXIT_TIME" => val: kv_epoch_opt => { screen_exit_time = val; },
+        "SCREEN_ENTRY_TIME" => val: kv_calendar_epoch_opt => { screen_entry_time = val; },
+        "SCREEN_EXIT_TIME" => val: kv_calendar_epoch_opt => { screen_exit_time = val; },
         "COLLISION_PROBABILITY" => val: kv_from_kvn_opt => { collision_probability = val; },
         "COLLISION_PROBABILITY_METHOD" => val: kv_string_opt => { collision_probability_method = val; },
     }, |i: &mut &str| at_block_start("META", i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Relative Metadata key");
@@ -271,6 +273,40 @@ fn is_cdm_data_key(key: &str) -> bool {
     )
 }
 
+fn is_od_parameter_key(key: &str) -> bool {
+    matches!(
+        key,
+        "TIME_LASTOB_START"
+            | "TIME_LASTOB_END"
+            | "RECOMMENDED_OD_SPAN"
+            | "ACTUAL_OD_SPAN"
+            | "OBS_AVAILABLE"
+            | "OBS_USED"
+            | "TRACKS_AVAILABLE"
+            | "TRACKS_USED"
+            | "RESIDUALS_ACCEPTED"
+            | "WEIGHTED_RMS"
+    )
+}
+
+fn is_additional_parameter_key(key: &str) -> bool {
+    matches!(
+        key,
+        "AREA_PC"
+            | "AREA_DRG"
+            | "AREA_SRP"
+            | "MASS"
+            | "CD_AREA_OVER_MASS"
+            | "CR_AREA_OVER_MASS"
+            | "THRUST_ACCELERATION"
+            | "SEDR"
+    )
+}
+
+fn is_state_vector_key(key: &str) -> bool {
+    matches!(key, "X" | "Y" | "Z" | "X_DOT" | "Y_DOT" | "Z_DOT")
+}
+
 pub fn cdm_metadata(input: &mut &str) -> KvnResult<CdmMetadata> {
     let has_meta_block = if at_block_start("META", input) {
         expect_block_start("META").parse_next(input)?;
@@ -302,7 +338,7 @@ pub fn cdm_metadata(input: &mut &str) -> KvnResult<CdmMetadata> {
     let mut earth_tides = None;
     let mut intrack_thrust = None;
 
-    parse_block!(input, comment, {
+    parse_routed_block!(input, |_, comments| comment.extend(comments), {
         "OBJECT" => object: kv_enum,
         "OBJECT_DESIGNATOR" => object_designator: kv_string,
         "CATALOG_NAME" => val: kv_string_opt => { catalog_name = val; },
@@ -371,6 +407,9 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
     let mut comment = Vec::new();
     let mut od_params = OdParameters::default();
     let mut add_params = AdditionalParameters::default();
+    let mut state_vector_comment = Vec::new();
+    let mut covariance_comment = Vec::new();
+    let mut saw_data_key = false;
     let mut x = None;
     let mut y = None;
     let mut z = None;
@@ -429,9 +468,25 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
     let mut cthr_thr = None;
     let mut has_cov = false;
 
-    parse_block!(input, comment, {
-        "TIME_LASTOB_START" => val: kv_epoch_opt => { od_params.time_lastob_start = val; has_od_params = true; },
-        "TIME_LASTOB_END" => val: kv_epoch_opt => { od_params.time_lastob_end = val; has_od_params = true; },
+    parse_routed_block!(input, |key, comments| {
+        // The outer data comment and the first nested block's comment are adjacent in KVN and
+        // therefore intrinsically ambiguous. Keep that leading run on the outer data block so
+        // generation preserves its position. Later runs have an unambiguous following block.
+        if !saw_data_key {
+            comment.extend(comments);
+            saw_data_key = true;
+        } else if is_od_parameter_key(key) {
+            od_params.comment.extend(comments);
+        } else if is_additional_parameter_key(key) {
+            add_params.comment.extend(comments);
+        } else if is_state_vector_key(key) {
+            state_vector_comment.extend(comments);
+        } else {
+            covariance_comment.extend(comments);
+        }
+    }, {
+        "TIME_LASTOB_START" => val: kv_calendar_epoch_opt => { od_params.time_lastob_start = val; has_od_params = true; },
+        "TIME_LASTOB_END" => val: kv_calendar_epoch_opt => { od_params.time_lastob_end = val; has_od_params = true; },
         "RECOMMENDED_OD_SPAN" => val: kv_from_kvn_opt => { od_params.recommended_od_span = val; has_od_params = true; },
         "ACTUAL_OD_SPAN" => val: kv_from_kvn_opt => { od_params.actual_od_span = val; has_od_params = true; },
         "OBS_AVAILABLE" => val: kv_u32_opt => { od_params.obs_available = val.map(|v| v.into()); has_od_params = true; },
@@ -506,7 +561,7 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
 
     let covariance_matrix = if has_cov {
         Some(CdmCovarianceMatrix {
-            comment: Vec::new(),
+            comment: covariance_comment,
             cr_r: cr_r.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CR_R"))?,
             ct_r: ct_r.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CT_R"))?,
             ct_t: ct_t.ok_or_else(|| missing_field_err(input, "Covariance Matrix", "CT_T"))?,
@@ -581,6 +636,7 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
             None
         },
         state_vector: CdmStateVector {
+            comment: state_vector_comment,
             x: x.ok_or_else(|| missing_field_err(input, "Data", "X"))?,
             y: y.ok_or_else(|| missing_field_err(input, "Data", "Y"))?,
             z: z.ok_or_else(|| missing_field_err(input, "Data", "Z"))?,
@@ -872,6 +928,43 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         kvn.to_string()
     }
 
+    const DRAG_COVARIANCE_ROW: &str = "\
+CDRG_R = 0.001 [m**3/kg]
+CDRG_T = 0.002 [m**3/kg]
+CDRG_N = 0.003 [m**3/kg]
+CDRG_RDOT = 0.0001 [m**3/(kg*s)]
+CDRG_TDOT = 0.0002 [m**3/(kg*s)]
+CDRG_NDOT = 0.0003 [m**3/(kg*s)]
+CDRG_DRG = 0.00001 [m**4/kg**2]";
+
+    const SRP_COVARIANCE_ROW: &str = "\
+CSRP_R = 0.001 [m**3/kg]
+CSRP_T = 0.002 [m**3/kg]
+CSRP_N = 0.003 [m**3/kg]
+CSRP_RDOT = 0.0001 [m**3/(kg*s)]
+CSRP_TDOT = 0.0002 [m**3/(kg*s)]
+CSRP_NDOT = 0.0003 [m**3/(kg*s)]
+CSRP_DRG = 0.00001 [m**4/kg**2]
+CSRP_SRP = 0.00002 [m**4/kg**2]";
+
+    const THRUST_COVARIANCE_ROW: &str = "\
+CTHR_R = 0.001 [m**2/s**2]
+CTHR_T = 0.002 [m**2/s**2]
+CTHR_N = 0.003 [m**2/s**2]
+CTHR_RDOT = 0.0001 [m**2/s**3]
+CTHR_TDOT = 0.0002 [m**2/s**3]
+CTHR_NDOT = 0.0003 [m**2/s**3]
+CTHR_DRG = 0.00001 [m**3/(kg*s**2)]
+CTHR_SRP = 0.00002 [m**3/(kg*s**2)]
+CTHR_THR = 0.000001 [m**2/s**4]";
+
+    fn with_optional_covariance_rows(kvn: &str, rows: &str) -> String {
+        kvn.replace(
+            "CNDOT_NDOT = 1.0 [m**2/s**2]",
+            &format!("CNDOT_NDOT = 1.0 [m**2/s**2]\n{rows}"),
+        )
+    }
+
     #[test]
     fn test_parse_cdm_blue_book_example() {
         let result = Cdm::from_kvn_str(CDM_BLUE_BOOK_SAMPLE);
@@ -995,13 +1088,12 @@ MESSAGE_ID = MSG-001
 
 TCA = 2025-01-02T12:00:00
 MISS_DISTANCE = 100.0 [m]
-SCREEN_VOLUME_SHAPE = BOX
 RELATIVE_POSITION_R = 10.0 [m]
 RELATIVE_POSITION_T = -20.0 [m]
 RELATIVE_POSITION_N = 5.0 [m]
 RELATIVE_VELOCITY_R = 0.1 [m/s]
 RELATIVE_VELOCITY_T = -0.2 [m/s]
-// Missing RELATIVE_VELOCITY_N
+SCREEN_VOLUME_SHAPE = BOX
 OBJECT = OBJECT1
 OBJECT_DESIGNATOR = 1
 CATALOG_NAME = CAT
@@ -1232,10 +1324,7 @@ ORIGINATOR = TEST
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(
-                        err.message.contains("Unknown Relative Metadata key")
-                            || err.contexts.contains(&"Unknown Relative Metadata key")
-                    )
+                    assert!(err.message.contains("unknown CDM keyword"))
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
             },
@@ -1248,8 +1337,8 @@ ORIGINATOR = TEST
         let mut kvn = sample_cdm_kvn();
         // Add optional metadata fields
         kvn = kvn.replace(
-            "INTERNATIONAL_DESIGNATOR = 1998-067A",
-            "INTERNATIONAL_DESIGNATOR = 1998-067A\nOPERATOR_CONTACT_POSITION = Flight Director\nOPERATOR_ORGANIZATION = NASA\nOPERATOR_PHONE = +1-555-1234\nOPERATOR_EMAIL = contact@nasa.gov\nORBIT_CENTER = EARTH\nGRAVITY_MODEL = EGM-96\nATMOSPHERIC_MODEL = JACCHIA 70 DCA\nN_BODY_PERTURBATIONS = MOON, SUN\nSOLAR_RAD_PRESSURE = YES\nEARTH_TIDES = YES\nINTRACK_THRUST = YES",
+            "OBJECT_TYPE = PAYLOAD\nEPHEMERIS_NAME = EPH1\nCOVARIANCE_METHOD = CALCULATED\nMANEUVERABLE = YES\nREF_FRAME = EME2000",
+            "OBJECT_TYPE = PAYLOAD\nOPERATOR_CONTACT_POSITION = Flight Director\nOPERATOR_ORGANIZATION = NASA\nOPERATOR_PHONE = +1-555-1234\nOPERATOR_EMAIL = contact@nasa.gov\nEPHEMERIS_NAME = EPH1\nCOVARIANCE_METHOD = CALCULATED\nMANEUVERABLE = YES\nORBIT_CENTER = EARTH\nREF_FRAME = EME2000\nGRAVITY_MODEL = EGM-96\nATMOSPHERIC_MODEL = JACCHIA 70 DCA\nN_BODY_PERTURBATIONS = MOON, SUN\nSOLAR_RAD_PRESSURE = YES\nEARTH_TIDES = YES\nINTRACK_THRUST = YES",
         );
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with optional metadata");
@@ -1424,10 +1513,7 @@ ORIGINATOR = TEST
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(
-                        err.message.contains("Unknown metadata key")
-                            || err.contexts.contains(&"Unknown metadata key")
-                    )
+                    assert!(err.message.contains("unknown CDM keyword"))
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
             },
@@ -1476,12 +1562,7 @@ ORIGINATOR = TEST
 
     #[test]
     fn covariance_with_drag_fields() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert CDRG fields
-        kvn = kvn.replace(
-            "CNDOT_NDOT = 1.0 [m**2/s**2]",
-            "CNDOT_NDOT = 1.0 [m**2/s**2]\nCDRG_R = 0.001 [m**3/kg]\nCDRG_T = 0.002 [m**3/kg]\nCDRG_N = 0.003 [m**3/kg]\nCDRG_RDOT = 0.0001 [m**3/(kg*s)]\nCDRG_TDOT = 0.0002 [m**3/(kg*s)]\nCDRG_NDOT = 0.0003 [m**3/(kg*s)]\nCDRG_DRG = 0.00001 [m**4/kg**2]",
-        );
+        let kvn = with_optional_covariance_rows(&sample_cdm_kvn(), DRAG_COVARIANCE_ROW);
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with CDRG fields");
         let cov = &cdm.body.segments[0]
@@ -1500,12 +1581,8 @@ ORIGINATOR = TEST
 
     #[test]
     fn covariance_with_srp_fields() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert CSRP fields
-        kvn = kvn.replace(
-            "CNDOT_NDOT = 1.0 [m**2/s**2]",
-            "CNDOT_NDOT = 1.0 [m**2/s**2]\nCSRP_R = 0.001 [m**3/kg]\nCSRP_T = 0.002 [m**3/kg]\nCSRP_N = 0.003 [m**3/kg]\nCSRP_RDOT = 0.0001 [m**3/(kg*s)]\nCSRP_TDOT = 0.0002 [m**3/(kg*s)]\nCSRP_NDOT = 0.0003 [m**3/(kg*s)]\nCSRP_DRG = 0.00001 [m**4/kg**2]\nCSRP_SRP = 0.00002 [m**4/kg**2]",
-        );
+        let rows = format!("{DRAG_COVARIANCE_ROW}\n{SRP_COVARIANCE_ROW}");
+        let kvn = with_optional_covariance_rows(&sample_cdm_kvn(), &rows);
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with CSRP fields");
         let cov = &cdm.body.segments[0]
@@ -1525,12 +1602,8 @@ ORIGINATOR = TEST
 
     #[test]
     fn covariance_with_thrust_fields() {
-        let mut kvn = sample_cdm_kvn();
-        // Insert CTHR fields
-        kvn = kvn.replace(
-            "CNDOT_NDOT = 1.0 [m**2/s**2]",
-            "CNDOT_NDOT = 1.0 [m**2/s**2]\nCTHR_R = 0.001 [m**2/s**2]\nCTHR_T = 0.002 [m**2/s**2]\nCTHR_N = 0.003 [m**2/s**2]\nCTHR_RDOT = 0.0001 [m**2/s**3]\nCTHR_TDOT = 0.0002 [m**2/s**3]\nCTHR_NDOT = 0.0003 [m**2/s**3]\nCTHR_DRG = 0.00001 [m**3/(kg*s**2)]\nCTHR_SRP = 0.00002 [m**3/(kg*s**2)]\nCTHR_THR = 0.000001 [m**2/s**4]",
-        );
+        let rows = format!("{DRAG_COVARIANCE_ROW}\n{SRP_COVARIANCE_ROW}\n{THRUST_COVARIANCE_ROW}");
+        let kvn = with_optional_covariance_rows(&sample_cdm_kvn(), &rows);
 
         let cdm = Cdm::from_kvn(&kvn).expect("should parse with CTHR fields");
         let cov = &cdm.body.segments[0]
@@ -1548,6 +1621,24 @@ ORIGINATOR = TEST
         assert!(cov.cthr_srp.is_some());
         assert!(cov.cthr_thr.is_some());
     }
+
+    #[test]
+    fn covariance_rejects_optional_rows_without_preceding_rows() {
+        for (label, rows, missing) in [
+            ("SRP without drag", SRP_COVARIANCE_ROW, "CDRG_R"),
+            (
+                "thrust without drag or SRP",
+                THRUST_COVARIANCE_ROW,
+                "CDRG_R",
+            ),
+        ] {
+            let kvn = with_optional_covariance_rows(&sample_cdm_kvn(), rows);
+            let error = Cdm::from_kvn(&kvn).expect_err(label);
+            assert_eq!(error.code(), Some("validation.missing_required_field"));
+            assert!(error.to_string().contains(missing), "{label}: {error}");
+        }
+    }
+
     #[test]
     fn covariance_unknown_field_error() {
         let mut kvn = sample_cdm_kvn();
@@ -1560,10 +1651,7 @@ ORIGINATOR = TEST
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(
-                        err.message.contains("Unknown Data key")
-                            || err.contexts.contains(&"Unknown Data key")
-                    )
+                    assert!(err.message.contains("unknown CDM keyword"))
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
             },
@@ -1627,7 +1715,6 @@ TCA = 2025-01-02T12:00:00
 MISS_DISTANCE = 100.0 [m]
 RELATIVE_SPEED = 7.5 [m/s]
 RELATIVE_POSITION_R = 10.0 [m]
-# Missing RELATIVE_POSITION_T etc.
 SCREEN_VOLUME_FRAME = RTN
 "#;
         let err = Cdm::from_kvn(input).unwrap_err();

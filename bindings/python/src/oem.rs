@@ -4,18 +4,17 @@
 
 use crate::common::{parse_reference_frame, parse_time_system};
 use crate::common::{OdmHeader, StateVectorAcc};
-use crate::types::parse_epoch;
+use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::messages::oem as core_oem;
-use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{
     Acc, InterpolationDegree, Position, PositionCovariance, PositionVelocityCovariance, Velocity,
     VelocityCovariance,
 };
-use ccsds_ndm::MessageType;
+use ccsds_ndm::ParseOptions;
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::fs;
+use pyo3::types::PyList;
 
 use std::num::NonZeroU32;
 
@@ -134,9 +133,56 @@ fn build_covariance_matrix(
 /// segments : list[OemSegment]
 ///     The list of data segments.
 #[pyclass]
-#[derive(Clone)]
 pub struct Oem {
-    pub inner: core_oem::Oem,
+    id: Option<String>,
+    version: String,
+    header: Py<OdmHeader>,
+    segments: Py<PyList>,
+}
+
+impl Oem {
+    pub(crate) fn from_core(py: Python<'_>, value: core_oem::Oem) -> PyResult<Self> {
+        let segments = value
+            .body
+            .segment
+            .into_iter()
+            .map(|segment| Py::new(py, OemSegment::from_core(py, segment)?))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            id: value.id,
+            version: value.version,
+            header: Py::new(
+                py,
+                OdmHeader {
+                    inner: value.header,
+                },
+            )?,
+            segments: PyList::new(py, segments)?.unbind(),
+        })
+    }
+
+    pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_oem::Oem> {
+        let segment = self
+            .segments
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, OemSegment>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("segments[{index}] must be OemSegment"))
+                    })?
+                    .to_core(py)
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(core_oem::Oem {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            header: self.header.borrow(py).inner.clone(),
+            body: core_oem::OemBody { segment },
+        })
+    }
 }
 
 /// A single segment of the OEM.
@@ -150,9 +196,30 @@ pub struct Oem {
 /// data : OemData
 ///     Segment data.
 #[pyclass]
-#[derive(Clone)]
 pub struct OemSegment {
-    pub inner: core_oem::OemSegment,
+    metadata: Py<OemMetadata>,
+    data: Py<OemData>,
+}
+
+impl OemSegment {
+    fn from_core(py: Python<'_>, value: core_oem::OemSegment) -> PyResult<Self> {
+        Ok(Self {
+            metadata: Py::new(
+                py,
+                OemMetadata {
+                    inner: value.metadata,
+                },
+            )?,
+            data: Py::new(py, OemData::from_core(py, value.data)?)?,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_oem::OemSegment> {
+        Ok(core_oem::OemSegment {
+            metadata: self.metadata.borrow(py).inner.clone(),
+            data: self.data.borrow(py).to_core(py)?,
+        })
+    }
 }
 
 /// OEM Metadata Section.
@@ -200,9 +267,70 @@ pub struct OemMetadata {
 ///     comments : list[str], optional
 ///     Comments.
 #[pyclass]
-#[derive(Clone)]
 pub struct OemData {
-    pub inner: core_oem::OemData,
+    comment: Vec<String>,
+    state_vector: Py<PyList>,
+    covariance_matrix: Py<PyList>,
+}
+
+impl OemData {
+    fn from_core(py: Python<'_>, value: core_oem::OemData) -> PyResult<Self> {
+        let state_vectors = value
+            .state_vector
+            .into_iter()
+            .map(|inner| Py::new(py, StateVectorAcc { inner }))
+            .collect::<PyResult<Vec<_>>>()?;
+        let covariance_matrices = value
+            .covariance_matrix
+            .into_iter()
+            .map(|inner| Py::new(py, OemCovarianceMatrix { inner }))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            comment: value.comment,
+            state_vector: PyList::new(py, state_vectors)?.unbind(),
+            covariance_matrix: PyList::new(py, covariance_matrices)?.unbind(),
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_oem::OemData> {
+        let state_vector = self
+            .state_vector
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, StateVectorAcc>>()
+                    .map(|value| value.inner.clone())
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "state_vector[{index}] must be StateVectorAcc"
+                        ))
+                    })
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        let covariance_matrix = self
+            .covariance_matrix
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, OemCovarianceMatrix>>()
+                    .map(|value| value.inner.clone())
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "covariance_matrix[{index}] must be OemCovarianceMatrix"
+                        ))
+                    })
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(core_oem::OemData {
+            comment: self.comment.clone(),
+            state_vector,
+            covariance_matrix,
+        })
+    }
 }
 
 /// OEM Covariance Matrix.
@@ -277,29 +405,27 @@ pub struct OemCovarianceMatrix {
 #[pymethods]
 impl Oem {
     #[new]
-    fn new(header: OdmHeader, segments: Vec<OemSegment>) -> Self {
-        Self {
-            inner: core_oem::Oem {
-                header: header.inner,
-                body: core_oem::OemBody {
-                    segment: segments.into_iter().map(|s| s.inner).collect(),
-                },
-                id: Some("CCSDS_OEM_VERS".to_string()),
-                version: "3.0".to_string(),
-            },
-        }
+    fn new(py: Python<'_>, header: Py<OdmHeader>, segments: Vec<Py<OemSegment>>) -> PyResult<Self> {
+        Ok(Self {
+            header,
+            segments: PyList::new(py, segments)?.unbind(),
+            id: Some("CCSDS_OEM_VERS".to_string()),
+            version: "3.0".to_string(),
+        })
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
+        let segments = self.segments.bind(py);
+        let object_name = segments
+            .get_item(0)
+            .ok()
+            .and_then(|segment| segment.extract::<PyRef<'_, OemSegment>>().ok())
+            .map(|segment| segment.metadata.borrow(py).inner.object_name.clone())
+            .unwrap_or_default();
         format!(
             "Oem(object_name='{}', segment={})",
-            self.inner
-                .body
-                .segment
-                .first()
-                .map(|s| s.metadata.object_name.clone())
-                .unwrap_or_default(),
-            self.inner.body.segment.len()
+            object_name,
+            segments.len()
         )
     }
 
@@ -308,7 +434,7 @@ impl Oem {
     /// :type: Optional[str]
     #[getter]
     fn get_id(&self) -> Option<String> {
-        self.inner.id.clone()
+        self.id.clone()
     }
 
     /// The message version.
@@ -316,13 +442,13 @@ impl Oem {
     /// :type: str
     #[getter]
     fn get_version(&self) -> String {
-        self.inner.version.clone()
+        self.version.clone()
     }
 
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Oem, &value)?;
-        self.inner.version = value;
+        self.version = value;
         Ok(())
     }
 
@@ -330,82 +456,33 @@ impl Oem {
     ///
     /// :type: OdmHeader
     #[getter]
-    fn get_header(&self) -> OdmHeader {
-        OdmHeader {
-            inner: self.inner.header.clone(),
-        }
+    fn get_header(&self, py: Python<'_>) -> Py<OdmHeader> {
+        self.header.clone_ref(py)
     }
 
     #[setter]
-    fn set_header(&mut self, header: OdmHeader) {
-        self.inner.header = header.inner;
+    fn set_header(&mut self, header: Py<OdmHeader>) {
+        self.header = header;
     }
 
     /// The list of data segments.
     ///
     /// :type: list[OemSegment]
     #[getter]
-    fn get_segments(&self) -> Vec<OemSegment> {
-        self.inner
-            .body
-            .segment
-            .iter()
-            .map(|s| OemSegment { inner: s.clone() })
-            .collect()
+    fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
+        self.segments.clone_ref(py)
     }
 
     #[setter]
-    fn set_segments(&mut self, segments: Vec<OemSegment>) {
-        self.inner.body.segment = segments.into_iter().map(|s| s.inner).collect();
+    fn set_segments(&mut self, py: Python<'_>, segments: Vec<Py<OemSegment>>) -> PyResult<()> {
+        self.segments = PyList::new(py, segments)?.unbind();
+        Ok(())
     }
 
     /// Validate the message against CCSDS rules.
     ///
-    /// Parameters
-    /// ----------
-    /// strict : bool, optional
-    ///     If True (default), raises ValueError on the first error found.
-    ///     If False, returns a list of validation error messages (or None if valid).
-    #[pyo3(signature = (strict=true))]
-    fn validate(&self, strict: bool) -> PyResult<Option<Vec<String>>> {
-        use ccsds_ndm::traits::Validate;
-
-        if strict {
-            self.inner
-                .validate()
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
-            Ok(None)
-        } else {
-            let mut issues = Vec::new();
-            // Use with_validation_mode to capture lenient errors
-            // Note: Current Rust implementation mostly "fails fast" even in lenient mode
-            // for many checks, but this sets up the infrastructure.
-            let _ = ccsds_ndm::validation::with_validation_mode(
-                ccsds_ndm::validation::ValidationMode::Lenient,
-                || {
-                    match self.inner.validate() {
-                        Ok(_) => Ok(()),
-                        Err(e) => {
-                            // If validate returns Err even in lenient mode, it's a fatal error
-                            issues.push(e.to_string());
-                            Ok(())
-                        }
-                    }
-                },
-            );
-
-            // Also collect any warnings that were pushed to thread-local storage during validation
-            let warnings = ccsds_ndm::validation::take_warnings();
-            for w in warnings {
-                issues.push(w.error.to_string());
-            }
-
-            if issues.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(issues))
-            }
-        }
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(&self.to_core(py)?)
     }
 
     /// Create an OEM message from a string.
@@ -423,32 +500,21 @@ impl Oem {
     /// Oem
     ///     The parsed OEM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None))]
-    fn from_str(data: &str, format: Option<&str>) -> PyResult<Self> {
-        let inner =
-            match format {
-                Some("kvn") => core_oem::Oem::from_kvn(data)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
-                Some("xml") => core_oem::Oem::from_xml(data)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?,
-                Some(other) => {
-                    return Err(PyValueError::new_err(format!(
-                        "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                        other
-                    )))
-                }
-                None => match ccsds_ndm::from_str(data) {
-                    Ok(MessageType::Oem(oem)) => oem,
-                    Ok(other) => {
-                        return Err(PyValueError::new_err(format!(
-                            "Parsed message is not OEM (got {:?})",
-                            other
-                        )))
-                    }
-                    Err(e) => return Err(PyValueError::new_err(e.to_string())),
-                },
-            };
-        Ok(Self { inner })
+    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_str(
+        py: Python<'_>,
+        data: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = ParseOptions {
+            max_input_bytes,
+            max_records,
+            ..ParseOptions::default()
+        };
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        Self::from_core(py, inner)
     }
 
     /// Create an OEM message from a file.
@@ -466,62 +532,41 @@ impl Oem {
     /// Oem
     ///     The parsed OEM object.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None))]
-    fn from_file(path: &str, format: Option<&str>) -> PyResult<Self> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| PyValueError::new_err(format!("Failed to read file: {}", e)))?;
-        Self::from_str(&content, format)
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_file(
+        py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = ParseOptions {
+            max_input_bytes,
+            max_records,
+            ..ParseOptions::default()
+        };
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Self::from_core(py, inner)
     }
 
-    /// Serialize to string.
-    ///
-    /// Parameters
-    /// ----------
-    /// format : str
-    ///     Output format ('kvn' or 'xml').
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     The serialized string.
-    /// Serialize to string.
-    ///
-    /// Parameters
-    /// ----------
-    /// format : str
-    ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     The serialized string.
-    #[pyo3(signature = (format, validate=true))]
-    fn to_str(&self, format: &str, validate: bool) -> PyResult<String> {
-        if validate {
-            self.validate(true)?;
-        }
-
-        match format {
-            "kvn" => self
-                .inner
-                .to_kvn()
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
-            "xml" => {
-                // If we already validated, or explicitly opted out of validation (validate=False),
-                // we use the direct XML writer to avoid a double validation penalty or forced validation.
-                ccsds_ndm::xml::to_string(&self.inner)
-                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
-            }
-            other => Err(PyValueError::new_err(format!(
-                "Unsupported format '{}'. Use 'kvn' or 'xml'",
-                other
-            ))),
-        }
+    /// Serialize to validated KVN or XML.
+    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        format: &str,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<String> {
+        crate::api::generate_string_with_limit(
+            &self.to_core(py)?,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 
-    /// Write to file.
+    /// Write directly to a KVN or XML file.
     ///
     /// Parameters
     /// ----------
@@ -529,47 +574,41 @@ impl Oem {
     ///     Output file path.
     /// format : str
     ///     Output format ('kvn' or 'xml').
-    /// Write to file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     Output file path.
-    /// format : str
-    ///     Output format ('kvn' or 'xml').
-    /// validate : bool, optional
-    ///     Whether to validate the message before writing (default: True).
-    #[pyo3(signature = (path, format, validate=true))]
-    fn to_file(&self, path: &str, format: &str, validate: bool) -> PyResult<()> {
-        let data = self.to_str(format, validate)?;
-        match fs::write(path, data) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(PyValueError::new_err(format!(
-                "Failed to write file: {}",
-                e
-            ))),
-        }
+    /// version : str, optional
+    ///     Source version by default, ``"latest"``, or an exact supported version.
+    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        path: &str,
+        format: &str,
+        version: Option<&str>,
+        max_output_bytes: Option<usize>,
+    ) -> PyResult<()> {
+        crate::api::generate_file_with_limit(
+            &self.to_core(py)?,
+            path,
+            format,
+            version,
+            max_output_bytes,
+        )
     }
 }
 
 #[pymethods]
 impl OemSegment {
     #[new]
-    fn new(metadata: OemMetadata, data: OemData) -> Self {
-        Self {
-            inner: core_oem::OemSegment {
-                metadata: metadata.inner,
-                data: data.inner,
-            },
-        }
+    fn new(metadata: Py<OemMetadata>, data: Py<OemData>) -> Self {
+        Self { metadata, data }
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
+        let metadata = self.metadata.borrow(py);
         format!(
             "OemSegment(object_name='{}',start_time='{}',stop_time='{}')",
-            self.inner.metadata.object_name,
-            self.inner.metadata.start_time.as_str(),
-            self.inner.metadata.stop_time.as_str()
+            metadata.inner.object_name,
+            metadata.inner.start_time.as_str(),
+            metadata.inner.stop_time.as_str()
         )
     }
 
@@ -579,36 +618,32 @@ impl OemSegment {
     ///
     /// :type: OemMetadata
     #[getter]
-    fn get_metadata(&self) -> OemMetadata {
-        OemMetadata {
-            inner: self.inner.metadata.clone(),
-        }
+    fn get_metadata(&self, py: Python<'_>) -> Py<OemMetadata> {
+        self.metadata.clone_ref(py)
     }
 
     #[setter]
-    fn set_metadata(&mut self, metadata: OemMetadata) {
-        self.inner.metadata = metadata.inner;
+    fn set_metadata(&mut self, metadata: Py<OemMetadata>) {
+        self.metadata = metadata;
     }
 
     /// Segment data.
     ///
     /// :type: OemData
     #[getter]
-    fn get_data(&self) -> OemData {
-        OemData {
-            inner: self.inner.data.clone(),
-        }
+    fn get_data(&self, py: Python<'_>) -> Py<OemData> {
+        self.data.clone_ref(py)
     }
 
     #[setter]
-    fn set_data(&mut self, data: OemData) {
-        self.inner.data = data.inner;
+    fn set_data(&mut self, data: Py<OemData>) {
+        self.data = data;
     }
 
     /// Validate the segment against CCSDS rules.
-    fn validate(&self) -> PyResult<()> {
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
         use ccsds_ndm::traits::Validate;
-        self.inner
+        self.to_core(py)?
             .validate()
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
@@ -667,7 +702,9 @@ impl OemMetadata {
                 start_time: parse_epoch(&start_time)?,
                 stop_time: parse_epoch(&stop_time)?,
                 comment: comment.unwrap_or_default(),
-                ref_frame_epoch: ref_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
+                ref_frame_epoch: ref_frame_epoch
+                    .map(|s| parse_calendar_epoch(&s))
+                    .transpose()?,
                 useable_start_time: useable_start_time.map(|s| parse_epoch(&s)).transpose()?,
                 useable_stop_time: useable_stop_time.map(|s| parse_epoch(&s)).transpose()?,
                 interpolation,
@@ -838,7 +875,9 @@ impl OemMetadata {
 
     #[setter]
     fn set_ref_frame_epoch(&mut self, ref_frame_epoch: Option<String>) -> PyResult<()> {
-        self.inner.ref_frame_epoch = ref_frame_epoch.map(|s| parse_epoch(&s)).transpose()?;
+        self.inner.ref_frame_epoch = ref_frame_epoch
+            .map(|s| parse_calendar_epoch(&s))
+            .transpose()?;
         Ok(())
     }
 
@@ -944,35 +983,30 @@ impl OemData {
     #[new]
     #[pyo3(signature = (state_vectors, covariance_matrix=None, comments=None))]
     fn new(
-        state_vectors: Vec<StateVectorAcc>,
-        covariance_matrix: Option<Vec<OemCovarianceMatrix>>,
+        py: Python<'_>,
+        state_vectors: Vec<Py<StateVectorAcc>>,
+        covariance_matrix: Option<Vec<Py<OemCovarianceMatrix>>>,
         comments: Option<Vec<String>>,
-    ) -> Self {
-        Self {
-            inner: core_oem::OemData {
-                state_vector: state_vectors.into_iter().map(|s| s.inner).collect(),
-                comment: comments.unwrap_or_default(),
-                covariance_matrix: covariance_matrix
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|cm| cm.inner)
-                    .collect(),
-            },
-        }
+    ) -> PyResult<Self> {
+        Ok(Self {
+            state_vector: PyList::new(py, state_vectors)?.unbind(),
+            comment: comments.unwrap_or_default(),
+            covariance_matrix: PyList::new(py, covariance_matrix.unwrap_or_default())?.unbind(),
+        })
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "OemData(state_vector={}, covariance_matrix={})",
-            self.inner.state_vector.len(),
-            self.inner.covariance_matrix.len()
+            self.state_vector.bind(py).len(),
+            self.covariance_matrix.bind(py).len()
         )
     }
 
     /// Validate the data section against CCSDS rules.
-    fn validate(&self) -> PyResult<()> {
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
         use ccsds_ndm::traits::Validate;
-        self.inner
+        self.to_core(py)?
             .validate()
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
@@ -987,7 +1021,9 @@ impl OemData {
         cov_comments=None,
         comments=None
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn from_numpy(
+        py: Python<'_>,
         state_vector_epochs: Vec<String>,
         state_vector_numpy: PyReadonlyArray2<f64>,
         covariance_matrix_epochs: Option<Vec<String>>,
@@ -1250,13 +1286,14 @@ impl OemData {
             }
         }
 
-        Ok(Self {
-            inner: core_oem::OemData {
+        Self::from_core(
+            py,
+            core_oem::OemData {
                 state_vector: state_vectors,
                 comment: comments.unwrap_or_default(),
                 covariance_matrix: covariance_matrices,
             },
-        })
+        )
     }
 
     /// List of state vectors. Each vector contains position, velocity, and optional
@@ -1268,79 +1305,91 @@ impl OemData {
     ///
     /// :type: list[StateVectorAcc]
     #[getter]
-    fn get_state_vector(&self) -> Vec<StateVectorAcc> {
-        self.inner
-            .state_vector
-            .iter()
-            .map(|sv| StateVectorAcc { inner: sv.clone() })
-            .collect()
+    fn get_state_vector(&self, py: Python<'_>) -> Py<PyList> {
+        self.state_vector.clone_ref(py)
     }
 
     #[setter]
-    fn set_state_vector(&mut self, state_vectors: Vec<StateVectorAcc>) {
-        self.inner.state_vector = state_vectors.into_iter().map(|sv| sv.inner).collect();
+    fn set_state_vector(
+        &mut self,
+        py: Python<'_>,
+        state_vectors: Vec<Py<StateVectorAcc>>,
+    ) -> PyResult<()> {
+        self.state_vector = PyList::new(py, state_vectors)?.unbind();
+        Ok(())
     }
 
     /// Epochs for state vectors (ISO 8601).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_state_vector_epochs(&self) -> Vec<String> {
-        self.inner
+    fn get_state_vector_epochs(&self, py: Python<'_>) -> PyResult<Vec<String>> {
+        Ok(self
+            .to_core(py)?
             .state_vector
             .iter()
             .map(|sv| sv.epoch.as_str().to_string())
-            .collect()
+            .collect())
     }
 
     #[setter]
-    fn set_state_vector_epochs(&mut self, epochs: Vec<String>) -> PyResult<()> {
-        if self.inner.state_vector.is_empty() {
-            let mut state_vectors = Vec::with_capacity(epochs.len());
+    fn set_state_vector_epochs(&mut self, py: Python<'_>, epochs: Vec<String>) -> PyResult<()> {
+        let state_vectors = self.state_vector.bind(py);
+        if state_vectors.is_empty() {
             for epoch_str in epochs {
-                state_vectors.push(ccsds_ndm::common::StateVectorAcc {
-                    epoch: parse_epoch(&epoch_str)?,
-                    x: Position {
-                        value: 0.0,
-                        units: None,
+                state_vectors.append(Py::new(
+                    py,
+                    StateVectorAcc {
+                        inner: ccsds_ndm::common::StateVectorAcc {
+                            epoch: parse_epoch(&epoch_str)?,
+                            x: Position {
+                                value: 0.0,
+                                units: None,
+                            },
+                            y: Position {
+                                value: 0.0,
+                                units: None,
+                            },
+                            z: Position {
+                                value: 0.0,
+                                units: None,
+                            },
+                            x_dot: Velocity {
+                                value: 0.0,
+                                units: None,
+                            },
+                            y_dot: Velocity {
+                                value: 0.0,
+                                units: None,
+                            },
+                            z_dot: Velocity {
+                                value: 0.0,
+                                units: None,
+                            },
+                            x_ddot: None,
+                            y_ddot: None,
+                            z_ddot: None,
+                        },
                     },
-                    y: Position {
-                        value: 0.0,
-                        units: None,
-                    },
-                    z: Position {
-                        value: 0.0,
-                        units: None,
-                    },
-                    x_dot: Velocity {
-                        value: 0.0,
-                        units: None,
-                    },
-                    y_dot: Velocity {
-                        value: 0.0,
-                        units: None,
-                    },
-                    z_dot: Velocity {
-                        value: 0.0,
-                        units: None,
-                    },
-                    x_ddot: None,
-                    y_ddot: None,
-                    z_ddot: None,
-                });
+                )?)?;
             }
-            self.inner.state_vector = state_vectors;
             return Ok(());
         }
 
-        if epochs.len() != self.inner.state_vector.len() {
+        if epochs.len() != state_vectors.len() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "Number of epochs must match number of state vectors",
             ));
         }
 
-        for (sv, epoch_str) in self.inner.state_vector.iter_mut().zip(epochs.iter()) {
-            sv.epoch = parse_epoch(epoch_str)?;
+        for (index, epoch_str) in epochs.iter().enumerate() {
+            let value = state_vectors.get_item(index)?;
+            let mut state = value
+                .extract::<PyRefMut<'_, StateVectorAcc>>()
+                .map_err(|_| {
+                    PyValueError::new_err(format!("state_vector[{index}] must be StateVectorAcc"))
+                })?;
+            state.inner.epoch = parse_epoch(epoch_str)?;
         }
         Ok(())
     }
@@ -1356,55 +1405,73 @@ impl OemData {
     ///
     /// :type: list[OemCovarianceMatrix]
     #[getter]
-    fn get_covariance_matrix(&self) -> Vec<OemCovarianceMatrix> {
-        self.inner
-            .covariance_matrix
-            .iter()
-            .map(|cm| OemCovarianceMatrix { inner: cm.clone() })
-            .collect()
+    fn get_covariance_matrix(&self, py: Python<'_>) -> Py<PyList> {
+        self.covariance_matrix.clone_ref(py)
     }
 
     #[setter]
-    fn set_covariance_matrix(&mut self, covariance_matrices: Vec<OemCovarianceMatrix>) {
-        self.inner.covariance_matrix = covariance_matrices.into_iter().map(|cm| cm.inner).collect();
+    fn set_covariance_matrix(
+        &mut self,
+        py: Python<'_>,
+        covariance_matrices: Vec<Py<OemCovarianceMatrix>>,
+    ) -> PyResult<()> {
+        self.covariance_matrix = PyList::new(py, covariance_matrices)?.unbind();
+        Ok(())
     }
 
     /// Epochs for covariance matrices (ISO 8601).
     ///
     /// :type: list[str]
     #[getter]
-    fn get_covariance_matrix_epochs(&self) -> Vec<String> {
-        self.inner
+    fn get_covariance_matrix_epochs(&self, py: Python<'_>) -> PyResult<Vec<String>> {
+        Ok(self
+            .to_core(py)?
             .covariance_matrix
             .iter()
             .map(|cm| cm.epoch.as_str().to_string())
-            .collect()
+            .collect())
     }
 
     #[setter]
-    fn set_covariance_matrix_epochs(&mut self, epochs: Vec<String>) -> PyResult<()> {
-        if self.inner.covariance_matrix.is_empty() {
-            let mut covariance_matrices = Vec::with_capacity(epochs.len());
+    fn set_covariance_matrix_epochs(
+        &mut self,
+        py: Python<'_>,
+        epochs: Vec<String>,
+    ) -> PyResult<()> {
+        let covariance_matrices = self.covariance_matrix.bind(py);
+        if covariance_matrices.is_empty() {
             for epoch_str in epochs {
-                covariance_matrices.push(build_covariance_matrix(
-                    parse_epoch(&epoch_str)?,
-                    None,
-                    Vec::new(),
-                    [0.0; 21],
-                ));
+                covariance_matrices.append(Py::new(
+                    py,
+                    OemCovarianceMatrix {
+                        inner: build_covariance_matrix(
+                            parse_epoch(&epoch_str)?,
+                            None,
+                            Vec::new(),
+                            [0.0; 21],
+                        ),
+                    },
+                )?)?;
             }
-            self.inner.covariance_matrix = covariance_matrices;
             return Ok(());
         }
 
-        if epochs.len() != self.inner.covariance_matrix.len() {
+        if epochs.len() != covariance_matrices.len() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "Number of epochs must match number of covariance matrices",
             ));
         }
 
-        for (cm, epoch_str) in self.inner.covariance_matrix.iter_mut().zip(epochs.iter()) {
-            cm.epoch = parse_epoch(epoch_str)?;
+        for (index, epoch_str) in epochs.iter().enumerate() {
+            let value = covariance_matrices.get_item(index)?;
+            let mut covariance = value
+                .extract::<PyRefMut<'_, OemCovarianceMatrix>>()
+                .map_err(|_| {
+                    PyValueError::new_err(format!(
+                        "covariance_matrix[{index}] must be OemCovarianceMatrix"
+                    ))
+                })?;
+            covariance.inner.epoch = parse_epoch(epoch_str)?;
         }
         Ok(())
     }
@@ -1414,12 +1481,12 @@ impl OemData {
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
-        self.inner.comment.clone()
+        self.comment.clone()
     }
 
     #[setter]
     fn set_comment(&mut self, comments: Vec<String>) {
-        self.inner.comment = comments;
+        self.comment = comments;
     }
 
     /// State vectors as a NumPy array.
@@ -1440,17 +1507,17 @@ impl OemData {
     ///
     /// :type: numpy.ndarray
     #[getter]
-    fn get_state_vector_numpy<'py>(&self, py: Python<'py>) -> Py<PyAny> {
-        let has_accel = self
-            .inner
+    fn get_state_vector_numpy<'py>(&self, py: Python<'py>) -> PyResult<Py<PyAny>> {
+        let core = self.to_core(py)?;
+        let has_accel = core
             .state_vector
             .iter()
             .any(|sv| sv.x_ddot.is_some() || sv.y_ddot.is_some() || sv.z_ddot.is_some());
 
         let num_cols = if has_accel { 9 } else { 6 };
-        let mut data = Vec::with_capacity(self.inner.state_vector.len() * num_cols);
+        let mut data = Vec::with_capacity(core.state_vector.len() * num_cols);
 
-        for sv in &self.inner.state_vector {
+        for sv in &core.state_vector {
             data.push(sv.x.value);
             data.push(sv.y.value);
             data.push(sv.z.value);
@@ -1464,13 +1531,17 @@ impl OemData {
             }
         }
         let array = PyArray::from_vec(py, data)
-            .reshape([self.inner.state_vector.len(), num_cols])
+            .reshape([core.state_vector.len(), num_cols])
             .unwrap();
-        array.into()
+        Ok(array.into())
     }
 
     #[setter]
-    fn set_state_vector_numpy(&mut self, array: PyReadonlyArray2<f64>) -> PyResult<()> {
+    fn set_state_vector_numpy(
+        &mut self,
+        py: Python<'_>,
+        array: PyReadonlyArray2<f64>,
+    ) -> PyResult<()> {
         let shape = array.shape();
         if shape.len() != 2 {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1482,12 +1553,13 @@ impl OemData {
                 "NumPy array must have 6 or 9 columns",
             ));
         }
-        if self.inner.state_vector.is_empty() {
+        let core = self.to_core(py)?;
+        if core.state_vector.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "State vector epochs are missing; set state_vector_epochs or use from_numpy",
             ));
         }
-        if self.inner.state_vector.len() != shape[0] {
+        if core.state_vector.len() != shape[0] {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "Number of rows must match number of state vectors",
             ));
@@ -1497,7 +1569,7 @@ impl OemData {
         let array_view = array.as_array();
         let mut state_vectors = Vec::with_capacity(shape[0]);
 
-        for (i, existing) in self.inner.state_vector.iter().enumerate() {
+        for (i, existing) in core.state_vector.iter().enumerate() {
             let row = array_view.row(i);
             state_vectors.push(ccsds_ndm::common::StateVectorAcc {
                 epoch: existing.epoch,
@@ -1552,7 +1624,16 @@ impl OemData {
             });
         }
 
-        self.inner.state_vector = state_vectors;
+        let values = self.state_vector.bind(py);
+        for (index, inner) in state_vectors.into_iter().enumerate() {
+            let value = values.get_item(index)?;
+            let mut state = value
+                .extract::<PyRefMut<'_, StateVectorAcc>>()
+                .map_err(|_| {
+                    PyValueError::new_err(format!("state_vector[{index}] must be StateVectorAcc"))
+                })?;
+            state.inner = inner;
+        }
         Ok(())
     }
 
@@ -1568,11 +1649,12 @@ impl OemData {
     /// :type: numpy.ndarray
     #[getter]
     fn get_covariance_matrix_numpy<'py>(&self, py: Python<'py>) -> PyResult<Py<PyAny>> {
-        let num_matrices = self.inner.covariance_matrix.len();
+        let core = self.to_core(py)?;
+        let num_matrices = core.covariance_matrix.len();
         // 6x6 matrix = 36 elements per epoch
         let mut data = Vec::with_capacity(num_matrices * 36);
 
-        for cm in &self.inner.covariance_matrix {
+        for cm in &core.covariance_matrix {
             // Row 0 (X)
             data.push(cm.cx_x.value); // 0,0
             data.push(cm.cy_x.value); // 0,1
@@ -1627,7 +1709,11 @@ impl OemData {
     }
 
     #[setter]
-    fn set_covariance_matrix_numpy(&mut self, array: PyReadonlyArrayDyn<f64>) -> PyResult<()> {
+    fn set_covariance_matrix_numpy(
+        &mut self,
+        py: Python<'_>,
+        array: PyReadonlyArrayDyn<f64>,
+    ) -> PyResult<()> {
         let shape = array.shape();
         let num_matrices = match shape.len() {
             3 => {
@@ -1665,18 +1751,19 @@ impl OemData {
             }
         };
 
-        if self.inner.covariance_matrix.is_empty() {
+        let core = self.to_core(py)?;
+        if core.covariance_matrix.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "Covariance epochs are missing; set covariance_matrix_epochs or use from_numpy",
             ));
         }
-        if self.inner.covariance_matrix.len() != num_matrices {
+        if core.covariance_matrix.len() != num_matrices {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "Number of matrices must match number of covariance epochs",
             ));
         }
 
-        let existing = self.inner.covariance_matrix.clone();
+        let existing = core.covariance_matrix;
         let array_view = array.as_array();
         let mut covariance_matrices = Vec::with_capacity(num_matrices);
 
@@ -1788,7 +1875,18 @@ impl OemData {
             ));
         }
 
-        self.inner.covariance_matrix = covariance_matrices;
+        let values = self.covariance_matrix.bind(py);
+        for (index, inner) in covariance_matrices.into_iter().enumerate() {
+            let value = values.get_item(index)?;
+            let mut covariance = value
+                .extract::<PyRefMut<'_, OemCovarianceMatrix>>()
+                .map_err(|_| {
+                    PyValueError::new_err(format!(
+                        "covariance_matrix[{index}] must be OemCovarianceMatrix"
+                    ))
+                })?;
+            covariance.inner = inner;
+        }
         Ok(())
     }
 }

@@ -2,10 +2,34 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::{from_str, MessageType};
+use ccsds_ndm::messages::ndm::CombinedNdm;
+use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::{detect::detect_notation, from_str, MessageType, Notation};
+
+const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
+const OPM_XML: &str = include_str!("../data/xml/opm_g5.xml");
 
 #[test]
-fn test_kvn_detect_messy_preamble() {
+fn notation_detection_and_auto_parse_are_bom_safe() {
+    assert_eq!(detect_notation("\u{feff}  <opm/>").unwrap(), Notation::Xml);
+    assert_eq!(
+        detect_notation("\u{feff}\nCCSDS_OPM_VERS = 3.0").unwrap(),
+        Notation::Kvn
+    );
+    assert!(detect_notation("\u{feff} \r\n").is_err());
+
+    assert!(matches!(
+        from_str(&format!("\u{feff}{OPM_KVN}")).unwrap(),
+        MessageType::Opm(_)
+    ));
+    assert!(matches!(
+        from_str(&format!("\u{feff}{OPM_XML}")).unwrap(),
+        MessageType::Opm(_)
+    ));
+}
+
+#[test]
+fn test_kvn_detection_does_not_bypass_strict_preamble_rules() {
     let input = r#"
 
     COMMENT This file starts with blank lines
@@ -29,19 +53,19 @@ fn test_kvn_detect_messy_preamble() {
     Y_DOT = 7.5 [km/s]
     Z_DOT = 0.0 [km/s]
 "#;
-    let msg = from_str(input).unwrap();
-    assert!(matches!(msg, MessageType::Opm(_)));
+    let error = from_str(input).expect_err("leading comments would be lost");
+    assert_eq!(error.code(), Some("parse.kvn.syntax"));
 }
 
 #[test]
-fn test_kvn_detect_crlf_and_tabs() {
+fn test_kvn_detection_does_not_bypass_printable_ascii_rules() {
     let input = "\r\n\tCOMMENT Tab indented\r\n\t\t\r\nCCSDS_OPM_VERS = 3.0\r\nCREATION_DATE = 2024-01-01T00:00:00\r\nORIGINATOR=X\r\nOBJECT_NAME=Y\r\nOBJECT_ID=1\r\nCENTER_NAME=EARTH\r\nREF_FRAME=GCRF\r\nTIME_SYSTEM=UTC\r\nEPOCH=2024-01-01T00:00:00\r\nX=0\r\nY=0\r\nZ=0\r\nX_DOT=0\r\nY_DOT=0\r\nZ_DOT=0\r\n";
-    let msg = from_str(input).unwrap();
-    assert!(matches!(msg, MessageType::Opm(_)));
+    let error = from_str(input).expect_err("tabs are not printable ASCII");
+    assert_eq!(error.code(), Some("parse.kvn.syntax"));
 }
 
 #[test]
-fn test_xml_detect_messy_preamble() {
+fn test_xml_detection_does_not_bypass_declaration_placement() {
     let input = r#"
     <?xml version="1.0" encoding="UTF-8"?>
     <!-- A comment before the root element -->
@@ -76,8 +100,8 @@ fn test_xml_detect_messy_preamble() {
         </body>
       </opm>
 "#;
-    let msg = from_str(input).unwrap();
-    assert!(matches!(msg, MessageType::Opm(_)));
+    let error = from_str(input).expect_err("the XML declaration is not first");
+    assert_eq!(error.code(), Some("parse.xml.syntax"));
 }
 
 #[test]
@@ -89,4 +113,41 @@ fn test_detect_failure_unknown_header() {
     "#;
     let err = from_str(input).unwrap_err();
     assert!(format!("{}", err).contains("Could not identify KVN header"));
+}
+
+#[test]
+fn kvn_header_names_inside_values_do_not_create_a_combined_message() {
+    let input = OPM_KVN.replace(
+        "COMMENT GEOCENTRIC, CARTESIAN, EARTH FIXED",
+        "COMMENT text mentioning CCSDS_OEM_VERS is not an OEM header",
+    );
+    assert!(matches!(from_str(&input).unwrap(), MessageType::Opm(_)));
+}
+
+#[test]
+fn xml_detection_rejects_nonstandard_wrappers_and_preserves_combined_identity() {
+    let opm_root = &OPM_XML[OPM_XML.find("<opm").unwrap()..];
+    let wrapped = format!("<response>{opm_root}</response>");
+    let error = from_str(&wrapped).expect_err("unknown wrappers are not strict NDM XML");
+    assert!(error.to_string().contains("unsupported XML root tag"));
+
+    let MessageType::Opm(opm) = from_str(OPM_XML).unwrap() else {
+        panic!("fixture should be an OPM");
+    };
+    let combined = CombinedNdm {
+        id: None,
+        comments: Vec::new(),
+        messages: vec![MessageType::Opm(opm)],
+    }
+    .to_xml()
+    .unwrap();
+    assert!(matches!(from_str(&combined).unwrap(), MessageType::Ndm(_)));
+}
+
+#[test]
+fn xml_detection_accepts_an_empty_combined_instantiation() {
+    let MessageType::Ndm(message) = from_str("<ndm/>").unwrap() else {
+        panic!("an empty combined instantiation should preserve its NDM identity");
+    };
+    assert!(message.messages.is_empty());
 }

@@ -12,7 +12,7 @@ use crate::messages::tdm::{
     Tdm, TdmBody, TdmData, TdmHeader, TdmMetadata, TdmObservation, TdmObservationData, TdmSegment,
 };
 use crate::parse_block;
-use crate::types::{Epoch, Percentage};
+use crate::types::{CalendarEpoch, Percentage};
 use winnow::combinator::preceded;
 use winnow::error::{AddContext, ErrMode, StrContext};
 use winnow::prelude::*;
@@ -59,7 +59,7 @@ pub fn tdm_header(input: &mut &str) -> KvnResult<TdmHeader> {
         kv_sep.parse_next(input)?;
         match key {
             "CREATION_DATE" => {
-                creation_date = Some(kv_epoch.parse_next(input)?);
+                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
             }
             "ORIGINATOR" => {
                 originator = Some(kv_string.parse_next(input)?);
@@ -158,8 +158,8 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
         "TRACK_ID" => val: kv_string => { track_id = Some(val); },
         "DATA_TYPES" => val: kv_string => { data_types = Some(val); },
         "TIME_SYSTEM" => val: kv_string => { time_system = Some(val); },
-        "START_TIME" => val: kv_epoch => { start_time = Some(val); },
-        "STOP_TIME" => val: kv_epoch => { stop_time = Some(val); },
+        "START_TIME" => val: kv_calendar_epoch => { start_time = Some(val); },
+        "STOP_TIME" => val: kv_calendar_epoch => { stop_time = Some(val); },
         "PARTICIPANT_1" => val: kv_string => { participant_1 = Some(val); },
         "PARTICIPANT_2" => val: kv_string => { participant_2 = Some(val); },
         "PARTICIPANT_3" => val: kv_string => { participant_3 = Some(val); },
@@ -293,6 +293,7 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
 pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
     use winnow::combinator::dispatch;
 
+    let kv_epoch_token = kv_calendar_epoch_token;
     let checkpoint = input.checkpoint();
     let (epoch, data) = dispatch! {
         preceded(ws, keyword);
@@ -346,7 +347,7 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
         "TROPO_WET" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoWet(v)))),
         "VLBI_DELAY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::VlbiDelay(v)))),
         _ => |i: &mut &str| Err(ErrMode::Cut(InternalParserError::from_input(i).add_context(i, &i.checkpoint(), StrContext::Label("Unknown TDM data keyword")))),
-    }.try_map(|res: std::result::Result<(Epoch, TdmObservationData), CcsdsNdmError>| res).parse_next(input).map_err(|e| {
+    }.try_map(|res: std::result::Result<(CalendarEpoch, TdmObservationData), CcsdsNdmError>| res).parse_next(input).map_err(|e| {
         if e.is_backtrack() {
             ErrMode::Backtrack(InternalParserError::from_input(input).add_context(
                 input,
@@ -467,10 +468,6 @@ impl ParseKvn for Tdm {
     fn parse_kvn(input: &mut &str) -> KvnResult<Self> {
         parse_tdm.parse_next(input)
     }
-}
-
-pub fn parse_u64(s: &str) -> crate::error::Result<u64> {
-    s.trim().parse::<u64>().map_err(CcsdsNdmError::from)
 }
 
 //----------------------------------------------------------------------
@@ -1290,7 +1287,7 @@ DATA_STOP
 
     #[test]
     fn test_xsd_sample_tdm_e1_kvn() {
-        let kvn = include_str!("../../../data/kvn/tdm_e1.kvn");
+        let kvn = include_str!("../../data/kvn/tdm_e1.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
         assert!(!tdm.body.segments[0].metadata.time_system.is_empty());
@@ -1298,21 +1295,21 @@ DATA_STOP
 
     #[test]
     fn test_xsd_sample_tdm_e2_kvn() {
-        let kvn = include_str!("../../../data/kvn/tdm_e2.kvn");
+        let kvn = include_str!("../../data/kvn/tdm_e2.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
     }
 
     #[test]
     fn test_xsd_sample_tdm_e3_kvn() {
-        let kvn = include_str!("../../../data/kvn/tdm_e3.kvn");
+        let kvn = include_str!("../../data/kvn/tdm_e3.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
     }
 
     #[test]
     fn test_xsd_sample_tdm_e16_kvn() {
-        let kvn = include_str!("../../../data/kvn/tdm_e16.kvn");
+        let kvn = include_str!("../../data/kvn/tdm_e16.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
         let seg = &tdm.body.segments[0];
@@ -1321,7 +1318,7 @@ DATA_STOP
 
     #[test]
     fn test_xsd_sample_tdm_e18_kvn() {
-        let kvn = include_str!("../../../data/kvn/tdm_e18.kvn");
+        let kvn = include_str!("../../data/kvn/tdm_e18.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
     }
@@ -1432,10 +1429,7 @@ CCSDS_TDM_VERS = 2.0
         match err {
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
-                    assert!(err
-                        .message
-                        .to_lowercase()
-                        .contains("expected ccsds_tdm_vers"));
+                    assert!(err.message.contains("assignment outside a TDM section"));
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
             },
@@ -1461,8 +1455,8 @@ DATA_STOP
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
                     assert!(
-                        err.message.contains("Unknown TDM data keyword")
-                            || err.contexts.contains(&"Unknown TDM data keyword")
+                        err.message.contains("unknown TDM observation keyword")
+                            || err.contexts.contains(&"while validating TDM KVN structure")
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
@@ -1490,8 +1484,8 @@ DATA_STOP
             CcsdsNdmError::Format(format_err) => match *format_err {
                 FormatError::Kvn(ref err) => {
                     assert!(
-                        err.message.contains("Unexpected TDM Metadata key")
-                            || err.contexts.contains(&"Unexpected TDM Metadata key")
+                        err.message.contains("unknown TDM metadata keyword")
+                            || err.contexts.contains(&"while validating TDM KVN structure")
                     );
                 }
                 _ => panic!("unexpected format error: {:?}", format_err),
