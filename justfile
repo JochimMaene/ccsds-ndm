@@ -84,7 +84,7 @@ fmt-rust-check:
 # Lint the Rust code
 [private]
 lint-rust:
-    cargo clippy --manifest-path {{rust_manifest}} -- -D warnings
+    cargo clippy --manifest-path {{rust_manifest}} --all-targets --all-features -- -D warnings
     cargo clippy --manifest-path {{python_manifest}} -- -D warnings
 
 # Format the Python code

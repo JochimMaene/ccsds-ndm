@@ -40,7 +40,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@1.88.0
       - name: Check the published library
-        run: cargo check --locked --manifest-path ccsds-ndm/Cargo.toml --lib
+        # No --locked: Cargo.lock is not tracked, so a clean checkout has no lock file to honor.
+        run: cargo check --manifest-path ccsds-ndm/Cargo.toml --lib
 
   fmt:
     name: Linting - Format check

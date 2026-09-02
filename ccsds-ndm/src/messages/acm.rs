@@ -108,7 +108,7 @@ impl Acm {
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
         let invalid_number = || {
             CcsdsNdmError::Validation(Box::new(ValidationError::Generic {
-                message: Cow::Borrowed("ACM KVN numbers must be finite"),
+                message: Cow::Borrowed("ACM KVN numbers must be representable CCSDS numbers"),
                 line: None,
             }))
         };

@@ -64,4 +64,18 @@ fn opm_kvn_generation_has_bounded_allocations() {
         streaming_stats.bytes_reallocated <= 128,
         "streaming reallocated bytes exceeded its budget: {streaming_stats:?}"
     );
+
+    // Repeated blocks report indexed diagnostic paths, which must stay unbuilt while validation
+    // is finding nothing wrong.
+    let maneuvers = Opm::from_kvn(include_str!("../data/kvn/opm_g2.kvn")).unwrap();
+    assert_eq!(maneuvers.body.segment.data.maneuver_parameters.len(), 2);
+    let _ = maneuvers.to_kvn().unwrap();
+    let maneuver_region = Region::new(GLOBAL);
+    let generated = black_box(&maneuvers).to_kvn().unwrap();
+    let maneuver_stats = maneuver_region.change();
+    black_box(&generated);
+    assert!(
+        maneuver_stats.allocations <= 16,
+        "maneuver allocation count exceeded its budget: {maneuver_stats:?}"
+    );
 }

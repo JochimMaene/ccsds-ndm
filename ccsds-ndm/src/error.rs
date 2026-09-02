@@ -345,11 +345,17 @@ impl ValidationError {
         }
     }
 
-    pub(crate) fn at_field_in(self, parent_path: &'static str) -> Self {
+    pub(crate) fn at_field_in(self, parent_path: impl Into<Cow<'static, str>>) -> Self {
+        let parent_path = parent_path.into();
         if matches!(self, Self::AtPath { .. }) {
             return self;
         }
-        if matches!(self, Self::MissingRequiredField { .. }) && self.field_path().is_some() {
+        // A block name derives its own path (see `field_path`), which is kept unless the caller
+        // supplies an indexed parent path: only the caller knows which repeat failed.
+        if matches!(self, Self::MissingRequiredField { .. })
+            && self.field_path().is_some()
+            && !parent_path.ends_with(']')
+        {
             return self;
         }
         let field = match &self {
@@ -365,7 +371,7 @@ impl ValidationError {
             Some(field) => format!("{field}.units"),
             None => field.replace(' ', "_"),
         };
-        let path = match parent_path {
+        let path = match parent_path.as_ref() {
             "" => field,
             _ => format!("{parent_path}.{field}"),
         };
@@ -893,7 +899,7 @@ impl CcsdsNdmError {
             Some(error) => {
                 let excerpt = input
                     .get(error.offset..)
-                    .and_then(|tail| tail.lines().next())
+                    .and_then(|tail| tail.split(['\r', '\n']).next())
                     .map(|token| token.chars().take(128).collect());
                 (
                     Some(error.offset),

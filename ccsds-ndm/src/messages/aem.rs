@@ -444,7 +444,9 @@ fn validate_aem_state_numbers(state: &AemAttitudeStateWrapper) -> Result<()> {
             Ok(())
         } else {
             Err(ValidationError::Generic {
-                message: Cow::Borrowed("AEM KVN attitude-state numbers must be finite"),
+                message: Cow::Borrowed(
+                    "AEM KVN attitude-state numbers must be representable CCSDS numbers",
+                ),
                 line: None,
             }
             .into())

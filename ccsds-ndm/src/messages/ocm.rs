@@ -875,7 +875,7 @@ impl Ocm {
                         return Err(ValidationError::InvalidValue {
                             field: Cow::Borrowed("trajLine"),
                             value: value.to_string(),
-                            expected: Cow::Borrowed("a finite number"),
+                            expected: Cow::Borrowed("a representable CCSDS number"),
                             line: None,
                         }
                         .into());
@@ -890,7 +890,7 @@ impl Ocm {
                         return Err(ValidationError::InvalidValue {
                             field: Cow::Borrowed("covLine"),
                             value: value.to_string(),
-                            expected: Cow::Borrowed("a finite number"),
+                            expected: Cow::Borrowed("a representable CCSDS number"),
                             line: None,
                         }
                         .into());

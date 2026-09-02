@@ -73,6 +73,7 @@ fn assert_missing_required<T: std::fmt::Debug>(
     let validation = error
         .as_validation_error()
         .unwrap_or_else(|| panic!("{surface} returned a non-validation error: {error}"));
+    let validation = validation_error_source(validation);
     assert!(
         matches!(
             validation,
@@ -356,7 +357,7 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
         ),
         (
             "maneuver COMMENT",
-            "body.segment.data.maneuver_parameters.comment",
+            "body.segment.data.maneuver_parameters[0].comment",
             1,
             |opm| {
                 opm.body.segment.data.maneuver_parameters[0]
@@ -366,7 +367,7 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
         ),
         (
             "MAN_REF_FRAME",
-            "body.segment.data.maneuver_parameters.man_ref_frame",
+            "body.segment.data.maneuver_parameters[0].man_ref_frame",
             1,
             |opm| {
                 opm.body.segment.data.maneuver_parameters[0]
@@ -572,7 +573,7 @@ fn opm_3_xml_generation_reports_all_reachable_missing_required_paths() {
         ),
         (
             "MAN_REF_FRAME",
-            "body.segment.data.maneuver_parameters.man_ref_frame",
+            "body.segment.data.maneuver_parameters[0].man_ref_frame",
             1,
             |opm| {
                 opm.body.segment.data.maneuver_parameters[0]
@@ -854,7 +855,7 @@ fn opm_3_xml_generation_rejects_every_invalid_maneuver_value() {
             Opm::from_kvn(OPM_3_KVN_FIXTURES[1].1).expect("failed to parse maneuver fixture");
         mutate(&mut opm);
         let path = format!(
-            "body.segment.data.maneuver_parameters.{}",
+            "body.segment.data.maneuver_parameters[0].{}",
             field.to_ascii_lowercase()
         );
         assert_invalid_value_diagnostic(field, opm.to_xml(), &path);
@@ -871,7 +872,7 @@ fn opm_3_xml_generation_validates_maneuver_boundaries() {
     assert_out_of_range_diagnostic(
         "MAN_DURATION",
         maneuver.to_xml(),
-        "body.segment.data.maneuver_parameters.man_duration",
+        "body.segment.data.maneuver_parameters[0].man_duration",
     );
 
     let mut zero_delta_mass =
@@ -890,7 +891,7 @@ fn opm_3_xml_generation_validates_maneuver_boundaries() {
     assert_out_of_range_diagnostic(
         "MAN_DELTA_MASS",
         zero_delta_mass.to_xml(),
-        "body.segment.data.maneuver_parameters.man_delta_mass",
+        "body.segment.data.maneuver_parameters[0].man_delta_mass",
     );
 }
 

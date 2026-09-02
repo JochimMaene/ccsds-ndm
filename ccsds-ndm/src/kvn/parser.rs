@@ -234,7 +234,14 @@ pub fn kvn_value<'a>(input: &mut &'a str) -> KvnResult<(&'a str, Option<&'a str>
 
 /// Parses a COMMENT line.
 pub fn comment_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
-    preceded((ws, "COMMENT", space0), till_line_ending).parse_next(input)
+    ws.parse_next(input)?;
+    "COMMENT".parse_next(input)?;
+    if let Some(rest) = input.strip_prefix(' ') {
+        *input = rest;
+    } else if !input.is_empty() && !input.starts_with(['\r', '\n']) {
+        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
+    }
+    till_line_ending.parse_next(input)
 }
 
 /// Parses a key-value pair line.
@@ -503,6 +510,11 @@ pub fn opt_line_ending(input: &mut &str) -> KvnResult<()> {
     (space0, opt(line_ending)).void().parse_next(input)
 }
 
+/// Skips any run of blank lines.
+pub fn blank_lines(input: &mut &str) -> KvnResult<()> {
+    repeat(0.., (ws, line_ending)).parse_next(input)
+}
+
 //----------------------------------------------------------------------
 // Direct Value Parsers
 //----------------------------------------------------------------------
@@ -741,7 +753,7 @@ pub fn collect_comments(input: &mut &str) -> KvnResult<Vec<String>> {
         0..,
         alt((
             // Corrected: removed unnecessary parentheses around alt
-            preceded(ws, comment_line).map(|s| Some(s.trim().to_string())),
+            preceded(ws, comment_line).map(|s| Some(s.to_string())),
             (ws, line_ending).map(|_| None),
         )),
     )
@@ -1017,8 +1029,9 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
     Ok(OdmHeader {
         comment,
         classification,
-        creation_date: creation_date.ok_or_else(|| cut_err(input, "Expected CREATION_DATE"))?,
-        originator: originator.ok_or_else(|| cut_err(input, "Expected ORIGINATOR"))?,
+        creation_date: creation_date
+            .ok_or_else(|| missing_field_err(input, "Header", "CREATION_DATE"))?,
+        originator: originator.ok_or_else(|| missing_field_err(input, "Header", "ORIGINATOR"))?,
         message_id,
     })
 }
@@ -1353,11 +1366,15 @@ mod tests {
     fn test_comment_line() {
         let mut input = "COMMENT This is a comment\n";
         let content = comment_line.parse_next(&mut input).unwrap();
-        assert_eq!(content.trim(), "This is a comment");
+        assert_eq!(content, "This is a comment");
 
         let mut input = "COMMENT\n";
         let content = comment_line.parse_next(&mut input).unwrap();
-        assert_eq!(content.trim(), "");
+        assert_eq!(content, "");
+
+        let mut input = "COMMENT    indented   \n";
+        let content = comment_line.parse_next(&mut input).unwrap();
+        assert_eq!(content, "   indented   ");
     }
 
     #[test]

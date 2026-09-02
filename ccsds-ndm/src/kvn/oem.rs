@@ -40,7 +40,7 @@
 //!             └── CovarianceMatrix* (optional, within COVARIANCE_START/STOP)
 //! ```
 
-use crate::common::{OdmHeader, StateVectorAcc};
+use crate::common::StateVectorAcc;
 use crate::error::InternalParserError;
 use crate::kvn::parser::*;
 use crate::messages::oem::{Oem, OemBody, OemCovarianceMatrix, OemData, OemMetadata, OemSegment};
@@ -66,65 +66,6 @@ pub fn oem_version(input: &mut &str) -> KvnResult<String> {
 
     let (value, _) = expect_key("CCSDS_OEM_VERS").parse_next(input)?;
     Ok(value.to_string())
-}
-
-pub fn oem_header(input: &mut &str) -> KvnResult<OdmHeader> {
-    let mut comment = Vec::new();
-    let mut classification = None;
-    let mut creation_date = None;
-    let mut originator = None;
-    let mut message_id = None;
-
-    loop {
-        let checkpoint_loop = input.checkpoint();
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let key = match preceded(ws, keyword).parse_next(input) {
-            Ok(k) => k,
-            Err(_) => {
-                input.reset(&checkpoint_loop);
-                break;
-            }
-        };
-
-        if key == "META_START" {
-            input.reset(&checkpoint_loop);
-            break;
-        }
-
-        kv_sep.parse_next(input)?;
-        match key {
-            "CLASSIFICATION" => {
-                classification = Some(kv_string.parse_next(input)?);
-            }
-            "CREATION_DATE" => {
-                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
-            }
-            "ORIGINATOR" => {
-                originator = Some(kv_string.parse_next(input)?);
-            }
-            "MESSAGE_ID" => {
-                message_id = Some(kv_string.parse_next(input)?);
-            }
-            _ => {
-                input.reset(&checkpoint_loop);
-                break;
-            }
-        }
-
-        if input.offset_from(&checkpoint_loop) == 0 {
-            break;
-        }
-    }
-
-    Ok(OdmHeader {
-        comment,
-        classification,
-        creation_date: creation_date
-            .ok_or_else(|| missing_field_err(input, "Header", "CREATION_DATE"))?,
-        originator: originator.ok_or_else(|| missing_field_err(input, "Header", "ORIGINATOR"))?,
-        message_id,
-    })
 }
 
 //----------------------------------------------------------------------
@@ -312,7 +253,7 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
     let mut floats = Vec::with_capacity(21);
 
     for expected_count in expected_counts {
-        comment.extend(collect_comments.parse_next(input)?);
+        blank_lines.parse_next(input)?;
 
         let line_vals = (
             preceded(ws, parse_odm_f64),
@@ -611,7 +552,7 @@ pub fn parse_oem(input: &mut &str) -> KvnResult<Oem> {
     let version = oem_version.parse_next(input)?;
 
     // 2. Header
-    let header = oem_header.parse_next(input)?;
+    let header = odm_header.parse_next(input)?;
 
     // 3. Body (segments)
     let body = oem_body.parse_next(input)?;
@@ -2165,10 +2106,10 @@ META_STOP
     }
 
     #[test]
-    fn test_oem_header_loops() {
+    fn oem_reuses_the_shared_odm_header_parser() {
         let mut input =
             "COMMENT C1\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = ME\nMETA_START";
-        let header = oem_header.parse_next(&mut input).unwrap();
+        let header = odm_header.parse_next(&mut input).unwrap();
         assert_eq!(header.comment, vec!["C1"]);
         assert_eq!(header.originator, "ME");
         assert_eq!(input, "META_START");

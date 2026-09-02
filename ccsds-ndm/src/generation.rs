@@ -111,7 +111,10 @@ pub trait VersionedNdm: Ndm {
         crate::xml::validate_output_text(self)
     }
 
-    /// Validate the complete model and KVN-specific generation constraints.
+    /// The complete KVN preflight: model validation plus every notation-specific constraint.
+    ///
+    /// Both KVN entry points run this exactly once and nothing else, so streaming never emits
+    /// bytes for a message that would fail validation. Implementors own the whole check.
     #[doc(hidden)]
     fn validate_kvn_output(&self) -> Result<()> {
         self.validate()
@@ -135,7 +138,6 @@ fn stream_kvn<T: VersionedNdm + ToKvn, W: Write>(message: &T, output: &mut W) ->
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
         message.validate_kvn_output()?;
-        ToKvn::validate_kvn(message)?;
         let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
         ToKvn::write_kvn(message, &mut writer);
         writer.finish_io()
@@ -150,6 +152,30 @@ macro_rules! impl_versioned_ndm {
 
             fn version(&self) -> &str {
                 &self.version
+            }
+
+            fn validate_kvn_output(&self) -> Result<()> {
+                self.validate()?;
+                ToKvn::validate_kvn(self)
+            }
+
+            fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
+                stream_kvn(self, output)
+            }
+        }
+    };
+    ($type:path, $kind:ident, kvn_representability) => {
+        impl VersionedNdm for $type {
+            const KIND: MessageKind = MessageKind::$kind;
+
+            fn version(&self) -> &str {
+                &self.version
+            }
+
+            fn validate_kvn_output(&self) -> Result<()> {
+                self.validate()?;
+                self.validate_kvn_representability()?;
+                ToKvn::validate_kvn(self)
             }
 
             fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
@@ -168,7 +194,8 @@ impl VersionedNdm for crate::messages::acm::Acm {
 
     fn validate_kvn_output(&self) -> Result<()> {
         self.validate()?;
-        self.validate_kvn_representability()
+        self.validate_kvn_representability()?;
+        ToKvn::validate_kvn(self)
     }
 
     fn validate_xml_output(&self) -> Result<()> {
@@ -184,90 +211,11 @@ impl VersionedNdm for crate::messages::acm::Acm {
 impl_versioned_ndm!(crate::messages::apm::Apm, Apm);
 impl_versioned_ndm!(crate::messages::omm::Omm, Omm);
 
-impl VersionedNdm for crate::messages::cdm::Cdm {
-    const KIND: MessageKind = MessageKind::Cdm;
-
-    fn version(&self) -> &str {
-        &self.version
-    }
-
-    fn validate_kvn_output(&self) -> Result<()> {
-        self.validate()?;
-        self.validate_kvn_representability()
-    }
-
-    fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        stream_kvn(self, output)
-    }
-}
-
-impl VersionedNdm for crate::messages::aem::Aem {
-    const KIND: MessageKind = MessageKind::Aem;
-
-    fn version(&self) -> &str {
-        &self.version
-    }
-
-    fn validate_kvn_output(&self) -> Result<()> {
-        self.validate()?;
-        self.validate_kvn_representability()
-    }
-
-    fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        stream_kvn(self, output)
-    }
-}
-
-impl VersionedNdm for crate::messages::ocm::Ocm {
-    const KIND: MessageKind = MessageKind::Ocm;
-
-    fn version(&self) -> &str {
-        &self.version
-    }
-
-    fn validate_kvn_output(&self) -> Result<()> {
-        self.validate()?;
-        self.validate_kvn_representability()
-    }
-
-    fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        stream_kvn(self, output)
-    }
-}
-
-impl VersionedNdm for crate::messages::tdm::Tdm {
-    const KIND: MessageKind = MessageKind::Tdm;
-
-    fn version(&self) -> &str {
-        &self.version
-    }
-
-    fn validate_kvn_output(&self) -> Result<()> {
-        self.validate()?;
-        self.validate_kvn_representability()
-    }
-
-    fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        stream_kvn(self, output)
-    }
-}
-
-impl VersionedNdm for crate::messages::rdm::Rdm {
-    const KIND: MessageKind = MessageKind::Rdm;
-
-    fn version(&self) -> &str {
-        &self.version
-    }
-
-    fn validate_kvn_output(&self) -> Result<()> {
-        self.validate()?;
-        self.validate_kvn_representability()
-    }
-
-    fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        stream_kvn(self, output)
-    }
-}
+impl_versioned_ndm!(crate::messages::cdm::Cdm, Cdm, kvn_representability);
+impl_versioned_ndm!(crate::messages::aem::Aem, Aem, kvn_representability);
+impl_versioned_ndm!(crate::messages::ocm::Ocm, Ocm, kvn_representability);
+impl_versioned_ndm!(crate::messages::tdm::Tdm, Tdm, kvn_representability);
+impl_versioned_ndm!(crate::messages::rdm::Rdm, Rdm, kvn_representability);
 
 impl VersionedNdm for crate::messages::opm::Opm {
     const KIND: MessageKind = MessageKind::Opm;
@@ -299,6 +247,11 @@ impl VersionedNdm for crate::messages::oem::Oem {
 
     fn validate_xml_output(&self) -> Result<()> {
         self.validate_xml_text()
+    }
+
+    fn validate_kvn_output(&self) -> Result<()> {
+        // OEM validates each record as it renders it, so its ToKvn pass is already complete.
+        ToKvn::validate_kvn(self)
     }
 
     fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {

@@ -214,7 +214,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
 }
 
 #[test]
-fn opm_kvn_requires_the_odm_spelling_for_gm_units() {
+fn opm_kvn_canonicalizes_gm_units_to_the_odm_spelling() {
     let mut message =
         Opm::from_kvn(include_str!("../data/kvn/opm_g2.kvn")).expect("fixture should parse");
     message
@@ -227,14 +227,30 @@ fn opm_kvn_requires_the_odm_spelling_for_gm_units() {
         .gm
         .units = Some(GmUnits::KM3PerS2);
 
-    let error = message
+    // ODM 7.7.1 admits only the keyword table spelling in KVN, so the uppercase spelling the
+    // XML schema also permits is rewritten rather than rejected.
+    let kvn = message
         .to_kvn()
-        .expect_err("XML-only uppercase GM units must not reach KVN");
-    assert_eq!(error.code(), Some("validation.invalid_value"));
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment.data.keplerian_elements.gm.units")
+        .expect("uppercase GM units should be canonicalized, not rejected");
+    assert!(kvn.contains("[km**3/s**2]"), "{kvn}");
+    assert!(!kvn.contains("KM**3/S**2"), "{kvn}");
+
+    // The uppercase spelling stays valid on the XML side.
+    assert!(message
+        .to_xml()
+        .expect("XML generation")
+        .contains("KM**3/S**2"));
+}
+
+#[test]
+fn opm_kvn_gm_units_survive_a_kvn_round_trip() {
+    let source = include_str!("../data/kvn/opm_g2.kvn").replace(
+        "GM = 398600.4415 [km**3/s**2]",
+        "GM = 398600.4415 [KM**3/S**2]",
     );
+    let message = Opm::from_kvn(&source).expect("uppercase GM units should parse");
+    let regenerated = message.to_kvn().expect("regeneration should succeed");
+    Opm::from_kvn(&regenerated).expect("regenerated KVN should parse");
 }
 
 #[test]

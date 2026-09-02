@@ -81,7 +81,10 @@ pub(crate) fn kvn_comment_error(value: &str) -> Option<ValidationError> {
     None
 }
 
-pub(crate) fn validate_at_field_path(result: Result<()>, parent_path: &'static str) -> Result<()> {
+pub(crate) fn validate_at_field_path(
+    result: Result<()>,
+    parent_path: impl Into<std::borrow::Cow<'static, str>>,
+) -> Result<()> {
     match result {
         Err(CcsdsNdmError::Validation(error)) => Err((*error).at_field_in(parent_path).into()),
         result => result,

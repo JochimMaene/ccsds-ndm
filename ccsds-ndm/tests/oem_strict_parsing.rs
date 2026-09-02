@@ -79,6 +79,27 @@ fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
         Oem::from_kvn(&crlf).expect("CRLF should parse"),
         Oem::from_kvn(source).expect("LF should parse")
     );
+    for (label, input) in [
+        ("CR", source.replace('\n', "\r")),
+        ("LFCR", source.replace('\n', "\n\r")),
+    ] {
+        assert_eq!(
+            Oem::from_kvn(&input).unwrap_or_else(|error| panic!("{label} should parse: {error}")),
+            Oem::from_kvn(source).unwrap()
+        );
+    }
+}
+
+#[test]
+fn kvn_comment_separator_is_not_part_of_the_value() {
+    let source =
+        KVN_FIXTURES[0].replacen("CCSDS_OEM_VERS = 3.0", "CCSDS_OEM_VERS = 3.0\nCOMMENT ", 1);
+    assert_eq!(Oem::from_kvn(&source).unwrap().header.comment, vec![""]);
+
+    // A producer that omits the separator entirely is still read as an empty comment, matching
+    // the other ODM families. Generation always writes the normative `COMMENT ` spelling.
+    let bare = source.replacen("COMMENT \n", "COMMENT\n", 1);
+    assert_eq!(Oem::from_kvn(&bare).unwrap().header.comment, vec![""]);
 }
 
 #[test]
@@ -131,6 +152,27 @@ fn xml_rejects_wrong_envelope_unknown_duplicate_reordered_and_trailing_content()
     ] {
         assert!(Oem::from_xml(&invalid).is_err(), "accepted {label}");
     }
+}
+
+#[test]
+fn xml_declaration_is_optional_but_must_lead_the_document() {
+    const DECLARATION: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    let without = XML
+        .strip_prefix(DECLARATION)
+        .expect("fixture starts with the declaration");
+
+    // Producers that omit the declaration, or spell it differently, are still read.
+    let baseline = Oem::from_xml(XML).unwrap();
+    assert_eq!(Oem::from_xml(without).unwrap(), baseline);
+    assert_eq!(
+        Oem::from_xml(&format!("<?xml version=\"1.0\"?>\n{without}")).unwrap(),
+        baseline
+    );
+    // A leading byte-order mark is tolerated ahead of the declaration.
+    assert_eq!(Oem::from_xml(&format!("\u{feff}{XML}")).unwrap(), baseline);
+
+    // Only the position is normative: a declaration cannot follow content.
+    assert!(Oem::from_xml(&format!("<!-- lead-in -->\n{XML}")).is_err());
 }
 
 #[test]

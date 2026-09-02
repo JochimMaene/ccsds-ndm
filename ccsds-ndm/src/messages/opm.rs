@@ -297,6 +297,88 @@ fn validate_xml_envelope(xml: &str, options: &crate::options::ParseOptions) -> R
         Ok(())
     }
 
+    /// Reject attributes the OPM schema does not declare on the element carrying them.
+    fn validate_attributes(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+        let name = start.name();
+        let name = name.as_ref();
+        // Elements whose schema type extends a base with an optional `units` attribute.
+        let allows_units = matches!(
+            name,
+            b"X" | b"Y"
+                | b"Z"
+                | b"X_DOT"
+                | b"Y_DOT"
+                | b"Z_DOT"
+                | b"SEMI_MAJOR_AXIS"
+                | b"INCLINATION"
+                | b"RA_OF_ASC_NODE"
+                | b"ARG_OF_PERICENTER"
+                | b"TRUE_ANOMALY"
+                | b"MEAN_ANOMALY"
+                | b"GM"
+                | b"MASS"
+                | b"SOLAR_RAD_AREA"
+                | b"DRAG_AREA"
+                | b"CX_X"
+                | b"CY_X"
+                | b"CY_Y"
+                | b"CZ_X"
+                | b"CZ_Y"
+                | b"CZ_Z"
+                | b"CX_DOT_X"
+                | b"CX_DOT_Y"
+                | b"CX_DOT_Z"
+                | b"CX_DOT_X_DOT"
+                | b"CY_DOT_X"
+                | b"CY_DOT_Y"
+                | b"CY_DOT_Z"
+                | b"CY_DOT_X_DOT"
+                | b"CY_DOT_Y_DOT"
+                | b"CZ_DOT_X"
+                | b"CZ_DOT_Y"
+                | b"CZ_DOT_Z"
+                | b"CZ_DOT_X_DOT"
+                | b"CZ_DOT_Y_DOT"
+                | b"CZ_DOT_Z_DOT"
+                | b"MAN_DURATION"
+                | b"MAN_DELTA_MASS"
+                | b"MAN_DV_1"
+                | b"MAN_DV_2"
+                | b"MAN_DV_3"
+        );
+        // Optional values may be marked absent instead of omitted (see `crate::utils::nullable`).
+        let allows_nil = matches!(
+            name,
+            b"REF_FRAME_EPOCH"
+                | b"TRUE_ANOMALY"
+                | b"MEAN_ANOMALY"
+                | b"MASS"
+                | b"SOLAR_RAD_AREA"
+                | b"SOLAR_RAD_COEFF"
+                | b"DRAG_AREA"
+                | b"DRAG_COEFF"
+                | b"COV_REF_FRAME"
+        );
+        for attribute in start.attributes() {
+            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+            let key = attribute.key.as_ref();
+            let allowed = match key {
+                b"units" => allows_units,
+                b"nil" | b"xsi:nil" => allows_nil,
+                b"parameter" => name == b"USER_DEFINED",
+                _ => false,
+            };
+            if !allowed {
+                return Err(invalid(format!(
+                    "attribute '{}' is not allowed on OPM element '{}'",
+                    String::from_utf8_lossy(key),
+                    String::from_utf8_lossy(name)
+                )));
+            }
+        }
+        Ok(())
+    }
+
     let document = xml.strip_prefix('\u{feff}').unwrap_or(xml);
     if document
         .find("<?xml")
@@ -504,6 +586,7 @@ fn validate_xml_envelope(xml: &str, options: &crate::options::ParseOptions) -> R
                     validate_root(&start)?;
                     root_seen = true;
                 } else {
+                    validate_attributes(&start)?;
                     enter_child(&mut stack, start.name().as_ref())?;
                 }
                 stack.push(Frame {
@@ -528,6 +611,7 @@ fn validate_xml_envelope(xml: &str, options: &crate::options::ParseOptions) -> R
                     root_seen = true;
                     root_closed = true;
                 } else {
+                    validate_attributes(&start)?;
                     enter_child(&mut stack, start.name().as_ref())?;
                 }
             }
@@ -569,19 +653,52 @@ fn validate_xml_envelope(xml: &str, options: &crate::options::ParseOptions) -> R
     Ok(())
 }
 
+/// A diagnostic field path that is only materialized when an error is reported.
+///
+/// Repeated blocks need their index in the path, which cannot be a `&'static str`; resolving
+/// lazily keeps the validation passes allocation-free while they are finding nothing wrong.
+#[derive(Clone, Copy)]
+enum FieldPath {
+    Fixed(&'static str),
+    /// A field of `maneuver_parameters[index]`.
+    Maneuver(usize, &'static str),
+    /// The `maneuver_parameters[index]` block itself.
+    ManeuverBlock(usize),
+}
+
+impl FieldPath {
+    fn resolve(self) -> Cow<'static, str> {
+        match self {
+            Self::Fixed(path) => Cow::Borrowed(path),
+            Self::Maneuver(index, field) => Cow::Owned(format!(
+                "body.segment.data.maneuver_parameters[{index}].{field}"
+            )),
+            Self::ManeuverBlock(index) => {
+                Cow::Owned(format!("body.segment.data.maneuver_parameters[{index}]"))
+            }
+        }
+    }
+}
+
+impl From<&'static str> for FieldPath {
+    fn from(path: &'static str) -> Self {
+        Self::Fixed(path)
+    }
+}
+
 impl Opm {
     fn validate_kvn_numbers(&self) -> Result<()> {
-        fn check(field: &'static str, value: f64, path: &'static str) -> Result<()> {
+        fn check(field: &'static str, value: f64, path: impl Into<FieldPath>) -> Result<()> {
             if OdmFloat::is_valid(value) {
                 return Ok(());
             }
             Err(ValidationError::InvalidValue {
                 field: field.into(),
                 value: value.to_string(),
-                expected: "a finite number".into(),
+                expected: "a representable CCSDS number".into(),
                 line: None,
             }
-            .at_path(path)
+            .at_path(path.into().resolve())
             .into())
         }
 
@@ -805,42 +922,30 @@ impl Opm {
             }
         }
 
-        for maneuver in &data.maneuver_parameters {
-            for (field, value, path) in [
-                (
-                    "MAN_DURATION",
-                    maneuver.man_duration.value,
-                    "body.segment.data.maneuver_parameters.man_duration",
-                ),
+        for (index, maneuver) in data.maneuver_parameters.iter().enumerate() {
+            for (field, value, field_path) in [
+                ("MAN_DURATION", maneuver.man_duration.value, "man_duration"),
                 (
                     "MAN_DELTA_MASS",
                     maneuver.man_delta_mass.value,
-                    "body.segment.data.maneuver_parameters.man_delta_mass",
+                    "man_delta_mass",
                 ),
-                (
-                    "MAN_DV_1",
-                    maneuver.man_dv_1.value,
-                    "body.segment.data.maneuver_parameters.man_dv_1",
-                ),
-                (
-                    "MAN_DV_2",
-                    maneuver.man_dv_2.value,
-                    "body.segment.data.maneuver_parameters.man_dv_2",
-                ),
-                (
-                    "MAN_DV_3",
-                    maneuver.man_dv_3.value,
-                    "body.segment.data.maneuver_parameters.man_dv_3",
-                ),
+                ("MAN_DV_1", maneuver.man_dv_1.value, "man_dv_1"),
+                ("MAN_DV_2", maneuver.man_dv_2.value, "man_dv_2"),
+                ("MAN_DV_3", maneuver.man_dv_3.value, "man_dv_3"),
             ] {
-                check(field, value, path)?;
+                check(field, value, FieldPath::Maneuver(index, field_path))?;
             }
         }
         Ok(())
     }
 
     fn validate_kvn_text(&self) -> Result<()> {
-        fn invalid_text(field: &'static str, value: &str, path: &'static str) -> Result<()> {
+        fn invalid_text(
+            field: &'static str,
+            value: &str,
+            path: impl Into<FieldPath>,
+        ) -> Result<()> {
             if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
                 return Ok(());
             }
@@ -850,16 +955,17 @@ impl Opm {
                 expected: "printable ASCII characters and blanks".into(),
                 line: None,
             }
-            .at_path(path)
+            .at_path(path.into().resolve())
             .into())
         }
 
         fn pair(
             field: &'static str,
             value: &str,
-            path: &'static str,
+            path: impl Into<FieldPath>,
             key_len: usize,
         ) -> Result<()> {
+            let path = path.into();
             invalid_text(field, value, path)?;
             let line_len = key_len.max(20) + 3 + value.len();
             if line_len <= 254 {
@@ -871,14 +977,15 @@ impl Opm {
                 expected: "a KVN line no longer than 254 characters".into(),
                 line: None,
             }
-            .at_path(path)
+            .at_path(path.resolve())
             .into())
         }
 
-        fn comments(comments: &[String], path: &'static str) -> Result<()> {
+        fn comments(comments: &[String], path: impl Into<FieldPath>) -> Result<()> {
+            let path = path.into();
             for comment in comments {
                 if let Some(error) = crate::validation::kvn_comment_error(comment) {
-                    return Err(error.at_path(path).into());
+                    return Err(error.at_path(path.resolve()).into());
                 }
             }
             Ok(())
@@ -946,16 +1053,6 @@ impl Opm {
                 &elements.comment,
                 "body.segment.data.keplerian_elements.comment",
             )?;
-            if matches!(elements.gm.units.as_ref(), Some(GmUnits::KM3PerS2)) {
-                return Err(ValidationError::InvalidValue {
-                    field: "GM units".into(),
-                    value: "KM**3/S**2".into(),
-                    expected: "km**3/s**2 or omitted for OPM KVN".into(),
-                    line: None,
-                }
-                .at_path("body.segment.data.keplerian_elements.gm.units")
-                .into());
-            }
         }
         if let Some(parameters) = &data.spacecraft_parameters {
             comments(
@@ -977,15 +1074,12 @@ impl Opm {
                 )?;
             }
         }
-        for maneuver in &data.maneuver_parameters {
-            comments(
-                &maneuver.comment,
-                "body.segment.data.maneuver_parameters.comment",
-            )?;
+        for (index, maneuver) in data.maneuver_parameters.iter().enumerate() {
+            comments(&maneuver.comment, FieldPath::Maneuver(index, "comment"))?;
             pair(
                 "MAN_REF_FRAME",
                 &maneuver.man_ref_frame,
-                "body.segment.data.maneuver_parameters.man_ref_frame",
+                FieldPath::Maneuver(index, "man_ref_frame"),
                 "MAN_REF_FRAME".len(),
             )?;
         }
@@ -1054,17 +1148,18 @@ impl Opm {
             errors: &mut Vec<ValidationError>,
             field: &'static str,
             value: &str,
-            path: &'static str,
+            path: impl Into<FieldPath>,
         ) {
             if let Some(error) = crate::validation::xml_text_error(field, value) {
-                errors.push(error.at_path(path));
+                errors.push(error.at_path(path.into().resolve()));
             }
         }
         fn check_comments(
             errors: &mut Vec<ValidationError>,
             comments: &[String],
-            path: &'static str,
+            path: impl Into<FieldPath>,
         ) {
+            let path = path.into();
             for comment in comments {
                 check(errors, "COMMENT", comment, path);
             }
@@ -1163,17 +1258,17 @@ impl Opm {
                 );
             }
         }
-        for maneuver in &data.maneuver_parameters {
+        for (index, maneuver) in data.maneuver_parameters.iter().enumerate() {
             check_comments(
                 &mut errors,
                 &maneuver.comment,
-                "body.segment.data.maneuver_parameters.comment",
+                FieldPath::Maneuver(index, "comment"),
             );
             check(
                 &mut errors,
                 "MAN_REF_FRAME",
                 &maneuver.man_ref_frame,
-                "body.segment.data.maneuver_parameters.man_ref_frame",
+                FieldPath::Maneuver(index, "man_ref_frame"),
             );
         }
         if let Some(user_defined) = &data.user_defined_parameters {
@@ -1492,11 +1587,15 @@ impl Validate for OpmData {
                 "body.segment.data.covariance_matrix",
             )?;
         }
-        for maneuver in &self.maneuver_parameters {
-            crate::validation::validate_at_field_path(
-                maneuver.validate(),
-                "body.segment.data.maneuver_parameters",
-            )?;
+        for (index, maneuver) in self.maneuver_parameters.iter().enumerate() {
+            match maneuver.validate() {
+                Ok(()) => {}
+                // Only the failing maneuver needs its indexed path built.
+                error => crate::validation::validate_at_field_path(
+                    error,
+                    FieldPath::ManeuverBlock(index).resolve(),
+                )?,
+            }
         }
         if !self.maneuver_parameters.is_empty()
             && self
@@ -1809,7 +1908,10 @@ impl ToKvn for KeplerianElements {
         if let Some(v) = &self.mean_anomaly {
             writer.write_odm_float_measure("MEAN_ANOMALY", &v.to_unit_value());
         }
-        writer.write_odm_float_measure("GM", &UnitValue::new(self.gm.value, self.gm.units.clone()));
+        // ODM 7.7.1 requires KVN units to match the keyword table spelling exactly, so the
+        // uppercase spelling the XML schema also permits is canonicalized on output.
+        let gm_units = self.gm.units.as_ref().map(|_| GmUnits::Km3PerS2);
+        writer.write_odm_float_measure("GM", &UnitValue::new(self.gm.value, gm_units));
     }
 }
 

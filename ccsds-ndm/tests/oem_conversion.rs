@@ -60,6 +60,31 @@ fn xml_to_kvn_rejects_comments_that_cannot_keep_their_covariance_association() {
 }
 
 #[test]
+fn xml_to_kvn_round_trip_preserves_empty_comments() {
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.header.comment = vec![String::new()];
+
+    let kvn = convert(&message.to_xml().unwrap(), Notation::Kvn).unwrap();
+    assert!(kvn.lines().any(|line| line == "COMMENT "));
+    let reparsed = Oem::from_kvn(&kvn).unwrap();
+    assert_eq!(reparsed.header.comment, vec![""]);
+    assert_eq!(
+        Oem::from_xml(&reparsed.to_xml().unwrap()).unwrap(),
+        reparsed
+    );
+}
+
+#[test]
+fn kvn_round_trip_preserves_significant_comment_whitespace() {
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.header.comment = vec!["   indented   ".into()];
+
+    let kvn = convert(&message.to_xml().unwrap(), Notation::Kvn).unwrap();
+    let reparsed = Oem::from_kvn(&kvn).unwrap();
+    assert_eq!(reparsed.header.comment, message.header.comment);
+}
+
+#[test]
 fn file_conversion_is_atomic_and_bounds_input_before_materialization() {
     let directory = tempfile::tempdir().unwrap();
     let source = directory.path().join("source.oem");

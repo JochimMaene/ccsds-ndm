@@ -132,13 +132,13 @@ fn oem_generation_rejects_non_finite_state_vectors() {
     oem.body.segment[0].data.state_vector[0].x.value = f64::NAN;
 
     let error = oem.to_kvn().unwrap_err();
-    assert!(error.to_string().contains("finite"));
+    assert!(error.to_string().contains("representable CCSDS number"));
 
     let mut oem = Oem::from_xml(OEM_XML).unwrap();
     oem.body.segment[0].data.covariance_matrix[0].cx_x.value = f64::INFINITY;
 
     let error = oem.to_kvn().unwrap_err();
-    assert!(error.to_string().contains("finite"));
+    assert!(error.to_string().contains("representable CCSDS number"));
 }
 
 #[test]
@@ -195,20 +195,45 @@ fn acm_and_ocm_fail_fast_on_nested_validation_errors() {
 
 #[test]
 fn oem_generation_handles_maximum_width_records_without_panicking() {
-    let mut input = OEM_XML.to_owned();
-    for value in [
-        "2789.6", "-280.0", "-1746.8", "4.73", "-2.50", "-1.04", "0.008", "0.001", "-0.159",
-    ] {
-        input = input.replacen(&format!(">{value}<"), ">1.7976931348623157e308<", 1);
-    }
+    // Widen every component of one state vector to the longest spelling the CCSDS digit limit
+    // allows, so the record sits just under the 254-character line limit.
+    let widest = f64::from_bits(f64::MAX.to_bits() - 2);
+    let oem = oem_with_state_vector_components(&format!("{widest:e}"));
 
-    let oem = Oem::from_xml(&input).unwrap();
     let result = std::panic::catch_unwind(|| oem.to_kvn());
     assert!(result.is_ok(), "KVN generation panicked");
     let output = result
         .unwrap()
-        .expect("finite values should round to the CCSDS digit limit");
-    assert!(output.contains("1.797693134862316e308"));
+        .expect("the widest representable values should generate");
+    assert!(output.contains("1.797693134862315e308"));
+    // The emitted document must read back, which is what makes the width limit meaningful.
+    Oem::from_kvn(&output).expect("widest records round-trip");
+}
+
+#[test]
+fn oem_generation_rejects_values_the_ccsds_digit_limit_cannot_represent() {
+    // Rounding `f64::MAX` to 16 digits overflows to infinity, so it has no CCSDS spelling.
+    let oem = oem_with_state_vector_components("1.7976931348623157e308");
+
+    let result = std::panic::catch_unwind(|| oem.to_kvn());
+    assert!(result.is_ok(), "KVN generation panicked");
+    let error = result
+        .unwrap()
+        .expect_err("f64::MAX has no representable CCSDS spelling");
+    assert!(
+        error.to_string().contains("representable CCSDS number"),
+        "unexpected diagnostic: {error}"
+    );
+}
+
+fn oem_with_state_vector_components(replacement: &str) -> Oem {
+    let mut input = OEM_XML.to_owned();
+    for value in [
+        "2789.6", "-280.0", "-1746.8", "4.73", "-2.50", "-1.04", "0.008", "0.001", "-0.159",
+    ] {
+        input = input.replacen(&format!(">{value}<"), &format!(">{replacement}<"), 1);
+    }
+    Oem::from_xml(&input).unwrap()
 }
 
 #[test]

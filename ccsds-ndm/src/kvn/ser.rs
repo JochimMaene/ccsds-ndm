@@ -12,37 +12,26 @@ use std::io::Write as IoWrite;
 /// Values whose shortest round-trip spelling needs 17 digits are rounded to 16 digits.
 pub(crate) struct OdmFloat(f64);
 
+/// Largest magnitude whose CCSDS spelling still reads back as a finite `f64`.
+///
+/// Rounding to 16 digits can round *up*, and the two largest `f64` magnitudes round up to
+/// `1.797693134862316e308`, which is greater than `f64::MAX` and therefore reparses as infinity.
+/// Emitting them would produce a document this library rejects, so they are not representable.
+const MAX_MAGNITUDE: f64 = f64::from_bits(f64::MAX.to_bits() - 2);
+
 impl OdmFloat {
     pub(crate) const fn new(value: f64) -> Self {
         Self(value)
     }
 
+    /// Report whether `value` has a CCSDS spelling that reads back as a finite number.
     pub(crate) const fn is_valid(value: f64) -> bool {
-        value.is_finite()
-    }
-
-    /// Return the emitted length of a finite CCSDS number.
-    pub(crate) fn formatted_len(value: f64) -> Option<usize> {
-        if !value.is_finite() {
-            return None;
-        }
-
-        struct Counter(usize);
-        impl FmtWrite for Counter {
-            fn write_str(&mut self, value: &str) -> std::fmt::Result {
-                self.0 += value.len();
-                Ok(())
-            }
-        }
-
-        let mut counter = Counter(0);
-        let _ = Self::write_finite(value, &mut counter);
-        Some(counter.0)
+        value.is_finite() && value.abs() <= MAX_MAGNITUDE
     }
 
     /// Write `value` using a CCSDS-compatible spelling.
     pub(crate) fn write_if_valid<W: FmtWrite>(value: f64, output: &mut W) -> bool {
-        if !value.is_finite() {
+        if !Self::is_valid(value) {
             return false;
         }
         Self::write_finite(value, output).is_ok()
@@ -244,7 +233,7 @@ impl OdmFloat {
     }
 
     fn write_to<W: FmtWrite>(&self, output: &mut W) -> std::fmt::Result {
-        if !self.0.is_finite() {
+        if !Self::is_valid(self.0) {
             return Err(std::fmt::Error);
         }
         Self::write_finite(self.0, output)
@@ -568,7 +557,7 @@ impl<'a> KvnWriter<'a> {
     pub fn write_comments(&mut self, comments: &[String]) {
         for c in comments {
             if c.is_empty() {
-                let _ = writeln!(self, "COMMENT");
+                let _ = writeln!(self, "COMMENT ");
                 continue;
             }
             for line in c.lines() {
@@ -650,7 +639,7 @@ mod tests {
     fn write_comments_preserves_empty_comment() {
         let mut writer = KvnWriter::new();
         writer.write_comments(&[String::new()]);
-        assert_eq!(writer.finish(), "COMMENT\n");
+        assert_eq!(writer.finish(), "COMMENT \n");
     }
 
     #[test]
@@ -681,17 +670,50 @@ mod tests {
     }
 
     #[test]
-    fn odm_float_accepts_all_finite_values_and_rejects_non_finite_values() {
+    fn odm_float_accepts_representable_values_and_rejects_the_rest() {
         assert!(OdmFloat::is_valid(1.234_567_890_123_456));
         assert!(OdmFloat::is_valid(1.234_567_890_123_456_7));
         assert!(OdmFloat::is_valid(f64::MIN_POSITIVE));
-        assert!(OdmFloat::is_valid(f64::MAX));
         assert!(!OdmFloat::is_valid(f64::NAN));
         assert!(!OdmFloat::is_valid(f64::INFINITY));
+        assert!(!OdmFloat::is_valid(f64::NEG_INFINITY));
     }
 
     #[test]
-    fn odm_float_combines_validity_and_emitted_length() {
+    fn odm_float_rejects_magnitudes_whose_rounded_spelling_overflows() {
+        // Rounding to 16 digits pushes the top two magnitudes above `f64::MAX`.
+        let magnitudes = [
+            f64::MAX,
+            f64::from_bits(f64::MAX.to_bits() - 1),
+            f64::from_bits(f64::MAX.to_bits() - 2),
+            f64::from_bits(f64::MAX.to_bits() - 3),
+            1.0e308,
+        ];
+        for (index, magnitude) in magnitudes.into_iter().enumerate() {
+            let representable = index >= 2;
+            for value in [magnitude, -magnitude] {
+                assert_eq!(
+                    OdmFloat::is_valid(value),
+                    representable,
+                    "{value:e} representability"
+                );
+
+                let mut output = String::new();
+                assert_eq!(OdmFloat::write_if_valid(value, &mut output), representable);
+                if !representable {
+                    assert!(output.is_empty());
+                    continue;
+                }
+                // Every accepted spelling must read back as the finite value it came from.
+                let reparsed: f64 = output.parse().expect("accepted spelling reparses");
+                assert!(reparsed.is_finite(), "{output} reparsed as {reparsed}");
+                assert_eq!(reparsed.is_sign_negative(), value.is_sign_negative());
+            }
+        }
+    }
+
+    #[test]
+    fn odm_float_write_matches_its_display_spelling() {
         for value in [
             -0.0,
             1.0,
@@ -700,19 +722,17 @@ mod tests {
             1.25e-20,
             f64::from_bits(1),
             1.234_567_890_123_456_7,
-            f64::MAX,
+            f64::from_bits(f64::MAX.to_bits() - 2),
         ] {
             let mut output = String::new();
             assert!(OdmFloat::write_if_valid(value, &mut output));
-            assert_eq!(OdmFloat::formatted_len(value), Some(output.len()));
             assert_eq!(output, OdmFloat(value).to_string());
             assert!(OdmFloat::significant_digits(&output) <= 16);
         }
-        for value in [f64::NAN, f64::INFINITY] {
+        for value in [f64::NAN, f64::INFINITY, f64::MAX] {
             let mut output = String::new();
             assert!(!OdmFloat::write_if_valid(value, &mut output));
             assert!(output.is_empty());
-            assert_eq!(OdmFloat::formatted_len(value), None);
         }
     }
 
@@ -749,6 +769,9 @@ mod tests {
             OdmFloat(1.234_567_890_123_456_7).to_string(),
             "1.234567890123457e0"
         );
-        assert_eq!(OdmFloat(f64::MAX).to_string(), "1.797693134862316e308");
+        assert_eq!(
+            OdmFloat(f64::from_bits(f64::MAX.to_bits() - 2)).to_string(),
+            "1.797693134862315e308"
+        );
     }
 }

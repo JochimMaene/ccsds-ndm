@@ -57,3 +57,77 @@ fn strict_xml_rejects_wrong_root_unknown_content_duplicates_and_trailing_documen
         source.replacen("<opm ", "<!DOCTYPE opm><opm ", 1),
     );
 }
+
+#[test]
+fn strict_xml_rejects_attributes_the_schema_does_not_declare() {
+    let source = Opm::from_kvn(include_str!("../data/kvn/opm_g2.kvn"))
+        .expect("fixture should parse")
+        .to_xml()
+        .expect("fixture should generate XML");
+
+    for (label, from, to) in [
+        (
+            "unknown attribute on a measure element",
+            "<X units=\"km\">",
+            "<X units=\"km\" unexpected=\"value\">",
+        ),
+        (
+            "unknown attribute on a text element",
+            "<OBJECT_NAME>",
+            "<OBJECT_NAME unexpected=\"value\">",
+        ),
+        (
+            "units on a unitless element",
+            "<ECCENTRICITY>",
+            "<ECCENTRICITY units=\"km\">",
+        ),
+        (
+            "units on an epoch element",
+            "<EPOCH>",
+            "<EPOCH units=\"s\">",
+        ),
+        (
+            "nil on a mandatory element",
+            "<X units=\"km\">",
+            "<X units=\"km\" nil=\"true\">",
+        ),
+        (
+            "parameter attribute outside USER_DEFINED",
+            "<MASS units=\"kg\">",
+            "<MASS units=\"kg\" parameter=\"FOO\">",
+        ),
+        (
+            "invalid units hidden by nil",
+            "<MASS units=\"kg\">",
+            "<MASS units=\"km\" nil=\"true\">",
+        ),
+    ] {
+        assert!(source.contains(from), "fixture should contain {from}");
+        assert_rejected(label, source.replace(from, to));
+    }
+}
+
+#[test]
+fn strict_xml_keeps_schema_attributes_and_the_documented_nil_extension() {
+    let source = Opm::from_kvn(include_str!("../data/kvn/opm_g2.kvn"))
+        .expect("fixture should parse")
+        .to_xml()
+        .expect("fixture should generate XML");
+
+    // `units` is schema-defined; `nil` on an otherwise attribute-free optional value is a
+    // documented compatibility extension.
+    Opm::from_xml(&source).expect("generated XML should round-trip");
+    let with_nil = source.replace("<DRAG_COEFF>2.3</DRAG_COEFF>", "<DRAG_COEFF nil=\"true\"/>");
+    assert_ne!(with_nil, source, "fixture should contain DRAG_COEFF");
+    let parsed = Opm::from_xml(&with_nil).expect("nil-marked optional value should be accepted");
+    assert!(
+        parsed
+            .body
+            .segment
+            .data
+            .spacecraft_parameters
+            .as_ref()
+            .is_some_and(|parameters| parameters.drag_coeff.is_none()),
+        "nil DRAG_COEFF should deserialize as absent"
+    );
+}

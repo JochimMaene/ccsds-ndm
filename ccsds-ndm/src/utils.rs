@@ -128,6 +128,7 @@ pub mod nullable {
                 // Store values as JSON so numeric-like text can be retyped for structured targets.
                 let mut values = JsonMap::new();
                 let mut nil = false;
+                let mut has_non_nil_attribute = false;
                 let mut text_val = None;
 
                 while let Some(key) = map.next_key::<String>()? {
@@ -146,6 +147,7 @@ pub mod nullable {
                             values.insert("$value".to_string(), JsonValue::String(v));
                         }
                     } else {
+                        has_non_nil_attribute = true;
                         let v: String = map.next_value()?;
                         if let Ok(json_value) = serde_json::from_str::<JsonValue>(&v) {
                             values.insert(key, json_value);
@@ -156,6 +158,11 @@ pub mod nullable {
                 }
 
                 if nil {
+                    if has_non_nil_attribute {
+                        return Err(de::Error::custom(
+                            "a nil optional value cannot carry additional attributes",
+                        ));
+                    }
                     return Ok(None);
                 }
                 if values.is_empty() {
@@ -165,7 +172,7 @@ pub mod nullable {
                 // Strategy 1: Deserialize T from object representation (handles structured wrappers).
                 match serde_json::from_value::<T>(JsonValue::Object(values.clone())) {
                     Ok(val) => Ok(Some(val)),
-                    Err(_) => {
+                    Err(error) => {
                         // Strategy 2: Fallback to deserializing T as a Primitive (e.g., f64, u32)
                         // If T is a primitive, Strategy 1 fails because it receives a Map.
                         // We extract just the text content and try again.
@@ -178,9 +185,9 @@ pub mod nullable {
                             let sd = txt.into_deserializer();
                             T::deserialize(sd).map(Some)
                         } else {
-                            // No text content but had attributes... e.g. <FIELD unit="m"/> (empty text)
-                            // Treat as None
-                            Ok(None)
+                            // An attribute-bearing element is not an empty optional value. Preserve
+                            // the typed error instead of silently discarding invalid attributes.
+                            Err(de::Error::custom(error))
                         }
                     }
                 }
@@ -290,5 +297,15 @@ mod tests {
                 units: Some(TimeUnits::Seconds),
             })
         );
+    }
+
+    #[test]
+    fn nullable_does_not_discard_attributes_on_absent_values() {
+        for json in [
+            r#"{ "duration_field": { "@nil": "true", "@units": "km" } }"#,
+            r#"{ "duration_field": { "@units": "km" } }"#,
+        ] {
+            assert!(serde_json::from_str::<NullableDurationWrapper>(json).is_err());
+        }
     }
 }
