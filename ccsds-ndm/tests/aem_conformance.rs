@@ -16,6 +16,20 @@ fn repository_path(relative: &str) -> PathBuf {
 }
 
 #[test]
+fn aem_xml_emits_canonical_uppercase_attitude_types() {
+    let lowercase = XML
+        .replace("QUATERNION/DERIVATIVE", "quaternion/derivative")
+        .replace("QUATERNION/ANGVEL", "quaternion/angvel")
+        .replace("QUATERNION", "quaternion");
+    let generated = Aem::from_xml(&lowercase).unwrap().to_xml().unwrap();
+
+    for value in ["QUATERNION", "QUATERNION/DERIVATIVE", "QUATERNION/ANGVEL"] {
+        assert!(generated.contains(&format!("<ATTITUDE_TYPE>{value}</ATTITUDE_TYPE>")));
+    }
+    assert!(!generated.contains("<ATTITUDE_TYPE>quaternion"));
+}
+
+#[test]
 fn aem_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
     let object = "OBJECT_NAME = MARS GLOBAL SURVEYOR";
     let object_id = "OBJECT_ID = 1996-062A";

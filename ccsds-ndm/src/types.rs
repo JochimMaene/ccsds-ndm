@@ -3841,23 +3841,23 @@ impl std::fmt::Display for AcmCovarianceLineType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AttitudeTypeType {
-    #[serde(rename = "quaternion", alias = "QUATERNION")]
+    #[serde(rename = "QUATERNION", alias = "quaternion")]
     Quaternion,
-    #[serde(rename = "quaternion/derivative", alias = "QUATERNION/DERIVATIVE")]
+    #[serde(rename = "QUATERNION/DERIVATIVE", alias = "quaternion/derivative")]
     QuaternionDerivative,
-    #[serde(rename = "quaternion/angvel", alias = "QUATERNION/ANGVEL")]
+    #[serde(rename = "QUATERNION/ANGVEL", alias = "quaternion/angvel")]
     QuaternionAngVel,
-    #[serde(rename = "euler_angle", alias = "EULER_ANGLE")]
+    #[serde(rename = "EULER_ANGLE", alias = "euler_angle")]
     EulerAngle,
-    #[serde(rename = "euler_angle/derivative", alias = "EULER_ANGLE/DERIVATIVE")]
+    #[serde(rename = "EULER_ANGLE/DERIVATIVE", alias = "euler_angle/derivative")]
     EulerAngleDerivative,
-    #[serde(rename = "euler_angle/angvel", alias = "EULER_ANGLE/ANGVEL")]
+    #[serde(rename = "EULER_ANGLE/ANGVEL", alias = "euler_angle/angvel")]
     EulerAngleAngVel,
-    #[serde(rename = "spin", alias = "SPIN")]
+    #[serde(rename = "SPIN", alias = "spin")]
     Spin,
-    #[serde(rename = "spin/nutation", alias = "SPIN/NUTATION")]
+    #[serde(rename = "SPIN/NUTATION", alias = "spin/nutation")]
     SpinNutation,
-    #[serde(rename = "spin/nutation_mom", alias = "SPIN/NUTATION_MOM")]
+    #[serde(rename = "SPIN/NUTATION_MOM", alias = "spin/nutation_mom")]
     SpinNutationMom,
 }
 
