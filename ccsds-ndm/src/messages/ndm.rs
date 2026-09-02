@@ -217,31 +217,6 @@ impl crate::traits::Validate for CombinedNdm {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = Vec::new();
-        for message in &self.messages {
-            errors.extend(match message {
-                MessageType::Opm(message) => message.validation_errors()?,
-                MessageType::Omm(message) => message.validation_errors()?,
-                MessageType::Oem(message) => message.validation_errors()?,
-                MessageType::Ocm(message) => message.validation_errors()?,
-                MessageType::Acm(message) => message.validation_errors()?,
-                MessageType::Cdm(message) => message.validation_errors()?,
-                MessageType::Tdm(message) => message.validation_errors()?,
-                MessageType::Rdm(message) => message.validation_errors()?,
-                MessageType::Aem(message) => message.validation_errors()?,
-                MessageType::Apm(message) => message.validation_errors()?,
-                MessageType::Ndm(_) => vec![crate::error::ValidationError::InvalidValue {
-                    field: "ndm".into(),
-                    value: "nested combined NDM".into(),
-                    expected: "a constituent standalone message".into(),
-                    line: None,
-                }],
-            });
-        }
-        Ok(errors)
-    }
 }
 
 impl Ndm for CombinedNdm {

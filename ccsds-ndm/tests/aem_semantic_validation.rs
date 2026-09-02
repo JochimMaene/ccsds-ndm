@@ -15,10 +15,10 @@ fn aem_enforces_metadata_spans_and_record_order() {
     let metadata = &mut reversed_span.body.segment[0].metadata;
     std::mem::swap(&mut metadata.start_time, &mut metadata.stop_time);
     assert!(reversed_span
-        .validation_errors()
-        .unwrap()
-        .iter()
-        .any(|error| error.to_string().contains("START_TIME")));
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("START_TIME"));
 
     let mut repeated_epoch = Aem::from_kvn(KVN).unwrap();
     let first_epoch = repeated_epoch.body.segment[0].data.attitude_states[0]
@@ -31,10 +31,11 @@ fn aem_enforces_metadata_spans_and_record_order() {
         .as_mut()
         .unwrap()
         .epoch = first_epoch;
-    let errors = repeated_epoch.validation_errors().unwrap();
-    assert!(errors
-        .iter()
-        .any(|error| error.to_string().contains("strictly increasing")));
+    assert!(repeated_epoch
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("strictly increasing"));
 
     let mut outside_span = Aem::from_kvn(KVN).unwrap();
     outside_span.body.segment[0].data.attitude_states[0]
@@ -43,10 +44,10 @@ fn aem_enforces_metadata_spans_and_record_order() {
         .unwrap()
         .epoch = epoch("1990-01-01T00:00:00");
     assert!(outside_span
-        .validation_errors()
-        .unwrap()
-        .iter()
-        .any(|error| error.to_string().contains("within START_TIME")));
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("within START_TIME"));
 }
 
 #[test]
@@ -57,10 +58,11 @@ fn aem_enforces_useable_span_continuity_between_blocks() {
     message.body.segment[1].metadata.useable_start_time =
         message.body.segment[0].metadata.useable_start_time;
 
-    let errors = message.validation_errors().unwrap();
-    assert!(errors
-        .iter()
-        .any(|error| error.to_string().contains("preceding segment")));
+    assert!(message
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("preceding segment"));
 }
 
 #[test]

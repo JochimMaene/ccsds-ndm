@@ -7,7 +7,7 @@
 //! This module defines the primary traits used for parsing and serializing
 //! NDM messages in both KVN and XML formats.
 
-use crate::error::{Result, ValidationError};
+use crate::error::Result;
 use crate::kvn::ser::KvnWriter;
 
 /// Trait for types that provide semantic validation.
@@ -20,18 +20,7 @@ pub trait Validate {
     /// # Returns
     ///
     /// `Ok(())` if valid, or a `ValidationError` if invalid.
-    fn validate(&self) -> Result<()> {
-        match self.validation_errors()?.into_iter().next() {
-            Some(error) => Err(error.into()),
-            None => Ok(()),
-        }
-    }
-
-    /// Return every semantic validation error found on the object.
-    ///
-    /// Parsing and generation use [`Validate::validate`] to fail fast. This method provides a
-    /// complete audit trail in stable model order.
-    fn validation_errors(&self) -> Result<Vec<ValidationError>>;
+    fn validate(&self) -> Result<()>;
 }
 
 /// Core trait for NDM message types.
@@ -184,23 +173,4 @@ pub(crate) trait ToKvn {
     ///
     /// * `writer` - The KVN writer to output to
     fn write_kvn(&self, writer: &mut KvnWriter<'_>);
-}
-
-#[cfg(test)]
-mod validate_default_tests {
-    use super::Validate;
-    use crate::error::{Result, ValidationError};
-
-    struct AggregateOnly;
-
-    impl Validate for AggregateOnly {
-        fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-            Ok(vec![ValidationError::generic("aggregate-only failure")])
-        }
-    }
-
-    #[test]
-    fn default_validate_fails_when_aggregate_validation_reports_an_error() {
-        assert!(AggregateOnly.validate().is_err());
-    }
 }

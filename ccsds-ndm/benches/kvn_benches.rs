@@ -220,8 +220,8 @@ fn bench_validate_opm(c: &mut Criterion) {
     group.bench_function("valid_rich", |b| {
         b.iter(|| black_box(&valid).validate().unwrap())
     });
-    group.bench_function("invalid_aggregate", |b| {
-        b.iter(|| black_box(&invalid).validation_errors().unwrap())
+    group.bench_function("invalid", |b| {
+        b.iter(|| black_box(&invalid).validate().unwrap_err())
     });
     group.bench_function("valid_1000_maneuvers", |b| {
         b.iter(|| black_box(&maneuver_heavy).validate().unwrap())

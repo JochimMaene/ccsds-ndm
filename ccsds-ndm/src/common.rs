@@ -67,16 +67,6 @@ impl crate::traits::Validate for NdmHeader {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "NDM Header",
-            [
-                ("ORIGINATOR", self.originator.trim().is_empty()),
-                ("CREATION_DATE", self.creation_date.is_empty()),
-            ],
-        ))
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
@@ -166,16 +156,6 @@ impl crate::traits::Validate for AdmHeader {
             .into());
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "ADM Header",
-            [
-                ("ORIGINATOR", self.originator.trim().is_empty()),
-                ("CREATION_DATE", self.creation_date.is_empty()),
-            ],
-        ))
     }
 }
 
@@ -269,16 +249,6 @@ impl crate::traits::Validate for OdmHeader {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "ODM Header",
-            [
-                ("ORIGINATOR", self.originator.trim().is_empty()),
-                ("CREATION_DATE", self.creation_date.is_empty()),
-            ],
-        ))
-    }
 }
 
 /// Spacecraft Parameters (if maneuver is specified, then mass must be provided).
@@ -363,14 +333,6 @@ pub struct SpacecraftParameters {
 
 impl crate::traits::Validate for SpacecraftParameters {
     fn validate(&self) -> Result<()> {
-        match self.validation_errors()?.into_iter().next() {
-            Some(error) => Err(error.into()),
-            None => Ok(()),
-        }
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
         for (field, value) in [
             ("MASS", self.mass.as_ref().map(|value| value.value)),
             (
@@ -390,26 +352,27 @@ impl crate::traits::Validate for SpacecraftParameters {
                 self.drag_coeff.as_ref().map(|value| value.value),
             ),
         ] {
-            let Some(value) = value else {
-                continue;
-            };
+            let Some(value) = value else { continue };
             if !value.is_finite() {
-                errors.push(ValidationError::InvalidValue {
+                return Err(ValidationError::InvalidValue {
                     field: field.into(),
                     value: value.to_string(),
                     expected: "a finite number".into(),
                     line: None,
-                });
-            } else if value < 0.0 {
-                errors.push(ValidationError::OutOfRange {
+                }
+                .into());
+            }
+            if value < 0.0 {
+                return Err(ValidationError::OutOfRange {
                     name: field.into(),
                     value: value.to_string(),
                     expected: ">= 0".into(),
                     line: None,
-                });
+                }
+                .into());
             }
         }
-        Ok(errors)
+        Ok(())
     }
 }
 
@@ -702,53 +665,6 @@ impl crate::traits::Validate for StateVectorAcc {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        if !self.epoch.is_contextually_valid() {
-            errors.push(ValidationError::InvalidValue {
-                field: "EPOCH".into(),
-                value: self.epoch.to_string(),
-                expected: "a valid calendar, ordinal, or non-degenerate numeric epoch".into(),
-                line: None,
-            });
-        }
-        for (field, value) in [
-            ("X", self.x.value),
-            ("Y", self.y.value),
-            ("Z", self.z.value),
-            ("X_DOT", self.x_dot.value),
-            ("Y_DOT", self.y_dot.value),
-            ("Z_DOT", self.z_dot.value),
-        ] {
-            if !value.is_finite() {
-                errors.push(ValidationError::InvalidValue {
-                    field: field.into(),
-                    value: value.to_string(),
-                    expected: "a finite number".into(),
-                    line: None,
-                });
-            }
-        }
-        for (field, acceleration) in [
-            ("X_DDOT", &self.x_ddot),
-            ("Y_DDOT", &self.y_ddot),
-            ("Z_DDOT", &self.z_ddot),
-        ] {
-            let Some(acceleration) = acceleration else {
-                continue;
-            };
-            if !acceleration.value.is_finite() {
-                errors.push(ValidationError::InvalidValue {
-                    field: field.into(),
-                    value: acceleration.value.to_string(),
-                    expected: "a finite number".into(),
-                    line: None,
-                });
-            }
-        }
-        Ok(errors)
-    }
 }
 
 // Quaternion (components each in [-1, 1])
@@ -789,10 +705,6 @@ impl crate::traits::Validate for Quaternion {
             .into());
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::validation_errors_from(self.validate())
     }
 }
 
@@ -909,31 +821,6 @@ impl crate::traits::Validate for StateVector {
             }
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "State Vector",
-            [("EPOCH", self.epoch.is_empty())],
-        );
-        for (field, value) in [
-            ("X", self.x.value),
-            ("Y", self.y.value),
-            ("Z", self.z.value),
-            ("X_DOT", self.x_dot.value),
-            ("Y_DOT", self.y_dot.value),
-            ("Z_DOT", self.z_dot.value),
-        ] {
-            if !value.is_finite() {
-                errors.push(ValidationError::InvalidValue {
-                    field: field.into(),
-                    value: value.to_string(),
-                    expected: "a finite number".into(),
-                    line: None,
-                });
-            }
-        }
-        Ok(errors)
     }
 }
 
@@ -1295,50 +1182,6 @@ impl crate::traits::Validate for SpinState {
         }
 
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "Spin",
-            [
-                ("REF_FRAME_A", self.ref_frame_a.trim().is_empty()),
-                ("REF_FRAME_B", self.ref_frame_b.trim().is_empty()),
-            ],
-        );
-        let nutation_present =
-            self.nutation.is_some() || self.nutation_per.is_some() || self.nutation_phase.is_some();
-        let momentum_present = self.momentum_alpha.is_some()
-            || self.momentum_delta.is_some()
-            || self.nutation_vel.is_some();
-        if nutation_present && momentum_present {
-            errors.push(ValidationError::Conflict {
-                fields: vec!["NUTATION".into(), "MOMENTUM_ALPHA".into()],
-                line: None,
-            });
-        }
-        if nutation_present
-            && (self.nutation.is_none()
-                || self.nutation_per.is_none()
-                || self.nutation_phase.is_none())
-        {
-            errors.push(ValidationError::MissingRequiredField {
-                block: "Spin".into(),
-                field: "NUTATION/NUTATION_PER/NUTATION_PHASE".into(),
-                line: None,
-            });
-        }
-        if momentum_present
-            && (self.momentum_alpha.is_none()
-                || self.momentum_delta.is_none()
-                || self.nutation_vel.is_none())
-        {
-            errors.push(ValidationError::MissingRequiredField {
-                block: "Spin".into(),
-                field: "MOMENTUM_ALPHA/MOMENTUM_DELTA/NUTATION_VEL".into(),
-                line: None,
-            });
-        }
-        Ok(errors)
     }
 }
 
@@ -2180,14 +2023,6 @@ pub struct OpmCovarianceMatrix {
 
 impl crate::traits::Validate for OpmCovarianceMatrix {
     fn validate(&self) -> Result<()> {
-        match self.validation_errors()?.into_iter().next() {
-            Some(error) => Err(error.into()),
-            None => Ok(()),
-        }
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
         for (field, value) in [
             ("CX_X", self.cx_x.value),
             ("CY_X", self.cy_x.value),
@@ -2212,15 +2047,16 @@ impl crate::traits::Validate for OpmCovarianceMatrix {
             ("CZ_DOT_Z_DOT", self.cz_dot_z_dot.value),
         ] {
             if !value.is_finite() {
-                errors.push(ValidationError::InvalidValue {
+                return Err(ValidationError::InvalidValue {
                     field: field.into(),
                     value: value.to_string(),
                     expected: "a finite number".into(),
                     line: None,
-                });
+                }
+                .into());
             }
         }
-        Ok(errors)
+        Ok(())
     }
 }
 

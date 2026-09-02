@@ -46,9 +46,8 @@ pub fn convert_file_with_options(
     parse_options: &ParseOptions,
 ) -> Result<()> {
     let message = crate::from_file_with_options(source_path, None, parse_options)?;
-    let output = match target {
-        Notation::Kvn => message.to_kvn(),
-        Notation::Xml => message.to_xml(),
-    }?;
-    crate::fsutil::atomic_write(destination_path.as_ref(), output.as_bytes())
+    match target {
+        Notation::Kvn => message.to_kvn_file(destination_path),
+        Notation::Xml => message.to_xml_file(destination_path),
+    }
 }

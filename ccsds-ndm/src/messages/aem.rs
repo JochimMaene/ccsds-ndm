@@ -53,16 +53,6 @@ impl crate::traits::Validate for Aem {
         self.header.validate()?;
         self.body.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::collect_message_validation_errors(
-            crate::validation::MessageKind::Aem,
-            &self.id,
-            &self.version,
-            &self.header,
-            &self.body,
-        )
-    }
 }
 
 impl Ndm for Aem {
@@ -613,26 +603,6 @@ impl crate::traits::Validate for AemBody {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        if self.segment.is_empty() {
-            errors.push(ValidationError::missing_required(
-                "AEM Body",
-                "segment (at least one required)",
-            ));
-        }
-        for (index, segment) in self.segment.iter().enumerate() {
-            errors.extend(
-                segment
-                    .validation_errors()?
-                    .into_iter()
-                    .map(|error| error.at_path(format!("segment[{index}]"))),
-            );
-        }
-        errors.extend(self.cross_segment_errors());
-        Ok(errors)
-    }
 }
 
 impl AemBody {
@@ -679,17 +649,6 @@ impl crate::traits::Validate for AemSegment {
             Some(error) => Err(error.into()),
             None => Ok(()),
         }
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        errors.extend(self.data.validation_errors()?);
-        errors.extend(
-            self.data
-                .validation_errors_with_type(&self.metadata.attitude_type),
-        );
-        errors.extend(self.timeline_errors());
-        Ok(errors)
     }
 }
 
@@ -1104,49 +1063,6 @@ impl crate::traits::Validate for AemMetadata {
     fn validate(&self) -> Result<()> {
         self.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let requires_euler_rot_seq = matches!(
-            self.attitude_type,
-            AttitudeTypeType::EulerAngle
-                | AttitudeTypeType::EulerAngleUpper
-                | AttitudeTypeType::EulerAngleDerivative
-                | AttitudeTypeType::EulerAngleDerivativeUpper
-                | AttitudeTypeType::EulerAngleAngVel
-                | AttitudeTypeType::EulerAngleAngVelUpper
-        );
-        let requires_angvel_frame = matches!(
-            self.attitude_type,
-            AttitudeTypeType::QuaternionAngVel
-                | AttitudeTypeType::QuaternionAngVelUpper
-                | AttitudeTypeType::EulerAngleAngVel
-                | AttitudeTypeType::EulerAngleAngVelUpper
-        );
-        let mut errors = crate::validation::missing_required_fields(
-            "AEM Metadata",
-            [
-                ("OBJECT_NAME", self.object_name.trim().is_empty()),
-                ("OBJECT_ID", self.object_id.trim().is_empty()),
-                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
-                ("REF_FRAME_A", self.ref_frame_a.trim().is_empty()),
-                ("REF_FRAME_B", self.ref_frame_b.trim().is_empty()),
-                (
-                    "INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)",
-                    self.interpolation_method.is_some() && self.interpolation_degree.is_none(),
-                ),
-                (
-                    "EULER_ROT_SEQ (required for EULER_ANGLE types)",
-                    requires_euler_rot_seq && self.euler_rot_seq.is_none(),
-                ),
-                (
-                    "ANGVEL_FRAME (required for ANGVEL types)",
-                    requires_angvel_frame && self.angvel_frame.is_none(),
-                ),
-            ],
-        );
-        errors.extend(self.time_span_errors());
-        Ok(errors)
-    }
 }
 
 impl ToKvn for AemMetadata {
@@ -1470,28 +1386,6 @@ impl crate::traits::Validate for AemData {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "AEM Data",
-            [(
-                "attitudeState (at least one required)",
-                self.attitude_states.is_empty(),
-            )],
-        );
-        for (index, state) in self.attitude_states.iter().enumerate() {
-            let fields = state.populated_fields();
-            match fields.len() {
-                0 => errors.push(ValidationError::missing_required(
-                    "AEM Data",
-                    format!("attitudeState[{}] (exactly one choice required)", index + 1),
-                )),
-                1 => {}
-                _ => errors.push(ValidationError::conflict(fields)),
-            }
-        }
-        Ok(errors)
-    }
 }
 
 impl AemData {
@@ -1507,25 +1401,6 @@ impl AemData {
             }
         }
         Ok(())
-    }
-
-    fn validation_errors_with_type(
-        &self,
-        attitude_type: &AttitudeTypeType,
-    ) -> Vec<ValidationError> {
-        let expected = attitude_type.to_string();
-        self.attitude_states
-            .iter()
-            .enumerate()
-            .filter(|(_, state)| !state.matches_type(attitude_type))
-            .map(|(index, _)| {
-                ValidationError::generic(format!(
-                    "Data line {} expected {} data",
-                    index + 1,
-                    expected
-                ))
-            })
-            .collect()
     }
 
     pub fn validate(&self, attitude_type: &AttitudeTypeType) -> Result<()> {

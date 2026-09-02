@@ -52,16 +52,6 @@ impl crate::traits::Validate for Rdm {
         self.header.validate()?;
         self.body.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        crate::validation::collect_message_validation_errors(
-            crate::validation::MessageKind::Rdm,
-            &self.id,
-            &self.version,
-            &self.header,
-            &self.body,
-        )
-    }
 }
 
 impl Ndm for Rdm {
@@ -605,17 +595,6 @@ impl crate::traits::Validate for RdmHeader {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "RDM Header",
-            [
-                ("CREATION_DATE", self.creation_date.is_empty()),
-                ("ORIGINATOR", self.originator.trim().is_empty()),
-                ("MESSAGE_ID", self.message_id.trim().is_empty()),
-            ],
-        ))
-    }
 }
 
 impl ToKvn for RdmHeader {
@@ -641,10 +620,6 @@ pub struct RdmBody {
 impl crate::traits::Validate for RdmBody {
     fn validate(&self) -> Result<()> {
         self.segment.validate()
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        self.segment.validation_errors()
     }
 }
 
@@ -682,26 +657,6 @@ impl crate::traits::Validate for RdmSegment {
             .into());
         }
         self.data.validate()
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        if self.data.state_vector.is_some()
-            && self
-                .metadata
-                .ref_frame
-                .as_deref()
-                .map(str::trim)
-                .is_none_or(str::is_empty)
-        {
-            errors.push(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Metadata".into(),
-                field: "REF_FRAME (required when state vector is provided)".into(),
-                line: None,
-            });
-        }
-        errors.extend(self.data.validation_errors()?);
-        Ok(errors)
     }
 }
 
@@ -1263,22 +1218,6 @@ impl crate::traits::Validate for RdmMetadata {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "RDM Metadata",
-            [
-                ("OBJECT_NAME", self.object_name.trim().is_empty()),
-                (
-                    "INTERNATIONAL_DESIGNATOR",
-                    self.international_designator.trim().is_empty(),
-                ),
-                ("CENTER_NAME", self.center_name.trim().is_empty()),
-                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
-                ("EPOCH_TZERO", self.epoch_tzero.is_empty()),
-            ],
-        ))
-    }
 }
 
 impl crate::traits::Validate for RdmData {
@@ -1309,33 +1248,6 @@ impl crate::traits::Validate for RdmData {
             state_vector.validate()?;
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "RDM Data",
-            [(
-                "stateVector (required when covarianceMatrix is provided)",
-                self.covariance_matrix.is_some() && self.state_vector.is_none(),
-            )],
-        );
-        let reentry = &self.atmospheric_reentry_parameters;
-        if let (Some(start), Some(end)) = (
-            &reentry.orbit_lifetime_window_start,
-            &reentry.orbit_lifetime_window_end,
-        ) {
-            if start.value > end.value {
-                errors.push(crate::error::ValidationError::Generic {
-                    message: "ORBIT_LIFETIME_WINDOW_START must be <= ORBIT_LIFETIME_WINDOW_END"
-                        .into(),
-                    line: None,
-                });
-            }
-        }
-        if let Some(state_vector) = &self.state_vector {
-            errors.extend(state_vector.validation_errors()?);
-        }
-        Ok(errors)
     }
 }
 

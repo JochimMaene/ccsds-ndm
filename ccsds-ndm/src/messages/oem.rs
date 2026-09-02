@@ -79,21 +79,6 @@ impl crate::traits::Validate for Oem {
         self.header.validate()?;
         validate_within_path(self.body.validate(), || "body".into())
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = crate::validation::collect_message_validation_errors(
-            crate::validation::MessageKind::Oem,
-            &self.id,
-            &self.version,
-            &self.header,
-            &self.body,
-        )?;
-        crate::validation::collect_validation_result(
-            &mut errors,
-            crate::versioning::validate_oem_edition(self),
-        )?;
-        Ok(errors)
-    }
 }
 
 impl crate::traits::Validate for OemBody {
@@ -103,69 +88,6 @@ impl crate::traits::Validate for OemBody {
             validate_within_path(segment.validate(), || format!("segment[{index}]").into())?;
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = Vec::new();
-        if self.segment.is_empty() {
-            errors.push(
-                crate::error::ValidationError::MissingRequiredField {
-                    block: "OEM Body".into(),
-                    field: "segment (at least one required)".into(),
-                    line: None,
-                }
-                .at_path("body.segment"),
-            );
-        }
-        if let Some(first) = self.segment.first() {
-            let time_system = &first.metadata.time_system;
-            let object_name = &first.metadata.object_name;
-            let object_id = &first.metadata.object_id;
-            for (index, segment) in self.segment.iter().enumerate().skip(1) {
-                if segment.metadata.time_system != *time_system {
-                    errors.push(
-                        crate::error::ValidationError::InvalidValue {
-                            field: "TIME_SYSTEM".into(),
-                            value: segment.metadata.time_system.clone(),
-                            expected: format!(
-                                "consistent TIME_SYSTEM across OEM segments (expected {time_system})"
-                            )
-                            .into(),
-                            line: None,
-                        }
-                        .at_path(format!("body.segment[{index}].metadata.time_system")),
-                    );
-                }
-                if segment.metadata.object_name != *object_name
-                    || segment.metadata.object_id != *object_id
-                {
-                    errors.push(
-                        crate::error::ValidationError::InvalidValue {
-                            field: "OBJECT_NAME/OBJECT_ID".into(),
-                            value: format!(
-                                "{}/{}",
-                                segment.metadata.object_name, segment.metadata.object_id
-                            ),
-                            expected: format!(
-                                "one object throughout the OEM (expected {object_name}/{object_id})"
-                            )
-                            .into(),
-                            line: None,
-                        }
-                        .at_path(format!("body.segment[{index}].metadata.object_id")),
-                    );
-                }
-            }
-        }
-        for (index, segment) in self.segment.iter().enumerate() {
-            errors.extend(
-                segment
-                    .validation_errors()?
-                    .into_iter()
-                    .map(|error| error.within_path(format!("body.segment[{index}]"))),
-            );
-        }
-        Ok(errors)
     }
 }
 
@@ -231,23 +153,6 @@ impl crate::traits::Validate for OemSegment {
             Some(error) => Err(error.into()),
             None => Ok(()),
         }
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = self
-            .metadata
-            .validation_errors()?
-            .into_iter()
-            .map(|error| error.within_path("metadata"))
-            .collect::<Vec<_>>();
-        errors.extend(
-            self.data
-                .validation_errors()?
-                .into_iter()
-                .map(|error| error.within_path("data")),
-        );
-        errors.extend(self.epoch_range_errors());
-        Ok(errors)
     }
 }
 
@@ -439,43 +344,6 @@ impl crate::traits::Validate for OemMetadata {
             None => Ok(()),
         }
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "OEM Metadata",
-            [
-                ("OBJECT_NAME", self.object_name.trim().is_empty()),
-                ("OBJECT_ID", self.object_id.trim().is_empty()),
-                ("CENTER_NAME", self.center_name.trim().is_empty()),
-                ("REF_FRAME", self.ref_frame.trim().is_empty()),
-                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
-                (
-                    "INTERPOLATION_DEGREE (required when INTERPOLATION is present)",
-                    self.interpolation.is_some() && self.interpolation_degree.is_none(),
-                ),
-            ],
-        );
-        for (field, epoch) in [
-            ("START_TIME", &self.start_time),
-            ("STOP_TIME", &self.stop_time),
-        ] {
-            if let Some(error) = absolute_epoch_error(epoch, field) {
-                errors.push(error);
-            }
-        }
-        for (field, epoch) in [
-            ("USEABLE_START_TIME", self.useable_start_time.as_ref()),
-            ("USEABLE_STOP_TIME", self.useable_stop_time.as_ref()),
-        ] {
-            if let Some(epoch) = epoch {
-                if let Some(error) = absolute_epoch_error(epoch, field) {
-                    errors.push(error);
-                }
-            }
-        }
-        errors.extend(self.time_span_errors());
-        Ok(errors)
-    }
 }
 
 impl OemMetadata {
@@ -543,33 +411,6 @@ impl crate::traits::Validate for OemData {
             })?;
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "OEM Data",
-            [(
-                "stateVector (at least one required)",
-                self.state_vector.is_empty(),
-            )],
-        );
-        for (index, state_vector) in self.state_vector.iter().enumerate() {
-            errors.extend(
-                state_vector
-                    .validation_errors()?
-                    .into_iter()
-                    .map(|error| error.within_path(format!("state_vector[{index}]"))),
-            );
-        }
-        for (index, covariance) in self.covariance_matrix.iter().enumerate() {
-            errors.extend(
-                covariance
-                    .validation_errors()?
-                    .into_iter()
-                    .map(|error| error.within_path(format!("covariance_matrix[{index}]"))),
-            );
-        }
-        Ok(errors)
     }
 }
 
@@ -2367,22 +2208,6 @@ impl crate::traits::Validate for OemCovarianceMatrix {
             }
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = Vec::new();
-        if let Some(error) = absolute_epoch_error(&self.epoch, "EPOCH") {
-            errors.push(error);
-        }
-        errors.extend(self.values().into_iter().filter_map(|(field, value)| {
-            (!value.is_finite()).then_some(crate::error::ValidationError::InvalidValue {
-                field: field.into(),
-                value: value.to_string(),
-                expected: "a finite number".into(),
-                line: None,
-            })
-        }));
-        Ok(errors)
     }
 }
 

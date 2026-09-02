@@ -56,16 +56,6 @@ impl crate::traits::Validate for Acm {
         self.header.validate()?;
         self.body.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::collect_message_validation_errors(
-            crate::validation::MessageKind::Acm,
-            &self.id,
-            &self.version,
-            &self.header,
-            &self.body,
-        )
-    }
 }
 
 impl Ndm for Acm {
@@ -901,10 +891,6 @@ impl crate::traits::Validate for AcmBody {
     fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self.segment.as_ref())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        self.segment.validation_errors()
-    }
 }
 
 impl ToKvn for AcmBody {
@@ -924,12 +910,6 @@ impl crate::traits::Validate for AcmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate_with_metadata(&self.metadata)
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        errors.extend(self.data.validation_errors()?);
-        Ok(errors)
     }
 }
 
@@ -1238,17 +1218,6 @@ impl crate::traits::Validate for AcmMetadata {
     fn validate(&self) -> Result<()> {
         self.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "ACM Metadata",
-            [
-                ("OBJECT_NAME", self.object_name.trim().is_empty()),
-                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
-                ("EPOCH_TZERO", self.epoch_tzero.is_empty()),
-            ],
-        ))
-    }
 }
 
 impl ToKvn for AcmMetadata {
@@ -1373,26 +1342,6 @@ impl crate::traits::Validate for AcmData {
             man.validate()?;
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        for attitude in &self.att {
-            crate::validation::collect_validation_result(&mut errors, attitude.validate())?;
-        }
-        if let Some(physical) = &self.phys {
-            crate::validation::collect_validation_result(&mut errors, physical.validate())?;
-        }
-        for covariance in &self.cov {
-            crate::validation::collect_validation_result(&mut errors, covariance.validate())?;
-        }
-        if let Some(determination) = &self.ad {
-            crate::validation::collect_validation_result(&mut errors, determination.validate())?;
-        }
-        for maneuver in &self.man {
-            crate::validation::collect_validation_result(&mut errors, maneuver.validate())?;
-        }
-        Ok(errors)
     }
 }
 

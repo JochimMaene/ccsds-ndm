@@ -57,16 +57,6 @@ impl crate::traits::Validate for Ocm {
         self.header.validate()?;
         self.body.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::collect_message_validation_errors(
-            crate::validation::MessageKind::Ocm,
-            &self.id,
-            &self.version,
-            &self.header,
-            &self.body,
-        )
-    }
 }
 
 impl Ndm for Ocm {
@@ -1005,12 +995,6 @@ impl crate::traits::Validate for OcmSegment {
         self.metadata.validate()?;
         self.data.validate_with_metadata(&self.metadata)
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        errors.extend(self.data.validation_errors()?);
-        Ok(errors)
-    }
 }
 
 impl OcmSegment {
@@ -1041,36 +1025,6 @@ impl crate::traits::Validate for OcmData {
         }
         OcmTrajState::validate_all(&self.traj)?;
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        for trajectory in &self.traj {
-            crate::validation::collect_validation_result(&mut errors, trajectory.validate())?;
-        }
-        if let Some(physical) = &self.phys {
-            crate::validation::collect_validation_result(&mut errors, physical.validate())?;
-        }
-        for covariance in &self.cov {
-            crate::validation::collect_validation_result(&mut errors, covariance.validate())?;
-        }
-        for maneuver in &self.man {
-            crate::validation::collect_validation_result(&mut errors, maneuver.validate())?;
-        }
-        if let Some(perturbations) = &self.pert {
-            crate::validation::collect_validation_result(&mut errors, perturbations.validate())?;
-        }
-        if let Some(orbit_determination) = &self.od {
-            crate::validation::collect_validation_result(
-                &mut errors,
-                orbit_determination.validate(),
-            )?;
-        }
-        crate::validation::collect_validation_result(
-            &mut errors,
-            OcmTrajState::validate_all(&self.traj),
-        )?;
-        Ok(errors)
     }
 }
 
@@ -1688,10 +1642,6 @@ pub struct OcmBody {
 impl crate::traits::Validate for OcmBody {
     fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self.segment.as_ref())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        self.segment.validation_errors()
     }
 }
 
@@ -2384,31 +2334,25 @@ fn validate_ocm_seconds_duration(
     })
 }
 
-fn ocm_metadata_validation_errors(metadata: &OcmMetadata) -> Vec<ValidationError> {
-    let mut errors = crate::validation::missing_required_fields(
-        "OCM Metadata",
-        [
-            ("TIME_SYSTEM", metadata.time_system.trim().is_empty()),
-            ("EPOCH_TZERO", metadata.epoch_tzero.is_empty()),
-        ],
-    );
-
-    if metadata.time_system.trim().eq_ignore_ascii_case("SCLK") {
-        errors.extend(crate::validation::missing_required_fields(
-            "OCM Metadata",
-            [
-                (
-                    "SCLK_OFFSET_AT_EPOCH",
-                    metadata.sclk_offset_at_epoch.is_none(),
-                ),
-                (
-                    "SCLK_SEC_PER_SI_SEC",
-                    metadata.sclk_sec_per_si_sec.is_none(),
-                ),
-            ],
-        ));
+fn validate_ocm_metadata(metadata: &OcmMetadata) -> Result<()> {
+    for (field, missing) in [
+        ("TIME_SYSTEM", metadata.time_system.trim().is_empty()),
+        ("EPOCH_TZERO", metadata.epoch_tzero.is_empty()),
+        (
+            "SCLK_OFFSET_AT_EPOCH",
+            metadata.time_system.trim().eq_ignore_ascii_case("SCLK")
+                && metadata.sclk_offset_at_epoch.is_none(),
+        ),
+        (
+            "SCLK_SEC_PER_SI_SEC",
+            metadata.time_system.trim().eq_ignore_ascii_case("SCLK")
+                && metadata.sclk_sec_per_si_sec.is_none(),
+        ),
+    ] {
+        if missing {
+            return Err(ValidationError::missing_required("OCM Metadata", field).into());
+        }
     }
-
     for (field, offset) in [
         (
             "SCLK_OFFSET_AT_EPOCH",
@@ -2420,35 +2364,28 @@ fn ocm_metadata_validation_errors(metadata: &OcmMetadata) -> Vec<ValidationError
     ] {
         if let Some(offset) = offset {
             if let Some(error) = validate_ocm_time_offset_units(field, offset) {
-                errors.push(error);
+                return Err(error.into());
             }
         }
     }
     if let Some(rate) = metadata.sclk_sec_per_si_sec.as_ref() {
         if let Some(error) = validate_ocm_seconds_duration("SCLK_SEC_PER_SI_SEC", rate) {
-            errors.push(error);
+            return Err(error.into());
         }
     }
     if metadata.next_leap_epoch.is_some() && metadata.next_leap_taimutc.is_none() {
-        errors.push(ValidationError::missing_required(
+        return Err(ValidationError::missing_required(
             "OCM Metadata",
             "NEXT_LEAP_TAIMUTC (required when NEXT_LEAP_EPOCH is present)",
-        ));
+        )
+        .into());
     }
-
-    errors
+    Ok(())
 }
 
 impl crate::traits::Validate for OcmMetadata {
     fn validate(&self) -> Result<()> {
-        match self.validation_errors()?.into_iter().next() {
-            Some(error) => Err(error.into()),
-            None => Ok(()),
-        }
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(ocm_metadata_validation_errors(self))
+        validate_ocm_metadata(self)
     }
 }
 

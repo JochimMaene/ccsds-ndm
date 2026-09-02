@@ -200,25 +200,6 @@ impl crate::traits::Validate for Omm {
         self.header.validate()?;
         self.body.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        crate::validation::collect_validation_result(
-            &mut errors,
-            crate::versioning::validate_root(
-                crate::validation::MessageKind::Omm,
-                &self.id,
-                &self.version,
-            ),
-        )?;
-        crate::validation::collect_validation_result(
-            &mut errors,
-            crate::versioning::validate_omm_edition(self),
-        )?;
-        errors.extend(self.header.validation_errors()?);
-        errors.extend(self.body.validation_errors()?);
-        Ok(errors)
-    }
 }
 
 impl Ndm for Omm {
@@ -525,10 +506,6 @@ impl crate::traits::Validate for OmmBody {
     fn validate(&self) -> Result<()> {
         self.segment.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        self.segment.validation_errors()
-    }
 }
 
 impl ToKvn for OmmBody {
@@ -555,12 +532,6 @@ impl crate::traits::Validate for OmmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate_with_metadata(&self.metadata)
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        errors.extend(self.data.validation_errors_with_metadata(&self.metadata)?);
-        Ok(errors)
     }
 }
 
@@ -713,27 +684,6 @@ impl crate::traits::Validate for OmmMetadata {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        for (field, value) in [
-            ("OBJECT_NAME", self.object_name.as_str()),
-            ("OBJECT_ID", self.object_id.as_str()),
-            ("CENTER_NAME", self.center_name.as_str()),
-            ("REF_FRAME", self.ref_frame.as_str()),
-            ("TIME_SYSTEM", self.time_system.as_str()),
-            ("MEAN_ELEMENT_THEORY", self.mean_element_theory.as_str()),
-        ] {
-            if value.trim().is_empty() {
-                errors.push(ValidationError::MissingRequiredField {
-                    block: "OMM Metadata".into(),
-                    field: field.into(),
-                    line: None,
-                });
-            }
-        }
-        Ok(errors)
-    }
 }
 
 impl ToKvn for OmmMetadata {
@@ -848,10 +798,6 @@ impl crate::traits::Validate for OmmData {
     fn validate(&self) -> Result<()> {
         self.mean_elements.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        self.mean_elements.validation_errors()
-    }
 }
 
 impl OmmData {
@@ -892,33 +838,6 @@ impl OmmData {
         }
 
         Ok(())
-    }
-
-    fn validation_errors_with_metadata(
-        &self,
-        metadata: &OmmMetadata,
-    ) -> Result<Vec<ValidationError>> {
-        let theory = metadata.mean_element_theory.as_str();
-        let mut errors = self.validation_errors()?;
-        match self.tle_parameters.as_ref() {
-            Some(tle) => errors.extend(tle.validation_errors(theory)),
-            None if matches!(theory, "SGP" | "SGP4" | "PPT3" | "SGP4-XP") => {
-                errors.push(ValidationError::MissingRequiredField {
-                    block: Cow::Borrowed("OMM Data"),
-                    field: Cow::Borrowed("TLE_PARAMETERS"),
-                    line: None,
-                });
-            }
-            None => {}
-        }
-        if matches!(theory, "SGP" | "SGP4") && self.mean_elements.mean_motion.is_none() {
-            errors.push(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("Mean Elements"),
-                field: Cow::Borrowed("MEAN_MOTION"),
-                line: None,
-            });
-        }
-        Ok(errors)
     }
 }
 
@@ -1029,10 +948,6 @@ impl crate::traits::Validate for MeanElements {
             }
             .into()),
         }
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::validation_errors_from(self.validate())
     }
 }
 
@@ -1280,42 +1195,6 @@ impl TleParameters {
             _ => {}
         }
         Ok(())
-    }
-
-    fn validation_errors(&self, theory: &str) -> Vec<ValidationError> {
-        let mut errors = Vec::new();
-        if self.bstar.is_some() && self.bterm.is_some() {
-            errors.push(ValidationError::Conflict {
-                fields: vec![Cow::Borrowed("BSTAR"), Cow::Borrowed("BTERM")],
-                line: None,
-            });
-        }
-        if self.mean_motion_ddot.is_some() && self.agom.is_some() {
-            errors.push(ValidationError::Conflict {
-                fields: vec![Cow::Borrowed("MEAN_MOTION_DDOT"), Cow::Borrowed("AGOM")],
-                line: None,
-            });
-        }
-        let required = match theory {
-            "SGP" | "PPT3" => vec![("MEAN_MOTION_DDOT", self.mean_motion_ddot.is_none())],
-            "SGP4" => vec![("BSTAR", self.bstar.is_none())],
-            "SGP4-XP" => vec![
-                ("BTERM", self.bterm.is_none()),
-                ("AGOM", self.agom.is_none()),
-            ],
-            _ => Vec::new(),
-        };
-        errors.extend(
-            required
-                .into_iter()
-                .filter(|(_, missing)| *missing)
-                .map(|(field, _)| ValidationError::MissingRequiredField {
-                    block: Cow::Borrowed("TLE Parameters"),
-                    field: Cow::Borrowed(field),
-                    line: None,
-                }),
-        );
-        errors
     }
 }
 

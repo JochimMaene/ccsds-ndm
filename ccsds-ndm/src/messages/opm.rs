@@ -81,28 +81,6 @@ impl crate::traits::Validate for Opm {
         self.body.validate()?;
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        match crate::versioning::validate_root(
-            crate::validation::MessageKind::Opm,
-            &self.id,
-            &self.version,
-        ) {
-            Ok(()) => {}
-            Err(crate::error::CcsdsNdmError::Validation(error)) => {
-                errors.push((*error).at_field_in(""))
-            }
-            Err(error) => return Err(error),
-        }
-        crate::validation::collect_validation_result(
-            &mut errors,
-            crate::versioning::validate_opm_edition(self),
-        )?;
-        errors.extend(self.header.validation_errors()?);
-        errors.extend(self.body.validation_errors()?);
-        Ok(errors)
-    }
 }
 
 impl Ndm for Opm {
@@ -1289,10 +1267,6 @@ impl crate::traits::Validate for OpmBody {
     fn validate(&self) -> Result<()> {
         self.segment.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        self.segment.validation_errors()
-    }
 }
 
 impl ToKvn for OpmBody {
@@ -1315,12 +1289,6 @@ impl crate::traits::Validate for OpmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate()
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        errors.extend(self.data.validation_errors()?);
-        Ok(errors)
     }
 }
 
@@ -1459,26 +1427,6 @@ impl crate::traits::Validate for OpmMetadata {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        for (field, value) in [
-            ("OBJECT_NAME", self.object_name.as_str()),
-            ("OBJECT_ID", self.object_id.as_str()),
-            ("CENTER_NAME", self.center_name.as_str()),
-            ("REF_FRAME", self.ref_frame.as_str()),
-            ("TIME_SYSTEM", self.time_system.as_str()),
-        ] {
-            if value.trim().is_empty() {
-                errors.push(ValidationError::MissingRequiredField {
-                    block: "OPM Metadata".into(),
-                    field: field.into(),
-                    line: None,
-                });
-            }
-        }
-        Ok(errors)
-    }
 }
 
 impl ToKvn for OpmMetadata {
@@ -1599,52 +1547,6 @@ impl Validate for OpmData {
             .into());
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = crate::validation::at_field_paths(
-            self.state_vector.validation_errors()?,
-            "body.segment.data.state_vector",
-        );
-        errors.extend(match &self.keplerian_elements {
-            Some(elements) => crate::validation::at_field_paths(
-                elements.validation_errors()?,
-                "body.segment.data.keplerian_elements",
-            ),
-            None => Vec::new(),
-        });
-        if let Some(parameters) = &self.spacecraft_parameters {
-            errors.extend(crate::validation::at_field_paths(
-                parameters.validation_errors()?,
-                "body.segment.data.spacecraft_parameters",
-            ));
-        }
-        if let Some(covariance) = &self.covariance_matrix {
-            errors.extend(crate::validation::at_field_paths(
-                covariance.validation_errors()?,
-                "body.segment.data.covariance_matrix",
-            ));
-        }
-        for maneuver in &self.maneuver_parameters {
-            errors.extend(crate::validation::at_field_paths(
-                maneuver.validation_errors()?,
-                "body.segment.data.maneuver_parameters",
-            ));
-        }
-        if !self.maneuver_parameters.is_empty()
-            && self
-                .spacecraft_parameters
-                .as_ref()
-                .and_then(|parameters| parameters.mass.as_ref())
-                .is_none()
-        {
-            errors.push(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("Spacecraft Parameters"),
-                field: Cow::Borrowed("MASS"),
-                line: None,
-            });
-        }
-        Ok(errors)
     }
 }
 
@@ -1813,119 +1715,116 @@ pub struct KeplerianElements {
 
 impl crate::traits::Validate for KeplerianElements {
     fn validate(&self) -> Result<()> {
-        match self.validation_errors()?.into_iter().next() {
-            Some(error) => Err(error.into()),
-            None => Ok(()),
-        }
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-
         let semi_major_axis = self.semi_major_axis.value;
         if !semi_major_axis.is_finite() {
-            errors.push(ValidationError::InvalidValue {
+            return Err(ValidationError::InvalidValue {
                 field: "SEMI_MAJOR_AXIS".into(),
                 value: semi_major_axis.to_string(),
                 expected: "a finite number".into(),
                 line: None,
-            });
+            }
+            .into());
         }
-
         let eccentricity = self.eccentricity.value;
         if !eccentricity.is_finite() {
-            errors.push(ValidationError::InvalidValue {
+            return Err(ValidationError::InvalidValue {
                 field: "ECCENTRICITY".into(),
                 value: eccentricity.to_string(),
                 expected: "a finite number".into(),
                 line: None,
-            });
-        } else if eccentricity < 0.0 {
-            errors.push(ValidationError::OutOfRange {
+            }
+            .into());
+        }
+        if eccentricity < 0.0 {
+            return Err(ValidationError::OutOfRange {
                 name: "ECCENTRICITY".into(),
                 value: eccentricity.to_string(),
                 expected: ">= 0".into(),
                 line: None,
-            });
+            }
+            .into());
         }
-
         let inclination = self.inclination.angle.value;
         if !inclination.is_finite() {
-            errors.push(ValidationError::InvalidValue {
+            return Err(ValidationError::InvalidValue {
                 field: "INCLINATION".into(),
                 value: inclination.to_string(),
                 expected: "a finite number".into(),
                 line: None,
-            });
-        } else if !(0.0..=180.0).contains(&inclination) {
-            errors.push(ValidationError::OutOfRange {
+            }
+            .into());
+        }
+        if !(0.0..=180.0).contains(&inclination) {
+            return Err(ValidationError::OutOfRange {
                 name: "INCLINATION".into(),
                 value: inclination.to_string(),
                 expected: "[0, 180]".into(),
                 line: None,
-            });
+            }
+            .into());
         }
-
         for (field, angle) in [
             ("RA_OF_ASC_NODE", Some(&self.ra_of_asc_node)),
             ("ARG_OF_PERICENTER", Some(&self.arg_of_pericenter)),
             ("TRUE_ANOMALY", self.true_anomaly.as_ref()),
             ("MEAN_ANOMALY", self.mean_anomaly.as_ref()),
         ] {
-            let Some(angle) = angle else {
-                continue;
-            };
+            let Some(angle) = angle else { continue };
             if !angle.value.is_finite() {
-                errors.push(ValidationError::InvalidValue {
+                return Err(ValidationError::InvalidValue {
                     field: field.into(),
                     value: angle.value.to_string(),
                     expected: "a finite number".into(),
                     line: None,
-                });
-            } else if !(-360.0..360.0).contains(&angle.value) {
-                errors.push(ValidationError::OutOfRange {
+                }
+                .into());
+            }
+            if !(-360.0..360.0).contains(&angle.value) {
+                return Err(ValidationError::OutOfRange {
                     name: field.into(),
                     value: angle.value.to_string(),
                     expected: "[-360, 360)".into(),
                     line: None,
-                });
+                }
+                .into());
             }
         }
-
         let gm = self.gm.value;
         if !gm.is_finite() {
-            errors.push(ValidationError::InvalidValue {
+            return Err(ValidationError::InvalidValue {
                 field: "GM".into(),
                 value: gm.to_string(),
                 expected: "a finite number".into(),
                 line: None,
-            });
-        } else if gm <= 0.0 {
-            errors.push(ValidationError::OutOfRange {
+            }
+            .into());
+        }
+        if gm <= 0.0 {
+            return Err(ValidationError::OutOfRange {
                 name: "GM".into(),
                 value: gm.to_string(),
                 expected: "> 0".into(),
                 line: None,
-            });
+            }
+            .into());
         }
-
-        let selected_anomalies = match (self.true_anomaly.is_some(), self.mean_anomaly.is_some()) {
-            (true, false) | (false, true) => None,
-            (false, false) => Some(Vec::new()),
-            (true, true) => Some(vec![
-                Cow::Borrowed("TRUE_ANOMALY"),
-                Cow::Borrowed("MEAN_ANOMALY"),
-            ]),
-        };
-        if let Some(selected) = selected_anomalies {
-            errors.push(ValidationError::InvalidChoice {
+        if self.true_anomaly.is_some() == self.mean_anomaly.is_some() {
+            let selected = [
+                ("TRUE_ANOMALY", self.true_anomaly.is_some()),
+                ("MEAN_ANOMALY", self.mean_anomaly.is_some()),
+            ]
+            .into_iter()
+            .filter(|(_, present)| *present)
+            .map(|(name, _)| Cow::Borrowed(name))
+            .collect();
+            return Err(ValidationError::InvalidChoice {
                 fields: vec![Cow::Borrowed("TRUE_ANOMALY"), Cow::Borrowed("MEAN_ANOMALY")],
                 selected,
                 line: None,
-            });
+            }
+            .into());
         }
-
-        Ok(errors)
+        Ok(())
     }
 }
 
@@ -2011,79 +1910,81 @@ pub struct ManeuverParameters {
 
 impl Validate for ManeuverParameters {
     fn validate(&self) -> Result<()> {
-        match self.validation_errors()?.into_iter().next() {
-            Some(error) => Err(error.into()),
-            None => Ok(()),
+        if self.man_epoch_ignition.is_empty() {
+            return Err(ValidationError::missing_required(
+                "Maneuver Parameters",
+                "MAN_EPOCH_IGNITION",
+            )
+            .into());
         }
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "Maneuver Parameters",
-            [
-                ("MAN_EPOCH_IGNITION", self.man_epoch_ignition.is_empty()),
-                ("MAN_REF_FRAME", self.man_ref_frame.trim().is_empty()),
-            ],
-        );
-
+        if self.man_ref_frame.trim().is_empty() {
+            return Err(
+                ValidationError::missing_required("Maneuver Parameters", "MAN_REF_FRAME").into(),
+            );
+        }
         let duration = self.man_duration.value;
         if !duration.is_finite() {
-            errors.push(ValidationError::InvalidValue {
+            return Err(ValidationError::InvalidValue {
                 field: "MAN_DURATION".into(),
                 value: duration.to_string(),
                 expected: "a finite number".into(),
                 line: None,
-            });
-        } else if duration < 0.0 {
-            errors.push(ValidationError::OutOfRange {
+            }
+            .into());
+        }
+        if duration < 0.0 {
+            return Err(ValidationError::OutOfRange {
                 name: "MAN_DURATION".into(),
                 value: duration.to_string(),
                 expected: ">= 0".into(),
                 line: None,
-            });
+            }
+            .into());
         }
         if matches!(self.man_duration.units, Some(TimeUnits::Day)) {
-            errors.push(ValidationError::InvalidValue {
+            return Err(ValidationError::InvalidValue {
                 field: "MAN_DURATION units".into(),
                 value: "d".into(),
                 expected: "s or omitted".into(),
                 line: None,
-            });
+            }
+            .into());
         }
-
         let delta_mass = self.man_delta_mass.value;
         if !delta_mass.is_finite() {
-            errors.push(ValidationError::InvalidValue {
+            return Err(ValidationError::InvalidValue {
                 field: "MAN_DELTA_MASS".into(),
                 value: delta_mass.to_string(),
                 expected: "a finite number".into(),
                 line: None,
-            });
-        } else if delta_mass > 0.0 {
-            errors.push(ValidationError::OutOfRange {
+            }
+            .into());
+        }
+        if delta_mass > 0.0 {
+            return Err(ValidationError::OutOfRange {
                 name: "MAN_DELTA_MASS".into(),
                 value: delta_mass.to_string(),
                 expected: "<= 0".into(),
                 line: None,
-            });
+            }
+            .into());
         }
-
         for (field, value) in [
             ("MAN_DV_1", self.man_dv_1.value),
             ("MAN_DV_2", self.man_dv_2.value),
             ("MAN_DV_3", self.man_dv_3.value),
         ] {
             if !value.is_finite() {
-                errors.push(ValidationError::InvalidValue {
+                return Err(ValidationError::InvalidValue {
                     field: field.into(),
                     value: value.to_string(),
                     expected: "a finite number".into(),
                     line: None,
-                });
+                }
+                .into());
             }
         }
-
-        Ok(errors)
+        Ok(())
     }
 }
 

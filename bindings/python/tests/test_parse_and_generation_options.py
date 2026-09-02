@@ -46,18 +46,18 @@ def test_generation_has_no_misleading_unchecked_mode():
         message.to_str("kvn", validate=False)
 
 
-def test_python_opm_validation_raises_one_aggregate_error():
+def test_python_opm_validation_raises_the_first_error():
     message = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn")
     header = message.header
     header.originator = ""
     message.header = header
     message.segment.metadata.object_name = ""
 
-    with pytest.raises(ccsds_ndm.NdmValidationError) as aggregate:
+    with pytest.raises(ccsds_ndm.NdmValidationError) as validation_error:
         message.validate()
-    error = str(aggregate.value).lower()
+    error = str(validation_error.value).lower()
     assert "originator" in error
-    assert "object_name" in error
+    assert "object_name" not in error
 
     with pytest.raises(TypeError):
         message.validate(strict=False)

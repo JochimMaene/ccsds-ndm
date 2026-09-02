@@ -32,11 +32,13 @@ fn test_enum_error_is_preserved() {
     assert!(res.is_err());
     let err = res.unwrap_err();
 
-    // Should be accessible via as_enum_error
-    if let Some(enum_err) = err.as_enum_error() {
+    let CcsdsNdmError::Format(format_error) = err else {
+        panic!("Expected FormatError");
+    };
+    if let ccsds_ndm::error::FormatError::Enum(enum_err) = *format_error {
         assert_eq!(enum_err.value, "INVALID_ORDERING");
         assert_eq!(enum_err.field, "COV_ORDERING");
     } else {
-        panic!("Expected EnumParseError, got {:?}", err);
+        panic!("Expected EnumParseError, got {format_error:?}");
     }
 }

@@ -191,14 +191,12 @@ fn convert_file(
 #[pyfunction]
 fn to_file(py: Python<'_>, message: Py<PyAny>, path: &str, format: &str) -> PyResult<()> {
     let message = ndm::py_message_to_core(py, &message)?;
-    api::atomic_write(path, |output| {
-        match format {
-            "kvn" => message.write_kvn_to(output),
-            "xml" => message.write_xml_to(output),
-            other => return Err(api::unsupported_format(other)),
-        }
-        .map_err(ccsds_error_to_pyerr)
-    })
+    match format {
+        "kvn" => message.to_kvn_file(path),
+        "xml" => message.to_xml_file(path),
+        other => return Err(api::unsupported_format(other)),
+    }
+    .map_err(ccsds_error_to_pyerr)
 }
 
 /// The Python module definition.

@@ -223,10 +223,6 @@ fn opm_3_xml_file_generation_reports_output_failures_without_a_field_path() {
 
     assert_eq!(error.code(), Some("io.error"));
     assert_eq!(error.field_path(), None);
-    assert!(
-        error.as_io_error().is_some(),
-        "file generation returned the wrong failure category: {error}"
-    );
 }
 
 #[test]

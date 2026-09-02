@@ -76,9 +76,12 @@ fn opm_3_xml_writer_propagates_sink_failures_without_panicking() {
             ccsds_ndm::validation::MessageKind::Opm
         );
         assert_eq!(diagnostic.field_path, None);
-        let io_error = error.as_io_error().unwrap_or_else(|| {
-            panic!("writer returned a non-I/O error at byte limit {limit}: {error}")
-        });
+        let ccsds_ndm::error::CcsdsNdmError::Generation { source, .. } = &error else {
+            panic!("writer returned an uncontextualized error: {error}");
+        };
+        let ccsds_ndm::error::CcsdsNdmError::Io(io_error) = source.as_ref() else {
+            panic!("writer returned a non-I/O error at byte limit {limit}: {error}");
+        };
 
         assert_eq!(io_error.kind(), io::ErrorKind::BrokenPipe);
         assert_eq!(io_error.to_string(), "deliberate test sink failure");

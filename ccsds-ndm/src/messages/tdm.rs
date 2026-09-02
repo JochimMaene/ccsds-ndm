@@ -57,16 +57,6 @@ impl crate::traits::Validate for Tdm {
         self.header.validate()?;
         self.body.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::collect_message_validation_errors(
-            crate::validation::MessageKind::Tdm,
-            &self.id,
-            &self.version,
-            &self.header,
-            &self.body,
-        )
-    }
 }
 
 impl Ndm for Tdm {
@@ -580,16 +570,6 @@ impl crate::traits::Validate for TdmHeader {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "TDM Header",
-            [
-                ("CREATION_DATE", self.creation_date.is_empty()),
-                ("ORIGINATOR", self.originator.trim().is_empty()),
-            ],
-        ))
-    }
 }
 
 impl ToKvn for TdmHeader {
@@ -631,21 +611,6 @@ impl crate::traits::Validate for TdmBody {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        if self.segments.is_empty() {
-            errors.push(ValidationError::MissingRequiredField {
-                block: "TDM Body".into(),
-                field: "segment (at least one required)".into(),
-                line: None,
-            });
-        }
-        for segment in &self.segments {
-            errors.extend(segment.validation_errors()?);
-        }
-        Ok(errors)
-    }
 }
 
 impl ToKvn for TdmBody {
@@ -669,12 +634,6 @@ impl crate::traits::Validate for TdmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate()
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        errors.extend(self.data.validation_errors()?);
-        Ok(errors)
     }
 }
 
@@ -1454,101 +1413,6 @@ impl crate::traits::Validate for TdmMetadata {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "TDM Metadata",
-            [
-                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
-                ("PARTICIPANT_1", self.participant_1.trim().is_empty()),
-            ],
-        );
-        if self.path.is_some() && (self.path_1.is_some() || self.path_2.is_some()) {
-            errors.push(ValidationError::Generic {
-                message: Cow::Borrowed("TDM Metadata cannot have both PATH and PATH_1/PATH_2"),
-                line: None,
-            });
-        }
-        if (self.path_1.is_some() && self.path_2.is_none())
-            || (self.path_1.is_none() && self.path_2.is_some())
-        {
-            errors.push(ValidationError::Generic {
-                message: Cow::Borrowed(
-                    "TDM Metadata must have both PATH_1 and PATH_2 if one is present",
-                ),
-                line: None,
-            });
-        }
-        match self.mode {
-            Some(TdmMode::Sequential) => {
-                if self.path.is_none() {
-                    errors.push(ValidationError::MissingRequiredField {
-                        block: "TDM Metadata".into(),
-                        field: "PATH (required when MODE=SEQUENTIAL)".into(),
-                        line: None,
-                    });
-                }
-                if self.path_1.is_some() || self.path_2.is_some() {
-                    errors.push(ValidationError::Generic {
-                        message: Cow::Borrowed(
-                            "TDM Metadata cannot use PATH_1/PATH_2 when MODE=SEQUENTIAL",
-                        ),
-                        line: None,
-                    });
-                }
-            }
-            Some(TdmMode::SingleDiff) => {
-                if self.path.is_some() {
-                    errors.push(ValidationError::Generic {
-                        message: Cow::Borrowed(
-                            "TDM Metadata cannot use PATH when MODE=SINGLE_DIFF",
-                        ),
-                        line: None,
-                    });
-                }
-                if self.path_1.is_none() || self.path_2.is_none() {
-                    errors.push(ValidationError::MissingRequiredField {
-                        block: "TDM Metadata".into(),
-                        field: "PATH_1 and PATH_2 (required when MODE=SINGLE_DIFF)".into(),
-                        line: None,
-                    });
-                }
-            }
-            None => {}
-        }
-        if self.angle_type == Some(TdmAngleType::Radec) && self.reference_frame.is_none() {
-            errors.push(ValidationError::MissingRequiredField {
-                block: "TDM Metadata".into(),
-                field: "REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)".into(),
-                line: None,
-            });
-        }
-        if self.interpolation.is_some() && self.interpolation_degree.is_none() {
-            errors.push(ValidationError::MissingRequiredField {
-                block: "TDM Metadata".into(),
-                field: "INTERPOLATION_DEGREE (required when INTERPOLATION is used)".into(),
-                line: None,
-            });
-        }
-        let has_correction = self.correction_angle_1.is_some()
-            || self.correction_angle_2.is_some()
-            || self.correction_doppler.is_some()
-            || self.correction_mag.is_some()
-            || self.correction_range.is_some()
-            || self.correction_rcs.is_some()
-            || self.correction_receive.is_some()
-            || self.correction_transmit.is_some()
-            || self.correction_aberration_yearly.is_some()
-            || self.correction_aberration_diurnal.is_some();
-        if has_correction && self.corrections_applied.is_none() {
-            errors.push(ValidationError::MissingRequiredField {
-                block: "TDM Metadata".into(),
-                field: "CORRECTIONS_APPLIED (required when CORRECTION_* keywords are used)".into(),
-                line: None,
-            });
-        }
-        Ok(errors)
-    }
 }
 
 impl TdmMetadata {
@@ -1770,20 +1634,6 @@ impl crate::traits::Validate for TdmData {
             observation.data.validate()?;
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "TDM Data",
-            [(
-                "observation (at least one required)",
-                self.observations.is_empty(),
-            )],
-        );
-        for observation in &self.observations {
-            errors.extend(observation.data.validation_errors());
-        }
-        Ok(errors)
     }
 }
 
@@ -2266,24 +2116,18 @@ impl TdmObservationData {
         }
     }
 
-    fn validation_errors(&self) -> Vec<ValidationError> {
+    fn validate(&self) -> Result<()> {
         let value = self.value();
         if value.is_finite() {
-            Vec::new()
+            Ok(())
         } else {
-            vec![ValidationError::InvalidValue {
+            Err(ValidationError::InvalidValue {
                 field: self.key().into(),
                 value: value.to_string(),
                 expected: "a finite number".into(),
                 line: None,
-            }]
-        }
-    }
-
-    fn validate(&self) -> Result<()> {
-        match self.validation_errors().into_iter().next() {
-            Some(error) => Err(error.into()),
-            None => Ok(()),
+            }
+            .into())
         }
     }
 

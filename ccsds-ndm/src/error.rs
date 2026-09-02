@@ -508,20 +508,11 @@ impl WithLocation for ValidationError {
 /// # Example: Handling Parse Errors
 /// ```no_run
 /// use ccsds_ndm::messages::opm::Opm;
-/// use ccsds_ndm::error::CcsdsNdmError;
 /// use ccsds_ndm::traits::Ndm;
 ///
 /// match Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...") {
 ///     Ok(opm) => println!("Parsed: {:?}", opm),
-///     Err(e) => {
-///         if let Some(enum_err) = e.as_enum_error() {
-///             eprintln!("Invalid enum value '{}' for field '{}'", enum_err.value, enum_err.field);
-///         } else if let Some(validation_err) = e.as_validation_error() {
-///             eprintln!("Validation error: {}", validation_err);
-///         } else {
-///             eprintln!("Error: {}", e);
-///         }
-///     }
+///     Err(e) => eprintln!("{}: {}", e.code().unwrap_or("unknown"), e),
 /// }
 /// ```
 #[derive(Error, Debug)]
@@ -1026,7 +1017,7 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner KVN parse error if this is a FormatError::Kvn.
-    pub fn as_kvn_parse_error(&self) -> Option<&KvnParseError> {
+    pub(crate) fn as_kvn_parse_error(&self) -> Option<&KvnParseError> {
         match self {
             CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
                 source.as_kvn_parse_error()
@@ -1062,7 +1053,8 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner epoch error if this is an EpochError.
-    pub fn as_epoch_error(&self) -> Option<&EpochError> {
+    #[cfg(test)]
+    pub(crate) fn as_epoch_error(&self) -> Option<&EpochError> {
         match self {
             CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
                 source.as_epoch_error()
@@ -1073,7 +1065,8 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner I/O error if this is an IoError.
-    pub fn as_io_error(&self) -> Option<&std::io::Error> {
+    #[cfg(test)]
+    pub(crate) fn as_io_error(&self) -> Option<&std::io::Error> {
         match self {
             CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
                 source.as_io_error()
@@ -1084,7 +1077,8 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner XML error if this is an XmlError.
-    pub fn as_xml_error(&self) -> Option<&quick_xml::Error> {
+    #[cfg(test)]
+    pub(crate) fn as_xml_error(&self) -> Option<&quick_xml::Error> {
         match self {
             CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
                 source.as_xml_error()
@@ -1098,32 +1092,38 @@ impl CcsdsNdmError {
     }
 
     /// Returns true if this is any FormatError.
-    pub fn is_format_error(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_format_error(&self) -> bool {
         matches!(self, CcsdsNdmError::Format(_))
     }
 
     /// Returns true if this is a KVN FormatError.
-    pub fn is_kvn_error(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_kvn_error(&self) -> bool {
         self.as_kvn_parse_error().is_some()
     }
 
     /// Returns true if this is a ValidationError.
-    pub fn is_validation_error(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_validation_error(&self) -> bool {
         self.as_validation_error().is_some()
     }
 
     /// Returns true if this is an I/O error.
-    pub fn is_io_error(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_io_error(&self) -> bool {
         matches!(self, CcsdsNdmError::Io(_))
     }
 
     /// Returns true if this is an epoch error.
-    pub fn is_epoch_error(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_epoch_error(&self) -> bool {
         matches!(self, CcsdsNdmError::Epoch(_))
     }
 
     /// Returns the inner EnumParseError if this is a FormatError::Enum.
-    pub fn as_enum_error(&self) -> Option<&EnumParseError> {
+    #[cfg(test)]
+    pub(crate) fn as_enum_error(&self) -> Option<&EnumParseError> {
         match self {
             CcsdsNdmError::Format(e) => match **e {
                 FormatError::Enum(ref ee) => Some(ee),
@@ -1134,7 +1134,8 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner ParseIntError if this is a FormatError::ParseInt.
-    pub fn as_parse_int_error(&self) -> Option<&std::num::ParseIntError> {
+    #[cfg(test)]
+    pub(crate) fn as_parse_int_error(&self) -> Option<&std::num::ParseIntError> {
         match self {
             CcsdsNdmError::Format(e) => match **e {
                 FormatError::ParseInt(ref pie) => Some(pie),
@@ -1145,7 +1146,8 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner ParseFloatError if this is a FormatError::ParseFloat.
-    pub fn as_parse_float_error(&self) -> Option<&std::num::ParseFloatError> {
+    #[cfg(test)]
+    pub(crate) fn as_parse_float_error(&self) -> Option<&std::num::ParseFloatError> {
         match self {
             CcsdsNdmError::Format(e) => match **e {
                 FormatError::ParseFloat(ref pfe) => Some(pfe),

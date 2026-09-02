@@ -178,11 +178,11 @@ fn rdm_generation_rejects_invalid_state_vectors() {
 }
 
 #[test]
-fn acm_and_ocm_collect_later_nested_validation_errors() {
+fn acm_and_ocm_fail_fast_on_nested_validation_errors() {
     let mut acm = Acm::from_kvn(ACM_KVN).unwrap();
     acm.body.segment.data.att[0].ref_frame_a.clear();
     acm.body.segment.data.man[0].man_purpose = Some(String::new());
-    assert_eq!(acm.validation_errors().unwrap().len(), 2);
+    assert!(acm.validate().is_err());
 
     let mut ocm = Ocm::from_kvn(OCM_KVN).unwrap();
     ocm.body.segment.data.traj[0].center_name.clear();
@@ -190,7 +190,7 @@ fn acm_and_ocm_collect_later_nested_validation_errors() {
         drag_coeff_nom: Some(-1.0),
         ..OcmPhysicalDescription::default()
     });
-    assert_eq!(ocm.validation_errors().unwrap().len(), 2);
+    assert!(ocm.validate().is_err());
 }
 
 #[test]

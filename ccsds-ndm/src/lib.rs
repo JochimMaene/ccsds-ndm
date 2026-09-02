@@ -388,8 +388,7 @@ impl MessageType {
     ///
     /// Returns a KVN-generation error or an I/O error from writing the destination.
     pub fn to_kvn_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let kvn = self.to_kvn()?;
-        fsutil::atomic_write(path.as_ref(), kvn.as_bytes()).map_err(|error| {
+        fsutil::atomic_write(path.as_ref(), |output| self.write_kvn_to(output)).map_err(|error| {
             error.with_generation_context(
                 self.kind(),
                 error::DiagnosticNotation::Kvn,
@@ -407,8 +406,7 @@ impl MessageType {
     ///
     /// Returns an XML-generation error or an I/O error from writing the destination.
     pub fn to_xml_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let xml = self.to_xml()?;
-        fsutil::atomic_write(path.as_ref(), xml.as_bytes()).map_err(|error| {
+        fsutil::atomic_write(path.as_ref(), |output| self.write_xml_to(output)).map_err(|error| {
             error.with_generation_context(
                 self.kind(),
                 error::DiagnosticNotation::Xml,

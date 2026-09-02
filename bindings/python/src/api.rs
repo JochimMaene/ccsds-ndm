@@ -2,14 +2,12 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::errors::{ccsds_error_to_pyerr, NdmValidationError};
-use ccsds_ndm::generation::VersionedNdm;
+use crate::errors::ccsds_error_to_pyerr;
 use ccsds_ndm::options::ParseOptions;
 use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::{MessageType, Notation};
-use pyo3::exceptions::{PyOSError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::path::Path;
 
 /// Build an optional validated core value, surfacing a rejection as a Python exception
 /// instead of panicking.
@@ -82,18 +80,7 @@ pub fn parse_typed_with_options<T: FromMessageType>(
 }
 
 pub fn validate_message<T: Validate>(message: &T) -> PyResult<()> {
-    let errors = message.validation_errors().map_err(ccsds_error_to_pyerr)?;
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(NdmValidationError::new_err(
-            errors
-                .into_iter()
-                .map(|error| error.to_string())
-                .collect::<Vec<_>>()
-                .join("\n"),
-        ))
-    }
+    message.validate().map_err(ccsds_error_to_pyerr)
 }
 
 pub fn generate_string<T: Ndm>(message: &T, format: &str) -> PyResult<String> {
@@ -102,57 +89,6 @@ pub fn generate_string<T: Ndm>(message: &T, format: &str) -> PyResult<String> {
         "xml" => message.to_xml().map_err(ccsds_error_to_pyerr),
         other => Err(unsupported_format(other)),
     }
-}
-
-pub fn generate_file<T: VersionedNdm>(message: &T, path: &str, format: &str) -> PyResult<()> {
-    if format != "kvn" && format != "xml" {
-        return Err(unsupported_format(format));
-    }
-
-    atomic_write(path, |output| {
-        match format {
-            "kvn" => message.write_kvn_to(output),
-            "xml" => message.write_xml_to(output),
-            _ => unreachable!(),
-        }
-        .map_err(ccsds_error_to_pyerr)
-    })
-}
-
-pub fn atomic_write(
-    path: &str,
-    write: impl FnOnce(&mut std::fs::File) -> PyResult<()>,
-) -> PyResult<()> {
-    let destination = Path::new(path);
-    let parent = destination
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."));
-    let mut builder = tempfile::Builder::new();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-
-        let permissions = destination
-            .metadata()
-            .map(|metadata| metadata.permissions())
-            .unwrap_or_else(|_| std::fs::Permissions::from_mode(0o666));
-        builder.permissions(permissions);
-    }
-    let mut output = builder
-        .tempfile_in(parent)
-        .map_err(|error| PyOSError::new_err(error.to_string()))?;
-
-    write(output.as_file_mut())?;
-
-    output
-        .as_file_mut()
-        .sync_all()
-        .map_err(|error| PyOSError::new_err(error.to_string()))?;
-    output
-        .persist(destination)
-        .map_err(|error| PyOSError::new_err(error.error.to_string()))?;
-    Ok(())
 }
 
 pub fn unsupported_format(format: &str) -> PyErr {
