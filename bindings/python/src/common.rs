@@ -2265,12 +2265,12 @@ pub fn parse_time_system(ob: &Bound<'_, PyAny>) -> PyResult<String> {
 }
 
 pub fn validate_version(kind: ccsds_ndm::validation::MessageKind, value: &str) -> PyResult<()> {
-    if let Some(spec) = ccsds_ndm::versioning::spec(kind) {
-        if !spec.supported_versions.contains(&value) {
+    if let Some(versions) = ccsds_ndm::versioning::supported_versions(kind) {
+        if !versions.contains(&value) {
             return Err(PyValueError::new_err(format!(
                 "Invalid version '{}'; expected one of: {}",
                 value,
-                spec.supported_versions.join(", ")
+                versions.join(", ")
             )));
         }
     }

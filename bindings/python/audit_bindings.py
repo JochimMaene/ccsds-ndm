@@ -7,18 +7,11 @@ Reports missing field exposures, missing docstrings, and documentation gaps.
 Designed for use as a pre-commit hook.
 
 Usage:
-    uv run python audit_bindings.py              # Run audit, report issues
-    uv run python audit_bindings.py --strict     # Exit 1 if any issues found
-    uv run python audit_bindings.py --verbose    # Show all checked items
-    uv run python audit_bindings.py --json       # Output as JSON for CI
+    uv run python audit_bindings.py
 """
 
 from __future__ import annotations
 
-import argparse
-import json
-import re
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -31,47 +24,16 @@ from binding_mappings import (
     is_python_only,
     should_skip_rust_field,
 )
+from binding_source import (
+    PythonClass,
+    RustStruct,
+    collect_rust_structs,
+    parse_python_binding_file,
+)
 
 # ---------------------------------------------------------------------------
 # Data Classes
 # ---------------------------------------------------------------------------
-
-
-@dataclass
-class RustField:
-    """A field in a Rust struct."""
-
-    name: str
-    rust_type: str
-    has_docstring: bool
-
-
-@dataclass
-class RustStruct:
-    """A Rust struct with its fields."""
-
-    name: str
-    fields: dict[str, RustField] = field(default_factory=dict)
-    has_docstring: bool = False
-
-
-@dataclass
-class PythonGetter:
-    """A Python getter in a PyO3 binding."""
-
-    name: str  # e.g., "object_name" (without get_ prefix)
-    has_docstring: bool
-    has_type_annotation: bool  # Has :type: in docstring
-
-
-@dataclass
-class PythonClass:
-    """A Python class in a PyO3 binding."""
-
-    name: str
-    getters: dict[str, PythonGetter] = field(default_factory=dict)
-    setters: set[str] = field(default_factory=set)
-    has_docstring: bool = False
 
 
 @dataclass
@@ -100,201 +62,6 @@ class AuditResult:
     stats: dict[str, int] = field(default_factory=dict)
 
 
-# ---------------------------------------------------------------------------
-# Rust Parser
-# ---------------------------------------------------------------------------
-
-
-def parse_rust_struct(content: str, struct_match: re.Match) -> RustStruct | None:
-    """Parse a single Rust struct and extract its fields."""
-    struct_name = struct_match.group(1)
-    struct_start = content[: struct_match.start()].count("\n")
-
-    # Check if struct has docstring
-    lines = content.split("\n")
-    has_docstring = False
-    idx = struct_start - 1
-    while idx >= 0:
-        line = lines[idx].strip()
-        if line.startswith("///"):
-            has_docstring = True
-            break
-        elif line.startswith("#[") or line == "":
-            idx -= 1
-        else:
-            break
-
-    rust_struct = RustStruct(name=struct_name, has_docstring=has_docstring)
-
-    # Find struct body
-    brace_start = struct_match.end() - 1
-    if content[brace_start] != "{":
-        brace_start = content.find("{", struct_match.end())
-    if brace_start == -1:
-        return rust_struct
-
-    # Find matching closing brace
-    depth = 1
-    pos = brace_start + 1
-    while pos < len(content) and depth > 0:
-        if content[pos] == "{":
-            depth += 1
-        elif content[pos] == "}":
-            depth -= 1
-        pos += 1
-
-    struct_body = content[brace_start + 1 : pos - 1]
-    struct_body_start_char = brace_start + 1
-
-    # Parse fields with pub keyword
-    field_pattern = re.compile(r"^\s*pub\s+(\w+)\s*:\s*([^,\n]+)", re.MULTILINE)
-
-    for match in field_pattern.finditer(struct_body):
-        field_name = match.group(1)
-        field_type = match.group(2).strip().rstrip(",")
-
-        # Check if field has docstring
-        field_char_in_content = struct_body_start_char + match.start()
-        field_line = content[:field_char_in_content].count("\n")
-
-        field_has_doc = False
-        idx = field_line - 1
-        while idx >= 0:
-            line = lines[idx].strip()
-            if line.startswith("///"):
-                field_has_doc = True
-                break
-            elif line.startswith("#[") or line == "":
-                idx -= 1
-            else:
-                break
-
-        rust_struct.fields[field_name] = RustField(
-            name=field_name, rust_type=field_type, has_docstring=field_has_doc
-        )
-
-    return rust_struct
-
-
-def parse_rust_file(filepath: Path) -> dict[str, RustStruct]:
-    """Parse a Rust file and extract all structs."""
-    content = filepath.read_text()
-    structs: dict[str, RustStruct] = {}
-
-    struct_pattern = re.compile(
-        r"pub\s+struct\s+(\w+)\s*(?:<[^>]*>)?\s*\{", re.MULTILINE
-    )
-
-    for match in struct_pattern.finditer(content):
-        rust_struct = parse_rust_struct(content, match)
-        if rust_struct:
-            structs[rust_struct.name] = rust_struct
-
-    return structs
-
-
-def collect_rust_structs(core_dir: Path) -> dict[str, RustStruct]:
-    """Collect all Rust structs from the core library."""
-    all_structs: dict[str, RustStruct] = {}
-
-    # Parse common.rs
-    common_path = core_dir / "common.rs"
-    if common_path.exists():
-        all_structs.update(parse_rust_file(common_path))
-
-    # Parse types.rs
-    types_path = core_dir / "types.rs"
-    if types_path.exists():
-        all_structs.update(parse_rust_file(types_path))
-
-    # Parse messages/*.rs
-    messages_dir = core_dir / "messages"
-    if messages_dir.exists():
-        for rs_file in sorted(messages_dir.glob("*.rs"), key=lambda p: p.name):
-            if rs_file.name != "mod.rs":
-                all_structs.update(parse_rust_file(rs_file))
-
-    return all_structs
-
-
-# ---------------------------------------------------------------------------
-# Python Binding Parser
-# ---------------------------------------------------------------------------
-
-
-def parse_python_binding_file(filepath: Path) -> dict[str, PythonClass]:
-    """Parse a Python binding Rust file and extract pyclass structs with getters."""
-    content = filepath.read_text()
-    classes: dict[str, PythonClass] = {}
-
-    # Find #[pyclass] structs
-    pyclass_pattern = re.compile(
-        r"((?:\s*///[^\n]*\n)*)\s*(#\[pyclass[^\]]*\]\s*(?:#\[[^\]]*\]\s*)*)pub\s+struct\s+(\w+)",
-        re.MULTILINE,
-    )
-
-    for match in pyclass_pattern.finditer(content):
-        docstring_block = match.group(1)
-        class_name = match.group(3)
-
-        has_docstring = bool(docstring_block.strip())
-        classes[class_name] = PythonClass(name=class_name, has_docstring=has_docstring)
-
-    # Find #[pymethods] impl blocks
-    impl_pattern = re.compile(r"#\[pymethods\]\s*impl\s+(\w+)\s*\{", re.MULTILINE)
-
-    for impl_match in impl_pattern.finditer(content):
-        class_name = impl_match.group(1)
-        if class_name not in classes:
-            continue
-
-        # Find the end of this impl block
-        impl_start = impl_match.end()
-        depth = 1
-        pos = impl_start
-        while pos < len(content) and depth > 0:
-            if content[pos] == "{":
-                depth += 1
-            elif content[pos] == "}":
-                depth -= 1
-            pos += 1
-
-        impl_body = content[impl_start : pos - 1]
-
-        # Find getters in this impl block
-        getter_pattern = re.compile(
-            r"((?:\s*///[^\n]*\n)*)\s*#\[getter\]\s*\n(?:\s*#\[[^\]]*\]\s*\n)*\s*fn\s+(get_)?(\w+)\s*\(",
-            re.MULTILINE,
-        )
-
-        for getter_match in getter_pattern.finditer(impl_body):
-            docstring_block = getter_match.group(1)
-            func_name_part = getter_match.group(3)
-
-            # Field name is the function name without get_ prefix
-            field_name = func_name_part
-
-            has_docstring = bool(docstring_block.strip())
-            has_type_annotation = ":type:" in docstring_block
-
-            classes[class_name].getters[field_name] = PythonGetter(
-                name=field_name,
-                has_docstring=has_docstring,
-                has_type_annotation=has_type_annotation,
-            )
-
-        # Find setters in this impl block
-        setter_pattern = re.compile(
-            r"#\[setter\]\s*\n(?:\s*#\[[^\]]*\]\s*\n)*\s*fn\s+(set_)?(\w+)\s*\(",
-            re.MULTILINE,
-        )
-        for setter_match in setter_pattern.finditer(impl_body):
-            func_name_part = setter_match.group(2)
-            classes[class_name].setters.add(func_name_part)
-
-    return classes
-
-
 def collect_python_classes(binding_dir: Path) -> dict[str, PythonClass]:
     """Collect all Python classes from binding files."""
     all_classes: dict[str, PythonClass] = {}
@@ -316,8 +83,6 @@ def collect_python_classes(binding_dir: Path) -> dict[str, PythonClass]:
 def audit_bindings(
     rust_structs: dict[str, RustStruct],
     python_classes: dict[str, PythonClass],
-    *,
-    check_setters: bool = False,
 ) -> AuditResult:
     """Audit Python bindings against Rust structs."""
     result = AuditResult()
@@ -335,46 +100,37 @@ def audit_bindings(
     }
 
     for class_name, py_class in python_classes.items():
-        if check_setters:
-            for py_field in py_class.getters:
-                if is_python_only(class_name, py_field):
-                    continue
-                if py_field in py_class.setters:
-                    continue
-
-                reason = get_read_only_reason(class_name, py_field)
-                if reason is None:
-                    result.stats["missing_setter"] += 1
-                    result.issues.append(
-                        AuditIssue(
-                            struct_name=class_name,
-                            field_name=py_field,
-                            issue_type="missing_setter",
-                            message=(
-                                f"Python getter '{class_name}.{py_field}' has no setter and no "
-                                "documented read-only rationale"
-                            ),
-                        )
-                    )
-                else:
-                    result.stats["readonly_documented"] += 1
-
-            for py_field in py_class.setters:
-                if py_field in py_class.getters:
-                    continue
-                if is_python_only(class_name, py_field):
-                    continue
-                result.stats["setter_without_getter"] += 1
+        for py_field in py_class.getters:
+            if is_python_only(class_name, py_field) or py_field in py_class.setters:
+                continue
+            if get_read_only_reason(class_name, py_field) is None:
+                result.stats["missing_setter"] += 1
                 result.issues.append(
                     AuditIssue(
                         struct_name=class_name,
                         field_name=py_field,
-                        issue_type="setter_without_getter",
+                        issue_type="missing_setter",
                         message=(
-                            f"Python setter '{class_name}.{py_field}' exists without matching getter"
+                            f"Python getter '{class_name}.{py_field}' has no setter and no "
+                            "documented read-only rationale"
                         ),
                     )
                 )
+            else:
+                result.stats["readonly_documented"] += 1
+
+        for py_field in py_class.setters - py_class.getters.keys():
+            if is_python_only(class_name, py_field):
+                continue
+            result.stats["setter_without_getter"] += 1
+            result.issues.append(
+                AuditIssue(
+                    struct_name=class_name,
+                    field_name=py_field,
+                    issue_type="setter_without_getter",
+                    message=f"Python setter '{class_name}.{py_field}' exists without matching getter",
+                )
+            )
 
         # Check if this is a Python-only helper class (no matching Rust struct)
         if is_python_helper_class(class_name):
@@ -472,7 +228,7 @@ def audit_bindings(
 # ---------------------------------------------------------------------------
 
 
-def print_report(result: AuditResult, verbose: bool = False) -> None:
+def print_report(result: AuditResult) -> None:
     """Print a human-readable audit report."""
     print("\n=== Python Binding Audit Report ===\n")
 
@@ -481,7 +237,7 @@ def print_report(result: AuditResult, verbose: bool = False) -> None:
     for issue in result.issues:
         issues_by_struct.setdefault(issue.struct_name, []).append(issue)
 
-    if verbose or result.issues:
+    if result.issues:
         for struct_name, issues in sorted(issues_by_struct.items()):
             print(f"{struct_name}:")
             for issue in issues:
@@ -522,119 +278,24 @@ def print_report(result: AuditResult, verbose: bool = False) -> None:
         print("\n✓ All bindings validated successfully")
 
 
-def print_json(result: AuditResult) -> None:
-    """Print audit result as JSON."""
-    output = {
-        "issues": [
-            {
-                "struct": issue.struct_name,
-                "field": issue.field_name,
-                "type": issue.issue_type,
-                "message": issue.message,
-            }
-            for issue in result.issues
-        ],
-        "stats": result.stats,
-    }
-    print(json.dumps(output, indent=2))
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Audit Python bindings against Rust core structs"
-    )
-    parser.add_argument(
-        "--core-dir",
-        type=Path,
-        default=Path("../../ccsds-ndm/src"),
-        help="Path to ccsds-ndm/src directory",
-    )
-    parser.add_argument(
-        "--binding-dir",
-        type=Path,
-        default=Path("src"),
-        help="Path to bindings/python/src directory",
-    )
-    parser.add_argument(
-        "--strict",
-        action="store_true",
-        help="Exit with code 1 if any issues found (for CI)",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Show all checked items",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output as JSON",
-    )
-    parser.add_argument(
-        "--check-setters",
-        action="store_true",
-        help="Also validate getter/setter parity and read-only rationale coverage",
-    )
-
-    args = parser.parse_args()
-
-    # Resolve paths
     script_dir = Path(__file__).parent
-    core_dir = (script_dir / args.core_dir).resolve()
-    binding_dir = (script_dir / args.binding_dir).resolve()
+    core_dir = (script_dir / "../../ccsds-ndm/src").resolve()
+    binding_dir = script_dir / "src"
 
-    if not core_dir.exists():
-        print(f"Error: Core directory not found: {core_dir}", file=sys.stderr)
-        return 1
-
-    if not binding_dir.exists():
-        print(f"Error: Binding directory not found: {binding_dir}", file=sys.stderr)
-        return 1
-
-    if not args.json:
-        print(f"Core directory: {core_dir}")
-        print(f"Binding directory: {binding_dir}")
-
-    # Collect structs
-    if not args.json:
-        print("\nParsing Rust core library...")
+    print(f"Core directory: {core_dir}")
+    print(f"Binding directory: {binding_dir}")
+    print("\nParsing Rust core library...")
     rust_structs = collect_rust_structs(core_dir)
-    if not args.json:
-        print(f"Found {len(rust_structs)} structs")
-
-    if not args.json:
-        print("Parsing Python bindings...")
+    print(f"Found {len(rust_structs)} structs")
+    print("Parsing Python bindings...")
     python_classes = collect_python_classes(binding_dir)
-    if not args.json:
-        print(f"Found {len(python_classes)} classes")
-
-    # Run audit
-    if not args.json:
-        print("\nAuditing bindings...")
-    result = audit_bindings(
-        rust_structs,
-        python_classes,
-        check_setters=args.check_setters,
-    )
-
-    # Output
-    if args.json:
-        print_json(result)
-    else:
-        print_report(result, verbose=args.verbose)
-
-    # Exit code
-    if args.strict and result.issues:
-        return 1
-
-    return 0
+    print(f"Found {len(python_classes)} classes")
+    print("\nAuditing bindings...")
+    result = audit_bindings(rust_structs, python_classes)
+    print_report(result)
+    return bool(result.issues)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

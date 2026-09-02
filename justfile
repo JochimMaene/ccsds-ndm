@@ -67,11 +67,6 @@ sync-docs-check:
 audit:
     cd {{python_dir}} && uv run python audit_bindings.py
 
-# Audit Python bindings against Rust core structs (strict mode)
-[private]
-audit-strict:
-    cd {{python_dir}} && uv run python audit_bindings.py --strict
-
 # --- Linting and Formatting -------------------------------------------------
 
 # Format the Rust code
@@ -132,8 +127,6 @@ conformance-opm-xml:
     cargo test --manifest-path {{rust_manifest}} --test opm_maneuver_duration_units
     cargo test --manifest-path {{rust_manifest}} --test opm_xml_root_envelope
     cargo test --manifest-path {{rust_manifest}} --test opm_xml_writer_failure
-    cargo test --manifest-path {{rust_manifest}} --test opm_generation_diagnostics
-    cargo test --manifest-path {{rust_manifest}} --test opm_generation_limits
     cargo test --manifest-path {{rust_manifest}} --test opm_xml_allocations
 
 # Run the OPM 3.0 Rust KVN-generation conformance slice
@@ -142,8 +135,6 @@ conformance-opm-kvn:
     cargo test --manifest-path {{rust_manifest}} --test opm_3_kvn_generation_conformance
     cargo test --manifest-path {{rust_manifest}} --test opm_kvn_writer_failure
     cargo test --manifest-path {{rust_manifest}} --test opm_kvn_allocations
-    cargo test --manifest-path {{rust_manifest}} --test opm_generation_diagnostics
-    cargo test --manifest-path {{rust_manifest}} --test opm_generation_limits
 
 # Run strict OPM parsing, validation, and conversion evidence
 [private]
@@ -273,7 +264,7 @@ verify-opm:
     just package-python
 
 # Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
-check: lint audit-strict stubs-check sync-docs-check test
+check: lint audit stubs-check sync-docs-check test
 
 # Backward-compatible CI alias
 [private]

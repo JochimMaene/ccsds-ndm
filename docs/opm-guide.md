@@ -10,13 +10,12 @@ Parse and validate with `Opm::from_kvn` or `Opm::from_xml`. Use
 policy. Input bytes are unlimited by default; XML depth defaults to 16 because valid OPM has a small
 fixed schema depth.
 
-Generate with `Ndm::to_kvn` / `to_xml`, or use `VersionedNdm` with `GenerateOptions` for an explicit
-target edition, output-byte bound, or streaming sink. Generation always validates first. A
-configured streaming output limit is counted before the caller sink receives bytes; the unlimited
-fast path performs one serialization pass.
+Generate with `Ndm::to_kvn` / `to_xml`, or use `VersionedNdm::write_kvn_to` /
+`write_xml_to` for a streaming sink. Generation validates first and preserves the edition stored
+on the message.
 
-`convert` composes strict detection, parsing, and validated target generation. `convert_file` and
-`convert_to_file` replace a destination atomically only after conversion succeeds. Finite XML
+`convert` composes strict detection, parsing, and validated target generation. `convert_file`
+replaces a destination atomically only after conversion succeeds. Finite XML
 values are rounded when necessary to the 16-digit KVN representation required by CCSDS ODM.
 
 Errors expose stable `code()`, `field_path()`, and `diagnostic()` accessors. Diagnostic wording may
@@ -24,17 +23,16 @@ improve before 1.0; codes, enum meanings, and canonical paths are the machine in
 
 ## Python
 
-Install distribution `ccsds-ndm-py` and import `ccsds_ndm`. `Opm.from_str` / `from_file` accept
-the keyword-only `max_input_bytes` safety control; record-bearing messages additionally accept
-`max_records`. `to_str` and `to_file` accept `max_output_bytes`. Python calls the Rust core for
-every parse, validation, and generation decision.
-Raised NDM exceptions expose `code`, `severity`, `operation`, `notation`, `message_kind`, editions,
-field path, and available source location/token fields.
+Install distribution `ccsds-ndm-py` and import `ccsds_ndm`. `Opm.from_str` and the module-level
+`from_file` accept the keyword-only `max_input_bytes` safety control; record-bearing messages
+additionally accept `max_records`. Python calls the Rust core for every parse, validation, and
+generation decision. Raised NDM exceptions expose `code`, `operation`, `notation`, `message_kind`,
+source edition, field path, and available source location/token fields.
 
 Use `ccsds_ndm.convert(data, "xml")` for strings and
 `ccsds_ndm.convert_file(source, destination, "kvn")` for atomic file conversion. Input notation is
-detected automatically. Both accept the same optional input, record, and output limits and delegate
-directly to Rust.
+detected automatically. Both accept the same optional input and record limits and delegate directly
+to Rust. Use `ccsds_ndm.to_file(message, path, format)` for atomic message generation.
 
 Nested model properties are live and can be changed directly:
 

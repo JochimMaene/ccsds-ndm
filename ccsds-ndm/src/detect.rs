@@ -82,13 +82,11 @@ pub(crate) fn detect_notation_bytes(input: &[u8]) -> Result<Notation> {
     }
 }
 
-/// Detects the NDM message type from the input string (KVN or XML).
-pub fn detect_message_type(s: &str) -> Result<MessageType> {
+pub(crate) fn detect_message_type(s: &str) -> Result<MessageType> {
     detect_message_type_with_options(s, None, &ParseOptions::default())
 }
 
-/// Parse a complete NDM document with optional notation selection and resource limits.
-pub fn detect_message_type_with_options(
+pub(crate) fn detect_message_type_with_options(
     s: &str,
     notation: Option<Notation>,
     options: &ParseOptions,

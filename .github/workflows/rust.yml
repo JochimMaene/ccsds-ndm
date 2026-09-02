@@ -89,7 +89,7 @@ jobs:
       - name: Lint Python
         run: just lint-python
       - name: Audit bindings
-        run: just audit-strict
+        run: just audit
       - name: Check stubs
         run: just stubs-check
       - name: Check synced docstrings

@@ -29,10 +29,8 @@ pub trait Validate {
 
     /// Return every semantic validation error found on the object.
     ///
-    /// Strict parsing and generation use [`Validate::validate`] to fail fast. Permissive parsing
-    /// uses this method to produce a complete audit trail. Implementations must explicitly define
-    /// exhaustive reporting so adding new validation rules cannot silently fall back to returning
-    /// only the first error.
+    /// Parsing and generation use [`Validate::validate`] to fail fast. This method provides a
+    /// complete audit trail in stable model order.
     fn validation_errors(&self) -> Result<Vec<ValidationError>>;
 }
 
@@ -57,9 +55,7 @@ pub trait Ndm: Sized + serde::Serialize + Validate {
     /// Generate KVN using the edition stored on the message.
     ///
     /// Implementations validate the complete message and confirm that KVN generation supports the
-    /// stored edition before serializing. Use
-    /// [`VersionedNdm::to_kvn_with`](crate::generation::VersionedNdm::to_kvn_with) to select a
-    /// different target edition explicitly.
+    /// stored edition before serializing.
     ///
     /// # Returns
     ///
@@ -87,9 +83,7 @@ pub trait Ndm: Sized + serde::Serialize + Validate {
     /// Generate XML using the edition stored on the message.
     ///
     /// Implementations validate the complete message and confirm that XML generation supports
-    /// the stored edition before serializing. Use
-    /// [`VersionedNdm::to_xml_with`](crate::generation::VersionedNdm::to_xml_with) to select a
-    /// different target edition explicitly.
+    /// the stored edition before serializing.
     ///
     /// # Returns
     ///
@@ -178,7 +172,10 @@ pub trait FromKvnFloat: Sized {
 pub(crate) trait ToKvn {
     /// Validate notation-specific constraints that must hold before any KVN bytes are written.
     fn validate_kvn(&self) -> Result<()> {
-        Ok(())
+        let mut sink = std::io::sink();
+        let mut writer = KvnWriter::from_io(&mut sink);
+        self.write_kvn(&mut writer);
+        writer.finish_io()
     }
 
     /// Write the KVN representation to the writer.

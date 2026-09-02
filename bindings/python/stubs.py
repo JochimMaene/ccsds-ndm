@@ -22,6 +22,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from binding_source import braced_blocks
+
 INDENT = "    "
 GENERATED_HEADER = """\
 # Generated content DO NOT EDIT
@@ -36,8 +38,6 @@ PUBLIC_API_PARAMETER_TYPES = {
         "to_format": "str",
         "max_input_bytes": "Optional[int]",
         "max_records": "Optional[int]",
-        "max_output_bytes": "Optional[int]",
-        "version": "Optional[str]",
     },
     "convert_file": {
         "source_path": "str",
@@ -45,8 +45,6 @@ PUBLIC_API_PARAMETER_TYPES = {
         "to_format": "str",
         "max_input_bytes": "Optional[int]",
         "max_records": "Optional[int]",
-        "max_output_bytes": "Optional[int]",
-        "version": "Optional[str]",
     },
     "from_file": {
         "format": "str",
@@ -61,37 +59,23 @@ PUBLIC_API_PARAMETER_TYPES = {
         "max_records": "Optional[int]",
     },
     "to_file": {
+        "message": "Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]",
         "format": "str",
         "path": "str",
-        "max_output_bytes": "Optional[int]",
-        "version": "Optional[str]",
     },
     "to_str": {
         "format": "str",
-        "max_output_bytes": "Optional[int]",
-        "version": "Optional[str]",
     },
 }
 
 
 def _extract_pymethod_bodies(content: str) -> list[tuple[str, str]]:
     """Extract (class_name, impl_body) from #[pymethods] impl blocks."""
-    impls: list[tuple[str, str]] = []
     impl_pattern = re.compile(r"#\[pymethods\]\s*impl\s+(\w+)\s*\{", re.MULTILINE)
-
-    for match in impl_pattern.finditer(content):
-        class_name = match.group(1)
-        start = match.end()
-        pos = start
-        depth = 1
-        while pos < len(content) and depth > 0:
-            if content[pos] == "{":
-                depth += 1
-            elif content[pos] == "}":
-                depth -= 1
-            pos += 1
-        impls.append((class_name, content[start : pos - 1]))
-    return impls
+    return [
+        (match.group(1), body)
+        for match, body, _ in braced_blocks(content, impl_pattern)
+    ]
 
 
 def _collect_property_setters(binding_src_dir: Path) -> dict[str, set[str]]:

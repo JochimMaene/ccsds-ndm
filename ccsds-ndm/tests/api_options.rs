@@ -11,9 +11,7 @@ use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{
-    from_str, from_str_with_options, GenerateOptions, MessageType, Notation, ParseOptions,
-};
+use ccsds_ndm::{from_str, from_str_with_options, MessageType, Notation, ParseOptions};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 const OPM_XML: &str = include_str!("../data/xml/opm_g5.xml");
@@ -93,8 +91,7 @@ fn history_record_limits_cover_each_concrete_history_message() {
     let MessageType::Acm(acm) = acm else {
         panic!("expected ACM fixture");
     };
-    let xml =
-        ccsds_ndm::VersionedNdm::to_xml_with(&acm, &ccsds_ndm::GenerateOptions::source()).unwrap();
+    let xml = acm.to_xml().unwrap();
     let error = from_str_with_options(&xml, Some(Notation::Xml), &options).unwrap_err();
     assert_eq!(error.code(), Some("resource.record_limit_exceeded"));
 }
@@ -153,9 +150,7 @@ fn opm_generation_rejects_non_finite_state_vectors() {
     assert!(error.to_string().contains("finite"));
 
     let mut output = Vec::new();
-    let error = opm
-        .write_kvn_to(&mut output, &GenerateOptions::source())
-        .unwrap_err();
+    let error = opm.write_kvn_to(&mut output).unwrap_err();
     assert!(error.to_string().contains("finite"));
     assert!(
         output.is_empty(),
@@ -219,13 +214,13 @@ fn oem_generation_handles_maximum_width_records_without_panicking() {
 #[test]
 fn generation_preserves_source_version_by_default() {
     let opm = Opm::from_kvn(OPM_KVN).unwrap();
-    let output = opm.to_kvn_with(&GenerateOptions::source()).unwrap();
+    let output = opm.to_kvn().unwrap();
     assert!(output.starts_with("CCSDS_OPM_VERS"));
     assert!(output.lines().next().unwrap().ends_with("3.0"));
 }
 
 #[test]
-fn unaudited_source_version_cannot_be_generated_or_relabelled() {
+fn unaudited_source_version_cannot_be_generated() {
     let legacy = OPM_KVN.replacen("3.0", "1.0", 1);
     let opm = Opm::from_kvn(&legacy).unwrap();
 
@@ -234,28 +229,18 @@ fn unaudited_source_version_cannot_be_generated_or_relabelled() {
         source_error.code(),
         Some("generation.unsupported_output_version")
     );
-
-    let relabel_error = opm
-        .to_kvn_with(&GenerateOptions::latest())
-        .expect_err("ODM 1.0 has no audited edition converter");
-    assert_eq!(
-        relabel_error.code(),
-        Some("generation.unsupported_version_conversion")
-    );
 }
 
 #[test]
 fn sink_writers_match_string_generation() {
     let opm = Opm::from_kvn(OPM_KVN).unwrap();
-    let options = GenerateOptions::source();
-
-    let expected_kvn = opm.to_kvn_with(&options).unwrap();
+    let expected_kvn = opm.to_kvn().unwrap();
     let mut kvn = Vec::new();
-    opm.write_kvn_to(&mut kvn, &options).unwrap();
+    opm.write_kvn_to(&mut kvn).unwrap();
     assert_eq!(kvn, expected_kvn.as_bytes());
 
-    let expected_xml = opm.to_xml_with(&options).unwrap();
+    let expected_xml = opm.to_xml().unwrap();
     let mut xml = Vec::new();
-    opm.write_xml_to(&mut xml, &options).unwrap();
+    opm.write_xml_to(&mut xml).unwrap();
     assert_eq!(xml, expected_xml.as_bytes());
 }

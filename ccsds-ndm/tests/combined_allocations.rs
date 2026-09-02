@@ -4,7 +4,7 @@ use std::hint::black_box;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{GenerateOptions, MessageType};
+use ccsds_ndm::MessageType;
 use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 
 #[global_allocator]
@@ -25,10 +25,7 @@ fn streaming_stats(message: &CombinedNdm, output_len: usize) -> Stats {
     let mut output = Vec::with_capacity(output_len);
     let region = Region::new(GLOBAL);
     black_box(message)
-        .write_kvn_to(
-            black_box(&mut output),
-            black_box(&GenerateOptions::source()),
-        )
+        .write_kvn_to(black_box(&mut output))
         .unwrap();
     let stats = region.change();
     assert_eq!(output.len(), output_len);

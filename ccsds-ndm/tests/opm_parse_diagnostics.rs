@@ -1,4 +1,4 @@
-use ccsds_ndm::error::{DiagnosticNotation, DiagnosticOperation, DiagnosticSeverity};
+use ccsds_ndm::error::{DiagnosticNotation, DiagnosticOperation};
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::validation::MessageKind;
@@ -16,17 +16,14 @@ fn kvn_parse_diagnostic_is_located_bounded_and_machine_readable() {
         .diagnostic()
         .expect("strict parser should attach diagnostic context");
 
-    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
     assert_eq!(diagnostic.operation, DiagnosticOperation::Parse);
     assert_eq!(diagnostic.notation, DiagnosticNotation::Kvn);
     assert_eq!(diagnostic.message_kind, MessageKind::Opm);
     assert_eq!(diagnostic.source_edition, Some("3.0"));
-    assert_eq!(diagnostic.target_edition, None);
     assert_eq!(diagnostic.code, Some("parse.kvn.syntax"));
     assert_eq!(diagnostic.source_location, Some((6, 1)));
     assert_eq!(diagnostic.original_token, Some("UNKNOWN_KEY = value"));
     assert_eq!(diagnostic.expected, Some("strict OPM KVN"));
-    assert_eq!(diagnostic.recovery, None);
 }
 
 #[test]
@@ -72,5 +69,4 @@ fn xml_parse_diagnostic_identifies_input_notation_without_inventing_a_location()
     assert_eq!(diagnostic.code, Some("parse.xml.syntax"));
     assert_eq!(diagnostic.source_location, None);
     assert_eq!(diagnostic.original_token, None);
-    assert_eq!(diagnostic.recovery, None);
 }

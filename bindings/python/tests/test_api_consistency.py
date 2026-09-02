@@ -77,7 +77,7 @@ LIVE_LIST_CASES = [
 
 @pytest.mark.parametrize(("cls", "path"), CLASS_FIXTURES)
 def test_type_specific_from_file_allows_default_format(cls, path):
-    parsed = cls.from_file(str(path))
+    parsed = ccsds_ndm.from_file(str(path))
     assert isinstance(parsed, cls)
 
 
@@ -111,7 +111,7 @@ def test_registered_model_types_are_exported_from_the_package(name):
 
 
 def test_nested_model_changes_are_live_without_an_editor():
-    opm = Opm.from_file(str(ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn"))
+    opm = ccsds_ndm.from_file(str(ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn"))
     assert opm.segment is opm.segment
     assert opm.segment.metadata is opm.segment.metadata
 
@@ -128,7 +128,7 @@ def test_nested_model_changes_are_live_without_an_editor():
         line.startswith("X ") and line.endswith("= 7000.0") for line in kvn.splitlines()
     )
 
-    cdm = Cdm.from_file(str(ROOT / "ccsds-ndm/data/kvn/cdm_362.kvn"))
+    cdm = ccsds_ndm.from_file(str(ROOT / "ccsds-ndm/data/kvn/cdm_362.kvn"))
     retained_segment = cdm.body.segments[0]
     retained_segment.metadata.object_name = "OBJECT-1"
     assert cdm.body.segments[0].metadata.object_name == "OBJECT-1"
@@ -158,7 +158,7 @@ def test_editor_api_is_not_part_of_the_public_surface():
 def test_nested_identity_and_mutation_are_live_for_every_message_family(
     cls, path, get_nested
 ):
-    message = cls.from_file(str(path))
+    message = ccsds_ndm.from_file(str(path))
     nested = get_nested(message)
     assert get_nested(message) is nested
 
@@ -175,7 +175,7 @@ def test_nested_identity_and_mutation_are_live_for_every_message_family(
 
 
 def test_tdm_nested_identity_and_mutation_are_live():
-    message = Tdm.from_file(str(ROOT / "ccsds-ndm/data/kvn/tdm_e1.kvn"))
+    message = ccsds_ndm.from_file(str(ROOT / "ccsds-ndm/data/kvn/tdm_e1.kvn"))
     metadata = message.body.segments[0].metadata
     assert message.body.segments[0].metadata is metadata
 
@@ -197,7 +197,7 @@ def test_tdm_nested_identity_and_mutation_are_live():
     ids=[case[0].__name__ for case in LIVE_LIST_CASES],
 )
 def test_repeated_model_fields_are_live_python_lists(cls, path, get_records):
-    message = cls.from_file(str(path))
+    message = ccsds_ndm.from_file(str(path))
     records = get_records(message)
     assert isinstance(records, list)
     assert get_records(message) is records
@@ -210,7 +210,7 @@ def test_repeated_model_fields_are_live_python_lists(cls, path, get_records):
 
 
 def test_live_lists_report_the_bad_index_at_the_generation_gate():
-    message = Oem.from_file(str(ROOT / "ccsds-ndm/data/kvn/oem_g12.kvn"))
+    message = ccsds_ndm.from_file(str(ROOT / "ccsds-ndm/data/kvn/oem_g12.kvn"))
     message.segments.append(object())
 
     with pytest.raises(ValueError, match=r"segments\[1\] must be OemSegment"):

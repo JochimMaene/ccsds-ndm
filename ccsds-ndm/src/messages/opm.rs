@@ -124,7 +124,6 @@ impl Ndm for Opm {
                 crate::validation::MessageKind::Opm,
                 crate::error::DiagnosticNotation::Kvn,
                 &self.version,
-                &self.version,
             )
         })
     }
@@ -148,7 +147,6 @@ impl Ndm for Opm {
             error.with_generation_context(
                 crate::validation::MessageKind::Opm,
                 crate::error::DiagnosticNotation::Xml,
-                &self.version,
                 &self.version,
             )
         })

@@ -3,9 +3,7 @@ use ccsds_ndm::messages::{
     tdm::Tdm,
 };
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{
-    from_str_with_options, GenerateOptions, MessageType, Notation, ParseOptions, VersionedNdm,
-};
+use ccsds_ndm::{from_str_with_options, MessageType, Notation, ParseOptions, VersionedNdm};
 
 #[test]
 fn opm_preserves_comment_before_user_defined_after_optional_maneuvers() {
@@ -150,9 +148,7 @@ fn xml_generation_rejects_forbidden_xml_1_characters_before_streaming() {
     assert!(cdm.to_xml().is_err());
 
     let mut output = Vec::new();
-    assert!(cdm
-        .write_xml_to(&mut output, &GenerateOptions::source())
-        .is_err());
+    assert!(cdm.write_xml_to(&mut output).is_err());
     assert!(output.is_empty());
 }
 
@@ -163,9 +159,7 @@ fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
     assert!(apm.to_kvn().is_err());
 
     let mut output = Vec::new();
-    assert!(apm
-        .write_kvn_to(&mut output, &GenerateOptions::source())
-        .is_err());
+    assert!(apm.write_kvn_to(&mut output).is_err());
     assert!(output.is_empty());
 
     let mut tdm = Tdm::from_kvn(include_str!("../data/kvn/tdm_e1.kvn")).unwrap();
@@ -197,7 +191,7 @@ fn display_includes_structured_operation_context() {
     let mut message = Opm::from_kvn(include_str!("../data/kvn/opm_g1.kvn")).unwrap();
     message.body.segment.metadata.object_name.clear();
     let generation_display = message.to_xml().unwrap_err().to_string();
-    assert!(generation_display.contains("failed to generate OPM XML 3.0 -> 3.0"));
+    assert!(generation_display.contains("failed to generate OPM XML 3.0"));
 }
 
 #[test]
@@ -209,9 +203,7 @@ fn multiline_xml_comments_convert_to_separate_kvn_records() {
     assert!(kvn.contains("COMMENT line one\nCOMMENT line two\n"));
 
     let mut streamed = Vec::new();
-    message
-        .write_kvn_to(&mut streamed, &GenerateOptions::source())
-        .unwrap();
+    message.write_kvn_to(&mut streamed).unwrap();
     assert_eq!(streamed, kvn.as_bytes());
 }
 
@@ -238,9 +230,7 @@ fn kvn_lexical_errors_have_the_same_category_for_string_and_streaming_output() {
     let mut message = Apm::from_kvn(include_str!("../data/kvn/apm_g1.kvn")).unwrap();
     message.header.originator = "GSFC-é".into();
     let direct = message.to_kvn().unwrap_err();
-    let streaming = message
-        .write_kvn_to(&mut Vec::new(), &GenerateOptions::source())
-        .unwrap_err();
+    let streaming = message.write_kvn_to(&mut Vec::new()).unwrap_err();
     assert!(direct.as_validation_error().is_some());
     assert!(streaming.as_validation_error().is_some());
 }

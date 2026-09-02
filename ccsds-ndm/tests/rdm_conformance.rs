@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ccsds_ndm::messages::rdm::Rdm;
-use ccsds_ndm::options::GenerateOptions;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::VersionedNdm;
 use tempfile::NamedTempFile;
@@ -141,11 +140,9 @@ fn rdm_kvn_rejects_an_xml_only_outer_data_comment_before_writing() {
     let mut message = Rdm::from_xml(XML).unwrap();
     message.body.segment.data.comment.push("outer".into());
     assert!(message.to_kvn().is_err());
-    assert!(message.to_kvn_with(&GenerateOptions::default()).is_err());
+    assert!(message.to_kvn().is_err());
     let mut output = Vec::new();
-    assert!(message
-        .write_kvn_to(&mut output, &GenerateOptions::default())
-        .is_err());
+    assert!(message.write_kvn_to(&mut output).is_err());
     assert!(output.is_empty());
 }
 

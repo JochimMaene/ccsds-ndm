@@ -190,33 +190,6 @@ impl Rdm {
         Self::from_core(py, inner)
     }
 
-    /// Create an RDM message from a file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     Path to the input file.
-    /// format : str, optional
-    ///     Format ('kvn' or 'xml'). Auto-detected if None.
-    ///     (Optional)
-    ///
-    /// Returns
-    /// -------
-    /// Rdm
-    ///     The parsed RDM object.
-    #[staticmethod]
-    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        max_input_bytes: Option<usize>,
-    ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
-        Self::from_core(py, inner)
-    }
-
     /// Serialize to string (generic).
     ///
     /// Parameters
@@ -227,49 +200,8 @@ impl Rdm {
     /// -------
     /// str
     ///     The serialized string.
-    /// ``version`` preserves the source version unless explicitly overridden.
-    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
-    fn to_str(
-        &self,
-        py: Python<'_>,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(
-            &self.to_core(py)?,
-            format,
-            version,
-            max_output_bytes,
-        )
-    }
-
-    /// Write to a file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     Output file path.
-    /// format : str
-    ///     Format ('kvn' or 'xml').
-    /// version : str, optional
-    ///     Source version by default, ``"latest"``, or an exact supported version.
-    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
-    fn to_file(
-        &self,
-        py: Python<'_>,
-        path: &str,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(
-            &self.to_core(py)?,
-            path,
-            format,
-            version,
-            max_output_bytes,
-        )
+    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+        crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
 

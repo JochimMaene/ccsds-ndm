@@ -6,6 +6,7 @@
 Unit tests for Orbit Ephemeris Message (OEM) Python bindings.
 """
 
+import ccsds_ndm
 import numpy as np
 import pytest
 
@@ -134,10 +135,10 @@ class TestOem:
         oem = self._create_valid_oem()
         path = tmp_path / "test.oem"
 
-        oem.to_file(str(path), format="kvn")
+        ccsds_ndm.to_file(oem, str(path), "kvn")
         assert path.exists()
 
-        oem2 = Oem.from_file(str(path), format="kvn")
+        oem2 = ccsds_ndm.from_file(str(path), format="kvn")
         assert oem2.header.originator == "TEST"
 
     def test_oem_data_numpy_api(self):

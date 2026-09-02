@@ -1,6 +1,6 @@
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{GenerateOptions, MessageType, VersionedNdm};
+use ccsds_ndm::{MessageType, VersionedNdm};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -59,23 +59,13 @@ fn public_generation_surfaces_are_identical_and_preflight_invalid_models() {
     let message = Oem::from_kvn(KVN_FIXTURES[2].1).unwrap();
     let expected_kvn = message.to_kvn().unwrap();
     let expected_xml = message.to_xml().unwrap();
-    assert_eq!(
-        message.to_kvn_with(&GenerateOptions::source()).unwrap(),
-        expected_kvn
-    );
-    assert_eq!(
-        message.to_xml_with(&GenerateOptions::source()).unwrap(),
-        expected_xml
-    );
+    assert_eq!(message.to_kvn().unwrap(), expected_kvn);
+    assert_eq!(message.to_xml().unwrap(), expected_xml);
     let mut streamed = Vec::new();
-    message
-        .write_kvn_to(&mut streamed, &GenerateOptions::source())
-        .unwrap();
+    message.write_kvn_to(&mut streamed).unwrap();
     assert_eq!(streamed, expected_kvn.as_bytes());
     streamed.clear();
-    message
-        .write_xml_to(&mut streamed, &GenerateOptions::source())
-        .unwrap();
+    message.write_xml_to(&mut streamed).unwrap();
     assert_eq!(streamed, expected_xml.as_bytes());
     let erased = MessageType::Oem(message.clone());
     assert_eq!(erased.to_kvn().unwrap(), expected_kvn);
@@ -102,7 +92,6 @@ fn public_generation_surfaces_are_identical_and_preflight_invalid_models() {
             ccsds_ndm::validation::MessageKind::Oem
         );
         assert_eq!(diagnostic.source_edition, Some("3.0"));
-        assert_eq!(diagnostic.target_edition, Some("3.0"));
     }
 }
 
@@ -118,7 +107,7 @@ fn kvn_rounds_to_the_ccsds_digit_limit_and_rejects_partial_acceleration() {
     state.y_ddot = None;
     let mut output = Vec::new();
     message
-        .write_kvn_to(&mut output, &GenerateOptions::source())
+        .write_kvn_to(&mut output)
         .expect_err("partial acceleration must fail preflight");
     assert!(output.is_empty());
     message
@@ -149,55 +138,15 @@ fn kvn_rejects_an_overlong_raw_record_before_writing() {
 
     let mut output = Vec::new();
     let error = message
-        .write_kvn_to(&mut output, &GenerateOptions::source())
+        .write_kvn_to(&mut output)
         .expect_err("a record over 254 characters must fail preflight");
     assert_eq!(error.code(), Some("validation.out_of_range"));
     assert!(output.is_empty());
 }
 
 #[test]
-fn output_limits_are_exact_and_streaming_failures_emit_nothing() {
-    let message = Oem::from_kvn(KVN_FIXTURES[2].1).unwrap();
-    for (expected, generate, stream) in [
-        (
-            message.to_kvn().unwrap(),
-            Oem::to_kvn_with as fn(&Oem, &GenerateOptions) -> _,
-            Oem::write_kvn_to::<Vec<u8>> as fn(&Oem, &mut Vec<u8>, &GenerateOptions) -> _,
-        ),
-        (
-            message.to_xml().unwrap(),
-            Oem::to_xml_with,
-            Oem::write_xml_to::<Vec<u8>>,
-        ),
-    ] {
-        let exact = GenerateOptions::source().with_max_output_bytes(expected.len());
-        let small = GenerateOptions::source().with_max_output_bytes(expected.len() - 1);
-        assert_eq!(generate(&message, &exact).unwrap(), expected);
-        assert_eq!(
-            generate(&message, &small).unwrap_err().code(),
-            Some("resource.output_limit_exceeded")
-        );
-        let mut output = Vec::new();
-        assert!(stream(&message, &mut output, &small).is_err());
-        assert!(output.is_empty());
-    }
-}
-
-#[test]
-fn unaudited_editions_are_rejected_instead_of_relabelled() {
-    let message = Oem::from_kvn(KVN_FIXTURES[0].1).unwrap();
-    let options = GenerateOptions::version("1.0");
-    for error in [
-        message.to_kvn_with(&options).unwrap_err(),
-        message.to_xml_with(&options).unwrap_err(),
-    ] {
-        assert_eq!(
-            error.code(),
-            Some("generation.unsupported_version_conversion")
-        );
-    }
-
-    let mut historical = message;
+fn unaudited_source_editions_are_rejected() {
+    let mut historical = Oem::from_kvn(KVN_FIXTURES[0].1).unwrap();
     historical.version = "1.0".into();
     assert!(historical.to_kvn().is_err());
     assert!(historical.to_xml().is_err());

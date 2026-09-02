@@ -6,6 +6,7 @@
 Unit tests for Orbit Mean-Elements Message (OMM) Python bindings.
 """
 
+import ccsds_ndm
 import pytest
 
 from ccsds_ndm import MeanElements, OdmHeader, Omm, OmmData, OmmMetadata, OmmSegment
@@ -91,10 +92,10 @@ class TestOmm:
         omm = self._create_valid_omm()
         path = tmp_path / "test.omm"
 
-        omm.to_file(str(path), format="kvn")
+        ccsds_ndm.to_file(omm, str(path), "kvn")
         assert path.exists()
 
-        omm2 = Omm.from_file(str(path), format="kvn")
+        omm2 = ccsds_ndm.from_file(str(path), format="kvn")
         assert omm2.header.originator == "TEST"
 
     def test_tle_lines_roundtrip(self):

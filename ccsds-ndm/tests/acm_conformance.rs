@@ -4,7 +4,7 @@ use std::process::Command;
 
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{GenerateOptions, VersionedNdm};
+use ccsds_ndm::VersionedNdm;
 use tempfile::NamedTempFile;
 
 const ATT_KVN: &str = include_str!("../data/kvn/acm_g7.kvn");
@@ -141,9 +141,7 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
         assert!(message.to_kvn().is_err(), "materialized accepted {label}");
         let mut output = Vec::new();
         assert!(
-            message
-                .write_kvn_to(&mut output, &GenerateOptions::source())
-                .is_err(),
+            message.write_kvn_to(&mut output).is_err(),
             "streaming accepted {label}"
         );
         assert!(output.is_empty(), "streaming wrote bytes for {label}");
@@ -173,9 +171,7 @@ fn xml_generation_rejects_kvn_only_sensor_comments_before_output() {
 
     assert!(message.to_xml().is_err());
     let mut output = Vec::new();
-    assert!(message
-        .write_xml_to(&mut output, &GenerateOptions::source())
-        .is_err());
+    assert!(message.write_xml_to(&mut output).is_err());
     assert!(output.is_empty());
 }
 

@@ -1,6 +1,5 @@
 use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::options::GenerateOptions;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{CalendarEpoch, GmUnits};
 use ccsds_ndm::MessageType;
@@ -128,7 +127,7 @@ fn opm_kvn_rounds_values_that_need_seventeen_digits() {
 
     let mut output = Vec::new();
     message
-        .write_kvn_to(&mut output, &GenerateOptions::source())
+        .write_kvn_to(&mut output)
         .expect("streaming should use the same CCSDS rounding");
     assert_eq!(output, generated.as_bytes());
 
@@ -246,14 +245,14 @@ fn opm_kvn_is_identical_across_public_generation_entry_points() {
 
     assert_eq!(
         message
-            .to_kvn_with(&GenerateOptions::source())
+            .to_kvn()
             .expect("versioned generation should succeed"),
         expected
     );
 
     let mut streamed = Vec::new();
     message
-        .write_kvn_to(&mut streamed, &GenerateOptions::source())
+        .write_kvn_to(&mut streamed)
         .expect("streaming generation should succeed");
     assert_eq!(streamed, expected.as_bytes());
 
@@ -266,7 +265,7 @@ fn opm_kvn_is_identical_across_public_generation_entry_points() {
     );
     assert_eq!(
         erased
-            .to_kvn_with(&GenerateOptions::source())
+            .to_kvn()
             .expect("type-erased versioned generation should succeed"),
         expected
     );
@@ -465,11 +464,11 @@ fn invalid_opm_kvn_is_rejected_across_public_generation_entry_points() {
     message.header.originator = "ESOC 🚀".to_owned();
 
     assert!(message.to_kvn().is_err());
-    assert!(message.to_kvn_with(&GenerateOptions::source()).is_err());
+    assert!(message.to_kvn().is_err());
 
     let mut output = Vec::new();
     let error = message
-        .write_kvn_to(&mut output, &GenerateOptions::source())
+        .write_kvn_to(&mut output)
         .expect_err("invalid KVN text must be rejected");
     assert_eq!(error.code(), Some("validation.invalid_value"));
     assert_eq!(error.field_path().as_deref(), Some("header.originator"));
@@ -477,7 +476,7 @@ fn invalid_opm_kvn_is_rejected_across_public_generation_entry_points() {
 
     let erased = MessageType::Opm(message);
     assert!(erased.to_kvn().is_err());
-    assert!(erased.to_kvn_with(&GenerateOptions::source()).is_err());
+    assert!(erased.to_kvn().is_err());
 
     let directory = tempfile::tempdir().expect("temporary directory should be created");
     let path = directory.path().join("opm.kvn");

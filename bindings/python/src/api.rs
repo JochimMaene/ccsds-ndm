@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::errors::{ccsds_error_to_pyerr, file_parse_error_to_pyerr, NdmValidationError};
+use crate::errors::{ccsds_error_to_pyerr, NdmValidationError};
 use ccsds_ndm::generation::VersionedNdm;
-use ccsds_ndm::options::{GenerateOptions, ParseOptions};
+use ccsds_ndm::options::ParseOptions;
 use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::{MessageType, Notation};
 use pyo3::exceptions::{PyOSError, PyValueError};
@@ -21,17 +21,12 @@ pub fn checked_optional<T>(
 }
 
 pub trait FromMessageType: Ndm {
-    const KIND: ccsds_ndm::validation::MessageKind;
-
     fn from_message_type(message: MessageType) -> Option<Self>;
 }
 
 macro_rules! impl_from_message_type {
-    ($type:path, $variant:ident, $kind:ident) => {
+    ($type:path, $variant:ident) => {
         impl FromMessageType for $type {
-            const KIND: ccsds_ndm::validation::MessageKind =
-                ccsds_ndm::validation::MessageKind::$kind;
-
             fn from_message_type(message: MessageType) -> Option<Self> {
                 match message {
                     MessageType::$variant(message) => Some(message),
@@ -42,17 +37,17 @@ macro_rules! impl_from_message_type {
     };
 }
 
-impl_from_message_type!(ccsds_ndm::messages::opm::Opm, Opm, Opm);
-impl_from_message_type!(ccsds_ndm::messages::oem::Oem, Oem, Oem);
-impl_from_message_type!(ccsds_ndm::messages::omm::Omm, Omm, Omm);
-impl_from_message_type!(ccsds_ndm::messages::ocm::Ocm, Ocm, Ocm);
-impl_from_message_type!(ccsds_ndm::messages::cdm::Cdm, Cdm, Cdm);
-impl_from_message_type!(ccsds_ndm::messages::tdm::Tdm, Tdm, Tdm);
-impl_from_message_type!(ccsds_ndm::messages::rdm::Rdm, Rdm, Rdm);
-impl_from_message_type!(ccsds_ndm::messages::aem::Aem, Aem, Aem);
-impl_from_message_type!(ccsds_ndm::messages::apm::Apm, Apm, Apm);
-impl_from_message_type!(ccsds_ndm::messages::acm::Acm, Acm, Acm);
-impl_from_message_type!(ccsds_ndm::messages::ndm::CombinedNdm, Ndm, Ndm);
+impl_from_message_type!(ccsds_ndm::messages::opm::Opm, Opm);
+impl_from_message_type!(ccsds_ndm::messages::oem::Oem, Oem);
+impl_from_message_type!(ccsds_ndm::messages::omm::Omm, Omm);
+impl_from_message_type!(ccsds_ndm::messages::ocm::Ocm, Ocm);
+impl_from_message_type!(ccsds_ndm::messages::cdm::Cdm, Cdm);
+impl_from_message_type!(ccsds_ndm::messages::tdm::Tdm, Tdm);
+impl_from_message_type!(ccsds_ndm::messages::rdm::Rdm, Rdm);
+impl_from_message_type!(ccsds_ndm::messages::aem::Aem, Aem);
+impl_from_message_type!(ccsds_ndm::messages::apm::Apm, Apm);
+impl_from_message_type!(ccsds_ndm::messages::acm::Acm, Acm);
+impl_from_message_type!(ccsds_ndm::messages::ndm::CombinedNdm, Ndm);
 
 fn selected_notation(format: Option<&str>) -> PyResult<Option<Notation>> {
     match format {
@@ -76,14 +71,6 @@ pub fn parse_options(max_input_bytes: Option<usize>, max_records: Option<usize>)
     }
 }
 
-pub fn parse_typed<T: FromMessageType>(
-    _py: Python<'_>,
-    data: &str,
-    format: Option<&str>,
-) -> PyResult<T> {
-    parse_typed_with_options(data, format, &ParseOptions::default())
-}
-
 pub fn parse_typed_with_options<T: FromMessageType>(
     data: &str,
     format: Option<&str>,
@@ -91,17 +78,6 @@ pub fn parse_typed_with_options<T: FromMessageType>(
 ) -> PyResult<T> {
     let message = ccsds_ndm::from_str_with_options(data, selected_notation(format)?, options)
         .map_err(ccsds_error_to_pyerr)?;
-    expect_typed(message)
-}
-
-pub fn parse_typed_file_with_options<T: FromMessageType>(
-    path: &str,
-    format: Option<&str>,
-    options: &ParseOptions,
-) -> PyResult<T> {
-    let notation = selected_notation(format)?;
-    let message = ccsds_ndm::from_file_with_options(path, notation, options)
-        .map_err(|error| file_parse_error_to_pyerr(error, notation, Some(T::KIND)))?;
     expect_typed(message)
 }
 
@@ -120,63 +96,23 @@ pub fn validate_message<T: Validate>(message: &T) -> PyResult<()> {
     }
 }
 
-pub fn generate_options(version: Option<&str>) -> GenerateOptions {
-    match version {
-        None => GenerateOptions::source(),
-        Some("latest") => GenerateOptions::latest(),
-        Some(version) => GenerateOptions::version(version),
-    }
-}
-
-pub fn generate_string<T: VersionedNdm>(
-    message: &T,
-    format: &str,
-    version: Option<&str>,
-) -> PyResult<String> {
-    generate_string_with_limit(message, format, version, None)
-}
-
-pub fn generate_string_with_limit<T: VersionedNdm>(
-    message: &T,
-    format: &str,
-    version: Option<&str>,
-    max_output_bytes: Option<usize>,
-) -> PyResult<String> {
-    let mut options = generate_options(version);
-    options.max_output_bytes = max_output_bytes;
+pub fn generate_string<T: Ndm>(message: &T, format: &str) -> PyResult<String> {
     match format {
-        "kvn" => message.to_kvn_with(&options).map_err(ccsds_error_to_pyerr),
-        "xml" => message.to_xml_with(&options).map_err(ccsds_error_to_pyerr),
+        "kvn" => message.to_kvn().map_err(ccsds_error_to_pyerr),
+        "xml" => message.to_xml().map_err(ccsds_error_to_pyerr),
         other => Err(unsupported_format(other)),
     }
 }
 
-pub fn generate_file<T: VersionedNdm>(
-    message: &T,
-    path: &str,
-    format: &str,
-    version: Option<&str>,
-) -> PyResult<()> {
-    generate_file_with_limit(message, path, format, version, None)
-}
-
-pub fn generate_file_with_limit<T: VersionedNdm>(
-    message: &T,
-    path: &str,
-    format: &str,
-    version: Option<&str>,
-    max_output_bytes: Option<usize>,
-) -> PyResult<()> {
-    let mut options = generate_options(version);
-    options.max_output_bytes = max_output_bytes;
+pub fn generate_file<T: VersionedNdm>(message: &T, path: &str, format: &str) -> PyResult<()> {
     if format != "kvn" && format != "xml" {
         return Err(unsupported_format(format));
     }
 
     atomic_write(path, |output| {
         match format {
-            "kvn" => message.write_kvn_to(output, &options),
-            "xml" => message.write_xml_to(output, &options),
+            "kvn" => message.write_kvn_to(output),
+            "xml" => message.write_xml_to(output),
             _ => unreachable!(),
         }
         .map_err(ccsds_error_to_pyerr)

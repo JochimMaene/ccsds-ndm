@@ -1,7 +1,7 @@
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::CalendarEpoch;
-use ccsds_ndm::{GenerateOptions, VersionedNdm};
+use ccsds_ndm::VersionedNdm;
 
 const KVN: &str = include_str!("../data/kvn/aem_g4.kvn");
 
@@ -80,8 +80,6 @@ fn invalid_aem_timeline_is_rejected_before_streaming_output() {
     assert!(message.validate().is_err());
     assert!(message.to_xml().is_err());
     let mut output = Vec::new();
-    assert!(message
-        .write_kvn_to(&mut output, &GenerateOptions::source())
-        .is_err());
+    assert!(message.write_kvn_to(&mut output).is_err());
     assert!(output.is_empty());
 }

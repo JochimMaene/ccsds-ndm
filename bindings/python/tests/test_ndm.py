@@ -8,6 +8,7 @@ Unit tests for Navigation Data Message (NDM) Python bindings.
 
 from pathlib import Path
 
+import ccsds_ndm
 import pytest
 
 from ccsds_ndm import (
@@ -151,7 +152,9 @@ class TestNdm:
 
     def test_accepts_tdm_message(self):
         root = Path(__file__).parents[3]
-        tdm = Tdm.from_file(str(root / "ccsds-ndm/data/xml/tdm_e21.xml"), format="xml")
+        tdm = ccsds_ndm.from_file(
+            str(root / "ccsds-ndm/data/xml/tdm_e21.xml"), format="xml"
+        )
 
         combined = Ndm([tdm])
 
@@ -184,10 +187,10 @@ class TestNdm:
         ndm = Ndm([oem])
         path = tmp_path / "test.ndm"
 
-        ndm.to_file(str(path), format="xml")
+        ccsds_ndm.to_file(ndm, str(path), "xml")
         assert path.exists()
 
-        ndm2 = Ndm.from_file(str(path), format="xml")
+        ndm2 = ccsds_ndm.from_file(str(path), format="xml")
         assert len(ndm2.messages) == 1
 
     def test_failed_file_generation_preserves_existing_file(self, tmp_path):
@@ -198,7 +201,7 @@ class TestNdm:
         path.write_text("keep me")
 
         with pytest.raises(NdmValidationError, match="output version 1.0") as caught:
-            ndm.to_file(str(path), format="xml")
+            ccsds_ndm.to_file(ndm, str(path), "xml")
 
         assert caught.value.code == "generation.unsupported_output_version"
         assert path.read_text() == "keep me"

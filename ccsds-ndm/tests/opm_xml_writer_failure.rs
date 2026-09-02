@@ -4,7 +4,7 @@
 
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{GenerateOptions, VersionedNdm};
+use ccsds_ndm::VersionedNdm;
 use std::io::{self, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -58,9 +58,7 @@ fn opm_3_xml_writer_propagates_sink_failures_without_panicking() {
         expected.len() - 1,
     ] {
         let mut sink = FailAfter::new(limit);
-        let outcome = catch_unwind(AssertUnwindSafe(|| {
-            opm.write_xml_to(&mut sink, &GenerateOptions::source())
-        }));
+        let outcome = catch_unwind(AssertUnwindSafe(|| opm.write_xml_to(&mut sink)));
 
         let result = outcome.unwrap_or_else(|_| panic!("writer panicked at byte limit {limit}"));
         let error = result.unwrap_err();

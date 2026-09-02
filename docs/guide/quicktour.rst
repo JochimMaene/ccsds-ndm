@@ -44,10 +44,10 @@ If you know the file type (e.g., OPM), you can parse it directly into the struct
 
    .. code-tab:: py
 
-        from ccsds_ndm import Opm
+        import ccsds_ndm
 
         # Returns an Opm object directly
-        opm = Opm.from_file("example.opm")
+        opm = ccsds_ndm.from_file("example.opm")
 
    .. code-tab:: rust
 
@@ -107,7 +107,7 @@ You can convert the in-memory structures back to KVN or XML.
         xml_string = ndm.to_str("xml")
 
         # Write to KVN file
-        ndm.to_file("output.kvn", "kvn")
+        ccsds_ndm.to_file(ndm, "output.kvn", "kvn")
 
    .. code-tab:: rust
 

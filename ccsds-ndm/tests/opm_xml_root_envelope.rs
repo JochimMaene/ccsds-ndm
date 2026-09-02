@@ -4,7 +4,7 @@
 
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{GenerateOptions, VersionedNdm};
+use ccsds_ndm::VersionedNdm;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -58,9 +58,7 @@ fn typed_opm_string_generation_emits_the_required_root_namespace() {
     assert_opm_envelope(&xml);
     assert_xsd_valid(&xml);
 
-    let versioned = opm
-        .to_xml_with(&GenerateOptions::source())
-        .expect("versioned XML generation failed");
+    let versioned = opm.to_xml().expect("versioned XML generation failed");
     assert_eq!(versioned, xml);
 }
 
@@ -68,7 +66,7 @@ fn typed_opm_string_generation_emits_the_required_root_namespace() {
 fn streamed_opm_generation_emits_the_required_root_namespace() {
     let opm = opm();
     let mut output = Vec::new();
-    opm.write_xml_to(&mut output, &GenerateOptions::source())
+    opm.write_xml_to(&mut output)
         .expect("streamed XML generation failed");
     let xml = String::from_utf8(output).expect("generated XML was not UTF-8");
 

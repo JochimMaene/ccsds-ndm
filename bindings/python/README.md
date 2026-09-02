@@ -50,8 +50,8 @@ if isinstance(msg, ccsds_ndm.Opm):
     msg.validate()
 
     # Generation always validates.
-    msg.to_file("output.opm", "kvn")
-    msg.to_file("output.xml", "xml")
+    ccsds_ndm.to_file(msg, "output.opm", "kvn")
+    ccsds_ndm.to_file(msg, "output.xml", "xml")
 
 # Input notation is detected; only choose the output notation.
 xml = ccsds_ndm.convert(msg.to_str("kvn"), "xml")

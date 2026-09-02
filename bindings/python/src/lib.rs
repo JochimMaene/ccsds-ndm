@@ -155,45 +155,50 @@ fn notation(value: &str) -> PyResult<ccsds_ndm::Notation> {
 
 /// Convert any recognized NDM message between KVN and XML through the shared generation gate.
 #[pyfunction]
-#[pyo3(signature = (data, to_format, *, max_input_bytes=None, max_records=None, max_output_bytes=None, version=None))]
+#[pyo3(signature = (data, to_format, *, max_input_bytes=None, max_records=None))]
 fn convert(
     data: &str,
     to_format: &str,
     max_input_bytes: Option<usize>,
     max_records: Option<usize>,
-    max_output_bytes: Option<usize>,
-    version: Option<&str>,
 ) -> PyResult<String> {
     let parse = api::parse_options(max_input_bytes, max_records);
-    let mut generate = api::generate_options(version);
-    generate.max_output_bytes = max_output_bytes;
-    ccsds_ndm::convert_with_options(data, notation(to_format)?, &parse, &generate)
+    ccsds_ndm::convert_with_options(data, notation(to_format)?, &parse)
         .map_err(ccsds_error_to_pyerr)
 }
 
 /// Convert any recognized NDM file and atomically replace the destination on success.
 #[pyfunction]
-#[pyo3(signature = (source_path, destination_path, to_format, *, max_input_bytes=None, max_records=None, max_output_bytes=None, version=None))]
+#[pyo3(signature = (source_path, destination_path, to_format, *, max_input_bytes=None, max_records=None))]
 fn convert_file(
     source_path: &str,
     destination_path: &str,
     to_format: &str,
     max_input_bytes: Option<usize>,
     max_records: Option<usize>,
-    max_output_bytes: Option<usize>,
-    version: Option<&str>,
 ) -> PyResult<()> {
     let parse = api::parse_options(max_input_bytes, max_records);
-    let mut generate = api::generate_options(version);
-    generate.max_output_bytes = max_output_bytes;
     ccsds_ndm::convert_file_with_options(
         source_path,
         destination_path,
         notation(to_format)?,
         &parse,
-        &generate,
     )
     .map_err(ccsds_error_to_pyerr)
+}
+
+/// Atomically write a parsed NDM message as KVN or XML.
+#[pyfunction]
+fn to_file(py: Python<'_>, message: Py<PyAny>, path: &str, format: &str) -> PyResult<()> {
+    let message = ndm::py_message_to_core(py, &message)?;
+    api::atomic_write(path, |output| {
+        match format {
+            "kvn" => message.write_kvn_to(output),
+            "xml" => message.write_xml_to(output),
+            other => return Err(api::unsupported_format(other)),
+        }
+        .map_err(ccsds_error_to_pyerr)
+    })
 }
 
 /// The Python module definition.
@@ -208,6 +213,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(from_file, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_function(wrap_pyfunction!(convert_file, m)?)?;
+    m.add_function(wrap_pyfunction!(to_file, m)?)?;
 
     // Common types shared across message types
     m.add_class::<OdmHeader>()?;

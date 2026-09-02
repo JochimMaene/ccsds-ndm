@@ -4,7 +4,7 @@ use std::process::Command;
 
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{GenerateOptions, VersionedNdm};
+use ccsds_ndm::VersionedNdm;
 use tempfile::NamedTempFile;
 
 const KVN: &str = include_str!("../data/kvn/aem_g4.kvn");
@@ -146,9 +146,7 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
         assert!(message.to_kvn().is_err(), "materialized accepted {label}");
         let mut output = Vec::new();
         assert!(
-            message
-                .write_kvn_to(&mut output, &GenerateOptions::source())
-                .is_err(),
+            message.write_kvn_to(&mut output).is_err(),
             "streaming accepted {label}"
         );
         assert!(output.is_empty(), "streaming wrote bytes for {label}");

@@ -4,7 +4,7 @@
 
 use crate::common::{parse_object_description, ObjectDescription, OdParameters};
 use ccsds_ndm::messages::cdm as core_cdm;
-use ccsds_ndm::traits::{Ndm, Validate};
+use ccsds_ndm::traits::Validate;
 use ccsds_ndm::types::{self as core_types, *};
 use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
@@ -263,23 +263,6 @@ impl Cdm {
         crate::api::validate_message(&self.to_core(py)?)
     }
 
-    /// Parse a CDM from a KVN formatted string.
-    ///
-    /// Parameters
-    /// ----------
-    /// kvn : str
-    ///     The KVN string to parse.
-    ///
-    /// Returns
-    /// -------
-    /// Cdm
-    ///     The parsed CDM object.
-    #[staticmethod]
-    fn from_kvn(py: Python<'_>, kvn: &str) -> PyResult<Self> {
-        core_cdm::Cdm::from_kvn(kvn)
-            .map_err(|e| PyValueError::new_err(e.to_string()))
-            .and_then(|inner| Self::from_core(py, inner))
-    }
     /// Parse a CDM from a string with optional format.
     ///
     /// Parameters
@@ -306,47 +289,9 @@ impl Cdm {
         Self::from_core(py, inner)
     }
 
-    /// Parse a CDM from a file path with optional format.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     The path to the file.
-    /// format : str, optional
-    ///     The format of the file ('kvn' or 'xml'). If None, it will be auto-detected.
-    ///
-    /// Returns
-    /// -------
-    /// Cdm
-    ///     The parsed CDM object.
-    #[staticmethod]
-    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
-    fn from_file(
-        py: Python<'_>,
-        path: &str,
-        format: Option<&str>,
-        max_input_bytes: Option<usize>,
-    ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
-        Self::from_core(py, inner)
-    }
-
     /// Serialize to validated KVN or XML.
-    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
-    fn to_str(
-        &self,
-        py: Python<'_>,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(
-            &self.to_core(py)?,
-            format,
-            version,
-            max_output_bytes,
-        )
+    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+        crate::api::generate_string(&self.to_core(py)?, format)
     }
 
     /// Conjunction Data Message (CDM).
@@ -406,34 +351,6 @@ impl Cdm {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Cdm, &value)?;
         self.version = value;
         Ok(())
-    }
-
-    /// Write the CDM to a file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     The output file path.
-    /// format : str
-    ///     The output format ('kvn' or 'xml').
-    /// version : str, optional
-    ///     Source version by default, ``"latest"``, or an exact supported version.
-    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
-    fn to_file(
-        &self,
-        py: Python<'_>,
-        path: &str,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(
-            &self.to_core(py)?,
-            path,
-            format,
-            version,
-            max_output_bytes,
-        )
     }
 }
 

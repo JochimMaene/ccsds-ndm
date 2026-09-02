@@ -1,8 +1,6 @@
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{
-    convert, convert_file, convert_file_with_options, GenerateOptions, Notation, ParseOptions,
-};
+use ccsds_ndm::{convert, convert_file, convert_file_with_options, Notation, ParseOptions};
 
 const KVN_FIXTURES: [&str; 3] = [
     include_str!("../data/kvn/oem_g11.kvn"),
@@ -78,7 +76,6 @@ fn file_conversion_is_atomic_and_bounds_input_before_materialization() {
         &destination,
         Notation::Xml,
         &ParseOptions::default().with_max_input_bytes(16),
-        &GenerateOptions::source(),
     )
     .expect_err("input limit should fail before replacement");
     assert_eq!(error.code(), Some("resource.input_limit_exceeded"));

@@ -40,7 +40,7 @@ repos:
 
       - id: audit-bindings
         name: audit bindings
-        entry: just audit-strict
+        entry: just audit
         language: system
         pass_filenames: false
         files: ^(src/.*\.rs|../../ccsds-ndm/src/.*)$

@@ -1,8 +1,6 @@
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{
-    convert, convert_file, convert_file_with_options, GenerateOptions, Notation, ParseOptions,
-};
+use ccsds_ndm::{convert, convert_file, convert_file_with_options, Notation, ParseOptions};
 
 const KVN_FIXTURES: [&str; 4] = [
     include_str!("../data/kvn/opm_g1.kvn"),
@@ -98,14 +96,8 @@ fn file_conversion_enforces_input_limit_before_materializing_the_document() {
     std::fs::write(&destination, b"sentinel").expect("sentinel should be written");
 
     let options = ParseOptions::default().with_max_input_bytes(16);
-    let error = convert_file_with_options(
-        &source,
-        &destination,
-        Notation::Xml,
-        &options,
-        &GenerateOptions::source(),
-    )
-    .expect_err("the configured input limit should fail");
+    let error = convert_file_with_options(&source, &destination, Notation::Xml, &options)
+        .expect_err("the configured input limit should fail");
 
     assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
     assert_eq!(

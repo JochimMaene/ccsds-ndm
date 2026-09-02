@@ -12,14 +12,14 @@ Nested model properties and collections are live. Change them directly:
 
    message = ccsds_ndm.from_file("example.opm")
    message.segment.metadata.object_name = "UPDATED"
-   message.to_file("updated.opm", "kvn")
+   ccsds_ndm.to_file(message, "updated.opm", "kvn")
 
 Retained child references preserve their identity, and structural changes to repeated model fields
 such as OEM state-vector lists affect the owning message. Generation always validates the complete
 message. There is no commit step and no unchecked ``validate=False`` mode.
 
-Converting notation and edition
--------------------------------
+Converting notation
+-------------------
 
 Use the same generic API for every recognized message family:
 

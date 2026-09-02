@@ -13,7 +13,7 @@ until equivalent runtime evidence exists.
 Run `just package-python` before release. It builds the wheel, creates an isolated environment,
 installs the artifact with its dependencies, and exercises the public OPM, OEM, OMM, and conversion
 APIs in both notations. Field parity, stubs, and synchronized docstrings are enforced separately by
-`just audit-strict`, `just stubs-check`, and `just sync-docs-check`.
+`just audit`, `just stubs-check`, and `just sync-docs-check`.
 
 Defects use the same public-only reporting scope documented in the
 [Rust release policy](rust-release-policy.md). A private security process and broader maintained

@@ -6,6 +6,7 @@
 Unit tests for Conjunction Data Message (CDM) Python bindings.
 """
 
+import ccsds_ndm
 import numpy as np
 import pytest
 
@@ -152,11 +153,11 @@ class TestCdm:
         kvn_path = tmp_path / "test.cdm"
 
         # Test to_file
-        cdm.to_file(str(kvn_path), format="kvn")
+        ccsds_ndm.to_file(cdm, str(kvn_path), "kvn")
         assert kvn_path.exists()
 
         # Test from_file
-        cdm2 = Cdm.from_file(str(kvn_path), format="kvn")
+        cdm2 = ccsds_ndm.from_file(str(kvn_path), format="kvn")
         assert cdm2.header.originator == "TEST"
 
     def test_cdm_data_numpy_api(self):

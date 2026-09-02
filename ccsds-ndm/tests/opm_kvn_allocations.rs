@@ -4,7 +4,6 @@
 
 use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::options::GenerateOptions;
 use ccsds_ndm::traits::Ndm;
 use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};
 use std::alloc::System;
@@ -18,7 +17,6 @@ static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 fn opm_kvn_generation_has_bounded_allocations() {
     let opm = Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).unwrap();
     let expected_len = opm.to_kvn().unwrap().len();
-    let options = GenerateOptions::source();
 
     let materialized_region = Region::new(GLOBAL);
     let materialized = black_box(&opm).to_kvn().unwrap();
@@ -28,7 +26,7 @@ fn opm_kvn_generation_has_bounded_allocations() {
     let mut streamed = Vec::with_capacity(expected_len);
     let streaming_region = Region::new(GLOBAL);
     black_box(&opm)
-        .write_kvn_to(black_box(&mut streamed), black_box(&options))
+        .write_kvn_to(black_box(&mut streamed))
         .unwrap();
     let streaming_stats = streaming_region.change();
     black_box(&streamed);

@@ -1,32 +1,26 @@
 //! Notation conversion composed from strict typed parsers and validated generators.
 
 use crate::error::Result;
-use crate::options::{GenerateOptions, ParseOptions};
+use crate::options::ParseOptions;
 use std::path::Path;
 
-pub use crate::detect::Notation;
+use crate::detect::Notation;
 
 /// Strictly convert any detected NDM message between KVN and XML.
 pub fn convert(input: &str, target: Notation) -> Result<String> {
-    convert_with_options(
-        input,
-        target,
-        &ParseOptions::default(),
-        &GenerateOptions::source(),
-    )
+    convert_with_options(input, target, &ParseOptions::default())
 }
 
-/// Strictly convert with explicit parsing and generation controls.
+/// Strictly convert with explicit parsing controls.
 pub fn convert_with_options(
     input: &str,
     target: Notation,
     parse_options: &ParseOptions,
-    generate_options: &GenerateOptions,
 ) -> Result<String> {
     let message = crate::from_str_with_options(input, None, parse_options)?;
     match target {
-        Notation::Kvn => message.to_kvn_with(generate_options),
-        Notation::Xml => message.to_xml_with(generate_options),
+        Notation::Kvn => message.to_kvn(),
+        Notation::Xml => message.to_xml(),
     }
 }
 
@@ -41,49 +35,20 @@ pub fn convert_file(
         destination_path,
         target,
         &ParseOptions::default(),
-        &GenerateOptions::source(),
     )
 }
 
-/// Strictly convert a file with explicit parsing and generation controls.
+/// Strictly convert a file with explicit parsing controls.
 pub fn convert_file_with_options(
     source_path: impl AsRef<Path>,
     destination_path: impl AsRef<Path>,
     target: Notation,
     parse_options: &ParseOptions,
-    generate_options: &GenerateOptions,
 ) -> Result<()> {
     let message = crate::from_file_with_options(source_path, None, parse_options)?;
     let output = match target {
-        Notation::Kvn => message.to_kvn_with(generate_options),
-        Notation::Xml => message.to_xml_with(generate_options),
+        Notation::Kvn => message.to_kvn(),
+        Notation::Xml => message.to_xml(),
     }?;
-    crate::fsutil::atomic_write(destination_path.as_ref(), output.as_bytes())
-}
-
-/// Convert in-memory input and atomically replace the destination on success.
-pub fn convert_to_file(
-    input: &str,
-    destination_path: impl AsRef<Path>,
-    target: Notation,
-) -> Result<()> {
-    convert_to_file_with_options(
-        input,
-        destination_path,
-        target,
-        &ParseOptions::default(),
-        &GenerateOptions::source(),
-    )
-}
-
-/// Convert in-memory input to a file with explicit parsing and generation controls.
-pub fn convert_to_file_with_options(
-    input: &str,
-    destination_path: impl AsRef<Path>,
-    target: Notation,
-    parse_options: &ParseOptions,
-    generate_options: &GenerateOptions,
-) -> Result<()> {
-    let output = convert_with_options(input, target, parse_options, generate_options)?;
     crate::fsutil::atomic_write(destination_path.as_ref(), output.as_bytes())
 }

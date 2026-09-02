@@ -612,7 +612,6 @@ impl Ndm for Oem {
                 crate::validation::MessageKind::Oem,
                 crate::error::DiagnosticNotation::Kvn,
                 &self.version,
-                &self.version,
             )
         })
     }
@@ -636,7 +635,6 @@ impl Ndm for Oem {
             error.with_generation_context(
                 crate::validation::MessageKind::Oem,
                 crate::error::DiagnosticNotation::Xml,
-                &self.version,
                 &self.version,
             )
         })

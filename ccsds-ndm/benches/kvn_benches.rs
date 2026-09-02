@@ -12,7 +12,7 @@ use ccsds_ndm::messages::oem::{Oem, OemBody, OemData, OemMetadata, OemSegment};
 use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::tdm::Tdm;
-use ccsds_ndm::options::{GenerateOptions, ParseOptions};
+use ccsds_ndm::options::ParseOptions;
 use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{
     CalendarEpoch, Epoch, InterpolationDegree, Position, PositionUnits, Velocity, VelocityUnits,
@@ -173,13 +173,12 @@ fn bench_generate_opm(c: &mut Criterion) {
     group.bench_function("materialized", |b| {
         b.iter(|| black_box(&opm).to_kvn().unwrap())
     });
-    let options = GenerateOptions::source();
     let mut output = Vec::with_capacity(output_len as usize);
     group.bench_function("streaming_reused_vec", |b| {
         b.iter(|| {
             output.clear();
             black_box(&opm)
-                .write_kvn_to(black_box(&mut output), black_box(&options))
+                .write_kvn_to(black_box(&mut output))
                 .unwrap();
             black_box(&output);
         })
