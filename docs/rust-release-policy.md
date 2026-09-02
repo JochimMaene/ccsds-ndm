@@ -6,13 +6,11 @@ claimed.
 
 ## Tested toolchain and platform
 
-The Rust CI and crate-packaging gates run with the current stable Rust toolchain on
-`ubuntu-latest`. That is the only tested Rust release environment.
-
-The crate does not currently declare a minimum supported Rust version (MSRV). Other Rust versions
-and operating systems may work, but they are not advertised as supported until they have explicit
-CI coverage. This scope should be expanded only when the project is prepared to maintain the
-corresponding CI and compatibility commitment.
+The crate declares Rust 1.88 as its minimum supported Rust version (MSRV), and CI checks the
+published library with that toolchain. Development, formatting, tests, and packaging use the
+repository's pinned Rust 1.90.0 toolchain on `ubuntu-latest`. Other operating systems may work, but
+they are not advertised as supported until they have explicit CI coverage. This scope should be
+expanded only when the project is prepared to maintain the corresponding compatibility commitment.
 
 ## Compatibility and migration
 

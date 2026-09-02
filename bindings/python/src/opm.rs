@@ -6,7 +6,6 @@ use crate::common::{parse_reference_frame, parse_time_system};
 use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::opm as core_opm;
-use ccsds_ndm::options::ParseOptions;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -156,26 +155,8 @@ impl Opm {
         format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
-        let options = ParseOptions {
-            max_input_bytes,
-            ..ParseOptions::default()
-        };
-        let parsed = match format {
-            Some("kvn") => core_opm::Opm::from_kvn_with_options(data, &options),
-            Some("xml") => core_opm::Opm::from_xml_with_options(data, &options),
-            Some(other) => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported format '{other}'. Use 'kvn' or 'xml'"
-                )))
-            }
-            None => match ccsds_ndm::detect::detect_notation(data)
-                .map_err(crate::errors::ccsds_error_to_pyerr)?
-            {
-                ccsds_ndm::Notation::Kvn => core_opm::Opm::from_kvn_with_options(data, &options),
-                ccsds_ndm::Notation::Xml => core_opm::Opm::from_xml_with_options(data, &options),
-            },
-        };
-        let inner = parsed.map_err(crate::errors::ccsds_error_to_pyerr)?;
+        let options = crate::api::parse_options(max_input_bytes, None);
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
         Self::from_core(py, inner)
     }
 

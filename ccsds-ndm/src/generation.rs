@@ -49,10 +49,7 @@ pub(crate) fn validate_output_version(
     let spec = crate::versioning::spec(kind).ok_or_else(|| {
         CcsdsNdmError::UnsupportedMessage(format!("{} generation", kind.as_str()))
     })?;
-    let supported = match format {
-        OutputFormat::Kvn => spec.kvn_output_versions,
-        OutputFormat::Xml => spec.xml_output_versions,
-    };
+    let supported = spec.output_versions;
     if !supported.contains(&version) {
         return Err(CcsdsNdmError::UnsupportedOutputVersion {
             message_type: kind.as_str(),
@@ -75,6 +72,27 @@ pub(crate) fn validate_for_generation(
         value.validate()
     })()
     .map_err(|error| generation_error(error, kind, format, version))
+}
+
+pub(crate) fn to_kvn_string<T: VersionedNdm + ToKvn>(message: &T) -> Result<String> {
+    (|| {
+        validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
+        message.validate_kvn_output()?;
+        let mut writer = crate::kvn::ser::KvnWriter::new();
+        ToKvn::write_kvn(message, &mut writer);
+        writer.finish_checked()
+    })()
+    .map_err(|error| generation_error(error, T::KIND, OutputFormat::Kvn, message.version()))
+}
+
+pub(crate) fn to_xml_string<T: VersionedNdm>(message: &T) -> Result<String> {
+    (|| {
+        validate_output_version(T::KIND, message.version(), OutputFormat::Xml)?;
+        message.validate()?;
+        message.validate_xml_output()?;
+        crate::xml::to_string(message)
+    })()
+    .map_err(|error| generation_error(error, T::KIND, OutputFormat::Xml, message.version()))
 }
 
 /// Complete NDM messages that support validated streaming generation.
@@ -263,7 +281,8 @@ impl VersionedNdm for crate::messages::opm::Opm {
     }
 
     fn validate_kvn_output(&self) -> Result<()> {
-        self.validate()
+        self.validate()?;
+        ToKvn::validate_kvn(self)
     }
 
     fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {

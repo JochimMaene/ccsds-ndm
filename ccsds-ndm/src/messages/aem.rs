@@ -57,16 +57,7 @@ impl crate::traits::Validate for Aem {
 
 impl Ndm for Aem {
     fn to_kvn(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Aem,
-            &self.version,
-            crate::generation::OutputFormat::Kvn,
-            self,
-        )?;
-        self.validate_kvn_representability()?;
-        let mut writer = KvnWriter::new();
-        self.write_kvn(&mut writer);
-        writer.finish_checked()
+        crate::generation::to_kvn_string(self)
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -77,13 +68,7 @@ impl Ndm for Aem {
     }
 
     fn to_xml(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Aem,
-            &self.version,
-            crate::generation::OutputFormat::Xml,
-            self,
-        )?;
-        crate::xml::to_string(self)
+        crate::generation::to_xml_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
@@ -969,18 +954,12 @@ impl AemMetadata {
         let requires_euler_rot_seq = matches!(
             self.attitude_type,
             AttitudeTypeType::EulerAngle
-                | AttitudeTypeType::EulerAngleUpper
                 | AttitudeTypeType::EulerAngleDerivative
-                | AttitudeTypeType::EulerAngleDerivativeUpper
                 | AttitudeTypeType::EulerAngleAngVel
-                | AttitudeTypeType::EulerAngleAngVelUpper
         );
         let requires_angvel_frame = matches!(
             self.attitude_type,
-            AttitudeTypeType::QuaternionAngVel
-                | AttitudeTypeType::QuaternionAngVelUpper
-                | AttitudeTypeType::EulerAngleAngVel
-                | AttitudeTypeType::EulerAngleAngVelUpper
+            AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::EulerAngleAngVel
         );
 
         // Validation Rule: EULER_ROT_SEQ is required if ATTITUDE_TYPE includes EULER_ANGLE
@@ -1295,29 +1274,15 @@ impl AemAttitudeStateWrapper {
 
     fn matches_type(&self, attitude_type: &AttitudeTypeType) -> bool {
         match attitude_type {
-            AttitudeTypeType::Quaternion | AttitudeTypeType::QuaternionUpper => {
-                self.quaternion_ephemeris.is_some()
-            }
-            AttitudeTypeType::QuaternionDerivative
-            | AttitudeTypeType::QuaternionDerivativeUpper => self.quaternion_derivative.is_some(),
-            AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::QuaternionAngVelUpper => {
-                self.quaternion_ang_vel.is_some()
-            }
-            AttitudeTypeType::EulerAngle | AttitudeTypeType::EulerAngleUpper => {
-                self.euler_angle.is_some()
-            }
-            AttitudeTypeType::EulerAngleDerivative
-            | AttitudeTypeType::EulerAngleDerivativeUpper => self.euler_angle_derivative.is_some(),
-            AttitudeTypeType::EulerAngleAngVel | AttitudeTypeType::EulerAngleAngVelUpper => {
-                self.euler_angle_ang_vel.is_some()
-            }
-            AttitudeTypeType::Spin | AttitudeTypeType::SpinUpper => self.spin.is_some(),
-            AttitudeTypeType::SpinNutation | AttitudeTypeType::SpinNutationUpper => {
-                self.spin_nutation.is_some()
-            }
-            AttitudeTypeType::SpinNutationMom | AttitudeTypeType::SpinNutationMomUpper => {
-                self.spin_nutation_mom.is_some()
-            }
+            AttitudeTypeType::Quaternion => self.quaternion_ephemeris.is_some(),
+            AttitudeTypeType::QuaternionDerivative => self.quaternion_derivative.is_some(),
+            AttitudeTypeType::QuaternionAngVel => self.quaternion_ang_vel.is_some(),
+            AttitudeTypeType::EulerAngle => self.euler_angle.is_some(),
+            AttitudeTypeType::EulerAngleDerivative => self.euler_angle_derivative.is_some(),
+            AttitudeTypeType::EulerAngleAngVel => self.euler_angle_ang_vel.is_some(),
+            AttitudeTypeType::Spin => self.spin.is_some(),
+            AttitudeTypeType::SpinNutation => self.spin_nutation.is_some(),
+            AttitudeTypeType::SpinNutationMom => self.spin_nutation_mom.is_some(),
         }
     }
 }
@@ -1581,24 +1546,24 @@ DATA_STOP
             comment: vec![],
             attitude_states: vec![valid_euler.clone()],
         };
-        assert!(data.validate(&AttitudeTypeType::QuaternionUpper).is_err());
+        assert!(data.validate(&AttitudeTypeType::Quaternion).is_err());
 
         // Type mismatch: Expects EULER_ANGLE, gets QUATERNION
         let data_q = AemData {
             comment: vec![],
             attitude_states: vec![valid_q.clone()],
         };
-        assert!(data_q.validate(&AttitudeTypeType::EulerAngleUpper).is_err());
+        assert!(data_q.validate(&AttitudeTypeType::EulerAngle).is_err());
 
         // Check all other variants against a wrong type declaration
         let cases = vec![
-            AttitudeTypeType::QuaternionDerivativeUpper,
-            AttitudeTypeType::QuaternionAngVelUpper,
-            AttitudeTypeType::EulerAngleDerivativeUpper,
-            AttitudeTypeType::EulerAngleAngVelUpper,
-            AttitudeTypeType::SpinUpper,
-            AttitudeTypeType::SpinNutationUpper,
-            AttitudeTypeType::SpinNutationMomUpper,
+            AttitudeTypeType::QuaternionDerivative,
+            AttitudeTypeType::QuaternionAngVel,
+            AttitudeTypeType::EulerAngleDerivative,
+            AttitudeTypeType::EulerAngleAngVel,
+            AttitudeTypeType::Spin,
+            AttitudeTypeType::SpinNutation,
+            AttitudeTypeType::SpinNutationMom,
         ];
 
         for attitude_type in cases {

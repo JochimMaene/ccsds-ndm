@@ -462,23 +462,7 @@ impl Ndm for Oem {
     }
 
     fn to_xml(&self) -> Result<String> {
-        (|| {
-            crate::generation::validate_for_generation(
-                crate::validation::MessageKind::Oem,
-                &self.version,
-                crate::generation::OutputFormat::Xml,
-                self,
-            )?;
-            self.validate_xml_text()?;
-            crate::xml::to_string(self)
-        })()
-        .map_err(|error: crate::error::CcsdsNdmError| {
-            error.with_generation_context(
-                crate::validation::MessageKind::Oem,
-                crate::error::DiagnosticNotation::Xml,
-                &self.version,
-            )
-        })
+        crate::generation::to_xml_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {

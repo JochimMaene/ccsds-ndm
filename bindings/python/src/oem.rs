@@ -10,7 +10,6 @@ use ccsds_ndm::types::{
     Acc, InterpolationDegree, Position, PositionCovariance, PositionVelocityCovariance, Velocity,
     VelocityCovariance,
 };
-use ccsds_ndm::ParseOptions;
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -508,11 +507,7 @@ impl Oem {
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = ParseOptions {
-            max_input_bytes,
-            max_records,
-            ..ParseOptions::default()
-        };
+        let options = crate::api::parse_options(max_input_bytes, max_records);
         let inner = crate::api::parse_typed_with_options(data, format, &options)?;
         Self::from_core(py, inner)
     }

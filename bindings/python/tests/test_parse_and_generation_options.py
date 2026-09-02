@@ -80,9 +80,21 @@ def test_unsupported_file_format_has_no_side_effect(tmp_path):
     output = tmp_path / "output.ndm"
 
     with pytest.raises(ValueError, match="Unsupported format"):
-        ccsds_ndm.to_file(message, str(output), "json")
+        message.to_file(str(output), "json")
 
     assert not output.exists()
+
+
+def test_format_names_are_case_insensitive(tmp_path):
+    message = ccsds_ndm.Opm.from_str(OPM_KVN, format="KVN")
+    xml = message.to_str("XML")
+    output = tmp_path / "output.xml"
+
+    message.to_file(str(output), "XML")
+
+    assert isinstance(ccsds_ndm.from_str(xml, format="XML"), ccsds_ndm.Opm)
+    assert isinstance(ccsds_ndm.from_file(str(output), format="XML"), ccsds_ndm.Opm)
+    assert ccsds_ndm.convert(OPM_KVN, "XML") == xml
 
 
 def test_failed_generation_preserves_existing_file(tmp_path):
@@ -94,7 +106,7 @@ def test_failed_generation_preserves_existing_file(tmp_path):
     with pytest.raises(
         ccsds_ndm.NdmValidationError, match="Unsupported KVN output version 1.0"
     ):
-        ccsds_ndm.to_file(message, str(output), "kvn")
+        message.to_file(str(output), "kvn")
 
     assert output.read_text() == "keep me"
 

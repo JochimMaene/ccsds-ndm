@@ -107,7 +107,7 @@ You can convert the in-memory structures back to KVN or XML.
         xml_string = ndm.to_str("xml")
 
         # Write to KVN file
-        ccsds_ndm.to_file(ndm, "output.kvn", "kvn")
+        ndm.to_file("output.kvn", "kvn")
 
    .. code-tab:: rust
 

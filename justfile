@@ -266,10 +266,6 @@ verify-opm:
 # Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
 check: lint audit stubs-check sync-docs-check test
 
-# Backward-compatible CI alias
-[private]
-check-ci: check
-
 # --- Benchmarking -----------------------------------------------------------
 
 # Run Rust benchmarks
@@ -356,8 +352,7 @@ fuzz-all duration="30":
 
 # --- Clean ------------------------------------------------------------------
 
-# Remove build artifacts
+# Remove build, documentation, and profiling artifacts
 clean:
-    cargo clean --manifest-path {{rust_manifest}}
-    rm -rf dist
-    rm -rf docs/_build
+    rm -rf target {{rust_dir}}/target {{rust_dir}}/fuzz/target {{python_dir}}/target dist docs/_build
+    rm -f perf.data perf.data.old {{rust_dir}}/perf.data {{rust_dir}}/perf.data.old

@@ -94,7 +94,7 @@ class TestOpm:
         opm = self._create_valid_opm()
         path = tmp_path / "test.opm"
 
-        ccsds_ndm.to_file(opm, str(path), "kvn")
+        opm.to_file(str(path), "kvn")
         assert path.exists()
 
         opm2 = ccsds_ndm.from_file(str(path), format="kvn")

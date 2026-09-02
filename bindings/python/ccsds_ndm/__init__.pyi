@@ -77,16 +77,6 @@ def from_str(
     """
     ...
 
-def to_file(
-    message: Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm],
-    path: str,
-    format: str,
-) -> None:
-    """
-    Atomically write a parsed NDM message as KVN or XML.
-    """
-    ...
-
 class Acm:
     """
     Attitude Comprehensive Message (ACM).

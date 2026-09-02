@@ -112,7 +112,7 @@ fn from_str(
 ) -> PyResult<Py<PyAny>> {
     let options = api::parse_options(max_input_bytes, max_records);
     let message =
-        ccsds_ndm::from_str_with_options(data, format.map(notation).transpose()?, &options)
+        ccsds_ndm::from_str_with_options(data, format.map(api::notation).transpose()?, &options)
             .map_err(ccsds_error_to_pyerr)?;
     message_to_py(py, message)
 }
@@ -137,20 +137,10 @@ fn from_file(
     max_records: Option<usize>,
 ) -> PyResult<Py<PyAny>> {
     let options = api::parse_options(max_input_bytes, max_records);
-    let notation = format.map(notation).transpose()?;
+    let notation = format.map(api::notation).transpose()?;
     let message = ccsds_ndm::from_file_with_options(path, notation, &options)
         .map_err(|error| file_parse_error_to_pyerr(error, notation, None))?;
     message_to_py(py, message)
-}
-
-fn notation(value: &str) -> PyResult<ccsds_ndm::Notation> {
-    match value {
-        "kvn" => Ok(ccsds_ndm::Notation::Kvn),
-        "xml" => Ok(ccsds_ndm::Notation::Xml),
-        other => Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "Unsupported format '{other}'. Use 'kvn' or 'xml'"
-        ))),
-    }
 }
 
 /// Convert any recognized NDM message between KVN and XML through the shared generation gate.
@@ -163,7 +153,7 @@ fn convert(
     max_records: Option<usize>,
 ) -> PyResult<String> {
     let parse = api::parse_options(max_input_bytes, max_records);
-    ccsds_ndm::convert_with_options(data, notation(to_format)?, &parse)
+    ccsds_ndm::convert_with_options(data, api::notation(to_format)?, &parse)
         .map_err(ccsds_error_to_pyerr)
 }
 
@@ -181,17 +171,10 @@ fn convert_file(
     ccsds_ndm::convert_file_with_options(
         source_path,
         destination_path,
-        notation(to_format)?,
+        api::notation(to_format)?,
         &parse,
     )
     .map_err(ccsds_error_to_pyerr)
-}
-
-/// Atomically write a parsed NDM message as KVN or XML.
-#[pyfunction]
-fn to_file(py: Python<'_>, message: Py<PyAny>, path: &str, format: &str) -> PyResult<()> {
-    let message = ndm::py_message_to_core(py, &message)?;
-    api::generate_file(&message, path, format)
 }
 
 /// The Python module definition.
@@ -206,7 +189,6 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(from_file, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_function(wrap_pyfunction!(convert_file, m)?)?;
-    m.add_function(wrap_pyfunction!(to_file, m)?)?;
 
     // Common types shared across message types
     m.add_class::<OdmHeader>()?;

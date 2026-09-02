@@ -82,7 +82,7 @@ class TestRdm:
         rdm = self._create_valid_rdm()
         path = tmp_path / "test.rdm"
 
-        ccsds_ndm.to_file(rdm, str(path), "kvn")
+        rdm.to_file(str(path), "kvn")
         assert path.exists()
 
         rdm2 = ccsds_ndm.from_file(str(path), format="kvn")

@@ -59,7 +59,6 @@ PUBLIC_API_PARAMETER_TYPES = {
         "max_records": "Optional[int]",
     },
     "to_file": {
-        "message": "Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]",
         "format": "str",
         "path": "str",
     },

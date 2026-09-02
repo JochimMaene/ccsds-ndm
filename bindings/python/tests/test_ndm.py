@@ -187,7 +187,7 @@ class TestNdm:
         ndm = Ndm([oem])
         path = tmp_path / "test.ndm"
 
-        ccsds_ndm.to_file(ndm, str(path), "xml")
+        ndm.to_file(str(path), "xml")
         assert path.exists()
 
         ndm2 = ccsds_ndm.from_file(str(path), format="xml")
@@ -201,7 +201,7 @@ class TestNdm:
         path.write_text("keep me")
 
         with pytest.raises(NdmValidationError, match="output version 1.0") as caught:
-            ccsds_ndm.to_file(ndm, str(path), "xml")
+            ndm.to_file(str(path), "xml")
 
         assert caught.value.code == "generation.unsupported_output_version"
         assert path.read_text() == "keep me"

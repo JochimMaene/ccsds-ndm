@@ -135,7 +135,7 @@ class TestOem:
         oem = self._create_valid_oem()
         path = tmp_path / "test.oem"
 
-        ccsds_ndm.to_file(oem, str(path), "kvn")
+        oem.to_file(str(path), "kvn")
         assert path.exists()
 
         oem2 = ccsds_ndm.from_file(str(path), format="kvn")

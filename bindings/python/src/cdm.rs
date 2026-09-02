@@ -1663,18 +1663,11 @@ impl CdmMetadata {
     #[getter]
     fn get_object_type(&self) -> Option<ObjectDescription> {
         self.inner.object_type.as_ref().map(|d| match d {
-            core_types::ObjectDescription::Payload
-            | core_types::ObjectDescription::PayloadLower => ObjectDescription::Payload,
-            core_types::ObjectDescription::RocketBody
-            | core_types::ObjectDescription::RocketBodyLower => ObjectDescription::RocketBody,
-            core_types::ObjectDescription::Debris | core_types::ObjectDescription::DebrisLower => {
-                ObjectDescription::Debris
-            }
-            core_types::ObjectDescription::Unknown
-            | core_types::ObjectDescription::UnknownLower => ObjectDescription::Unknown,
-            core_types::ObjectDescription::Other | core_types::ObjectDescription::OtherLower => {
-                ObjectDescription::Other
-            }
+            core_types::ObjectDescription::Payload => ObjectDescription::Payload,
+            core_types::ObjectDescription::RocketBody => ObjectDescription::RocketBody,
+            core_types::ObjectDescription::Debris => ObjectDescription::Debris,
+            core_types::ObjectDescription::Unknown => ObjectDescription::Unknown,
+            core_types::ObjectDescription::Other => ObjectDescription::Other,
         })
     }
     #[setter]
@@ -1765,8 +1758,8 @@ impl CdmMetadata {
     #[getter]
     fn get_solar_rad_pressure(&self) -> Option<bool> {
         self.inner.solar_rad_pressure.as_ref().map(|v| match v {
-            core_types::YesNo::Yes | core_types::YesNo::YesLower => true,
-            core_types::YesNo::No | core_types::YesNo::NoLower => false,
+            core_types::YesNo::Yes => true,
+            core_types::YesNo::No => false,
         })
     }
     #[setter]
@@ -1788,8 +1781,8 @@ impl CdmMetadata {
     #[getter]
     fn get_earth_tides(&self) -> Option<bool> {
         self.inner.earth_tides.as_ref().map(|v| match v {
-            core_types::YesNo::Yes | core_types::YesNo::YesLower => true,
-            core_types::YesNo::No | core_types::YesNo::NoLower => false,
+            core_types::YesNo::Yes => true,
+            core_types::YesNo::No => false,
         })
     }
     #[setter]
@@ -1811,8 +1804,8 @@ impl CdmMetadata {
     #[getter]
     fn get_intrack_thrust(&self) -> Option<bool> {
         self.inner.intrack_thrust.as_ref().map(|v| match v {
-            core_types::YesNo::Yes | core_types::YesNo::YesLower => true,
-            core_types::YesNo::No | core_types::YesNo::NoLower => false,
+            core_types::YesNo::Yes => true,
+            core_types::YesNo::No => false,
         })
     }
     #[setter]

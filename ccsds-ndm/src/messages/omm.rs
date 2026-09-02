@@ -47,26 +47,20 @@ pub type BStar = UnitValue<f64, InvErUnits>;
 // rev/day for MEAN_MOTION
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDayUnits {
-    #[serde(rename = "rev/day")]
+    #[serde(rename = "rev/day", alias = "REV/DAY")]
     #[default]
     RevPerDay,
-    #[serde(rename = "REV/DAY")]
-    RevPerDayUpper,
 }
 impl std::fmt::Display for RevPerDayUnits {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RevPerDayUnits::RevPerDay => write!(f, "rev/day"),
-            RevPerDayUnits::RevPerDayUpper => write!(f, "REV/DAY"),
-        }
+        write!(f, "rev/day")
     }
 }
 impl FromStr for RevPerDayUnits {
     type Err = EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "rev/day" => Ok(RevPerDayUnits::RevPerDay),
-            "REV/DAY" => Ok(RevPerDayUnits::RevPerDayUpper),
+            "rev/day" | "REV/DAY" => Ok(RevPerDayUnits::RevPerDay),
             _ => Err(EnumParseError {
                 field: "unit",
                 value: s.to_string(),
@@ -80,26 +74,20 @@ pub type MeanMotion = UnitValue<f64, RevPerDayUnits>;
 // rev/day**2 for MEAN_MOTION_DOT
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDay2Units {
-    #[serde(rename = "rev/day**2")]
+    #[serde(rename = "rev/day**2", alias = "REV/DAY**2")]
     #[default]
     RevPerDay2,
-    #[serde(rename = "REV/DAY**2")]
-    RevPerDay2Upper,
 }
 impl std::fmt::Display for RevPerDay2Units {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RevPerDay2Units::RevPerDay2 => write!(f, "rev/day**2"),
-            RevPerDay2Units::RevPerDay2Upper => write!(f, "REV/DAY**2"),
-        }
+        write!(f, "rev/day**2")
     }
 }
 impl FromStr for RevPerDay2Units {
     type Err = EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "rev/day**2" => Ok(RevPerDay2Units::RevPerDay2),
-            "REV/DAY**2" => Ok(RevPerDay2Units::RevPerDay2Upper),
+            "rev/day**2" | "REV/DAY**2" => Ok(RevPerDay2Units::RevPerDay2),
             _ => Err(EnumParseError {
                 field: "unit",
                 value: s.to_string(),
@@ -113,26 +101,20 @@ pub type MeanMotionDot = UnitValue<f64, RevPerDay2Units>;
 // rev/day**3 for MEAN_MOTION_DDOT
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDay3Units {
-    #[serde(rename = "rev/day**3")]
+    #[serde(rename = "rev/day**3", alias = "REV/DAY**3")]
     #[default]
     RevPerDay3,
-    #[serde(rename = "REV/DAY**3")]
-    RevPerDay3Upper,
 }
 impl std::fmt::Display for RevPerDay3Units {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RevPerDay3Units::RevPerDay3 => write!(f, "rev/day**3"),
-            RevPerDay3Units::RevPerDay3Upper => write!(f, "REV/DAY**3"),
-        }
+        write!(f, "rev/day**3")
     }
 }
 impl FromStr for RevPerDay3Units {
     type Err = EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "rev/day**3" => Ok(RevPerDay3Units::RevPerDay3),
-            "REV/DAY**3" => Ok(RevPerDay3Units::RevPerDay3Upper),
+            "rev/day**3" | "REV/DAY**3" => Ok(RevPerDay3Units::RevPerDay3),
             _ => Err(EnumParseError {
                 field: "unit",
                 value: s.to_string(),
@@ -204,15 +186,7 @@ impl crate::traits::Validate for Omm {
 
 impl Ndm for Omm {
     fn to_kvn(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Omm,
-            &self.version,
-            crate::generation::OutputFormat::Kvn,
-            self,
-        )?;
-        let mut writer = KvnWriter::new();
-        self.write_kvn(&mut writer);
-        writer.finish_checked()
+        crate::generation::to_kvn_string(self)
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -223,13 +197,7 @@ impl Ndm for Omm {
     }
 
     fn to_xml(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Omm,
-            &self.version,
-            crate::generation::OutputFormat::Xml,
-            self,
-        )?;
-        crate::xml::to_string(self)
+        crate::generation::to_xml_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
@@ -2140,14 +2108,8 @@ MEAN_MOTION_DDOT = 0.0
 
     #[test]
     fn test_rev_per_day_units_display_all() {
-        assert_eq!(format!("{}", RevPerDayUnits::RevPerDayUpper), "REV/DAY");
-        assert_eq!(
-            format!("{}", RevPerDay2Units::RevPerDay2Upper),
-            "REV/DAY**2"
-        );
-        assert_eq!(
-            format!("{}", RevPerDay3Units::RevPerDay3Upper),
-            "REV/DAY**3"
-        );
+        assert_eq!(format!("{}", RevPerDayUnits::RevPerDay), "rev/day");
+        assert_eq!(format!("{}", RevPerDay2Units::RevPerDay2), "rev/day**2");
+        assert_eq!(format!("{}", RevPerDay3Units::RevPerDay3), "rev/day**3");
     }
 }

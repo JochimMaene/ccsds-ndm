@@ -32,7 +32,7 @@ source edition, field path, and available source location/token fields.
 Use `ccsds_ndm.convert(data, "xml")` for strings and
 `ccsds_ndm.convert_file(source, destination, "kvn")` for atomic file conversion. Input notation is
 detected automatically. Both accept the same optional input and record limits and delegate directly
-to Rust. Use `ccsds_ndm.to_file(message, path, format)` for atomic message generation.
+to Rust. Use `message.to_file(path, format)` for atomic message generation.
 
 Nested model properties are live and can be changed directly:
 

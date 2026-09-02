@@ -175,7 +175,7 @@ class TestOcm:
         ocm = self._create_valid_ocm()
         path = tmp_path / "test.ocm"
 
-        ccsds_ndm.to_file(ocm, str(path), "kvn")
+        ocm.to_file(str(path), "kvn")
         assert path.exists()
 
         ocm2 = ccsds_ndm.from_file(str(path), format="kvn")

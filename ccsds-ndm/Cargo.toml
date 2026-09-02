@@ -7,6 +7,7 @@ name = "ccsds-ndm"
 version = "0.0.9"
 authors = ["Jochim Maene <jochim.maene+github@gmail.com>"]
 edition = "2021"
+rust-version = "1.88"
 description = "Parse and generate CCSDS Navigation Data Messages (NDM) in KVN and XML formats"
 license = "MPL-2.0"
 repository = "https://github.com/JochimMaene/ccsds-ndm"
@@ -25,7 +26,6 @@ tempfile = "3"
 
 [dev-dependencies]
 criterion = { version = "4.2.1", package = "codspeed-criterion-compat" }
-paste = "1.0.15"
 stats_alloc = "0.1.10"
 
 [[bench]]

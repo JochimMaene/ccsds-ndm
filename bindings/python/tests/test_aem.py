@@ -202,7 +202,7 @@ class TestAem:
         kvn_path = tmp_path / "test.aem"
 
         # Write to file directly
-        ccsds_ndm.to_file(aem, str(kvn_path), "kvn")
+        aem.to_file(str(kvn_path), "kvn")
         assert kvn_path.exists()
 
         # Read back

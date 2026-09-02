@@ -166,7 +166,7 @@ class TestApm:
         kvn_path = tmp_path / "test.apm"
 
         # Test to_file
-        ccsds_ndm.to_file(apm, str(kvn_path), "kvn")
+        apm.to_file(str(kvn_path), "kvn")
         assert kvn_path.exists()
 
         # Test from_file

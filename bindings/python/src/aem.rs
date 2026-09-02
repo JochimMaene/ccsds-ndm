@@ -19,21 +19,21 @@ use std::str::FromStr;
 
 fn expected_values_len(attitude_type: &AttitudeTypeType) -> usize {
     match attitude_type {
-        AttitudeTypeType::Quaternion | AttitudeTypeType::QuaternionUpper => 4,
-        AttitudeTypeType::QuaternionDerivative | AttitudeTypeType::QuaternionDerivativeUpper => 8,
-        AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::QuaternionAngVelUpper => 7,
-        AttitudeTypeType::EulerAngle | AttitudeTypeType::EulerAngleUpper => 3,
-        AttitudeTypeType::EulerAngleDerivative | AttitudeTypeType::EulerAngleDerivativeUpper => 6,
-        AttitudeTypeType::EulerAngleAngVel | AttitudeTypeType::EulerAngleAngVelUpper => 6,
-        AttitudeTypeType::Spin | AttitudeTypeType::SpinUpper => 4,
-        AttitudeTypeType::SpinNutation | AttitudeTypeType::SpinNutationUpper => 7,
-        AttitudeTypeType::SpinNutationMom | AttitudeTypeType::SpinNutationMomUpper => 7,
+        AttitudeTypeType::Quaternion => 4,
+        AttitudeTypeType::QuaternionDerivative => 8,
+        AttitudeTypeType::QuaternionAngVel => 7,
+        AttitudeTypeType::EulerAngle => 3,
+        AttitudeTypeType::EulerAngleDerivative => 6,
+        AttitudeTypeType::EulerAngleAngVel => 6,
+        AttitudeTypeType::Spin => 4,
+        AttitudeTypeType::SpinNutation => 7,
+        AttitudeTypeType::SpinNutationMom => 7,
     }
 }
 
 fn infer_attitude_type_from_values_len(values_len: usize) -> PyResult<AttitudeTypeType> {
     match values_len {
-        3 => Ok(AttitudeTypeType::EulerAngleUpper),
+        3 => Ok(AttitudeTypeType::EulerAngle),
         4 => Err(PyValueError::new_err(
             "Ambiguous 4-column AEM data; specify attitude_type explicitly (QUATERNION or SPIN)",
         )),
@@ -43,7 +43,7 @@ fn infer_attitude_type_from_values_len(values_len: usize) -> PyResult<AttitudeTy
         7 => Err(PyValueError::new_err(
             "Ambiguous 7-column AEM data; specify attitude_type explicitly (QUATERNION/ANGVEL, SPIN/NUTATION, or SPIN/NUTATION_MOM)",
         )),
-        8 => Ok(AttitudeTypeType::QuaternionDerivativeUpper),
+        8 => Ok(AttitudeTypeType::QuaternionDerivative),
         _ => Err(PyValueError::new_err(format!(
             "Unsupported AEM data width {}. Allowed widths are 3, 4, 6, 7, 8",
             values_len
@@ -85,7 +85,7 @@ fn build_state_from_values(
     };
 
     let state = match attitude_type {
-        AttitudeTypeType::Quaternion | AttitudeTypeType::QuaternionUpper => {
+        AttitudeTypeType::Quaternion => {
             AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
                 epoch,
                 quaternion: Quaternion {
@@ -96,7 +96,7 @@ fn build_state_from_values(
                 },
             })
         }
-        AttitudeTypeType::QuaternionDerivative | AttitudeTypeType::QuaternionDerivativeUpper => {
+        AttitudeTypeType::QuaternionDerivative => {
             AemAttitudeState::QuaternionDerivative(QuaternionDerivative {
                 epoch,
                 quaternion: Quaternion {
@@ -125,7 +125,7 @@ fn build_state_from_values(
                 },
             })
         }
-        AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::QuaternionAngVelUpper => {
+        AttitudeTypeType::QuaternionAngVel => {
             AemAttitudeState::QuaternionAngVel(QuaternionAngVel {
                 epoch,
                 quaternion: Quaternion {
@@ -150,24 +150,22 @@ fn build_state_from_values(
                 },
             })
         }
-        AttitudeTypeType::EulerAngle | AttitudeTypeType::EulerAngleUpper => {
-            AemAttitudeState::EulerAngle(EulerAngle {
-                epoch,
-                angle_1: Angle {
-                    value: values[0],
-                    units: None,
-                },
-                angle_2: Angle {
-                    value: values[1],
-                    units: None,
-                },
-                angle_3: Angle {
-                    value: values[2],
-                    units: None,
-                },
-            })
-        }
-        AttitudeTypeType::EulerAngleDerivative | AttitudeTypeType::EulerAngleDerivativeUpper => {
+        AttitudeTypeType::EulerAngle => AemAttitudeState::EulerAngle(EulerAngle {
+            epoch,
+            angle_1: Angle {
+                value: values[0],
+                units: None,
+            },
+            angle_2: Angle {
+                value: values[1],
+                units: None,
+            },
+            angle_3: Angle {
+                value: values[2],
+                units: None,
+            },
+        }),
+        AttitudeTypeType::EulerAngleDerivative => {
             AemAttitudeState::EulerAngleDerivative(EulerAngleDerivative {
                 epoch,
                 angle_1: Angle {
@@ -196,7 +194,7 @@ fn build_state_from_values(
                 },
             })
         }
-        AttitudeTypeType::EulerAngleAngVel | AttitudeTypeType::EulerAngleAngVelUpper => {
+        AttitudeTypeType::EulerAngleAngVel => {
             AemAttitudeState::EulerAngleAngVel(EulerAngleAngVel {
                 epoch,
                 angle_1: Angle {
@@ -225,7 +223,7 @@ fn build_state_from_values(
                 },
             })
         }
-        AttitudeTypeType::Spin | AttitudeTypeType::SpinUpper => AemAttitudeState::Spin(Spin {
+        AttitudeTypeType::Spin => AemAttitudeState::Spin(Spin {
             epoch,
             spin_alpha: Angle {
                 value: values[0],
@@ -244,72 +242,68 @@ fn build_state_from_values(
                 units: None,
             },
         }),
-        AttitudeTypeType::SpinNutation | AttitudeTypeType::SpinNutationUpper => {
-            AemAttitudeState::SpinNutation(SpinNutation {
-                epoch,
-                spin_alpha: Angle {
-                    value: values[0],
-                    units: None,
-                },
-                spin_delta: Angle {
-                    value: values[1],
-                    units: None,
-                },
-                spin_angle: Angle {
-                    value: values[2],
-                    units: None,
-                },
-                spin_angle_vel: AngleRate {
-                    value: values[3],
-                    units: None,
-                },
-                nutation: Angle {
-                    value: values[4],
-                    units: None,
-                },
-                nutation_per: Duration {
-                    value: values[5],
-                    units: None,
-                },
-                nutation_phase: Angle {
-                    value: values[6],
-                    units: None,
-                },
-            })
-        }
-        AttitudeTypeType::SpinNutationMom | AttitudeTypeType::SpinNutationMomUpper => {
-            AemAttitudeState::SpinNutationMom(SpinNutationMom {
-                epoch,
-                spin_alpha: Angle {
-                    value: values[0],
-                    units: None,
-                },
-                spin_delta: Angle {
-                    value: values[1],
-                    units: None,
-                },
-                spin_angle: Angle {
-                    value: values[2],
-                    units: None,
-                },
-                spin_angle_vel: AngleRate {
-                    value: values[3],
-                    units: None,
-                },
-                momentum_alpha: Angle {
-                    value: values[4],
-                    units: None,
-                },
-                momentum_delta: Angle {
-                    value: values[5],
-                    units: None,
-                },
-                nutation_vel: AngleRate {
-                    value: values[6],
-                    units: None,
-                },
-            })
-        }
+        AttitudeTypeType::SpinNutation => AemAttitudeState::SpinNutation(SpinNutation {
+            epoch,
+            spin_alpha: Angle {
+                value: values[0],
+                units: None,
+            },
+            spin_delta: Angle {
+                value: values[1],
+                units: None,
+            },
+            spin_angle: Angle {
+                value: values[2],
+                units: None,
+            },
+            spin_angle_vel: AngleRate {
+                value: values[3],
+                units: None,
+            },
+            nutation: Angle {
+                value: values[4],
+                units: None,
+            },
+            nutation_per: Duration {
+                value: values[5],
+                units: None,
+            },
+            nutation_phase: Angle {
+                value: values[6],
+                units: None,
+            },
+        }),
+        AttitudeTypeType::SpinNutationMom => AemAttitudeState::SpinNutationMom(SpinNutationMom {
+            epoch,
+            spin_alpha: Angle {
+                value: values[0],
+                units: None,
+            },
+            spin_delta: Angle {
+                value: values[1],
+                units: None,
+            },
+            spin_angle: Angle {
+                value: values[2],
+                units: None,
+            },
+            spin_angle_vel: AngleRate {
+                value: values[3],
+                units: None,
+            },
+            momentum_alpha: Angle {
+                value: values[4],
+                units: None,
+            },
+            momentum_delta: Angle {
+                value: values[5],
+                units: None,
+            },
+            nutation_vel: AngleRate {
+                value: values[6],
+                units: None,
+            },
+        }),
     };
 
     Ok(state.into())
@@ -417,26 +411,24 @@ fn values_from_content(
 
 fn attitude_type_from_content(content: &ccsds_ndm::common::AemAttitudeState) -> AttitudeTypeType {
     match content {
-        ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(_) => {
-            AttitudeTypeType::QuaternionUpper
-        }
+        ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(_) => AttitudeTypeType::Quaternion,
         ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(_) => {
-            AttitudeTypeType::QuaternionDerivativeUpper
+            AttitudeTypeType::QuaternionDerivative
         }
         ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(_) => {
-            AttitudeTypeType::QuaternionAngVelUpper
+            AttitudeTypeType::QuaternionAngVel
         }
-        ccsds_ndm::common::AemAttitudeState::EulerAngle(_) => AttitudeTypeType::EulerAngleUpper,
+        ccsds_ndm::common::AemAttitudeState::EulerAngle(_) => AttitudeTypeType::EulerAngle,
         ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(_) => {
-            AttitudeTypeType::EulerAngleDerivativeUpper
+            AttitudeTypeType::EulerAngleDerivative
         }
         ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(_) => {
-            AttitudeTypeType::EulerAngleAngVelUpper
+            AttitudeTypeType::EulerAngleAngVel
         }
-        ccsds_ndm::common::AemAttitudeState::Spin(_) => AttitudeTypeType::SpinUpper,
-        ccsds_ndm::common::AemAttitudeState::SpinNutation(_) => AttitudeTypeType::SpinNutationUpper,
+        ccsds_ndm::common::AemAttitudeState::Spin(_) => AttitudeTypeType::Spin,
+        ccsds_ndm::common::AemAttitudeState::SpinNutation(_) => AttitudeTypeType::SpinNutation,
         ccsds_ndm::common::AemAttitudeState::SpinNutationMom(_) => {
-            AttitudeTypeType::SpinNutationMomUpper
+            AttitudeTypeType::SpinNutationMom
         }
     }
 }

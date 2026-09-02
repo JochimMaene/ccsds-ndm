@@ -375,7 +375,7 @@ class TestAcm:
         kvn_path = tmp_path / "test.acm"
 
         # Test to_file
-        ccsds_ndm.to_file(acm, str(kvn_path), "kvn")
+        acm.to_file(str(kvn_path), "kvn")
         assert kvn_path.exists()
 
         # Test from_file

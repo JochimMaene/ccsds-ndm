@@ -35,7 +35,7 @@ FIELD_MAPPINGS: dict[str, dict[str, str]] = {
     },
     # TDM - Tracking Data Message
     "Tdm": {
-        "segment": "body.segment",
+        "segments": "body.segments",
     },
     # RDM - Re-entry Data Message
     "Rdm": {
@@ -120,6 +120,7 @@ PYTHON_ONLY_FIELDS: dict[str, list[str]] = {
         "attitude_states_epochs",
         "from_numpy",
     ],
+    "TdmObservation": ["keyword", "value", "value_str"],
     # Add other NumPy accessors as needed
 }
 

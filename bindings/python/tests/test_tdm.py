@@ -80,7 +80,7 @@ class TestTdm:
         tdm = self._create_valid_tdm()
         path = tmp_path / "test.tdm"
 
-        ccsds_ndm.to_file(tdm, str(path), "kvn")
+        tdm.to_file(str(path), "kvn")
         assert path.exists()
 
         tdm2 = ccsds_ndm.from_file(str(path), format="kvn")

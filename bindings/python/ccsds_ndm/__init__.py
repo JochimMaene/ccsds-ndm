@@ -118,7 +118,6 @@ from .ccsds_ndm import (
     convert_file,
     from_file,
     from_str,
-    to_file,
 )
 
 __all__ = [
@@ -127,7 +126,6 @@ __all__ = [
     "from_file",
     "convert",
     "convert_file",
-    "to_file",
     "UserDefined",
     "Ndm",
     # Exceptions

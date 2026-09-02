@@ -159,10 +159,9 @@ impl Ndm {
     /// Serialize to a string.
     fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
         let message = MessageType::Ndm(self.to_core(py)?);
-        match format {
-            "kvn" => message.to_kvn(),
-            "xml" => message.to_xml(),
-            other => return Err(crate::api::unsupported_format(other)),
+        match crate::api::notation(format)? {
+            ccsds_ndm::Notation::Kvn => message.to_kvn(),
+            ccsds_ndm::Notation::Xml => message.to_xml(),
         }
         .map_err(crate::errors::ccsds_error_to_pyerr)
     }

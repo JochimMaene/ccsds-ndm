@@ -92,7 +92,7 @@ class TestOmm:
         omm = self._create_valid_omm()
         path = tmp_path / "test.omm"
 
-        ccsds_ndm.to_file(omm, str(path), "kvn")
+        omm.to_file(str(path), "kvn")
         assert path.exists()
 
         omm2 = ccsds_ndm.from_file(str(path), format="kvn")

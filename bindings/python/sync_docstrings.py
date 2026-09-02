@@ -22,6 +22,7 @@ from binding_mappings import (
     PYTHON_ONLY_FIELDS,
     get_rust_path,
     get_rust_struct_name,
+    is_python_helper_class,
 )
 from binding_source import (
     PythonClass,
@@ -259,6 +260,9 @@ def sync_docstrings(
         changes: list[tuple[int, int, str, str, bool]] = []
 
         for class_name, py_class in classes.items():
+            if is_python_helper_class(class_name):
+                continue
+
             # Find matching Rust struct
             rust_struct_name = get_rust_struct_name(class_name)
             rust_struct = rust_structs.get(rust_struct_name)

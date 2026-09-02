@@ -48,11 +48,16 @@ impl_from_message_type!(ccsds_ndm::messages::acm::Acm, Acm);
 impl_from_message_type!(ccsds_ndm::messages::ndm::CombinedNdm, Ndm);
 
 fn selected_notation(format: Option<&str>) -> PyResult<Option<Notation>> {
-    match format {
-        Some("kvn") => Ok(Some(Notation::Kvn)),
-        Some("xml") => Ok(Some(Notation::Xml)),
-        Some(other) => Err(unsupported_format(other)),
-        None => Ok(None),
+    format.map(notation).transpose()
+}
+
+pub fn notation(format: &str) -> PyResult<Notation> {
+    if format.eq_ignore_ascii_case("kvn") {
+        Ok(Notation::Kvn)
+    } else if format.eq_ignore_ascii_case("xml") {
+        Ok(Notation::Xml)
+    } else {
+        Err(unsupported_format(format))
     }
 }
 
@@ -94,22 +99,21 @@ pub fn validate_message<T: Validate>(message: &T) -> PyResult<()> {
 }
 
 pub fn generate_string<T: Ndm>(message: &T, format: &str) -> PyResult<String> {
-    match format {
-        "kvn" => message.to_kvn().map_err(ccsds_error_to_pyerr),
-        "xml" => message.to_xml().map_err(ccsds_error_to_pyerr),
-        other => Err(unsupported_format(other)),
-    }
-}
-
-pub fn generate_file(message: &MessageType, path: &str, format: &str) -> PyResult<()> {
-    match format {
-        "kvn" => message.to_kvn_file(path),
-        "xml" => message.to_xml_file(path),
-        other => return Err(unsupported_format(other)),
+    match notation(format)? {
+        Notation::Kvn => message.to_kvn(),
+        Notation::Xml => message.to_xml(),
     }
     .map_err(ccsds_error_to_pyerr)
 }
 
-pub fn unsupported_format(format: &str) -> PyErr {
+pub fn generate_file(message: &MessageType, path: &str, format: &str) -> PyResult<()> {
+    match notation(format)? {
+        Notation::Kvn => message.to_kvn_file(path),
+        Notation::Xml => message.to_xml_file(path),
+    }
+    .map_err(ccsds_error_to_pyerr)
+}
+
+fn unsupported_format(format: &str) -> PyErr {
     PyValueError::new_err(format!("Unsupported format '{format}'. Use 'kvn' or 'xml'",))
 }
